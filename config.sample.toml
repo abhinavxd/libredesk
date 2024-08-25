@@ -43,6 +43,10 @@ reader_concurrency = 1
 incoming_queue_size = 10000
 outgoing_queue_size = 10000
 
+[root]
+user_email = "admin"
+user_password = "secrate"
+user_name = "Administrator"
 
 [notification]
 [notification.provider]

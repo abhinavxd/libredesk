@@ -71,6 +71,17 @@ func main() {
 	// Init DB.
 	db := initDB()
 
+	fs := initFS()
+
+	// Installer mode? This runs before the SQL queries are loaded and prepared
+	// as the installer needs to work on an empty DB.
+	if ko.Bool("install") {
+		if err := initInstall(db, fs); err != nil {
+			log.Fatalf("error running install: %v", err)
+		}
+		os.Exit(0)
+	}
+
 	// Load app settings into Koanf.
 	setting := initSettingsManager(db)
 	loadSettings(setting)
@@ -79,7 +90,6 @@ func main() {
 		shutdownCh   = make(chan struct{})
 		ctx, stop    = signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		wsHub        = ws.NewHub()
-		fs           = initFS()
 		i18n         = initI18n(fs)
 		lo           = initLogger("artemis")
 		rdb          = initRedis()

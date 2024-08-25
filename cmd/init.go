@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/abhinavxd/artemis/internal/auth"
 	"github.com/abhinavxd/artemis/internal/autoassigner"
@@ -44,6 +45,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	flag "github.com/spf13/pflag"
 	"github.com/zerodha/logf"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // constants holds the app constants.
@@ -80,6 +82,7 @@ func initFlags() {
 	f.StringSlice("config", []string{"config.toml"},
 		"path to one or more config files (will be merged in order)")
 	f.Bool("version", false, "show current version of the build")
+	f.Bool("install", false, "setup database (first time)")
 
 	if err := f.Parse(os.Args[1:]); err != nil {
 		log.Fatalf("loading flags: %v", err)
@@ -88,6 +91,49 @@ func initFlags() {
 	if err := ko.Load(posflag.Provider(f, ".", ko), nil); err != nil {
 		log.Fatalf("loading config: %v", err)
 	}
+}
+
+func initInstall(db *sqlx.DB, fs stuffbin.FileSystem) error {
+	fmt.Println("** first time installation **")
+
+	// Get user consent to wipe db if already exists 
+	if _, err := db.Exec("SELECT count(*) FROM public.settings"); err == nil { 
+		fmt.Printf("** IMPORTANT: This will wipe existing listmonk tables and types in the DB '%s' **", ko.String("db.database"))
+	
+		fmt.Print("continue (y/N)? ")
+		var ok string
+		if _, err := fmt.Scanf("%s", &ok); err != nil {
+			log.Fatalf("error reading value from terminal: %v", err)
+		}
+		if strings.EqualFold(ok,"y") {
+			return fmt.Errorf("install cancelled")
+		}
+	}
+
+	// Install schema.sql
+	q, err := fs.Read("/schema.sql")
+	if err != nil {
+		return err
+	}
+	if _, err := db.Exec(string(q)); err != nil {
+		return err
+	}
+
+	// Create admin user
+	password, err := bcrypt.GenerateFromPassword([]byte(ko.MustString("root.user_password")), 12)
+	if err != nil {
+		return fmt.Errorf("error creating user, failed to generate password : %v ", err)
+	}
+
+	query := "INSERT INTO users (email, \"uuid\", first_name, last_name, \"password\", roles) VALUES($1, $2, $3, $4, $5, $6) RETURNING id"
+	var userId int
+	if err := db.QueryRow(query, ko.MustString("root.user_email"), user.SystemUserUUID, ko.MustString("root.user_name"), "", password, "{Admin,Agent}").Scan(&userId); err != nil {
+		return fmt.Errorf("error creating user : %v ", err)
+	}
+
+	fmt.Println("Root user created - installation complete.")
+
+	return nil
 }
 
 func initConstants() constants {
@@ -104,6 +150,7 @@ func initFS() stuffbin.FileSystem {
 	var files = []string{
 		"frontend/dist",
 		"i18n",
+		"schema.sql",
 	}
 
 	// Get self executable path.
