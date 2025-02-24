@@ -487,8 +487,9 @@
 <h2 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h2>
 <p>The latest image is available on DockerHub at <code>libredesk/llibredeskistmonk:latest</code></p>
 <p>The recommended method is to download the <a href="https://github.com/abhinavxd/libredesk/blob/master/docker-compose.yml">docker-compose.yml</a> file, customize it for your environment and then to simply run <code>docker compose up -d</code>.</p>
-<div class="codehilite"><pre><span></span><code><span class="c1"># Download the compose file to the current directory.</span>
-curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/abhinavxd/libredesk/raw/master/docker-compose.yml
+<div class="codehilite"><pre><span></span><code><span class="c1"># Download the compose file and the sample config file in the current directory.</span>
+curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/abhinavxd/libredesk/raw/main/docker-compose.yml
+curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/abhinavxd/libredesk/raw/main/config.sample.toml
 
 <span class="c1"># Copy the config.sample.toml to config.toml and edit it as needed.</span>
 cp<span class="w"> </span>config.sample.toml<span class="w"> </span>config.toml
