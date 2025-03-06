@@ -343,6 +343,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#nginx" class="md-nav__link">
+    <span class="md-ellipsis">
+      Nginx
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -455,6 +464,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#nginx" class="md-nav__link">
+    <span class="md-ellipsis">
+      Nginx
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -502,7 +520,6 @@ docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </spa
 </code></pre></div>
 
 <p>Go to <code>http://localhost:9000</code> and login with the email <code>System</code> and the password you set using the <code>--set-system-user-password</code> command.</p>
-<hr />
 <h2 id="compiling-from-source">Compiling from source<a class="headerlink" href="#compiling-from-source" title="Permanent link">&para;</a></h2>
 <p>To compile the latest unreleased version (<code>main</code> branch):</p>
 <ol>
@@ -510,6 +527,17 @@ docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </spa
 <li><code>git clone git@github.com:abhinavxd/libredesk.git</code></li>
 <li><code>cd libredesk &amp;&amp; make</code>. This will generate the <code>libredesk</code> binary.</li>
 </ol>
+<h2 id="nginx">Nginx<a class="headerlink" href="#nginx" title="Permanent link">&para;</a></h2>
+<p>Libredesk using websockets for real-time updates. If you are using Nginx, you need to add the following (or similar) configuration to your Nginx configuration file.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://localhost:9000</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">proxy_http_version</span><span class="w"> </span><span class="mi">1</span><span class="s">.1</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Upgrade</span><span class="w"> </span><span class="nv">$http_upgrade</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Connection</span><span class="w"> </span><span class="s">&#39;upgrade&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Host</span><span class="w"> </span><span class="nv">$host</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">proxy_cache_bypass</span><span class="w"> </span><span class="nv">$http_upgrade</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
 
 
 
