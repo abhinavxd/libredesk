@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: libredesk
+          POSTGRES_PASSWORD: libredesk
+          POSTGRES_DB: libredesk
+        options: >-
+          --health-cmd="pg_isready -U libredesk"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.22.3"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install cypress deps
+        run: sudo apt-get update && sudo apt-get install -y libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2 libxtst6 xauth xvfb
+
+      - name: Build binary and frontend
+        run: make build
+
+      - name: Configure app
+        run: |
+          cp config.sample.toml config.toml
+
+      - name: Install db schema and run tests
+        env:
+          LIBREDESK_SYSTEM_USER_PASSWORD: "StrongPass!123"
+        run: |
+          ./libredesk --install --idempotent-install --yes --config ./config.toml
+          ./libredesk --upgrade --yes --config ./config.toml
+          ./libredesk --config ./config.toml &
+          sleep 10
+          cd frontend
+          pnpm run test:e2e:ci
