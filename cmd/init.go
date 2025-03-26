@@ -606,7 +606,8 @@ func initAuth(o *oidc.Manager, rd *redis.Client) *auth_.Auth {
 		log.Fatalf("error initializing auth: %v", err)
 	}
 
-	auth, err := auth_.New(auth_.Config{Providers: providers}, rd, lo)
+	secure := !ko.Bool("app.server.disable_secure_cookies")
+	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure}, rd, lo)
 	if err != nil {
 		log.Fatalf("error initializing auth: %v", err)
 	}

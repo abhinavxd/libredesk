@@ -8,6 +8,9 @@ check_updates = true
 [app.server]
 address = "0.0.0.0:9000"
 socket = ""
+# Do NOT disable secure cookies in production environment if you don't know
+# exactly what you're doing!
+disable_secure_cookies = false
 read_timeout = "5s"
 write_timeout = "5s"
 max_body_size = 500000000

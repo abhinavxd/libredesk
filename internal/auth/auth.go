@@ -46,7 +46,8 @@ type Provider struct {
 
 // Config stores multiple OIDC provider configurations
 type Config struct {
-	Providers []Provider
+	Providers     []Provider
+	SecureCookies bool
 }
 
 // Auth is the auth service it manages OIDC authentication and sessions
@@ -92,7 +93,7 @@ func New(cfg Config, rd *redis.Client, logger *logf.Logger) (*Auth, error) {
 		Cookie: simplesessions.CookieOptions{
 			Name:       "libredesk_session",
 			IsHTTPOnly: true,
-			IsSecure:   true,
+			IsSecure:   cfg.SecureCookies,
 			MaxAge:     time.Hour * 9,
 		},
 	})
@@ -282,7 +283,7 @@ func (a *Auth) SetCSRFCookie(r *fastglue.Request) error {
 		csrfCookie.SetKey("csrf_token")
 		csrfCookie.SetValue(token)
 		csrfCookie.SetPath("/")
-		csrfCookie.SetSecure(true)
+		csrfCookie.SetSecure(a.cfg.SecureCookies)
 		csrfCookie.SetHTTPOnly(false)
 		r.RequestCtx.Response.Header.SetCookie(&csrfCookie)
 		return nil
