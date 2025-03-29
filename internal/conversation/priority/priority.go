@@ -8,6 +8,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
+	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
 
@@ -18,14 +19,16 @@ var (
 
 // Manager handles changes to priorities.
 type Manager struct {
-	q  queries
-	lo *logf.Logger
+	q    queries
+	lo   *logf.Logger
+	i18n *i18n.I18n
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB   *sqlx.DB
+	Lo   *logf.Logger
+	I18n *i18n.I18n
 }
 
 // queries contains prepared SQL queries.
@@ -41,8 +44,9 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		q:  q,
-		lo: opts.Lo,
+		q:    q,
+		lo:   opts.Lo,
+		i18n: opts.I18n,
 	}, nil
 }
 
@@ -51,7 +55,7 @@ func (m *Manager) GetAll() ([]models.Priority, error) {
 	var priorities = make([]models.Priority, 0)
 	if err := m.q.GetAll.Select(&priorities); err != nil {
 		m.lo.Error("error fetching priorities", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching priorities", nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.entities.priority")), nil)
 	}
 	return priorities, nil
 }
@@ -61,7 +65,7 @@ func (m *Manager) Get(id int) (models.Priority, error) {
 	var priority models.Priority
 	if err := m.q.Get.Get(&priority, id); err != nil {
 		m.lo.Error("error fetching priority", "error", err)
-		return priority, envelope.NewError(envelope.GeneralError, "Error fetching priority", nil)
+		return priority, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.S("globals.entities.priority")), nil)
 	}
 	return priority, nil
 }

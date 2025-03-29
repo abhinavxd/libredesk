@@ -12,7 +12,7 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// handleGetGeneralSettings fetches general settings.
+// handleGetGeneralSettings fetches general settings, this endpoint is not behind auth as it has no sensitive data and is required for the app to function.
 func handleGetGeneralSettings(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
@@ -25,7 +25,7 @@ func handleGetGeneralSettings(r *fastglue.Request) error {
 	var settings map[string]interface{}
 	if err := json.Unmarshal(out, &settings); err != nil {
 		app.lo.Error("error unmarshalling settings", "err", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, "Error fetching settings", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", app.i18n.T("globals.entities.setting")), nil))
 	}
 	// Set the app.update to the settings, adding `app` prefix to the key to match the settings structure in db.
 	settings["app.update"] = app.update
@@ -42,7 +42,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Bad request", nil, "")
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("app.badRequest"), nil, envelope.InputError)
 	}
 
 	// Remove any trailing slash `/` from the root url.
@@ -53,12 +53,12 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	}
 	// Reload the settings and templates.
 	if err := reloadSettings(app); err != nil {
-		return envelope.NewError(envelope.GeneralError, "Could not reload settings, Please restart the app.", nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("app.couldNotReload", "name", app.i18n.T("globals.entities.setting")), nil)
 	}
 	if err := reloadTemplates(app); err != nil {
-		return envelope.NewError(envelope.GeneralError, "Could not reload settings, Please restart the app.", nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("app.couldNotReload", "name", app.i18n.T("globals.entities.setting")), nil)
 	}
-	return r.SendEnvelope("Settings updated successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleGetEmailNotificationSettings fetches email notification settings.
@@ -75,7 +75,7 @@ func handleGetEmailNotificationSettings(r *fastglue.Request) error {
 
 	// Unmarshal and filter out password.
 	if err := json.Unmarshal(out, &notif); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, "Error fetching settings", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", app.i18n.T("globals.entities.setting")), nil))
 	}
 	if notif.Password != "" {
 		notif.Password = strings.Repeat(stringutil.PasswordDummy, 10)
@@ -92,7 +92,7 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Bad request", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("app.badRequest"), nil, envelope.InputError)
 	}
 
 	out, err := app.setting.GetByPrefix("notification.email")
@@ -101,12 +101,12 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	}
 
 	if err := json.Unmarshal(out, &cur); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, "Error updating settings", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorUpdating", "name", app.i18n.T("globals.entities.setting")), nil))
 	}
 
 	// Make sure it's a valid from email address.
 	if _, err := mail.ParseAddress(req.EmailAddress); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid from email address format, make sure it's a valid email address in the format `Name <mail@example.com>`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("email.invalidFromAddress"), nil, envelope.InputError)
 	}
 
 	if req.Password == "" {
@@ -118,5 +118,5 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	}
 
 	// No reload implemented, so user has to restart the app.
-	return r.SendEnvelope("Settings updated successfully, Please restart the app for changes to take effect.")
+	return r.SendEnvelope(true)
 }

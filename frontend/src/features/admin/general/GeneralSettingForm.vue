@@ -22,6 +22,7 @@
             <SelectContent>
               <SelectGroup>
                 <SelectItem value="en"> English </SelectItem>
+                <SelectItem value="es"> Spanish </SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>

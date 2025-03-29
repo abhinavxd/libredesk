@@ -41,7 +41,7 @@ func handleGetOIDC(r *fastglue.Request) error {
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid OIDC `id`", nil, envelope.InputError)
+			app.i18n.Ts("globals.messages.invalid", "name", "OIDC `id`"), nil, envelope.InputError)
 	}
 	o, err := app.oidc.Get(id, false)
 	if err != nil {
@@ -59,7 +59,7 @@ func handleTestOIDC(r *fastglue.Request) error {
 	if err := app.auth.TestProvider(providerURL); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("OIDC provider discovered successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleCreateOIDC creates a new OIDC record.
@@ -69,7 +69,7 @@ func handleCreateOIDC(r *fastglue.Request) error {
 		req = models.OIDC{}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Bad request", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.GeneralError)
 	}
 
 	if err := app.oidc.Create(req); err != nil {
@@ -78,7 +78,7 @@ func handleCreateOIDC(r *fastglue.Request) error {
 
 	// Reload the auth manager to update the OIDC providers.
 	if err := reloadAuth(app); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.couldNotReload", "name", "OIDC"), nil, envelope.GeneralError)
 	}
 	return r.SendEnvelope("OIDC created successfully")
 }
@@ -91,12 +91,11 @@ func handleUpdateOIDC(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid oidc `id`.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "OIDC `id`"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Bad request", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.GeneralError)
 	}
 
 	if err = app.oidc.Update(id, req); err != nil {
@@ -105,9 +104,9 @@ func handleUpdateOIDC(r *fastglue.Request) error {
 
 	// Reload the auth manager to update the OIDC providers.
 	if err := reloadAuth(app); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.couldNotReload", "name", "OIDC"), nil, envelope.GeneralError)
 	}
-	return r.SendEnvelope("OIDC updated successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleDeleteOIDC deletes an OIDC record.
@@ -115,11 +114,10 @@ func handleDeleteOIDC(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid oidc `id`.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "OIDC `id`"), nil, envelope.InputError)
 	}
 	if err = app.oidc.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("OIDC deleted successfully")
+	return r.SendEnvelope(true)
 }

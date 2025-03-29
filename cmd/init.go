@@ -231,11 +231,12 @@ func initConversations(
 }
 
 // initTag inits tag manager.
-func initTag(db *sqlx.DB) *tag.Manager {
+func initTag(db *sqlx.DB, i18n *i18n.I18n) *tag.Manager {
 	var lo = initLogger("tag_manager")
 	mgr, err := tag.New(tag.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing tags: %v", err)
@@ -257,11 +258,12 @@ func initView(db *sqlx.DB) *view.Manager {
 }
 
 // initMacro inits macro manager.
-func initMacro(db *sqlx.DB) *macro.Manager {
+func initMacro(db *sqlx.DB, i18n *i18n.I18n) *macro.Manager {
 	var lo = initLogger("macro")
 	m, err := macro.New(macro.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing macro manager: %v", err)
@@ -270,11 +272,12 @@ func initMacro(db *sqlx.DB) *macro.Manager {
 }
 
 // initBusinessHours inits business hours manager.
-func initBusinessHours(db *sqlx.DB) *businesshours.Manager {
+func initBusinessHours(db *sqlx.DB, i18n *i18n.I18n) *businesshours.Manager {
 	var lo = initLogger("business-hours")
 	m, err := businesshours.New(businesshours.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing business hours manager: %v", err)
@@ -283,11 +286,12 @@ func initBusinessHours(db *sqlx.DB) *businesshours.Manager {
 }
 
 // initSLA inits SLA manager.
-func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, businessHours *businesshours.Manager, notifier *notifier.Service, template *tmpl.Manager, userManager *user.Manager) *sla.Manager {
+func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, businessHours *businesshours.Manager, notifier *notifier.Service, template *tmpl.Manager, userManager *user.Manager, i18n *i18n.I18n) *sla.Manager {
 	var lo = initLogger("sla")
 	m, err := sla.New(sla.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	}, teamManager, settings, businessHours, notifier, template, userManager)
 	if err != nil {
 		log.Fatalf("error initializing SLA manager: %v", err)
@@ -296,11 +300,12 @@ func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, 
 }
 
 // initCSAT inits CSAT manager.
-func initCSAT(db *sqlx.DB) *csat.Manager {
+func initCSAT(db *sqlx.DB, i18n *i18n.I18n) *csat.Manager {
 	var lo = initLogger("csat")
 	m, err := csat.New(csat.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing CSAT manager: %v", err)
@@ -314,7 +319,7 @@ func initWS(user *user.Manager) *ws.Hub {
 }
 
 // initTemplates inits template manager.
-func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants) *tmpl.Manager {
+func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *i18n.I18n) *tmpl.Manager {
 	var (
 		lo      = initLogger("template")
 		funcMap = getTmplFuncs(consts)
@@ -327,7 +332,7 @@ func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants) *tmpl.
 	if err != nil {
 		log.Fatalf("error parsing web templates: %v", err)
 	}
-	m, err := tmpl.New(lo, db, webTpls, tpls, funcMap)
+	m, err := tmpl.New(lo, db, webTpls, tpls, funcMap, i18n)
 	if err != nil {
 		log.Fatalf("error initializing template manager: %v", err)
 	}
@@ -398,11 +403,12 @@ func reloadTemplates(app *App) error {
 }
 
 // initTeam inits team manager.
-func initTeam(db *sqlx.DB) *team.Manager {
+func initTeam(db *sqlx.DB, i18n *i18n.I18n) *team.Manager {
 	var lo = initLogger("team-manager")
 	mgr, err := team.New(team.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing team manager: %v", err)
@@ -411,7 +417,7 @@ func initTeam(db *sqlx.DB) *team.Manager {
 }
 
 // initMedia inits media manager.
-func initMedia(db *sqlx.DB) *media.Manager {
+func initMedia(db *sqlx.DB, i18n *i18n.I18n) *media.Manager {
 	var (
 		store      media.Store
 		err        error
@@ -452,6 +458,7 @@ func initMedia(db *sqlx.DB) *media.Manager {
 		Store: store,
 		Lo:    lo,
 		DB:    db,
+		I18n:  i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)
@@ -460,9 +467,9 @@ func initMedia(db *sqlx.DB) *media.Manager {
 }
 
 // initInbox initializes the inbox manager without registering inboxes.
-func initInbox(db *sqlx.DB) *inbox.Manager {
+func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 	var lo = initLogger("inbox-manager")
-	mgr, err := inbox.New(lo, db)
+	mgr, err := inbox.New(lo, db, i18n)
 	if err != nil {
 		log.Fatalf("error initializing inbox manager: %v", err)
 	}
@@ -470,11 +477,12 @@ func initInbox(db *sqlx.DB) *inbox.Manager {
 }
 
 // initAutomationEngine initializes the automation engine.
-func initAutomationEngine(db *sqlx.DB) *automation.Engine {
+func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n) *automation.Engine {
 	var lo = initLogger("automation_engine")
 	engine, err := automation.New(automation.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing automation engine: %v", err)
@@ -589,8 +597,8 @@ func startInboxes(ctx context.Context, mgr *inbox.Manager, store inbox.MessageSt
 }
 
 // initAuthz initializes authorization enforcer.
-func initAuthz() *authz.Enforcer {
-	enforcer, err := authz.NewEnforcer(initLogger("authz"))
+func initAuthz(i18n *i18n.I18n) *authz.Enforcer {
+	enforcer, err := authz.NewEnforcer(initLogger("authz"), i18n)
 	if err != nil {
 		log.Fatalf("error initializing authz: %v", err)
 	}
@@ -598,7 +606,7 @@ func initAuthz() *authz.Enforcer {
 }
 
 // initAuth initializes the authentication manager.
-func initAuth(o *oidc.Manager, rd *redis.Client) *auth_.Auth {
+func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n) *auth_.Auth {
 	lo := initLogger("auth")
 
 	providers, err := buildProviders(o)
@@ -606,7 +614,7 @@ func initAuth(o *oidc.Manager, rd *redis.Client) *auth_.Auth {
 		log.Fatalf("error initializing auth: %v", err)
 	}
 
-	auth, err := auth_.New(auth_.Config{Providers: providers}, rd, lo)
+	auth, err := auth_.New(auth_.Config{Providers: providers, I18n: i18n}, rd, lo)
 	if err != nil {
 		log.Fatalf("error initializing auth: %v", err)
 	}
@@ -653,11 +661,12 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 }
 
 // initOIDC initializes open id connect config manager.
-func initOIDC(db *sqlx.DB, settings *setting.Manager) *oidc.Manager {
+func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Manager {
 	lo := initLogger("oidc")
 	o, err := oidc.New(oidc.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	}, settings)
 	if err != nil {
 		log.Fatalf("error initializing oidc: %v", err)
@@ -669,7 +678,7 @@ func initOIDC(db *sqlx.DB, settings *setting.Manager) *oidc.Manager {
 func initI18n(fs stuffbin.FileSystem) *i18n.I18n {
 	file, err := fs.Get("i18n/" + cmp.Or(ko.String("app.lang"), defLang) + ".json")
 	if err != nil {
-		log.Fatalf("error reading i18n language file")
+		log.Fatalf("error reading i18n language file: %v", err)
 	}
 	i18n, err := i18n.New(file.ReadBytes())
 	if err != nil {
@@ -713,11 +722,12 @@ func initDB() *sqlx.DB {
 }
 
 // initRedis inits role manager.
-func initRole(db *sqlx.DB) *role.Manager {
+func initRole(db *sqlx.DB, i18n *i18n.I18n) *role.Manager {
 	var lo = initLogger("role_manager")
 	r, err := role.New(role.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing role manager: %v", err)
@@ -726,10 +736,11 @@ func initRole(db *sqlx.DB) *role.Manager {
 }
 
 // initStatus inits conversation status manager.
-func initStatus(db *sqlx.DB) *status.Manager {
+func initStatus(db *sqlx.DB, i18n *i18n.I18n) *status.Manager {
 	manager, err := status.New(status.Opts{
-		DB: db,
-		Lo: initLogger("status-manager"),
+		DB:   db,
+		Lo:   initLogger("status-manager"),
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing status manager: %v", err)
@@ -738,10 +749,11 @@ func initStatus(db *sqlx.DB) *status.Manager {
 }
 
 // initPriority inits conversation priority manager.
-func initPriority(db *sqlx.DB) *priority.Manager {
+func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 	manager, err := priority.New(priority.Opts{
-		DB: db,
-		Lo: initLogger("priority-manager"),
+		DB:   db,
+		Lo:   initLogger("priority-manager"),
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing priority manager: %v", err)
@@ -750,11 +762,12 @@ func initPriority(db *sqlx.DB) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(db *sqlx.DB) *ai.Manager {
+func initAI(db *sqlx.DB, i18n *i18n.I18n) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)
@@ -763,11 +776,12 @@ func initAI(db *sqlx.DB) *ai.Manager {
 }
 
 // initSearch inits search manager.
-func initSearch(db *sqlx.DB) *search.Manager {
+func initSearch(db *sqlx.DB, i18n *i18n.I18n) *search.Manager {
 	lo := initLogger("search")
 	m, err := search.New(search.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing search manager: %v", err)

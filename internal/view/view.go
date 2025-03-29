@@ -9,6 +9,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/view/models"
 	"github.com/jmoiron/sqlx"
+	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
 
@@ -19,14 +20,16 @@ var (
 
 // Manager manages views.
 type Manager struct {
-	q  queries
-	lo *logf.Logger
+	q    queries
+	lo   *logf.Logger
+	i18n *i18n.I18n
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB   *sqlx.DB
+	Lo   *logf.Logger
+	I18n *i18n.I18n
 }
 
 // queries contains prepared SQL queries.
@@ -45,8 +48,9 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		q:  q,
-		lo: opts.Lo,
+		q:    q,
+		lo:   opts.Lo,
+		i18n: opts.I18n,
 	}, nil
 }
 
@@ -55,20 +59,20 @@ func (v *Manager) Get(id int) (models.View, error) {
 	var view = models.View{}
 	if err := v.q.GetView.Get(&view, id); err != nil {
 		if err == sql.ErrNoRows {
-			return view, envelope.NewError(envelope.NotFoundError, "View not found", nil)
+			return view, envelope.NewError(envelope.NotFoundError, v.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.view}"), nil)
 		}
 		v.lo.Error("error fetching view", "error", err)
-		return view, envelope.NewError(envelope.GeneralError, "Error fetching view", nil)
+		return view, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.view}"), nil)
 	}
 	return view, nil
 }
 
 // GetUsersViews returns all views for a user.
 func (v *Manager) GetUsersViews(userID int) ([]models.View, error) {
-	views := []models.View{}
+	views := make([]models.View, 0)
 	if err := v.q.GetUserViews.Select(&views, userID); err != nil {
 		v.lo.Error("error fetching views", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching views", nil)
+		return nil, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.view}"), nil)
 	}
 	return views, nil
 }
@@ -77,7 +81,7 @@ func (v *Manager) GetUsersViews(userID int) ([]models.View, error) {
 func (v *Manager) Create(name string, filter []byte, userID int) error {
 	if _, err := v.q.InsertView.Exec(name, filter, userID); err != nil {
 		v.lo.Error("error inserting view", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error creating view", nil)
+		return envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.view}"), nil)
 	}
 	return nil
 }
@@ -86,7 +90,7 @@ func (v *Manager) Create(name string, filter []byte, userID int) error {
 func (v *Manager) Update(id int, name string, filter []byte) error {
 	if _, err := v.q.UpdateView.Exec(id, name, filter); err != nil {
 		v.lo.Error("error updating view", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating view", nil)
+		return envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.view}"), nil)
 	}
 	return nil
 }
@@ -95,7 +99,7 @@ func (v *Manager) Update(id int, name string, filter []byte) error {
 func (v *Manager) Delete(id int) error {
 	if _, err := v.q.DeleteView.Exec(id); err != nil {
 		v.lo.Error("error deleting view", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error deleting view", nil)
+		return envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.view}"), nil)
 	}
 	return nil
 }

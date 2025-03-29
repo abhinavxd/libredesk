@@ -12,6 +12,7 @@ import (
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
+	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
 
@@ -19,6 +20,7 @@ import (
 type Enforcer struct {
 	enforcer *casbin.SyncedEnforcer
 	lo       *logf.Logger
+	i18n     *i18n.I18n
 }
 
 const casbinModel = `
@@ -36,7 +38,7 @@ const casbinModel = `
 `
 
 // NewEnforcer initializes a new Enforcer with the hardcoded model
-func NewEnforcer(lo *logf.Logger) (*Enforcer, error) {
+func NewEnforcer(lo *logf.Logger, i18n *i18n.I18n) (*Enforcer, error) {
 	m, err := model.NewModelFromString(casbinModel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Casbin model: %v", err)
@@ -46,7 +48,7 @@ func NewEnforcer(lo *logf.Logger) (*Enforcer, error) {
 		return nil, fmt.Errorf("failed to create Casbin enforcer: %v", err)
 	}
 
-	return &Enforcer{enforcer: e, lo: lo}, nil
+	return &Enforcer{enforcer: e, lo: lo, i18n: i18n}, nil
 }
 
 // LoadPermissions syncs user permissions with Casbin enforcer by removing existing
@@ -100,7 +102,7 @@ func (e *Enforcer) EnforceConversationAccess(user umodels.User, conversation cmo
 		allowed, err := e.Enforce(user, "conversations", action)
 		if err != nil {
 			e.lo.Error("error enforcing permission", "user_id", user.ID, "conversation_id", conversation.ID, "error", err)
-			return false, envelope.NewError(envelope.GeneralError, "Error checking permissions", nil)
+			return false, envelope.NewError(envelope.GeneralError, e.i18n.Ts("globals.messages.errorChecking", "name", "{globals.entities.permission}"), nil)
 		}
 		if !allowed {
 			e.lo.Debug("permission denied", "user_id", user.ID, "action", action, "conversation_id", conversation.ID)
@@ -147,10 +149,11 @@ func (e *Enforcer) EnforceMediaAccess(user umodels.User, model string) (bool, er
 	case "messages":
 		allowed, err := e.Enforce(user, model, "read")
 		if err != nil {
-			return false, envelope.NewError(envelope.GeneralError, "Error checking permissions", nil)
+			e.lo.Error("error enforcing permission", "user_id", user.ID, "model", model, "error", err)
+			return false, envelope.NewError(envelope.GeneralError, e.i18n.Ts("globals.messages.errorChecking", "name", "{globals.entities.permission}"), nil)
 		}
 		if !allowed {
-			return false, envelope.NewError(envelope.UnauthorizedError, "Permission denied", nil)
+			return false, envelope.NewError(envelope.UnauthorizedError, e.i18n.T("authz.permissionDenied"), nil)
 		}
 	default:
 		return true, nil

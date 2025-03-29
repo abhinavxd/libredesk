@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/setting/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
+	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
 
@@ -21,14 +22,16 @@ var (
 
 // Manager handles setting-related operations.
 type Manager struct {
-	q  queries
-	lo *logf.Logger
+	q    queries
+	lo   *logf.Logger
+	i18n *i18n.I18n
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB   *sqlx.DB
+	Lo   *logf.Logger
+	I18n *i18n.I18n
 }
 
 // queries contains prepared SQL queries.
@@ -48,8 +51,9 @@ func New(opts Opts) (*Manager, error) {
 	}
 
 	return &Manager{
-		q:  q,
-		lo: opts.Lo,
+		q:    q,
+		lo:   opts.Lo,
+		i18n: opts.I18n,
 	}, nil
 }
 
@@ -87,12 +91,20 @@ func (m *Manager) Update(s interface{}) error {
 	b, err := json.Marshal(s)
 	if err != nil {
 		m.lo.Error("error marshalling settings", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating settings", nil)
+		return envelope.NewError(
+			envelope.GeneralError,
+			m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.setting}"),
+			nil,
+		)
 	}
 	// Update the settings in the DB.
 	if _, err := m.q.Update.Exec(b); err != nil {
 		m.lo.Error("error updating settings", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating settings", nil)
+		return envelope.NewError(
+			envelope.GeneralError,
+			m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.setting}"),
+			nil,
+		)
 	}
 	return nil
 }
@@ -102,7 +114,11 @@ func (m *Manager) GetByPrefix(prefix string) (types.JSONText, error) {
 	var b types.JSONText
 	if err := m.q.GetByPrefix.Get(&b, prefix+"%"); err != nil {
 		m.lo.Error("error fetching settings", "prefix", prefix, "error", err)
-		return b, envelope.NewError(envelope.GeneralError, "Error fetching settings", nil)
+		return b, envelope.NewError(
+			envelope.GeneralError,
+			m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.setting}"),
+			nil,
+		)
 	}
 	return b, nil
 }
@@ -112,7 +128,11 @@ func (m *Manager) Get(key string) (types.JSONText, error) {
 	var b types.JSONText
 	if err := m.q.Get.Get(&b, key); err != nil {
 		m.lo.Error("error fetching setting", "key", key, "error", err)
-		return b, envelope.NewError(envelope.GeneralError, "Error fetching setting", nil)
+		return b, envelope.NewError(
+			envelope.GeneralError,
+			m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.setting}"),
+			nil,
+		)
 	}
 	return b, nil
 }
@@ -122,7 +142,11 @@ func (m *Manager) GetAppRootURL() (string, error) {
 	rootURL, err := m.Get("app.root_url")
 	if err != nil {
 		m.lo.Error("error fetching root URL", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, "Error fetching app root URL", nil)
+		return "", envelope.NewError(
+			envelope.GeneralError,
+			m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.appRootURL}"),
+			nil,
+		)
 	}
 	return strings.Trim(string(rootURL), "\""), nil
 }

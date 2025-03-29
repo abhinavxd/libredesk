@@ -245,10 +245,10 @@ func (c *Manager) GetConversation(id int, uuid string) (models.Conversation, err
 	var conversation models.Conversation
 	if err := c.q.GetConversation.Get(&conversation, id, uuid); err != nil {
 		if err == sql.ErrNoRows {
-			return conversation, envelope.NewError(envelope.InputError, "Conversation not found", nil)
+			return conversation, envelope.NewError(envelope.InputError, c.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.conversation}"), nil)
 		}
 		c.lo.Error("error fetching conversation", "error", err)
-		return conversation, envelope.NewError(envelope.GeneralError, "Error fetching conversation", nil)
+		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversation}"), nil)
 	}
 	return conversation, nil
 }
@@ -258,7 +258,7 @@ func (c *Manager) GetContactConversations(contactID int) ([]models.Conversation,
 	var conversations = make([]models.Conversation, 0)
 	if err := c.q.GetContactConversations.Select(&conversations, contactID); err != nil {
 		c.lo.Error("error fetching conversations", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, "Error fetching conversations", nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversation}"), nil)
 	}
 	return conversations, nil
 }
@@ -277,7 +277,7 @@ func (c *Manager) GetConversationsCreatedAfter(time time.Time) ([]models.Convers
 func (c *Manager) UpdateConversationAssigneeLastSeen(uuid string) error {
 	if _, err := c.q.UpdateConversationAssigneeLastSeen.Exec(uuid); err != nil {
 		c.lo.Error("error updating conversation", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating assignee last seen", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 
 	// Broadcast the property update to all subscribers.
@@ -290,7 +290,7 @@ func (c *Manager) GetConversationParticipants(uuid string) ([]models.Conversatio
 	conv := make([]models.ConversationParticipant, 0)
 	if err := c.q.GetConversationParticipants.Select(&conv, uuid); err != nil {
 		c.lo.Error("error fetching conversation", "error", err)
-		return conv, envelope.NewError(envelope.GeneralError, "Error fetching conversation participants", nil)
+		return conv, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversation}"), nil)
 	}
 	return conv, nil
 }
@@ -352,19 +352,19 @@ func (c *Manager) GetConversations(userID int, teamIDs []int, listTypes []string
 	query, qArgs, err := c.makeConversationsListQuery(userID, teamIDs, listTypes, c.q.GetConversations, order, orderBy, page, pageSize, filters)
 	if err != nil {
 		c.lo.Error("error making conversations query", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversations}"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversation}"), nil)
 	}
 
 	tx, err := c.db.BeginTxx(context.Background(), nil)
 	defer tx.Rollback()
 	if err != nil {
 		c.lo.Error("error preparing get conversations query", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversations}"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversation}"), nil)
 	}
 
 	if err := tx.Select(&conversations, query, qArgs...); err != nil {
 		c.lo.Error("error fetching conversations", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversations}"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversation}"), nil)
 	}
 	return conversations, nil
 }
@@ -374,7 +374,7 @@ func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User
 	rows, err := c.q.ReOpenConversation.Exec(conversationUUID)
 	if err != nil {
 		c.lo.Error("error reopening conversation", "uuid", conversationUUID, "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error reopening conversation", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 
 	// Record the status change as an activity if the conversation was reopened.
@@ -396,7 +396,7 @@ func (c *Manager) ActiveUserConversationsCount(userID int) (int, error) {
 	var count int
 	if err := c.q.GetUserActiveConversationsCount.Get(&count, userID); err != nil {
 		c.lo.Error("error fetching active conversation count", "error", err)
-		return count, envelope.NewError(envelope.GeneralError, "Error fetching active conversation count", nil)
+		return count, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversation}"), nil)
 	}
 	return count, nil
 }
@@ -428,7 +428,7 @@ func (c *Manager) UpdateConversationFirstReplyAt(conversationUUID string, conver
 // UpdateConversationUserAssignee sets the assignee of a conversation to a specifc user.
 func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, actor umodels.User) error {
 	if err := c.UpdateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error updating assignee", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 
 	conversation, err := c.GetConversation(0, uuid)
@@ -442,7 +442,7 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 	}
 
 	if err := c.RecordAssigneeUserChange(uuid, assigneeID, actor); err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error recording assignee change", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 	return nil
 }
@@ -457,7 +457,7 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 	previousAssignedTeamID := conversation.AssignedTeamID.Int
 
 	if err := c.UpdateAssignee(uuid, teamID, models.AssigneeTypeTeam); err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error updating assignee", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 
 	// Assignment successful, any errors now are non-critical and can be ignored by returning nil.
@@ -526,10 +526,10 @@ func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priori
 	}
 	if _, err := c.q.UpdateConversationPriority.Exec(uuid, priority); err != nil {
 		c.lo.Error("error updating conversation priority", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating priority", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 	if err := c.RecordPriorityChange(priority, uuid, actor); err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error recording priority change", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 	c.BroadcastConversationUpdate(uuid, "priority", priority)
 	return nil
@@ -547,7 +547,7 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	}
 
 	if status == models.StatusSnoozed && snoozeDur == "" {
-		return envelope.NewError(envelope.InputError, "Snooze duration is required", nil)
+		return envelope.NewError(envelope.InputError, c.i18n.T("conversation.invalidSnoozeDuration"), nil)
 	}
 
 	// Parse the snooze duration if status is snoozed.
@@ -556,7 +556,7 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		duration, err := time.ParseDuration(snoozeDur)
 		if err != nil {
 			c.lo.Error("error parsing snooze duration", "error", err)
-			return envelope.NewError(envelope.InputError, "Invalid snooze duration format", nil)
+			return envelope.NewError(envelope.InputError, c.i18n.T("conversation.invalidSnoozeDuration"), nil)
 		}
 		snoozeUntil = time.Now().Add(duration)
 	}
@@ -564,12 +564,12 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	// Update the conversation status.
 	if _, err := c.q.UpdateConversationStatus.Exec(uuid, status, snoozeUntil); err != nil {
 		c.lo.Error("error updating conversation status", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating status", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 
 	// Record the status change as an activity.
 	if err := c.RecordStatusChange(status, uuid, actor); err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error recording status change", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.conversation}"), nil)
 	}
 
 	// Broadcast updates using websocket.
@@ -584,7 +584,7 @@ func (c *Manager) GetDashboardCounts(userID, teamID int) (json.RawMessage, error
 	tx, err := c.db.BeginTxx(context.Background(), nil)
 	if err != nil {
 		c.lo.Error("error starting db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching dashboard counts", nil)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.entities.dashboard}"), nil)
 	}
 	defer tx.Rollback()
 
@@ -605,12 +605,12 @@ func (c *Manager) GetDashboardCounts(userID, teamID int) (json.RawMessage, error
 	query := fmt.Sprintf(c.q.GetDashboardCounts, cond)
 	if err := tx.Get(&counts, query, qArgs...); err != nil {
 		c.lo.Error("error fetching dashboard counts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching dashboard counts", nil)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.entities.dashboard}"), nil)
 	}
 
 	if err := tx.Commit(); err != nil {
 		c.lo.Error("error committing db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching dashboard counts", nil)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.entities.dashboard}"), nil)
 	}
 
 	return counts, nil
@@ -622,7 +622,7 @@ func (c *Manager) GetDashboardChart(userID, teamID int) (json.RawMessage, error)
 	tx, err := c.db.BeginTxx(context.Background(), nil)
 	if err != nil {
 		c.lo.Error("error starting db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching dashboard charts", nil)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetchingChart", "name", "{globals.entities.dashboard}"), nil)
 	}
 	defer tx.Rollback()
 
@@ -645,23 +645,23 @@ func (c *Manager) GetDashboardChart(userID, teamID int) (json.RawMessage, error)
 	query := fmt.Sprintf(c.q.GetDashboardCharts, cond, cond, cond)
 	if err := tx.Get(&stats, query, qArgs...); err != nil {
 		c.lo.Error("error fetching dashboard charts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching dashboard charts", nil)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetchingChart", "name", "{globals.entities.dashboard}"), nil)
 	}
 	return stats, nil
 }
 
 // UpsertConversationTags upserts the tags associated with a conversation.
-func (t *Manager) UpsertConversationTags(uuid string, tagNames []string, actor umodels.User) error {
+func (c *Manager) UpsertConversationTags(uuid string, tagNames []string, actor umodels.User) error {
 	// Get the existing tags.
-	tags, err := t.getConversationTags(uuid)
+	tags, err := c.getConversationTags(uuid)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error fetching tags", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.tag}"), nil)
 	}
 
 	// Upsert the tags.
-	if _, err := t.q.UpsertConversationTags.Exec(uuid, pq.Array(tagNames)); err != nil {
-		t.lo.Error("error upserting conversation tags", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error upserting tags", nil)
+	if _, err := c.q.UpsertConversationTags.Exec(uuid, pq.Array(tagNames)); err != nil {
+		c.lo.Error("error upserting conversation tags", "error", err)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.tag}"), nil)
 	}
 
 	// Find the newly added tags.
@@ -675,92 +675,12 @@ func (t *Manager) UpsertConversationTags(uuid string, tagNames []string, actor u
 
 	// Record the new tags as activities.
 	for _, tag := range newTags {
-		if err := t.RecordTagChange(uuid, tag, actor); err != nil {
-			return envelope.NewError(envelope.GeneralError, "Error recording tag change", nil)
+		if err := c.RecordTagChange(uuid, tag, actor); err != nil {
+			return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.tag}"), nil)
 		}
 	}
 
 	return nil
-}
-
-// getConversationTags retrieves the tags associated with a conversation.
-func (t *Manager) getConversationTags(uuid string) ([]string, error) {
-	var tags []string
-	if err := t.q.GetConversationTags.Select(&tags, uuid); err != nil {
-		t.lo.Error("error fetching conversation tags", "error", err)
-		return tags, envelope.NewError(envelope.GeneralError, "Error fetching tags", nil)
-	}
-	return tags, nil
-}
-
-// makeConversationsListQuery prepares a SQL query string for conversations list
-func (c *Manager) makeConversationsListQuery(userID int, teamIDs []int, listTypes []string, baseQuery, order, orderBy string, page, pageSize int, filtersJSON string) (string, []interface{}, error) {
-	var qArgs []interface{}
-
-	// Set defaults
-	if orderBy == "" {
-		orderBy = "last_message_at"
-	}
-	if order == "" {
-		order = "DESC"
-	}
-	if filtersJSON == "" {
-		filtersJSON = "[]"
-	}
-
-	// Validate inputs
-	if pageSize > conversationsListMaxPageSize || pageSize < 1 {
-		return "", nil, fmt.Errorf("invalid page size: must be between 1 and %d", conversationsListMaxPageSize)
-	}
-	if page < 1 {
-		return "", nil, fmt.Errorf("page must be greater than 0")
-	}
-
-	if len(listTypes) == 0 {
-		return "", nil, fmt.Errorf("no conversation list types specified")
-	}
-
-	// Prepare the conditions based on the list types.
-	conditions := []string{}
-	for _, lt := range listTypes {
-		switch lt {
-		case models.AssignedConversations:
-			conditions = append(conditions, fmt.Sprintf("conversations.assigned_user_id = $%d", len(qArgs)+1))
-			qArgs = append(qArgs, userID)
-		case models.UnassignedConversations:
-			conditions = append(conditions, "conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL")
-		case models.TeamUnassignedConversations:
-			placeholders := make([]string, len(teamIDs))
-			for i := range teamIDs {
-				placeholders[i] = fmt.Sprintf("$%d", len(qArgs)+i+1)
-			}
-			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s) AND conversations.assigned_user_id IS NULL)", strings.Join(placeholders, ",")))
-			for _, id := range teamIDs {
-				qArgs = append(qArgs, id)
-			}
-		case models.AllConversations:
-			// No conditions needed for all conversations.
-		default:
-			return "", nil, fmt.Errorf("unknown conversation type: %s", lt)
-		}
-	}
-
-	if len(conditions) > 0 {
-		baseQuery = fmt.Sprintf(baseQuery, "AND ("+strings.Join(conditions, " OR ")+")")
-	} else {
-		// Replace the `%s` in the base query with an empty string.
-		baseQuery = fmt.Sprintf(baseQuery, "")
-	}
-
-	return dbutil.BuildPaginatedQuery(baseQuery, qArgs, dbutil.PaginationOptions{
-		Order:    order,
-		OrderBy:  orderBy,
-		Page:     page,
-		PageSize: pageSize,
-	}, filtersJSON, dbutil.AllowedFields{
-		"conversations":         conversationsListAllowedFilterFields,
-		"conversation_statuses": conversationStatusesFilterFields,
-	})
 }
 
 // GetToAddress retrieves the recipient addresses for a conversation and channel.
@@ -852,7 +772,7 @@ func (m *Manager) SendAssignedConversationEmail(userIDs []int, conversation mode
 func (m *Manager) UnassignOpen(userID int) error {
 	if _, err := m.q.UnassignOpenConversations.Exec(userID); err != nil {
 		m.lo.Error("error unassigning open conversations", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error unassigning open conversations", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorUnassigningOpenConversations"), nil)
 	}
 	return nil
 }
@@ -862,7 +782,7 @@ func (m *Manager) ApplySLA(conversation models.Conversation, policyID int, actor
 	policy, err := m.slaStore.ApplySLA(conversation.CreatedAt, conversation.ID, conversation.AssignedTeamID.Int, policyID)
 	if err != nil {
 		m.lo.Error("error applying SLA to conversation", "conversation_id", conversation.ID, "policy_id", policyID, "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error applying SLA", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorApplying", "name", m.i18n.Ts("globals.entities.sla")), nil)
 	}
 
 	// Record the SLA application as an activity.
@@ -928,7 +848,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 func (m *Manager) RemoveConversationAssignee(uuid, typ string) error {
 	if _, err := m.q.RemoveConversationAssignee.Exec(uuid, typ); err != nil {
 		m.lo.Error("error removing conversation assignee", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error removing conversation assignee", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorRemovingConversationAssignee"), nil)
 	}
 	return nil
 }
@@ -937,11 +857,11 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string) error {
 func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversation) error {
 	appRootURL, err := m.settingsStore.GetAppRootURL()
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error fetching app root URL", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.appRootURL}"), nil)
 	}
 	csat, err := m.csatStore.Create(conversation.ID)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error creating CSAT", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.csat}"), nil)
 	}
 	csatPublicURL := m.csatStore.MakePublicURL(appRootURL, csat.UUID)
 	message := fmt.Sprintf(csatReplyMessage, csatPublicURL)
@@ -956,7 +876,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 func (m *Manager) DeleteConversation(uuid string) error {
 	if _, err := m.q.DeleteConversation.Exec(uuid); err != nil {
 		m.lo.Error("error deleting conversation", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error deleting conversation", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", m.i18n.Ts("globals.entities.conversation")), nil)
 	}
 	return nil
 }
@@ -965,7 +885,87 @@ func (m *Manager) DeleteConversation(uuid string) error {
 func (c *Manager) addConversationParticipant(userID int, conversationUUID string) error {
 	if _, err := c.q.InsertConversationParticipant.Exec(userID, conversationUUID); err != nil && !dbutil.IsUniqueViolationError(err) {
 		c.lo.Error("error adding conversation participant", "user_id", userID, "conversation_uuid", conversationUUID, "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error adding conversation participant", nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.conversationParticipant}"), nil)
 	}
 	return nil
+}
+
+// getConversationTags retrieves the tags associated with a conversation.
+func (c *Manager) getConversationTags(uuid string) ([]string, error) {
+	var tags []string
+	if err := c.q.GetConversationTags.Select(&tags, uuid); err != nil {
+		c.lo.Error("error fetching conversation tags", "error", err)
+		return tags, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.tag}"), nil)
+	}
+	return tags, nil
+}
+
+// makeConversationsListQuery prepares a SQL query string for conversations list
+func (c *Manager) makeConversationsListQuery(userID int, teamIDs []int, listTypes []string, baseQuery, order, orderBy string, page, pageSize int, filtersJSON string) (string, []interface{}, error) {
+	var qArgs []interface{}
+
+	// Set defaults
+	if orderBy == "" {
+		orderBy = "last_message_at"
+	}
+	if order == "" {
+		order = "DESC"
+	}
+	if filtersJSON == "" {
+		filtersJSON = "[]"
+	}
+
+	// Validate inputs
+	if pageSize > conversationsListMaxPageSize || pageSize < 1 {
+		return "", nil, fmt.Errorf("invalid page size: must be between 1 and %d", conversationsListMaxPageSize)
+	}
+	if page < 1 {
+		return "", nil, fmt.Errorf("page must be greater than 0")
+	}
+
+	if len(listTypes) == 0 {
+		return "", nil, fmt.Errorf("no conversation list types specified")
+	}
+
+	// Prepare the conditions based on the list types.
+	conditions := []string{}
+	for _, lt := range listTypes {
+		switch lt {
+		case models.AssignedConversations:
+			conditions = append(conditions, fmt.Sprintf("conversations.assigned_user_id = $%d", len(qArgs)+1))
+			qArgs = append(qArgs, userID)
+		case models.UnassignedConversations:
+			conditions = append(conditions, "conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL")
+		case models.TeamUnassignedConversations:
+			placeholders := make([]string, len(teamIDs))
+			for i := range teamIDs {
+				placeholders[i] = fmt.Sprintf("$%d", len(qArgs)+i+1)
+			}
+			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s) AND conversations.assigned_user_id IS NULL)", strings.Join(placeholders, ",")))
+			for _, id := range teamIDs {
+				qArgs = append(qArgs, id)
+			}
+		case models.AllConversations:
+			// No conditions needed for all conversations.
+		default:
+			return "", nil, fmt.Errorf("unknown conversation type: %s", lt)
+		}
+	}
+
+	if len(conditions) > 0 {
+		baseQuery = fmt.Sprintf(baseQuery, "AND ("+strings.Join(conditions, " OR ")+")")
+	} else {
+		// Replace the `%s` in the base query with an empty string.
+		baseQuery = fmt.Sprintf(baseQuery, "")
+	}
+
+	return dbutil.BuildPaginatedQuery(baseQuery, qArgs, dbutil.PaginationOptions{
+		Order:    order,
+		OrderBy:  orderBy,
+		Page:     page,
+		PageSize: pageSize,
+	}, filtersJSON, dbutil.AllowedFields{
+		"conversations":         conversationsListAllowedFilterFields,
+		"conversation_statuses": conversationStatusesFilterFields,
+	})
 }

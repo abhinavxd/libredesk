@@ -15,6 +15,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/knadh/go-i18n"
 	"github.com/redis/go-redis/v9"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
@@ -47,12 +48,14 @@ type Provider struct {
 // Config stores multiple OIDC provider configurations
 type Config struct {
 	Providers []Provider
+	I18n      *i18n.I18n
 }
 
 // Auth is the auth service it manages OIDC authentication and sessions
 type Auth struct {
 	mu        sync.RWMutex
 	cfg       Config
+	i18n      *i18n.I18n
 	oauthCfgs map[int]oauth2.Config
 	verifiers map[int]*oidc.IDTokenVerifier
 	sess      *simplesessions.Manager
@@ -103,6 +106,7 @@ func New(cfg Config, rd *redis.Client, logger *logf.Logger) (*Auth, error) {
 
 	return &Auth{
 		cfg:       cfg,
+		i18n:      cfg.I18n,
 		oauthCfgs: oauthCfgs,
 		verifiers: verifiers,
 		sess:      sess,
@@ -163,7 +167,7 @@ func (a *Auth) LoginURL(providerID int, state string) (string, error) {
 	defer a.mu.RUnlock()
 	oauthCfg, ok := a.oauthCfgs[providerID]
 	if !ok {
-		return "", envelope.NewError(envelope.InputError, "Provider not found", nil)
+		return "", envelope.NewError(envelope.InputError, a.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.provider}"), nil)
 	}
 	return oauthCfg.AuthCodeURL(state), nil
 }

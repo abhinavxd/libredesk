@@ -26,11 +26,11 @@ func handleCreateStatus(r *fastglue.Request) error {
 		status = cmodels.Status{}
 	)
 	if err := r.Decode(&status, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), err.Error(), envelope.InputError)
 	}
 
 	if status.Name == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty status `Name`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil, envelope.InputError)
 	}
 
 	err := app.status.Create(status.Name)
@@ -46,20 +46,13 @@ func handleDeleteStatus(r *fastglue.Request) error {
 		app = r.Context.(*App)
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
-	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid status `id`.", nil, envelope.InputError)
+	if err != nil || id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
-
-	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty status `ID`", nil, envelope.InputError)
-	}
-
 	err = app.status.Delete(id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-
 	return r.SendEnvelope(true)
 }
 
@@ -70,16 +63,15 @@ func handleUpdateStatus(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid status `id`.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&status, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), err.Error(), envelope.InputError)
 	}
 
 	if status.Name == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty status `Name`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil, envelope.InputError)
 	}
 
 	err = app.status.Update(id, status.Name)

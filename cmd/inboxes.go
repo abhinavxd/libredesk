@@ -10,6 +10,7 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+// handleGetInboxes returns all inboxes
 func handleGetInboxes(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 	inboxes, err := app.inbox.GetAll()
@@ -19,6 +20,7 @@ func handleGetInboxes(r *fastglue.Request) error {
 	return r.SendEnvelope(inboxes)
 }
 
+// handleGetInbox returns an inbox by ID
 func handleGetInbox(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -26,34 +28,35 @@ func handleGetInbox(r *fastglue.Request) error {
 	)
 	inbox, err := app.inbox.GetDBRecord(id)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error fetching inbox", nil, envelope.GeneralError)
+		return sendErrorEnvelope(r, err)
 	}
 	if err := inbox.ClearPasswords(); err != nil {
-		app.lo.Error("error clearing out passwords", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error fetching inbox", nil)
+		app.lo.Error("error clearing inbox passwords from response", "error", err)
+		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.inbox}"), nil)
 	}
 	return r.SendEnvelope(inbox)
 }
 
+// handleCreateInbox creates a new inbox
 func handleCreateInbox(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
 		inbox = imodels.Inbox{}
 	)
 	if err := r.Decode(&inbox, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), err.Error(), envelope.InputError)
 	}
 
 	if err := app.inbox.Create(inbox); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if err := validateInbox(inbox); err != nil {
+	if err := validateInbox(app, inbox); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
 	if err := reloadInboxes(app); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error reloading inboxes", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.couldNotReload", "name", "{globals.entities.inbox}"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(true)
@@ -68,24 +71,24 @@ func handleUpdateInbox(r *fastglue.Request) error {
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid inbox `id`.", nil, envelope.InputError)
+			app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&inbox, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), err.Error(), envelope.InputError)
 	}
 
-	if err := validateInbox(inbox); err != nil {
+	if err := validateInbox(app, inbox); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
 	err = app.inbox.Update(id, inbox)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Could not update inbox.", nil, envelope.GeneralError)
+		return sendErrorEnvelope(r, err)
 	}
 
 	if err := reloadInboxes(app); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error reloading inboxes, Please restart the app.", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.couldNotReload", "name", "{globals.entities.inbox}"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(inbox)
@@ -99,7 +102,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid inbox `id`.", nil, envelope.InputError)
+			app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 
 	if err = app.inbox.Toggle(id); err != nil {
@@ -107,7 +110,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 	}
 
 	if err := reloadInboxes(app); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error reloading inboxes", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.couldNotReload", "name", "{globals.entities.inbox}"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(true)
@@ -121,33 +124,33 @@ func handleDeleteInbox(r *fastglue.Request) error {
 	)
 	err := app.inbox.SoftDelete(id)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Could not update inbox.", nil, envelope.GeneralError)
+		return sendErrorEnvelope(r, err)
 	}
 
 	if err := reloadInboxes(app); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error reloading inboxes", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.couldNotReload", "name", "{globals.entities.inbox}"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(true)
 }
 
 // validateInbox validates the inbox
-func validateInbox(inbox imodels.Inbox) error {
-	// Make sure it's a valid from email address.
+func validateInbox(app *App, inbox imodels.Inbox) error {
+	// Validate from address.
 	if _, err := mail.ParseAddress(inbox.From); err != nil {
-		return envelope.NewError(envelope.InputError, "Invalid from email address format, make sure it's a valid email address in the format `Name <mail@example.com>`", nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("email.invalidFromAddress"), nil)
 	}
 
 	if len(inbox.Config) == 0 {
-		return envelope.NewError(envelope.InputError, "Empty config provided for inbox", nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "{globals.entities.inbox} config"), nil)
 	}
 
 	if inbox.Name == "" {
-		return envelope.NewError(envelope.InputError, "Empty name provided for inbox", nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "{globals.entities.inbox} name"), nil)
 	}
 
 	if inbox.Channel == "" {
-		return envelope.NewError(envelope.InputError, "Empty channel provided for inbox", nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "{globals.entities.inbox} channel"), nil)
 	}
 	return nil
 }

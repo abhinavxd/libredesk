@@ -64,8 +64,6 @@ type queries struct {
 	GetUsers              *sqlx.Stmt `query:"get-users"`
 	GetUsersCompact       *sqlx.Stmt `query:"get-users-compact"`
 	GetUser               *sqlx.Stmt `query:"get-user"`
-	GetEmail              *sqlx.Stmt `query:"get-email"`
-	GetPermissions        *sqlx.Stmt `query:"get-permissions"`
 	UpdateUser            *sqlx.Stmt `query:"update-user"`
 	UpdateAvatar          *sqlx.Stmt `query:"update-avatar"`
 	UpdateAvailability    *sqlx.Stmt `query:"update-availability"`
@@ -116,7 +114,7 @@ func (u *Manager) GetAll() ([]models.User, error) {
 			return users, nil
 		}
 		u.lo.Error("error fetching users from db", "error", err)
-		return users, envelope.NewError(envelope.GeneralError, "Error fetching users", nil)
+		return users, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", u.i18n.P("globals.entities.user")), nil)
 	}
 
 	return users, nil
@@ -130,7 +128,7 @@ func (u *Manager) GetAllCompact() ([]models.User, error) {
 			return users, nil
 		}
 		u.lo.Error("error fetching users from db", "error", err)
-		return users, envelope.NewError(envelope.GeneralError, "Error fetching users", nil)
+		return users, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", u.i18n.P("globals.entities.user")), nil)
 	}
 
 	return users, nil
@@ -141,15 +139,15 @@ func (u *Manager) CreateAgent(user *models.User) error {
 	password, err := u.generatePassword()
 	if err != nil {
 		u.lo.Error("error generating password", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error creating user", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.user}"), nil)
 	}
 	user.Email = null.NewString(strings.TrimSpace(strings.ToLower(user.Email.String)), user.Email.Valid)
 	if err := u.q.InsertAgent.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, pq.Array(user.Roles)).Scan(&user.ID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return envelope.NewError(envelope.GeneralError, "User with the same email already exists", nil)
+			return envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
 		}
 		u.lo.Error("error creating user", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error creating user", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.user}"), nil)
 	}
 	return nil
 }
@@ -175,10 +173,10 @@ func (u *Manager) Get(id int, type_ string) (models.User, error) {
 	if err := u.q.GetUser.Get(&user, id, "", type_); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			u.lo.Error("user not found", "id", id, "error", err)
-			return user, envelope.NewError(envelope.NotFoundError, "User not found", nil)
+			return user, envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.user}"), nil)
 		}
 		u.lo.Error("error fetching user from db", "error", err)
-		return user, envelope.NewError(envelope.GeneralError, "Error fetching user", nil)
+		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.user}"), nil)
 	}
 	return user, nil
 }
@@ -188,10 +186,10 @@ func (u *Manager) GetByEmail(email, type_ string) (models.User, error) {
 	var user models.User
 	if err := u.q.GetUser.Get(&user, 0, email, type_); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return user, envelope.NewError(envelope.GeneralError, "User not found", nil)
+			return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.user}"), nil)
 		}
 		u.lo.Error("error fetching user from db", "error", err)
-		return user, envelope.NewError(envelope.GeneralError, "Error fetching user", nil)
+		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.user}"), nil)
 	}
 	return user, nil
 }
@@ -205,7 +203,7 @@ func (u *Manager) GetSystemUser() (models.User, error) {
 func (u *Manager) UpdateAvatar(id int, avatar string) error {
 	if _, err := u.q.UpdateAvatar.Exec(id, null.NewString(avatar, avatar != "")); err != nil {
 		u.lo.Error("error updating user avatar", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating avatar", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.user}"), nil)
 	}
 	return nil
 }
@@ -224,14 +222,14 @@ func (u *Manager) Update(id int, user models.User) error {
 		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(user.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
 			u.lo.Error("error generating bcrypt password", "error", err)
-			return envelope.NewError(envelope.GeneralError, "Error updating user", nil)
+			return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.user}"), nil)
 		}
 		u.lo.Debug("setting new password for user", "user_id", id)
 	}
 
 	if _, err := u.q.UpdateUser.Exec(id, user.FirstName, user.LastName, user.Email, pq.Array(user.Roles), user.AvatarURL, hashedPassword, user.Enabled); err != nil {
 		u.lo.Error("error updating user", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating user", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.user}"), nil)
 	}
 	return nil
 }
@@ -244,27 +242,14 @@ func (u *Manager) SoftDelete(id int) error {
 		return err
 	}
 	if id == systemUser.ID {
-		return envelope.NewError(envelope.InputError, "Cannot delete system user", nil)
+		return envelope.NewError(envelope.InputError, u.i18n.T("user.cannotDeleteSystemUser"), nil)
 	}
 
 	if _, err := u.q.SoftDeleteUser.Exec(id); err != nil {
 		u.lo.Error("error deleting user", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error deleting user", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.user}"), nil)
 	}
 	return nil
-}
-
-// GetEmail retrieves the email of an user by ID.
-func (u *Manager) GetEmail(id int) (string, error) {
-	var email string
-	if err := u.q.GetEmail.Get(&email, id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return email, fmt.Errorf("user not found: %v", err)
-		}
-		u.lo.Error("error fetching user email from db", "error", err)
-		return email, fmt.Errorf("fetching user: %w", err)
-	}
-	return email, nil
 }
 
 // SetResetPasswordToken sets a reset password token for an user and returns the token.
@@ -272,11 +257,11 @@ func (u *Manager) SetResetPasswordToken(id int) (string, error) {
 	token, err := stringutil.RandomAlphanumeric(32)
 	if err != nil {
 		u.lo.Error("error generating reset password token", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, "Error generating reset password token", nil)
+		return "", envelope.NewError(envelope.GeneralError, u.i18n.T("user.errorGeneratingPasswordToken"), nil)
 	}
 	if _, err := u.q.SetResetPasswordToken.Exec(id, token); err != nil {
 		u.lo.Error("error setting reset password token", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, "Error setting reset password token", nil)
+		return "", envelope.NewError(envelope.GeneralError, u.i18n.T("user.errorGeneratingPasswordToken"), nil)
 	}
 	return token, nil
 }
@@ -290,34 +275,24 @@ func (u *Manager) ResetPassword(token, password string) error {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		u.lo.Error("error generating bcrypt password", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error setting new password", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("user.errorUpdatingPassword"), nil)
 	}
 	rows, err := u.q.ResetPassword.Exec(passwordHash, token)
 	if err != nil {
 		u.lo.Error("error setting new password", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error setting new password", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("user.errorUpdatingPassword"), nil)
 	}
 	if count, _ := rows.RowsAffected(); count == 0 {
-		return envelope.NewError(envelope.InputError, "Token is invalid or expired, please try again by requesting a new password reset link", nil)
+		return envelope.NewError(envelope.InputError, u.i18n.T("user.resetPasswordTokenExpired"), nil)
 	}
 	return nil
-}
-
-// GetPermissions retrieves the permissions of an user by ID.
-func (u *Manager) GetPermissions(id int) ([]string, error) {
-	var permissions []string
-	if err := u.q.GetPermissions.Select(&permissions, id); err != nil {
-		u.lo.Error("error fetching user permissions", "error", err)
-		return permissions, envelope.NewError(envelope.GeneralError, "Error fetching user permissions", nil)
-	}
-	return permissions, nil
 }
 
 // UpdateAvailability updates the availability status of an user.
 func (u *Manager) UpdateAvailability(id int, status string) error {
 	if _, err := u.q.UpdateAvailability.Exec(id, status); err != nil {
 		u.lo.Error("error updating user availability", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating user availability", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.user}"), nil)
 	}
 	return nil
 }
@@ -326,7 +301,7 @@ func (u *Manager) UpdateAvailability(id int, status string) error {
 func (u *Manager) UpdateLastActive(id int) error {
 	if _, err := u.q.UpdateLastActiveAt.Exec(id); err != nil {
 		u.lo.Error("error updating user last active at", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating user last active at", nil)
+		return fmt.Errorf("updating user last active at: %w", err)
 	}
 	return nil
 }
@@ -360,7 +335,8 @@ func (u *Manager) markInactiveAgentsOffline() {
 // verifyPassword compares the provided password with the stored password hash.
 func (u *Manager) verifyPassword(pwd []byte, pwdHash string) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(pwdHash), pwd); err != nil {
-		return fmt.Errorf("invalid username or password")
+		u.lo.Error("error verifying password", "error", err)
+		return fmt.Errorf("error verifying password: %w", err)
 	}
 	return nil
 }

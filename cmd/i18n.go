@@ -27,6 +27,7 @@ func handleGetI18nLang(r *fastglue.Request) error {
 	return r.SendBytes(http.StatusOK, "application/json", i.JSON())
 }
 
+// loadI18nLang loads the i18n language pack for the given language code.
 func loadI18nLang(lang string, fs stuffbin.FileSystem) (*i18n.I18n, error) {
 	// Helper function to read and initialize i18n language.
 	readLang := func(lang string) ([]byte, error) {

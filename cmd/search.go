@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/zerodha/fastglue"
 )
@@ -11,52 +13,45 @@ const (
 
 // handleSearchConversations searches conversations based on the query.
 func handleSearchConversations(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-		q   = string(r.RequestCtx.QueryArgs().Peek("query"))
-	)
-
-	if len(q) < minSearchQueryLength {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Query length should be at least 3 characters", nil))
+	app := r.Context.(*App)
+	wrapper := func(query string) (interface{}, error) {
+		return app.search.Conversations(query)
 	}
-
-	conversations, err := app.search.Conversations(q)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	return r.SendEnvelope(conversations)
+	return handleSearch(r, wrapper)
 }
 
 // handleSearchMessages searches messages based on the query.
 func handleSearchMessages(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-		q   = string(r.RequestCtx.QueryArgs().Peek("query"))
-	)
-
-	if len(q) < minSearchQueryLength {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Query length should be at least 3 characters", nil))
+	app := r.Context.(*App)
+	wrapper := func(query string) (interface{}, error) {
+		return app.search.Messages(query)
 	}
-
-	messages, err := app.search.Messages(q)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	return r.SendEnvelope(messages)
+	return handleSearch(r, wrapper)
 }
 
 // handleSearchContacts searches contacts based on the query.
 func handleSearchContacts(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	wrapper := func(query string) (interface{}, error) {
+		return app.search.Contacts(query)
+	}
+	return handleSearch(r, wrapper)
+}
+
+// handleSearch searches for the given query using the provided search function.
+func handleSearch(r *fastglue.Request, searchFunc func(string) (interface{}, error)) error {
 	var (
 		app = r.Context.(*App)
 		q   = string(r.RequestCtx.QueryArgs().Peek("query"))
 	)
+
 	if len(q) < minSearchQueryLength {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Query length should be at least 3 characters", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minSearchQueryLength)), nil))
 	}
-	contacts, err := app.search.Contacts(q)
+
+	results, err := searchFunc(q)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(contacts)
+	return r.SendEnvelope(results)
 }

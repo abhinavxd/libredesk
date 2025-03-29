@@ -43,7 +43,7 @@ func handleUpdateAIProvider(r *fastglue.Request) error {
 		req providerUpdateReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Error unmarshalling request", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil))
 	}
 	if err := app.ai.UpdateProvider(req.Provider, req.APIKey); err != nil {
 		return sendErrorEnvelope(r, err)

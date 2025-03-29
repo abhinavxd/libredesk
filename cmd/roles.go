@@ -14,11 +14,11 @@ func handleGetRoles(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
 	)
-	agents, err := app.role.GetAll()
+	roles, err := app.role.GetAll()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(agents)
+	return r.SendEnvelope(roles)
 }
 
 // handleGetRole returns a single role
@@ -43,7 +43,7 @@ func handleDeleteRole(r *fastglue.Request) error {
 	if err := app.role.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Role deleted successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleCreateRole creates a new role
@@ -53,12 +53,12 @@ func handleCreateRole(r *fastglue.Request) error {
 		req = models.Role{}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.InputError)
 	}
 	if err := app.role.Create(req); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Role created successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleUpdateRole updates a role
@@ -69,10 +69,10 @@ func handleUpdateRole(r *fastglue.Request) error {
 		req   = models.Role{}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.InputError)
 	}
-	if err := app.role.Update(id, req);err != nil {
+	if err := app.role.Update(id, req); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Role updated successfully")
+	return r.SendEnvelope(true)
 }

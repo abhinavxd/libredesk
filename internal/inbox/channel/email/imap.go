@@ -78,6 +78,9 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 	case "none":
 		client, err = imapclient.DialInsecure(address, imapOptions)
 	case "starttls":
+		fmt.Println("starttls")
+		fmt.Println("skip verify", cfg.TLSSkipVerify)
+		fmt.Println(address)
 		client, err = imapclient.DialStartTLS(address, imapOptions)
 	case "tls":
 		client, err = imapclient.DialTLS(address, imapOptions)

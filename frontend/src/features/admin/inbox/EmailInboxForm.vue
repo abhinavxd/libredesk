@@ -22,7 +22,7 @@
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription> Enter the from email address. </FormDescription>
+        <FormDescription> Enter the from email address. e.g. John Doe &lt;john@libredesk.io&gt; </FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>

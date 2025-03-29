@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
+	"github.com/knadh/go-i18n"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -23,14 +24,16 @@ var (
 
 // Manager manages business hours.
 type Manager struct {
-	q  queries
-	lo *logf.Logger
+	q    queries
+	lo   *logf.Logger
+	i18n *i18n.I18n
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB   *sqlx.DB
+	Lo   *logf.Logger
+	I18n *i18n.I18n
 }
 
 // queries contains prepared SQL queries.
@@ -49,8 +52,9 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		q:  q,
-		lo: opts.Lo,
+		q:    q,
+		lo:   opts.Lo,
+		i18n: opts.I18n,
 	}, nil
 }
 
@@ -71,7 +75,7 @@ func (m *Manager) GetAll() ([]models.BusinessHours, error) {
 	var hours = make([]models.BusinessHours, 0)
 	if err := m.q.GetAllBusinessHours.Select(&hours); err != nil {
 		m.lo.Error("error fetching business hours", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching business hours", nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.businessHour}"), nil)
 	}
 	return hours, nil
 }
@@ -80,7 +84,7 @@ func (m *Manager) GetAll() ([]models.BusinessHours, error) {
 func (m *Manager) Create(name string, description null.String, isAlwaysOpen bool, workingHrs, holidays types.JSONText) error {
 	if _, err := m.q.InsertBusinessHours.Exec(name, description, isAlwaysOpen, workingHrs, holidays); err != nil {
 		m.lo.Error("error inserting business hours", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error creating business hours", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.businessHour}"), nil)
 	}
 	return nil
 }
@@ -89,10 +93,10 @@ func (m *Manager) Create(name string, description null.String, isAlwaysOpen bool
 func (m *Manager) Delete(id int) error {
 	if _, err := m.q.DeleteBusinessHours.Exec(id); err != nil {
 		if dbutil.IsForeignKeyError(err) {
-			return envelope.NewError(envelope.GeneralError, "Cannot delete business hours as it is being used", nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.businessHour}"), nil)
 		}
 		m.lo.Error("error deleting business hours", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error deleting business hours", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.businessHour}"), nil)
 	}
 	return nil
 }
@@ -101,7 +105,7 @@ func (m *Manager) Delete(id int) error {
 func (m *Manager) Update(id int, name string, description null.String, isAlwaysOpen bool, workingHrs, holidays types.JSONText) error {
 	if _, err := m.q.UpdateBusinessHours.Exec(id, name, description, isAlwaysOpen, workingHrs, holidays); err != nil {
 		m.lo.Error("error updating business hours", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating business hours", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.businessHour}"), nil)
 	}
 	return nil
 }

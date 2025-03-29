@@ -16,6 +16,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/knadh/go-i18n"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -38,6 +39,7 @@ type Store interface {
 type Manager struct {
 	store   Store
 	lo      *logf.Logger
+	i18n    *i18n.I18n
 	queries queries
 }
 
@@ -46,6 +48,7 @@ type Opts struct {
 	Store Store
 	Lo    *logf.Logger
 	DB    *sqlx.DB
+	I18n  *i18n.I18n
 }
 
 // New initializes and returns a new Manager instance for handling media operations.
@@ -57,6 +60,7 @@ func New(opt Opts) (*Manager, error) {
 	return &Manager{
 		store:   opt.Store,
 		lo:      opt.Lo,
+		i18n:    opt.I18n,
 		queries: q,
 	}, nil
 }
@@ -94,7 +98,7 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 	fName, err := m.store.Put(fileName, contentType, content)
 	if err != nil {
 		m.lo.Error("error uploading media", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, "Error uploading media", nil)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUploading", "name", "{globals.entities.media}"), nil)
 	}
 	return fName, nil
 }
@@ -104,6 +108,7 @@ func (m *Manager) Insert(disposition null.String, fileName, contentType, content
 	var id int
 	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid).Scan(&id); err != nil {
 		m.lo.Error("error inserting media", "error", err)
+		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.entities.media}"), nil)
 	}
 	return m.Get(id, "")
 }
@@ -112,8 +117,11 @@ func (m *Manager) Insert(disposition null.String, fileName, contentType, content
 func (m *Manager) Get(id int, uuid string) (models.Media, error) {
 	var media models.Media
 	if err := m.queries.Get.Get(&media, id, uuid); err != nil {
+		if err == sql.ErrNoRows {
+			return media, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.media}"), nil)
+		}
 		m.lo.Error("error fetching media", "error", err)
-		return media, envelope.NewError(envelope.GeneralError, "Error fetching media", nil)
+		return media, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.media}"), nil)
 	}
 	media.URL = m.store.GetURL(media.UUID)
 	return media, nil
@@ -154,10 +162,9 @@ func (m *Manager) Attach(id int, model string, modelID int) error {
 // GetByModel retrieves all media files attached to a specific model.
 func (m *Manager) GetByModel(modelID int, model string) ([]models.Media, error) {
 	var media = make([]models.Media, 0)
-	err := m.queries.GetByModel.Select(&media, model, modelID)
-	if err != nil {
+	if err := m.queries.GetByModel.Select(&media, model, modelID); err != nil {
 		m.lo.Error("error getting model media", "model", model, "model_id", modelID, "error", err)
-		return nil, err
+		return nil, fmt.Errorf("fetching media for model:%s model_id:%d: %w", model, modelID, err)
 	}
 	return media, nil
 }
@@ -168,13 +175,13 @@ func (m *Manager) Delete(name string) error {
 		m.lo.Error("error deleting media from store", "error", err)
 		// If the file does not exist, ignore the error.
 		if !errors.Is(err, os.ErrNotExist) {
-			return envelope.NewError(envelope.GeneralError, "Error deleting media from store", nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.media}"), nil)
 		}
 	}
 	// Delete the media record from the database.
 	if _, err := m.queries.Delete.Exec(name); err != nil {
 		m.lo.Error("error deleting media from db", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error deleting media from DB", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.media}"), nil)
 	}
 	return nil
 }

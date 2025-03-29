@@ -12,6 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/team/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
+	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -24,14 +25,16 @@ var (
 
 // Manager handles team-related operations.
 type Manager struct {
-	lo *logf.Logger
-	q  queries
+	lo   *logf.Logger
+	i18n *i18n.I18n
+	q    queries
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB   *sqlx.DB
+	Lo   *logf.Logger
+	I18n *i18n.I18n
 }
 
 // queries contains prepared SQL queries.
@@ -55,8 +58,9 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		q:  q,
-		lo: opts.Lo,
+		q:    q,
+		lo:   opts.Lo,
+		i18n: opts.I18n,
 	}, nil
 }
 
@@ -68,7 +72,7 @@ func (u *Manager) GetAll() ([]models.Team, error) {
 			return teams, nil
 		}
 		u.lo.Error("error fetching teams", "error", err)
-		return teams, envelope.NewError(envelope.GeneralError, "Error fetching teams", nil)
+		return teams, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.team}"), nil)
 	}
 	return teams, nil
 }
@@ -81,7 +85,7 @@ func (u *Manager) GetAllCompact() ([]models.Team, error) {
 			return teams, nil
 		}
 		u.lo.Error("error fetching teams", "error", err)
-		return teams, envelope.NewError(envelope.GeneralError, "Error fetching teams", nil)
+		return teams, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.team}"), nil)
 	}
 	return teams, nil
 }
@@ -92,10 +96,10 @@ func (u *Manager) Get(id int) (models.Team, error) {
 	if err := u.q.GetTeam.Get(&team, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			u.lo.Error("team not found", "id", id, "error", err)
-			return team, envelope.NewError(envelope.InputError, "Team not found", nil)
+			return team, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.team}"), nil)
 		}
 		u.lo.Error("error fetching team", "id", id, "error", err)
-		return team, envelope.NewError(envelope.GeneralError, "Error fetching team", nil)
+		return team, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.team}"), nil)
 	}
 	return team, nil
 }
@@ -104,10 +108,10 @@ func (u *Manager) Get(id int) (models.Team, error) {
 func (u *Manager) Create(name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int) error {
 	if _, err := u.q.InsertTeam.Exec(name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return envelope.NewError(envelope.GeneralError, "Team with the same name already exists", nil)
+			return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorAlreadyExists", "name", "{globals.entities.team}"), nil)
 		}
 		u.lo.Error("error inserting team", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error creating team", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.team}"), nil)
 	}
 	return nil
 }
@@ -116,7 +120,7 @@ func (u *Manager) Create(name, timezone, conversationAssignmentType string, busi
 func (u *Manager) Update(id int, name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int) error {
 	if _, err := u.q.UpdateTeam.Exec(id, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations); err != nil {
 		u.lo.Error("error updating team", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating team", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.team}"), nil)
 	}
 	return nil
 }
@@ -125,7 +129,7 @@ func (u *Manager) Update(id int, name, timezone, conversationAssignmentType stri
 func (u *Manager) Delete(id int) error {
 	if _, err := u.q.DeleteTeam.Exec(id); err != nil {
 		u.lo.Error("error deleting team", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error deleting team", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.team}"), nil)
 	}
 	return nil
 }
@@ -138,7 +142,7 @@ func (u *Manager) GetUserTeams(userID int) ([]models.Team, error) {
 			return teams, nil
 		}
 		u.lo.Error("error fetching teams", "user_id", userID, "error", err)
-		return teams, envelope.NewError(envelope.GeneralError, "Error fetching teams", nil)
+		return teams, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.team}"), nil)
 	}
 	return teams, nil
 }
@@ -147,7 +151,7 @@ func (u *Manager) GetUserTeams(userID int) ([]models.Team, error) {
 func (u *Manager) UpsertUserTeams(id int, teamNames []string) error {
 	if _, err := u.q.UpsertUserTeams.Exec(id, pq.Array(teamNames)); err != nil {
 		u.lo.Error("error updating user teams", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating user team", nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.team}"), nil)
 	}
 	return nil
 }
@@ -157,7 +161,7 @@ func (u *Manager) UserBelongsToTeam(teamID, userID int) (bool, error) {
 	var exists bool
 	if err := u.q.UserBelongsToTeam.Get(&exists, teamID, userID); err != nil {
 		u.lo.Error("error fetching team members", "team_id", teamID, "user_id", userID, "error", err)
-		return false, envelope.NewError(envelope.GeneralError, "Error fetching team members", nil)
+		return false, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.team}"), nil)
 	}
 	return exists, nil
 }

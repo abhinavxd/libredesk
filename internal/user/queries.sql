@@ -19,11 +19,6 @@ FROM users u
 WHERE u.email != 'System' AND u.deleted_at IS NULL AND u.type = 'agent'
 ORDER BY u.updated_at DESC;
 
--- name: get-email
-SELECT email
-FROM users
-WHERE id = $1 AND deleted_at IS NULL AND type = 'agent';
-
 -- name: get-user
 SELECT
     u.id,
@@ -105,13 +100,6 @@ WHERE
 type = 'agent' 
 AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL '5 minutes')
 AND availability_status != 'offline';
-
--- name: get-permissions
-SELECT DISTINCT unnest(r.permissions)
-FROM users u
-JOIN user_roles ur ON ur.user_id = u.id
-JOIN roles r ON r.id = ur.role_id
-WHERE u.id = $1 AND u.type = 'agent';
 
 -- name: set-reset-password-token
 UPDATE users

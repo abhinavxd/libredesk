@@ -2,6 +2,7 @@
 package macro
 
 import (
+	"database/sql"
 	"embed"
 	"encoding/json"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/macro/models"
 	"github.com/jmoiron/sqlx"
+	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
 
@@ -19,8 +21,9 @@ var (
 
 // Manager is the macro manager.
 type Manager struct {
-	q  queries
-	lo *logf.Logger
+	q    queries
+	lo   *logf.Logger
+	i18n *i18n.I18n
 }
 
 // Predefined queries.
@@ -35,8 +38,9 @@ type queries struct {
 
 // Opts contains the dependencies for the macro manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB   *sqlx.DB
+	Lo   *logf.Logger
+	I18n *i18n.I18n
 }
 
 // New initializes a macro manager.
@@ -46,16 +50,18 @@ func New(opts Opts) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Manager{q: q, lo: opts.Lo}, nil
+	return &Manager{q: q, lo: opts.Lo, i18n: opts.I18n}, nil
 }
 
 // Get returns a macro by ID.
 func (m *Manager) Get(id int) (models.Macro, error) {
 	macro := models.Macro{}
-	err := m.q.Get.Get(&macro, id)
-	if err != nil {
+	if err := m.q.Get.Get(&macro, id); err != nil {
+		if err == sql.ErrNoRows {
+			return macro, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.macro}"), nil)
+		}
 		m.lo.Error("error getting macro", "error", err)
-		return macro, envelope.NewError(envelope.GeneralError, "Error getting macro", nil)
+		return macro, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.macro}"), nil)
 	}
 	return macro, nil
 }
@@ -65,7 +71,7 @@ func (m *Manager) Create(name, messageContent string, userID, teamID *int, visib
 	_, err := m.q.Create.Exec(name, messageContent, userID, teamID, visibility, actions)
 	if err != nil {
 		m.lo.Error("error creating macro", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error creating macro", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.macro}"), nil)
 	}
 	return nil
 }
@@ -75,10 +81,10 @@ func (m *Manager) Update(id int, name, messageContent string, userID, teamID *in
 	result, err := m.q.Update.Exec(id, name, messageContent, userID, teamID, visibility, actions)
 	if err != nil {
 		m.lo.Error("error updating macro", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating macro", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.macro}"), nil)
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		return envelope.NewError(envelope.NotFoundError, "Macro not found", nil)
+		return envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.macro}"), nil)
 	}
 	return nil
 }
@@ -89,7 +95,7 @@ func (m *Manager) GetAll() ([]models.Macro, error) {
 	err := m.q.GetAll.Select(&macros)
 	if err != nil {
 		m.lo.Error("error fetching macros", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching macros", nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.entities.macro")), nil)
 	}
 	return macros, nil
 }
@@ -99,10 +105,10 @@ func (m *Manager) Delete(id int) error {
 	result, err := m.q.Delete.Exec(id)
 	if err != nil {
 		m.lo.Error("error deleting macro", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error deleting macro", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.macro}"), nil)
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		return envelope.NewError(envelope.NotFoundError, "Macro not found", nil)
+		return envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.macro}"), nil)
 	}
 	return nil
 }
@@ -111,7 +117,7 @@ func (m *Manager) Delete(id int) error {
 func (m *Manager) IncrementUsageCount(id int) error {
 	if _, err := m.q.IncUsageCount.Exec(id); err != nil {
 		m.lo.Error("error incrementing usage count", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error incrementing macro usage count", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "macro usage count"), nil)
 	}
 	return nil
 }

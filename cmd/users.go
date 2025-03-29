@@ -32,7 +32,7 @@ func handleGetUsers(r *fastglue.Request) error {
 	)
 	agents, err := app.user.GetAll()
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, "")
+		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(agents)
 }
@@ -42,7 +42,7 @@ func handleGetUsersCompact(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 	agents, err := app.user.GetAllCompact()
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, "")
+		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(agents)
 }
@@ -53,9 +53,8 @@ func handleGetUser(r *fastglue.Request) error {
 		app = r.Context.(*App)
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
-	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid user `id`.", nil, envelope.InputError)
+	if err != nil || id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 	user, err := app.user.GetAgent(id)
 	if err != nil {
@@ -74,7 +73,7 @@ func handleUpdateUserAvailability(r *fastglue.Request) error {
 	if err := app.user.UpdateAvailability(auser.ID, status); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("User availability updated successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleGetCurrentUserTeams returns the teams of a user.
@@ -109,7 +108,7 @@ func handleUpdateCurrentUser(r *fastglue.Request) error {
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
 		app.lo.Error("error parsing form data", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error parsing data", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.GeneralError)
 	}
 
 	files, ok := form.File["files"]
@@ -120,7 +119,7 @@ func handleUpdateCurrentUser(r *fastglue.Request) error {
 		file, err := fileHeader.Open()
 		if err != nil {
 			app.lo.Error("error reading uploaded", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error reading file", nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.entities.file}"), nil, envelope.GeneralError)
 		}
 		defer file.Close()
 
@@ -131,7 +130,7 @@ func handleUpdateCurrentUser(r *fastglue.Request) error {
 		srcExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(srcFileName)), ".")
 
 		if !slices.Contains(image.Exts, srcExt) {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "File type is not an image", nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.fileTypeisNotAnImage"), nil, envelope.InputError)
 		}
 
 		// Check file size
@@ -139,7 +138,7 @@ func handleUpdateCurrentUser(r *fastglue.Request) error {
 			app.lo.Error("error uploaded file size is larger than max allowed", "size", bytesToMegabytes(srcFileSize), "max_allowed", maxAvatarSizeMB)
 			return r.SendErrorEnvelope(
 				http.StatusRequestEntityTooLarge,
-				fmt.Sprintf("File size is too large. Please upload file lesser than %d MB", maxAvatarSizeMB),
+				app.i18n.Ts("media.fileSizeTooLarge", "size", fmt.Sprintf("%dMB", maxAvatarSizeMB)),
 				nil,
 				envelope.GeneralError,
 			)
@@ -155,7 +154,7 @@ func handleUpdateCurrentUser(r *fastglue.Request) error {
 		media, err := app.media.UploadAndInsert(srcFileName, srcContentType, contentID, linkedModel, linkedID, file, int(srcFileSize), disposition, meta)
 		if err != nil {
 			app.lo.Error("error uploading file", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error uploading file", nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
 		}
 
 		// Delete current avatar.
@@ -168,13 +167,13 @@ func handleUpdateCurrentUser(r *fastglue.Request) error {
 		path, err := stringutil.GetPathFromURL(media.URL)
 		if err != nil {
 			app.lo.Debug("error getting path from URL", "url", media.URL, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error uploading file", nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
 		}
 		if err := app.user.UpdateAvatar(user.ID, path); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 	}
-	return r.SendEnvelope("User updated successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleCreateUser creates a new user.
@@ -184,19 +183,19 @@ func handleCreateUser(r *fastglue.Request) error {
 		user = models.User{}
 	)
 	if err := r.Decode(&user, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.InputError)
 	}
 
 	if user.Email.String == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty `email`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`email`"), nil, envelope.InputError)
 	}
 
 	if user.Roles == nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Please select at least one role", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`role`"), nil, envelope.InputError)
 	}
 
 	if user.FirstName == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty `first_name`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`first_name`"), nil, envelope.InputError)
 	}
 
 	// Right now, only agents can be created.
@@ -225,7 +224,7 @@ func handleCreateUser(r *fastglue.Request) error {
 		})
 		if err != nil {
 			app.lo.Error("error rendering template", "error", err)
-			return r.SendEnvelope("User created successfully, but error rendering welcome email.")
+			return r.SendEnvelope(true)
 		}
 
 		if err := app.notifier.Send(notifier.Message{
@@ -235,10 +234,10 @@ func handleCreateUser(r *fastglue.Request) error {
 			Provider:        notifier.ProviderEmail,
 		}); err != nil {
 			app.lo.Error("error sending notification message", "error", err)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, "User created successfully, but could not send welcome email.", nil))
+			return r.SendEnvelope(true)
 		}
 	}
-	return r.SendEnvelope("User created successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleUpdateUser updates a user.
@@ -249,24 +248,23 @@ func handleUpdateUser(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid user `id`.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "{globals.entities.user} `id`"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&user, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.InputError)
 	}
 
 	if user.Email.String == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty `email`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`email`"), nil, envelope.InputError)
 	}
 
 	if user.Roles == nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Please select at least one role", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`role`"), nil, envelope.InputError)
 	}
 
 	if user.FirstName == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty `first_name`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`first_name`"), nil, envelope.InputError)
 	}
 
 	// Update user.
@@ -279,7 +277,7 @@ func handleUpdateUser(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	return r.SendEnvelope("User updated successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleDeleteUser soft deletes a user.
@@ -289,8 +287,7 @@ func handleDeleteUser(r *fastglue.Request) error {
 		id, err = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid user `id`.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "{globals.entities.user} `id`"), nil, envelope.InputError)
 	}
 
 	// Soft delete user.
@@ -347,7 +344,7 @@ func handleDeleteAvatar(r *fastglue.Request) error {
 	if err = app.user.UpdateAvatar(user.ID, ""); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Avatar deleted successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleResetPassword generates a reset password token and sends an email to the user.
@@ -359,11 +356,11 @@ func handleResetPassword(r *fastglue.Request) error {
 		email     = string(p.Peek("email"))
 	)
 	if ok && auser.ID > 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "User is already logged in, Please logout to reset password.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("user.userAlreadyLoggedIn"), nil, envelope.InputError)
 	}
 
 	if email == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty `email`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`email`"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgentByEmail(email)
@@ -383,7 +380,7 @@ func handleResetPassword(r *fastglue.Request) error {
 	})
 	if err != nil {
 		app.lo.Error("error rendering template", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error rendering template", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingPasswordResetEmail"), nil, envelope.GeneralError)
 	}
 
 	if err := app.notifier.Send(notifier.Message{
@@ -393,10 +390,10 @@ func handleResetPassword(r *fastglue.Request) error {
 		Provider:        notifier.ProviderEmail,
 	}); err != nil {
 		app.lo.Error("error sending password reset email", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error sending password reset email", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingPasswordResetEmail"), nil, envelope.GeneralError)
 	}
 
-	return r.SendEnvelope("Reset password email sent successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleSetPassword resets the password with the provided token.
@@ -410,16 +407,16 @@ func handleSetPassword(r *fastglue.Request) error {
 	)
 
 	if ok && user.ID > 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "User is already logged in", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("user.userAlreadyLoggedIn"), nil, envelope.InputError)
 	}
 
 	if password == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty `password`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`password`"), nil, envelope.InputError)
 	}
 
 	if err := app.user.ResetPassword(token, password); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	return r.SendEnvelope("Password reset successfully.")
+	return r.SendEnvelope(true)
 }

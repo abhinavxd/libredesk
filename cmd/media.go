@@ -24,6 +24,7 @@ const (
 	thumbPrefix = "thumb_"
 )
 
+// handleMediaUpload handles media uploads.
 func handleMediaUpload(r *fastglue.Request) error {
 	var (
 		app     = r.Context.(*App)
@@ -33,19 +34,19 @@ func handleMediaUpload(r *fastglue.Request) error {
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
 		app.lo.Error("error parsing form data.", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error parsing data", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.GeneralError)
 	}
 
 	files, ok := form.File["files"]
 	if !ok || len(files) == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "File not found", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.file}"), nil, envelope.InputError)
 	}
 
 	fileHeader := files[0]
 	file, err := fileHeader.Open()
 	if err != nil {
 		app.lo.Error("error reading uploaded file", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error reading file", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.entities.file}"), nil, envelope.GeneralError)
 	}
 	defer file.Close()
 
@@ -74,15 +75,15 @@ func handleMediaUpload(r *fastglue.Request) error {
 	if bytesToMegabytes(srcFileSize) > float64(consts.MaxFileUploadSizeMB) {
 		app.lo.Error("error: uploaded file size is larger than max allowed", "size", bytesToMegabytes(srcFileSize), "max_allowed", consts.MaxFileUploadSizeMB)
 		return r.SendErrorEnvelope(
-			http.StatusRequestEntityTooLarge,
-			fmt.Sprintf("File size is too large. Please upload file lesser than %d MB", consts.MaxFileUploadSizeMB),
+			fasthttp.StatusRequestEntityTooLarge,
+			app.i18n.Ts("media.fileSizeTooLarge", "size", fmt.Sprint(consts.MaxFileUploadSizeMB), "unit", "MB"),
 			nil,
 			envelope.GeneralError,
 		)
 	}
 
 	if !slices.Contains(consts.AllowedUploadFileExtensions, "*") && !slices.Contains(consts.AllowedUploadFileExtensions, srcExt) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "File type not allowed", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileTypeNotAllowed"), nil, envelope.InputError)
 	}
 
 	// Delete files on any error.
@@ -102,11 +103,10 @@ func handleMediaUpload(r *fastglue.Request) error {
 		thumbFile, err := image.CreateThumb(image.DefThumbSize, file)
 		if err != nil {
 			app.lo.Error("error creating thumb image", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error creating image thumbnail", nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.thumbnail}"), nil, envelope.GeneralError)
 		}
 		thumbName, err = app.media.Upload(thumbName, srcContentType, thumbFile)
 		if err != nil {
-			app.lo.Error("error uploading thumbnail", "error", err)
 			return sendErrorEnvelope(r, err)
 		}
 
@@ -116,7 +116,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 		if err != nil {
 			cleanUp = true
 			app.lo.Error("error getting image dimensions", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error uploading file", nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorUploading", "name", "{globals.entities.media}"), nil, envelope.GeneralError)
 		}
 		meta, _ = json.Marshal(map[string]interface{}{
 			"width":  width,
@@ -129,7 +129,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error uploading file", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error uploading file", nil, envelope.GeneralError)
+		return sendErrorEnvelope(r, err)
 	}
 
 	// Insert in DB.
@@ -137,7 +137,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error inserting metadata into database", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error inserting media", nil, envelope.GeneralError)
+		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(media)
 }
@@ -164,7 +164,6 @@ func handleServeMedia(r *fastglue.Request) error {
 	// Check if the user has permission to access the linked model.
 	allowed, err := app.authz.EnforceMediaAccess(user, media.Model.String)
 	if err != nil {
-		app.lo.Error("error checking media permission", "error", err, "model", media.Model.String, "model_id", media.ModelID)
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -181,7 +180,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	}
 
 	if !allowed {
-		return r.SendErrorEnvelope(http.StatusUnauthorized, "Permission denied", nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("authz.permissionDenied"), nil, envelope.UnauthorizedError)
 	}
 	consts := app.consts.Load().(*constants)
 	switch consts.UploadProvider {
@@ -193,6 +192,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	return nil
 }
 
+// bytesToMegabytes converts bytes to megabytes.
 func bytesToMegabytes(bytes int64) float64 {
 	return float64(bytes) / 1024 / 1024
 }

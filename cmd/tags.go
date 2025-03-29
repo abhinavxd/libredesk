@@ -26,11 +26,11 @@ func handleCreateTag(r *fastglue.Request) error {
 		tag = tmodels.Tag{}
 	)
 	if err := r.Decode(&tag, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), err.Error(), envelope.InputError)
 	}
 
 	if tag.Name == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty tag `Name`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil, envelope.InputError)
 	}
 
 	err := app.tag.Create(tag.Name)
@@ -46,13 +46,8 @@ func handleDeleteTag(r *fastglue.Request) error {
 		app = r.Context.(*App)
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
-	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid tag `id`.", nil, envelope.InputError)
-	}
-
-	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty tag `ID`", nil, envelope.InputError)
+	if err != nil || id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 
 	err = app.tag.Delete(id)
@@ -69,17 +64,16 @@ func handleUpdateTag(r *fastglue.Request) error {
 		tag = tmodels.Tag{}
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
-	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid tag `id`.", nil, envelope.InputError)
+	if err != nil || id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&tag, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "decode failed", err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), err.Error(), envelope.InputError)
 	}
 
 	if tag.Name == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Empty tag `Name`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil, envelope.InputError)
 	}
 
 	err = app.tag.Update(id, tag.Name)

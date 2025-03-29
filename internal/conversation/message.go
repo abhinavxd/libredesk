@@ -272,19 +272,19 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	query, pageSize, qArgs, err := m.generateMessagesQuery(m.q.GetMessages, qArgs, page, pageSize)
 	if err != nil {
 		m.lo.Error("error generating messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, "Error fetching messages", nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.message}"), nil)
 	}
 
 	tx, err := m.db.BeginTxx(context.Background(), nil)
 	defer tx.Rollback()
 	if err != nil {
 		m.lo.Error("error preparing get messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, "Error fetching messages", nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.message}"), nil)
 	}
 
 	if err := tx.Select(&messages, query, qArgs...); err != nil {
 		m.lo.Error("error fetching conversations", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, "Error fetching messages", nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.message}"), nil)
 	}
 
 	return messages, pageSize, nil
@@ -295,7 +295,7 @@ func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 	var message models.Message
 	if err := m.q.GetMessage.Get(&message, uuid); err != nil {
 		m.lo.Error("error fetching message", "uuid", uuid, "error", err)
-		return message, envelope.NewError(envelope.GeneralError, "Error fetching message", nil)
+		return message, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.message}"), nil)
 	}
 	return message, nil
 }
@@ -316,7 +316,7 @@ func (m *Manager) UpdateMessageStatus(uuid string, status string) error {
 // MarkMessageAsPending updates message status to `Pending`, so if it's a outgoing message it can be picked up again by a worker.
 func (m *Manager) MarkMessageAsPending(uuid string) error {
 	if err := m.UpdateMessageStatus(uuid, MessageStatusPending); err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error retrying message", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorSending", "name", "{globals.entities.message}"), nil)
 	}
 	return nil
 }
@@ -351,7 +351,7 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conver
 	}
 	metaJSON, err := json.Marshal(meta)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, "Error marshalling message meta", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorMarshallingMeta"), nil)
 	}
 
 	// Generage unique source ID i.e. message-id for email.
@@ -362,7 +362,7 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conver
 	sourceID, err := stringutil.GenerateEmailMessageID(conversationUUID, inbox.From)
 	if err != nil {
 		m.lo.Error("error generating source message id", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error generating source message id", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
 	}
 
 	// Insert Message.
@@ -401,7 +401,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	if err := m.q.InsertMessage.QueryRow(message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta).Scan(&message.ID, &message.UUID, &message.CreatedAt); err != nil {
 		m.lo.Error("error inserting message in db", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error sending message", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.entities.message}"), nil)
 	}
 
 	// Attach message to the media.
@@ -493,7 +493,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 
 	if err := m.InsertMessage(&message); err != nil {
 		m.lo.Error("error inserting activity message", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error inserting activity message", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.entities.activityMessage}"), nil)
 	}
 	return nil
 }
@@ -627,10 +627,10 @@ func (m *Manager) GetConversationByMessageID(id int) (models.Conversation, error
 	var conversation = models.Conversation{}
 	if err := m.q.GetConversationByMessageID.Get(&conversation, id); err != nil {
 		if err == sql.ErrNoRows {
-			return conversation, errConversationNotFound
+			return conversation, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.conversation}"), nil)
 		}
 		m.lo.Error("error fetching message from DB", "error", err)
-		return conversation, envelope.NewError(envelope.GeneralError, "Error fetching message", nil)
+		return conversation, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.conversation}"), nil)
 	}
 	return conversation, nil
 }

@@ -3,6 +3,7 @@ package inbox
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/jmoiron/sqlx"
+	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
 
@@ -75,6 +77,7 @@ type Manager struct {
 	queries   queries
 	inboxes   map[int]Inbox
 	lo        *logf.Logger
+	i18n      *i18n.I18n
 	receivers map[int]context.CancelFunc
 	store     MessageStore
 	wg        sync.WaitGroup
@@ -92,7 +95,7 @@ type queries struct {
 }
 
 // New returns a new inbox manager.
-func New(lo *logf.Logger, db *sqlx.DB) (*Manager, error) {
+func New(lo *logf.Logger, db *sqlx.DB, i18n *i18n.I18n) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
 		return nil, err
@@ -103,6 +106,7 @@ func New(lo *logf.Logger, db *sqlx.DB) (*Manager, error) {
 		inboxes:   make(map[int]Inbox),
 		receivers: make(map[int]context.CancelFunc),
 		queries:   q,
+		i18n:      i18n,
 	}
 	return m, nil
 }
@@ -134,20 +138,13 @@ func (m *Manager) Get(id int) (Inbox, error) {
 func (m *Manager) GetDBRecord(id int) (imodels.Inbox, error) {
 	var inbox imodels.Inbox
 	if err := m.queries.GetInbox.Get(&inbox, id); err != nil {
+		if err == sql.ErrNoRows {
+			return inbox, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.inbox}"), nil)
+		}
 		m.lo.Error("error fetching inbox", "error", err)
-		return inbox, envelope.NewError(envelope.GeneralError, "Error fetching inbox", nil)
+		return inbox, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.entities.inbox}"), nil)
 	}
 	return inbox, nil
-}
-
-// GetActive returns all active inboxes from the DB.
-func (m *Manager) GetActive() ([]imodels.Inbox, error) {
-	var inboxes []imodels.Inbox
-	if err := m.queries.GetActive.Select(&inboxes); err != nil {
-		m.lo.Error("fetching active inboxes", "error", err)
-		return nil, err
-	}
-	return inboxes, nil
 }
 
 // GetAll returns all inboxes from the DB.
@@ -155,7 +152,7 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 	var inboxes = make([]imodels.Inbox, 0)
 	if err := m.queries.GetAll.Select(&inboxes); err != nil {
 		m.lo.Error("error fetching inboxes", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching inboxes", nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.entities.inbox")), nil)
 	}
 	return inboxes, nil
 }
@@ -164,7 +161,7 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 func (m *Manager) Create(inbox imodels.Inbox) error {
 	if _, err := m.queries.InsertInbox.Exec(inbox.Channel, inbox.Config, inbox.Name, inbox.From, inbox.CSATEnabled); err != nil {
 		m.lo.Error("error creating inbox", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error creating inbox", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.inbox}"), nil)
 	}
 	return nil
 }
@@ -174,7 +171,7 @@ func (m *Manager) InitInboxes(initFn initFn) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	inboxRecords, err := m.GetActive()
+	inboxRecords, err := m.getActive()
 	if err != nil {
 		m.lo.Error("error fetching active inboxes", "error", err)
 		return fmt.Errorf("fetching active inboxes: %v", err)
@@ -212,7 +209,7 @@ func (m *Manager) Reload(ctx context.Context, initFn initFn) error {
 
 	// Clear and reload inboxes.
 	m.inboxes = make(map[int]Inbox)
-	inboxRecords, err := m.GetActive()
+	inboxRecords, err := m.getActive()
 	if err != nil {
 		return fmt.Errorf("error fetching active inboxes: %v", err)
 	}
@@ -266,18 +263,22 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) error {
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
 			m.lo.Error("error unmarshalling current config", "id", id, "error", err)
-			return envelope.NewError(envelope.GeneralError, "Error unmarshalling config", nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.config}"), nil)
 		}
 		if len(inbox.Config) == 0 {
-			return envelope.NewError(envelope.InputError, "Empty config provided", nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "{globals.entities.config}"), nil)
 		}
 		if err := json.Unmarshal(inbox.Config, &updateCfg); err != nil {
 			m.lo.Error("error unmarshalling update config", "id", id, "error", err)
-			return envelope.NewError(envelope.GeneralError, "Error unmarshalling config", nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.config}"), nil)
 		}
 
-		if len(updateCfg.IMAP) == 0 || len(updateCfg.SMTP) == 0 {
-			return envelope.NewError(envelope.InputError, "Invalid email config", nil)
+		if len(updateCfg.IMAP) == 0 {
+			return envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptyIMAP"), nil)
+		}
+
+		if len(updateCfg.SMTP) == 0 {
+			return envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptySMTP"), nil)
 		}
 
 		// Preserve existing IMAP passwords if update has empty password
@@ -304,7 +305,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) error {
 	// Update the inbox in the DB.
 	if _, err := m.queries.Update.Exec(id, inbox.Channel, inbox.Config, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Enabled); err != nil {
 		m.lo.Error("error updating inbox", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error updating inbox", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.inbox}"), nil)
 	}
 
 	return nil
@@ -314,7 +315,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) error {
 func (m *Manager) Toggle(id int) error {
 	if _, err := m.queries.Toggle.Exec(id); err != nil {
 		m.lo.Error("error toggling inbox", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error toggling inbox", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.entities.inbox}"), nil)
 	}
 	return nil
 }
@@ -323,7 +324,7 @@ func (m *Manager) Toggle(id int) error {
 func (m *Manager) SoftDelete(id int) error {
 	if _, err := m.queries.SoftDelete.Exec(id); err != nil {
 		m.lo.Error("error deleting inbox", "error", err)
-		return err
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.entities.inbox}"), nil)
 	}
 	return nil
 }
@@ -364,4 +365,14 @@ func (m *Manager) Close() {
 
 	// Wait for all workers to finish.
 	m.wg.Wait()
+}
+
+// getActive returns all active inboxes from the DB.
+func (m *Manager) getActive() ([]imodels.Inbox, error) {
+	var inboxes []imodels.Inbox
+	if err := m.queries.GetActive.Select(&inboxes); err != nil {
+		m.lo.Error("fetching active inboxes", "error", err)
+		return nil, err
+	}
+	return inboxes, nil
 }

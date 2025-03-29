@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
+	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
 
@@ -24,14 +25,16 @@ var (
 
 // Manager manages LLM providers.
 type Manager struct {
-	q  queries
-	lo *logf.Logger
+	q    queries
+	lo   *logf.Logger
+	i18n *i18n.I18n
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB   *sqlx.DB
+	I18n *i18n.I18n
+	Lo   *logf.Logger
 }
 
 // queries contains prepared SQL queries.
@@ -49,8 +52,9 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		q:  q,
-		lo: opts.Lo,
+		q:    q,
+		lo:   opts.Lo,
+		i18n: opts.I18n,
 	}, nil
 }
 
@@ -64,7 +68,7 @@ func (m *Manager) Completion(k string, prompt string) (string, error) {
 	client, err := m.getDefaultProviderClient()
 	if err != nil {
 		m.lo.Error("error getting provider client", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, "Error getting provider client", nil)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.Ts("globals.entities.provider")), nil)
 	}
 
 	payload := PromptPayload{
@@ -76,11 +80,11 @@ func (m *Manager) Completion(k string, prompt string) (string, error) {
 	if err != nil {
 		if errors.Is(err, ErrInvalidAPIKey) {
 			m.lo.Error("error invalid API key", "error", err)
-			return "", envelope.NewError(envelope.InputError, "OpenAI API Key is invalid, Please ask your administrator to set it up", nil)
+			return "", envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.invalid", "name", "OpenAI API Key"), nil)
 		}
 		if errors.Is(err, ErrApiKeyNotSet) {
 			m.lo.Error("error API key not set", "error", err)
-			return "", envelope.NewError(envelope.InputError, "OpenAI API Key is not set, Please ask your administrator to set it up", nil)
+			return "", envelope.NewError(envelope.InputError, m.i18n.Ts("ai.apiKeyNotSet", "provider", "OpenAI"), nil)
 		}
 		m.lo.Error("error sending prompt to provider", "error", err)
 		return "", envelope.NewError(envelope.GeneralError, err.Error(), nil)
@@ -94,7 +98,7 @@ func (m *Manager) GetPrompts() ([]models.Prompt, error) {
 	var prompts = make([]models.Prompt, 0)
 	if err := m.q.GetPrompts.Select(&prompts); err != nil {
 		m.lo.Error("error fetching prompts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching prompts", nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.Ts("globals.entities.template")), nil)
 	}
 	return prompts, nil
 }
@@ -106,7 +110,7 @@ func (m *Manager) UpdateProvider(provider, apiKey string) error {
 		return m.setOpenAIAPIKey(apiKey)
 	default:
 		m.lo.Error("unsupported provider type", "provider", provider)
-		return envelope.NewError(envelope.GeneralError, "Unsupported provider type", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.invalid", "name", m.i18n.Ts("globals.entities.provider")), nil)
 	}
 }
 
@@ -114,7 +118,7 @@ func (m *Manager) UpdateProvider(provider, apiKey string) error {
 func (m *Manager) setOpenAIAPIKey(apiKey string) error {
 	if _, err := m.q.SetOpenAIKey.Exec(apiKey); err != nil {
 		m.lo.Error("error setting OpenAI API key", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error setting OpenAI API key", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "OpenAI API Key"), nil)
 	}
 	return nil
 }
@@ -125,10 +129,10 @@ func (m *Manager) getPrompt(k string) (string, error) {
 	if err := m.q.GetPrompt.Get(&p, k); err != nil {
 		if err == sql.ErrNoRows {
 			m.lo.Error("error prompt not found", "key", k)
-			return "", envelope.NewError(envelope.InputError, "Prompt not found", nil)
+			return "", envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.notFound", "name", m.i18n.Ts("globals.entities.template")), nil)
 		}
 		m.lo.Error("error fetching prompt", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, "Error fetching prompt", nil)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.Ts("globals.entities.template")), nil)
 	}
 	return p.Content, nil
 }
@@ -139,7 +143,7 @@ func (m *Manager) getDefaultProviderClient() (ProviderClient, error) {
 
 	if err := m.q.GetDefaultProvider.Get(&p); err != nil {
 		m.lo.Error("error fetching provider details", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, "Error fetching provider details", nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.Ts("globals.entities.provider")), nil)
 	}
 
 	switch ProviderType(p.Provider) {
@@ -149,11 +153,11 @@ func (m *Manager) getDefaultProviderClient() (ProviderClient, error) {
 		}{}
 		if err := json.Unmarshal([]byte(p.Config), &config); err != nil {
 			m.lo.Error("error parsing provider config", "error", err)
-			return nil, envelope.NewError(envelope.GeneralError, "Error parsing provider config", nil)
+			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorParsing", "name", m.i18n.Ts("globals.entities.provider")), nil)
 		}
 		return NewOpenAIClient(config.APIKey, m.lo), nil
 	default:
 		m.lo.Error("unsupported provider type", "provider", p.Provider)
-		return nil, envelope.NewError(envelope.GeneralError, "Unsupported provider type", nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.invalid", "name", m.i18n.Ts("globals.entities.provider")), nil)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
+	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
 
@@ -26,14 +27,16 @@ const (
 
 // Manager manages CSAT.
 type Manager struct {
-	q  queries
-	lo *logf.Logger
+	q    queries
+	lo   *logf.Logger
+	i18n *i18n.I18n
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB   *sqlx.DB
+	Lo   *logf.Logger
+	I18n *i18n.I18n
 }
 
 // queries contains prepared SQL queries.
@@ -50,8 +53,9 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		q:  q,
-		lo: opts.Lo,
+		q:    q,
+		lo:   opts.Lo,
+		i18n: opts.I18n,
 	}, nil
 }
 
@@ -63,7 +67,7 @@ func (m *Manager) Create(conversationID int) (models.CSATResponse, error) {
 	)
 	if err := m.q.Insert.QueryRow(conversationID).Scan(&uuid); err != nil {
 		m.lo.Error("error creating CSAT", "error", err)
-		return rsp, envelope.NewError(envelope.GeneralError, "Error creating CSAT survey", nil)
+		return rsp, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.csatSurvey}"), nil)
 	}
 	return m.Get(uuid)
 }
@@ -74,7 +78,7 @@ func (m *Manager) Get(uuid string) (models.CSATResponse, error) {
 	err := m.q.Get.Get(&csat, uuid)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return csat, envelope.NewError(envelope.InputError, "CSAT not found", nil)
+			return csat, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.entities.csatSurvey}"), nil)
 		}
 		m.lo.Error("error getting CSAT", "error", err)
 		return csat, err
@@ -90,13 +94,13 @@ func (m *Manager) UpdateResponse(uuid string, score int, feedback string) error 
 	}
 
 	if csat.Score > 0 || !csat.ResponseTimestamp.IsZero() {
-		return envelope.NewError(envelope.InputError, "CSAT already submitted", nil)
+		return envelope.NewError(envelope.InputError, m.i18n.T("csat.alreadySubmitted"), nil)
 	}
 
 	_, err = m.q.Update.Exec(uuid, score, feedback)
 	if err != nil {
 		m.lo.Error("error updating CSAT", "error", err)
-		return envelope.NewError(envelope.GeneralError, "Error saving CSAT response", nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorSaving", "name", "{globals.entities.csatResponse}"), nil)
 	}
 	return nil
 }

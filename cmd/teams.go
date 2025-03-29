@@ -40,7 +40,7 @@ func handleGetTeam(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id < 1 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid team `id`.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 	team, err := app.team.Get(id)
 	if err != nil {
@@ -64,7 +64,7 @@ func handleCreateTeam(r *fastglue.Request) error {
 	if err := app.team.Create(name, timezone, conversationAssignmentType, null.NewInt(businessHrsID, businessHrsID != 0), null.NewInt(slaPolicyID, slaPolicyID != 0), emoji, maxAutoAssignedConversations); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Team created successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleUpdateTeam updates an existing team.
@@ -86,7 +86,7 @@ func handleUpdateTeam(r *fastglue.Request) error {
 	if err := app.team.Update(id, name, timezone, conversationAssignmentType, null.NewInt(businessHrsID, businessHrsID != 0), null.NewInt(slaPolicyID, slaPolicyID != 0), emoji, maxAutoAssignedConversations); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Team updated successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleDeleteTeam deletes a team
@@ -96,12 +96,11 @@ func handleDeleteTeam(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			"Invalid team `id`.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 	err = app.team.Delete(id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Team deleted successfully.")
+	return r.SendEnvelope(true)
 }

@@ -165,21 +165,21 @@ func main() {
 		rdb                         = initRedis()
 		constants                   = initConstants()
 		i18n                        = initI18n(fs)
-		csat                        = initCSAT(db)
-		oidc                        = initOIDC(db, settings)
-		status                      = initStatus(db)
-		priority                    = initPriority(db)
-		auth                        = initAuth(oidc, rdb)
-		template                    = initTemplate(db, fs, constants)
-		media                       = initMedia(db)
-		inbox                       = initInbox(db)
-		team                        = initTeam(db)
-		businessHours               = initBusinessHours(db)
+		csat                        = initCSAT(db, i18n)
+		oidc                        = initOIDC(db, settings, i18n)
+		status                      = initStatus(db, i18n)
+		priority                    = initPriority(db, i18n)
+		auth                        = initAuth(oidc, rdb, i18n)
+		template                    = initTemplate(db, fs, constants, i18n)
+		media                       = initMedia(db, i18n)
+		inbox                       = initInbox(db, i18n)
+		team                        = initTeam(db, i18n)
+		businessHours               = initBusinessHours(db, i18n)
 		user                        = initUser(i18n, db)
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
-		automation                  = initAutomationEngine(db)
-		sla                         = initSLA(db, team, settings, businessHours, notifier, template, user)
+		automation                  = initAutomationEngine(db, i18n)
+		sla                         = initSLA(db, team, settings, businessHours, notifier, template, user, i18n)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 	)
@@ -216,14 +216,14 @@ func main() {
 		conversation:  conversation,
 		automation:    automation,
 		businessHours: businessHours,
-		authz:         initAuthz(),
+		authz:         initAuthz(i18n),
 		view:          initView(db),
-		csat:          initCSAT(db),
-		search:        initSearch(db),
-		role:          initRole(db),
-		tag:           initTag(db),
-		macro:         initMacro(db),
-		ai:            initAI(db),
+		csat:          initCSAT(db, i18n),
+		search:        initSearch(db, i18n),
+		role:          initRole(db, i18n),
+		tag:           initTag(db, i18n),
+		macro:         initMacro(db, i18n),
+		ai:            initAI(db, i18n),
 	}
 	app.consts.Store(constants)
 

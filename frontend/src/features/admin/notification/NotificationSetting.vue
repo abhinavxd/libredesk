@@ -67,10 +67,11 @@ const submitForm = async (values) => {
         return [`notification.email.${key}`, value]
       })
     )
-    const resp = await api.updateEmailNotificationSettings(updatedValues)
+    await api.updateEmailNotificationSettings(updatedValues)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       title: 'Success',
-      description: resp.data.data
+      description:
+        'Settings updated successfully, Please restart the app for changes to take effect.'
     })
     await getNotificationSettings()
   } catch (error) {

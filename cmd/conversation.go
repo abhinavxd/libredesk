@@ -61,7 +61,7 @@ func handleGetAssignedConversations(r *fastglue.Request) error {
 	)
 	conversations, err := app.conversation.GetAssignedConversationsList(user.ID, order, orderBy, filters, page, pageSize)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, "")
+		return sendErrorEnvelope(r, err)
 	}
 	if len(conversations) > 0 {
 		total = conversations[0].Total
@@ -90,7 +90,7 @@ func handleGetUnassignedConversations(r *fastglue.Request) error {
 
 	conversations, err := app.conversation.GetUnassignedConversationsList(order, orderBy, filters, page, pageSize)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, "")
+		return sendErrorEnvelope(r, err)
 	}
 	if len(conversations) > 0 {
 		total = conversations[0].Total
@@ -118,7 +118,7 @@ func handleGetViewConversations(r *fastglue.Request) error {
 		total       = 0
 	)
 	if viewID < 1 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid `view_id`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`view_id`"), nil, envelope.InputError)
 	}
 
 	// Check if user has access to the view.
@@ -127,7 +127,7 @@ func handleGetViewConversations(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if view.UserID != auser.ID {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, "You don't have access to this view.", nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("conversation.viewPermissionDenied"), nil, envelope.PermissionError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID)
@@ -135,7 +135,7 @@ func handleGetViewConversations(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Prepare lists user has access to based on user permissions, internally this affects the SQL query.
+	// Prepare lists user has access to based on user permissions, internally this prepares the SQL query.
 	lists := []string{}
 	for _, perm := range user.Permissions {
 		if perm == authzModels.PermConversationsReadAll {
@@ -156,7 +156,7 @@ func handleGetViewConversations(r *fastglue.Request) error {
 
 	// No lists found, user doesn't have access to any conversations.
 	if len(lists) == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, "Permission denied", nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("authz.permissionDenied"), nil, envelope.PermissionError)
 	}
 
 	conversations, err := app.conversation.GetViewConversationsList(user.ID, user.Teams.IDs(), lists, order, orderBy, string(view.Filters), page, pageSize)
@@ -191,7 +191,7 @@ func handleGetTeamUnassignedConversations(r *fastglue.Request) error {
 	)
 	teamID, _ := strconv.Atoi(teamIDStr)
 	if teamID < 1 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid `team_id`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`team_id`"), nil, envelope.InputError)
 	}
 
 	// Check if user belongs to the team.
@@ -201,7 +201,7 @@ func handleGetTeamUnassignedConversations(r *fastglue.Request) error {
 	}
 
 	if !exists {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, "You're not a member of this team, Please refresh the page and try again.", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("conversation.notMemberOfTeam"), nil))
 	}
 
 	conversations, err := app.conversation.GetTeamUnassignedConversationsList(teamID, order, orderBy, filters, page, pageSize)
@@ -262,7 +262,7 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 	if err = app.conversation.UpdateConversationAssigneeLastSeen(uuid); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Last seen updated successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleGetConversationParticipants retrieves participants of a conversation.
@@ -296,7 +296,7 @@ func handleUpdateUserAssignee(r *fastglue.Request) error {
 		assigneeID = r.RequestCtx.PostArgs().GetUintOrZero("assignee_id")
 	)
 	if assigneeID == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid `assignee_id`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`assignee_id`"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID)
@@ -316,7 +316,7 @@ func handleUpdateUserAssignee(r *fastglue.Request) error {
 	// Evaluate automation rules.
 	app.automation.EvaluateConversationUpdateRules(uuid, models.EventConversationUserAssigned)
 
-	return r.SendEnvelope("User assigned successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleUpdateTeamAssignee updates the team assigned to a conversation.
@@ -328,7 +328,7 @@ func handleUpdateTeamAssignee(r *fastglue.Request) error {
 	)
 	assigneeID, err := r.RequestCtx.PostArgs().GetUint("assignee_id")
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid assignee `id`.", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`assignee_id`"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID)
@@ -352,7 +352,7 @@ func handleUpdateTeamAssignee(r *fastglue.Request) error {
 	// Evaluate automation rules on team assignment.
 	app.automation.EvaluateConversationUpdateRules(uuid, models.EventConversationTeamAssigned)
 
-	return r.SendEnvelope("Team assigned successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleUpdateConversationPriority updates the priority of a conversation.
@@ -364,7 +364,7 @@ func handleUpdateConversationPriority(r *fastglue.Request) error {
 		priority = string(r.RequestCtx.PostArgs().Peek("priority"))
 	)
 	if priority == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid `priority`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`priority`"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID)
@@ -382,7 +382,7 @@ func handleUpdateConversationPriority(r *fastglue.Request) error {
 	// Evaluate automation rules.
 	app.automation.EvaluateConversationUpdateRules(uuid, models.EventConversationPriorityChange)
 
-	return r.SendEnvelope("Priority updated successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleUpdateConversationStatus updates the status of a conversation.
@@ -397,15 +397,15 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 
 	// Validate inputs
 	if status == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid `status`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`status`"), nil, envelope.InputError)
 	}
 	if snoozedUntil == "" && status == cmodels.StatusSnoozed {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid `snoozed_until`", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`snoozed_until`"), nil, envelope.InputError)
 	}
 	if status == cmodels.StatusSnoozed {
 		_, err := time.ParseDuration(snoozedUntil)
 		if err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid `snoozed_until`", nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`snoozed_until`"), nil, envelope.InputError)
 		}
 	}
 
@@ -421,7 +421,7 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 
 	// Make sure a user is assigned before resolving conversation.
 	if status == cmodels.StatusResolved && conversation.AssignedUserID.Int == 0 {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Cannot resolve the conversation without an assigned user, Please assign a user before attempting to resolve.", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("conversation.resolveWithoutAssignee"), nil))
 	}
 
 	// Update conversation status.
@@ -445,7 +445,7 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 			}
 		}
 	}
-	return r.SendEnvelope("Status updated successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleUpdateConversationtags updates conversation tags.
@@ -460,7 +460,7 @@ func handleUpdateConversationtags(r *fastglue.Request) error {
 
 	if err := json.Unmarshal(tagJSON, &tagNames); err != nil {
 		app.lo.Error("error unmarshalling tags JSON", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Error unmarshalling tags JSON", nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.entities.request}"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID)
@@ -475,7 +475,7 @@ func handleUpdateConversationtags(r *fastglue.Request) error {
 	if err := app.conversation.UpsertConversationTags(uuid, tagNames, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope("Tags added successfully")
+	return r.SendEnvelope(true)
 }
 
 // handleDashboardCounts retrieves general dashboard counts for all users.
@@ -510,7 +510,7 @@ func enforceConversationAccess(app *App, uuid string, user umodels.User) (*cmode
 	}
 	allowed, err := app.authz.EnforceConversationAccess(user, conversation)
 	if err != nil {
-		return nil, envelope.NewError(envelope.GeneralError, "Error checking permissions", nil)
+		return nil, err
 	}
 	if !allowed {
 		return nil, envelope.NewError(envelope.PermissionError, "Permission denied", nil)
@@ -586,19 +586,19 @@ func handleCreateConversation(r *fastglue.Request) error {
 	)
 	// Validate required fields
 	if inboxID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "inbox_id is required", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "`inbox_id`"), nil, envelope.InputError)
 	}
-	if subject == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "subject is required", nil, envelope.InputError)
+	if strings.TrimSpace(subject) == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "`subject`"), nil, envelope.InputError)
 	}
-	if content == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "content is required", nil, envelope.InputError)
+	if strings.TrimSpace(content) == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "`content`"), nil, envelope.InputError)
 	}
-	if email == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Contact email is required", nil, envelope.InputError)
+	if strings.TrimSpace(email) == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "`contact_email`"), nil, envelope.InputError)
 	}
 	if firstName == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "First name is required when creating a new contact", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "`first_name`"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID)
@@ -612,7 +612,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if !inbox.Enabled {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "The chosen inbox is disabled", nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "inbox"), nil, envelope.InputError)
 	}
 
 	// Find or create contact.
@@ -624,7 +624,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		InboxID:         inboxID,
 	}
 	if err := app.user.CreateContact(&contact); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, "Error creating contact", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.contact}"), nil))
 	}
 
 	// Create conversation
@@ -639,15 +639,16 @@ func handleCreateConversation(r *fastglue.Request) error {
 	)
 	if err != nil {
 		app.lo.Error("error creating conversation", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, "Error creating conversation", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.entities.conversation}"), nil))
 	}
 
 	// Send reply to the created conversation.
 	if err := app.conversation.SendReply(nil /**media**/, inboxID, auser.ID, conversationUUID, content, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
+		// Delete the conversation if sending the reply fails.
 		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 			app.lo.Error("error deleting conversation", "error", err)
 		}
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, "Error sending message", nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.entities.conversation}"), nil))
 	}
 
 	// Assign the conversation to the agent or team.
@@ -659,9 +660,6 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 
 	// Send the created conversation back to the client.
-	conversation, err := app.conversation.GetConversation(conversationID, "")
-	if err != nil {
-		app.lo.Error("error fetching created conversation", "error", err)
-	}
+	conversation, _ := app.conversation.GetConversation(conversationID, "")
 	return r.SendEnvelope(conversation)
 }
