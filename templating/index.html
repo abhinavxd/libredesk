@@ -375,14 +375,23 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#email-template-expressions" class="md-nav__link">
+  <a href="#outgoing-email-template-expressions" class="md-nav__link">
     <span class="md-ellipsis">
-      Email template expressions
+      Outgoing Email Template Expressions
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Email template expressions">
+    <nav class="md-nav" aria-label="Outgoing Email Template Expressions">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conversation-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conversation fields
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#contact-fields" class="md-nav__link">
@@ -584,14 +593,23 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#email-template-expressions" class="md-nav__link">
+  <a href="#outgoing-email-template-expressions" class="md-nav__link">
     <span class="md-ellipsis">
-      Email template expressions
+      Outgoing Email Template Expressions
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Email template expressions">
+    <nav class="md-nav" aria-label="Outgoing Email Template Expressions">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conversation-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conversation fields
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#contact-fields" class="md-nav__link">
@@ -642,9 +660,10 @@
 
 
 <h1 id="templating">Templating<a class="headerlink" href="#templating" title="Permanent link">&para;</a></h1>
-<p>Templating in outgoing emails allows you to personalize content by embedding dynamic expressions like {{ .Recipient.FullName }}. These expressions reference fields from the conversation, contact, and recipient objects, making it easy to generate customized messages. This section documents all available template variables and provides a basic example to demonstrate their usage.</p>
-<h2 id="email-template-expressions">Email template expressions<a class="headerlink" href="#email-template-expressions" title="Permanent link">&para;</a></h2>
-<p>There are several template expressions that can be used in the outgoing email template, They are written in the form <code>{{ .Recipient.FullName }}</code>.</p>
+<p>Templating in outgoing emails allows you to personalize content by embedding dynamic expressions like <code>{{ .Recipient.FullName }}</code>. These expressions reference fields from the conversation, contact, and recipient objects.</p>
+<h2 id="outgoing-email-template-expressions">Outgoing Email Template Expressions<a class="headerlink" href="#outgoing-email-template-expressions" title="Permanent link">&para;</a></h2>
+<p>If you want to customize the look of outgoing emails, you can do so in the <strong>Settings &gt; Templates -&gt; Outgoing Email Templates</strong> section. This template will be used for all outgoing emails including replies to conversations, notifications, and other system-generated emails.</p>
+<h3 id="conversation-fields">Conversation fields<a class="headerlink" href="#conversation-fields" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -727,7 +746,8 @@
 Best regards,
 </code></pre></div>
 
-<p>Here the <code>{{ template "content" . }}</code> is a placeholder for the content of the outgoing email. It will be replaced with the actual content of the email when it is sent. The <code>{{ .Recipient.FirstName }}</code> will be replaced with the first name of the recipient when the email is sent, this way you don't have to hardcode the name in the template. The same applies to the other variables.</p>
+<p>Here, the <code>{{ template "content" . }}</code> serves as a placeholder for the body of the outgoing email. It will be replaced with the actual email content at the time of sending.</p>
+<p>Similarly, the <code>{{ .Recipient.FirstName }}</code> expression will dynamically insert the recipient's first name when the email is sent.</p>
 
 
 
