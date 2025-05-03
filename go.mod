@@ -1,6 +1,7 @@
 module github.com/abhinavxd/libredesk
 
 go 1.22.3
+toolchain go1.24.1
 
 require (
 	github.com/casbin/casbin/v2 v2.99.0
@@ -35,7 +36,7 @@ require (
 	github.com/zerodha/logf v0.5.5
 	github.com/zerodha/simplesessions/stores/redis/v3 v3.0.0
 	github.com/zerodha/simplesessions/v3 v3.0.0
-	golang.org/x/crypto v0.32.0
+	golang.org/x/crypto v0.35.0
 	golang.org/x/mod v0.17.0
 	golang.org/x/oauth2 v0.21.0
 )
@@ -72,7 +73,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	golang.org/x/image v0.18.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
