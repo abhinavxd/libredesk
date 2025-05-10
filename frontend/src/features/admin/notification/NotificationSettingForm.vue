@@ -97,6 +97,18 @@
       </FormItem>
     </FormField>
 
+    <!-- Max Message Retries Field -->
+    <FormField v-slot="{ componentField }" name="max_msg_retries">
+      <FormItem>
+        <FormLabel>{{ $t('admin.inbox.maxRetries') }}</FormLabel>
+        <FormControl>
+          <Input type="number" placeholder="3" v-bind="componentField" />
+        </FormControl>
+        <FormMessage />
+        <FormDescription> {{ $t('admin.inbox.maxRetries.description') }} </FormDescription>
+      </FormItem>
+    </FormField>
+
     <!-- Authentication Protocol Field -->
     <FormField v-slot="{ componentField }" name="auth_protocol">
       <FormItem>
@@ -133,18 +145,6 @@
         </FormControl>
         <FormMessage />
         <FormDescription> {{ $t('admin.inbox.fromEmailAddress.description') }}</FormDescription>
-      </FormItem>
-    </FormField>
-
-    <!-- Max Message Retries Field -->
-    <FormField v-slot="{ componentField }" name="max_msg_retries">
-      <FormItem>
-        <FormLabel>{{ $t('admin.inbox.maxRetries') }}</FormLabel>
-        <FormControl>
-          <Input type="number" placeholder="3" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-        <FormDescription> {{ $t('admin.inbox.maxRetries.description') }} </FormDescription>
       </FormItem>
     </FormField>
 

@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/automation/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
@@ -640,23 +641,28 @@ func handleCreateConversation(r *fastglue.Request) error {
 		firstName       = strings.TrimSpace(string(r.RequestCtx.PostArgs().Peek("first_name")))
 		lastName        = strings.TrimSpace(string(r.RequestCtx.PostArgs().Peek("last_name")))
 		subject         = strings.TrimSpace(string(r.RequestCtx.PostArgs().Peek("subject")))
-		content         = string(r.RequestCtx.PostArgs().Peek("content"))
+		content         = strings.TrimSpace(string(r.RequestCtx.PostArgs().Peek("content")))
+		to              = []string{email}
 	)
+
 	// Validate required fields
 	if inboxID <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldRequired", "name", "`inbox_id`"), nil, envelope.InputError)
 	}
-	if strings.TrimSpace(subject) == "" {
+	if subject == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldRequired", "name", "`subject`"), nil, envelope.InputError)
 	}
-	if strings.TrimSpace(content) == "" {
+	if content == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldRequired", "name", "`content`"), nil, envelope.InputError)
 	}
-	if strings.TrimSpace(email) == "" {
+	if email == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldRequired", "name", "`contact_email`"), nil, envelope.InputError)
 	}
 	if firstName == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldRequired", "name", "`first_name`"), nil, envelope.InputError)
+	}
+	if !stringutil.ValidEmail(email) {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`contact_email`"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID, "")
@@ -690,8 +696,8 @@ func handleCreateConversation(r *fastglue.Request) error {
 		contact.ID,
 		contact.ContactChannelID,
 		inboxID,
-		"", /** last_message **/
-		time.Now(),
+		"",         /** last_message **/
+		time.Now(), /** last_message_at **/
 		subject,
 		true, /** append reference number to subject **/
 	)
@@ -701,7 +707,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 
 	// Send reply to the created conversation.
-	if err := app.conversation.SendReply(nil /**media**/, inboxID, auser.ID, conversationUUID, content, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
+	if err := app.conversation.SendReply(nil /**media**/, inboxID, auser.ID, conversationUUID, content, to, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
 		// Delete the conversation if sending the reply fails.
 		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 			app.lo.Error("error deleting conversation", "error", err)

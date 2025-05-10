@@ -142,7 +142,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		return
 	}
 
-	// Render content  template
+	// Render content in template
 	if err := m.RenderContentInTemplate(inbox.Channel(), &message); err != nil {
 		handleError(err, "error rendering content in template")
 		return
@@ -154,12 +154,8 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		return
 	}
 
-	// Set from and to addresses
+	// Set from address of the inbox
 	message.From = inbox.FromAddress()
-	message.To, err = m.GetToAddress(message.ConversationID)
-	if handleError(err, "error fetching `to` address") {
-		return
-	}
 
 	// Set "In-Reply-To" and "References" headers, logging any errors but continuing to send the message.
 	// Include only the last 20 messages as references to avoid exceeding header size limits.
@@ -318,16 +314,24 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 }
 
 // SendReply inserts a reply message in a conversation.
-func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conversationUUID, content string, cc, bcc []string, meta map[string]interface{}) error {
-	// Save cc and bcc as JSON in meta.
+func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conversationUUID, content string, to, cc, bcc []string, meta map[string]interface{}) error {
+	// Save to, cc and bcc in meta.
+	to = stringutil.RemoveEmpty(to)
 	cc = stringutil.RemoveEmpty(cc)
 	bcc = stringutil.RemoveEmpty(bcc)
+
+	if len(to) == 0 {
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "to"), nil)
+	}
+	meta["to"] = to
+
 	if len(cc) > 0 {
 		meta["cc"] = cc
 	}
 	if len(bcc) > 0 {
 		meta["bcc"] = bcc
 	}
+
 	metaJSON, err := json.Marshal(meta)
 	if err != nil {
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorMarshalling", "name", "{globals.terms.meta}"), nil)
@@ -355,7 +359,7 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conver
 		ContentType:      models.ContentTypeHTML,
 		Private:          false,
 		Media:            media,
-		Meta:             string(metaJSON),
+		Meta:             metaJSON,
 		SourceID:         null.StringFrom(sourceID),
 	}
 	return m.InsertMessage(&message)
@@ -368,9 +372,8 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.Status = models.MessageStatusSent
 	}
 
-	// Handle empty meta.
-	if message.Meta == "" || message.Meta == "null" {
-		message.Meta = "{}"
+	if len(message.Meta) == 0 || string(message.Meta) == "null" {
+		message.Meta = json.RawMessage(`{}`)
 	}
 
 	// Convert HTML content to text for search.
@@ -566,11 +569,10 @@ func (m *Manager) processIncomingMessage(in models.IncomingMessage) error {
 	systemUser, err := m.userStore.GetSystemUser()
 	if err != nil {
 		m.lo.Error("error fetching system user", "error", err)
-		return fmt.Errorf("error fetching system user for reopening conversation: %w", err)
-	}
-	if err := m.ReOpenConversation(in.Message.ConversationUUID, systemUser); err != nil {
-		m.lo.Error("error reopening conversation", "error", err)
-		return fmt.Errorf("error reopening conversation: %w", err)
+	} else {
+		if err := m.ReOpenConversation(in.Message.ConversationUUID, systemUser); err != nil {
+			m.lo.Error("error reopening conversation", "error", err)
+		}
 	}
 
 	// Trigger automations on incoming message event.

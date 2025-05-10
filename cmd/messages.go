@@ -15,6 +15,7 @@ type messageReq struct {
 	Attachments []int    `json:"attachments"`
 	Message     string   `json:"message"`
 	Private     bool     `json:"private"`
+	To          []string `json:"to"`
 	CC          []string `json:"cc"`
 	BCC         []string `json:"bcc"`
 }
@@ -140,7 +141,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Check permission
+	// Check access to conversation.
 	conv, err := enforceConversationAccess(app, cuuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -151,6 +152,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
 	}
 
+	// Prepare attachments.
 	for _, id := range req.Attachments {
 		m, err := app.media.Get(id, "")
 		if err != nil {
@@ -165,7 +167,7 @@ func handleSendMessage(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, err)
 		}
 	} else {
-		if err := app.conversation.SendReply(media, conv.InboxID, user.ID, cuuid, req.Message, req.CC, req.BCC, map[string]any{} /**meta**/); err != nil {
+		if err := app.conversation.SendReply(media, conv.InboxID, user.ID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 		// Evaluate automation rules.

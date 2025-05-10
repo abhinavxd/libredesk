@@ -37,11 +37,21 @@
       </span>
     </div>
 
-    <!-- CC and BCC fields -->
+    <!-- To, CC, and BCC fields -->
     <div
       :class="['space-y-3', isFullscreen ? 'p-4 border-b border-border' : 'mb-4']"
       v-if="messageType === 'reply'"
     >
+      <div class="flex items-center space-x-2">
+        <label class="w-12 text-sm font-medium text-muted-foreground">To:</label>
+        <Input
+          type="text"
+          :placeholder="t('replyBox.emailAddresess')"
+          v-model="to"
+          class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
+          @blur="validateEmails('to')"
+        />
+      </div>
       <div class="flex items-center space-x-2">
         <label class="w-12 text-sm font-medium text-muted-foreground">CC:</label>
         <Input
@@ -71,7 +81,7 @@
       </div>
     </div>
 
-    <!-- CC and BCC field validation errors -->
+    <!-- email errors -->
     <div
       v-if="emailErrors.length > 0"
       class="mb-4 px-2 py-1 bg-destructive/10 border border-destructive text-destructive rounded"
@@ -148,9 +158,11 @@ import AttachmentsPreview from '@/features/conversation/message/attachment/Attac
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { useI18n } from 'vue-i18n'
+import { validateEmail } from '@/utils/strings'
 
 // Define models for two-way binding
 const messageType = defineModel('messageType', { default: 'reply' })
+const to = defineModel('to', { default: '' })
 const cc = defineModel('cc', { default: '' })
 const bcc = defineModel('bcc', { default: '' })
 const showBcc = defineModel('showBcc', { default: false })
@@ -243,28 +255,30 @@ const enableSend = computed(() => {
 })
 
 /**
- * Validate email addresses in the CC and BCC fields
- * @param {string} field - 'cc' or 'bcc'
+ * Validate email addresses in the To, CC, and BCC fields
+ * @param {string} field - 'to', 'cc', or 'bcc'
  */
 const validateEmails = (field) => {
-  const emails = field === 'cc' ? cc.value : bcc.value
+  console.log('Validating emails for field:', field)
+  const emails = field === 'to' ? to.value : field === 'cc' ? cc.value : bcc.value
   const emailList = emails
     .split(',')
     .map((e) => e.trim())
     .filter((e) => e !== '')
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  const invalidEmails = emailList.filter((email) => !emailRegex.test(email))
 
-  // Remove any existing errors for this field
-  emailErrors.value = emailErrors.value.filter(
-    (error) => !error.startsWith(`${t('replyBox.invalidEmailsIn')} ${field.toUpperCase()}`)
-  )
+  const invalidEmails = emailList.filter((email) => !validateEmail(email))
+
+  console.log('Invalid emails:', invalidEmails)
+
+  // Clear existing errors
+  emailErrors.value = []
 
   // Add new error if there are invalid emails
   if (invalidEmails.length > 0) {
-    emailErrors.value.push(
-      `${t('replyBox.invalidEmailsIn')} ${field.toUpperCase()}: ${invalidEmails.join(', ')}`
-    )
+    emailErrors.value = [
+      ...emailErrors.value,
+      `${t('replyBox.invalidEmailsIn')} '${field}': ${invalidEmails.join(', ')}`
+    ]
   }
 }
 
@@ -272,6 +286,7 @@ const validateEmails = (field) => {
  * Send the reply or private note
  */
 const handleSend = async () => {
+  validateEmails('to')
   validateEmails('cc')
   validateEmails('bcc')
   if (emailErrors.value.length > 0) {

@@ -8,7 +8,7 @@
     </div>
 
     <!-- Message Bubble -->
-    <div class="flex flex-row gap-2">
+    <div class="flex flex-row gap-2 w-full">
       <!-- Avatar -->
       <Avatar class="cursor-pointer w-8 h-8">
         <AvatarImage :src="getAvatar" />
@@ -18,32 +18,40 @@
       </Avatar>
 
       <!-- Message Content -->
-      <div
-        class="flex flex-col justify-end message-bubble bg-white border border-border rounded-lg p-3 max-w-[80%]"
-        :class="{
-          'show-quoted-text': showQuotedText,
-          'hide-quoted-text': !showQuotedText
-        }"
-      >
-        <!-- Message Text -->
-        <Letter
-          :html="sanitizedMessageContent"
-          :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-          class="mb-1 native-html"
-          :class="{ 'mb-3': message.attachments.length > 0 }"
-        />
-
-        <!-- Quoted Text Toggle -->
+      <div class="w-4/5">
         <div
-          v-if="hasQuotedContent"
-          @click="toggleQuote"
-          class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded-md transition-all"
+          class="flex flex-col justify-end message-bubble"
+          :class="{
+            'show-quoted-text': showQuotedText,
+            'hide-quoted-text': !showQuotedText
+          }"
         >
-          {{ showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText') }}
-        </div>
+          <MessageEnvelope :message="message" v-if="showEnvelope" />
 
-        <!-- Attachments -->
-        <MessageAttachmentPreview :attachments="nonInlineAttachments" />
+          <hr class="mb-2" v-if="showEnvelope" />
+
+          <!-- Message Text -->
+          <Letter
+            :html="sanitizedMessageContent"
+            :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+            class="mb-1 native-html"
+            :class="{ 'mb-3': message.attachments.length > 0 }"
+          />
+
+          <!-- Quoted Text Toggle -->
+          <div
+            v-if="hasQuotedContent"
+            @click="toggleQuote"
+            class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded-md transition-all"
+          >
+            {{
+              showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText')
+            }}
+          </div>
+
+          <!-- Attachments -->
+          <MessageAttachmentPreview :attachments="nonInlineAttachments" />
+        </div>
       </div>
     </div>
 
@@ -75,6 +83,7 @@ import { Letter } from 'vue-letter'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import { useI18n } from 'vue-i18n'
 import MessageAttachmentPreview from '@/features/conversation/message/attachment/MessageAttachmentPreview.vue'
+import MessageEnvelope from './MessageEnvelope.vue'
 
 const props = defineProps({
   message: Object
@@ -122,5 +131,15 @@ const getFullName = computed(() => {
 const avatarFallback = computed(() => {
   const contact = convStore.current?.contact || {}
   return (contact.first_name || '').toUpperCase().substring(0, 2)
+})
+
+const showEnvelope = computed(() => {
+  return (
+    props.message.meta?.from?.length ||
+    props.message.meta?.to?.length ||
+    props.message.meta?.cc?.length ||
+    props.message.meta?.bcc?.length ||
+    props.message.meta?.subject
+  )
 })
 </script>

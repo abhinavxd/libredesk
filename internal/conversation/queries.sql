@@ -82,21 +82,6 @@ SELECT
 WHERE 1=1 %s
 
 -- name: get-conversation
-WITH last_reply AS (
-   SELECT 
-       conversation_id,
-       meta->'cc' as cc,
-       meta->'bcc' as bcc
-   FROM conversation_messages 
-   WHERE private = false
-   AND type IN ('outgoing', 'incoming')
-   AND (
-       ($1 > 0 AND conversation_id = $1)
-       OR ($2 != '' AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2::uuid))
-   )
-   ORDER BY created_at DESC 
-   LIMIT 1
-)
 SELECT
    c.id,
    c.created_at,
@@ -104,6 +89,7 @@ SELECT
    c.closed_at,
    c.resolved_at,
    c.inbox_id,
+   COALESCE(inb.from, '') as inbox_mail,
    c.status_id,
    c.priority_id,
    p.name as priority,
@@ -138,18 +124,16 @@ SELECT
    ct.phone_number as "contact.phone_number",
    ct.phone_number_calling_code as "contact.phone_number_calling_code",
    ct.custom_attributes as "contact.custom_attributes",
-   COALESCE(lr.cc, '[]'::jsonb) as cc,
-   COALESCE(lr.bcc, '[]'::jsonb) as bcc,
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
    as_latest.status as sla_status
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
+INNER JOIN inboxes inb ON c.inbox_id = inb.id
 LEFT JOIN sla_policies sla ON c.sla_policy_id = sla.id
 LEFT JOIN teams at ON at.id = c.assigned_team_id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id
 LEFT JOIN conversation_priorities p ON c.priority_id = p.id
-LEFT JOIN last_reply lr ON lr.conversation_id = c.id
 LEFT JOIN LATERAL (
     SELECT first_response_deadline_at, resolution_deadline_at, status
     FROM applied_slas 
@@ -424,6 +408,7 @@ SELECT
     m.source_id,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'cc')) AS cc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'bcc')) AS bcc,
+    ARRAY(SELECT jsonb_array_elements_text(m.meta->'to')) AS to,
     c.inbox_id,
     c.uuid as conversation_uuid,
     c.subject

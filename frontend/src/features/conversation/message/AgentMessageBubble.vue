@@ -9,38 +9,46 @@
 
     <!-- Message Bubble -->
     <div class="flex flex-row gap-2 justify-end">
-      <div
-        class="flex flex-col message-bubble justify-end items-end relative rounded-lg p-3 max-w-[80%]"
-        :class="{
-          '!bg-[#FEF1E1]': message.private,
-          'bg-white border border-border': !message.private,
-          'opacity-50 animate-pulse': message.status === 'pending',
-          'bg-red-50 border-red-200': message.status === 'failed'
-        }"
-      >
-        <!-- Message Content -->
+      <!-- Bubble Wrapper with max 80% width -->
+      <div class="w-4/5 flex justify-end">
         <div
-          v-dompurify-html="messageContent"
-          class="whitespace-pre-wrap break-words overflow-wrap-anywhere native-html" 
-          :class="{ 'mb-3': message.attachments.length > 0 }"
-        />
+          class="flex flex-col justify-end message-bubble relative"
+          :class="{
+            '!bg-[#FEF1E1]': message.private,
+            'bg-white border border-border': !message.private,
+            'opacity-50 animate-pulse': message.status === 'pending',
+            'bg-red-50 border-red-200': message.status === 'failed'
+          }"
+        >
+          <!-- Message Envelope -->
+          <MessageEnvelope :message="message" v-if="showEnvelope" />
 
-        <!-- Attachments -->
-        <MessageAttachmentPreview :attachments="nonInlineAttachments" />
+          <hr class="mb-2" v-if="showEnvelope" />
 
-        <!-- Spinner for Pending Messages -->
-        <Spinner v-if="message.status === 'pending'" size="w-4 h-4" />
-
-        <!-- Icons -->
-        <div class="flex items-center space-x-2 mt-2">
-          <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
-          <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
-          <RotateCcw
-            size="10"
-            @click="retryMessage(message)"
-            class="cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-200"
-            v-if="showRetry"
+          <!-- Message -->
+          <div
+            v-dompurify-html="messageContent"
+            class="whitespace-pre-wrap break-words overflow-wrap-anywhere native-html"
+            :class="{ 'mb-3': message.attachments.length > 0 }"
           />
+
+          <!-- Attachments -->
+          <MessageAttachmentPreview :attachments="nonInlineAttachments" />
+
+          <!-- Spinner for Pending Messages -->
+          <Spinner v-if="message.status === 'pending'" size="w-4 h-4" />
+
+          <!-- Icons -->
+          <div class="flex items-center space-x-2 mt-2 self-end">
+            <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
+            <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
+            <RotateCcw
+              size="10"
+              @click="retryMessage(message)"
+              class="cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-200"
+              v-if="showRetry"
+            />
+          </div>
         </div>
       </div>
 
@@ -53,7 +61,7 @@
       </Avatar>
     </div>
 
-    <!-- Timestamp -->
+    <!-- Timestamp tooltip -->
     <div class="pr-[47px]">
       <Tooltip>
         <TooltipTrigger>
@@ -79,6 +87,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Spinner } from '@/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import MessageAttachmentPreview from '@/features/conversation/message/attachment/MessageAttachmentPreview.vue'
+import MessageEnvelope from './MessageEnvelope.vue'
 import api from '@/api'
 
 const props = defineProps({
@@ -128,6 +137,16 @@ const avatarFallback = computed(() => {
 const retryMessage = (msg) => {
   api.retryMessage(convStore.current.uuid, msg.uuid)
 }
+
+const showEnvelope = computed(() => {
+  return (
+    props.message.meta?.from?.length ||
+    props.message.meta?.to?.length ||
+    props.message.meta?.cc?.length ||
+    props.message.meta?.bcc?.length ||
+    props.message.meta?.subject
+  )
+})
 </script>
 
 <style scoped>

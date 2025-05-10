@@ -53,30 +53,20 @@
           :isSending="isSending"
           :uploadingFiles="uploadingFiles"
           :clearEditorContent="clearEditorContent"
-          :htmlContent="htmlContent"
-          :textContent="textContent"
-          :selectedText="selectedText"
-          :isBold="isBold"
-          :isItalic="isItalic"
-          :cursorPosition="cursorPosition"
           :contentToSet="contentToSet"
-          :cc="cc"
-          :bcc="bcc"
-          :emailErrors="emailErrors"
-          :messageType="messageType"
-          :showBcc="showBcc"
-          @update:htmlContent="htmlContent = $event"
-          @update:textContent="textContent = $event"
-          @update:selectedText="selectedText = $event"
-          @update:isBold="isBold = $event"
-          @update:isItalic="isItalic = $event"
-          @update:cursorPosition="cursorPosition = $event"
-          @toggleFullscreen="isEditorFullscreen = false"
-          @update:messageType="messageType = $event"
-          @update:cc="cc = $event"
-          @update:bcc="bcc = $event"
-          @update:showBcc="showBcc = $event"
-          @updateEmailErrors="emailErrors = $event"
+          v-model:htmlContent="htmlContent"
+          v-model:textContent="textContent"
+          v-model:selectedText="selectedText"
+          v-model:isBold="isBold"
+          v-model:isItalic="isItalic"
+          v-model:cursorPosition="cursorPosition"
+          v-model:to="to"
+          v-model:cc="cc"
+          v-model:bcc="bcc"
+          v-model:emailErrors="emailErrors"
+          v-model:messageType="messageType"
+          v-model:showBcc="showBcc"
+          @toggleFullscreen="isEditorFullscreen = true"
           @send="processSend"
           @fileUpload="handleFileUpload"
           @inlineImageUpload="handleInlineImageUpload"
@@ -99,30 +89,20 @@
         :isSending="isSending"
         :uploadingFiles="uploadingFiles"
         :clearEditorContent="clearEditorContent"
-        :htmlContent="htmlContent"
-        :textContent="textContent"
-        :selectedText="selectedText"
-        :isBold="isBold"
-        :isItalic="isItalic"
-        :cursorPosition="cursorPosition"
         :contentToSet="contentToSet"
-        :cc="cc"
-        :bcc="bcc"
-        :emailErrors="emailErrors"
-        :messageType="messageType"
-        :showBcc="showBcc"
-        @update:htmlContent="htmlContent = $event"
-        @update:textContent="textContent = $event"
-        @update:selectedText="selectedText = $event"
-        @update:isBold="isBold = $event"
-        @update:isItalic="isItalic = $event"
-        @update:cursorPosition="cursorPosition = $event"
+        v-model:htmlContent="htmlContent"
+        v-model:textContent="textContent"
+        v-model:selectedText="selectedText"
+        v-model:isBold="isBold"
+        v-model:isItalic="isItalic"
+        v-model:cursorPosition="cursorPosition"
+        v-model:to="to"
+        v-model:cc="cc"
+        v-model:bcc="bcc"
+        v-model:emailErrors="emailErrors"
+        v-model:messageType="messageType"
+        v-model:showBcc="showBcc"
         @toggleFullscreen="isEditorFullscreen = true"
-        @update:messageType="messageType = $event"
-        @update:cc="cc = $event"
-        @update:bcc="bcc = $event"
-        @update:showBcc="showBcc = $event"
-        @updateEmailErrors="emailErrors = $event"
         @send="processSend"
         @fileUpload="handleFileUpload"
         @inlineImageUpload="handleInlineImageUpload"
@@ -183,6 +163,7 @@ const clearEditorContent = ref(false)
 const isEditorFullscreen = ref(false)
 const isSending = ref(false)
 const messageType = ref('reply')
+const to = ref('')
 const cc = ref('')
 const bcc = ref('')
 const showBcc = ref(false)
@@ -353,6 +334,7 @@ const processSend = async () => {
         .map((img) => img.getAttribute('title'))
         .filter(Boolean)
 
+      // TODO: Inline images are not supported yet, this is some old boilerplate code.
       conversationStore.conversation.mediaFiles = conversationStore.conversation.mediaFiles.filter(
         (file) =>
           // Keep if:
@@ -375,12 +357,18 @@ const processSend = async () => {
               .split(',')
               .map((email) => email.trim())
               .filter((email) => email)
+          : [],
+        to: to.value
+          ? to.value
+              .split(',')
+              .map((email) => email.trim())
+              .filter((email) => email)
           : []
       })
     }
 
     // Apply macro actions if any.
-    // For macros errors just show toast and clear the editor, as most likely it's the permission error.
+    // For macro errors just show toast and clear the editor.
     if (conversationStore.conversation?.macro?.actions?.length > 0) {
       try {
         await api.applyMacro(
@@ -390,7 +378,6 @@ const processSend = async () => {
         )
       } catch (error) {
         emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-          title: 'Error',
           variant: 'destructive',
           description: handleHTTPError(error).message
         })
@@ -453,13 +440,21 @@ watch(
   { deep: true }
 )
 
-// Initialize cc and bcc from conversation store
+// Initialize to, cc, and bcc fields with the current conversation's values.
 watch(
   () => conversationStore.currentCC,
   (newVal) => {
     cc.value = newVal?.join(', ') || ''
   },
   { deep: true, immediate: true }
+)
+
+watch(
+  () => conversationStore.currentTo,
+  (newVal) => {
+    to.value = newVal?.join(', ') || ''
+  },
+  { immediate: true }
 )
 
 watch(

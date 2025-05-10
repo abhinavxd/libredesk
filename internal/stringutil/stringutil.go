@@ -191,3 +191,12 @@ func ValidEmail(email string) bool {
 	}
 	return addr.Name == "" && addr.Address == email
 }
+
+// ExtractEmail extracts the email address from a string.
+func ExtractEmail(s string) (string, error) {
+	addr, err := mail.ParseAddress(s)
+	if err != nil {
+		return "", err
+	}
+	return addr.Address, nil
+}

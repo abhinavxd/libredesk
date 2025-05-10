@@ -28,6 +28,7 @@ import (
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	slaModels "github.com/abhinavxd/libredesk/internal/sla/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/abhinavxd/libredesk/internal/template"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -41,11 +42,11 @@ import (
 
 var (
 	//go:embed queries.sql
-	efs                                  embed.FS
-	errConversationNotFound              = errors.New("conversation not found")
-	conversationsAllowedFields = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "created_at", "waiting_since", "next_sla_deadline_at", "priority_id"}
-	conversationStatusAllowedFields     = []string{"id", "name"}
-	csatReplyMessage                     = "Please rate your experience with us: <a href=\"%s\">Rate now</a>"
+	efs                             embed.FS
+	errConversationNotFound         = errors.New("conversation not found")
+	conversationsAllowedFields      = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "created_at", "waiting_since", "next_sla_deadline_at", "priority_id"}
+	conversationStatusAllowedFields = []string{"id", "name"}
+	csatReplyMessage                = "Please rate your experience with us: <a href=\"%s\">Rate now</a>"
 )
 
 const (
@@ -254,6 +255,14 @@ func (c *Manager) GetConversation(id int, uuid string) (models.Conversation, err
 		c.lo.Error("error fetching conversation", "error", err)
 		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
 	}
+
+	// Strip name and extract plain email from "Name <email>"
+	var err error
+	conversation.InboxMail, err = stringutil.ExtractEmail(conversation.InboxMail)
+	if err != nil {
+		c.lo.Error("error extracting email from inbox mail", "inbox_mail", conversation.InboxMail, "error", err)
+	}
+
 	return conversation, nil
 }
 
@@ -886,7 +895,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 	case amodels.ActionSendPrivateNote:
 		return m.SendPrivateNote([]mmodels.Media{}, user.ID, conv.UUID, action.Value[0])
 	case amodels.ActionReply:
-		return m.SendReply([]mmodels.Media{}, conv.InboxID, user.ID, conv.UUID, action.Value[0], nil, nil, nil)
+		return m.SendReply([]mmodels.Media{}, conv.InboxID, user.ID, conv.UUID, action.Value[0], nil, nil, nil, nil)
 	case amodels.ActionSetSLA:
 		slaID, _ := strconv.Atoi(action.Value[0])
 		return m.ApplySLA(conv, slaID, user)
@@ -924,7 +933,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 	meta := map[string]interface{}{
 		"is_csat": true,
 	}
-	return m.SendReply([]mmodels.Media{}, conversation.InboxID, actorUserID, conversation.UUID, message, nil, nil, meta)
+	return m.SendReply([]mmodels.Media{}, conversation.InboxID, actorUserID, conversation.UUID, message, nil, nil, nil, meta)
 }
 
 // DeleteConversation deletes a conversation.

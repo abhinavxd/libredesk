@@ -186,7 +186,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		e.lo.Warn("no sender received for email", "message_id", env.MessageID)
 		return nil
 	}
-	var fromAddr = env.From[0].Addr()
+	var fromAddress = env.From[0].Addr()
 
 	// Check if the message already exists in the database.
 	// If it does, ignore it.
@@ -200,14 +200,14 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 	}
 
 	// Check if contact with this email is blocked / disabed, if so, ignore the message.
-	if contact, err := e.userStore.GetContact(0, fromAddr); err != nil {
+	if contact, err := e.userStore.GetContact(0, fromAddress); err != nil {
 		envErr, ok := err.(envelope.Error)
 		if !ok || envErr.ErrorType != envelope.NotFoundError {
-			e.lo.Error("error checking if user is blocked", "email", fromAddr, "error", err)
+			e.lo.Error("error checking if user is blocked", "email", fromAddress, "error", err)
 			return fmt.Errorf("checking if user is blocked: %w", err)
 		}
 	} else if !contact.Enabled {
-		e.lo.Debug("contact is blocked, ignoring message", "email", fromAddr)
+		e.lo.Debug("contact is blocked, ignoring message", "email", fromAddress)
 		return nil
 	}
 
@@ -220,20 +220,43 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		FirstName:       firstName,
 		LastName:        lastName,
 		SourceChannel:   null.NewString(e.Channel(), true),
-		SourceChannelID: null.NewString(fromAddr, true),
-		Email:           null.NewString(fromAddr, true),
+		SourceChannelID: null.NewString(fromAddress, true),
+		Email:           null.NewString(fromAddress, true),
 		Type:            umodels.UserTypeContact,
 	}
 
-	// Set CC addresses in meta.
+	// Set `to`, `cc`, and `bcc` addresses in meta.
 	var ccAddr = make([]string, 0, len(env.Cc))
+	var toAddr = make([]string, 0, len(env.To))
+	var bccAddr = make([]string, 0, len(env.Bcc))
+	var fromAddr = make([]string, 0, len(env.From))
 	for _, cc := range env.Cc {
 		if cc.Addr() != "" {
 			ccAddr = append(ccAddr, cc.Addr())
 		}
 	}
+	for _, to := range env.To {
+		if to.Addr() != "" {
+			toAddr = append(toAddr, to.Addr())
+		}
+	}
+	for _, bcc := range env.Bcc {
+		if bcc.Addr() != "" {
+			bccAddr = append(bccAddr, bcc.Addr())
+		}
+	}
+	for _, from := range env.From {
+		if from.Addr() != "" {
+			fromAddr = append(fromAddr, from.Addr())
+		}
+	}
+
 	meta, err := json.Marshal(map[string]interface{}{
-		"cc": ccAddr,
+		"from":    fromAddr,
+		"cc":      ccAddr,
+		"bcc":     bccAddr,
+		"to":      toAddr,
+		"subject": env.Subject,
 	})
 	if err != nil {
 		e.lo.Error("error marshalling meta", "error", err)
@@ -248,7 +271,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 			Status:     models.MessageStatusReceived,
 			Subject:    env.Subject,
 			SourceID:   null.StringFrom(env.MessageID),
-			Meta:       string(meta),
+			Meta:       meta,
 		},
 		Contact: contact,
 		InboxID: inboxID,

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { computed, reactive, ref, nextTick } from 'vue'
+import { computed, reactive, ref, nextTick, watchEffect } from 'vue'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES } from '@/constants/conversation'
 import { handleHTTPError } from '@/utils/http'
+import { computeRecipientsFromMessage } from '@/utils/email-recipients'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import MessageCache from '@/utils/conversation-message-cache'
@@ -12,6 +13,9 @@ export const useConversationStore = defineStore('conversation', () => {
   const MESSAGE_LIST_PAGE_SIZE = 30
   const priorities = ref([])
   const statuses = ref([])
+  const currentTo = ref([])
+  const currentBCC = ref([])
+  const currentCC = ref([])
 
   // Options for select fields
   const priorityOptions = computed(() => {
@@ -105,6 +109,8 @@ export const useConversationStore = defineStore('conversation', () => {
     data: new MessageCache(),
     loading: false,
     page: 1,
+    // To trigger reactivity on the messages cache, simpler than making MessageCache reactive.
+    version: 0,
   })
 
   let seenConversationUUIDs = new Map()
@@ -112,6 +118,8 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations.data = [...conversations.data]
   }, 120000)
   const emitter = useEmitter()
+
+  const incrementMessageVersion = () => setTimeout(() => messages.version++, 0)
 
   function clearListReRenderInterval () {
     clearInterval(reRenderInterval)
@@ -245,12 +253,30 @@ export const useConversationStore = defineStore('conversation', () => {
     return Object.keys(conversation.data || {}).length > 0
   })
 
-  const currentBCC = computed(() => {
-    return conversation.data?.bcc || []
-  })
+  // Watch for changes in the conversation and messages and update the to, cc, and bcc
+  watchEffect(async () => {
+    const _ = messages.version // eslint-disable-line no-unused-vars
+    const conv = conversation.data
+    const msgData = messages.data
+    const inboxEmail = conv?.inbox_mail
+    if (!conv || !msgData || !inboxEmail) return
 
-  const currentCC = computed(() => {
-    return conversation.data?.cc || []
+    const latestMessage = msgData.getLatestMessage(conv.uuid, ['incoming', 'outgoing'], true)
+
+    if (!["received", "sent"].includes(latestMessage.status)) {
+      return
+    }
+
+    if (!latestMessage) return
+
+    const { to, cc, bcc } = computeRecipientsFromMessage(
+      latestMessage,
+      conv.contact?.email || '',
+      inboxEmail
+    )
+    currentTo.value = to
+    currentCC.value = cc
+    currentBCC.value = bcc
   })
 
   async function fetchParticipants (uuid) {
@@ -288,7 +314,7 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   /**
-   * Fetches messages for a conversation if not already cached.
+   * Fetches messages for a conversation if not already present in the cache.
    * 
    * @param {string} uuid
    * @returns 
@@ -312,6 +338,7 @@ export const useConversationStore = defineStore('conversation', () => {
       markConversationAsRead(uuid)
       // Cache messages
       messages.data.addMessages(uuid, newMessages, result.page, result.total_pages)
+      incrementMessageVersion()
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         title: 'Error',
@@ -328,7 +355,7 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   /**
-   * Fetches a single message from the server and adds it to the cache.
+   * Fetches a single message from the server and adds it to the message cache.
    * 
    * @param {string} conversationUUID
    * @param {string} messageUUID
@@ -341,6 +368,7 @@ export const useConversationStore = defineStore('conversation', () => {
         const newMsg = response.data.data
         // Add message to cache.
         messages.data.addMessage(conversationUUID, newMsg)
+        incrementMessageVersion()
         return newMsg
       }
     } catch (error) {
@@ -606,6 +634,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const exists = messages.data.hasMessage(message.conversation_uuid, message.uuid)
     if (exists) {
       messages.data.updateMessageField(message.conversation_uuid, message.uuid, message.prop, message.value)
+      incrementMessageVersion()
     }
   }
 
@@ -647,6 +676,7 @@ export const useConversationStore = defineStore('conversation', () => {
     hasConversationOpen,
     current,
     currentContactName,
+    currentTo,
     currentBCC,
     currentCC,
     clearListReRenderInterval,

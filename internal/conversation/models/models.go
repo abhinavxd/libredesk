@@ -74,8 +74,9 @@ type Conversation struct {
 	WaitingSince          null.Time       `db:"waiting_since" json:"waiting_since"`
 	Subject               null.String     `db:"subject" json:"subject"`
 	UnreadMessageCount    int             `db:"unread_message_count" json:"unread_message_count"`
-	InboxName             string          `db:"inbox_name" json:"inbox_name"`
-	InboxChannel          string          `db:"inbox_channel" json:"inbox_channel"`
+	InboxMail             string          `db:"inbox_mail" json:"inbox_mail"`
+	InboxName             string          `db:"inbox_name" json:"inbox_name,omitempty"`
+	InboxChannel          string          `db:"inbox_channel" json:"inbox_channel,omitempty"`
 	Tags                  null.JSON       `db:"tags" json:"tags"`
 	Meta                  pq.StringArray  `db:"meta" json:"meta"`
 	CustomAttributes      json.RawMessage `db:"custom_attributes" json:"custom_attributes"`
@@ -89,6 +90,7 @@ type Conversation struct {
 	FirstResponseDueAt    null.Time       `db:"first_response_deadline_at" json:"first_response_deadline_at"`
 	ResolutionDueAt       null.Time       `db:"resolution_deadline_at" json:"resolution_deadline_at"`
 	SLAStatus             null.String     `db:"sla_status" json:"sla_status"`
+	To                    json.RawMessage `db:"to" json:"to"`
 	BCC                   json.RawMessage `db:"bcc" json:"bcc"`
 	CC                    json.RawMessage `db:"cc" json:"cc"`
 	PreviousConversations []Conversation  `db:"-" json:"previous_conversations"`
@@ -131,19 +133,19 @@ type Message struct {
 	SenderID         int                    `db:"sender_id" json:"sender_id"`
 	SenderType       string                 `db:"sender_type" json:"sender_type"`
 	InboxID          int                    `db:"inbox_id" json:"-"`
-	Meta             string                 `db:"meta" json:"meta"`
+	Meta             json.RawMessage        `db:"meta" json:"meta"`
 	Attachments      attachment.Attachments `db:"attachments" json:"attachments"`
 	ConversationUUID string                 `db:"conversation_uuid" json:"-"`
 	From             string                 `db:"from"  json:"-"`
-	To               []string               `db:"from"  json:"-"`
-	AltContent       string                 `db:"alt_content" json:"-"`
 	Subject          string                 `db:"subject" json:"-"`
 	Channel          string                 `db:"channel" json:"-"`
+	To               pq.StringArray         `db:"to"  json:"-"`
 	CC               pq.StringArray         `db:"cc" json:"-"`
 	BCC              pq.StringArray         `db:"bcc" json:"-"`
 	References       []string               `json:"-"`
 	InReplyTo        string                 `json:"-"`
 	Headers          textproto.MIMEHeader   `json:"-"`
+	AltContent       string                 `db:"-" json:"-"`
 	Media            []mmodels.Media        `db:"-" json:"-"`
 	IsCSAT           bool                   `db:"-" json:"-"`
 	Total            int                    `db:"total" json:"-"`
