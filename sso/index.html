@@ -633,69 +633,69 @@
 <p>Since each provider’s configuration might differ, consult your provider’s documentation for any additional or divergent settings.</p>
 <ol>
 <li>
-<p><strong>Provider Setup:</strong><br />
+<p>Provider setup:<br />
    In your provider’s admin console, create a new OpenID Connect application/client. Retrieve:</p>
 <ul>
-<li><strong>Client ID</strong></li>
-<li><strong>Client Secret</strong></li>
+<li>Client ID</li>
+<li>Client Secret</li>
 </ul>
 </li>
 <li>
-<p><strong>Libredesk Configuration:</strong><br />
-   In Libredesk, navigate to <strong>Security &gt; SSO</strong> and click <strong>New SSO</strong>. Enter:</p>
+<p>Libredesk configuration: 
+   In Libredesk, navigate to Security &gt; SSO and click New SSO and enter the following details:</p>
 <ul>
-<li><strong>Provider URL</strong> (e.g., the URL of your OpenID provider)</li>
-<li><strong>Client ID</strong></li>
-<li><strong>Client Secret</strong></li>
-<li>A descriptive <strong>Name</strong> for the connection</li>
+<li>Provider URL (e.g., the URL of your OpenID provider)</li>
+<li>Client ID</li>
+<li>Client Secret</li>
+<li>A descriptive name for the connection</li>
 </ul>
 </li>
 <li>
-<p><strong>Redirect URL:</strong><br />
-   After saving, copy the generated <strong>Callback URL</strong> from Libredesk and add it as a valid redirect URI in your provider’s client settings.</p>
+<p>Redirect URL:<br />
+   After saving, copy the generated Callback URL from Libredesk and add it as a valid redirect URI in your provider’s client settings.</p>
 </li>
 </ol>
 <h2 id="provider-examples">Provider Examples<a class="headerlink" href="#provider-examples" title="Permanent link">&para;</a></h2>
-<h3 id="keycloak">Keycloak<a class="headerlink" href="#keycloak" title="Permanent link">&para;</a></h3>
+<h4 id="keycloak">Keycloak<a class="headerlink" href="#keycloak" title="Permanent link">&para;</a></h4>
 <ol>
 <li>
 <p>Log in to your Keycloak Admin Console.</p>
 </li>
 <li>
-<p>In Keycloak, navigate to <strong>Clients</strong> and click <strong>Create</strong>:</p>
+<p>In Keycloak, navigate to Clients and click Create:</p>
 <ul>
-<li><strong>Client ID</strong> (e.g., <code>libredesk-app</code>)</li>
-<li><strong>Client Protocol</strong>: <code>openid-connect</code></li>
-<li><strong>Root URL</strong> and <strong>Web Origins</strong>: your app domain (e.g., <code>https://ticket.example.com</code>)</li>
-<li>Under <strong>Authentication flow</strong>, uncheck everything except <strong>Standard flow</strong></li>
-<li>Click <strong>Save</strong></li>
+<li>Client ID (e.g., <code>libredesk-app</code>)</li>
+<li>Client Protocol: <code>openid-connect</code></li>
+<li>Root URL and Web Origins: your app domain (e.g., <code>https://ticket.example.com</code>)</li>
+<li>Under Authentication flow, uncheck everything except the standard flow</li>
+<li>Click save</li>
 </ul>
 </li>
 <li>
-<p>Go to the <strong>Credentials</strong> tab:</p>
+<p>Go to the credentials tab:</p>
 <ul>
-<li>Ensure <strong>Client Authenticator</strong> is set to <code>Client Id and Secret</code></li>
-<li>Note down the generated <strong>Client Secret</strong></li>
+<li>Ensure client authenticator is set to <code>Client Id and Secret</code></li>
+<li>Note down the generated client secret</li>
 </ul>
 </li>
 <li>
-<p>In Libredesk, go to <strong>Security &gt; SSO</strong> and click <strong>New SSO</strong>:</p>
+<p>In Libredesk, go to Admin &gt; Security &gt; SSO and click New SSO:</p>
 <ul>
-<li><strong>Provider URL</strong> (e.g., <code>https://keycloak.example.com/realms/yourrealm</code>)</li>
-<li><strong>Name</strong> (e.g., <code>Keycloak</code>)</li>
-<li><strong>Client ID</strong></li>
-<li><strong>Client Secret</strong></li>
-<li>Click <strong>Save</strong></li>
+<li>Provider URL (e.g., <code>https://keycloak.example.com/realms/yourrealm</code>)</li>
+<li>Name (e.g., <code>Keycloak</code>)</li>
+<li>Client ID</li>
+<li>Client secret</li>
+<li>Click save</li>
 </ul>
 </li>
 <li>
-<p>After saving, click on the three dots and choose <strong>Edit</strong> to open the newly SSO entry.</p>
+<p>After saving, click on the three dots and choose Edit to open the new SSO entry.</p>
 </li>
 <li>
-<p>Copy the generated <strong>Callback URL</strong> from Libredesk.</p>
+<p>Copy the generated Callback URL from Libredesk.</p>
 </li>
 <li>
-<p>Back in Keycloak, edit the client and add the <strong>Callback URL</strong> to <strong>Valid Redirect URIs</strong>:</p>
+<p>Back in Keycloak, edit the client and add the Callback URL to Valid Redirect URIs:</p>
 <ul>
 <li>e.g., <code>https://ticket.example.com/api/v1/oidc/1/finish</code></li>
 </ul>
