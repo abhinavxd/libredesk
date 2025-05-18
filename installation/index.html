@@ -670,7 +670,7 @@ docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </spa
 <li><code>cd libredesk &amp;&amp; make</code>. This will generate the <code>libredesk</code> binary.</li>
 </ol>
 <h2 id="nginx">Nginx<a class="headerlink" href="#nginx" title="Permanent link">&para;</a></h2>
-<p>Libredesk using websockets for real-time updates. If you are using Nginx, you need to add the following (or similar) configuration to your Nginx configuration file.</p>
+<p>Libredesk uses websockets for real-time updates. If you are using Nginx, you need to add the following (or similar) configuration to your Nginx configuration file.</p>
 <div class="codehilite"><pre><span></span><code><span class="k">client_max_body_size</span><span class="w"> </span><span class="s">100M</span><span class="p">;</span>
 <span class="k">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://localhost:9000</span><span class="p">;</span>
