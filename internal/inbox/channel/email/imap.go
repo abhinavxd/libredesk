@@ -198,15 +198,14 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 	inboxEmail, err := stringutil.ExtractEmail(inboxFromAddress)
 	if err != nil {
 		e.lo.Error("error extracting email from inbox address", "inbox_from_address", inboxFromAddress, "error", err)
-		return fmt.Errorf("extracting email from inbox address: %w", err)
+		return fmt.Errorf("extracting email from inbox address (%s): %w", inboxFromAddress, err)
 	}
 	if strings.EqualFold(fromEmail, inboxEmail) {
 		e.lo.Info("ignoring incoming message from inbox address", "message_id", env.MessageID, "from_email", fromEmail, "inbox_email", inboxEmail)
 		return nil
 	}
 
-	// Check if the message already exists in the database.
-	// If it does, ignore it.
+	// If message already exists in the database, ignore it.
 	exists, err := e.messageStore.MessageExists(env.MessageID)
 	if err != nil {
 		e.lo.Error("error checking if message exists", "message_id", env.MessageID)
@@ -220,8 +219,8 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 	if contact, err := e.userStore.GetContact(0, fromEmail); err != nil {
 		envErr, ok := err.(envelope.Error)
 		if !ok || envErr.ErrorType != envelope.NotFoundError {
-			e.lo.Error("error checking if user is blocked", "email", fromEmail, "error", err)
-			return fmt.Errorf("checking if user is blocked: %w", err)
+			e.lo.Error("error checking if contact is blocked", "email", fromEmail, "error", err)
+			return fmt.Errorf("checking if contact is blocked: %w", err)
 		}
 	} else if !contact.Enabled {
 		e.lo.Info("contact is blocked, ignoring message", "email", fromEmail)
