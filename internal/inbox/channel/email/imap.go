@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
@@ -182,11 +183,27 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 
 // processEnvelope processes an email envelope.
 func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, env *imap.Envelope, seqNum uint32, inboxID int) error {
+	// No from?
 	if len(env.From) == 0 {
 		e.lo.Warn("no sender received for email", "message_id", env.MessageID)
 		return nil
 	}
-	var fromAddress = strings.ToLower(env.From[0].Addr())
+	var (
+		fromEmail        = strings.ToLower(env.From[0].Addr())
+		inboxFromAddress = e.FromAddress()
+	)
+
+	// If the sender email address is the same as the inbox email address, ignore it.
+	// Extract email address from the inbox `from` address. "Name <email@example.com>"
+	inboxEmail, err := stringutil.ExtractEmail(inboxFromAddress)
+	if err != nil {
+		e.lo.Error("error extracting email from inbox address", "inbox_from_address", inboxFromAddress, "error", err)
+		return fmt.Errorf("extracting email from inbox address: %w", err)
+	}
+	if strings.EqualFold(fromEmail, inboxEmail) {
+		e.lo.Info("ignoring incoming message from inbox address", "message_id", env.MessageID, "from_email", fromEmail, "inbox_email", inboxEmail)
+		return nil
+	}
 
 	// Check if the message already exists in the database.
 	// If it does, ignore it.
@@ -200,18 +217,18 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 	}
 
 	// Check if contact with this email is blocked / disabed, if so, ignore the message.
-	if contact, err := e.userStore.GetContact(0, fromAddress); err != nil {
+	if contact, err := e.userStore.GetContact(0, fromEmail); err != nil {
 		envErr, ok := err.(envelope.Error)
 		if !ok || envErr.ErrorType != envelope.NotFoundError {
-			e.lo.Error("error checking if user is blocked", "email", fromAddress, "error", err)
+			e.lo.Error("error checking if user is blocked", "email", fromEmail, "error", err)
 			return fmt.Errorf("checking if user is blocked: %w", err)
 		}
 	} else if !contact.Enabled {
-		e.lo.Debug("contact is blocked, ignoring message", "email", fromAddress)
+		e.lo.Info("contact is blocked, ignoring message", "email", fromEmail)
 		return nil
 	}
 
-	e.lo.Debug("message does not exist", "message_id", env.MessageID)
+	e.lo.Info("message does not exist", "message_id", env.MessageID)
 
 	// Make contact.
 	firstName, lastName := getContactName(env.From[0])
@@ -220,8 +237,8 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		FirstName:       firstName,
 		LastName:        lastName,
 		SourceChannel:   null.NewString(e.Channel(), true),
-		SourceChannelID: null.NewString(fromAddress, true),
-		Email:           null.NewString(fromAddress, true),
+		SourceChannelID: null.NewString(fromEmail, true),
+		Email:           null.NewString(fromEmail, true),
 		Type:            umodels.UserTypeContact,
 	}
 
