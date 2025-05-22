@@ -385,6 +385,8 @@
   "admin.sla.firstResponseTime.description": "Duration in hours or minutes. Example: 1h, 30m, 1h30m",
   "admin.sla.resolutionTime": "Resolution Time",
   "admin.sla.resolutionTime.description": "Duration in hours or minutes. Example: 1h, 30m, 1h30m",
+  "admin.sla.nextResponseTime": "Next Response Time",
+  "admin.sla.nextResponseTime.description": "Duration in hours or minutes. Example: 1h, 30m, 1h30m",
   "admin.sla.alertConfiguration": "Alert Configuration",
   "admin.sla.alertConfiguration.description": "Set up notification triggers and recipients",
   "admin.sla.addBreachAlert": "Add Breach Alert",

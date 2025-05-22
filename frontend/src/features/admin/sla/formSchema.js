@@ -18,6 +18,10 @@ export const createFormSchema = (t) => z.object({
         message:
             t('globals.messages.goHourMinuteDuration'),
     }),
+    next_response_time: z.string().refine(isGoHourMinuteDuration, {
+        message:
+            t('globals.messages.goHourMinuteDuration'),
+    }),
     notifications: z
         .array(
             z

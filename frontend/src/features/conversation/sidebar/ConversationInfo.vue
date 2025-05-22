@@ -1,9 +1,6 @@
 <template>
   <div class="space-y-4">
-    <div
-      class="flex flex-col"
-      v-if="conversation.subject"
-    >
+    <div class="flex flex-col" v-if="conversation.subject">
       <p class="font-medium">{{ $t('form.field.subject') }}</p>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
       <p v-else>
@@ -66,7 +63,19 @@
     </div>
 
     <div class="flex flex-col">
-      <p class="font-medium">{{ $t('form.field.lastReplyAt') }}</p>
+      <div class="flex justify-start items-center space-x-2">
+        <p class="font-medium">{{ $t('form.field.lastReplyAt') }}</p>
+        <SlaBadge
+          v-if="conversation.next_response_deadline_at"
+          :dueAt="conversation.next_response_deadline_at"
+          :actualAt="
+            ['met'].includes(conversation.next_response_sla_event_status)
+              ? conversation.last_reply_at
+              : null
+          "
+          :key="conversation.uuid"
+        />
+      </div>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
       <p v-if="conversation.last_reply_at">
         {{ format(conversation.last_reply_at, 'PPpp') }}

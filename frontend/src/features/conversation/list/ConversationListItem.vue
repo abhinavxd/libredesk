@@ -55,6 +55,10 @@
           </div>
         </div>
 
+        {{ conversation.next_response_deadline_at }}
+        <br />
+        {{ conversation.last_reply_at }}
+
         <div class="flex items-center mt-2 space-x-2">
           <SlaBadge
             v-if="conversation.first_response_deadline_at"
@@ -68,6 +72,16 @@
             :dueAt="conversation.resolution_deadline_at"
             :actualAt="conversation.resolved_at"
             :label="'RD'"
+            :showExtra="false"
+          />
+          <SlaBadge
+            :dueAt="conversation.next_response_deadline_at"
+            :actualAt="
+              ['met'].includes(conversation.next_response_sla_event_status)
+                ? conversation.last_reply_at
+                : null
+            "
+            :label="'NRD'"
             :showExtra="false"
           />
         </div>

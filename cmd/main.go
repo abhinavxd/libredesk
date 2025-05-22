@@ -195,7 +195,7 @@ func main() {
 	go conversation.Run(ctx, messageIncomingQWorkers, messageOutgoingQWorkers, messageOutgoingScanInterval)
 	go conversation.RunUnsnoozer(ctx, unsnoozeInterval)
 	go notifier.Run(ctx)
-	go sla.Run(ctx, slaEvaluationInterval)
+	go sla.Start(ctx, slaEvaluationInterval)
 	go sla.SendNotifications(ctx)
 	go media.DeleteUnlinkedMedia(ctx)
 	go user.MonitorAgentAvailability(ctx)

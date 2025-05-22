@@ -12,6 +12,7 @@ import (
 
 	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
 	bmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
@@ -35,7 +36,8 @@ var (
 
 const (
 	MetricFirstResponse = "first_response"
-	MetricsResolution   = "resolution"
+	MetricResolution    = "resolution"
+	MetricNextResponse  = "next_response"
 
 	NotificationTypeWarning = "warning"
 	NotificationTypeBreach  = "breach"
@@ -43,7 +45,8 @@ const (
 
 var metricLabels = map[string]string{
 	MetricFirstResponse: "First Response",
-	MetricsResolution:   "Resolution",
+	MetricResolution:    "Resolution",
+	MetricNextResponse:  "Next Response",
 }
 
 // Manager manages SLA policies and calculations.
@@ -72,12 +75,14 @@ type Opts struct {
 type Deadlines struct {
 	FirstResponse time.Time
 	Resolution    time.Time
+	NextResponse  time.Time
 }
 
 // Breaches holds the breach timestamps for an SLA policy.
 type Breaches struct {
 	FirstResponse time.Time
 	Resolution    time.Time
+	NextResponse  time.Time
 }
 
 type teamStore interface {
@@ -98,21 +103,28 @@ type businessHrsStore interface {
 
 // queries hold prepared SQL queries.
 type queries struct {
-	GetSLA                         *sqlx.Stmt `query:"get-sla-policy"`
-	GetAllSLA                      *sqlx.Stmt `query:"get-all-sla-policies"`
-	GetAppliedSLA                  *sqlx.Stmt `query:"get-applied-sla"`
-	GetScheduledSLANotifications   *sqlx.Stmt `query:"get-scheduled-sla-notifications"`
-	InsertScheduledSLANotification *sqlx.Stmt `query:"insert-scheduled-sla-notification"`
-	InsertSLA                      *sqlx.Stmt `query:"insert-sla-policy"`
-	DeleteSLA                      *sqlx.Stmt `query:"delete-sla-policy"`
-	UpdateSLA                      *sqlx.Stmt `query:"update-sla-policy"`
-	ApplySLA                       *sqlx.Stmt `query:"apply-sla"`
-	GetPendingSLAs                 *sqlx.Stmt `query:"get-pending-slas"`
-	UpdateBreach                   *sqlx.Stmt `query:"update-breach"`
-	UpdateMet                      *sqlx.Stmt `query:"update-met"`
-	SetNextSLADeadline             *sqlx.Stmt `query:"set-next-sla-deadline"`
-	UpdateSLAStatus                *sqlx.Stmt `query:"update-sla-status"`
-	MarkNotificationProcessed      *sqlx.Stmt `query:"mark-notification-processed"`
+	GetSLA                            *sqlx.Stmt `query:"get-sla-policy"`
+	GetAllSLA                         *sqlx.Stmt `query:"get-all-sla-policies"`
+	GetAppliedSLA                     *sqlx.Stmt `query:"get-applied-sla"`
+	GetSLAEvent                       *sqlx.Stmt `query:"get-sla-event"`
+	GetScheduledSLANotifications      *sqlx.Stmt `query:"get-scheduled-sla-notifications"`
+	InsertScheduledSLANotification    *sqlx.Stmt `query:"insert-scheduled-sla-notification"`
+	InsertSLA                         *sqlx.Stmt `query:"insert-sla-policy"`
+	InsertNextResponseSLAEvent        *sqlx.Stmt `query:"insert-next-response-sla-event"`
+	DeleteSLA                         *sqlx.Stmt `query:"delete-sla-policy"`
+	UpdateSLA                         *sqlx.Stmt `query:"update-sla-policy"`
+	ApplySLA                          *sqlx.Stmt `query:"apply-sla"`
+	GetPendingSLAs                    *sqlx.Stmt `query:"get-pending-slas"`
+	UpdateBreach                      *sqlx.Stmt `query:"update-breach"`
+	UpdateMet                         *sqlx.Stmt `query:"update-met"`
+	UpdateConversationNextSLADeadline *sqlx.Stmt `query:"update-conversation-next-sla-deadline"`
+	SetNextSLADeadline                *sqlx.Stmt `query:"set-next-sla-deadline"`
+	GetPendingSLAEvents               *sqlx.Stmt `query:"get-pending-sla-events"`
+	UpdateSLAStatus                   *sqlx.Stmt `query:"update-sla-status"`
+	MarkNotificationProcessed         *sqlx.Stmt `query:"mark-notification-processed"`
+	MarkSLAEventAsBreached            *sqlx.Stmt `query:"mark-sla-event-as-breached"`
+	MarkSLAEventAsMet                 *sqlx.Stmt `query:"mark-sla-event-as-met"`
+	SetLatestSLAEventMetAt            *sqlx.Stmt `query:"set-latest-sla-event-met-at"`
 }
 
 // New creates a new SLA manager.
@@ -148,8 +160,8 @@ func (m *Manager) GetAll() ([]models.SLAPolicy, error) {
 }
 
 // Create creates a new SLA policy.
-func (m *Manager) Create(name, description string, firstResponseTime, resolutionTime string, notifications models.SlaNotifications) error {
-	if _, err := m.q.InsertSLA.Exec(name, description, firstResponseTime, resolutionTime, notifications); err != nil {
+func (m *Manager) Create(name, description string, firstResponseTime, resolutionTime, nextResponseTime string, notifications models.SlaNotifications) error {
+	if _, err := m.q.InsertSLA.Exec(name, description, firstResponseTime, resolutionTime, nextResponseTime, notifications); err != nil {
 		m.lo.Error("error inserting SLA", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.sla}"), nil)
 	}
@@ -157,8 +169,8 @@ func (m *Manager) Create(name, description string, firstResponseTime, resolution
 }
 
 // Update updates a SLA policy.
-func (m *Manager) Update(id int, name, description string, firstResponseTime, resolutionTime string, notifications models.SlaNotifications) error {
-	if _, err := m.q.UpdateSLA.Exec(id, name, description, firstResponseTime, resolutionTime, notifications); err != nil {
+func (m *Manager) Update(id int, name, description string, firstResponseTime, resolutionTime, nextResponseTime string, notifications models.SlaNotifications) error {
+	if _, err := m.q.UpdateSLA.Exec(id, name, description, firstResponseTime, resolutionTime, nextResponseTime, notifications); err != nil {
 		m.lo.Error("error updating SLA", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.sla}"), nil)
 	}
@@ -175,7 +187,7 @@ func (m *Manager) Delete(id int) error {
 }
 
 // GetDeadlines returns the deadline for a given start time, sla policy and assigned team.
-func (m *Manager) GetDeadlines(startTime time.Time, slaPolicyID, assignedTeamID int) (Deadlines, error) {
+func (m *Manager) GetDeadlines(startTime time.Time, slaPolicyID, assignedTeamID int, skipNextResponse bool) (Deadlines, error) {
 	var deadlines Deadlines
 
 	businessHrs, timezone, err := m.getBusinessHoursAndTimezone(assignedTeamID)
@@ -197,7 +209,7 @@ func (m *Manager) GetDeadlines(startTime time.Time, slaPolicyID, assignedTeamID 
 		}
 		dur, err := time.ParseDuration(durationStr)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("parsing SLA duration: %v", err)
+			return time.Time{}, fmt.Errorf("parsing SLA duration (%s): %v", durationStr, err)
 		}
 		deadline, err := m.CalculateDeadline(startTime, int(dur.Minutes()), businessHrs, timezone)
 		if err != nil {
@@ -212,6 +224,11 @@ func (m *Manager) GetDeadlines(startTime time.Time, slaPolicyID, assignedTeamID 
 	if deadlines.Resolution, err = calculateDeadline(sla.ResolutionTime); err != nil {
 		return deadlines, err
 	}
+	if !skipNextResponse {
+		if deadlines.NextResponse, err = calculateDeadline(sla.NextResponseTime); err != nil {
+			return deadlines, err
+		}
+	}
 	return deadlines, nil
 }
 
@@ -220,7 +237,7 @@ func (m *Manager) ApplySLA(startTime time.Time, conversationID, assignedTeamID, 
 	var sla models.SLAPolicy
 
 	// Get deadlines for the SLA policy and assigned team.
-	deadlines, err := m.GetDeadlines(startTime, slaPolicyID, assignedTeamID)
+	deadlines, err := m.GetDeadlines(startTime, slaPolicyID, assignedTeamID, true)
 	if err != nil {
 		return sla, err
 	}
@@ -237,26 +254,156 @@ func (m *Manager) ApplySLA(startTime time.Time, conversationID, assignedTeamID, 
 		return sla, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorApplying", "name", "{globals.terms.sla}"), nil)
 	}
 
+	// Schedule SLA notifications if any exist. SLA breaches have not occurred yet, as this is the first time the SLA is being applied.
+	// Therefore, only schedule notifications for the deadlines.
 	sla, err = m.Get(slaPolicyID)
 	if err != nil {
 		return sla, err
 	}
-
-	// Schedule SLA notifications if there are any, SLA breaches did not happen yet as this is the first time SLA is applied.
-	// So, only schedule SLA breach warnings.
-	m.createNotificationSchedule(sla.Notifications, appliedSLAID, deadlines, Breaches{})
+	m.createNotificationSchedule(sla.Notifications, appliedSLAID, null.Int{}, deadlines, Breaches{})
 
 	return sla, nil
 }
 
-// Run starts the SLA evaluation loop and evaluates pending SLAs.
-func (m *Manager) Run(ctx context.Context, evalInterval time.Duration) {
-	ticker := time.NewTicker(evalInterval)
-	m.wg.Add(1)
-	defer func() {
-		m.wg.Done()
-		ticker.Stop()
-	}()
+// CreateNextResponseSLAEvent creates a next response SLA event for a conversation.
+func (m *Manager) CreateNextResponseSLAEvent(conversationID, appliedSLAID, slaPolicyID, assignedTeamID int) error {
+	var slaPolicy models.SLAPolicy
+	if err := m.q.GetSLA.Get(&slaPolicy, slaPolicyID); err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("SLA policy not found: %d", slaPolicyID)
+		}
+		m.lo.Error("error fetching SLA policy", "error", err)
+		return fmt.Errorf("fetching SLA policy: %w", err)
+	}
+
+	if slaPolicy.NextResponseTime == "" {
+		m.lo.Info("no next response time set for SLA policy, skipping event creation", "conversation_id", conversationID, "policy_id", slaPolicyID)
+		return nil
+	}
+
+	// Calculate the deadline for the next response SLA event.
+	deadlines, err := m.GetDeadlines(time.Now(), slaPolicy.ID, assignedTeamID, false)
+	if err != nil {
+		m.lo.Error("error calculating deadlines for next response SLA event", "error", err)
+		return fmt.Errorf("calculating deadlines for next response SLA event: %w", err)
+	}
+
+	if deadlines.NextResponse.IsZero() {
+		m.lo.Info("next response deadline is zero, skipping event creation", "conversation_id", conversationID, "policy_id", slaPolicyID)
+		return nil
+	}
+
+	var slaEventID int
+	if err := m.q.InsertNextResponseSLAEvent.QueryRow(appliedSLAID, slaPolicyID, deadlines.NextResponse).Scan(&slaEventID); err != nil {
+		if err == sql.ErrNoRows {
+			m.lo.Debug("sla event for next response already exists, skipping creation", "conversation_id", conversationID, "policy_id", slaPolicyID)
+			return nil
+		}
+		m.lo.Error("error inserting SLA event", "error", err)
+		return fmt.Errorf("inserting SLA event: %w", err)
+	}
+
+	// Update next SLA deadline in the conversation.
+	if _, err := m.q.UpdateConversationNextSLADeadline.Exec(conversationID, deadlines.NextResponse); err != nil {
+		m.lo.Error("error updating conversation next SLA deadline", "error", err)
+		return fmt.Errorf("updating conversation next SLA deadline: %w", err)
+	}
+
+	// Create notification schedule for the next response SLA event.
+	deadlines.FirstResponse = time.Time{}
+	deadlines.Resolution = time.Time{}
+	m.createNotificationSchedule(slaPolicy.Notifications, appliedSLAID, null.IntFrom(slaEventID), deadlines, Breaches{})
+	return nil
+}
+
+// SetLatestSLAEventMetAt marks the latest SLA event as met for a given applied SLA.
+func (m *Manager) SetLatestSLAEventMetAt(appliedSLAID int, metric string) error {
+	if _, err := m.q.SetLatestSLAEventMetAt.Exec(appliedSLAID, metric); err != nil {
+		m.lo.Error("error marking SLA event as met", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.sla}"), nil)
+	}
+	return nil
+}
+
+// evaluatePendingSLAEvents fetches pending SLA events and marks them as breached if the deadline has passed.
+func (m *Manager) evaluatePendingSLAEvents(ctx context.Context) error {
+	var slaEvents []models.SLAEvent
+	if err := m.q.GetPendingSLAEvents.SelectContext(ctx, &slaEvents); err != nil {
+		m.lo.Error("error fetching pending SLA events", "error", err)
+		return fmt.Errorf("fetching pending SLA events: %w", err)
+	}
+	m.lo.Info("found SLA events that have breached", "count", len(slaEvents))
+
+	// Cache for SLA policies.
+	var slaPolicyCache = make(map[int]models.SLAPolicy)
+	for _, event := range slaEvents {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if err := m.q.GetSLAEvent.GetContext(ctx, &event, event.ID); err != nil {
+			m.lo.Error("error fetching SLA event", "error", err)
+			continue
+		}
+
+		if event.DeadlineAt.IsZero() {
+			m.lo.Warn("SLA event deadline is zero, skipping marking as breached", "sla_event_id", event.ID)
+			continue
+		}
+
+		// Met at after the deadline or current time is after the deadline - mark event breached.
+		var hasBreached bool
+		if (event.MetAt.Valid && event.MetAt.Time.After(event.DeadlineAt)) || (time.Now().After(event.DeadlineAt) && !event.MetAt.Valid) {
+			hasBreached = true
+			if _, err := m.q.MarkSLAEventAsBreached.Exec(event.ID); err != nil {
+				m.lo.Error("error marking SLA event as breached", "error", err)
+				continue
+			}
+		}
+
+		// Met at before the deadline - mark event met.
+		if event.MetAt.Valid && event.MetAt.Time.Before(event.DeadlineAt) {
+			if _, err := m.q.MarkSLAEventAsMet.Exec(event.ID); err != nil {
+				m.lo.Error("error marking SLA event as met", "error", err)
+				continue
+			}
+		}
+
+		// Schedule a breach notification if the event is not met at all.
+		if !event.MetAt.Valid && hasBreached {
+			// Check if the SLA policy is already cached.
+			slaPolicy, ok := slaPolicyCache[event.SlaPolicyID]
+			if !ok {
+				var err error
+				slaPolicy, err = m.Get(event.SlaPolicyID)
+				if err != nil {
+					m.lo.Error("error fetching SLA policy", "error", err)
+					continue
+				}
+				slaPolicyCache[event.SlaPolicyID] = slaPolicy
+			}
+			m.createNotificationSchedule(slaPolicy.Notifications, event.AppliedSLAID, null.IntFrom(event.ID), Deadlines{}, Breaches{
+				NextResponse: time.Now(),
+			})
+		}
+	}
+	return nil
+}
+
+// Start begins SLA and SLA event evaluation loops in separate goroutines.
+func (m *Manager) Start(ctx context.Context, interval time.Duration) {
+	m.wg.Add(2)
+	go m.runSLAEvaluation(ctx, interval)
+	go m.runSLAEventEvaluation(ctx, interval)
+}
+
+// runSLAEvaluation periodically evaluates pending SLAs.
+func (m *Manager) runSLAEvaluation(ctx context.Context, interval time.Duration) {
+	defer m.wg.Done()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -265,6 +412,24 @@ func (m *Manager) Run(ctx context.Context, evalInterval time.Duration) {
 		case <-ticker.C:
 			if err := m.evaluatePendingSLAs(ctx); err != nil {
 				m.lo.Error("error processing pending SLAs", "error", err)
+			}
+		}
+	}
+}
+
+// runSLAEventEvaluation periodically evaluates pending SLA events.
+func (m *Manager) runSLAEventEvaluation(ctx context.Context, interval time.Duration) {
+	defer m.wg.Done()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := m.evaluatePendingSLAEvents(ctx); err != nil {
+				m.lo.Error("error marking SLA events as breached", "error", err)
 			}
 		}
 	}
@@ -303,17 +468,35 @@ func (m *Manager) SendNotifications(ctx context.Context) error {
 			}
 
 			// Sleep for short duration to avoid hammering the database.
-			time.Sleep(30 * time.Second)
+			time.Sleep(20 * time.Second)
 		}
 	}
 }
 
 // SendNotification sends a SLA notification to agents.
 func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANotification) error {
-	var appliedSLA models.AppliedSLA
+	var (
+		appliedSLA models.AppliedSLA
+		slaEvent   models.SLAEvent
+	)
+	if scheduledNotification.SlaEventID.Int != 0 {
+		if err := m.q.GetSLAEvent.Get(&slaEvent, scheduledNotification.SlaEventID.Int); err != nil {
+			m.lo.Error("error fetching SLA event", "error", err)
+			return fmt.Errorf("fetching SLA event for notification: %w", err)
+		}
+	}
 	if err := m.q.GetAppliedSLA.Get(&appliedSLA, scheduledNotification.AppliedSLAID); err != nil {
 		m.lo.Error("error fetching applied SLA", "error", err)
 		return fmt.Errorf("fetching applied SLA for notification: %w", err)
+	}
+
+	// If conversation is `Resolved` / `Closed`, mark the notification as processed and skip sending.
+	if appliedSLA.ConversationStatus == cmodels.StatusResolved || appliedSLA.ConversationStatus == cmodels.StatusClosed {
+		m.lo.Info("skipping notification as conversation is resolved/closed", "conversation_id", appliedSLA.ConversationID)
+		if _, err := m.q.MarkNotificationProcessed.Exec(scheduledNotification.ID); err != nil {
+			m.lo.Error("error marking notification as processed", "error", err)
+		}
+		return nil
 	}
 
 	// Send to all recipients (agents).
@@ -322,15 +505,27 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 		switch scheduledNotification.Metric {
 		case MetricFirstResponse:
 			if appliedSLA.FirstResponseMetAt.Valid {
-				m.lo.Debug("skipping notification as first response is already met", "applied_sla_id", appliedSLA.ID)
+				m.lo.Info("skipping notification as first response is already met", "applied_sla_id", appliedSLA.ID)
 				if _, err := m.q.MarkNotificationProcessed.Exec(scheduledNotification.ID); err != nil {
 					m.lo.Error("error marking notification as processed", "error", err)
 				}
 				continue
 			}
-		case MetricsResolution:
+		case MetricResolution:
 			if appliedSLA.ResolutionMetAt.Valid {
-				m.lo.Debug("skipping notification as resolution is already met", "applied_sla_id", appliedSLA.ID)
+				m.lo.Info("skipping notification as resolution is already met", "applied_sla_id", appliedSLA.ID)
+				if _, err := m.q.MarkNotificationProcessed.Exec(scheduledNotification.ID); err != nil {
+					m.lo.Error("error marking notification as processed", "error", err)
+				}
+				continue
+			}
+		case MetricNextResponse:
+			if slaEvent.ID == 0 {
+				m.lo.Warn("next response SLA event not found", "scheduled_notification_id", scheduledNotification.ID)
+				return fmt.Errorf("next response SLA event not found for notification: %d", scheduledNotification.ID)
+			}
+			if slaEvent.MetAt.Valid {
+				m.lo.Info("skipping notification as next response is already met", "applied_sla_id", appliedSLA.ID)
 				if _, err := m.q.MarkNotificationProcessed.Exec(scheduledNotification.ID); err != nil {
 					m.lo.Error("error marking notification as processed", "error", err)
 				}
@@ -349,6 +544,14 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			m.lo.Error("error parsing recipient ID", "error", err, "recipient_id", recipientS)
 			continue
 		}
+
+		if recipientID == 0 {
+			if _, err := m.q.MarkNotificationProcessed.Exec(scheduledNotification.ID); err != nil {
+				m.lo.Error("error marking notification as processed", "error", err)
+			}
+			continue
+		}
+
 		agent, err := m.userStore.GetAgent(recipientID, "")
 		if err != nil {
 			m.lo.Error("error fetching agent for SLA notification", "recipient_id", recipientID, "error", err)
@@ -378,7 +581,7 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 		getFriendlyDuration := func(target time.Time) string {
 			d := time.Until(target)
 			if d < 0 {
-				return "Overdue by " + stringutil.FormatDuration(-d, false)
+				return stringutil.FormatDuration(-d, false)
 			}
 			return stringutil.FormatDuration(d, false)
 		}
@@ -387,9 +590,12 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 		case MetricFirstResponse:
 			dueIn = getFriendlyDuration(appliedSLA.FirstResponseDeadlineAt)
 			overdueBy = getFriendlyDuration(appliedSLA.FirstResponseBreachedAt.Time)
-		case MetricsResolution:
+		case MetricResolution:
 			dueIn = getFriendlyDuration(appliedSLA.ResolutionDeadlineAt)
 			overdueBy = getFriendlyDuration(appliedSLA.ResolutionBreachedAt.Time)
+		case MetricNextResponse:
+			dueIn = getFriendlyDuration(slaEvent.DeadlineAt)
+			overdueBy = getFriendlyDuration(slaEvent.BreachedAt.Time)
 		default:
 			m.lo.Error("unknown metric type", "metric", scheduledNotification.Metric)
 			return fmt.Errorf("unknown metric type: %s", scheduledNotification.Metric)
@@ -446,7 +652,7 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			m.lo.Error("error sending email notification", "error", err)
 		}
 
-		// Set the notification as processed.
+		// Mark the notification as processed.
 		if _, err := m.q.MarkNotificationProcessed.Exec(scheduledNotification.ID); err != nil {
 			m.lo.Error("error marking notification as processed", "error", err)
 		}
@@ -512,14 +718,14 @@ func (m *Manager) getBusinessHoursAndTimezone(assignedTeamID int) (bmodels.Busin
 }
 
 // createNotificationSchedule creates a notification schedule in database for the applied SLA.
-func (m *Manager) createNotificationSchedule(notifications models.SlaNotifications, appliedSLAID int, deadlines Deadlines, breaches Breaches) {
+func (m *Manager) createNotificationSchedule(notifications models.SlaNotifications, appliedSLAID int, slaEventID null.Int, deadlines Deadlines, breaches Breaches) {
 	scheduleNotification := func(sendAt time.Time, metric, notifType string, recipients []string) {
+		// Make sure the sendAt time is in not too far in the past.
 		if sendAt.Before(time.Now().Add(-5 * time.Minute)) {
 			m.lo.Debug("skipping scheduling notification as it is in the past", "send_at", sendAt)
 			return
 		}
-
-		if _, err := m.q.InsertScheduledSLANotification.Exec(appliedSLAID, metric, notifType, pq.Array(recipients), sendAt); err != nil {
+		if _, err := m.q.InsertScheduledSLANotification.Exec(appliedSLAID, slaEventID, metric, notifType, pq.Array(recipients), sendAt); err != nil {
 			m.lo.Error("error inserting scheduled SLA notification", "error", err)
 		}
 	}
@@ -547,14 +753,20 @@ func (m *Manager) createNotificationSchedule(notifications models.SlaNotificatio
 				scheduleNotification(deadlines.FirstResponse.Add(-delayDur), MetricFirstResponse, notif.Type, notif.Recipients)
 			}
 			if !deadlines.Resolution.IsZero() {
-				scheduleNotification(deadlines.Resolution.Add(-delayDur), MetricsResolution, notif.Type, notif.Recipients)
+				scheduleNotification(deadlines.Resolution.Add(-delayDur), MetricResolution, notif.Type, notif.Recipients)
+			}
+			if !deadlines.NextResponse.IsZero() {
+				scheduleNotification(deadlines.NextResponse.Add(-delayDur), MetricNextResponse, notif.Type, notif.Recipients)
 			}
 		} else if notif.Type == NotificationTypeBreach {
 			if !breaches.FirstResponse.IsZero() {
 				scheduleNotification(breaches.FirstResponse.Add(delayDur), MetricFirstResponse, notif.Type, notif.Recipients)
 			}
 			if !breaches.Resolution.IsZero() {
-				scheduleNotification(breaches.Resolution.Add(delayDur), MetricsResolution, notif.Type, notif.Recipients)
+				scheduleNotification(breaches.Resolution.Add(delayDur), MetricResolution, notif.Type, notif.Recipients)
+			}
+			if !breaches.NextResponse.IsZero() {
+				scheduleNotification(breaches.NextResponse.Add(delayDur), MetricNextResponse, notif.Type, notif.Recipients)
 			}
 		}
 	}
@@ -626,8 +838,8 @@ func (m *Manager) evaluateSLA(sla models.AppliedSLA) error {
 
 	// If resolution is not breached and not met, check the deadine and set them.
 	if !sla.ResolutionBreachedAt.Valid && !sla.ResolutionMetAt.Valid {
-		m.lo.Debug("checking deadline", "deadline", sla.ResolutionDeadlineAt, "met_at", sla.ConversationResolvedAt.Time, "metric", MetricsResolution)
-		if err := checkDeadline(sla.ResolutionDeadlineAt, sla.ConversationResolvedAt, MetricsResolution); err != nil {
+		m.lo.Debug("checking deadline", "deadline", sla.ResolutionDeadlineAt, "met_at", sla.ConversationResolvedAt.Time, "metric", MetricResolution)
+		if err := checkDeadline(sla.ResolutionDeadlineAt, sla.ConversationResolvedAt, MetricResolution); err != nil {
 			return err
 		}
 	}
@@ -661,12 +873,12 @@ func (m *Manager) updateBreachAt(appliedSLAID, slaPolicyID int, metric string) e
 	var firstResponse, resolution time.Time
 	if metric == MetricFirstResponse {
 		firstResponse = time.Now()
-	} else if metric == MetricsResolution {
+	} else if metric == MetricResolution {
 		resolution = time.Now()
 	}
 
 	// Create notification schedule.
-	m.createNotificationSchedule(sla.Notifications, appliedSLAID, Deadlines{}, Breaches{
+	m.createNotificationSchedule(sla.Notifications, appliedSLAID, null.Int{}, Deadlines{}, Breaches{
 		FirstResponse: firstResponse,
 		Resolution:    resolution,
 	})

@@ -15,7 +15,8 @@ DROP TYPE IF EXISTS "media_disposition" CASCADE; CREATE TYPE "media_disposition"
 DROP TYPE IF EXISTS "media_store" CASCADE; CREATE TYPE "media_store" AS ENUM ('s3', 'fs');
 DROP TYPE IF EXISTS "user_availability_status" CASCADE; CREATE TYPE "user_availability_status" AS ENUM ('online', 'away', 'away_manual', 'offline', 'away_and_reassigning');
 DROP TYPE IF EXISTS "applied_sla_status" CASCADE; CREATE TYPE "applied_sla_status" AS ENUM ('pending', 'breached', 'met', 'partially_met');
-DROP TYPE IF EXISTS "sla_metric" CASCADE; CREATE TYPE "sla_metric" AS ENUM ('first_response', 'resolution');
+DROP TYPE IF EXISTS "sla_event_status" CASCADE; CREATE TYPE "sla_event_status" AS ENUM ('pending', 'breached', 'met');
+DROP TYPE IF EXISTS "sla_metric" CASCADE; CREATE TYPE "sla_metric" AS ENUM ('first_response', 'resolution', 'next_response');
 DROP TYPE IF EXISTS "sla_notification_type" CASCADE; CREATE TYPE "sla_notification_type" AS ENUM ('warning', 'breach');
 DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online');
 
@@ -39,6 +40,7 @@ CREATE TABLE sla_policies (
 	description TEXT NULL,
 	first_response_time TEXT NOT NULL,
 	resolution_time TEXT NOT NULL,
+	next_response_time TEXT NULL,
 	notifications JSONB DEFAULT '[]'::jsonb NOT NULL,
 	CONSTRAINT constraint_sla_policies_on_name CHECK (length(name) <= 140),
 	CONSTRAINT constraint_sla_policies_on_description CHECK (length(description) <= 300)
@@ -201,7 +203,8 @@ CREATE TABLE conversations (
 
 	-- Set to NULL when SLA policy is deleted.
 	sla_policy_id INT REFERENCES sla_policies(id) ON DELETE SET NULL ON UPDATE CASCADE,
-	
+	applied_sla_id BIGINT REFERENCES applied_slas(id) ON DELETE SET NULL ON UPDATE CASCADE,
+
     -- Cascade deletes when inbox is deleted.
 	inbox_id INT REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
 
@@ -374,6 +377,7 @@ CREATE TABLE team_members (
 	CONSTRAINT constraint_team_members_on_emoji CHECK (length(emoji) <= 1)
 );
 CREATE UNIQUE INDEX index_unique_team_members_on_team_id_and_user_id ON team_members (team_id, user_id);
+CREATE INDEX index_team_members_on_user_id ON team_members (user_id);
 
 DROP TABLE IF EXISTS templates CASCADE;
 CREATE TABLE templates (
@@ -456,12 +460,29 @@ CREATE TABLE applied_slas (
 CREATE INDEX index_applied_slas_on_conversation_id ON applied_slas(conversation_id);
 CREATE INDEX index_applied_slas_on_status ON applied_slas(status);
 
+DROP TABLE IF EXISTS sla_events CASCADE;
+CREATE TABLE sla_events (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	status sla_event_status DEFAULT 'pending' NOT NULL,
+	applied_sla_id BIGINT REFERENCES applied_slas(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	sla_policy_id INT REFERENCES sla_policies(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	type sla_metric NOT NULL,
+	deadline_at TIMESTAMPTZ NOT NULL,
+	met_at TIMESTAMPTZ,
+	breached_at TIMESTAMPTZ
+);
+CREATE INDEX index_sla_events_on_applied_sla_id ON sla_events(applied_sla_id);
+CREATE INDEX index_sla_events_on_status ON sla_events(status);
+
 DROP TABLE IF EXISTS scheduled_sla_notifications CASCADE;
 CREATE TABLE scheduled_sla_notifications (
   id BIGSERIAL PRIMARY KEY,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   applied_sla_id BIGINT NOT NULL REFERENCES applied_slas(id) ON DELETE CASCADE,
+  sla_event_id BIGINT REFERENCES sla_events(id) ON DELETE CASCADE,
   metric sla_metric NOT NULL,
   notification_type sla_notification_type NOT NULL,
   recipients TEXT[] NOT NULL,

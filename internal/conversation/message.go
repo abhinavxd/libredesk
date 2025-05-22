@@ -392,9 +392,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	}
 
 	// Add this user as a participant.
-	if err := m.addConversationParticipant(message.SenderID, message.ConversationUUID); err != nil {
-		return err
-	}
+	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
 	// Hide CSAT message content as it contains a public link to the survey.
 	lastMessage := message.TextContent
@@ -577,6 +575,20 @@ func (m *Manager) processIncomingMessage(in models.IncomingMessage) error {
 
 	// Trigger automations on incoming message event.
 	m.automation.EvaluateConversationUpdateRules(in.Message.ConversationUUID, amodels.EventConversationMessageIncoming)
+
+	// Create SLA event for next response if SLA is applied and has next response time set, subsequent agent replies will mark this event as met.
+	conversation, err := m.GetConversation(in.Message.ConversationID, "")
+	if err != nil {
+		m.lo.Error("error fetching conversation", "conversation_id", in.Message.ConversationID, "error", err)
+	}
+	if conversation.SLAPolicyID.Int == 0 {
+		m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
+		return nil
+	}
+	if err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AppliedSLAID.Int, conversation.SLAPolicyID.Int, conversation.AssignedTeamID.Int); err != nil {
+		m.lo.Error("error creating next response SLA event", "conversation_id", conversation.ID, "error", err)
+		return fmt.Errorf("creating next response SLA event: %w", err)
+	}
 	return nil
 }
 
