@@ -19,6 +19,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/lib/pq"
@@ -180,7 +181,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		return
 	}
 
-	// Update status of the message.
+	// Update status.
 	m.UpdateMessageStatus(message.UUID, models.MessageStatusSent)
 
 	// Update first and last reply time if the sender is not the system user.
@@ -188,6 +189,15 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	if systemUser, err := m.userStore.GetSystemUser(); err == nil && message.SenderID != systemUser.ID {
 		m.UpdateConversationFirstReplyAt(message.ConversationUUID, message.ConversationID, time.Now())
 		m.UpdateConversationLastReplyAt(message.ConversationUUID, message.ConversationID, time.Now())
+		// Set `met_at` timestamp for next response SLA event if event exists and not already met.
+		if message.ConversationAppliedSLAID.Int > 0 {
+			metAt, err := m.slaStore.SetLatestSLAEventMetAt(message.ConversationAppliedSLAID.Int, sla.MetricNextResponse)
+			if err != nil {
+				m.lo.Error("error setting next response SLA event met at", "conversation_id", message.ConversationID, "error", err)
+			} else if !metAt.IsZero() {
+				m.BroadcastConversationUpdate(message.ConversationUUID, "next_response_met_at", metAt.Format(time.RFC3339))
+			}
+		}
 	} else if err != nil {
 		m.lo.Error("error fetching system user for updating first reply time", "error", err)
 	}
@@ -276,15 +286,15 @@ func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 }
 
 // UpdateMessageStatus updates the status of a message.
-func (m *Manager) UpdateMessageStatus(uuid string, status string) error {
-	if _, err := m.q.UpdateMessageStatus.Exec(status, uuid); err != nil {
-		m.lo.Error("error updating message status", "error", err, "uuid", uuid)
+func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
+	if _, err := m.q.UpdateMessageStatus.Exec(status, messageUUID); err != nil {
+		m.lo.Error("error updating message status", "message_uuid", messageUUID, "error", err)
 		return err
 	}
 
-	// Broadcast messge status update to all conversation subscribers.
-	conversationUUID, _ := m.getConversationUUIDFromMessageUUID(uuid)
-	m.BroadcastMessageUpdate(conversationUUID, uuid, "status" /*property*/, status)
+	// Broadcast message status update to all conversation subscribers.
+	conversationUUID, _ := m.getConversationUUIDFromMessageUUID(messageUUID)
+	m.BroadcastMessageUpdate(conversationUUID, messageUUID, "status" /*property*/, status)
 	return nil
 }
 
@@ -392,9 +402,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	}
 
 	// Add this user as a participant.
-	if err := m.addConversationParticipant(message.SenderID, message.ConversationUUID); err != nil {
-		return err
-	}
+	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
 	// Hide CSAT message content as it contains a public link to the survey.
 	lastMessage := message.TextContent
@@ -577,6 +585,25 @@ func (m *Manager) processIncomingMessage(in models.IncomingMessage) error {
 
 	// Trigger automations on incoming message event.
 	m.automation.EvaluateConversationUpdateRules(in.Message.ConversationUUID, amodels.EventConversationMessageIncoming)
+
+	// Create SLA event for next response if a SLA is applied and has next response time set, subsequent agent replies will mark this event as met.
+	// This cycle continues for next response time SLA metric.
+	conversation, err := m.GetConversation(in.Message.ConversationID, "")
+	if err != nil {
+		m.lo.Error("error fetching conversation", "conversation_id", in.Message.ConversationID, "error", err)
+	}
+	if conversation.SLAPolicyID.Int == 0 {
+		m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
+		return nil
+	}
+	if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AssignedTeamID.Int); err != nil {
+		m.lo.Error("error creating next response SLA event", "conversation_id", conversation.ID, "error", err)
+	} else if !deadline.IsZero() {
+		m.lo.Debug("next response SLA event created for conversation", "conversation_id", conversation.ID, "deadline", deadline, "sla_policy_id", conversation.SLAPolicyID.Int)
+		m.BroadcastConversationUpdate(in.Message.ConversationUUID, "next_response_deadline_at", deadline.Format(time.RFC3339))
+		// Clear next response met at timestamp as this event was just created.
+		m.BroadcastConversationUpdate(in.Message.ConversationUUID, "next_response_met_at", nil)
+	}
 	return nil
 }
 

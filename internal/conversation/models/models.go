@@ -89,7 +89,8 @@ type Conversation struct {
 	NextSLADeadlineAt     null.Time       `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	FirstResponseDueAt    null.Time       `db:"first_response_deadline_at" json:"first_response_deadline_at"`
 	ResolutionDueAt       null.Time       `db:"resolution_deadline_at" json:"resolution_deadline_at"`
-	SLAStatus             null.String     `db:"sla_status" json:"sla_status"`
+	NextResponseDueAt     null.Time       `db:"next_response_deadline_at" json:"next_response_deadline_at"`
+	NextResponseMetAt     null.Time       `db:"next_response_met_at" json:"next_response_met_at"`
 	To                    json.RawMessage `db:"to" json:"to"`
 	BCC                   json.RawMessage `db:"bcc" json:"bcc"`
 	CC                    json.RawMessage `db:"cc" json:"cc"`
@@ -118,37 +119,38 @@ type NewConversationsStats struct {
 
 // Message represents a message in a conversation
 type Message struct {
-	ID               int                    `db:"id" json:"id,omitempty"`
-	CreatedAt        time.Time              `db:"created_at" json:"created_at"`
-	UpdatedAt        time.Time              `db:"updated_at" json:"updated_at"`
-	UUID             string                 `db:"uuid" json:"uuid"`
-	Type             string                 `db:"type" json:"type"`
-	Status           string                 `db:"status" json:"status"`
-	ConversationID   int                    `db:"conversation_id" json:"conversation_id"`
-	Content          string                 `db:"content" json:"content"`
-	TextContent      string                 `db:"text_content" json:"text_content"`
-	ContentType      string                 `db:"content_type" json:"content_type"`
-	Private          bool                   `db:"private" json:"private"`
-	SourceID         null.String            `db:"source_id" json:"-"`
-	SenderID         int                    `db:"sender_id" json:"sender_id"`
-	SenderType       string                 `db:"sender_type" json:"sender_type"`
-	InboxID          int                    `db:"inbox_id" json:"-"`
-	Meta             json.RawMessage        `db:"meta" json:"meta"`
-	Attachments      attachment.Attachments `db:"attachments" json:"attachments"`
-	ConversationUUID string                 `db:"conversation_uuid" json:"-"`
-	From             string                 `db:"from"  json:"-"`
-	Subject          string                 `db:"subject" json:"-"`
-	Channel          string                 `db:"channel" json:"-"`
-	To               pq.StringArray         `db:"to"  json:"-"`
-	CC               pq.StringArray         `db:"cc" json:"-"`
-	BCC              pq.StringArray         `db:"bcc" json:"-"`
-	References       []string               `json:"-"`
-	InReplyTo        string                 `json:"-"`
-	Headers          textproto.MIMEHeader   `json:"-"`
-	AltContent       string                 `db:"-" json:"-"`
-	Media            []mmodels.Media        `db:"-" json:"-"`
-	IsCSAT           bool                   `db:"-" json:"-"`
-	Total            int                    `db:"total" json:"-"`
+	ID                       int                    `db:"id" json:"id,omitempty"`
+	CreatedAt                time.Time              `db:"created_at" json:"created_at"`
+	UpdatedAt                time.Time              `db:"updated_at" json:"updated_at"`
+	UUID                     string                 `db:"uuid" json:"uuid"`
+	Type                     string                 `db:"type" json:"type"`
+	Status                   string                 `db:"status" json:"status"`
+	ConversationID           int                    `db:"conversation_id" json:"conversation_id"`
+	Content                  string                 `db:"content" json:"content"`
+	TextContent              string                 `db:"text_content" json:"text_content"`
+	ContentType              string                 `db:"content_type" json:"content_type"`
+	Private                  bool                   `db:"private" json:"private"`
+	SourceID                 null.String            `db:"source_id" json:"-"`
+	SenderID                 int                    `db:"sender_id" json:"sender_id"`
+	SenderType               string                 `db:"sender_type" json:"sender_type"`
+	InboxID                  int                    `db:"inbox_id" json:"-"`
+	Meta                     json.RawMessage        `db:"meta" json:"meta"`
+	Attachments              attachment.Attachments `db:"attachments" json:"attachments"`
+	ConversationUUID         string                 `db:"conversation_uuid" json:"-"`
+	ConversationAppliedSLAID null.Int               `db:"conversation_applied_sla_id" json:"-"`
+	From                     string                 `db:"from"  json:"-"`
+	Subject                  string                 `db:"subject" json:"-"`
+	Channel                  string                 `db:"channel" json:"-"`
+	To                       pq.StringArray         `db:"to"  json:"-"`
+	CC                       pq.StringArray         `db:"cc" json:"-"`
+	BCC                      pq.StringArray         `db:"bcc" json:"-"`
+	References               []string               `json:"-"`
+	InReplyTo                string                 `json:"-"`
+	Headers                  textproto.MIMEHeader   `json:"-"`
+	AltContent               string                 `db:"-" json:"-"`
+	Media                    []mmodels.Media        `db:"-" json:"-"`
+	IsCSAT                   bool                   `db:"-" json:"-"`
+	Total                    int                    `db:"total" json:"-"`
 }
 
 // CensorCSATContent redacts the content of a CSAT message to prevent leaking the CSAT survey public link.

@@ -19,6 +19,7 @@ type SLAPolicy struct {
 	Description       string           `db:"description" json:"description,omitempty"`
 	FirstResponseTime string           `db:"first_response_time" json:"first_response_time,omitempty"`
 	EveryResponseTime string           `db:"every_response_time" json:"every_response_time,omitempty"`
+	NextResponseTime  string           `db:"next_response_time" json:"next_response_time,omitempty"`
 	ResolutionTime    string           `db:"resolution_time" json:"resolution_time,omitempty"`
 	Notifications     SlaNotifications `db:"notifications" json:"notifications,omitempty"`
 }
@@ -58,6 +59,7 @@ type ScheduledSLANotification struct {
 	ID               int            `db:"id" json:"id"`
 	CreatedAt        time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt        time.Time      `db:"updated_at" json:"updated_at"`
+	SlaEventID       null.Int       `db:"sla_event_id" json:"sla_event_id"`
 	AppliedSLAID     int            `db:"applied_sla_id" json:"applied_sla_id"`
 	Metric           string         `db:"metric" json:"metric"`
 	NotificationType string         `db:"notification_type" json:"notification_type"`
@@ -87,4 +89,17 @@ type AppliedSLA struct {
 	ConversationReferenceNumber string    `db:"conversation_reference_number"`
 	ConversationSubject         string    `db:"conversation_subject"`
 	ConversationAssignedUserID  null.Int  `db:"conversation_assigned_user_id"`
+	ConversationStatus          string    `db:"conversation_status"`
+}
+
+type SLAEvent struct {
+	ID           int       `db:"id"`
+	CreatedAt    time.Time `db:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at"`
+	AppliedSLAID int       `db:"applied_sla_id"`
+	SlaPolicyID  int       `db:"sla_policy_id"`
+	Type         string    `db:"type"`
+	DeadlineAt   time.Time `db:"deadline_at"`
+	MetAt        null.Time `db:"met_at"`
+	BreachedAt   null.Time `db:"breached_at"`
 }

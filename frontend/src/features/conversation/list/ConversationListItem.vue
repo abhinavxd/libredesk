@@ -55,21 +55,38 @@
           </div>
         </div>
 
-        <div class="flex items-center mt-2 space-x-2">
-          <SlaBadge
-            v-if="conversation.first_response_deadline_at"
-            :dueAt="conversation.first_response_deadline_at"
-            :actualAt="conversation.first_reply_at"
-            :label="'FRD'"
-            :showExtra="false"
-          />
-          <SlaBadge
-            v-if="conversation.resolution_deadline_at"
-            :dueAt="conversation.resolution_deadline_at"
-            :actualAt="conversation.resolved_at"
-            :label="'RD'"
-            :showExtra="false"
-          />
+        <!-- SLA Badges -->
+        <div class="flex items-center">
+          <div :class="getSlaClass(frdStatus)">
+            <SlaBadge
+              :dueAt="conversation.first_response_deadline_at"
+              :actualAt="conversation.first_reply_at"
+              :label="'FRD'"
+              :showExtra="false"
+              @status="frdStatus = $event"
+              :key="`${conversation.uuid}-${conversation.first_response_deadline_at}-${conversation.first_reply_at}`"
+            />
+          </div>
+          <div :class="getSlaClass(rdStatus)">
+            <SlaBadge
+              :dueAt="conversation.resolution_deadline_at"
+              :actualAt="conversation.resolved_at"
+              :label="'RD'"
+              :showExtra="false"
+              @status="rdStatus = $event"
+              :key="`${conversation.uuid}-${conversation.resolution_deadline_at}-${conversation.resolved_at}`"
+            />
+          </div>
+          <div :class="getSlaClass(nrdStatus)">
+            <SlaBadge
+              :dueAt="conversation.next_response_deadline_at"
+              :actualAt="conversation.next_response_met_at"
+              :label="'NRD'"
+              :showExtra="false"
+              @status="nrdStatus = $event"
+              :key="`${conversation.uuid}-${conversation.next_response_deadline_at}-${conversation.next_response_met_at}`"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -77,7 +94,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { formatTime } from '@/utils/datetime'
 import { Mail, Reply } from 'lucide-vue-next'
@@ -86,6 +103,9 @@ import SlaBadge from '@/features/sla/SlaBadge.vue'
 
 const router = useRouter()
 const route = useRoute()
+const frdStatus = ref('')
+const rdStatus = ref('')
+const nrdStatus = ref('')
 
 const props = defineProps({
   conversation: Object,
@@ -113,4 +133,6 @@ const trimmedLastMessage = computed(() => {
   const message = props.conversation.last_message || ''
   return message.length > 100 ? message.slice(0, 100) + '...' : message
 })
+
+const getSlaClass = (status) => (['overdue', 'remaining'].includes(status) ? 'mr-2' : '')
 </script>

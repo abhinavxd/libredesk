@@ -173,6 +173,5 @@ func handleSendMessage(r *fastglue.Request) error {
 		// Evaluate automation rules.
 		app.automation.EvaluateConversationUpdateRules(cuuid, models.EventConversationMessageOutgoing)
 	}
-
 	return r.SendEnvelope(true)
 }

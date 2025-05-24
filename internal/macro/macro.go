@@ -28,12 +28,12 @@ type Manager struct {
 
 // Predefined queries.
 type queries struct {
-	Get           *sqlx.Stmt `query:"get"`
-	GetAll        *sqlx.Stmt `query:"get-all"`
-	Create        *sqlx.Stmt `query:"create"`
-	Update        *sqlx.Stmt `query:"update"`
-	Delete        *sqlx.Stmt `query:"delete"`
-	IncUsageCount *sqlx.Stmt `query:"increment-usage-count"`
+	Get            *sqlx.Stmt `query:"get"`
+	GetAll         *sqlx.Stmt `query:"get-all"`
+	Create         *sqlx.Stmt `query:"create"`
+	Update         *sqlx.Stmt `query:"update"`
+	Delete         *sqlx.Stmt `query:"delete"`
+	IncrUsageCount *sqlx.Stmt `query:"increment-usage-count"`
 }
 
 // Opts contains the dependencies for the macro manager.
@@ -115,7 +115,7 @@ func (m *Manager) Delete(id int) error {
 
 // IncrementUsageCount increments the usage count of a macro.
 func (m *Manager) IncrementUsageCount(id int) error {
-	if _, err := m.q.IncUsageCount.Exec(id); err != nil {
+	if _, err := m.q.IncrUsageCount.Exec(id); err != nil {
 		m.lo.Error("error incrementing usage count", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "macro usage count"), nil)
 	}

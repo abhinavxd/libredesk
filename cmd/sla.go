@@ -54,7 +54,7 @@ func handleCreateSLA(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if err := app.sla.Create(sla.Name, sla.Description, sla.FirstResponseTime, sla.ResolutionTime, sla.Notifications); err != nil {
+	if err := app.sla.Create(sla.Name, sla.Description, sla.FirstResponseTime, sla.ResolutionTime, sla.NextResponseTime, sla.Notifications); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -81,11 +81,11 @@ func handleUpdateSLA(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if err := app.sla.Update(id, sla.Name, sla.Description, sla.FirstResponseTime, sla.ResolutionTime, sla.Notifications); err != nil {
+	if err := app.sla.Update(id, sla.Name, sla.Description, sla.FirstResponseTime, sla.ResolutionTime, sla.NextResponseTime, sla.Notifications); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	return r.SendEnvelope("SLA updated successfully.")
+	return r.SendEnvelope(true)
 }
 
 // handleDeleteSLA deletes the SLA with the given ID.
@@ -153,6 +153,14 @@ func validateSLA(app *App, sla *smodels.SLAPolicy) error {
 	}
 	if frt > rt {
 		return envelope.NewError(envelope.InputError, app.i18n.T("sla.firstResponseTimeAfterResolution"), nil)
+	}
+
+	nrt, err := time.ParseDuration(sla.NextResponseTime)
+	if err != nil {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "`next_response_time`"), nil)
+	}
+	if nrt.Seconds() < 1 {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "`next_response_time`"), nil)
 	}
 
 	return nil

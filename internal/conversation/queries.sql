@@ -67,18 +67,27 @@ SELECT
     conversation_priorities.name as priority,
     as_latest.first_response_deadline_at,
     as_latest.resolution_deadline_at,
-    as_latest.status as sla_status
+    next_sla.deadline_at AS next_response_deadline_at,
+    next_sla.met_at as next_response_met_at
     FROM conversations
     JOIN users ON contact_id = users.id
     JOIN inboxes ON inbox_id = inboxes.id  
     LEFT JOIN conversation_statuses ON status_id = conversation_statuses.id
     LEFT JOIN conversation_priorities ON priority_id = conversation_priorities.id
     LEFT JOIN LATERAL (
-        SELECT first_response_deadline_at, resolution_deadline_at, status
+        SELECT id, first_response_deadline_at, resolution_deadline_at, status
         FROM applied_slas 
         WHERE conversation_id = conversations.id 
         ORDER BY created_at DESC LIMIT 1
     ) as_latest ON true
+    LEFT JOIN LATERAL (
+        SELECT se.deadline_at, se.met_at
+        FROM sla_events se
+        WHERE se.applied_sla_id = as_latest.id
+        AND se.type = 'next_response'
+        ORDER BY se.created_at DESC
+        LIMIT 1
+    ) next_sla ON true
 WHERE 1=1 %s
 
 -- name: get-conversation
@@ -128,7 +137,9 @@ SELECT
    ct.custom_attributes as "contact.custom_attributes",
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
-   as_latest.status as sla_status
+   next_sla.deadline_at AS next_response_deadline_at,
+   next_sla.met_at as next_response_met_at,
+   as_latest.id as applied_sla_id
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
@@ -137,11 +148,19 @@ LEFT JOIN teams at ON at.id = c.assigned_team_id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id
 LEFT JOIN conversation_priorities p ON c.priority_id = p.id
 LEFT JOIN LATERAL (
-    SELECT first_response_deadline_at, resolution_deadline_at, status
-    FROM applied_slas 
+    SELECT id, first_response_deadline_at, resolution_deadline_at, status
+    FROM applied_slas
     WHERE conversation_id = c.id 
     ORDER BY created_at DESC LIMIT 1
 ) as_latest ON true
+LEFT JOIN LATERAL (
+  SELECT se.deadline_at, se.met_at
+  FROM sla_events se
+  WHERE se.applied_sla_id = as_latest.id
+  AND se.type = 'next_response'
+  ORDER BY se.created_at DESC
+  LIMIT 1
+) next_sla ON true
 WHERE 
    ($1 > 0 AND c.id = $1)
    OR 
@@ -407,6 +426,7 @@ SELECT
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'to')) AS to,
     c.inbox_id,
     c.uuid as conversation_uuid,
+    c.applied_sla_id as conversation_applied_sla_id,
     c.subject
 FROM conversation_messages m
 INNER JOIN conversations c ON c.id = m.conversation_id

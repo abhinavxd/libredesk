@@ -1,9 +1,6 @@
 <template>
   <div class="space-y-4">
-    <div
-      class="flex flex-col"
-      v-if="conversation.subject"
-    >
+    <div class="flex flex-col" v-if="conversation.subject">
       <p class="font-medium">{{ $t('form.field.subject') }}</p>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
       <p v-else>
@@ -34,7 +31,7 @@
           v-if="conversation.first_response_deadline_at"
           :dueAt="conversation.first_response_deadline_at"
           :actualAt="conversation.first_reply_at"
-          :key="conversation.uuid"
+          :key="`${conversation.uuid}-${conversation.first_response_deadline_at}-${conversation.first_reply_at}`"
         />
       </div>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
@@ -53,7 +50,7 @@
           v-if="conversation.resolution_deadline_at"
           :dueAt="conversation.resolution_deadline_at"
           :actualAt="conversation.resolved_at"
-          :key="conversation.uuid"
+          :key="`${conversation.uuid}-${conversation.resolution_deadline_at}-${conversation.resolved_at}`"
         />
       </div>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
@@ -66,7 +63,15 @@
     </div>
 
     <div class="flex flex-col">
-      <p class="font-medium">{{ $t('form.field.lastReplyAt') }}</p>
+      <div class="flex justify-start items-center space-x-2">
+        <p class="font-medium">{{ $t('form.field.lastReplyAt') }}</p>
+        <SlaBadge
+          v-if="conversation.next_response_deadline_at"
+          :dueAt="conversation.next_response_deadline_at"
+          :actualAt="conversation.next_response_met_at"
+          :key="`${conversation.uuid}-${conversation.next_response_deadline_at}-${conversation.next_response_met_at}`"
+        />
+      </div>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
       <p v-if="conversation.last_reply_at">
         {{ format(conversation.last_reply_at, 'PPpp') }}

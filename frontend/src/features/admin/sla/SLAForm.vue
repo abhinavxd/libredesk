@@ -44,6 +44,19 @@
       </FormItem>
     </FormField>
 
+    <FormField v-slot="{ componentField }" name="next_response_time">
+      <FormItem>
+        <FormLabel>{{ t('admin.sla.nextResponseTime') }}</FormLabel>
+        <FormControl>
+          <Input type="text" placeholder="30m" v-bind="componentField" />
+        </FormControl>
+        <FormDescription>
+          {{ t('admin.sla.nextResponseTime.description') }}
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <!-- Notifications Section -->
     <div class="space-y-6">
       <div class="flex items-center justify-between pb-3 border-b">
@@ -93,7 +106,10 @@
               </span>
               <div>
                 <div class="font-medium text-foreground">
-                  {{ notification.type === 'warning' ? t('admin.sla.warning') : t('admin.sla.breach') }} {{ t('admin.sla.notification') }}
+                  {{
+                    notification.type === 'warning' ? t('admin.sla.warning') : t('admin.sla.breach')
+                  }}
+                  {{ t('admin.sla.notification') }}
                 </div>
                 <p class="text-xs text-muted-foreground">
                   {{ notification.type === 'warning' ? 'Pre-breach alert' : 'Post-breach action' }}
@@ -149,7 +165,11 @@
                   <FormItem v-if="shouldShowTimeDelay(index)">
                     <FormLabel class="flex items-center gap-1.5 text-sm font-medium">
                       <Hourglass class="w-4 h-4 text-muted-foreground" />
-                      {{ notification.type === 'warning' ? t('admin.sla.advanceWarning') : t('admin.sla.followUpDelay') }}
+                      {{
+                        notification.type === 'warning'
+                          ? t('admin.sla.advanceWarning')
+                          : t('admin.sla.followUpDelay')
+                      }}
                     </FormLabel>
                     <FormControl>
                       <Select v-bind="componentField" class="hover:border-foreground/30">
@@ -274,7 +294,10 @@ const props = defineProps({
 
 const usersStore = useUsersStore()
 const submitLabel = computed(() => {
-  return props.submitLabel || (props.initialValues.id ? t('globals.buttons.update') : t('globals.buttons.create'))
+  return (
+    props.submitLabel ||
+    (props.initialValues.id ? t('globals.buttons.update') : t('globals.buttons.create'))
+  )
 })
 const delayDurations = [
   '5m',

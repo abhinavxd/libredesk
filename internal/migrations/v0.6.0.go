@@ -207,5 +207,85 @@ func V0_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	// Add column `next_response_time` to sla_policies table if it doesn't exist
+	_, err = db.Exec(`
+		ALTER TABLE sla_policies ADD COLUMN IF NOT EXISTS next_response_time TEXT NULL;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Add `next_response` value to type if it doesn't exist.
+	_, err = db.Exec(`
+		DO $$
+		BEGIN
+			IF EXISTS (
+				SELECT 1 FROM pg_type WHERE typname = 'sla_metric'
+			) AND NOT EXISTS (
+				SELECT 1 FROM pg_enum e
+				JOIN pg_type t ON t.oid = e.enumtypid
+				WHERE t.typname = 'sla_metric'
+				AND e.enumlabel = 'next_response'
+			) THEN
+				ALTER TYPE sla_metric ADD VALUE 'next_response';
+			END IF;
+		END
+		$$;
+	`)
+
+	// Create sla_event_status enum type if it doesn't exist
+	_, err = db.Exec(`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_type WHERE typname = 'sla_event_status'
+			) THEN
+				CREATE TYPE sla_event_status AS ENUM ('pending', 'breached', 'met');
+			END IF;
+		END
+		$$;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create sla_events table if it does not exist
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS sla_events (
+			id BIGSERIAL PRIMARY KEY,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW(),
+			status sla_event_status DEFAULT 'pending' NOT NULL,
+			applied_sla_id BIGINT REFERENCES applied_slas(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+			sla_policy_id INT REFERENCES sla_policies(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+			type sla_metric NOT NULL,
+			deadline_at TIMESTAMPTZ NOT NULL,
+			met_at TIMESTAMPTZ,
+			breached_at TIMESTAMPTZ
+		);
+		CREATE INDEX IF NOT EXISTS index_sla_events_on_applied_sla_id ON sla_events(applied_sla_id);
+		CREATE INDEX IF NOT EXISTS index_sla_events_on_status ON sla_events(status);
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Add sla_event_id column to scheduled_sla_notifications if it doesn't exist
+	_, err = db.Exec(`
+		ALTER TABLE scheduled_sla_notifications
+		ADD COLUMN IF NOT EXISTS sla_event_id BIGINT REFERENCES sla_events(id) ON DELETE CASCADE;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create index on team_members(user_id) if it doesn't exist
+	_, err = db.Exec(`
+		CREATE INDEX IF NOT EXISTS index_team_members_on_user_id ON team_members (user_id);
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
