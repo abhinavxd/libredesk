@@ -38,12 +38,11 @@ WITH new_sla AS (
   ) VALUES ($1, $2, $3, $4)
   RETURNING conversation_id, id
 )
--- update the conversation with the new SLA policy and applied SLA
+-- update the conversation with the new SLA policy and next SLA deadline.
 UPDATE conversations c
 SET 
    sla_policy_id = $2,
-   next_sla_deadline_at = LEAST($3, $4),
-   applied_sla_id = ns.id
+   next_sla_deadline_at = LEAST($3, $4)
 FROM new_sla ns
 WHERE c.id = ns.conversation_id
 RETURNING ns.id;
@@ -70,14 +69,30 @@ UPDATE applied_slas SET
    updated_at = NOW()
 WHERE id = $1;
 
--- name: set-next-sla-deadline
+-- name: set-conversation-sla-deadline
 UPDATE conversations c
-SET next_sla_deadline_at = CASE 
-    WHEN c.status_id IN (SELECT id from conversation_statuses where name in ('Resolved', 'Closed')) THEN NULL
-    WHEN c.first_reply_at IS NOT NULL AND c.resolved_at IS NULL AND a.resolution_deadline_at IS NOT NULL THEN a.resolution_deadline_at
-    WHEN c.first_reply_at IS NULL AND c.resolved_at IS NULL AND a.first_response_deadline_at IS NOT NULL THEN a.first_response_deadline_at
-    WHEN a.first_response_deadline_at IS NOT NULL AND a.resolution_deadline_at IS NOT NULL THEN LEAST(a.first_response_deadline_at, a.resolution_deadline_at)
-    ELSE NULL
+SET next_sla_deadline_at = CASE
+    -- If resolved or closed, clear the deadline
+    WHEN c.status_id IN (SELECT id FROM conversation_statuses WHERE name IN ('Resolved', 'Closed')) THEN NULL
+
+    -- If an external timestamp ($3) is provided (e.g. next_response), use the earliest of $3.
+    WHEN $3 IS NOT NULL THEN LEAST(
+        $3,
+        CASE
+            WHEN c.first_reply_at IS NOT NULL AND c.resolved_at IS NULL AND a.resolution_deadline_at IS NOT NULL THEN a.resolution_deadline_at
+            WHEN c.first_reply_at IS NULL AND c.resolved_at IS NULL AND a.first_response_deadline_at IS NOT NULL THEN a.first_response_deadline_at
+            WHEN a.first_response_deadline_at IS NOT NULL AND a.resolution_deadline_at IS NOT NULL THEN LEAST(a.first_response_deadline_at, a.resolution_deadline_at)
+            ELSE NULL
+        END
+    )
+
+    -- No $3,
+    ELSE CASE
+        WHEN c.first_reply_at IS NOT NULL AND c.resolved_at IS NULL AND a.resolution_deadline_at IS NOT NULL THEN a.resolution_deadline_at
+        WHEN c.first_reply_at IS NULL AND c.resolved_at IS NULL AND a.first_response_deadline_at IS NOT NULL THEN a.first_response_deadline_at
+        WHEN a.first_response_deadline_at IS NOT NULL AND a.resolution_deadline_at IS NOT NULL THEN LEAST(a.first_response_deadline_at, a.resolution_deadline_at)
+        ELSE NULL
+    END
 END
 FROM applied_slas a
 WHERE a.conversation_id = c.id
@@ -136,6 +151,33 @@ FROM applied_slas a INNER JOIN conversations c on a.conversation_id = c.id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id
 WHERE a.id = $1;
 
+-- name: get-latest-applied-sla-for-conversation
+SELECT a.id,
+   a.created_at,
+   a.updated_at,
+   a.conversation_id,
+   a.sla_policy_id,
+   a.first_response_deadline_at,
+   a.resolution_deadline_at,
+   a.first_response_met_at,
+   a.resolution_met_at,
+   a.first_response_breached_at,
+   a.resolution_breached_at,
+   a.status,
+   c.first_reply_at as conversation_first_response_at,
+   c.resolved_at as conversation_resolved_at,
+   c.uuid as conversation_uuid,
+   c.reference_number as conversation_reference_number,
+   c.subject as conversation_subject,
+   c.assigned_user_id as conversation_assigned_user_id,
+   s.name as conversation_status
+FROM applied_slas a
+INNER JOIN conversations c ON a.conversation_id = c.id
+LEFT JOIN conversation_statuses s ON c.status_id = s.id
+WHERE a.conversation_id = $1
+ORDER BY a.created_at DESC
+LIMIT 1;
+
 -- name: mark-notification-processed
 UPDATE scheduled_sla_notifications
 SET processed_at = NOW(),
@@ -177,11 +219,6 @@ WHERE id = $1;
 -- name: get-sla-event
 SELECT id, created_at, updated_at, applied_sla_id, sla_policy_id, type, deadline_at, met_at, breached_at
 FROM sla_events
-WHERE id = $1;
-
--- name: update-conversation-next-sla-deadline
-UPDATE conversations
-SET next_sla_deadline_at = LEAST(next_sla_deadline_at, $2)
 WHERE id = $1;
 
 -- name: get-pending-sla-events

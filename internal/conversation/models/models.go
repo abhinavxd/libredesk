@@ -84,7 +84,6 @@ type Conversation struct {
 	LastMessage           null.String     `db:"last_message" json:"last_message"`
 	LastMessageSender     null.String     `db:"last_message_sender" json:"last_message_sender"`
 	Contact               umodels.User    `db:"contact" json:"contact"`
-	AppliedSLAID          null.Int        `db:"applied_sla_id" json:"applied_sla_id"`
 	SLAPolicyID           null.Int        `db:"sla_policy_id" json:"sla_policy_id"`
 	SlaPolicyName         null.String     `db:"sla_policy_name" json:"sla_policy_name"`
 	NextSLADeadlineAt     null.Time       `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`

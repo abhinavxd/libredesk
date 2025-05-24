@@ -203,7 +203,6 @@ CREATE TABLE conversations (
 
 	-- Set to NULL when SLA policy is deleted.
 	sla_policy_id INT REFERENCES sla_policies(id) ON DELETE SET NULL ON UPDATE CASCADE,
-	applied_sla_id BIGINT REFERENCES applied_slas(id) ON DELETE SET NULL ON UPDATE CASCADE,
 
     -- Cascade deletes when inbox is deleted.
 	inbox_id INT REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,

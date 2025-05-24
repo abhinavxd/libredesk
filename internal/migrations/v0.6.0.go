@@ -249,14 +249,6 @@ func V0_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
-	// Add applied_sla_id column to conversations table if it doesn't exist
-	_, err = db.Exec(`
-		ALTER TABLE conversations ADD COLUMN IF NOT EXISTS applied_sla_id BIGINT REFERENCES applied_slas(id) ON DELETE SET NULL ON UPDATE CASCADE;
-	`)
-	if err != nil {
-		return err
-	}
-
 	// Create sla_events table if it does not exist
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS sla_events (

@@ -587,6 +587,7 @@ func (m *Manager) processIncomingMessage(in models.IncomingMessage) error {
 	m.automation.EvaluateConversationUpdateRules(in.Message.ConversationUUID, amodels.EventConversationMessageIncoming)
 
 	// Create SLA event for next response if a SLA is applied and has next response time set, subsequent agent replies will mark this event as met.
+	// This cycle continues for next response time SLA metric.
 	conversation, err := m.GetConversation(in.Message.ConversationID, "")
 	if err != nil {
 		m.lo.Error("error fetching conversation", "conversation_id", in.Message.ConversationID, "error", err)
@@ -595,15 +596,13 @@ func (m *Manager) processIncomingMessage(in models.IncomingMessage) error {
 		m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
 		return nil
 	}
-	if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AppliedSLAID.Int, conversation.SLAPolicyID.Int, conversation.AssignedTeamID.Int); err != nil {
+	if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AssignedTeamID.Int); err != nil {
 		m.lo.Error("error creating next response SLA event", "conversation_id", conversation.ID, "error", err)
-	} else {
-		if !deadline.IsZero() {
-			m.lo.Debug("next response SLA event created", "conversation_id", conversation.ID, "deadline", deadline, "applied_sla_id", conversation.AppliedSLAID.Int, "sla_policy_id", conversation.SLAPolicyID.Int)
-			m.BroadcastConversationUpdate(in.Message.ConversationUUID, "next_response_deadline_at", deadline.Format(time.RFC3339))
-			// Clear next response met at timestamp as a new SLA event is created.
-			m.BroadcastConversationUpdate(in.Message.ConversationUUID, "next_response_met_at", nil)
-		}
+	} else if !deadline.IsZero() {
+		m.lo.Debug("next response SLA event created for conversation", "conversation_id", conversation.ID, "deadline", deadline, "sla_policy_id", conversation.SLAPolicyID.Int)
+		m.BroadcastConversationUpdate(in.Message.ConversationUUID, "next_response_deadline_at", deadline.Format(time.RFC3339))
+		// Clear next response met at timestamp as this event was just created.
+		m.BroadcastConversationUpdate(in.Message.ConversationUUID, "next_response_met_at", nil)
 	}
 	return nil
 }
