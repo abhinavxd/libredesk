@@ -31,7 +31,7 @@
           v-if="conversation.first_response_deadline_at"
           :dueAt="conversation.first_response_deadline_at"
           :actualAt="conversation.first_reply_at"
-          :key="conversation.uuid"
+          :key="`${conversation.uuid}-${conversation.first_response_deadline_at}-${conversation.first_reply_at}`"
         />
       </div>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
@@ -50,7 +50,7 @@
           v-if="conversation.resolution_deadline_at"
           :dueAt="conversation.resolution_deadline_at"
           :actualAt="conversation.resolved_at"
-          :key="conversation.uuid"
+          :key="`${conversation.uuid}-${conversation.resolution_deadline_at}-${conversation.resolved_at}`"
         />
       </div>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
@@ -68,12 +68,8 @@
         <SlaBadge
           v-if="conversation.next_response_deadline_at"
           :dueAt="conversation.next_response_deadline_at"
-          :actualAt="
-            ['met'].includes(conversation.next_response_sla_event_status)
-              ? conversation.last_reply_at
-              : null
-          "
-          :key="conversation.uuid"
+          :actualAt="conversation.next_response_met_at"
+          :key="`${conversation.uuid}-${conversation.next_response_deadline_at}-${conversation.next_response_met_at}`"
         />
       </div>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4" />
