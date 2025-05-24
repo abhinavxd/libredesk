@@ -82,7 +82,8 @@ type Manager struct {
 
 type slaStore interface {
 	ApplySLA(startTime time.Time, conversationID, assignedTeamID, slaID int) (slaModels.SLAPolicy, error)
-	CreateNextResponseSLAEvent(conversationID, appliedSLAID, slaPolicyID, assignedTeamID int) error
+	CreateNextResponseSLAEvent(conversationID, appliedSLAID, slaPolicyID, assignedTeamID int) (time.Time, error)
+	SetLatestSLAEventMetAt(appliedSLAID int, metric string) (time.Time, error)
 }
 
 type statusStore interface {
@@ -592,6 +593,19 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		snoozeUntil = time.Now().Add(duration)
 	}
 
+	conversationBeforeChange, err := c.GetConversation(0, uuid)
+	if err != nil {
+		c.lo.Error("error fetching conversation before status change", "uuid", uuid, "error", err)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
+	}
+	oldStatus := conversationBeforeChange.Status.String
+
+	// Status not changed? return early.
+	if oldStatus == status {
+		c.lo.Info("conversation status is unchanged", "uuid", uuid, "status", status)
+		return nil
+	}
+
 	// Update the conversation status.
 	if _, err := c.q.UpdateConversationStatus.Exec(uuid, status, snoozeUntil); err != nil {
 		c.lo.Error("error updating conversation status", "error", err)
@@ -605,6 +619,16 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 
 	// Broadcast updates using websocket.
 	c.BroadcastConversationUpdate(uuid, "status", status)
+
+	// Broadcast `resolved_at` if the status is changed to resolved, `resolved_at` is set only once when the conversation is resolved for the first time.
+	// Subsequent status changes to resolved will not update the `resolved_at` field.
+	if oldStatus != models.StatusResolved && status == models.StatusResolved {
+		resolvedAt := conversationBeforeChange.ResolvedAt.Time
+		if resolvedAt.IsZero() {
+			resolvedAt = time.Now()
+		}
+		c.BroadcastConversationUpdate(uuid, "resolved_at", resolvedAt.Format(time.RFC3339))
+	}
 	return nil
 }
 

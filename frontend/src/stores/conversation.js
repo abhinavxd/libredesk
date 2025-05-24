@@ -638,9 +638,11 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function updateConversationProp (update) {
+    // Update the current conversation if it matches the UUID.
     if (conversation.data?.uuid === update.uuid) {
       conversation.data[update.prop] = update.value
     }
+    // Update the conversation in the list if it exists.
     const existingConversation = conversations?.data?.find(c => c.uuid === update.uuid)
     if (existingConversation) {
       existingConversation[update.prop] = update.value

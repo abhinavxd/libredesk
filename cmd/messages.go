@@ -7,7 +7,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	medModels "github.com/abhinavxd/libredesk/internal/media/models"
-	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -173,10 +172,6 @@ func handleSendMessage(r *fastglue.Request) error {
 		}
 		// Evaluate automation rules.
 		app.automation.EvaluateConversationUpdateRules(cuuid, models.EventConversationMessageOutgoing)
-
-		// Set `met at` timestamp for next response SLA metric as the agent has sent a message.
-		app.sla.SetLatestSLAEventMetAt(conv.AppliedSLAID.Int, sla.MetricNextResponse)
 	}
-
 	return r.SendEnvelope(true)
 }

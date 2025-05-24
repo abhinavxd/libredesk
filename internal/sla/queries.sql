@@ -153,13 +153,15 @@ RETURNING id;
 
 -- name: set-latest-sla-event-met-at
 UPDATE sla_events
-SET met_at = NOW()
+SET met_at = NOW(),
+status = CASE WHEN NOW() > deadline_at THEN 'breached'::sla_event_status ELSE 'met'::sla_event_status END
 WHERE id = (
   SELECT id FROM sla_events
   WHERE applied_sla_id = $1 AND type = $2 AND met_at IS NULL
   ORDER BY created_at DESC
   LIMIT 1
 )
+RETURNING met_at;
 
 -- name: mark-sla-event-as-breached
 UPDATE sla_events
