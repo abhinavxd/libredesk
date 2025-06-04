@@ -412,6 +412,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#author-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Author Variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#example-outgoing-email-template" class="md-nav__link">
     <span class="md-ellipsis">
       Example outgoing email template
@@ -630,6 +639,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#author-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Author Variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#example-outgoing-email-template" class="md-nav__link">
     <span class="md-ellipsis">
       Example outgoing email template
@@ -660,7 +678,7 @@
 
 
 <h1 id="templating">Templating<a class="headerlink" href="#templating" title="Permanent link">&para;</a></h1>
-<p>Templating in outgoing emails allows you to personalize content by embedding dynamic expressions like <code>{{ .Recipient.FullName }}</code>. These expressions reference fields from the conversation, contact, and recipient objects.</p>
+<p>Templating in outgoing emails allows you to personalize content by embedding dynamic expressions like <code>{{ .Recipient.FullName }}</code>. These expressions reference fields from the conversation, contact, recipient, and author objects.</p>
 <h2 id="outgoing-email-template-expressions">Outgoing Email Template Expressions<a class="headerlink" href="#outgoing-email-template-expressions" title="Permanent link">&para;</a></h2>
 <p>If you want to customize the look of outgoing emails, you can do so in the Admin &gt; Templates -&gt; Outgoing Email Templates section. This template will be used for all outgoing emails including replies to conversations, notifications, and other system-generated emails.</p>
 <h3 id="conversation-variables">Conversation Variables<a class="headerlink" href="#conversation-variables" title="Permanent link">&para;</a></h3>
@@ -679,6 +697,10 @@
 <tr>
 <td>{{ .Conversation.Subject }}</td>
 <td>The subject of the conversation</td>
+</tr>
+<tr>
+<td>{{ .Conversation.Priority }}</td>
+<td>The priority level of the conversation</td>
 </tr>
 <tr>
 <td>{{ .Conversation.UUID }}</td>
@@ -740,10 +762,42 @@
 </tr>
 </tbody>
 </table>
+<h3 id="author-variables">Author Variables<a class="headerlink" href="#author-variables" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>{{ .Author.FirstName }}</td>
+<td>First name of the message author</td>
+</tr>
+<tr>
+<td>{{ .Author.LastName }}</td>
+<td>Last name of the message author</td>
+</tr>
+<tr>
+<td>{{ .Author.FullName }}</td>
+<td>Full name of the message author</td>
+</tr>
+<tr>
+<td>{{ .Author.Email }}</td>
+<td>Email address of the message author</td>
+</tr>
+</tbody>
+</table>
 <h3 id="example-outgoing-email-template">Example outgoing email template<a class="headerlink" href="#example-outgoing-email-template" title="Permanent link">&para;</a></h3>
-<div class="codehilite"><pre><span></span><code>Dear {{ .Recipient.FirstName }}
+<div class="codehilite"><pre><span></span><code>Dear {{ .Recipient.FirstName }},
+
 {{ template &quot;content&quot; . }}
+
 Best regards,
+{{ .Author.FullName }}
+---
+Reference: {{ .Conversation.ReferenceNumber }}
 </code></pre></div>
 
 <p>Here, the <code>{{ template "content" . }}</code> serves as a placeholder for the body of the outgoing email. It will be replaced with the actual email content at the time of sending.</p>
