@@ -157,6 +157,15 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/roles/{id}", perm(handleUpdateRole, "roles:manage"))
 	g.DELETE("/api/v1/roles/{id}", perm(handleDeleteRole, "roles:manage"))
 
+	// Webhooks.
+	g.GET("/api/v1/webhooks", perm(handleGetWebhooks, "webhooks:manage"))
+	g.GET("/api/v1/webhooks/{id}", perm(handleGetWebhook, "webhooks:manage"))
+	g.POST("/api/v1/webhooks", perm(handleCreateWebhook, "webhooks:manage"))
+	g.PUT("/api/v1/webhooks/{id}", perm(handleUpdateWebhook, "webhooks:manage"))
+	g.DELETE("/api/v1/webhooks/{id}", perm(handleDeleteWebhook, "webhooks:manage"))
+	g.PUT("/api/v1/webhooks/{id}/toggle", perm(handleToggleWebhook, "webhooks:manage"))
+	g.POST("/api/v1/webhooks/{id}/test", perm(handleTestWebhook, "webhooks:manage"))
+
 	// Reports.
 	g.GET("/api/v1/reports/overview/sla", perm(handleOverviewSLA, "reports:manage"))
 	g.GET("/api/v1/reports/overview/counts", perm(handleOverviewCounts, "reports:manage"))

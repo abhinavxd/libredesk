@@ -45,7 +45,7 @@ const routes = [
         path: 'contacts/:id',
         name: 'contact-detail',
         component: () => import('@/views/contact/ContactDetailView.vue'),
-        meta: { title: 'Contacts' },
+        meta: { title: 'Contacts' }
       },
       {
         path: '/reports',
@@ -57,7 +57,7 @@ const routes = [
             name: 'overview',
             component: () => import('@/views/reports/OverviewView.vue'),
             meta: { title: 'Overview' }
-          },
+          }
         ]
       },
       {
@@ -108,7 +108,7 @@ const routes = [
         path: 'inboxes/search',
         name: 'search',
         component: () => import('@/views/search/SearchView.vue'),
-        meta: { title: 'Search', hidePageHeader: true },
+        meta: { title: 'Search', hidePageHeader: true }
       },
       {
         path: '/inboxes/:type(assigned|unassigned|all)?',
@@ -124,7 +124,7 @@ const routes = [
             component: () => import('@/views/inbox/InboxView.vue'),
             meta: {
               title: 'Inbox',
-              type: route => route.params.type === 'assigned' ? 'My inbox' : route.params.type
+              type: (route) => (route.params.type === 'assigned' ? 'My inbox' : route.params.type)
             },
             children: [
               {
@@ -134,12 +134,13 @@ const routes = [
                 props: true,
                 meta: {
                   title: 'Inbox',
-                  type: route => route.params.type === 'assigned' ? 'My inbox' : route.params.type,
+                  type: (route) =>
+                    route.params.type === 'assigned' ? 'My inbox' : route.params.type,
                   hidePageHeader: true
                 }
-              },
+              }
             ]
-          },
+          }
         ]
       },
       {
@@ -184,21 +185,23 @@ const routes = [
               {
                 path: '',
                 name: 'business-hours-list',
-                component: () => import('@/views/admin/business-hours/BusinessHoursList.vue'),
+                component: () => import('@/views/admin/business-hours/BusinessHoursList.vue')
               },
               {
                 path: 'new',
                 name: 'new-business-hours',
-                component: () => import('@/views/admin/business-hours/CreateOrEditBusinessHours.vue'),
+                component: () =>
+                  import('@/views/admin/business-hours/CreateOrEditBusinessHours.vue'),
                 meta: { title: 'New Business Hours' }
               },
               {
                 path: ':id/edit',
                 name: 'edit-business-hours',
                 props: true,
-                component: () => import('@/views/admin/business-hours/CreateOrEditBusinessHours.vue'),
+                component: () =>
+                  import('@/views/admin/business-hours/CreateOrEditBusinessHours.vue'),
                 meta: { title: 'Edit Business Hours' }
-              },
+              }
             ]
           },
           {
@@ -209,7 +212,7 @@ const routes = [
               {
                 path: '',
                 name: 'sla-list',
-                component: () => import('@/views/admin/sla/SLAList.vue'),
+                component: () => import('@/views/admin/sla/SLAList.vue')
               },
               {
                 path: 'new',
@@ -223,7 +226,7 @@ const routes = [
                 name: 'edit-sla',
                 component: () => import('@/views/admin/sla/CreateEditSLA.vue'),
                 meta: { title: 'Edit SLA' }
-              },
+              }
             ]
           },
           {
@@ -234,7 +237,7 @@ const routes = [
               {
                 path: '',
                 name: 'inbox-list',
-                component: () => import('@/views/admin/inbox/InboxList.vue'),
+                component: () => import('@/views/admin/inbox/InboxList.vue')
               },
               {
                 path: 'new',
@@ -248,8 +251,8 @@ const routes = [
                 name: 'edit-inbox',
                 component: () => import('@/views/admin/inbox/EditInbox.vue'),
                 meta: { title: 'Edit Inbox' }
-              },
-            ],
+              }
+            ]
           },
           {
             path: 'notification',
@@ -268,7 +271,7 @@ const routes = [
                   {
                     path: '',
                     name: 'agent-list',
-                    component: () => import('@/views/admin/agents/AgentList.vue'),
+                    component: () => import('@/views/admin/agents/AgentList.vue')
                   },
                   {
                     path: 'new',
@@ -281,7 +284,7 @@ const routes = [
                     props: true,
                     component: () => import('@/views/admin/agents/EditAgent.vue'),
                     meta: { title: 'Edit agent' }
-                  },
+                  }
                 ]
               },
               {
@@ -292,7 +295,7 @@ const routes = [
                   {
                     path: '',
                     name: 'team-list',
-                    component: () => import('@/views/admin/teams/TeamList.vue'),
+                    component: () => import('@/views/admin/teams/TeamList.vue')
                   },
                   {
                     path: 'new',
@@ -306,7 +309,7 @@ const routes = [
                     name: 'edit-team',
                     component: () => import('@/views/admin/teams/EditTeamForm.vue'),
                     meta: { title: 'Edit Team' }
-                  },
+                  }
                 ]
               },
               {
@@ -317,7 +320,7 @@ const routes = [
                   {
                     path: '',
                     name: 'role-list',
-                    component: () => import('@/views/admin/roles/RoleList.vue'),
+                    component: () => import('@/views/admin/roles/RoleList.vue')
                   },
                   {
                     path: 'new',
@@ -338,7 +341,7 @@ const routes = [
                 path: 'activity-log',
                 name: 'activity-log',
                 component: () => import('@/views/admin/activity-log/ActivityLog.vue'),
-                meta: { title: 'Activity Log' },
+                meta: { title: 'Activity Log' }
               }
             ]
           },
@@ -395,7 +398,7 @@ const routes = [
               {
                 path: '',
                 name: 'sso-list',
-                component: () => import('@/views/admin/oidc/OIDCList.vue'),
+                component: () => import('@/views/admin/oidc/OIDCList.vue')
               },
               {
                 path: ':id/edit',
@@ -409,6 +412,32 @@ const routes = [
                 name: 'new-sso',
                 component: () => import('@/views/admin/oidc/CreateEditOIDC.vue'),
                 meta: { title: 'New SSO' }
+              }
+            ]
+          },
+          {
+            path: 'webhooks',
+            component: () => import('@/views/admin/webhooks/Webhooks.vue'),
+            name: 'webhooks',
+            meta: { title: 'Webhooks' },
+            children: [
+              {
+                path: '',
+                name: 'webhook-list',
+                component: () => import('@/views/admin/webhooks/WebhookList.vue')
+              },
+              {
+                path: ':id/edit',
+                props: true,
+                name: 'edit-webhook',
+                component: () => import('@/views/admin/webhooks/CreateEditWebhook.vue'),
+                meta: { title: 'Edit Webhook' }
+              },
+              {
+                path: 'new',
+                name: 'new-webhook',
+                component: () => import('@/views/admin/webhooks/CreateEditWebhook.vue'),
+                meta: { title: 'New Webhook' }
               }
             ]
           },
@@ -434,7 +463,7 @@ const routes = [
                   {
                     path: '',
                     name: 'macro-list',
-                    component: () => import('@/views/admin/macros/MacroList.vue'),
+                    component: () => import('@/views/admin/macros/MacroList.vue')
                   },
                   {
                     path: 'new',
@@ -448,7 +477,7 @@ const routes = [
                     name: 'edit-macro',
                     component: () => import('@/views/admin/macros/EditMacro.vue'),
                     meta: { title: 'Edit Macro' }
-                  },
+                  }
                 ]
               }
             ]

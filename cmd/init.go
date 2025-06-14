@@ -45,6 +45,7 @@ import (
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/view"
+	"github.com/abhinavxd/libredesk/internal/webhook"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
@@ -220,8 +221,9 @@ func initConversations(
 	csat *csat.Manager,
 	automationEngine *automation.Engine,
 	template *tmpl.Manager,
+	webhook *webhook.Manager,
 ) *conversation.Manager {
-	c, err := conversation.New(hub, i18n, notif, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, conversation.Opts{
+	c, err := conversation.New(hub, i18n, notif, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, conversation.Opts{
 		DB:                       db,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
@@ -834,6 +836,23 @@ func initReport(db *sqlx.DB, i18n *i18n.I18n) *report.Manager {
 	})
 	if err != nil {
 		log.Fatalf("error initializing report manager: %v", err)
+	}
+	return m
+}
+
+// initWebhook inits webhook manager.
+func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
+	var lo = initLogger("webhook")
+	m, err := webhook.New(webhook.Opts{
+		DB:        db,
+		Lo:        lo,
+		I18n:      i18n,
+		Workers:   ko.MustInt("webhook.workers"),
+		QueueSize: ko.MustInt("webhook.queue_size"),
+		Timeout:   ko.MustDuration("webhook.timeout"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing webhook manager: %v", err)
 	}
 	return m
 }

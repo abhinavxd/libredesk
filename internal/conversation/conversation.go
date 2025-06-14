@@ -32,6 +32,7 @@ import (
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/abhinavxd/libredesk/internal/template"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
@@ -65,6 +66,7 @@ type Manager struct {
 	slaStore                   slaStore
 	settingsStore              settingsStore
 	csatStore                  csatStore
+	webhookStore               webhookStore
 	notifier                   *notifier.Service
 	lo                         *logf.Logger
 	db                         *sqlx.DB
@@ -128,6 +130,10 @@ type csatStore interface {
 	MakePublicURL(appBaseURL, uuid string) string
 }
 
+type webhookStore interface {
+	TriggerEvent(event wmodels.WebhookEvent, data any)
+}
+
 // Opts holds the options for creating a new Manager.
 type Opts struct {
 	DB                       *sqlx.DB
@@ -152,6 +158,7 @@ func New(
 	csatStore csatStore,
 	automation *automation.Engine,
 	template *template.Manager,
+	webhook webhookStore,
 	opts Opts) (*Manager, error) {
 
 	var q queries
@@ -170,6 +177,7 @@ func New(
 		mediaStore:                 mediaStore,
 		settingsStore:              settingsStore,
 		csatStore:                  csatStore,
+		webhookStore:               webhook,
 		slaStore:                   slaStore,
 		statusStore:                statusStore,
 		priorityStore:              priorityStore,
@@ -486,10 +494,20 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
 	}
 
+	c.webhookStore.TriggerEvent(wmodels.EventConversationAssigned, map[string]any{
+		"conversation_uuid": uuid,
+		"assigned_to":       assigneeID,
+		"actor_id":          actor.ID,
+	})
+
+	// Refetch the conversation to get the updated details.
 	conversation, err := c.GetConversation(0, uuid)
 	if err != nil {
 		return err
 	}
+
+	// Evaluate automation rules.
+	c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationUserAssigned)
 
 	// Send email to assignee.
 	if err := c.SendAssignedConversationEmail([]int{assigneeID}, conversation); err != nil {
@@ -499,12 +517,13 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 	if err := c.RecordAssigneeUserChange(uuid, assigneeID, actor); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
 	}
+
 	return nil
 }
 
 // UpdateConversationTeamAssignee sets the assignee of a conversation to a specific team and sets the assigned user id to NULL.
 func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor umodels.User) error {
-	// Store previous assigned team ID to apply SLA policy if team has changed.
+	// Store previously assigned team ID to apply SLA policy if team has changed.
 	conversation, err := c.GetConversation(0, uuid)
 	if err != nil {
 		return err
@@ -520,9 +539,14 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 		return nil
 	}
 
-	// Apply SLA policy if team has changed and the new team has an SLA policy.
-	if previousAssignedTeamID != teamID && teamID > 0 {
+	// Team changed?
+	if previousAssignedTeamID != teamID {
 		team, err := c.teamStore.Get(teamID)
+		if err != nil {
+			return nil
+		}
+		// Fetch the conversation again to get the updated details.
+		conversation, err := c.GetConversation(0, uuid)
 		if err != nil {
 			return nil
 		}
@@ -531,16 +555,13 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 			if err != nil {
 				return nil
 			}
-
-			// Fetch the conversation again to get the updated assignee details.
-			conversation, err := c.GetConversation(0, uuid)
-			if err != nil {
-				return nil
-			}
 			if err := c.ApplySLA(conversation, team.SLAPolicyID.Int, systemUser); err != nil {
 				return nil
 			}
 		}
+
+		// Evaluate automation rules for conversation team assignment.
+		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationTeamAssigned)
 	}
 	return nil
 }
@@ -583,6 +604,14 @@ func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priori
 		c.lo.Error("error updating conversation priority", "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
 	}
+
+	// Evaluate automation rules for conversation priority change.
+	conversation, err := c.GetConversation(0, uuid)
+	if err == nil {
+		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationPriorityChange)
+	}
+
+	// Record activity.
 	if err := c.RecordPriorityChange(priority, uuid, actor); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
 	}
@@ -635,6 +664,19 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
 	}
 
+	// Trigger webhook for conversation status change
+	var snoozeUntilStr string
+	if !snoozeUntil.IsZero() {
+		snoozeUntilStr = snoozeUntil.UTC().Format(time.RFC3339)
+	}
+	c.webhookStore.TriggerEvent(wmodels.EventConversationStatusChanged, map[string]any{
+		"conversation_uuid": uuid,
+		"previous_status":   oldStatus,
+		"new_status":        status,
+		"snooze_until":      snoozeUntilStr,
+		"actor_id":          actor.ID,
+	})
+
 	// Record the status change as an activity.
 	if err := c.RecordStatusChange(status, uuid, actor); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
@@ -642,6 +684,14 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 
 	// Broadcast updates using websocket.
 	c.BroadcastConversationUpdate(uuid, "status", status)
+
+	// Evaluate automation rules.
+	conversation, err := c.GetConversation(0, uuid)
+	if err != nil {
+		c.lo.Error("error fetching conversation after status change", "uuid", uuid, "error", err)
+	} else {
+		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationStatusChange)
+	}
 
 	// Broadcast `resolved_at` if the status is changed to resolved, `resolved_at` is set only once when the conversation is resolved for the first time.
 	// Subsequent status changes to resolved will not update the `resolved_at` field.
@@ -661,6 +711,9 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 	prevTags, err := c.getConversationTags(uuid)
 	if err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.tag}"), nil)
+	}
+	if prevTags == nil {
+		prevTags = []string{}
 	}
 
 	// Add specified tags, ignore existing ones.
@@ -692,6 +745,17 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 	if err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.tag}"), nil)
 	}
+
+	// Trigger webhook for conversation tags changed.
+	if newTags == nil {
+		newTags = []string{}
+	}
+	c.webhookStore.TriggerEvent(wmodels.EventConversationTagsChanged, map[string]any{
+		"conversation_uuid": uuid,
+		"previous_tags":     prevTags,
+		"new_tags":          newTags,
+		"actor_id":          actor.ID,
+	})
 
 	// Find actually removed tags.
 	for _, tag := range prevTags {
@@ -890,11 +954,20 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 }
 
 // RemoveConversationAssignee removes the assignee from the conversation.
-func (m *Manager) RemoveConversationAssignee(uuid, typ string) error {
+func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.User) error {
 	if _, err := m.q.RemoveConversationAssignee.Exec(uuid, typ); err != nil {
 		m.lo.Error("error removing conversation assignee", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorRemovingConversationAssignee"), nil)
 	}
+
+	// Trigger webhook for conversation unassigned from user.
+	if typ == models.AssigneeTypeUser {
+		m.webhookStore.TriggerEvent(wmodels.EventConversationUnassigned, map[string]any{
+			"conversation_uuid": uuid,
+			"actor_id":          actor.ID,
+		})
+	}
+
 	return nil
 }
 

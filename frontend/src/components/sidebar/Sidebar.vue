@@ -223,7 +223,7 @@ const viewInboxOpen = useStorage('viewInboxOpen', true)
                 >
                   <CollapsibleTrigger as-child>
                     <SidebarMenuButton :isActive="isActiveParent(item.href)">
-                      <span>{{ t(item.titleKey) }}</span>
+                      <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
                       <ChevronRight
                         class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                       />

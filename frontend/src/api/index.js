@@ -7,15 +7,15 @@ const http = axios.create({
 })
 
 function getCSRFToken () {
-  const name = 'csrf_token=';
-  const cookies = document.cookie.split(';');
+  const name = 'csrf_token='
+  const cookies = document.cookie.split(';')
   for (let i = 0; i < cookies.length; i++) {
-    let c = cookies[i].trim();
+    let c = cookies[i].trim()
     if (c.indexOf(name) === 0) {
-      return c.substring(name.length, c.length);
+      return c.substring(name.length, c.length)
     }
   }
-  return '';
+  return ''
 }
 
 // Request interceptor.
@@ -33,9 +33,10 @@ http.interceptors.request.use((request) => {
   return request
 })
 
-const getCustomAttributes = (appliesTo) => http.get('/api/v1/custom-attributes', {
-  params: { applies_to: appliesTo }
-})
+const getCustomAttributes = (appliesTo) =>
+  http.get('/api/v1/custom-attributes', {
+    params: { applies_to: appliesTo }
+  })
 const createCustomAttribute = (data) =>
   http.post('/api/v1/custom-attributes', data, {
     headers: {
@@ -54,7 +55,8 @@ const searchConversations = (params) => http.get('/api/v1/conversations/search',
 const searchMessages = (params) => http.get('/api/v1/messages/search', { params })
 const searchContacts = (params) => http.get('/api/v1/contacts/search', { params })
 const getEmailNotificationSettings = () => http.get('/api/v1/settings/notifications/email')
-const updateEmailNotificationSettings = (data) => http.put('/api/v1/settings/notifications/email', data)
+const updateEmailNotificationSettings = (data) =>
+  http.put('/api/v1/settings/notifications/email', data)
 const getPriorities = () => http.get('/api/v1/priorities')
 const getStatuses = () => http.get('/api/v1/statuses')
 const createStatus = (data) => http.post('/api/v1/statuses', data)
@@ -81,11 +83,12 @@ const updateTemplate = (id, data) =>
 
 const getAllBusinessHours = () => http.get('/api/v1/business-hours')
 const getBusinessHours = (id) => http.get(`/api/v1/business-hours/${id}`)
-const createBusinessHours = (data) => http.post('/api/v1/business-hours', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const createBusinessHours = (data) =>
+  http.post('/api/v1/business-hours', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const updateBusinessHours = (id, data) =>
   http.put(`/api/v1/business-hours/${id}`, data, {
     headers: {
@@ -96,16 +99,18 @@ const deleteBusinessHours = (id) => http.delete(`/api/v1/business-hours/${id}`)
 
 const getAllSLAs = () => http.get('/api/v1/sla')
 const getSLA = (id) => http.get(`/api/v1/sla/${id}`)
-const createSLA = (data) => http.post('/api/v1/sla', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const updateSLA = (id, data) => http.put(`/api/v1/sla/${id}`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const createSLA = (data) =>
+  http.post('/api/v1/sla', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const updateSLA = (id, data) =>
+  http.put(`/api/v1/sla/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const deleteSLA = (id) => http.delete(`/api/v1/sla/${id}`)
 const createOIDC = (data) =>
   http.post('/api/v1/oidc', data, {
@@ -156,7 +161,8 @@ const updateAutomationRuleWeights = (data) =>
       'Content-Type': 'application/json'
     }
   })
-const updateAutomationRulesExecutionMode = (data) => http.put(`/api/v1/automations/rules/execution-mode`, data)
+const updateAutomationRulesExecutionMode = (data) =>
+  http.put(`/api/v1/automations/rules/execution-mode`, data)
 const getRoles = () => http.get('/api/v1/roles')
 const getRole = (id) => http.get(`/api/v1/roles/${id}`)
 const createRole = (data) =>
@@ -174,11 +180,12 @@ const updateRole = (id, data) =>
 const deleteRole = (id) => http.delete(`/api/v1/roles/${id}`)
 const getContacts = (params) => http.get('/api/v1/contacts', { params })
 const getContact = (id) => http.get(`/api/v1/contacts/${id}`)
-const updateContact = (id, data) => http.put(`/api/v1/contacts/${id}`, data, {
-  headers: {
-    'Content-Type': 'multipart/form-data'
-  }
-})
+const updateContact = (id, data) =>
+  http.put(`/api/v1/contacts/${id}`, data, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
 const blockContact = (id, data) => http.put(`/api/v1/contacts/${id}/block`, data)
 const getTeam = (id) => http.get(`/api/v1/teams/${id}`)
 const getTeams = () => http.get('/api/v1/teams')
@@ -216,31 +223,39 @@ const createUser = (data) =>
   })
 const getTags = () => http.get('/api/v1/tags')
 const upsertTags = (uuid, data) => http.post(`/api/v1/conversations/${uuid}/tags`, data)
-const updateAssignee = (uuid, assignee_type, data) => http.put(`/api/v1/conversations/${uuid}/assignee/${assignee_type}`, data)
-const removeAssignee = (uuid, assignee_type) => http.put(`/api/v1/conversations/${uuid}/assignee/${assignee_type}/remove`)
-const updateContactCustomAttribute = (uuid, data) => http.put(`/api/v1/conversations/${uuid}/contacts/custom-attributes`, data,
-  {
+const updateAssignee = (uuid, assignee_type, data) =>
+  http.put(`/api/v1/conversations/${uuid}/assignee/${assignee_type}`, data)
+const removeAssignee = (uuid, assignee_type) =>
+  http.put(`/api/v1/conversations/${uuid}/assignee/${assignee_type}/remove`)
+const updateContactCustomAttribute = (uuid, data) =>
+  http.put(`/api/v1/conversations/${uuid}/contacts/custom-attributes`, data, {
     headers: {
       'Content-Type': 'application/json'
     }
   })
-const updateConversationCustomAttribute = (uuid, data) => http.put(`/api/v1/conversations/${uuid}/custom-attributes`, data,
-  {
+const updateConversationCustomAttribute = (uuid, data) =>
+  http.put(`/api/v1/conversations/${uuid}/custom-attributes`, data, {
     headers: {
       'Content-Type': 'application/json'
     }
   })
-const createConversation = (data) => http.post('/api/v1/conversations', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const updateConversationStatus = (uuid, data) => http.put(`/api/v1/conversations/${uuid}/status`, data)
-const updateConversationPriority = (uuid, data) => http.put(`/api/v1/conversations/${uuid}/priority`, data)
+const createConversation = (data) =>
+  http.post('/api/v1/conversations', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const updateConversationStatus = (uuid, data) =>
+  http.put(`/api/v1/conversations/${uuid}/status`, data)
+const updateConversationPriority = (uuid, data) =>
+  http.put(`/api/v1/conversations/${uuid}/priority`, data)
 const updateAssigneeLastSeen = (uuid) => http.put(`/api/v1/conversations/${uuid}/last-seen`)
-const getConversationMessage = (cuuid, uuid) => http.get(`/api/v1/conversations/${cuuid}/messages/${uuid}`)
-const retryMessage = (cuuid, uuid) => http.put(`/api/v1/conversations/${cuuid}/messages/${uuid}/retry`)
-const getConversationMessages = (uuid, params) => http.get(`/api/v1/conversations/${uuid}/messages`, { params })
+const getConversationMessage = (cuuid, uuid) =>
+  http.get(`/api/v1/conversations/${cuuid}/messages/${uuid}`)
+const retryMessage = (cuuid, uuid) =>
+  http.put(`/api/v1/conversations/${cuuid}/messages/${uuid}/retry`)
+const getConversationMessages = (uuid, params) =>
+  http.get(`/api/v1/conversations/${uuid}/messages`, { params })
 const sendMessage = (uuid, data) =>
   http.post(`/api/v1/conversations/${uuid}/messages`, data, {
     headers: {
@@ -251,28 +266,33 @@ const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`)
 const getConversationParticipants = (uuid) => http.get(`/api/v1/conversations/${uuid}/participants`)
 const getAllMacros = () => http.get('/api/v1/macros')
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
-const createMacro = (data) => http.post('/api/v1/macros', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const updateMacro = (id, data) => http.put(`/api/v1/macros/${id}`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const createMacro = (data) =>
+  http.post('/api/v1/macros', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const updateMacro = (id, data) =>
+  http.put(`/api/v1/macros/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const deleteMacro = (id) => http.delete(`/api/v1/macros/${id}`)
-const applyMacro = (uuid, id, data) => http.post(`/api/v1/conversations/${uuid}/macros/${id}/apply`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const applyMacro = (uuid, id, data) =>
+  http.post(`/api/v1/conversations/${uuid}/macros/${id}/apply`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getTeamUnassignedConversations = (teamID, params) =>
   http.get(`/api/v1/teams/${teamID}/conversations/unassigned`, { params })
 const getAssignedConversations = (params) => http.get('/api/v1/conversations/assigned', { params })
-const getUnassignedConversations = (params) => http.get('/api/v1/conversations/unassigned', { params })
+const getUnassignedConversations = (params) =>
+  http.get('/api/v1/conversations/unassigned', { params })
 const getAllConversations = (params) => http.get('/api/v1/conversations/all', { params })
-const getViewConversations = (id, params) => http.get(`/api/v1/views/${id}/conversations`, { params })
+const getViewConversations = (id, params) =>
+  http.get(`/api/v1/views/${id}/conversations`, { params })
 const uploadMedia = (data) =>
   http.post('/api/v1/media', data, {
     headers: {
@@ -320,6 +340,23 @@ const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data)
 const deleteContactNote = (id, noteId) => http.delete(`/api/v1/contacts/${id}/notes/${noteId}`)
 const getActivityLogs = (params) => http.get('/api/v1/activity-logs', { params })
+const getWebhooks = () => http.get('/api/v1/webhooks')
+const getWebhook = (id) => http.get(`/api/v1/webhooks/${id}`)
+const createWebhook = (data) =>
+  http.post('/api/v1/webhooks', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const updateWebhook = (id, data) =>
+  http.put(`/api/v1/webhooks/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const deleteWebhook = (id) => http.delete(`/api/v1/webhooks/${id}`)
+const toggleWebhook = (id) => http.put(`/api/v1/webhooks/${id}/toggle`)
+const testWebhook = (id) => http.post(`/api/v1/webhooks/${id}/test`)
 
 export default {
   login,
@@ -448,5 +485,12 @@ export default {
   getContactNotes,
   createContactNote,
   deleteContactNote,
-  getActivityLogs
+  getActivityLogs,
+  getWebhooks,
+  getWebhook,
+  createWebhook,
+  updateWebhook,
+  deleteWebhook,
+  toggleWebhook,
+  testWebhook
 }

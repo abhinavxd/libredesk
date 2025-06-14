@@ -41,6 +41,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/team"
 	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user"
+	"github.com/abhinavxd/libredesk/internal/webhook"
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -92,6 +93,7 @@ type App struct {
 	notifier        *notifier.Service
 	customAttribute *customAttribute.Manager
 	report          *report.Manager
+	webhook         *webhook.Manager
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -191,12 +193,13 @@ func main() {
 		inbox                       = initInbox(db, i18n)
 		team                        = initTeam(db, i18n)
 		businessHours               = initBusinessHours(db, i18n)
+		webhook                     = initWebhook(db, i18n)
 		user                        = initUser(i18n, db)
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
 		automation                  = initAutomationEngine(db, i18n)
 		sla                         = initSLA(db, team, settings, businessHours, notifier, template, user, i18n)
-		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template)
+		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template, webhook)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 	)
 	automation.SetConversationStore(conversation)
@@ -206,6 +209,7 @@ func main() {
 	go autoassigner.Run(ctx, autoAssignInterval)
 	go conversation.Run(ctx, messageIncomingQWorkers, messageOutgoingQWorkers, messageOutgoingScanInterval)
 	go conversation.RunUnsnoozer(ctx, unsnoozeInterval)
+	go webhook.Run(ctx)
 	go notifier.Run(ctx)
 	go sla.Run(ctx, slaEvaluationInterval)
 	go sla.SendNotifications(ctx)
@@ -243,6 +247,7 @@ func main() {
 		tag:             initTag(db, i18n),
 		macro:           initMacro(db, i18n),
 		ai:              initAI(db, i18n),
+		webhook:         webhook,
 	}
 	app.consts.Store(constants)
 
@@ -286,6 +291,8 @@ func main() {
 	autoassigner.Close()
 	colorlog.Red("Shutting down notifier...")
 	notifier.Close()
+	colorlog.Red("Shutting down webhook...")
+	webhook.Close()
 	colorlog.Red("Shutting down conversation...")
 	conversation.Close()
 	colorlog.Red("Shutting down SLA...")

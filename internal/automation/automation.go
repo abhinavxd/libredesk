@@ -40,9 +40,9 @@ const (
 
 // ConversationTask represents a unit of work for processing conversations.
 type ConversationTask struct {
-	taskType         TaskType
-	eventType        string
-	conversationUUID string
+	taskType     TaskType
+	eventType    string
+	conversation cmodels.Conversation
 }
 
 type Engine struct {
@@ -151,9 +151,9 @@ func (e *Engine) worker(ctx context.Context) {
 			}
 			switch task.taskType {
 			case NewConversation:
-				e.handleNewConversation(task.conversationUUID)
+				e.handleNewConversation(task.conversation)
 			case UpdateConversation:
-				e.handleUpdateConversation(task.conversationUUID, task.eventType)
+				e.handleUpdateConversation(task.conversation, task.eventType)
 			case TimeTrigger:
 				e.handleTimeTrigger()
 			}
@@ -272,7 +272,7 @@ func (e *Engine) UpdateRuleExecutionMode(ruleType, mode string) error {
 }
 
 // EvaluateNewConversationRules enqueues a new conversation for rule evaluation.
-func (e *Engine) EvaluateNewConversationRules(conversationUUID string) {
+func (e *Engine) EvaluateNewConversationRules(conversation cmodels.Conversation) {
 	e.closedMu.RLock()
 	defer e.closedMu.RUnlock()
 	if e.closed {
@@ -280,8 +280,8 @@ func (e *Engine) EvaluateNewConversationRules(conversationUUID string) {
 	}
 	select {
 	case e.taskQueue <- ConversationTask{
-		taskType:         NewConversation,
-		conversationUUID: conversationUUID,
+		taskType:     NewConversation,
+		conversation: conversation,
 	}:
 	default:
 		// Queue is full.
@@ -290,7 +290,7 @@ func (e *Engine) EvaluateNewConversationRules(conversationUUID string) {
 }
 
 // EvaluateConversationUpdateRules enqueues an updated conversation for rule evaluation.
-func (e *Engine) EvaluateConversationUpdateRules(conversationUUID string, eventType string) {
+func (e *Engine) EvaluateConversationUpdateRules(conversation cmodels.Conversation, eventType string) {
 	if eventType == "" {
 		e.lo.Error("error evaluating conversation update rules: eventType is empty")
 		return
@@ -302,9 +302,9 @@ func (e *Engine) EvaluateConversationUpdateRules(conversationUUID string, eventT
 	}
 	select {
 	case e.taskQueue <- ConversationTask{
-		taskType:         UpdateConversation,
-		conversationUUID: conversationUUID,
-		eventType:        eventType,
+		taskType:     UpdateConversation,
+		eventType:    eventType,
+		conversation: conversation,
 	}:
 	default:
 		// Queue is full.
@@ -313,32 +313,22 @@ func (e *Engine) EvaluateConversationUpdateRules(conversationUUID string, eventT
 }
 
 // handleNewConversation handles new conversation events.
-func (e *Engine) handleNewConversation(conversationUUID string) {
-	e.lo.Debug("handling new conversation", "uuid", conversationUUID)
-	conversation, err := e.conversationStore.GetConversation(0, conversationUUID)
-	if err != nil {
-		e.lo.Error("error fetching conversation for new event", "uuid", conversationUUID, "error", err)
-		return
-	}
+func (e *Engine) handleNewConversation(conversation cmodels.Conversation) {
+	e.lo.Debug("handling new conversation for automation rule evaluation", "uuid", conversation.UUID)
 	rules := e.filterRulesByType(models.RuleTypeNewConversation, "")
 	if len(rules) == 0 {
-		e.lo.Warn("no rules to evaluate for new conversation", "uuid", conversationUUID)
+		e.lo.Warn("no rules to evaluate for new conversation rule evaluation", "uuid", conversation.UUID)
 		return
 	}
 	e.evalConversationRules(rules, conversation)
 }
 
 // handleUpdateConversation handles update conversation events with specific eventType.
-func (e *Engine) handleUpdateConversation(conversationUUID, eventType string) {
-	e.lo.Debug("handling update conversation", "uuid", conversationUUID, "event_type", eventType)
-	conversation, err := e.conversationStore.GetConversation(0, conversationUUID)
-	if err != nil {
-		e.lo.Error("error fetching conversation for update event", "uuid", conversationUUID, "error", err)
-		return
-	}
+func (e *Engine) handleUpdateConversation(conversation cmodels.Conversation, eventType string) {
+	e.lo.Debug("handling update conversation for automation rule evaluation", "uuid", conversation.UUID, "event_type", eventType)
 	rules := e.filterRulesByType(models.RuleTypeConversationUpdate, eventType)
 	if len(rules) == 0 {
-		e.lo.Warn("no rules to evaluate for conversation update", "uuid", conversationUUID, "event_type", eventType)
+		e.lo.Warn("no rules to evaluate for conversation update", "uuid", conversation.UUID, "event_type", eventType)
 		return
 	}
 	e.evalConversationRules(rules, conversation)
@@ -346,7 +336,7 @@ func (e *Engine) handleUpdateConversation(conversationUUID, eventType string) {
 
 // handleTimeTrigger handles time trigger events.
 func (e *Engine) handleTimeTrigger() {
-	e.lo.Debug("handling time triggers")
+	e.lo.Info("running time trigger evaluation for automation rules")
 	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
 	conversations, err := e.conversationStore.GetConversationsCreatedAfter(thirtyDaysAgo)
 	if err != nil {
@@ -358,7 +348,7 @@ func (e *Engine) handleTimeTrigger() {
 		e.lo.Warn("no rules to evaluate for time trigger")
 		return
 	}
-	e.lo.Debug("fetched conversations for evaluating time triggers", "conversations_count", len(conversations), "rules_count", len(rules))
+	e.lo.Info("fetched conversations for evaluating time triggers", "conversations_count", len(conversations), "rules_count", len(rules))
 	for _, c := range conversations {
 		// Fetch entire conversation.
 		conversation, err := e.conversationStore.GetConversation(0, c.UUID)

@@ -20,6 +20,15 @@ DROP TYPE IF EXISTS "sla_metric" CASCADE; CREATE TYPE "sla_metric" AS ENUM ('fir
 DROP TYPE IF EXISTS "sla_notification_type" CASCADE; CREATE TYPE "sla_notification_type" AS ENUM ('warning', 'breach');
 DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online');
 DROP TYPE IF EXISTS "macro_visible_when" CASCADE; CREATE TYPE "macro_visible_when" AS ENUM ('replying', 'starting_conversation', 'adding_private_note');
+DROP TYPE IF EXISTS "webhook_event" CASCADE; CREATE TYPE webhook_event AS ENUM (
+	'conversation.created',
+	'conversation.status_changed',
+	'conversation.tags_changed',
+	'conversation.assigned',
+	'conversation.unassigned',
+	'message.created',
+	'message.updated'
+);
 
 -- Sequence to generate reference number for conversations.
 DROP SEQUENCE IF EXISTS conversation_reference_number_sequence; CREATE SEQUENCE conversation_reference_number_sequence START 100;
@@ -138,7 +147,7 @@ CREATE TABLE users (
     CONSTRAINT constraint_users_on_first_name CHECK (LENGTH(first_name) <= 140),
     CONSTRAINT constraint_users_on_last_name CHECK (LENGTH(last_name) <= 140)
 );
-CREATE UNIQUE INDEX index_unique_users_on_email_and_type_when_deleted_at_is_null ON users (email, type) 
+CREATE UNIQUE INDEX index_unique_users_on_email_and_type_when_deleted_at_is_null ON users (email, type)
 WHERE deleted_at IS NULL;
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 
@@ -211,8 +220,8 @@ CREATE TABLE conversations (
 	-- Restrict delete.
 	contact_channel_id INT REFERENCES contact_channels(id) ON DELETE RESTRICT ON UPDATE CASCADE NOT NULL,
 	status_id INT REFERENCES conversation_statuses(id) ON DELETE RESTRICT ON UPDATE CASCADE NOT NULL,
-    priority_id INT REFERENCES conversation_priorities(id) ON DELETE RESTRICT ON UPDATE CASCADE,	
-    
+    priority_id INT REFERENCES conversation_priorities(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+
 	meta JSONB DEFAULT '{}'::jsonb NOT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
     assignee_last_seen_at TIMESTAMPTZ DEFAULT NOW(),
@@ -406,7 +415,7 @@ CREATE TABLE conversation_tags (
 	tag_id INT REFERENCES tags(id) ON DELETE CASCADE ON UPDATE CASCADE,
 	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX index_conversation_tags_on_conversation_id_and_tag_id ON conversation_tags (conversation_id, tag_id); 
+CREATE UNIQUE INDEX index_conversation_tags_on_conversation_id_and_tag_id ON conversation_tags (conversation_id, tag_id);
 
 DROP TABLE IF EXISTS csat_responses CASCADE;
 CREATE TABLE csat_responses (
@@ -570,6 +579,24 @@ CREATE INDEX IF NOT EXISTS index_activity_logs_on_actor_id ON activity_logs (act
 CREATE INDEX IF NOT EXISTS index_activity_logs_on_activity_type ON activity_logs (activity_type);
 CREATE INDEX IF NOT EXISTS index_activity_logs_on_created_at ON activity_logs (created_at);
 
+DROP TABLE IF EXISTS webhooks CASCADE;
+CREATE TABLE webhooks (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	name TEXT NOT NULL,
+	url TEXT NOT NULL,
+	events webhook_event[] NOT NULL DEFAULT '{}',
+	secret TEXT DEFAULT '',
+	is_active BOOLEAN DEFAULT true,
+	CONSTRAINT constraint_webhooks_on_name CHECK (length(name) <= 255),
+	CONSTRAINT constraint_webhooks_on_url CHECK (length(url) <= 2048),
+	CONSTRAINT constraint_webhooks_on_secret CHECK (length(secret) <= 255),
+	CONSTRAINT constraint_webhooks_on_events_not_empty CHECK (array_length(events, 1) > 0)
+);
+CREATE INDEX index_webhooks_on_created_at ON webhooks (created_at);
+CREATE INDEX index_webhooks_on_events ON webhooks USING GIN (events);
+
 INSERT INTO ai_providers
 ("name", provider, config, is_default)
 VALUES('openai', 'openai', '{"api_key": ""}'::jsonb, true);
@@ -618,7 +645,7 @@ INSERT INTO conversation_priorities (name) VALUES
 
 -- Default conversation statuses
 INSERT INTO conversation_statuses (name) VALUES
-('Open'),          
+('Open'),
 ('Snoozed'),
 ('Resolved'),
 ('Closed');

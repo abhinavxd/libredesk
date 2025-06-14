@@ -13,6 +13,7 @@ import (
 	medModels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
@@ -326,9 +327,6 @@ func handleUpdateUserAssignee(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Evaluate automation rules.
-	app.automation.EvaluateConversationUpdateRules(uuid, models.EventConversationUserAssigned)
-
 	return r.SendEnvelope(true)
 }
 
@@ -362,9 +360,6 @@ func handleUpdateTeamAssignee(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Evaluate automation rules on team assignment.
-	app.automation.EvaluateConversationUpdateRules(uuid, models.EventConversationTeamAssigned)
-
 	return r.SendEnvelope(true)
 }
 
@@ -391,9 +386,6 @@ func handleUpdateConversationPriority(r *fastglue.Request) error {
 	if err := app.conversation.UpdateConversationPriority(uuid, 0 /**priority_id**/, priority, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-
-	// Evaluate automation rules.
-	app.automation.EvaluateConversationUpdateRules(uuid, models.EventConversationPriorityChange)
 
 	return r.SendEnvelope(true)
 }
@@ -441,9 +433,6 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 	if err := app.conversation.UpdateConversationStatus(uuid, 0 /**status_id**/, status, snoozedUntil, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-
-	// Evaluate automation rules.
-	app.automation.EvaluateConversationUpdateRules(uuid, models.EventConversationStatusChange)
 
 	// If status is `Resolved`, send CSAT survey if enabled on inbox.
 	if status == cmodels.StatusResolved {
@@ -582,7 +571,7 @@ func handleRemoveUserAssignee(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if err = app.conversation.RemoveConversationAssignee(uuid, "user"); err != nil {
+	if err = app.conversation.RemoveConversationAssignee(uuid, "user", user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)
@@ -603,7 +592,7 @@ func handleRemoveTeamAssignee(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if err = app.conversation.RemoveConversationAssignee(uuid, "team"); err != nil {
+	if err = app.conversation.RemoveConversationAssignee(uuid, "team", user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)
@@ -720,7 +709,11 @@ func handleCreateConversation(r *fastglue.Request) error {
 		app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
 	}
 
-	// Send the created conversation back to the client.
-	conversation, _ := app.conversation.GetConversation(conversationID, "")
+	// Trigger webhook event for conversation created.
+	conversation, err := app.conversation.GetConversation(conversationID, "")
+	if err == nil {
+		app.webhook.TriggerEvent(wmodels.EventConversationCreated, conversation)
+	}
+
 	return r.SendEnvelope(conversation)
 }

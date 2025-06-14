@@ -107,6 +107,14 @@ worker_count = 10
 # How often to run automatic conversation assignment
 autoassign_interval = "5m"
 
+[webhook]
+# Number of webhook delivery workers
+workers = 5
+# Maximum number of webhook deliveries that can be queued
+queue_size = 10000
+# HTTP timeout for webhook requests
+timeout = "15s"
+
 [conversation]
 # How often to check for conversations to unsnooze
 unsnooze_interval = "5m"

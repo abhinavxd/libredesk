@@ -212,7 +212,6 @@ const deleteView = async (view) => {
     })
   } catch (err) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      title: 'Error',
       variant: 'destructive',
       description: handleHTTPError(err).message
     })

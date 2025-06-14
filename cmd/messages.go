@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	medModels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/valyala/fasthttp"
@@ -170,8 +169,6 @@ func handleSendMessage(r *fastglue.Request) error {
 		if err := app.conversation.SendReply(media, conv.InboxID, user.ID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		// Evaluate automation rules.
-		app.automation.EvaluateConversationUpdateRules(cuuid, models.EventConversationMessageOutgoing)
 	}
 	return r.SendEnvelope(true)
 }

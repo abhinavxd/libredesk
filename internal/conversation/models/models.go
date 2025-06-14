@@ -92,9 +92,6 @@ type Conversation struct {
 	ResolutionDueAt       null.Time       `db:"resolution_deadline_at" json:"resolution_deadline_at"`
 	NextResponseDueAt     null.Time       `db:"next_response_deadline_at" json:"next_response_deadline_at"`
 	NextResponseMetAt     null.Time       `db:"next_response_met_at" json:"next_response_met_at"`
-	To                    json.RawMessage `db:"to" json:"to"`
-	BCC                   json.RawMessage `db:"bcc" json:"bcc"`
-	CC                    json.RawMessage `db:"cc" json:"cc"`
 	PreviousConversations []Conversation  `db:"-" json:"previous_conversations"`
 	Total                 int             `db:"total" json:"-"`
 }
