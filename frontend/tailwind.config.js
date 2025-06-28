@@ -9,10 +9,9 @@ module.exports = {
   prefix: "",
 
   content: [
-    './pages/**/*.{js,jsx,vue}',
-    './components/**/*.{js,jsx,vue}',
-    './app/**/*.{js,jsx,vue}',
-    './src/**/*.{js,jsx,vue}',
+    './apps/main/src/**/*.{js,ts,vue}',
+    './apps/widget/src/**/*.{js,ts,vue}',
+    './shared-ui/**/*.{js,ts,vue}',
   ],
 
   theme: {

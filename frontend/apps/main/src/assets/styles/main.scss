@@ -1,0 +1,235 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-size: 16px;
+}
+
+@layer base {
+  html,
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    min-height: 100%;
+    overflow: hidden;
+    margin: 0;
+    @apply bg-background text-foreground;
+  }
+
+  @media (max-width: 768px) {
+    html,
+    body {
+      overflow-x: auto;
+    }
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  .native-html {
+    p {
+      margin-bottom: 0.5rem;
+    }
+
+    ul {
+      list-style-type: disc;
+      margin-left: 1.5rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    ol {
+      list-style-type: decimal;
+      margin-left: 1.5rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    li {
+      padding-left: 0.25rem;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    a {
+      color: #0066cc;
+      cursor: pointer;
+
+      &:hover {
+        color: #003d7a;
+      }
+    }
+  }
+  :root {
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 5.9% 10%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  :root {
+    --vis-tooltip-background-color: none !important;
+    --vis-tooltip-border-color: none !important;
+    --vis-tooltip-text-color: none !important;
+    --vis-tooltip-shadow-color: none !important;
+    --vis-tooltip-backdrop-filter: none !important;
+    --vis-tooltip-padding: none !important;
+    --vis-primary-color: var(--primary);
+    --vis-secondary-color: 160 81% 40%;
+    --vis-text-color: var(--muted-foreground);
+  }
+
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 5.9% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+  }
+}
+
+.message-bubble {
+  @apply flex flex-col px-4 pt-2 pb-3 w-fit min-w-[30%] max-w-full border overflow-x-auto rounded shadow-sm;
+  table {
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+}
+
+.overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.text-sm-muted {
+  @apply text-muted-foreground text-sm;
+}
+
+.box {
+  @apply border shadow rounded;
+}
+
+// Scrollbar start
+::-webkit-scrollbar {
+  width: 8px; /* Adjust width */
+  height: 8px; /* Adjust height */
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 3px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #555; /* Hover effect */
+}
+
+::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+// End Scrollbar
+
+.code-editor {
+  @apply rounded border shadow h-[65vh] min-h-[250px] w-full relative;
+}
+
+.show-quoted-text {
+  blockquote {
+    @apply block;
+  }
+}
+
+.hide-quoted-text {
+  blockquote {
+    @apply hidden;
+  }
+}
+
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+// Components
+@layer components {
+  .link-style {
+    @apply text-blue-500 hover:underline;
+  }
+}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/ws"
@@ -214,8 +215,18 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 		return handleWS(r, hub)
 	}))
 
+	// Live chat widget.
+	g.GET("/widget/ws", handleWidgetWS)
+	g.GET("/api/v1/widget/chat/settings", handleGetChatSettings)
+	g.POST("/api/v1/widget/chat/conversations/init", handleChatInit)
+	g.POST("/api/v1/widget/chat/conversations", handleGetConversations)
+	g.POST("/api/v1/widget/chat/conversations/{uuid}", handleChatGetConversation)
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", handleChatSendMessage)
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/close", handleChatCloseConversation)
+
 	// Frontend pages.
 	g.GET("/", notAuthPage(serveIndexPage))
+	g.GET("/widget", serveWidgetIndexPage)
 	g.GET("/inboxes/{all:*}", authPage(serveIndexPage))
 	g.GET("/teams/{all:*}", authPage(serveIndexPage))
 	g.GET("/views/{all:*}", authPage(serveIndexPage))
@@ -225,8 +236,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/account/{all:*}", authPage(serveIndexPage))
 	g.GET("/reset-password", notAuthPage(serveIndexPage))
 	g.GET("/set-password", notAuthPage(serveIndexPage))
-	// FIXME: Don't need three separate routes for the same thing.
+
+	// Assets and static files.
+	// FIXME: Reduce the number of routes.
+	g.GET("/widget.js", serveWidgetJS)
 	g.GET("/assets/{all:*}", serveFrontendStaticFiles)
+	g.GET("/widget/assets/{all:*}", serveWidgetStaticFiles)
 	g.GET("/images/{all:*}", serveFrontendStaticFiles)
 	g.GET("/static/public/{all:*}", serveStaticFiles)
 
@@ -260,6 +275,26 @@ func serveIndexPage(r *fastglue.Request) error {
 		app.lo.Error("error setting csrf cookie", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorSaving", "name", "{globals.terms.session}"), nil))
 	}
+	return nil
+}
+
+// serveWidgetIndexPage serves the widget index page of the application.
+func serveWidgetIndexPage(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	// Prevent caching of the index page.
+	r.RequestCtx.Response.Header.Add("Cache-Control", "no-store, no-cache, must-revalidate, post-check=0, pre-check=0")
+	r.RequestCtx.Response.Header.Add("Pragma", "no-cache")
+	r.RequestCtx.Response.Header.Add("Expires", "-1")
+
+	// Serve the index.html file from the embedded filesystem.
+	file, err := app.fs.Get(path.Join(widgetDir, "index.html"))
+	if err != nil {
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+	}
+	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
+	r.RequestCtx.SetBody(file.ReadBytes())
+
 	return nil
 }
 
@@ -307,6 +342,47 @@ func serveFrontendStaticFiles(r *fastglue.Request) error {
 		contentType = http.DetectContentType(file.ReadBytes())
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
+	r.RequestCtx.SetBody(file.ReadBytes())
+	return nil
+}
+
+// serveWidgetStaticFiles serves widget static assets from the embedded filesystem.
+func serveWidgetStaticFiles(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	filePath := string(r.RequestCtx.Path())
+	finalPath := filepath.Join(widgetDir, strings.TrimPrefix(filePath, "/widget"))
+
+	file, err := app.fs.Get(finalPath)
+	if err != nil {
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+	}
+
+	// Set the appropriate Content-Type based on the file extension.
+	ext := filepath.Ext(filePath)
+	contentType := mime.TypeByExtension(ext)
+	if contentType == "" {
+		contentType = http.DetectContentType(file.ReadBytes())
+	}
+	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
+	r.RequestCtx.SetBody(file.ReadBytes())
+	return nil
+}
+
+// serveWidgetJS serves the widget JavaScript file.
+func serveWidgetJS(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	// Set appropriate headers for JavaScript
+	r.RequestCtx.Response.Header.Set("Content-Type", "application/javascript")
+	r.RequestCtx.Response.Header.Set("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+
+	// Serve the widget.js file from the embedded filesystem.
+	file, err := app.fs.Get("static/widget.js")
+	if err != nil {
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+	}
+
 	r.RequestCtx.SetBody(file.ReadBytes())
 	return nil
 }

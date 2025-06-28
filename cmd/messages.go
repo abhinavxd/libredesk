@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	medModels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/valyala/fasthttp"
@@ -41,7 +42,7 @@ func handleGetMessages(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	messages, pageSize, err := app.conversation.GetConversationMessages(uuid, page, pageSize)
+	messages, pageSize, err := app.conversation.GetConversationMessages(uuid, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing, cmodels.MessageActivity}, nil, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

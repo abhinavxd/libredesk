@@ -150,17 +150,18 @@ JOIN roles r ON r.name = role_name
 RETURNING user_id;
 
 -- name: insert-contact
-WITH contact AS (
-   INSERT INTO users (email, type, first_name, last_name, "password", avatar_url)
-   VALUES ($1, 'contact', $2, $3, $4, $5)
-   ON CONFLICT (email, type) WHERE deleted_at IS NULL
-   DO UPDATE SET updated_at = now()
-   RETURNING id
-)
-INSERT INTO contact_channels (contact_id, inbox_id, identifier)
-VALUES ((SELECT id FROM contact), $6, $7)
-ON CONFLICT (contact_id, inbox_id) DO UPDATE SET updated_at = now()
-RETURNING contact_id, id;
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url)
+VALUES ($1, 'contact', $2, $3, $4, $5)
+ON CONFLICT (email, type) WHERE deleted_at IS NULL
+DO UPDATE SET updated_at = now()
+RETURNING id;
+
+-- name: insert-visitor
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url)
+VALUES ($1, 'visitor', $2, $3, $4, $5)
+ON CONFLICT (email, type) WHERE deleted_at IS NULL
+DO UPDATE SET updated_at = now()
+RETURNING id;
 
 -- name: update-last-login-at
 UPDATE users

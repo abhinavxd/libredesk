@@ -81,6 +81,7 @@ type queries struct {
 	InsertAgent            *sqlx.Stmt `query:"insert-agent"`
 	InsertContact          *sqlx.Stmt `query:"insert-contact"`
 	InsertNote             *sqlx.Stmt `query:"insert-note"`
+	InsertVisitor          *sqlx.Stmt `query:"insert-visitor"`
 	ToggleEnable           *sqlx.Stmt `query:"toggle-enable"`
 	// API key queries
 	GetUserByAPIKey      *sqlx.Stmt `query:"get-user-by-api-key"`

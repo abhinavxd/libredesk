@@ -14,7 +14,7 @@ import (
 // SafeBool is a thread-safe boolean.
 type SafeBool struct {
 	flag bool
-	mu   sync.Mutex
+	mu   sync.RWMutex
 }
 
 // Set sets the value of the SafeBool.
@@ -26,8 +26,8 @@ func (b *SafeBool) Set(value bool) {
 
 // Get returns the value of the SafeBool.
 func (b *SafeBool) Get() bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	return b.flag
 }
 

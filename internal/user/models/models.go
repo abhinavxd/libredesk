@@ -19,6 +19,7 @@ const (
 	// User types
 	UserTypeAgent   = "agent"
 	UserTypeContact = "contact"
+	UserTypeVisitor = "visitor"
 
 	// User availability statuses
 	Online  = "online"
@@ -51,12 +52,8 @@ type User struct {
 	Meta                   pq.StringArray  `db:"meta" json:"meta"`
 	CustomAttributes       json.RawMessage `db:"custom_attributes" json:"custom_attributes"`
 	Teams                  tmodels.Teams   `db:"teams" json:"teams"`
-	ContactChannelID       int             `db:"contact_channel_id" json:"contact_channel_id,omitempty"`
 	NewPassword            string          `db:"-" json:"new_password,omitempty"`
 	SendWelcomeEmail       bool            `db:"-" json:"send_welcome_email,omitempty"`
-	InboxID                int             `json:"-"`
-	SourceChannel          null.String     `json:"-"`
-	SourceChannelID        null.String     `json:"-"`
 
 	// API Key fields
 	APIKey           null.String `db:"api_key" json:"api_key"`

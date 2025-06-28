@@ -12,7 +12,7 @@ import (
 type Hub struct {
 	// Client ID to WS Client map, user can connect from multiple devices and each device will have a separate client.
 	clients      map[int][]*Client
-	clientsMutex sync.Mutex
+	clientsMutex sync.RWMutex
 
 	userStore userStore
 }
@@ -25,7 +25,7 @@ type userStore interface {
 func NewHub(userStore userStore) *Hub {
 	return &Hub{
 		clients:      make(map[int][]*Client, 10000),
-		clientsMutex: sync.Mutex{},
+		clientsMutex: sync.RWMutex{},
 		userStore:    userStore,
 	}
 }
@@ -54,8 +54,8 @@ func (h *Hub) RemoveClient(client *Client) {
 // BroadcastMessage broadcasts a message to the specified users.
 // If no users are specified, the message is broadcast to all users.
 func (h *Hub) BroadcastMessage(msg models.BroadcastMessage) {
-	h.clientsMutex.Lock()
-	defer h.clientsMutex.Unlock()
+	h.clientsMutex.RLock()
+	defer h.clientsMutex.RUnlock()
 
 	// Broadcast to all users if no users are specified.
 	if len(msg.Users) == 0 {

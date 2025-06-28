@@ -4,12 +4,12 @@
   "typescript": false,
   "tailwind": {
     "config": "tailwind.config.js",
-    "css": "src/assets/styles/main.scss",
+    "css": "shared-ui/assets/styles/main.scss",
     "baseColor": "gray",
     "cssVariables": true
   },
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils"
+    "components": "@shared-ui/components",
+    "utils": "@shared-ui/lib/utils"
   }
 }

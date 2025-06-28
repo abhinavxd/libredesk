@@ -54,7 +54,8 @@ var (
 	ko          = koanf.New(".")
 	ctx         = context.Background()
 	appName     = "libredesk"
-	frontendDir = "frontend/dist"
+	frontendDir = "frontend/dist/main"
+	widgetDir   = "frontend/dist/widget"
 
 	// Injected at build time.
 	buildString   string

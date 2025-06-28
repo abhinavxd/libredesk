@@ -239,13 +239,13 @@ type queries struct {
 }
 
 // CreateConversation creates a new conversation and returns its ID and UUID.
-func (c *Manager) CreateConversation(contactID, contactChannelID, inboxID int, lastMessage string, lastMessageAt time.Time, subject string, appendRefNumToSubject bool) (int, string, error) {
+func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string, lastMessageAt time.Time, subject string, appendRefNumToSubject bool) (int, string, error) {
 	var (
 		id     int
 		uuid   string
 		prefix string
 	)
-	if err := c.q.InsertConversation.QueryRow(contactID, contactChannelID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject).Scan(&id, &uuid); err != nil {
+	if err := c.q.InsertConversation.QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject).Scan(&id, &uuid); err != nil {
 		c.lo.Error("error inserting new conversation into the DB", "error", err)
 		return id, uuid, err
 	}

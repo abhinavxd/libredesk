@@ -708,10 +708,8 @@ func handleCreateConversation(r *fastglue.Request) error {
 	// Find or create contact.
 	contact := umodels.User{
 		Email:           null.StringFrom(req.Email),
-		SourceChannelID: null.StringFrom(req.Email),
 		FirstName:       req.FirstName,
 		LastName:        req.LastName,
-		InboxID:         req.InboxID,
 	}
 	if err := app.user.CreateContact(&contact); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.contact}"), nil))
@@ -720,7 +718,6 @@ func handleCreateConversation(r *fastglue.Request) error {
 	// Create conversation
 	conversationID, conversationUUID, err := app.conversation.CreateConversation(
 		contact.ID,
-		contact.ContactChannelID,
 		req.InboxID,
 		"",         /** last_message **/
 		time.Now(), /** last_message_at **/

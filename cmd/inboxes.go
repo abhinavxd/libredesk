@@ -154,9 +154,11 @@ func handleDeleteInbox(r *fastglue.Request) error {
 
 // validateInbox validates the inbox
 func validateInbox(app *App, inbox imodels.Inbox) error {
-	// Validate from address.
-	if _, err := mail.ParseAddress(inbox.From); err != nil {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalidFromAddress"), nil)
+	// Validate from address only for email channels.
+	if inbox.Channel == "email" {
+		if _, err := mail.ParseAddress(inbox.From); err != nil {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalidFromAddress"), nil)
+		}
 	}
 	if len(inbox.Config) == 0 {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "config"), nil)

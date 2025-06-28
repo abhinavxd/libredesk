@@ -1,13 +1,13 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email');
+DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email', 'livechat');
 DROP TYPE IF EXISTS "message_type" CASCADE; CREATE TYPE "message_type" AS ENUM ('incoming','outgoing','activity');
 DROP TYPE IF EXISTS "message_sender_type" CASCADE; CREATE TYPE "message_sender_type" AS ENUM ('agent','contact');
 DROP TYPE IF EXISTS "message_status" CASCADE; CREATE TYPE "message_status" AS ENUM ('received','sent','failed','pending');
 DROP TYPE IF EXISTS "content_type" CASCADE; CREATE TYPE "content_type" AS ENUM ('text','html');
 DROP TYPE IF EXISTS "conversation_assignment_type" CASCADE; CREATE TYPE "conversation_assignment_type" AS ENUM ('Round robin','Manual');
 DROP TYPE IF EXISTS "template_type" CASCADE; CREATE TYPE "template_type" AS ENUM ('email_outgoing', 'email_notification');
-DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact');
+DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact', 'visitor');
 DROP TYPE IF EXISTS "ai_provider" CASCADE; CREATE TYPE "ai_provider" AS ENUM ('openai');
 DROP TYPE IF EXISTS "automation_execution_mode" CASCADE; CREATE TYPE "automation_execution_mode" AS ENUM ('all', 'first_match');
 DROP TYPE IF EXISTS "macro_visibility" CASCADE; CREATE TYPE "macro_visibility" AS ENUM ('all', 'team', 'user');
@@ -186,21 +186,6 @@ CREATE TABLE conversation_priorities (
 	"name" TEXT NOT NULL UNIQUE
 );
 
-DROP TABLE IF EXISTS contact_channels CASCADE;
-CREATE TABLE contact_channels (
-	id SERIAL PRIMARY KEY,
-	created_at TIMESTAMPTZ DEFAULT NOW(),
-	updated_at TIMESTAMPTZ DEFAULT NOW(),
-
-	-- Cascade deletes when contact or inbox is deleted.
-	contact_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-	inbox_id INT NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE,
-
-	identifier TEXT NOT NULL,
-	CONSTRAINT constraint_contact_channels_on_identifier CHECK (length(identifier) <= 1000),
-	CONSTRAINT constraint_contact_channels_on_inbox_id_and_contact_id_unique UNIQUE (inbox_id, contact_id)
-);
-
 DROP TABLE IF EXISTS conversations CASCADE;
 CREATE TABLE conversations (
     id BIGSERIAL PRIMARY KEY,
@@ -223,7 +208,6 @@ CREATE TABLE conversations (
 	inbox_id INT REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
 
 	-- Restrict delete.
-	contact_channel_id INT REFERENCES contact_channels(id) ON DELETE RESTRICT ON UPDATE CASCADE NOT NULL,
 	status_id INT REFERENCES conversation_statuses(id) ON DELETE RESTRICT ON UPDATE CASCADE NOT NULL,
     priority_id INT REFERENCES conversation_priorities(id) ON DELETE RESTRICT ON UPDATE CASCADE,
 

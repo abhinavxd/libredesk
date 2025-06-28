@@ -18,6 +18,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -286,13 +287,19 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 }
 
 // GetConversationMessages retrieves messages for a specific conversation.
-func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSize int) ([]models.Message, int, error) {
+func (m *Manager) GetConversationMessages(conversationUUID string, types []string, privateMsgs *bool, page, pageSize int) ([]models.Message, int, error) {
 	var (
 		messages = make([]models.Message, 0)
-		qArgs    []interface{}
+		qArgs    []any
 	)
 
 	qArgs = append(qArgs, conversationUUID)
+	if len(types) > 0 {
+		qArgs = append(qArgs, pq.Array(types))
+	} else {
+		qArgs = append(qArgs, pq.Array(nil))
+	}
+	qArgs = append(qArgs, privateMsgs)
 	query, pageSize, qArgs, err := m.generateMessagesQuery(m.q.GetMessages, qArgs, page, pageSize)
 	if err != nil {
 		m.lo.Error("error generating messages query", "error", err)
@@ -374,16 +381,17 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 
 // SendReply inserts a reply message in a conversation.
 func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conversationUUID, content string, to, cc, bcc []string, meta map[string]interface{}) error {
+	// Generage unique source ID i.e. message-id for email.
+	inbox, err := m.inboxStore.GetDBRecord(inboxID)
+	if err != nil {
+		return err
+	}
+
 	// Save to, cc and bcc in meta.
 	to = stringutil.RemoveEmpty(to)
 	cc = stringutil.RemoveEmpty(cc)
 	bcc = stringutil.RemoveEmpty(bcc)
-
-	if len(to) == 0 {
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "`to`"), nil)
-	}
 	meta["to"] = to
-
 	if len(cc) > 0 {
 		meta["cc"] = cc
 	}
@@ -396,15 +404,25 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conver
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorMarshalling", "name", "{globals.terms.meta}"), nil)
 	}
 
-	// Generage unique source ID i.e. message-id for email.
-	inbox, err := m.inboxStore.GetDBRecord(inboxID)
-	if err != nil {
-		return err
-	}
-	sourceID, err := stringutil.GenerateEmailMessageID(conversationUUID, inbox.From)
-	if err != nil {
-		m.lo.Error("error generating source message id", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
+	var sourceID = ""
+	var msgStatus = ""
+	if inbox.Channel == "email" {
+		msgStatus = models.MessageStatusPending
+		if len(to) == 0 {
+			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "`to`"), nil)
+		}
+		sourceID, err = stringutil.GenerateEmailMessageID(conversationUUID, inbox.From)
+		if err != nil {
+			m.lo.Error("error generating source message id", "error", err)
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
+		}
+	} else {
+		msgStatus = models.MessageStatusSent
+		sourceID, err = stringutil.RandomAlphanumeric(35)
+		if err != nil {
+			m.lo.Error("error generating random source id", "error", err)
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
+		}
 	}
 
 	// Insert Message.
@@ -413,7 +431,7 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conver
 		SenderID:         senderID,
 		Type:             models.MessageOutgoing,
 		SenderType:       models.SenderTypeAgent,
-		Status:           models.MessageStatusPending,
+		Status:           msgStatus,
 		Content:          content,
 		ContentType:      models.ContentTypeHTML,
 		Private:          false,
@@ -421,7 +439,21 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conver
 		Meta:             metaJSON,
 		SourceID:         null.StringFrom(sourceID),
 	}
-	return m.InsertMessage(&message)
+
+	// Insert the message into the database
+	if err := m.InsertMessage(&message); err != nil {
+		return err
+	}
+
+	// For live chat, broadcast the message to connected clients
+	if inbox.Channel == "livechat" {
+		if err := m.broadcastLiveChatMessage(&message, inboxID); err != nil {
+			m.lo.Error("error broadcasting live chat message", "conversation_uuid", conversationUUID, "message_uuid", message.UUID, "error", err)
+			// Don't return error as the message was successfully inserted
+		}
+	}
+
+	return nil
 }
 
 // InsertMessage inserts a message and attaches the media to the message.
@@ -609,7 +641,7 @@ func (m *Manager) processIncomingMessage(in models.IncomingMessage) error {
 	}
 
 	// Find or create new conversation.
-	isNewConversation, err := m.findOrCreateConversation(&in.Message, in.InboxID, in.Contact.ContactChannelID, in.Contact.ID)
+	isNewConversation, err := m.findOrCreateConversation(&in.Message, in.InboxID, in.Contact.ID)
 	if err != nil {
 		return err
 	}
@@ -811,7 +843,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) []error {
 }
 
 // findOrCreateConversation finds or creates a conversation for the given message.
-func (m *Manager) findOrCreateConversation(in *models.Message, inboxID, contactChannelID, contactID int) (bool, error) {
+func (m *Manager) findOrCreateConversation(in *models.Message, inboxID, contactID int) (bool, error) {
 	var (
 		new              bool
 		err              error
@@ -831,7 +863,7 @@ func (m *Manager) findOrCreateConversation(in *models.Message, inboxID, contactC
 		new = true
 		lastMessage := stringutil.HTML2Text(in.Content)
 		lastMessageAt := time.Now()
-		conversationID, conversationUUID, err = m.CreateConversation(contactID, contactChannelID, inboxID, lastMessage, lastMessageAt, in.Subject, false /**append reference number to subject**/)
+		conversationID, conversationUUID, err = m.CreateConversation(contactID, inboxID, lastMessage, lastMessageAt, in.Subject, false /**append reference number to subject**/)
 		if err != nil || conversationID == 0 {
 			return new, err
 		}
@@ -947,4 +979,68 @@ func (m *Manager) getLatestMessage(conversationID int, typ []string, status []st
 		return message, fmt.Errorf("fetching latest message: %w", err)
 	}
 	return message, nil
+}
+
+// broadcastLiveChatMessage broadcasts a message to live chat clients connected to the conversation
+func (m *Manager) broadcastLiveChatMessage(message *models.Message, inboxID int) error {
+	// Get the inbox instance
+	inboxInstance, err := m.inboxStore.Get(inboxID)
+	if err != nil {
+		return fmt.Errorf("error getting inbox instance: %w", err)
+	}
+
+	// Type assert to live chat inbox
+	liveChatInbox, ok := inboxInstance.(*livechat.LiveChat)
+	if !ok {
+		return fmt.Errorf("inbox is not a live chat inbox")
+	}
+
+	// Get sender information
+	sender, err := m.userStore.GetAgent(message.SenderID, "")
+	if err != nil {
+		m.lo.Error("error getting message sender", "sender_id", message.SenderID, "error", err)
+		// Use default values if we can't get sender info
+		sender = umodels.User{
+			FirstName: "Agent",
+			LastName:  "",
+		}
+	}
+
+	// Create the message data for WebSocket broadcast
+	// Use text content for live chat (HTML stripped), or convert HTML to text if not available
+	var textContent string
+	if message.TextContent != "" {
+		textContent = message.TextContent
+	} else {
+		textContent = stringutil.HTML2Text(message.Content)
+	}
+
+	messageData := map[string]interface{}{
+		"type": "new_message",
+		"data": map[string]interface{}{
+			"created_at":        message.CreatedAt.Format(time.RFC3339),
+			"conversation_uuid": message.ConversationUUID,
+			"message_id":        message.UUID,
+			"content":           textContent,
+			"sender_type":       "agent",
+			"sender_name":       sender.FullName(),
+			"status":            message.Status,
+		},
+	}
+
+	// Convert to JSON
+	messageJSON, err := json.Marshal(messageData)
+	if err != nil {
+		return fmt.Errorf("error marshaling message data: %w", err)
+	}
+
+	// Broadcast to all clients in this conversation
+	liveChatInbox.BroadcastToConversation(message.ConversationUUID, messageJSON)
+
+	m.lo.Info("broadcasted live chat message",
+		"conversation_uuid", message.ConversationUUID,
+		"message_uuid", message.UUID,
+		"sender", sender.FullName())
+
+	return nil
 }

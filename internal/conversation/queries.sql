@@ -6,23 +6,22 @@ WHERE snoozed_until <= NOW();
 -- name: insert-conversation
 WITH 
 status_id AS (
-   SELECT id FROM conversation_statuses WHERE name = $3
+    SELECT id FROM conversation_statuses WHERE name = $2
 ),
 reference_number AS (
-   SELECT generate_reference_number($8) AS reference_number
+    SELECT generate_reference_number($7) AS reference_number
 )
 INSERT INTO conversations
-(contact_id, contact_channel_id, status_id, inbox_id, last_message, last_message_at, subject, reference_number)
+(contact_id, status_id, inbox_id, last_message, last_message_at, subject, reference_number)
 VALUES(
    $1, 
-   $2, 
    (SELECT id FROM status_id), 
+   $3, 
    $4, 
    $5, 
-   $6, 
    CASE 
-      WHEN $9 = TRUE THEN CONCAT($7::text, ' - #', (SELECT reference_number FROM reference_number), '')
-      ELSE $7::text
+      WHEN $8 = TRUE THEN CONCAT($6::text, ' - #', (SELECT reference_number FROM reference_number), '')
+      ELSE $6::text
    END, 
    (SELECT reference_number FROM reference_number)
 )
@@ -466,6 +465,7 @@ SELECT
    m.status,
    m.type, 
    m.content,
+   m.text_content,
    m.uuid,
    m.private,
    m.sender_id,
@@ -487,6 +487,10 @@ SELECT
 FROM conversation_messages m
 WHERE m.conversation_id = (
    SELECT id FROM conversations WHERE uuid = $1 LIMIT 1
+)
+AND m.type = ANY($2)
+AND (
+    $3::boolean IS NULL OR m.private = $3::boolean
 )
 ORDER BY m.created_at DESC %s
 

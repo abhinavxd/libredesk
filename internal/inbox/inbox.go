@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	ChannelEmail = "email"
+	ChannelEmail    = "email"
+	ChannelLiveChat = "livechat"
 )
 
 var (

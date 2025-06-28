@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm exec vite",
-    "build": "vite build",
+    "dev:main": "pnpm exec vite --mode main",
+    "dev:widget": "pnpm exec vite --mode widget",
+    "build:main": "vite build --mode main",
+    "build:widget": "vite build --mode widget",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
