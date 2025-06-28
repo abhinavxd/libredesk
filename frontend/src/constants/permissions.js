@@ -38,5 +38,9 @@ export const permissions = {
   CONTACT_NOTES_WRITE: 'contact_notes:write',
   CONTACT_NOTES_DELETE: 'contact_notes:delete',
   ACTIVITY_LOGS_MANAGE: 'activity_logs:manage',
-  WEBHOOKS_MANAGE: 'webhooks:manage'
+  WEBHOOKS_MANAGE: 'webhooks:manage',
+  ARTICLE_SETTING_MANAGE: 'article_setting:manage',
+  ARTICLE_MANAGE: 'article:manage',
+  ARTICLE_SECTION_MANAGE: 'article_section:manage',
+  ARTICLE_CATEGORY_MANAGE: 'article_category:manage'
 }

@@ -431,6 +431,27 @@ const generateAPIKey = (id) =>
 
 const revokeAPIKey = (id) => http.delete(`/api/v1/agents/${id}/api-key`)
 
+const getArticleCategories = () => http.get('/api/v1/article/categories')
+const createArticleCategory = (data) => http.post('/api/v1/article/category', data)
+const updateArticleCategory = (id, data) => http.put(`/api/v1/article/category/${id}`, data)
+const deleteArticleCategory = (id) => http.delete(`/api/v1/article/category/${id}`)
+
+const getArticleSections = () => http.get('/api/v1/article/sections')
+const createArticleSection = (data) => http.post('/api/v1/article/section', data)
+const updateArticleSection = (id, data) => http.put(`/api/v1/article/section/${id}`, data)
+const deleteArticleSection = (id) => http.delete(`/api/v1/article/section/${id}`)
+
+
+const getArticles = () => http.get('/api/v1/articles')
+const getArticle = (id) => http.get(`/api/v1/article/${id}`)
+const getArticlesBySection = (sectionId) => http.get(`/api/v1/articles/section/${sectionId}`)
+const createArticle = (data) => http.post('/api/v1/article', data)
+const updateArticle = (id, data) => http.put(`/api/v1/article/${id}`, data)
+const deleteArticle = (id) => http.delete(`/api/v1/article/${id}`)
+const publishArticle = (id) => http.put(`/api/v1/article/${id}/publish`)
+const unpublishArticle = (id) => http.put(`/api/v1/article/${id}/unpublish`)
+
+
 export default {
   login,
   deleteUser,
@@ -567,5 +588,21 @@ export default {
   toggleWebhook,
   testWebhook,
   generateAPIKey,
-  revokeAPIKey
+  revokeAPIKey,
+  getArticleCategories,
+  createArticleCategory,
+  updateArticleCategory,
+  deleteArticleCategory,
+  getArticleSections,
+  createArticleSection,
+  updateArticleSection,
+  deleteArticleSection,
+  getArticles,
+  getArticle,
+  getArticlesBySection,
+  createArticle,
+  updateArticle,
+  deleteArticle,
+  publishArticle,
+  unpublishArticle
 }

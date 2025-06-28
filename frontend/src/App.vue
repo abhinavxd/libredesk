@@ -67,6 +67,24 @@
                     </TooltipContent>
                   </Tooltip>
                 </SidebarMenuItem>
+                <SidebarMenuItem v-if="userStore.hasAdminTabPermissions">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/article')">
+                        <router-link
+                          :to="{
+                            name: 'article-category'
+                          }"
+                        >
+                          <Newspaper />
+                        </router-link>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>{{ t('articles.support.article') }}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -134,7 +152,7 @@ import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
-import { Inbox, Shield, FileLineChart, BookUser } from 'lucide-vue-next'
+import { Inbox, Shield, FileLineChart, BookUser, Newspaper } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import {

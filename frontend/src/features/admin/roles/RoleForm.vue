@@ -181,6 +181,15 @@ const permissions = ref([
       { name: perms.CONTACT_NOTES_WRITE, label: t('admin.role.contactNotes.write') },
       { name: perms.CONTACT_NOTES_DELETE, label: t('admin.role.contactNotes.delete') }
     ]
+  },
+  {
+    name: "Articles",
+    permissions: [
+      { name: perms.ARTICLE_MANAGE, label: "Manage Articles" },
+      { name: perms.ARTICLE_SECTION_MANAGE, label: "Manage Sections" },
+      { name: perms.ARTICLE_CATEGORY_MANAGE, label: "Manage Categories" },
+      { name: perms.ARTICLE_SETTING_MANAGE, label: "Manage Article Settings" },
+    ]
   }
 ])
 

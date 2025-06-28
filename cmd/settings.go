@@ -120,3 +120,45 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	// No reload implemented, so user has to restart the app.
 	return r.SendEnvelope(true)
 }
+
+// handleGetArticleSettings fetches article settings.
+func handleGetArticleSettings(r *fastglue.Request) error {
+	var (
+		app     = r.Context.(*App)
+		article = models.ArticleSettings{} // Assuming you have an Article model
+	)
+	
+	out, err := app.setting.GetByPrefix("article")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	
+	// Unmarshal into the article struct
+	if err := json.Unmarshal(out, &article); err != nil {
+		app.lo.Error("error unmarshalling article settings", "err", err)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", app.i18n.T("globals.terms.setting")), nil))
+	}
+	
+	return r.SendEnvelope(article)
+}
+
+// handleUpdateArticleSettings updates article settings.
+func handleUpdateArticleSettings(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req = models.ArticleSettings{}
+	)
+
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+
+	// Remove any trailing slash from logo URL if present
+	req.LogoURL = strings.TrimRight(req.LogoURL, "/")
+
+	if err := app.setting.Update(req); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(true)
+}
