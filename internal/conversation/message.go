@@ -179,7 +179,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	}
 
 	// Send message
-	err = inbox.Send(message)
+	err = inb.Send(message)
 	if handleError(err, "error sending message") {
 		return
 	}
