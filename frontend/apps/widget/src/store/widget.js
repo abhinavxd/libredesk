@@ -4,21 +4,20 @@ import { ref, computed } from 'vue'
 export const useWidgetStore = defineStore('widget', () => {
     // State
     const isOpen = ref(false)
-    const currentView = ref('welcome')
+    const currentView = ref('home')
     const config = ref({})
+    const isInChatView = ref(false)
 
 
     // Getters
-    const isWelcomeView = computed(() => currentView.value === 'welcome')
-    const isChatView = computed(() => currentView.value === 'chat')
+    const isHomeView = computed(() => currentView.value === 'home')
+    const isChatView = computed(() => isInChatView.value)
+    const isMessagesView = computed(() => currentView.value === 'messages' && !isInChatView.value)
 
     // Actions
     const toggleWidget = () => {
         isOpen.value = !isOpen.value
-        if (!isOpen.value) {
-            // Reset to welcome view when closing
-            currentView.value = 'welcome'
-        }
+        isInChatView.value = false
     }
 
     const openWidget = () => {
@@ -27,15 +26,23 @@ export const useWidgetStore = defineStore('widget', () => {
 
     const closeWidget = () => {
         isOpen.value = false
-        currentView.value = 'welcome'
+        currentView.value = 'home'
+        isInChatView.value = false
     }
 
     const navigateToChat = () => {
-        currentView.value = 'chat'
+        currentView.value = 'messages'
+        isInChatView.value = true
     }
 
-    const navigateToWelcome = () => {
-        currentView.value = 'welcome'
+    const navigateToMessages = () => {
+        currentView.value = 'messages'
+        isInChatView.value = false
+    }
+
+    const navigateToHome = () => {
+        currentView.value = 'home'
+        isInChatView.value = false
     }
 
     const updateConfig = (newConfig) => {
@@ -47,17 +54,20 @@ export const useWidgetStore = defineStore('widget', () => {
         isOpen,
         currentView,
         config,
+        isInChatView,
 
         // Getters
-        isWelcomeView,
+        isHomeView,
         isChatView,
+        isMessagesView,
 
         // Actions
         toggleWidget,
         openWidget,
         closeWidget,
         navigateToChat,
-        navigateToWelcome,
+        navigateToMessages,
+        navigateToHome,
         updateConfig,
     }
 })

@@ -316,16 +316,6 @@
               <FormMessage />
             </FormItem>
           </FormField>
-
-          <FormField v-slot="{ componentField }" name="config.colors.background">
-            <FormItem>
-              <FormLabel>{{ $t('admin.inbox.livechat.colors.background') }}</FormLabel>
-              <FormControl>
-                <Input type="color" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
         </div>
       </div>
 
@@ -358,25 +348,6 @@
                 }}</FormLabel>
                 <FormDescription>{{
                   $t('admin.inbox.livechat.features.emoji.description')
-                }}</FormDescription>
-              </div>
-              <FormControl>
-                <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
-              </FormControl>
-            </FormItem>
-          </FormField>
-
-          <FormField
-            v-slot="{ componentField, handleChange }"
-            name="config.features.allow_close_conversation"
-          >
-            <FormItem class="flex flex-row items-center justify-between box p-4">
-              <div class="space-y-0.5">
-                <FormLabel class="text-base">{{
-                  $t('admin.inbox.livechat.features.allowCloseConversation')
-                }}</FormLabel>
-                <FormDescription>{{
-                  $t('admin.inbox.livechat.features.allowCloseConversation.description')
                 }}</FormDescription>
               </div>
               <FormControl>
@@ -417,9 +388,9 @@
                 {{ $t('admin.inbox.livechat.externalLinks.add') }}
               </Button>
             </div>
-            <FormDescription>{{
-              $t('admin.inbox.livechat.externalLinks.description')
-            }}</FormDescription>
+            <FormDescription>
+              {{ $t('admin.inbox.livechat.externalLinks.description') }}
+            </FormDescription>
             <FormMessage />
           </FormItem>
         </FormField>
@@ -660,12 +631,10 @@ const form = useForm({
       },
       colors: {
         primary: '#2563eb',
-        background: '#ffffff'
       },
       features: {
         file_upload: true,
-        emoji: true,
-        allow_close_conversation: true
+        emoji: true
       },
       trusted_domains: '',
       external_links: [],
@@ -711,10 +680,7 @@ const removeExternalLink = (index) => {
 }
 
 const updateExternalLinks = () => {
-  form.setFieldValue(
-    'config.external_links',
-    externalLinks.value.filter((link) => link.text && link.url)
-  )
+  form.setFieldValue('config.external_links', externalLinks.value)
 }
 
 const onSubmit = form.handleSubmit(async (values) => {
@@ -724,6 +690,13 @@ const onSubmit = form.handleSubmit(async (values) => {
       .split('\n')
       .map((domain) => domain.trim())
       .filter((domain) => domain)
+  }
+
+  // Filter out incomplete external links before submission
+  if (values.config.external_links) {
+    values.config.external_links = values.config.external_links.filter(
+      (link) => link.text && link.url
+    )
   }
 
   await props.submitForm(values)

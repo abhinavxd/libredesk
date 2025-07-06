@@ -707,9 +707,9 @@ func handleCreateConversation(r *fastglue.Request) error {
 
 	// Find or create contact.
 	contact := umodels.User{
-		Email:           null.StringFrom(req.Email),
-		FirstName:       req.FirstName,
-		LastName:        req.LastName,
+		Email:     null.StringFrom(req.Email),
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
 	}
 	if err := app.user.CreateContact(&contact); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.contact}"), nil))
@@ -741,7 +741,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 
 	// Send reply to the created conversation.
-	if err := app.conversation.SendReply(media, req.InboxID, auser.ID /**sender_id**/, conversationUUID, req.Content, to, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
+	if err := app.conversation.SendReply(media, req.InboxID, auser.ID, contact.ID, conversationUUID, req.Content, to, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
 		// Delete the conversation if reply fails.
 		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 			app.lo.Error("error deleting conversation", "error", err)

@@ -34,7 +34,7 @@
           <Letter
             :html="sanitizedMessageContent"
             :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-            class="mb-1 native-html"
+            class="mb-1 native-html break-all"
             :class="{ 'mb-3': message.attachments.length > 0 }"
           />
 

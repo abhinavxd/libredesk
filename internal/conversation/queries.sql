@@ -48,19 +48,28 @@ SELECT
     conversations.last_reply_at,
     conversations.resolved_at,
     conversations.subject,
-    conversations.last_message,
-    conversations.last_message_at,
-    conversations.last_message_sender,
+    COALESCE(
+        conversations.meta->'last_message'->>'text_content',
+        conversations.last_message
+    ) as last_message,
+    COALESCE(
+        (conversations.meta->'last_message'->>'created_at')::timestamptz,
+        conversations.last_message_at
+    ) as last_message_at,
+    COALESCE(
+        conversations.meta->'last_message'->>'sender_type',
+        conversations.last_message_sender::TEXT
+    ) as last_message_sender,
     conversations.next_sla_deadline_at,
     conversations.priority_id,
     (
-    SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
-    FROM (
-        SELECT 1 FROM conversation_messages 
-        WHERE conversation_id = conversations.id 
-        AND created_at > conversations.assignee_last_seen_at
-        LIMIT 10
-    ) t
+        SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
+        FROM (
+            SELECT 1 FROM conversation_messages 
+            WHERE conversation_id = conversations.id 
+            AND created_at > conversations.assignee_last_seen_at
+            LIMIT 10
+        ) t
     ) as unread_message_count,
     conversation_statuses.name as status,
     conversation_priorities.name as priority,
@@ -116,9 +125,18 @@ SELECT
    c.sla_policy_id,
    c.meta,
    sla.name as sla_policy_name,
-   c.last_message_at,
-   c.last_message_sender,
-   c.last_message,
+   COALESCE(
+       (c.meta->'last_message'->>'created_at')::TIMESTAMPTZ,
+       c.last_message_at
+   ) as last_message_at,
+   COALESCE(
+       c.meta->'last_message'->>'sender_type',
+       c.last_message_sender::TEXT
+   ) as last_message_sender,
+   COALESCE(
+       c.meta->'last_message'->>'text_content',
+       c.last_message
+   ) as last_message,
    c.custom_attributes,
    (SELECT COALESCE(
        (SELECT json_agg(t.name)
@@ -188,13 +206,42 @@ SELECT
     u.first_name AS "contact.first_name",
     u.last_name AS "contact.last_name",
     u.avatar_url AS "contact.avatar_url",
-    c.last_message,
-    c.last_message_at
+    COALESCE(
+        c.meta->'last_message'->>'text_content',
+        c.last_message
+    ) as last_message,
+    COALESCE(
+        (c.meta->'last_message'->>'created_at')::timestamptz,
+        c.last_message_at
+    ) as last_message_at
 FROM users u
 JOIN conversations c ON c.contact_id = u.id
 WHERE c.contact_id = $1
 ORDER BY c.created_at DESC
 LIMIT 10;
+
+-- name: get-contact-chat-conversations
+SELECT
+    c.uuid,
+    COALESCE(c.meta->'last_chat_message'->>'text_content', '') as last_message,
+    COALESCE((c.meta->'last_chat_message'->>'created_at')::timestamptz, NULL) as last_message_at,
+    COALESCE(c.meta->'last_chat_message'->'sender'->>'first_name', '') AS last_message_sender_first_name,
+    COALESCE(c.meta->'last_chat_message'->'sender'->>'last_name', '') AS last_message_sender_last_name,
+    COALESCE(c.meta->'last_chat_message'->'sender'->>'avatar_url', '') AS last_message_sender_avatar_url,
+    LEAST(10, COUNT(unread.id)) AS unread_message_count
+FROM conversations c
+LEFT JOIN conversation_messages unread ON unread.conversation_id = c.id 
+    AND unread.created_at > c.contact_last_seen_at
+    AND unread.type IN ('incoming', 'outgoing') AND unread.private = false
+WHERE c.contact_id = $1
+GROUP BY c.id, c.uuid, 
+    c.meta->'last_chat_message'->>'text_content', 
+    (c.meta->'last_chat_message'->>'created_at')::timestamptz,
+    c.meta->'last_chat_message'->'sender'->>'first_name',
+    c.meta->'last_chat_message'->'sender'->>'last_name',
+    c.meta->'last_chat_message'->'sender'->>'avatar_url'
+ORDER BY c.created_at DESC
+LIMIT 100;
 
 -- name: get-conversation-uuid
 SELECT uuid from conversations where id = $1;
@@ -207,10 +254,22 @@ assignee_last_seen_at = NULL,
 updated_at = NOW()
 WHERE uuid = $1;
 
+-- name: update-conversation-contact-last-seen
+UPDATE conversations
+SET contact_last_seen_at = NOW(),
+updated_at = NOW()
+WHERE uuid = $1;
+
 -- name: update-conversation-assigned-team
 UPDATE conversations
 SET assigned_team_id = $2,
 updated_at = NOW()
+WHERE uuid = $1;
+
+-- name: update-conversation-meta
+UPDATE conversations
+SET meta = COALESCE(meta, '{}'::jsonb) || $2,
+    updated_at = NOW()
 WHERE uuid = $1;
 
 -- name: update-conversation-status
@@ -238,7 +297,14 @@ SET assignee_last_seen_at = NOW(),
 WHERE uuid = $1;
 
 -- name: update-conversation-last-message
-UPDATE conversations SET last_message = $3, last_message_sender = $4, last_message_at = $5, updated_at = NOW() WHERE CASE 
+UPDATE conversations SET 
+last_message = $3,
+last_message_sender = $4,
+last_message_at = $5,
+last_interaction_at = COALESCE($6, last_interaction_at),
+meta = COALESCE(meta, '{}'::jsonb) || $7,
+updated_at = NOW() 
+WHERE CASE 
     WHEN $1 > 0 THEN id = $1
     ELSE uuid = $2
 END

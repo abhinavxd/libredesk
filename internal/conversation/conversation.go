@@ -103,6 +103,8 @@ type teamStore interface {
 
 type userStore interface {
 	GetAgent(int, string) (umodels.User, error)
+	GetContact(int, string) (umodels.User, error)
+	GetVisitor(int) (umodels.User, error)
 	GetSystemUser() (umodels.User, error)
 	CreateContact(user *umodels.User) error
 }
@@ -201,18 +203,21 @@ type queries struct {
 	GetUnassignedConversations         *sqlx.Stmt `query:"get-unassigned-conversations"`
 	GetConversations                   string     `query:"get-conversations"`
 	GetContactConversations            *sqlx.Stmt `query:"get-contact-conversations"`
+	GetContactChatConversations        *sqlx.Stmt `query:"get-contact-chat-conversations"`
 	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
 	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
 	UpdateConversationFirstReplyAt     *sqlx.Stmt `query:"update-conversation-first-reply-at"`
 	UpdateConversationLastReplyAt      *sqlx.Stmt `query:"update-conversation-last-reply-at"`
 	UpdateConversationWaitingSince     *sqlx.Stmt `query:"update-conversation-waiting-since"`
 	UpdateConversationAssigneeLastSeen *sqlx.Stmt `query:"update-conversation-assignee-last-seen"`
+	UpdateConversationContactLastSeen  *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
 	UpdateConversationAssignedUser     *sqlx.Stmt `query:"update-conversation-assigned-user"`
 	UpdateConversationAssignedTeam     *sqlx.Stmt `query:"update-conversation-assigned-team"`
 	UpdateConversationCustomAttributes *sqlx.Stmt `query:"update-conversation-custom-attributes"`
 	UpdateConversationPriority         *sqlx.Stmt `query:"update-conversation-priority"`
 	UpdateConversationStatus           *sqlx.Stmt `query:"update-conversation-status"`
 	UpdateConversationLastMessage      *sqlx.Stmt `query:"update-conversation-last-message"`
+	UpdateConversationMeta             *sqlx.Stmt `query:"update-conversation-meta"`
 	InsertConversationParticipant      *sqlx.Stmt `query:"insert-conversation-participant"`
 	InsertConversation                 *sqlx.Stmt `query:"insert-conversation"`
 	AddConversationTags                *sqlx.Stmt `query:"add-conversation-tags"`
@@ -262,19 +267,19 @@ func (c *Manager) GetConversation(id int, uuid string) (models.Conversation, err
 
 	if err := c.q.GetConversation.Get(&conversation, id, uuidParam); err != nil {
 		if err == sql.ErrNoRows {
-			return conversation, envelope.NewError(envelope.InputError,
-				c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.conversation}"), nil)
+			return conversation, envelope.NewError(envelope.InputError, c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.conversation}"), nil)
 		}
 		c.lo.Error("error fetching conversation", "error", err)
-		return conversation, envelope.NewError(envelope.GeneralError,
-			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
+		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
 	}
 
 	// Strip name and extract plain email from "Name <email>"
-	var err error
-	conversation.InboxMail, err = stringutil.ExtractEmail(conversation.InboxMail)
-	if err != nil {
-		c.lo.Error("error extracting email from inbox mail", "inbox_mail", conversation.InboxMail, "error", err)
+	if conversation.InboxMail != "" {
+		var err error
+		conversation.InboxMail, err = stringutil.ExtractEmail(conversation.InboxMail)
+		if err != nil {
+			c.lo.Error("error extracting email from inbox mail", "inbox_mail", conversation.InboxMail, "error", err)
+		}
 	}
 
 	return conversation, nil
@@ -284,6 +289,16 @@ func (c *Manager) GetConversation(id int, uuid string) (models.Conversation, err
 func (c *Manager) GetContactConversations(contactID int) ([]models.Conversation, error) {
 	var conversations = make([]models.Conversation, 0)
 	if err := c.q.GetContactConversations.Select(&conversations, contactID); err != nil {
+		c.lo.Error("error fetching conversations", "error", err)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
+	}
+	return conversations, nil
+}
+
+// GetContactChatConversations retrieves conversations for a chat.
+func (c *Manager) GetContactChatConversations(contactID int) ([]models.ChatConversation, error) {
+	var conversations = make([]models.ChatConversation, 0)
+	if err := c.q.GetContactChatConversations.Select(&conversations, contactID); err != nil {
 		c.lo.Error("error fetching conversations", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
 	}
@@ -309,6 +324,18 @@ func (c *Manager) UpdateConversationAssigneeLastSeen(uuid string) error {
 
 	// Broadcast the property update to all subscribers.
 	c.BroadcastConversationUpdate(uuid, "assignee_last_seen_at", time.Now().Format(time.RFC3339))
+	return nil
+}
+
+// UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.
+func (c *Manager) UpdateConversationContactLastSeen(uuid string) error {
+	if _, err := c.q.UpdateConversationContactLastSeen.Exec(uuid); err != nil {
+		c.lo.Error("error updating contact last seen timestamp", "conversation_id", uuid, "error", err)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
+	}
+
+	// Broadcast the property update to all subscribers.
+	c.BroadcastConversationUpdate(uuid, "contact_last_seen_at", time.Now().Format(time.RFC3339))
 	return nil
 }
 
@@ -431,9 +458,18 @@ func (c *Manager) ActiveUserConversationsCount(userID int) (int, error) {
 }
 
 // UpdateConversationLastMessage updates the last message details for a conversation.
-func (c *Manager) UpdateConversationLastMessage(conversation int, conversationUUID, lastMessage, lastMessageSenderType string, lastMessageAt time.Time) error {
-	if _, err := c.q.UpdateConversationLastMessage.Exec(conversation, conversationUUID, lastMessage, lastMessageSenderType, lastMessageAt); err != nil {
+func (c *Manager) UpdateConversationLastMessage(conversation int, conversationUUID, lastMessage, lastMessageSenderType string, lastMessageAt time.Time, lastInteractionAt null.Time, conversationMeta []byte) error {
+	if _, err := c.q.UpdateConversationLastMessage.Exec(conversation, conversationUUID, lastMessage, lastMessageSenderType, lastMessageAt, lastInteractionAt, conversationMeta); err != nil {
 		c.lo.Error("error updating conversation last message", "error", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateConversationMeta updates meta data for a conversation.
+func (c *Manager) UpdateConversationMeta(uuid string, meta map[string]any) error {
+	if _, err := c.q.UpdateConversationMeta.Exec(uuid, meta); err != nil {
+		c.lo.Error("error updating conversation meta", "error", err)
 		return err
 	}
 	return nil
@@ -931,6 +967,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			[]mmodels.Media{},
 			conv.InboxID,
 			user.ID,
+			conv.ContactID,
 			conv.UUID,
 			action.Value[0],
 			to,
@@ -994,7 +1031,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		return fmt.Errorf("making recipients for CSAT reply: %w", err)
 	}
 
-	return m.SendReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.UUID, message, to, cc, bcc, meta)
+	return m.SendReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, cc, bcc, meta)
 }
 
 // DeleteConversation deletes a conversation.

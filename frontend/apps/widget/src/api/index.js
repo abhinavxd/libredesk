@@ -14,9 +14,11 @@ http.interceptors.request.use((request) => {
     // Add libredesk_session to POST/PUT request data
     if (request.method === 'post' || request.method === 'put') {
         const libredeskSession = localStorage.getItem('libredesk_session')
+        // Get inbox_id from widget config or use default
+        const inboxId = window.widgetConfig?.inbox_id || 11
         request.data = {
             ...request.data,
-            inbox_id: 11,
+            inbox_id: inboxId,
             jwt: libredeskSession
         }
     }
@@ -32,6 +34,27 @@ const getChatConversations = () => http.post('/api/v1/widget/chat/conversations'
 const getChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}`)
 const sendChatMessage = (uuid, data) => http.post(`/api/v1/widget/chat/conversations/${uuid}/message`, data)
 const closeChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/close`)
+const uploadMedia = (conversationUUID, files) => {
+    const formData = new FormData()
+    
+    // Add JWT token
+    const libredeskSession = localStorage.getItem('libredesk_session')
+    formData.append('jwt', libredeskSession)
+    formData.append('conversation_uuid', conversationUUID)
+    
+    // Add files
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i])
+    }
+    
+    return axios.post('/api/v1/widget/media/upload', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        },
+        timeout: 30000
+    })
+}
+const updateConversationLastSeen = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/update-last-seen`)
 
 export default {
     getWidgetSettings,
@@ -39,5 +62,7 @@ export default {
     getChatConversations,
     getChatConversation,
     sendChatMessage,
-    closeChatConversation
+    closeChatConversation,
+    uploadMedia,
+    updateConversationLastSeen
 }

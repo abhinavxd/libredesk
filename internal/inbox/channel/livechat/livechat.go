@@ -3,6 +3,9 @@ package livechat
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -11,25 +14,30 @@ import (
 	"github.com/zerodha/logf"
 )
 
+var (
+	ErrClientNotConnected = fmt.Errorf("client not connected")
+)
+
 const (
-	ChannelLiveChat = "livechat"
+	ChannelLiveChat       = "livechat"
+	MaxConnectionsPerUser = 10
 )
 
 // Config holds the live chat inbox configuration.
 type Config struct {
-	Users struct {
+	BrandName string `json:"brand_name"`
+	Language  string `json:"language"`
+	Users     struct {
 		AllowStartConversation       bool   `json:"allow_start_conversation"`
 		PreventMultipleConversations bool   `json:"prevent_multiple_conversations"`
 		StartConversationButtonText  string `json:"start_conversation_button_text"`
 	} `json:"users"`
 	Colors struct {
-		Primary    string `json:"primary"`
-		Background string `json:"background"`
+		Primary string `json:"primary"`
 	} `json:"colors"`
 	Features struct {
-		Emoji                  bool `json:"emoji"`
-		FileUpload             bool `json:"file_upload"`
-		AllowCloseConversation bool `json:"allow_close_conversation"`
+		Emoji      bool `json:"emoji"`
+		FileUpload bool `json:"file_upload"`
 	} `json:"features"`
 	Launcher struct {
 		Spacing struct {
@@ -45,7 +53,6 @@ type Config struct {
 		PreventMultipleConversations bool   `json:"prevent_multiple_conversations"`
 		StartConversationButtonText  string `json:"start_conversation_button_text"`
 	} `json:"visitors"`
-	SecretKey    string `json:"secret_key"`
 	NoticeBanner struct {
 		Text    string `json:"text"`
 		Enabled bool   `json:"enabled"`
@@ -64,11 +71,9 @@ type Config struct {
 
 // Client represents a connected chat client
 type Client struct {
-	ID             string
-	ConversationID string
-	Channel        chan []byte
-	LastActivity   time.Time
-	mutex          sync.RWMutex
+	ID      string
+	Channel chan []byte
+	mutex   sync.RWMutex
 }
 
 // LiveChat represents the live chat inbox.
@@ -79,11 +84,9 @@ type LiveChat struct {
 	lo           *logf.Logger
 	messageStore inbox.MessageStore
 	userStore    inbox.UserStore
-	clients      map[string]*Client
-	// conversationClients maps conversation IDs to client IDs.
-	conversationClients map[string]map[string]*Client
-	clientsMutex        sync.RWMutex
-	wg                  sync.WaitGroup
+	clients      map[string][]*Client // Maps user IDs to slices of clients (to handle multiple devices)
+	clientsMutex sync.RWMutex
+	wg           sync.WaitGroup
 }
 
 // Opts holds the options required for the live chat inbox.
@@ -97,14 +100,13 @@ type Opts struct {
 // New returns a new instance of the live chat inbox.
 func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*LiveChat, error) {
 	lc := &LiveChat{
-		id:                  opts.ID,
-		config:              opts.Config,
-		from:                opts.From,
-		lo:                  opts.Lo,
-		messageStore:        store,
-		userStore:           userStore,
-		clients:             make(map[string]*Client),
-		conversationClients: make(map[string]map[string]*Client),
+		id:           opts.ID,
+		config:       opts.Config,
+		from:         opts.From,
+		lo:           opts.Lo,
+		messageStore: store,
+		userStore:    userStore,
+		clients:      make(map[string][]*Client),
 	}
 	return lc, nil
 }
@@ -114,53 +116,68 @@ func (lc *LiveChat) Identifier() int {
 	return lc.id
 }
 
-// Receive handles incoming messages for the live chat channel.
-// For live chat, this is a no-op as messages come through WebSocket connections.
+// Receive is no-op as messages received via api.
 func (lc *LiveChat) Receive(ctx context.Context) error {
-	lc.lo.Info("live chat receiver started", "inbox_id", lc.id)
-
-	// Start a cleanup routine for inactive clients
-	lc.wg.Add(1)
-	go func() {
-		defer lc.wg.Done()
-		ticker := time.NewTicker(5 * time.Minute)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				lc.cleanupInactiveClients()
-			}
-		}
-	}()
-
-	<-ctx.Done()
-	lc.wg.Wait()
 	return nil
 }
 
-// Send sends a message through the live chat channel.
+// Send sends the passed message to the message receiver if they are connected to the live chat.
 func (lc *LiveChat) Send(message models.Message) error {
-	lc.lo.Info("sending live chat message",
-		"conversation_id", message.ConversationUUID,
-		"message_id", message.UUID)
+	if message.MessageReceiverID > 0 {
+		msgReceiverStr := strconv.Itoa(message.MessageReceiverID)
+		lc.clientsMutex.RLock()
+		clients, exists := lc.clients[msgReceiverStr]
+		lc.clientsMutex.RUnlock()
+
+		if exists {
+			sender, err := lc.userStore.GetAgent(message.SenderID, "")
+			if err != nil {
+				lc.lo.Error("failed to get sender name", "sender_id", message.SenderID, "error", err)
+				return fmt.Errorf("failed to get sender name: %w", err)
+			}
+
+			for _, client := range clients {
+				messageData := map[string]any{
+					"type": "new_message",
+					"data": map[string]any{
+						"created_at":        message.CreatedAt.Format(time.RFC3339),
+						"conversation_uuid": message.ConversationUUID,
+						"uuid":              message.UUID,
+						"content":           message.Content,
+						"text_content":      message.TextContent,
+						"sender_type":       message.SenderType,
+						"sender_name":       sender.FullName(),
+						"status":            message.Status,
+					},
+				}
+
+				// Convert messageData to JSON
+				messageJSON, err := json.Marshal(messageData)
+				if err != nil {
+					lc.lo.Error("failed to marshal message data", "error", err)
+					continue
+				}
+
+				// Send the message to the client's channel
+				select {
+				case client.Channel <- messageJSON:
+					lc.lo.Info("message sent to live chat client", "client_id", client.ID, "message_id", message.UUID)
+				default:
+					lc.lo.Warn("client channel full, dropping message", "client_id", client.ID, "message_id", message.UUID)
+				}
+				continue
+			}
+		} else {
+			lc.lo.Debug("client not connected for live chat message", "receiver_id", msgReceiverStr, "message_id", message.UUID)
+			return ErrClientNotConnected
+		}
+	}
+	lc.lo.Warn("received empty receiver_id for live chat message", "message_id", message.UUID, "receiver_id", message.MessageReceiverID)
 	return nil
 }
 
 // Close closes the live chat channel.
 func (lc *LiveChat) Close() error {
-	lc.clientsMutex.Lock()
-	defer lc.clientsMutex.Unlock()
-
-	// Close all client channels
-	for _, client := range lc.clients {
-		close(client.Channel)
-	}
-
-	lc.clients = make(map[string]*Client)
-	lc.conversationClients = make(map[string]map[string]*Client)
 	return nil
 }
 
@@ -175,128 +192,46 @@ func (lc *LiveChat) Channel() string {
 }
 
 // AddClient adds a new client to the live chat session.
-// TODO: Limit the number of clients that can be connected for a `clientID`.
-func (lc *LiveChat) AddClient(clientID, conversationID string) *Client {
+func (lc *LiveChat) AddClient(userID, conversationUUID string) (*Client, error) {
 	lc.clientsMutex.Lock()
 	defer lc.clientsMutex.Unlock()
 
-	client := &Client{
-		ID:             clientID,
-		ConversationID: conversationID,
-		Channel:        make(chan []byte, 256),
-		LastActivity:   time.Now(),
+	// Check if the user already has the maximum allowed connections.
+	if clients, exists := lc.clients[userID]; exists && len(clients) >= MaxConnectionsPerUser {
+		lc.lo.Warn("maximum connections reached for user", "client_id", userID, "max_connections", MaxConnectionsPerUser)
+		return nil, fmt.Errorf("maximum connections reached")
 	}
 
-	lc.clients[clientID] = client
-	
-	// Add to conversation mapping for faster lookup
-	if lc.conversationClients[conversationID] == nil {
-		lc.conversationClients[conversationID] = make(map[string]*Client)
+	client := &Client{
+		ID:      userID,
+		Channel: make(chan []byte, 1000),
 	}
-	lc.conversationClients[conversationID][clientID] = client
-	
-	lc.lo.Info("client added to live chat", "client_id", clientID, "conversation_id", conversationID)
-	return client
+
+	// Add the client to the clients map.
+	lc.clients[userID] = append(lc.clients[userID], client)
+
+	lc.lo.Info("client added to live chat", "client_id", userID, "conversation_uuid", conversationUUID)
+	return client, nil
 }
 
 // RemoveClient removes a client from the live chat session.
-func (lc *LiveChat) RemoveClient(clientID string) {
+func (lc *LiveChat) RemoveClient(c *Client) {
 	lc.clientsMutex.Lock()
 	defer lc.clientsMutex.Unlock()
+	if clients, exists := lc.clients[c.ID]; exists {
+		for i, client := range clients {
+			if client == c {
+				// Remove the client from the slice
+				lc.clients[c.ID] = append(clients[:i], clients[i+1:]...)
 
-	if client, exists := lc.clients[clientID]; exists {
-		close(client.Channel)
-		delete(lc.clients, clientID)
-		
-		// Remove from conversation mapping
-		if conversationClients, exists := lc.conversationClients[client.ConversationID]; exists {
-			delete(conversationClients, clientID)
-			// Clean up empty conversation mapping
-			if len(conversationClients) == 0 {
-				delete(lc.conversationClients, client.ConversationID)
-			}
-		}
-		
-		lc.lo.Info("client removed from live chat", "client_id", clientID)
-	}
-}
-
-// GetClient returns a client by ID.
-func (lc *LiveChat) GetClient(clientID string) (*Client, bool) {
-	lc.clientsMutex.RLock()
-	defer lc.clientsMutex.RUnlock()
-
-	client, exists := lc.clients[clientID]
-	return client, exists
-}
-
-// BroadcastToConversation broadcasts a message to all clients in a conversation.
-func (lc *LiveChat) BroadcastToConversation(conversationID string, message []byte) {
-	lc.clientsMutex.RLock()
-	defer lc.clientsMutex.RUnlock()
-
-	// Use the conversation mapping for O(1) lookup instead of iterating all clients
-	if conversationClients, exists := lc.conversationClients[conversationID]; exists {
-		for _, client := range conversationClients {
-			select {
-			case client.Channel <- message:
-			default:
-				lc.lo.Warn("client channel full, dropping message", "client_id", client.ID)
-			}
-		}
-	}
-}
-
-// GetConfig returns the live chat configuration.
-func (lc *LiveChat) GetConfig() Config {
-	return lc.config
-}
-
-// UpdateClientActivity updates the last activity time for a client.
-func (lc *LiveChat) UpdateClientActivity(clientID string) {
-	lc.clientsMutex.Lock()
-	defer lc.clientsMutex.Unlock()
-
-	if client, exists := lc.clients[clientID]; exists {
-		client.mutex.Lock()
-		client.LastActivity = time.Now()
-		client.mutex.Unlock()
-	}
-}
-
-// cleanupInactiveClients removes clients that have been inactive for too long.
-func (lc *LiveChat) cleanupInactiveClients() {
-	lc.clientsMutex.Lock()
-	defer lc.clientsMutex.Unlock()
-
-	cutoff := time.Now().Add(-30 * time.Minute)
-
-	for clientID, client := range lc.clients {
-		client.mutex.RLock()
-		lastActivity := client.LastActivity
-		client.mutex.RUnlock()
-
-		if lastActivity.Before(cutoff) {
-			close(client.Channel)
-			delete(lc.clients, clientID)
-			
-			// Remove from conversation mapping
-			if conversationClients, exists := lc.conversationClients[client.ConversationID]; exists {
-				delete(conversationClients, clientID)
-				// Clean up empty conversation mapping
-				if len(conversationClients) == 0 {
-					delete(lc.conversationClients, client.ConversationID)
+				// If no more clients for this user, remove the entry entirely
+				if len(lc.clients[c.ID]) == 0 {
+					delete(lc.clients, c.ID)
 				}
+
+				lc.lo.Debug("client removed from live chat", "client_id", c.ID)
+				return
 			}
-			
-			lc.lo.Info("cleaned up inactive client", "client_id", clientID)
 		}
 	}
-}
-
-// GetActiveClients returns the number of active clients.
-func (lc *LiveChat) GetActiveClients() int {
-	lc.clientsMutex.RLock()
-	defer lc.clientsMutex.RUnlock()
-	return len(lc.clients)
 }

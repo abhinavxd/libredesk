@@ -14,9 +14,12 @@ const (
 	WidgetMsgTypeJoin    = "join"
 	WidgetMsgTypeMessage = "message"
 	WidgetMsgTypeTyping  = "typing"
+	WidgetMsgTypePing    = "ping"
+	WidgetMsgTypePong    = "pong"
 	WidgetMsgTypeError   = "error"
 	WidgetMsgTypeNewMsg  = "new_message"
 	WidgetMsgTypeStatus  = "status"
+	WidgetMsgTypeJoined  = "joined"
 )
 
 // WidgetMessage represents a message sent through the widget WebSocket
@@ -33,55 +36,85 @@ type WidgetJoinData struct {
 
 // WidgetMessageData represents a chat message through the widget
 type WidgetMessageData struct {
-	ConversationID string `json:"conversation_id"`
-	Content        string `json:"content"`
-	SenderName     string `json:"sender_name,omitempty"`
-	SenderType     string `json:"sender_type"`
-	Timestamp      int64  `json:"timestamp"`
+	ConversationUUID string `json:"conversation_uuid"`
+	Content          string `json:"content"`
+	SenderName       string `json:"sender_name,omitempty"`
+	SenderType       string `json:"sender_type"`
+	Timestamp        int64  `json:"timestamp"`
 }
 
 // WidgetTypingData represents typing indicator data
 type WidgetTypingData struct {
-	ConversationID string `json:"conversation_id"`
-	IsTyping       bool   `json:"is_typing"`
+	ConversationUUID string `json:"conversation_uuid"`
+	IsTyping         bool   `json:"is_typing"`
 }
 
-// handleWidgetWS handles the widget WebSocket connection for public live chat
+// handleWidgetWS handles the widget WebSocket connection for live chat.
 func handleWidgetWS(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	var app = r.Context.(*App)
 
 	if err := upgrader.Upgrade(r.RequestCtx, func(conn *websocket.Conn) {
-		defer conn.Close()
-		// Handle incoming messages
+		// To store client and live chat references for cleanup.
+		var client *livechat.Client
+		var liveChat *livechat.LiveChat
+
+		// Clean up client when connection closes.
+		defer func() {
+			conn.Close()
+			if client != nil && liveChat != nil {
+				liveChat.RemoveClient(client)
+				close(client.Channel)
+				app.lo.Debug("cleaned up client on websocket disconnect", "client_id", client.ID)
+			}
+		}()
+
+		// Read messages from the WebSocket connection.
 		for {
 			var msg WidgetMessage
 			if err := conn.ReadJSON(&msg); err != nil {
-				app.lo.Error("error reading widget websocket message", "error", err)
+				app.lo.Debug("widget websocket connection closed", "error", err)
 				break
 			}
 
-			claims, err := validateWidgetMessageJWT(msg.JWT)
-			if err != nil {
-				app.lo.Error("invalid JWT in widget message", "error", err)
-				sendWidgetError(conn, "Invalid JWT token")
-				continue
+			var (
+				claims Claims
+				err    error
+			)
+			// Validate JWT if present, except for ping messages
+			if msg.Type != WidgetMsgTypePing {
+				claims, err = validateWidgetMessageJWT(msg.JWT)
+				if err != nil {
+					app.lo.Error("invalid JWT in widget message", "error", err)
+					sendWidgetError(conn, "Invalid JWT token")
+					continue
+				}
 			}
 
 			switch msg.Type {
 			// Join conversation request.
 			case WidgetMsgTypeJoin:
-				if err := handleWidgetJoin(app, conn, &msg, claims); err != nil {
+				var joinedClient *livechat.Client
+				var joinedLiveChat *livechat.LiveChat
+				if joinedClient, joinedLiveChat, err = handleWidgetJoin(app, conn, &msg, claims); err != nil {
 					app.lo.Error("error handling widget join", "error", err)
 					sendWidgetError(conn, "Failed to join conversation")
 					continue
 				}
+				// Store the client and livechat reference for cleanup.
+				client = joinedClient
+				liveChat = joinedLiveChat
 			// Typing.
 			case WidgetMsgTypeTyping:
 				if err := handleWidgetTyping(app, &msg, claims); err != nil {
 					app.lo.Error("error handling widget typing", "error", err)
 					continue
+				}
+			// Ping.
+			case WidgetMsgTypePing:
+				if err := conn.WriteJSON(WidgetMessage{
+					Type: WidgetMsgTypePong,
+				}); err != nil {
+					app.lo.Error("error writing pong to widget client", "error", err)
 				}
 			}
 		}
@@ -92,60 +125,63 @@ func handleWidgetWS(r *fastglue.Request) error {
 }
 
 // handleWidgetJoin handles a client joining a conversation
-func handleWidgetJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims Claims) error {
+func handleWidgetJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims Claims) (*livechat.Client, *livechat.LiveChat, error) {
 	userID := claims.UserID
 
 	joinDataBytes, err := json.Marshal(msg.Data)
 	if err != nil {
-		return fmt.Errorf("invalid join data: %w", err)
+		return nil, nil, fmt.Errorf("invalid join data: %w", err)
 	}
 
 	var joinData WidgetJoinData
 	if err := json.Unmarshal(joinDataBytes, &joinData); err != nil {
-		return fmt.Errorf("invalid join data format: %w", err)
+		return nil, nil, fmt.Errorf("invalid join data format: %w", err)
 	}
 
 	// Get conversation to find the inbox
 	conversation, err := app.conversation.GetConversation(0, joinData.ConversationUUID)
 	if err != nil {
-		return fmt.Errorf("conversation not found: %w", err)
+		return nil, nil, fmt.Errorf("conversation not found: %w", err)
 	}
 
 	// Make sure conversation belongs to the user.
 	if conversation.ContactID != userID {
-		return fmt.Errorf("conversation does not belong to the user")
+		return nil, nil, fmt.Errorf("conversation does not belong to the user")
 	}
 
 	// Make sure inbox is active.
 	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
 	if err != nil {
-		return fmt.Errorf("inbox not found: %w", err)
+		return nil, nil, fmt.Errorf("inbox not found: %w", err)
 	}
 
 	if !inbox.Enabled {
-		return fmt.Errorf("inbox is not enabled")
+		return nil, nil, fmt.Errorf("inbox is not enabled")
 	}
 
 	// Get live chat inbox
 	lcInbox, err := app.inbox.Get(inbox.ID)
 	if err != nil {
-		return fmt.Errorf("live chat inbox not found: %w", err)
+		return nil, nil, fmt.Errorf("live chat inbox not found: %w", err)
 	}
 
 	// Assert type.
-	chatInbox, ok := lcInbox.(*livechat.LiveChat)
+	liveChat, ok := lcInbox.(*livechat.LiveChat)
 	if !ok {
-		return fmt.Errorf("inbox is not a live chat inbox")
+		return nil, nil, fmt.Errorf("inbox is not a live chat inbox")
 	}
 
 	// Add client to live chat session
 	userIDStr := fmt.Sprintf("%d", userID)
-	client := chatInbox.AddClient(userIDStr, joinData.ConversationUUID)
+	client, err := liveChat.AddClient(userIDStr, joinData.ConversationUUID)
+	if err != nil {
+		app.lo.Error("error adding client to live chat", "error", err, "user_id", userIDStr, "conversation_uuid", joinData.ConversationUUID)
+		return nil, nil, err
+	}
 
-	// Start listening for messages from the live chat channel
+	// Start listening for messages from the live chat channel.
 	go func() {
 		for msgData := range client.Channel {
-			// Forward message to WebSocket client
 			if err := conn.WriteMessage(websocket.TextMessage, msgData); err != nil {
 				app.lo.Error("error forwarding message to widget client", "error", err)
 				return
@@ -155,14 +191,18 @@ func handleWidgetJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims
 
 	// Send join confirmation
 	joinResp := WidgetMessage{
-		Type: WidgetMsgTypeStatus,
+		Type: WidgetMsgTypeJoined,
 		Data: map[string]string{
 			"message":           "Joined conversation successfully",
 			"conversation_uuid": joinData.ConversationUUID,
 		},
 	}
 
-	return conn.WriteJSON(joinResp)
+	if err := conn.WriteJSON(joinResp); err != nil {
+		return nil, nil, err
+	}
+
+	return client, liveChat, nil
 }
 
 // handleWidgetTyping handles typing indicators
@@ -179,8 +219,8 @@ func handleWidgetTyping(app *App, msg *WidgetMessage, claims Claims) error {
 		app.lo.Error("error unmarshalling typing data", "error", err)
 		return fmt.Errorf("invalid typing data format: %w", err)
 	}
-	// TODO: broadcast typing data to all clients in the conversation.
-	app.lo.Debug("Received typing data for user", "user_id", userID, "is_typing", typingData.IsTyping)
+	// Broadcast this to agents.
+	app.lo.Debug("Received typing data for user", "user_id", userID, "is_typing", typingData.IsTyping, "conversation_uuid", typingData.ConversationUUID)
 	return nil
 }
 

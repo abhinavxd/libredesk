@@ -151,6 +151,15 @@ func handleSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
 	}
 
+	// Make sure the inbox is enabled.
+	inbox, err := app.inbox.GetDBRecord(conv.InboxID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if !inbox.Enabled {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+	}
+
 	// Prepare attachments.
 	var media = make([]medModels.Media, 0, len(req.Attachments))
 	for _, id := range req.Attachments {
@@ -167,7 +176,7 @@ func handleSendMessage(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, err)
 		}
 	} else {
-		if err := app.conversation.SendReply(media, conv.InboxID, user.ID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/); err != nil {
+		if err := app.conversation.SendReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 	}

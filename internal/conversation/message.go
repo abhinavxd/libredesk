@@ -18,7 +18,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -140,13 +139,13 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	}
 
 	// Get inbox
-	inbox, err := m.inboxStore.Get(message.InboxID)
+	inb, err := m.inboxStore.Get(message.InboxID)
 	if handleError(err, "error fetching inbox") {
 		return
 	}
 
 	// Render content in template
-	if err := m.RenderMessageInTemplate(inbox.Channel(), &message); err != nil {
+	if err := m.RenderMessageInTemplate(inb.Channel(), &message); err != nil {
 		handleError(err, "error rendering content in template")
 		return
 	}
@@ -157,24 +156,26 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		return
 	}
 
-	// Set from address of the inbox
-	message.From = inbox.FromAddress()
+	if inb.Channel() == inbox.ChannelEmail {
+		// Set from address of the inbox
+		message.From = inb.FromAddress()
 
-	// Set "In-Reply-To" and "References" headers, logging any errors but continuing to send the message.
-	// Include only the last 20 messages as references to avoid exceeding header size limits.
-	message.References, err = m.GetMessageSourceIDs(message.ConversationID, 20)
-	if err != nil {
-		m.lo.Error("Error fetching conversation source IDs", "error", err)
-	}
+		// Set "In-Reply-To" and "References" headers, logging any errors but continuing to send the message.
+		// Include only the last 20 messages as references to avoid exceeding header size limits.
+		message.References, err = m.GetMessageSourceIDs(message.ConversationID, 20)
+		if err != nil {
+			m.lo.Error("Error fetching conversation source IDs", "error", err)
+		}
 
-	// References is sorted in DESC i.e newest message first, so reverse it to keep the references in order.
-	stringutil.ReverseSlice(message.References)
+		// References is sorted in DESC i.e newest message first, so reverse it to keep the references in order.
+		stringutil.ReverseSlice(message.References)
 
-	// Remove the current message ID from the references.
-	message.References = stringutil.RemoveItemByValue(message.References, message.SourceID.String)
+		// Remove the current message ID from the references.
+		message.References = stringutil.RemoveItemByValue(message.References, message.SourceID.String)
 
-	if len(message.References) > 0 {
-		message.InReplyTo = message.References[len(message.References)-1]
+		if len(message.References) > 0 {
+			message.InReplyTo = message.References[len(message.References)-1]
+		}
 	}
 
 	// Send message
@@ -279,6 +280,9 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 			m.lo.Error("could not render email content using template", "id", message.ID, "error", err)
 			return fmt.Errorf("could not render email content using template: %w", err)
 		}
+	case inbox.ChannelLiveChat:
+		// Live chat doesn't use templates for rendering messages.
+		return nil
 	default:
 		m.lo.Warn("unknown message channel", "channel", channel)
 		return fmt.Errorf("unknown message channel: %s", channel)
@@ -362,9 +366,8 @@ func (m *Manager) MarkMessageAsPending(uuid string) error {
 	return nil
 }
 
-// SendPrivateNote inserts a private message in a conversation.
+// SendPrivateNote inserts a private message for a conversation.
 func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string) error {
-	// Insert Message.
 	message := models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
@@ -379,78 +382,72 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 	return m.InsertMessage(&message)
 }
 
-// SendReply inserts a reply message in a conversation.
-func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conversationUUID, content string, to, cc, bcc []string, meta map[string]interface{}) error {
-	// Generage unique source ID i.e. message-id for email.
-	inbox, err := m.inboxStore.GetDBRecord(inboxID)
+// SendReply inserts a reply message for a conversation.
+func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) error {
+	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
 	if err != nil {
 		return err
+	}
+
+	if !inboxRecord.Enabled {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil)
 	}
 
 	// Save to, cc and bcc in meta.
 	to = stringutil.RemoveEmpty(to)
 	cc = stringutil.RemoveEmpty(cc)
 	bcc = stringutil.RemoveEmpty(bcc)
-	meta["to"] = to
+	metaMap["to"] = to
 	if len(cc) > 0 {
-		meta["cc"] = cc
+		metaMap["cc"] = cc
 	}
 	if len(bcc) > 0 {
-		meta["bcc"] = bcc
-	}
-
-	metaJSON, err := json.Marshal(meta)
-	if err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorMarshalling", "name", "{globals.terms.meta}"), nil)
+		metaMap["bcc"] = bcc
 	}
 
 	var sourceID = ""
-	var msgStatus = ""
-	if inbox.Channel == "email" {
-		msgStatus = models.MessageStatusPending
+	if inboxRecord.Channel == "email" {
 		if len(to) == 0 {
 			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "`to`"), nil)
 		}
-		sourceID, err = stringutil.GenerateEmailMessageID(conversationUUID, inbox.From)
+		sourceID, err = stringutil.GenerateEmailMessageID(conversationUUID, inboxRecord.From)
 		if err != nil {
 			m.lo.Error("error generating source message id", "error", err)
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
 		}
 	} else {
-		msgStatus = models.MessageStatusSent
 		sourceID, err = stringutil.RandomAlphanumeric(35)
 		if err != nil {
 			m.lo.Error("error generating random source id", "error", err)
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
 		}
+		sourceID = "livechat-" + sourceID
 	}
 
-	// Insert Message.
-	message := models.Message{
-		ConversationUUID: conversationUUID,
-		SenderID:         senderID,
-		Type:             models.MessageOutgoing,
-		SenderType:       models.SenderTypeAgent,
-		Status:           msgStatus,
-		Content:          content,
-		ContentType:      models.ContentTypeHTML,
-		Private:          false,
-		Media:            media,
-		Meta:             metaJSON,
-		SourceID:         null.StringFrom(sourceID),
+	// Marshal meta.
+	metaJSON, err := json.Marshal(metaMap)
+	if err != nil {
+		m.lo.Error("error marshalling message meta map to JSON", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil)
 	}
 
 	// Insert the message into the database
+	message := models.Message{
+		ConversationUUID:  conversationUUID,
+		SenderID:          senderID,
+		Type:              models.MessageOutgoing,
+		SenderType:        models.SenderTypeAgent,
+		Status:            models.MessageStatusPending,
+		Content:           content,
+		ContentType:       models.ContentTypeHTML,
+		Private:           false,
+		Media:             media,
+		SourceID:          null.StringFrom(sourceID),
+		MessageReceiverID: contactID,
+		Meta:              metaJSON,
+	}
 	if err := m.InsertMessage(&message); err != nil {
 		return err
-	}
-
-	// For live chat, broadcast the message to connected clients
-	if inbox.Channel == "livechat" {
-		if err := m.broadcastLiveChatMessage(&message, inboxID); err != nil {
-			m.lo.Error("error broadcasting live chat message", "conversation_uuid", conversationUUID, "message_uuid", message.UUID, "error", err)
-			// Don't return error as the message was successfully inserted
-		}
 	}
 
 	return nil
@@ -467,7 +464,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.Meta = json.RawMessage(`{}`)
 	}
 
-	// Convert HTML content to text for search.
+	// Save message as text.
 	message.TextContent = stringutil.HTML2Text(message.Content)
 
 	// Insert Message.
@@ -477,12 +474,12 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil)
 	}
 
-	// Attach message to the media.
+	// Attach message to the media in DB.
 	for _, media := range message.Media {
 		m.mediaStore.Attach(media.ID, mmodels.ModelMessages, message.ID)
 	}
 
-	// Add this user as a participant.
+	// Add this user as a participant if not already present.
 	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
 	// Hide CSAT message content as it contains a public link to the survey.
@@ -491,8 +488,62 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		lastMessage = "Please rate your experience with us"
 	}
 
-	// Update conversation last message details in conversation.
-	m.UpdateConversationLastMessage(message.ConversationID, message.ConversationUUID, lastMessage, message.SenderType, message.CreatedAt)
+	// Get sender user and store last message in conversation.
+	var (
+		sender            umodels.User
+		conversationMeta  = map[string]any{}
+		lastInteractionAt = null.Time{}
+		err               error
+	)
+	switch message.SenderType {
+	case models.SenderTypeAgent:
+		sender, err = m.userStore.GetAgent(message.SenderID, "")
+		if err != nil {
+			m.lo.Error("error fetching message sender user", "sender_id", message.SenderID, "error", err)
+		}
+	case models.SenderTypeContact:
+		sender, err = m.userStore.GetContact(message.SenderID, "")
+		if err != nil {
+			m.lo.Error("error fetching message contact user", "contact_id", message.SenderID, "error", err)
+			sender, err = m.userStore.GetVisitor(message.SenderID)
+			if err != nil {
+				m.lo.Error("error fetching message visitor user", "visitor_id", message.SenderID, "error", err)
+			}
+		}
+	}
+	fmt.Println("NAME", sender.FullName())
+	if slices.Contains([]string{models.MessageIncoming, models.MessageOutgoing}, message.Type) && !message.Private {
+		conversationMeta["last_chat_message"] = map[string]any{
+			"uuid":         message.UUID,
+			"created_at":   message.CreatedAt,
+			"text_content": message.TextContent,
+			"sender": map[string]any{
+				"id":         sender.ID,
+				"first_name": sender.FirstName,
+				"last_name":  sender.LastName,
+			},
+			"sender_type": message.SenderType,
+		}
+		lastInteractionAt = null.TimeFrom(message.CreatedAt)
+	}
+	conversationMeta["last_message"] = map[string]any{
+		"uuid":         message.UUID,
+		"created_at":   message.CreatedAt,
+		"text_content": message.TextContent,
+		"sender": map[string]any{
+			"id":         sender.ID,
+			"first_name": sender.FirstName,
+			"last_name":  sender.LastName,
+		},
+		"sender_type": message.SenderType,
+	}
+	conversationMetaB, err := json.Marshal(conversationMeta)
+	if err != nil {
+		m.lo.Error("error marshalling conversation meta to JSON", "error", err)
+		conversationMetaB = []byte("{}")
+	}
+
+	m.UpdateConversationLastMessage(message.ConversationID, message.ConversationUUID, lastMessage, message.SenderType, message.CreatedAt, lastInteractionAt, conversationMetaB)
 
 	// Broadcast new message.
 	m.BroadcastNewMessage(message)
@@ -504,7 +555,6 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	} else {
 		m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, updatedMessage)
 	}
-
 	return nil
 }
 
@@ -979,68 +1029,4 @@ func (m *Manager) getLatestMessage(conversationID int, typ []string, status []st
 		return message, fmt.Errorf("fetching latest message: %w", err)
 	}
 	return message, nil
-}
-
-// broadcastLiveChatMessage broadcasts a message to live chat clients connected to the conversation
-func (m *Manager) broadcastLiveChatMessage(message *models.Message, inboxID int) error {
-	// Get the inbox instance
-	inboxInstance, err := m.inboxStore.Get(inboxID)
-	if err != nil {
-		return fmt.Errorf("error getting inbox instance: %w", err)
-	}
-
-	// Type assert to live chat inbox
-	liveChatInbox, ok := inboxInstance.(*livechat.LiveChat)
-	if !ok {
-		return fmt.Errorf("inbox is not a live chat inbox")
-	}
-
-	// Get sender information
-	sender, err := m.userStore.GetAgent(message.SenderID, "")
-	if err != nil {
-		m.lo.Error("error getting message sender", "sender_id", message.SenderID, "error", err)
-		// Use default values if we can't get sender info
-		sender = umodels.User{
-			FirstName: "Agent",
-			LastName:  "",
-		}
-	}
-
-	// Create the message data for WebSocket broadcast
-	// Use text content for live chat (HTML stripped), or convert HTML to text if not available
-	var textContent string
-	if message.TextContent != "" {
-		textContent = message.TextContent
-	} else {
-		textContent = stringutil.HTML2Text(message.Content)
-	}
-
-	messageData := map[string]interface{}{
-		"type": "new_message",
-		"data": map[string]interface{}{
-			"created_at":        message.CreatedAt.Format(time.RFC3339),
-			"conversation_uuid": message.ConversationUUID,
-			"message_id":        message.UUID,
-			"content":           textContent,
-			"sender_type":       "agent",
-			"sender_name":       sender.FullName(),
-			"status":            message.Status,
-		},
-	}
-
-	// Convert to JSON
-	messageJSON, err := json.Marshal(messageData)
-	if err != nil {
-		return fmt.Errorf("error marshaling message data: %w", err)
-	}
-
-	// Broadcast to all clients in this conversation
-	liveChatInbox.BroadcastToConversation(message.ConversationUUID, messageJSON)
-
-	m.lo.Info("broadcasted live chat message",
-		"conversation_uuid", message.ConversationUUID,
-		"message_uuid", message.UUID,
-		"sender", sender.FullName())
-
-	return nil
 }

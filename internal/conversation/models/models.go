@@ -52,6 +52,28 @@ var (
 	ContentTypeHTML = "html"
 )
 
+type ChatConversation struct {
+	UUID                       string       `db:"uuid" json:"uuid"`
+	Status                     string       `db:"status" json:"status"`
+	LastMessage                string       `db:"last_message" json:"last_message"`
+	LastMessageAt              null.Time    `db:"last_message_at" json:"last_message_at"`
+	LastMessageSenderFirstName string       `db:"last_message_sender_first_name" json:"last_message_sender_first_name"`
+	LastMessageSenderLastName  string       `db:"last_message_sender_last_name" json:"last_message_sender_last_name"`
+	LastMessageSenderAvatarURL string       `db:"last_message_sender_avatar_url" json:"last_message_sender_avatar_url"`
+	UnreadMessageCount         int          `db:"unread_message_count" json:"unread_message_count"`
+	Assignee                   umodels.User `db:"assignee" json:"assignee"`
+}
+
+type ChatMessage struct {
+	CreatedAt      time.Time              `json:"created_at"`
+	UUID           string                 `json:"uuid"`
+	Content        string                 `json:"content"`
+	SenderType     string                 `json:"sender_type"`
+	SenderName     string                 `json:"sender_name"`
+	ConversationID string                 `json:"conversation_id"`
+	Attachments    attachment.Attachments `json:"attachments"`
+}
+
 type Conversation struct {
 	ID                    int             `db:"id" json:"id,omitempty"`
 	CreatedAt             time.Time       `db:"created_at" json:"created_at"`
@@ -78,7 +100,7 @@ type Conversation struct {
 	InboxName             string          `db:"inbox_name" json:"inbox_name"`
 	InboxChannel          string          `db:"inbox_channel" json:"inbox_channel"`
 	Tags                  null.JSON       `db:"tags" json:"tags"`
-	Meta                  pq.StringArray  `db:"meta" json:"meta"`
+	Meta                  json.RawMessage `db:"meta" json:"meta"`
 	CustomAttributes      json.RawMessage `db:"custom_attributes" json:"custom_attributes"`
 	LastMessageAt         null.Time       `db:"last_message_at" json:"last_message_at"`
 	LastMessage           null.String     `db:"last_message" json:"last_message"`
@@ -147,7 +169,9 @@ type Message struct {
 	AltContent       string                 `db:"-" json:"-"`
 	Media            []mmodels.Media        `db:"-" json:"-"`
 	IsCSAT           bool                   `db:"-" json:"-"`
-	Total            int                    `db:"total" json:"-"`
+	// TODO: Figure if this field is needed or there's a better way.
+	MessageReceiverID int `db:"-" json:"-"`
+	Total             int `db:"total" json:"-"`
 }
 
 // CensorCSATContent redacts the content of a CSAT message to prevent leaking the CSAT survey public link.

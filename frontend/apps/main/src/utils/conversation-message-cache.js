@@ -34,6 +34,14 @@ export default class MessageCache {
         }
     }
 
+    /** Purge conversation messages from cache
+     * @param {string} convId - Conversation ID to purge
+     * @returns {boolean} - True if the conversation was purged, false if not found
+     */
+    purgeConversation (convId) {
+        return this.cache.delete(convId)
+    }
+
     /**
     * Checks if message exists in conversation
     * @returns {boolean} 
@@ -144,5 +152,14 @@ export default class MessageCache {
             const removed = this.recentConvs.pop()
             this.cache.delete(removed)
         }
+    }
+
+    /**
+     * Returns true if a conversation has been added to the cache
+     * @param {string} convId - Conversation ID
+     * @returns {boolean}
+     */
+    hasConversation (convId) {
+        return this.cache.has(convId)
     }
 }

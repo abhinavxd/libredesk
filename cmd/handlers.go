@@ -220,9 +220,11 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/widget/chat/settings", handleGetChatSettings)
 	g.POST("/api/v1/widget/chat/conversations/init", handleChatInit)
 	g.POST("/api/v1/widget/chat/conversations", handleGetConversations)
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", handleChatUpdateLastSeen)
 	g.POST("/api/v1/widget/chat/conversations/{uuid}", handleChatGetConversation)
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", handleChatSendMessage)
-	g.POST("/api/v1/widget/chat/conversations/{uuid}/close", handleChatCloseConversation)
+	g.POST("/api/v1/widget/media/upload", handleWidgetMediaUpload)
+	g.GET("/api/v1/widget/media/{uuid}", handleWidgetServeMedia)
 
 	// Frontend pages.
 	g.GET("/", notAuthPage(serveIndexPage))

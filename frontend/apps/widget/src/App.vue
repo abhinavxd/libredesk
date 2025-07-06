@@ -1,24 +1,18 @@
 <template>
   <div class="libredesk-widget-app">
     <div class="widget-container">
-      <!-- Welcome View -->
-      <WelcomeView v-if="isWelcomeView" />
-      <!-- Chat View -->
-      <ChatView v-if="isChatView" />
+      <MainLayout />
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import WelcomeView from './views/WelcomeView.vue'
-import ChatView from './views/ChatView.vue'
+import { onMounted } from 'vue'
 import { useWidgetStore } from './store/widget.js'
 import api from '@widget/api/index.js'
+import MainLayout from '@widget/layouts/MainLayout.vue'
 
 const widgetStore = useWidgetStore()
-const isWelcomeView = computed(() => widgetStore.isWelcomeView)
-const isChatView = computed(() => widgetStore.isChatView)
 
 onMounted(async () => {
   await fetchWidgetSettings()
@@ -45,26 +39,11 @@ const fetchWidgetSettings = async () => {
 .libredesk-widget-app {
   width: 100vw;
   height: 100vh;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  background: hsl(var(--background));
   overflow: hidden;
 }
 
 .widget-container {
   width: 100%;
   height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
 }
 </style>

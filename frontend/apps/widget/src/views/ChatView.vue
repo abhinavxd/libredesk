@@ -1,26 +1,49 @@
 <template>
-  <div class="flex flex-col h-screen bg-background widget-slide-up">
+  <div class="flex flex-col h-full">
     <!-- Chat Header -->
-    <div class="flex items-center p-4 border-b border-border bg-background gap-3">
-      <Button @click="goBack" variant="ghost" size="sm" class="min-w-8 h-8 p-0">
-        <ArrowLeft class="w-4 h-4" />
+    <div class="flex items-center p-4 border-b border-border bg-background gap-3 relative">
+      <Button @click="goBack" variant="ghost" size="sm" class="absolute left-2">
+        <ArrowLeft />
       </Button>
 
-      <div class="flex-1 text-center">
-        <h3 class="text-base font-semibold m-0 text-foreground">
-          {{ config.brand_name }}
-        </h3>
+      <!-- Title -->
+      <div class="flex items-center justify-center gap-3 ml-10">
+        <Avatar class="size-10">
+          <AvatarImage :src="chatTitle.avatarUrl" />
+          <AvatarFallback>
+            {{ chatTitle.avatarFallback }}
+          </AvatarFallback>
+        </Avatar>
+        <div class="flex flex-col">
+          <h3 class="text-base font-bold text-foreground">
+            {{ chatTitle.name }}
+          </h3>
+          <p v-if="chatTitle.showStatus" class="text-xs text-muted-foreground">
+            <span v-if="chatTitle.isOnline">
+              <span class="inline-block w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+              {{ chatTitle.statusText }}
+            </span>
+            <span v-else> Active {{ chatTitle.lastActiveText }} </span>
+          </p>
+        </div>
       </div>
-
-      <!-- Remove close button in iframe mode -->
-      <div class="min-w-8 h-8"></div>
     </div>
 
     <!-- Messages Container -->
     <div
-      class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-muted/30 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
+      class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
       ref="messagesContainer"
     >
+      <!-- Chat Intro -->
+      <ChatIntro :introText="config.chat_introduction" />
+
+      <!-- Notice -->
+      <NoticeBanner
+        v-if="config.notice_banner.enabled === true"
+        :noticeText="config.notice_banner.text"
+      />
+
+      <!-- Messages -->
       <div
         v-for="message in messages"
         :key="message.uuid"
@@ -37,10 +60,19 @@
               : 'bg-background text-foreground rounded-bl-sm border border-border'
           ]"
         >
-          {{ message.content }}
+          <Letter
+            :html="message.content"
+            :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+            class="mb-1 native-html"
+          />
+          <!-- Show attachments if available -->
+          <MessageAttachment
+            v-if="message.attachments && message.attachments.length > 0"
+            :attachments="message.attachments"
+          />
         </div>
-        <div class="text-xs text-muted-foreground mt-1 px-2">
-          {{ getRelativeTime(message.created_at) }}
+        <div class="text-xs text-muted-foreground mt-1">
+          {{ getMessageTime(message.created_at) }}
         </div>
       </div>
 
@@ -65,91 +97,155 @@
     </div>
 
     <!-- Error Display -->
-    <div v-if="errorMessage" class="p-4 bg-destructive/10 border-t border-destructive/20">
-      <p class="text-sm text-destructive text-center">{{ errorMessage }}</p>
-    </div>
+    <WidgetError :errorMessage="errorMessage" />
 
     <!-- Message Input -->
-    <div class="border-t border-border bg-background">
-      <div class="flex gap-2 p-4 items-end">
-        <Input
-          v-model="newMessage"
-          @keypress.enter="sendMessage"
-          placeholder="Type your message..."
-          class="flex-1 min-h-10 rounded-3xl"
-        />
-        <Button
-          @click="sendMessage"
-          size="sm"
-          class="min-w-10 h-10 rounded-full p-0 disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="!newMessage.trim()"
-        >
-          <Send class="w-4 h-4" />
-        </Button>
-      </div>
+    <div class="border-t flex-shrink-0 focus:ring-0 focus:outline-none">
+      <div class="p-3">
+        <!-- Unified Input Container -->
+        <div class="border border-input rounded-lg bg-background focus-within:border-primary">
+          <!-- Textarea Container -->
+          <div class="p-3 pb-2">
+            <Textarea
+              v-model="newMessage"
+              @keydown="handleKeydown"
+              @input="handleTyping"
+              placeholder="Type your message..."
+              class="w-full min-h-6 max-h-32 resize-none border-0 bg-transparent focus:ring-0 focus:outline-none focus-visible:ring-0 p-0 shadow-none"
+              ref="messageInput"
+            ></Textarea>
+          </div>
 
-      <div class="px-4 pb-3 text-center">
-        <span class="text-xs text-muted-foreground"
-          >Powered by <a href="https://libredesk.io" target="_blank">Libredesk</a></span
-        >
+          <!-- Actions and Send Button -->
+          <div class="flex justify-between items-center px-3 py-2">
+            <!-- Message Input Actions (file upload + emoji) -->
+            <MessageInputActions
+              :fileUploadEnabled="config.features?.file_upload || false"
+              :emojiEnabled="config.features?.emoji || false"
+              :uploading="isUploading"
+              @fileUpload="handleFileUpload"
+              @emojiSelect="handleEmojiSelect"
+            />
+
+            <!-- Send Button -->
+            <Button
+              @click="sendMessage"
+              size="sm"
+              class="h-8 px-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed border-0"
+              :disabled="!newMessage.trim() || isUploading"
+            >
+              <ArrowUp class="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
-import { ArrowLeft, Send } from 'lucide-vue-next'
+import { ref, computed, nextTick, onMounted, watch, onUnmounted } from 'vue'
+import { ArrowLeft, ArrowUp } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
-import { Input } from '@shared-ui/components/ui/input'
+import { Textarea } from '@shared-ui/components/ui/textarea'
 import { useWidgetStore } from '../store/widget.js'
 import { useChatStore } from '../store/chat.js'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-
+import { sendWidgetTyping } from '../websocket.js'
+import { debounce } from '@shared-ui/utils/debounce.js'
+import { Letter } from 'vue-letter'
+import { convertTextToHtml } from '@shared-ui/utils/string.js'
+import ChatIntro from '@widget/components/ChatIntro.vue'
+import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
+import NoticeBanner from '@widget/components/NoticeBanner.vue'
+import WidgetError from '@widget/components/WidgetError.vue'
+import MessageAttachment from '@widget/components/MessageAttachment.vue'
+import MessageInputActions from '@widget/components/MessageInputActions.vue'
 import api from '@widget/api/index.js'
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const messagesContainer = ref(null)
+const messageInput = ref(null)
 const newMessage = ref('')
 const errorMessage = ref('')
+const timeUpdateTrigger = ref(0) // Force reactivity for time updates
+const isUploading = ref(false)
 
-// Computed properties
+
 const config = computed(() => widgetStore.config)
 const isTyping = computed(() => chatStore.isTyping)
-const messages = computed(() => chatStore.getMessages())
+const messages = computed(() => chatStore.getCurrentConversationMessages())
+const chatTitle = computed(() => {
+  const assignee = chatStore.currentConversation?.assignee
+  const hasAssignee = assignee?.id > 0
+
+  if (hasAssignee) {
+    return {
+      name: assignee.first_name,
+      avatarUrl: assignee.avatar_url || '',
+      avatarFallback: assignee.first_name?.charAt(0).toUpperCase() || 'A',
+      showStatus: !!assignee.active_at,
+      isOnline: assignee.availability_status === 'online',
+      statusText:
+        assignee.availability_status?.charAt(0).toUpperCase() +
+        assignee.availability_status?.slice(1),
+      lastActiveText: assignee.active_at ? getRelativeTime(assignee.active_at).toLowerCase() : ''
+    }
+  } else {
+    return {
+      name: config.value.brand_name,
+      avatarUrl: '',
+      avatarFallback: config.value.brand_name?.charAt(0).toUpperCase() || 'B',
+      showStatus: false,
+      isOnline: false,
+      statusText: '',
+      lastActiveText: ''
+    }
+  }
+})
+
+const getMessageTime = computed(() => {
+  timeUpdateTrigger.value
+  return (timestamp) => getRelativeTime(timestamp)
+})
 
 // Methods
 const goBack = () => {
-  widgetStore.navigateToWelcome()
+  widgetStore.navigateToMessages()
 }
 
 const sendMessage = async () => {
   if (!newMessage.value.trim()) return
 
-  const messageText = newMessage.value.trim()
+  // Convert text to HTML.
+  const messageText = convertTextToHtml(newMessage.value.trim())
+
   newMessage.value = ''
 
   try {
     let resp = {}
-    if (!chatStore.currentConversationId) {
+    // No current conversation ID? Start a new conversation.
+    if (!chatStore.currentConversation.uuid) {
       resp = await api.initChatConversation({
         message: messageText
       })
       let data = resp.data.data
 
-      // store data.jwt in localStorage as 'libredesk_session'
+      const conversation = data.conversation
       const conversationUUID = data.conversation.uuid
 
-      localStorage.setItem('libredesk_session', data.jwt)
-      localStorage.setItem('libredesk_current_conversation', data.conversation.uuid)
+      if (!localStorage.getItem('libredesk_session')) {
+        localStorage.setItem('libredesk_session', data.jwt)
+      }
 
       scrollToBottom()
 
       // Fetch entire conversation and replace messages
       if (conversationUUID) {
-        chatStore.setCurrentConversationId(conversationUUID)
+        // Use the openConversation method which handles both setting ID and WebSocket joining
+        chatStore.openConversation(conversation)
 
         let resp = await api.getChatConversation(conversationUUID)
         let msgs = resp.data.data.messages
@@ -158,18 +254,21 @@ const sendMessage = async () => {
         chatStore.replaceMessages(msgs)
       }
     } else {
-      resp = await api.sendChatMessage(chatStore.currentConversationId, {
+      // Send message in existing conversation
+      await api.sendChatMessage(chatStore.currentConversation.uuid, {
         message: messageText
       })
+      await chatStore.fetchAndReplaceConversationAndMessages()
     }
+    errorMessage.value = ''
   } catch (error) {
-    console.error('Error sending message:', error)
-    if (error.response && error.response.status === 403) {
+    if (error.response && error.response.status === 401) {
       localStorage.removeItem('libredesk_session')
-      localStorage.removeItem('libredesk_current_conversation')
-      widgetStore.navigateToWelcome()
+      chatStore.setCurrentConversation(null)
     }
     errorMessage.value = handleHTTPError(error).message
+  } finally {
+    await chatStore.updateCurrentConversationLastSeen()
   }
 }
 
@@ -181,26 +280,97 @@ const scrollToBottom = () => {
   })
 }
 
-onMounted(() => {
-  const conversationUUID = localStorage.getItem('libredesk_current_conversation')
+let timeUpdateTimer = null
 
-  if (conversationUUID) {
-    chatStore.setCurrentConversationId(conversationUUID)
-
-    // Fetch entire conversation and replace messages
-    api
-      .getChatConversation(conversationUUID)
-      .then((resp) => {
-        let msgs = resp.data.data.messages
-        chatStore.replaceMessages(msgs)
-      })
-      .catch((error) => {
-        console.error('Error fetching conversation:', error)
-      })
+// Debounced typing functions
+const sendTypingStart = debounce(() => {
+  if (chatStore.currentConversation.uuid) {
+    sendWidgetTyping(true)
   }
+}, 300)
+
+const sendTypingStop = debounce(() => {
+  if (chatStore.currentConversation.uuid) {
+    sendWidgetTyping(false)
+  }
+}, 3000)
+
+const handleTyping = () => {
+  sendTypingStart()
+  sendTypingStop()
+}
+
+// Handle Enter vs Shift+Enter
+const handleKeydown = (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    sendMessage()
+  }
+  // Allow Shift+Enter for new lines (default behavior)
+}
+
+// File upload handler
+const handleFileUpload = async (files) => {
+  if (!chatStore.currentConversation.uuid || files.length === 0) return
+
+  isUploading.value = true
+  errorMessage.value = ''
+
+  try {
+    // Upload files using the widget API
+    await api.uploadMedia(chatStore.currentConversation.uuid, files)
+
+    // Refresh conversation to get updated messages with attachments
+    const resp = await api.getChatConversation(chatStore.currentConversation.uuid)
+    const msgs = resp.data.data.messages
+    chatStore.replaceMessages(msgs)
+
+    // Scroll to bottom to show new messages
+    scrollToBottom()
+  } catch (error) {
+    console.error('Error uploading files:', error)
+    errorMessage.value = handleHTTPError(error).message
+  } finally {
+    isUploading.value = false
+  }
+}
+
+// Emoji selection handler
+const handleEmojiSelect = (emoji) => {
+  if (messageInput.value) {
+    const textarea = messageInput.value.$el.querySelector('textarea') || messageInput.value.$el
+    if (textarea) {
+      const cursorPos = textarea.selectionStart || 0
+      const textBefore = newMessage.value.substring(0, cursorPos)
+      const textAfter = newMessage.value.substring(cursorPos)
+      newMessage.value = textBefore + emoji + textAfter
+
+      // Set cursor position after the emoji
+      nextTick(() => {
+        const newPos = cursorPos + emoji.length
+        textarea.setSelectionRange(newPos, newPos)
+        textarea.focus()
+      })
+    } else {
+      // Fallback: just append emoji
+      newMessage.value += emoji
+    }
+  }
+}
+
+onMounted(async () => {
+  await chatStore.fetchCurrentConversation()
+
+  // Start timer to update relative times every 1 minute
+  timeUpdateTimer = setInterval(() => {
+    timeUpdateTrigger.value++
+  }, 60000)
 
   // Scroll to bottom on mount
   scrollToBottom()
+
+  // Update last seen timestamp for the contact
+  await chatStore.updateCurrentConversationLastSeen()
 })
 
 // Watch for new messages and scroll to bottom
@@ -211,4 +381,22 @@ watch(
   },
   { deep: true }
 )
+
+// Auto-resize textarea
+watch(newMessage, () => {
+  nextTick(() => {
+    if (messageInput.value?.$el) {
+      const textarea = messageInput.value.$el
+      textarea.style.height = 'auto'
+      textarea.style.height = Math.min(textarea.scrollHeight, 128) + 'px'
+    }
+  })
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  if (timeUpdateTimer) {
+    clearInterval(timeUpdateTimer)
+  }
+})
 </script>

@@ -33,7 +33,14 @@
 
         <!-- Inbox name -->
         <p class="text-xs text-gray-400 flex items-center gap-1.5">
-          <Mail class="w-3.5 h-3.5 text-gray-400/80" />
+          <Mail
+            class="w-3.5 h-3.5"
+            v-if="conversation.inbox_channel === 'email'"
+          />
+          <MessageCircle
+            class="w-3.5 h-3.5"
+            v-else-if="conversation.inbox_channel === 'livechat'"
+          />
           <span>{{ conversation.inbox_name }}</span>
         </p>
 
@@ -99,7 +106,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getRelativeTime } from '../../../utils/datetime'
-import { Mail, Reply } from 'lucide-vue-next'
+import { Mail, Reply, MessageCircle } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 
