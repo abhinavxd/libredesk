@@ -1121,7 +1121,7 @@
 
 <h2 id="delivery-and-retries">Delivery and Retries<a class="headerlink" href="#delivery-and-retries" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Webhooks are delivered with a 10-second timeout</li>
+<li>Webhooks requests timeout can be configured in the <code>config.toml</code> file</li>
 <li>Failed deliveries are not automatically retried</li>
 <li>Webhook delivery runs in a background worker pool for better performance</li>
 <li>If the webhook queue is full (configurable in config.toml file), new events may be dropped</li>
