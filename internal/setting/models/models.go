@@ -29,6 +29,14 @@ type EmailNotification struct {
 	Enabled       bool   `json:"notification.email.enabled" db:"notification.email.enabled"`
 }
 
+type ArticleSettings struct {
+	SiteTitle       string `json:"article.site_title" db:"article.site_title"`
+	SiteDescription string `json:"article.site_description" db:"article.site_description"`
+	PrimaryFont     string `json:"article.primary_font" db:"article.primary_font"`
+	LogoURL         string `json:"article.logo_url" db:"article.logo_url"`
+	CustomScript	string `json:"article.custom_script" db:"article.custom_script"`
+}
+
 type Settings struct {
 	EmailNotification
 	General

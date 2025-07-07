@@ -600,6 +600,41 @@ CREATE TABLE webhooks (
 	CONSTRAINT constraint_webhooks_on_events_not_empty CHECK (array_length(events, 1) > 0)
 );
 
+DROP TABLE IF EXISTS article_categories CASCADE;
+CREATE TABLE article_categories (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	"name" TEXT NOT NULL UNIQUE,
+	CONSTRAINT constraint_article_categories_on_name CHECK (length("name") <= 140)
+);
+
+DROP TABLE IF EXISTS article_sections CASCADE;
+CREATE TABLE article_sections (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	"name" TEXT NOT NULL UNIQUE,
+	category_id INT REFERENCES article_categories(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	CONSTRAINT constraint_article_sections_on_name CHECK (length("name") <= 140)
+);
+CREATE INDEX IF NOT EXISTS index_sections_on_category_id ON article_sections (category_id);
+
+DROP TABLE IF EXISTS articles CASCADE;
+CREATE TABLE articles (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    title TEXT NOT NULL,
+    content TEXT,
+    section_id INT REFERENCES article_sections(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	published_at TIMESTAMPTZ,
+    is_published BOOLEAN DEFAULT FALSE,
+    CONSTRAINT constraint_articles_on_title CHECK (length(title) <= 255)
+);
+CREATE INDEX IF NOT EXISTS index_articles_on_section_id ON articles (section_id);
+
+
 INSERT INTO ai_providers
 ("name", provider, config, is_default)
 VALUES('openai', 'openai', '{"api_key": ""}'::jsonb, true);
@@ -638,7 +673,13 @@ VALUES
 	('notification.email.hello_hostname', '""'::jsonb),
     ('notification.email.email_address', '"admin@yourcompany.com"'::jsonb),
     ('notification.email.max_msg_retries', '3'::jsonb),
-    ('notification.email.enabled', 'false'::jsonb);
+    ('notification.email.enabled', 'false'::jsonb),
+	    -- Article settings
+    ('article.site_title', '""'::jsonb),
+    ('article.site_description', '""'::jsonb),
+    ('article.custom_script', '""'::jsonb),
+    ('article.primary_font', '"inter"'::jsonb),
+    ('article.logo_url', '""'::jsonb);
 
 -- Default conversation priorities
 INSERT INTO conversation_priorities (name) VALUES
@@ -669,7 +710,7 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
+		'{webhooks:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage,article_category:manage,article_section:manage,article:manage,article_setting:manage}'
 	);
 
 

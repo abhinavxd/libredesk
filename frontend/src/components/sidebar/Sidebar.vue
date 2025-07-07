@@ -3,7 +3,8 @@ import {
   adminNavItems,
   reportsNavItems,
   accountNavItems,
-  contactNavItems
+  contactNavItems,
+  articlesNavItems
 } from '@/constants/navigation'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -132,24 +133,40 @@ const navigateToViewInbox = (viewID) => {
 const filteredAdminNavItems = computed(() => filterNavItems(adminNavItems, userStore.can))
 const filteredReportsNavItems = computed(() => filterNavItems(reportsNavItems, userStore.can))
 const filteredContactsNavItems = computed(() => filterNavItems(contactNavItems, userStore.can))
+const filteredArticlesNavItems = computed(() => filterNavItems(articlesNavItems, userStore.can))
+
 
 // For auto opening admin collapsibles when a child route is active
 const openAdminCollapsible = ref(null)
 const toggleAdminCollapsible = (titleKey) => {
   openAdminCollapsible.value = openAdminCollapsible.value === titleKey ? null : titleKey
 }
+
+// For auto opening articles collapsibles when a child route is active
+const openArticlesCollapsible = ref(null)
+const toggleArticlesCollapsible = (titleKey) => {
+  openArticlesCollapsible.value = openArticlesCollapsible.value === titleKey ? null : titleKey
+} 
+
+
 // Watch for route changes and update the active collapsible
+const updateActiveCollapsible = (filteredItems, openCollapsible) => {
+  const activeItem = filteredItems.value.find((item) => {
+    if (!item.children) return isActiveParent(item.href)
+    return item.children.some((child) => isActiveParent(child.href))
+  })
+  if (activeItem) {
+    openCollapsible.value = activeItem.titleKey
+  }
+}
 watch(
   [() => route.path, filteredAdminNavItems],
-  () => {
-    const activeItem = filteredAdminNavItems.value.find((item) => {
-      if (!item.children) return isActiveParent(item.href)
-      return item.children.some((child) => isActiveParent(child.href))
-    })
-    if (activeItem) {
-      openAdminCollapsible.value = activeItem.titleKey
-    }
-  },
+  () => updateActiveCollapsible(filteredAdminNavItems, openAdminCollapsible),
+  { immediate: true }
+)
+watch(
+  [() => route.path, filteredArticlesNavItems],
+  () => updateActiveCollapsible(filteredArticlesNavItems, openArticlesCollapsible),
   { immediate: true }
 )
 
@@ -505,6 +522,73 @@ const viewInboxOpen = useStorage('viewInboxOpen', true)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+      </Sidebar>
+    </template>
+
+
+    <!-- Articles Sidebar -->
+    <template v-if="route.matched.some((record) => record.name && record.name.startsWith('article'))">
+      <Sidebar collapsible="offcanvas" class="border-r ml-12">
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <div class="flex flex-col items-start justify-between w-full px-1">
+                <span class="font-semibold text-xl">
+                  {{ t('articles.support.article') }} 
+                </span>
+                <!-- App version -->
+                <div class="text-xs text-muted-foreground">
+                  ({{ settingsStore.settings['app.version'] }})
+                </div>
+              </div>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem v-for="item in filteredArticlesNavItems" :key="item.titleKey">
+                <SidebarMenuButton
+                  v-if="!item.children"
+                  :isActive="isActiveParent(item.href)"
+                  asChild
+                >
+                  <router-link :to="item.href">
+                    <span>{{ t(item.titleKey) }}</span>
+                  </router-link>
+                </SidebarMenuButton>
+
+                <Collapsible
+                  v-else
+                  class="group/collapsible"
+                  :open="openArticlesCollapsible === item.titleKey"
+                  @update:open="toggleArticlesCollapsible(item.titleKey)"
+                >
+                  <CollapsibleTrigger as-child>
+                    <SidebarMenuButton :isActive="isActiveParent(item.href)">
+                      <span>{{ t(item.titleKey) }}</span>
+                      <ChevronRight
+                        class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+                      />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      <SidebarMenuSubItem v-for="child in item.children" :key="child.titleKey">
+                        <SidebarMenuButton size="sm" :isActive="isActiveParent(child.href)" asChild>
+                          <router-link :to="child.href">
+                            <span>{{ t(child.titleKey) }}</span>
+                          </router-link>
+                        </SidebarMenuButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </Collapsible>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarRail />
       </Sidebar>
     </template>
 

@@ -14,6 +14,9 @@ import (
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
 	"github.com/abhinavxd/libredesk/internal/ai"
+	"github.com/abhinavxd/libredesk/internal/article"
+	"github.com/abhinavxd/libredesk/internal/article_category"
+	"github.com/abhinavxd/libredesk/internal/article_section"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	"github.com/abhinavxd/libredesk/internal/autoassigner"
@@ -233,6 +236,49 @@ func initConversations(
 		log.Fatalf("error initializing conversation manager: %v", err)
 	}
 	return c
+}
+
+// inits article category manager.
+func initArticleCategory(db *sqlx.DB, i18n *i18n.I18n) *article_category.Manager {
+	var lo = initLogger("article_category")
+	mgr, err := article_category.New(article_category.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing categories: %v", err)
+	}
+	return mgr
+}
+
+// initArticleSection inits article section manager.
+func initArticleSection(db *sqlx.DB, i18n *i18n.I18n) *article_section.Manager {
+	var lo = initLogger("article_section")
+	m, err := article_section.New(article_section.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing sections: %v", err)
+	}
+	return m
+}
+
+
+// initArticle inits article manager.
+func initArticle(db *sqlx.DB, i18n *i18n.I18n) *article.Manager {
+	var lo = initLogger("article")
+	m, err := article.New(article.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing articles: %v", err)
+	}
+	return m
 }
 
 // initTag inits tag manager.

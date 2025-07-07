@@ -32,6 +32,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/settings/general", perm(handleUpdateGeneralSettings, "general_settings:manage"))
 	g.GET("/api/v1/settings/notifications/email", perm(handleGetEmailNotificationSettings, "notification_settings:manage"))
 	g.PUT("/api/v1/settings/notifications/email", perm(handleUpdateEmailNotificationSettings, "notification_settings:manage"))
+	g.GET("/api/v1/settings/article", handleGetArticleSettings)
+	g.PUT("/api/v1/settings/article", perm(handleUpdateArticleSettings, "article_setting:manage"))
 
 	// OpenID connect single sign-on.
 	g.GET("/api/v1/oidc/enabled", handleGetAllEnabledOIDC)
@@ -205,6 +207,29 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/custom-attributes/{id}", perm(handleGetCustomAttribute, "custom_attributes:manage"))
 	g.PUT("/api/v1/custom-attributes/{id}", perm(handleUpdateCustomAttribute, "custom_attributes:manage"))
 	g.DELETE("/api/v1/custom-attributes/{id}", perm(handleDeleteCustomAttribute, "custom_attributes:manage"))
+
+
+	// Article Categories.
+	g.GET("/api/v1/article/categories", auth(handleGetArticleCategories))
+	g.POST("/api/v1/article/category", perm(handleCreateArticleCategory, "article_category:manage"))
+	g.PUT("/api/v1/article/category/{id}", perm(handleUpdateArticleCategory, "article_category:manage"))
+	g.DELETE("/api/v1/article/category/{id}", perm(handleDeleteArticleCategory, "article_category:manage"))
+
+ 	// Article sections.
+	g.GET("/api/v1/article/sections", auth(handleGetArticleSections))
+	g.POST("/api/v1/article/section", perm(handleCreateArticleSection, "article_section:manage"))
+	g.PUT("/api/v1/article/section/{id}", perm(handleUpdateArticleSection, "article_section:manage"))
+	g.DELETE("/api/v1/article/section/{id}", perm(handleDeleteArticleSection, "article_section:manage"))
+
+	// Articles
+	g.GET("/api/v1/articles", auth(handleGetArticles))
+	g.GET("/api/v1/article/{id}", auth(handleGetArticle))
+	g.GET("/api/v1/articles/section/{sectionId}", auth(handleGetArticlesBySection))
+	g.POST("/api/v1/article", perm(handleCreateArticle, "article:manage"))
+	g.PUT("/api/v1/article/{id}", perm(handleUpdateArticle, "article:manage"))
+	g.DELETE("/api/v1/article/{id}", perm(handleDeleteArticle, "article:manage"))
+	g.PUT("/api/v1/article/{id}/publish", perm(handlePublishArticle, "article:manage"))
+	g.PUT("/api/v1/article/{id}/unpublish", perm(handleUnpublishArticle, "article:manage"))
 
 	// Actvity logs.
 	g.GET("/api/v1/activity-logs", perm(handleGetActivityLogs, "activity_logs:manage"))
