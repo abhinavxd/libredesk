@@ -1,9 +1,11 @@
 import { format, isToday, isTomorrow, addDays, setHours, setMinutes } from 'date-fns'
+import { useI18n } from 'vue-i18n'
 
 /**
  * Business hours composable providing generic business hours utilities.
  */
 export function useBusinessHours() {
+  const { t } = useI18n()
 
   /**
    * Get the business hours by ID from a list
@@ -163,7 +165,15 @@ export function useBusinessHours() {
    * @returns {string} Day name
    */
   function getDayName(dayNum) {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const days = [
+      t('globals.days.sunday'),
+      t('globals.days.monday'), 
+      t('globals.days.tuesday'),
+      t('globals.days.wednesday'),
+      t('globals.days.thursday'),
+      t('globals.days.friday'),
+      t('globals.days.saturday')
+    ]
     return days[dayNum]
   }
 
@@ -178,11 +188,14 @@ export function useBusinessHours() {
     }
 
     if (isToday(nextWorkingTime)) {
-      return `today at ${format(nextWorkingTime, 'h:mm a')}`
+      return t('globals.messages.backTodayAt', { time: format(nextWorkingTime, 'h:mm a') })
     } else if (isTomorrow(nextWorkingTime)) {
-      return `tomorrow at ${format(nextWorkingTime, 'h:mm a')}`
+      return t('globals.messages.backTomorrowAt', { time: format(nextWorkingTime, 'h:mm a') })
     } else {
-      return `on ${format(nextWorkingTime, 'EEEE')} at ${format(nextWorkingTime, 'h:mm a')}`
+      return t('globals.messages.backOnDayAt', { 
+        day: format(nextWorkingTime, 'EEEE'), 
+        time: format(nextWorkingTime, 'h:mm a') 
+      })
     }
   }
   /**
@@ -206,9 +219,9 @@ export function useBusinessHours() {
     } else {
       const nextWorkingTime = getNextWorkingTime(businessHours, now, utcOffset)
       if (nextWorkingTime) {
-        status = `We'll be back ${formatNextWorkingTime(nextWorkingTime)}`
+        status = t('globals.messages.wellBeBack', { when: formatNextWorkingTime(nextWorkingTime) })
       } else {
-        status = 'We are currently offline'
+        status = t('globals.messages.currentlyOffline')
       }
     }
 

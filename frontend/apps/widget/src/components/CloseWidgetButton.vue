@@ -3,7 +3,7 @@
     v-if="widgetStore.isMobileFullScreen"
     @click="closeWidget"
     variant="ghost"
-    aria-label="Close chat"
+    :aria-label="$t('globals.messages.closeChat')"
   >
     <X class="w-4 h-4" />
   </Button>

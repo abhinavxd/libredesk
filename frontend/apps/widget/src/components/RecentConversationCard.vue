@@ -38,6 +38,7 @@ import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useUserStore } from '@widget/store/user.js'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
   conversation: {
@@ -49,15 +50,16 @@ const props = defineProps({
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()
 const userStore = useUserStore()
+const { t } = useI18n()
 
 const authorDisplayName = computed(() => {
   const author = props.conversation.last_message.author
-  if (!author) return 'Someone'
+  if (!author) return t('globals.terms.someone')
   // Check if the author is the current user
   if (author.id === userStore.userID) {
-    return 'You'
+    return t('globals.terms.you')
   }
-  return author.first_name || 'Someone'
+  return author.first_name || t('globals.terms.someone')
 })
 
 const continueConversation = async () => {

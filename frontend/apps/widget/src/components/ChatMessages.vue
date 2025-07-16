@@ -2,7 +2,7 @@
   <div class="flex flex-col relative flex-1 min-h-0">
     <!-- Loading conversation overlay -->
     <div v-if="isLoadingConversation" class="absolute inset-0 bg-background/80 backdrop-blur-sm z-10">
-      <Spinner size="md" text="Loading conversation..." absolute />
+      <Spinner size="md" :text="$t('globals.terms.loading')" absolute />
     </div>
     
     <div
@@ -82,7 +82,7 @@
               <div
                 class="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"
               ></div>
-              Sending...
+              {{ $t('globals.messages.sending') }}
             </span>
             <span v-else>
               {{ getMessageTime(message.created_at) }}

@@ -2,7 +2,7 @@
   <div>
     <!-- Loading State -->
     <div v-if="isLoadingConversations" class="py-8">
-      <Spinner size="md" text="Loading conversations..." />
+      <Spinner size="md" :text="$t('globals.terms.loading')" />
     </div>
 
     <!-- Empty State -->
@@ -35,7 +35,7 @@
                   conversation.last_message?.author.last_name
                 }}
               </span>
-              <span v-else>You</span>
+              <span v-else>{{ $t('globals.terms.you') }}</span>
               <span>•</span>
               <span>{{ getConversationTime(conversation.last_message.created_at) }}</span>
             </div>

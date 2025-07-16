@@ -13,11 +13,11 @@
       <TabsList class="grid grid-cols-2 border-t rounded-none">
         <TabsTrigger value="home" class="flex gap-1">
           <Home class="w-5 h-5" />
-          <span class="text-xs">Home</span>
+          <span class="text-xs">{{ $t('globals.terms.home') }}</span>
         </TabsTrigger>
         <TabsTrigger value="messages" class="flex gap-1">
           <MessageCircle class="w-5 h-5" />
-          <span class="text-xs">Messages</span>
+          <span class="text-xs">{{ $t('globals.terms.message', 2) }}</span>
         </TabsTrigger>
       </TabsList>
       <div class="text-center flex items-center justify-center py-1">

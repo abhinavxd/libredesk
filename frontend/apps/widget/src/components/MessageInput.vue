@@ -9,7 +9,7 @@
             v-model="newMessage"
             @keydown="handleKeydown"
             @input="handleTyping"
-            placeholder="Type your message..."
+            :placeholder="$t('globals.placeholders.typeMessage')"
             class="w-full min-h-6 max-h-32 resize-none border-0 bg-transparent focus:ring-0 focus:outline-none focus-visible:ring-0 p-0 shadow-none"
             ref="messageInput"
           ></Textarea>

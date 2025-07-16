@@ -13,7 +13,7 @@
         @click="widgetStore.toggleExpand" 
         variant="ghost" 
         size="sm"
-        :title="widgetStore.isExpanded ? 'Collapse' : 'Expand'"
+        :title="widgetStore.isExpanded ? $t('globals.terms.collapse') : $t('globals.terms.expand')"
       >
         <Maximize2 v-if="!widgetStore.isExpanded" class="w-4 h-4" />
         <Minimize2 v-else class="w-4 h-4" />

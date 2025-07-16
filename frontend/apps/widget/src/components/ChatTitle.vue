@@ -31,7 +31,7 @@
           }}
         </span>
         <span v-else-if="chatStore.currentConversation?.assignee?.active_at">
-          Active
+          {{ $t('globals.terms.active') }}
           {{ getRelativeTime(chatStore.currentConversation?.assignee?.active_at).toLowerCase() }}
         </span>
       </p>

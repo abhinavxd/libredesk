@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <WidgetHeader title="Messages" />
+    <WidgetHeader :title="$t('globals.terms.message', 2)" />
 
     <!-- Messages List -->
     <div class="flex-1 overflow-y-auto">
@@ -11,7 +11,7 @@
     <!-- New conversation button -->
     <div class="p-4 border-border mx-auto" v-if="canStartNewConversation">
       <Button @click="startNewConversation">
-        {{ widgetStore.config?.users?.start_conversation_button_text || 'Start new conversation' }}
+        {{ widgetStore.config?.users?.start_conversation_button_text || $t('globals.messages.startNewConversation') }}
       </Button>
     </div>
   </div>

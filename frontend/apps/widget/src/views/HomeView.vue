@@ -38,6 +38,7 @@ import { Button } from '@shared-ui/components/ui/button'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from '@widget/store/user.js'
+import { useI18n } from 'vue-i18n'
 import HomeHeader from '@widget/components/HomeHeader.vue'
 import HomeExternalLinks from '@widget/components/HomeExternalLinks.vue'
 import RecentConversationCard from '@widget/components/RecentConversationCard.vue'
@@ -46,6 +47,7 @@ import CloseWidgetButton from '@widget/components/CloseWidgetButton.vue'
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const { t } = useI18n()
 const config = computed(() => widgetStore.config)
 
 const mostRecentConversation = computed(() => {
@@ -63,8 +65,8 @@ const canStartConversation = computed(() => {
 const startButtonText = computed(() => {
   const isVisitor = userStore.isVisitor
   return isVisitor
-    ? config.value.visitors?.start_conversation_button_text || 'Send us a message'
-    : config.value.users?.start_conversation_button_text || 'Send us a message'
+    ? config.value.visitors?.start_conversation_button_text || t('globals.messages.sendUsMessage')
+    : config.value.users?.start_conversation_button_text || t('globals.messages.sendUsMessage')
 })
 
 const startConversation = () => {

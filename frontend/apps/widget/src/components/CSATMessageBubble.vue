@@ -1,7 +1,7 @@
 <template>
   <div class="p-4 rounded-2xl text-sm bg-background text-foreground border border-border">
     <div v-if="!isSubmitted">
-      <p class="mb-3">Please rate this conversation:</p>
+      <p class="mb-3">{{ t('globals.messages.pleaseRateConversation') }}</p>
 
       <div class="flex gap-3 mb-4">
         <button
@@ -18,11 +18,11 @@
 
       <div class="mb-4">
         <label class="text-xs text-muted-foreground mb-2 block">
-          Additional feedback (optional)
+          {{ t('globals.messages.additionalFeedbackOptional') }}
         </label>
         <textarea
           v-model="feedback"
-          placeholder="Tell us more..."
+          :placeholder="$t('globals.placeholders.tellUsMore')"
           class="w-full p-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground"
           rows="2"
           maxlength="500"
@@ -36,13 +36,13 @@
         class="w-full py-2 bg-primary text-primary-foreground rounded-md text-sm disabled:opacity-50 flex items-center justify-center gap-2"
       >
         <div v-if="isSubmitting" class="w-4 h-4 border border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
-        <span v-if="isSubmitting">Submitting...</span>
-        <span v-else>Submit feedback</span>
+        <span v-if="isSubmitting">{{ t('globals.messages.submitting') }}</span>
+        <span v-else>{{ t('globals.messages.submitFeedback') }}</span>
       </button>
     </div>
 
     <div v-else class="text-center py-2">
-      <p class="mb-3">✅ Thank you for your feedback!</p>
+      <p class="mb-3">{{ t('globals.messages.thankYouFeedback') }}</p>
       
       <!-- Show submitted rating if provided -->
       <div v-if="csatMeta.submitted_rating" class="mb-2">
@@ -60,6 +60,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '@widget/api/index.js'
 
 const props = defineProps({
@@ -79,12 +80,14 @@ const csatMeta = computed(() => {
 const isSubmitted = computed(() => csatMeta.value.csat_submitted === true)
 const csatUuid = computed(() => csatMeta.value.csat_uuid || '')
 
+const { t } = useI18n()
+
 const ratings = [
-  { value: 1, emoji: '😢', text: 'Poor' },
-  { value: 2, emoji: '😕', text: 'Fair' },
-  { value: 3, emoji: '😊', text: 'Good' },
-  { value: 4, emoji: '😃', text: 'Great' },
-  { value: 5, emoji: '🤩', text: 'Excellent' }
+  { value: 1, emoji: '😢', text: t('globals.terms.poor') },
+  { value: 2, emoji: '😕', text: t('globals.terms.fair') },
+  { value: 3, emoji: '😊', text: t('globals.terms.good') },
+  { value: 4, emoji: '😃', text: t('globals.terms.great') },
+  { value: 5, emoji: '🤩', text: t('globals.terms.excellent') }
 ]
 
 const submitRating = async () => {

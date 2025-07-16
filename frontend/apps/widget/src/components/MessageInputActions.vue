@@ -28,7 +28,7 @@
         v-if="emojiEnabled"
         @click="toggleEmojiPicker"
         :class="{ 'bg-muted': isEmojiPickerVisible }"
-        title="Add emoji"
+        :title="$t('globals.messages.addEmoji')"
         variant="ghost"
         size="sm"
         class="h-8 w-8 p-0 hover:bg-muted/50 border-0"
