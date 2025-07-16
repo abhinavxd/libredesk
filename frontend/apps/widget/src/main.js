@@ -45,12 +45,22 @@ async function initWidget () {
         // Store widget config globally for access in App.vue
         app.config.globalProperties.$widgetConfig = widgetConfig
         app.mount('#app')
+        
+        // Signal to parent that Vue app is ready
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'VUE_APP_READY' }, '*')
+        }
     } catch (error) {
         console.error('Error initializing widget:', error)
         const app = createApp(App)
         const pinia = createPinia()
         app.use(pinia)
         app.mount('#app')
+        
+        // Signal to parent that Vue app is ready (even on error)
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'VUE_APP_READY' }, '*')
+        }
     }
 }
 

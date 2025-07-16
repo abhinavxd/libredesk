@@ -30,6 +30,7 @@
             this.unreadCount = 0;
             this.isMobile = window.innerWidth <= 600;
             this.isExpanded = false;
+            this.isVueAppReady = false;
             this.init();
         }
 
@@ -38,6 +39,8 @@
                 await this.fetchWidgetSettings();
                 this.createElements();
                 this.setLauncherPosition();
+                // Hide widget initially until Vue app is ready
+                this.widgetButtonWrapper.style.display = 'none';
                 this.iframe.addEventListener('load', () => {
                     setTimeout(() => {
                         this.sendMobileState();
@@ -93,17 +96,45 @@
                 transition: transform 0.3s ease;
             `;
 
-            // Create icon element
+            // Create icon element or arrow based on state
+            this.iconContainer = document.createElement('div');
+            this.iconContainer.style.cssText = `
+                width: 60%;
+                height: 60%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transition: transform 0.3s ease;
+            `;
+            
             if (launcher.logo_url) {
-                const icon = document.createElement('img');
-                icon.src = launcher.logo_url;
-                icon.style.cssText = `
-                    width: 60%;
-                    height: 60%;
+                this.defaultIcon = document.createElement('img');
+                this.defaultIcon.src = launcher.logo_url;
+                this.defaultIcon.style.cssText = `
+                    width: 100%;
+                    height: 100%;
                     filter: brightness(0) invert(1);
                 `;
-                this.toggleButton.appendChild(icon);
+                this.iconContainer.appendChild(this.defaultIcon);
             }
+            
+            // Create downward arrow SVG
+            this.arrowIcon = document.createElement('div');
+            this.arrowIcon.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 10L12 15L17 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            `;
+            this.arrowIcon.style.cssText = `
+                width: 100%;
+                height: 100%;
+                display: none;
+                justify-content: center;
+                align-items: center;
+            `;
+            this.iconContainer.appendChild(this.arrowIcon);
+            
+            this.toggleButton.appendChild(this.iconContainer);
 
             // Create unread badge
             this.unreadBadge = document.createElement('div');
@@ -190,7 +221,9 @@
             window.addEventListener('message', (event) => {
                 // Verify the message is from our iframe.
                 if (event.source === this.iframe.contentWindow) {
-                    if (event.data.type === 'CLOSE_WIDGET') {
+                    if (event.data.type === 'VUE_APP_READY') {
+                        this.handleVueAppReady();
+                    } else if (event.data.type === 'CLOSE_WIDGET') {
                         this.hideChat();
                     } else if (event.data.type === 'UPDATE_UNREAD_COUNT') {
                         this.updateUnreadCount(event.data.count);
@@ -216,6 +249,12 @@
                     this.showChat();
                 }
             });
+        }
+
+        handleVueAppReady () {
+            this.isVueAppReady = true;
+            // Show the widget button now that Vue app is ready
+            this.widgetButtonWrapper.style.display = '';
         }
 
         toggle () {
@@ -266,6 +305,10 @@
                 this.isChatVisible = true;
                 this.toggleButton.style.transform = 'scale(0.9)';
                 this.unreadBadge.style.display = 'none';
+                
+                // Switch to arrow icon
+                if (this.defaultIcon) this.defaultIcon.style.display = 'none';
+                this.arrowIcon.style.display = 'flex';
             }
         }
 
@@ -276,6 +319,10 @@
                 this.isExpanded = false;
                 this.toggleButton.style.transform = 'scale(1)';
                 this.widgetButtonWrapper.style.display = '';
+                
+                // Switch back to default icon
+                if (this.defaultIcon) this.defaultIcon.style.display = 'block';
+                this.arrowIcon.style.display = 'none';
             }
         }
 
