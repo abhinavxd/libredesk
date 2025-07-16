@@ -7,6 +7,7 @@ export const useWidgetStore = defineStore('widget', () => {
     const currentView = ref('home')
     const config = ref({})
     const isInChatView = ref(false)
+    const isMobileFullScreen = ref(false)
 
 
     // Getters
@@ -49,12 +50,17 @@ export const useWidgetStore = defineStore('widget', () => {
         config.value = { ...newConfig }
     }
 
+    const setMobileFullScreen = (isMobile) => {
+        isMobileFullScreen.value = isMobile
+    }
+
     return {
         // State
         isOpen,
         currentView,
         config,
         isInChatView,
+        isMobileFullScreen,
 
         // Getters
         isHomeView,
@@ -69,5 +75,6 @@ export const useWidgetStore = defineStore('widget', () => {
         navigateToMessages,
         navigateToHome,
         updateConfig,
+        setMobileFullScreen,
     }
 })

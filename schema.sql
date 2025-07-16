@@ -151,8 +151,12 @@ CREATE TABLE users (
     CONSTRAINT constraint_users_on_first_name CHECK (LENGTH(first_name) <= 140),
     CONSTRAINT constraint_users_on_last_name CHECK (LENGTH(last_name) <= 140)
 );
-CREATE UNIQUE INDEX index_unique_users_on_email_and_type_when_deleted_at_is_null ON users (email, type)
-WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_contact
+       ON users(email)
+       WHERE type = 'contact' AND deleted_at IS NULL;
+CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
+       ON users(email)
+       WHERE type = 'agent' AND deleted_at IS NULL;
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
 

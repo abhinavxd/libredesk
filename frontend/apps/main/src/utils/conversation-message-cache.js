@@ -1,6 +1,8 @@
 export default class MessageCache {
     /**
      * Cache for conversation messages with eviction of old conversations
+     * NOTE- This is not reactive, check implementation in `widget/store/chat.js` to see how this is made reactive.
+     * 
      * @param {number} maxConvs - Max conversations to store before eviction
      */
     constructor(maxConvs = 100) {
@@ -126,6 +128,20 @@ export default class MessageCache {
         conv.pages.forEach(msgs => {
             const msg = msgs.find(m => m.uuid === msgId)
             if (msg) msg[field] = value
+        })
+    }
+
+    /**
+     * Removes a message from the cache
+     */
+    removeMessage (convId, msgId) {
+        const conv = this.cache.get(convId)
+        if (!conv) return
+        conv.pages.forEach(msgs => {
+            const msgIndex = msgs.findIndex(m => m.uuid === msgId)
+            if (msgIndex !== -1) {
+                msgs.splice(msgIndex, 1)
+            }
         })
     }
 

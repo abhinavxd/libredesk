@@ -6,11 +6,21 @@ export const createFormSchema = (t) => z.object({
   csat_enabled: z.boolean(),
   config: z.object({
     brand_name: z.string().min(1, { message: t('globals.messages.required') }),
-    logo_url: z.string().url({ message: t('globals.messages.invalidUrl') }).optional().or(z.literal('')),
+    dark_mode: z.boolean(),
+    language: z.string().min(1, { message: t('globals.messages.required') }),
+    logo_url: z.string().url({
+      message: t('globals.messages.invalid', {
+        name: t('globals.terms.url').toLowerCase()
+      })
+    }).optional().or(z.literal('')),
     secret_key: z.string().optional(),
     launcher: z.object({
       position: z.enum(['left', 'right']),
-      logo_url: z.string().url({ message: t('globals.messages.invalidUrl') }).optional().or(z.literal('')),
+      logo_url: z.string().url({
+        message: t('globals.messages.invalid', {
+          name: t('globals.terms.url').toLowerCase()
+        })
+      }).optional().or(z.literal('')),
       spacing: z.object({
         side: z.number().min(0),
         bottom: z.number().min(0),
@@ -39,7 +49,11 @@ export const createFormSchema = (t) => z.object({
     trusted_domains: z.string().optional(),
     external_links: z.array(z.object({
       text: z.string().min(1),
-      url: z.string().url({ message: t('globals.messages.invalidUrl') })
+      url: z.string().url({
+        message: t('globals.messages.invalid', {
+          name: t('globals.terms.url').toLowerCase()
+        })
+      })
     })),
     visitors: z.object({
       start_conversation_button_text: z.string(),

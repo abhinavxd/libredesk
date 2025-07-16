@@ -5,6 +5,7 @@ import { handleHTTPError } from '../utils/http'
 import { computeRecipientsFromMessage } from '../utils/email-recipients'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
+import { subscribeToConversation, sendTypingIndicator } from '@main/websocket'
 import MessageCache from '../utils/conversation-message-cache'
 import api from '../api'
 
@@ -101,7 +102,8 @@ export const useConversationStore = defineStore('conversation', () => {
     data: null,
     participants: {},
     loading: false,
-    errorMessage: ''
+    errorMessage: '',
+    isTyping: false
   })
 
   const messages = reactive({
@@ -242,6 +244,15 @@ export const useConversationStore = defineStore('conversation', () => {
     const conv = conversation.data
     const msgData = messages.data
     const inboxEmail = conv?.inbox_mail
+
+    // If the conversation is a live chat, reset recipients.
+    if (conv?.inbox_channel === 'livechat') {
+      currentTo.value = []
+      currentCC.value = []
+      currentBCC.value = []
+      return
+    }
+
     if (!conv || !msgData || !inboxEmail) return
 
     const latestMessage = msgData.getLatestMessage(conv.uuid, ['incoming', 'outgoing'], true)
@@ -284,6 +295,8 @@ export const useConversationStore = defineStore('conversation', () => {
     try {
       const resp = await api.getConversation(uuid)
       conversation.data = resp.data.data
+      // Do a websocket subscription to the conversation.
+      subscribeToConversation(uuid)
     } catch (error) {
       conversation.errorMessage = handleHTTPError(error).message
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -643,22 +656,11 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  function resetCurrentConversation () {
-    Object.assign(conversation, {
-      data: null,
-      participants: {},
-      macro: {},
-      loading: false,
-      errorMessage: ''
-    })
-  }
-
   function resetConversations () {
     conversations.data = []
     conversations.page = 1
     seenConversationUUIDs = new Map()
   }
-
 
   /** Macros set for new conversation or an open conversation **/
   async function setMacro (macro, context) {
@@ -676,6 +678,22 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function resetMacro (context) {
     macros.value = { ...macros.value, [context]: {} }
+  }
+
+  // Typing indicators
+  function updateTypingStatus (typingData) {
+    const { conversation_uuid, is_typing } = typingData
+
+    // Only update typing status for the current conversation
+    if (conversation.data?.uuid !== conversation_uuid) return
+
+    conversation.isTyping = is_typing
+  }
+
+  function sendTyping (isTyping) {
+    if (conversation.data?.uuid) {
+      sendTypingIndicator(conversation.data.uuid, isTyping)
+    }
   }
 
   return {
@@ -710,7 +728,6 @@ export const useConversationStore = defineStore('conversation', () => {
     updatePriority,
     updateStatus,
     updateConversationList,
-    resetCurrentConversation,
     fetchFirstPageConversations,
     fetchStatuses,
     fetchPriorities,
@@ -727,6 +744,8 @@ export const useConversationStore = defineStore('conversation', () => {
     priorities,
     priorityOptions,
     statusOptionsNoSnooze,
-    statusOptions
+    statusOptions,
+    updateTypingStatus,
+    sendTyping
   }
 })

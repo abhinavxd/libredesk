@@ -115,7 +115,7 @@ func (u *Manager) VerifyPassword(email string, password []byte) (models.User, er
 		u.lo.Error("error fetching user from db", "error", err)
 		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
 	}
-	if err := u.verifyPassword(password, user.Password); err != nil {
+	if err := u.verifyPassword(password, user.Password.String); err != nil {
 		return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 	}
 	return user, nil
@@ -151,6 +151,10 @@ func (u *Manager) GetAllUsers(page, pageSize int, userType, order, orderBy strin
 
 // Get retrieves an user by ID or email.
 func (u *Manager) Get(id int, email, type_ string) (models.User, error) {
+	if id == 0 && email == "" {
+		return models.User{}, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.user}"), nil)
+	}
+
 	var user models.User
 	if err := u.q.GetUser.Get(&user, id, email, type_); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

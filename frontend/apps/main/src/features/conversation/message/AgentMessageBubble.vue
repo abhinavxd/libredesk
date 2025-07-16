@@ -32,6 +32,9 @@
             :class="{ 'mb-3': message.attachments.length > 0 }"
           />
 
+          <!-- CSAT Response Display -->
+          <CSATResponseDisplay :message="message" />
+
           <!-- Attachments -->
           <MessageAttachmentPreview :attachments="nonInlineAttachments" />
 
@@ -88,6 +91,7 @@ import { Spinner } from '@shared-ui/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import MessageAttachmentPreview from '@/features/conversation/message/attachment/MessageAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'
+import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '../../../api'
 
 const props = defineProps({

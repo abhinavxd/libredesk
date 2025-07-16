@@ -10,17 +10,17 @@
           <ChatView v-else />
         </TabsContent>
       </div>
-      <TabsList class="grid grid-cols-2 border-t w-full h-10 bg-background">
-        <TabsTrigger value="home" class="flex-col gap-1 px-4 !shadow-none">
+      <TabsList class="grid grid-cols-2 border-t rounded-none">
+        <TabsTrigger value="home" class="flex gap-1">
           <Home class="w-5 h-5" />
           <span class="text-xs">Home</span>
         </TabsTrigger>
-        <TabsTrigger value="messages" class="flex-col gap-1 px-4 !shadow-none">
+        <TabsTrigger value="messages" class="flex gap-1">
           <MessageCircle class="w-5 h-5" />
           <span class="text-xs">Messages</span>
         </TabsTrigger>
       </TabsList>
-      <div class="py-2 text-center">
+      <div class="text-center flex items-center justify-center py-1">
         <span class="text-[10px] text-muted-foreground"
           >Powered by <a href="https://libredesk.io" target="_blank">Libredesk</a></span
         >

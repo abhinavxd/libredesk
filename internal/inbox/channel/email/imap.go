@@ -340,6 +340,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return fmt.Errorf("marshalling meta: %w", err)
 	}
 	incomingMsg := models.IncomingMessage{
+		Channel: ChannelEmail,
 		Message: models.Message{
 			Channel:    e.Channel(),
 			SenderType: models.SenderTypeContact,

@@ -97,6 +97,23 @@ func auth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		var app = r.Context.(*App)
 
+		// For media uploads, check if signature is provided in the query parameters, if so, verify it.
+		path := string(r.RequestCtx.Path())
+		if strings.HasPrefix(path, "/uploads/") {
+			signature := string(r.RequestCtx.QueryArgs().Peek("signature"))
+			expires := string(r.RequestCtx.QueryArgs().Peek("expires"))
+
+			if signature != "" && expires != "" {
+				if err := app.media.VerifySignature(r); err != nil {
+					app.lo.Error("error verifying media signature", "error",
+						err, "path", string(r.RequestCtx.Path()), "query", string(r.RequestCtx.QueryArgs().QueryString()))
+					return r.SendErrorEnvelope(http.StatusUnauthorized, "signature verification failed", nil, envelope.PermissionError)
+				}
+				return handler(r)
+			}
+			// If no signature, continue with normal authentication.
+		}
+
 		// Authenticate user using shared authentication logic
 		user, err := authenticateUser(r, app)
 		if err != nil {

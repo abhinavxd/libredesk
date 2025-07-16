@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"net/mail"
 	"strconv"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -169,5 +171,17 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 	if inbox.Channel == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "channel"), nil)
 	}
+
+	// Validate livechat-specific configuration
+	if inbox.Channel == livechat.ChannelLiveChat {
+		var config livechat.Config
+		if err := json.Unmarshal(inbox.Config, &config); err == nil {
+			// ShowOfficeHoursAfterAssignment cannot be enabled if ShowOfficeHoursInChat is disabled
+			if config.ShowOfficeHoursAfterAssignment && !config.ShowOfficeHoursInChat {
+				return envelope.NewError(envelope.InputError, "`show_office_hours_after_assignment` cannot be enabled when `show_office_hours_in_chat` is disabled", nil)
+			}
+		}
+	}
+
 	return nil
 }

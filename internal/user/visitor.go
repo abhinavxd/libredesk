@@ -11,12 +11,6 @@ import (
 
 // CreateVisitor creates a new visitor user.
 func (u *Manager) CreateVisitor(user *models.User) error {
-	password, err := u.generatePassword()
-	if err != nil {
-		u.lo.Error("generating password", "error", err)
-		return fmt.Errorf("generating password: %w", err)
-	}
-
 	// Normalize email address.
 	user.Email = null.NewString(strings.ToLower(user.Email.String), user.Email.Valid)
 
@@ -25,7 +19,7 @@ func (u *Manager) CreateVisitor(user *models.User) error {
 		user.FirstName = h.Haikunate()
 	}
 
-	if err := u.q.InsertVisitor.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL).Scan(&user.ID); err != nil {
+	if err := u.q.InsertVisitor.Get(user, user.Email, user.FirstName, user.LastName); err != nil {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
 	}

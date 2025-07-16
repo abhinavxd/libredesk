@@ -1,6 +1,6 @@
-import { useChatStore } from './store/chat'
-
 // Widget WebSocket message types (matching backend constants)
+import { useChatStore } from './store/chat.js'
+
 export const WS_EVENT = {
   JOIN: 'join',
   MESSAGE: 'message',
@@ -23,13 +23,14 @@ export class WidgetWebSocketClient {
     this.manualClose = false
     this.pingInterval = null
     this.lastPong = Date.now()
-    this.chatStore = useChatStore()
     this.jwt = null
-    this.isJoined = false
+    this.inboxId = null
   }
 
-  init (jwt) {
+  init (jwt, inboxId) {
+    this.manualClose = false
     this.jwt = jwt
+    this.inboxId = inboxId
     this.connect()
     this.setupNetworkListeners()
   }
@@ -50,44 +51,48 @@ export class WidgetWebSocketClient {
   }
 
   handleOpen () {
-    console.log('Widget WebSocket connected')
     this.reconnectInterval = 1000
+    const wasReconnecting = this.reconnectAttempts > 0
     this.reconnectAttempts = 0
     this.isReconnecting = false
     this.lastPong = Date.now()
     this.setupPing()
 
-    // Auto-join conversation after connection if a conversation uuid is set.
-    if (this.chatStore.currentConversation.uuid && this.jwt && !this.isJoined) {
-      this.joinConversation()
+    // Auto-join inbox after connection if inbox_id is set.
+    if (this.inboxId && this.jwt) {
+      this.joinInbox()
+    }
+
+    // If this was a reconnection, sync current conversation messages
+    if (wasReconnecting) {
+      this.resyncCurrentConversation()
     }
   }
 
   handleMessage (event) {
+    const chatStore = useChatStore()
     try {
       if (!event.data) return
       const data = JSON.parse(event.data)
       const handlers = {
         [WS_EVENT.JOINED]: () => {
-          this.isJoined = true
+          // Joined inbox.
         },
         [WS_EVENT.PONG]: () => {
           this.lastPong = Date.now()
         },
         [WS_EVENT.NEW_MESSAGE]: () => {
-          // Add new message to chat store
           if (data.data) {
-            this.chatStore.addMessageToConversation(data.data.conversation_uuid, data.data)
+            chatStore.addMessageToConversation(data.data.conversation_uuid, data.data)
           }
         },
         [WS_EVENT.ERROR]: () => {
           console.error('Widget WebSocket error:', data.data)
         },
         [WS_EVENT.TYPING]: () => {
-          // TODO: check conversation uuid and then set typing as true.
-          // if (data.data && data.data.is_typing !== undefined) {
-          //   this.chatStore.setTypingStatus(data.data.is_typing)
-          // }
+          if (data.data && data.data.is_typing !== undefined) {
+            chatStore.setTypingStatus(data.data.conversation_uuid, data.data.is_typing)
+          }
         }
       }
       const handler = handlers[data.type]
@@ -108,7 +113,6 @@ export class WidgetWebSocketClient {
 
   handleClose () {
     this.clearPing()
-    this.isJoined = false
     if (!this.manualClose) {
       this.reconnect()
     }
@@ -169,10 +173,9 @@ export class WidgetWebSocketClient {
     }
   }
 
-  joinConversation () {
-    const currentConversationUuid = this.chatStore.currentConversation.uuid
-    if (!currentConversationUuid || !this.jwt) {
-      console.error('Cannot join conversation: missing conversationUuid or JWT')
+  joinInbox () {
+    if (!this.inboxId || !this.jwt) {
+      console.error('Cannot join inbox: missing inbox_id or JWT')
       return
     }
 
@@ -180,29 +183,31 @@ export class WidgetWebSocketClient {
       type: WS_EVENT.JOIN,
       jwt: this.jwt,
       data: {
-        conversation_uuid: currentConversationUuid
+        inbox_id: parseInt(this.inboxId, 10)
       }
     }
 
     this.send(joinMessage)
   }
 
-  sendTyping (isTyping = true) {
-    if (!this.isJoined) {
-      console.warn('Cannot send typing indicator: not joined to conversation')
-      return
+  // Resync current conversation after reconnection to catch any missed messages.
+  resyncCurrentConversation () {
+    const chatStore = useChatStore()
+    const currentConversationUUID = chatStore.currentConversation?.uuid
+    if (currentConversationUUID) {
+      chatStore.loadConversation(currentConversationUUID)
     }
+  }
 
-    const currentConversationUUID = this.chatStore.currentConversation.uuid
+  sendTyping (isTyping = true, conversationUUID = null) {
     const typingMessage = {
       type: WS_EVENT.TYPING,
       jwt: this.jwt,
       data: {
-        conversation_uuid: currentConversationUUID,
+        conversation_uuid: conversationUUID,
         is_typing: isTyping
       }
     }
-
     this.send(typingMessage)
   }
 
@@ -214,19 +219,8 @@ export class WidgetWebSocketClient {
     }
   }
 
-  // Method to join a new conversation without reinitializing the connection
-  joinNewConversation () {
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.isJoined = false
-      this.joinConversation()
-    } else {
-      console.warn('WebSocket not connected, cannot join new conversation')
-    }
-  }
-
   close () {
     this.manualClose = true
-    this.isJoined = false
     this.clearPing()
     if (this.socket) {
       this.socket.close()
@@ -236,26 +230,25 @@ export class WidgetWebSocketClient {
 
 let widgetWSClient
 
-export function initWidgetWS (jwt) {
+export function initWidgetWS (jwt, inboxId) {
   if (!widgetWSClient) {
     widgetWSClient = new WidgetWebSocketClient()
-    widgetWSClient.init(jwt)
+    widgetWSClient.init(jwt, inboxId)
   } else {
-    // Update JWT and rejoin if connection exists
+    // Update JWT and inbox_id and rejoin if connection exists
     widgetWSClient.jwt = jwt
+    widgetWSClient.inboxId = inboxId
     if (widgetWSClient.socket?.readyState === WebSocket.OPEN) {
-      // Reset joined status and join the new conversation
-      widgetWSClient.isJoined = false
-      widgetWSClient.joinConversation()
+      widgetWSClient.joinInbox()
     } else {
       // If connection is not open, reconnect
-      widgetWSClient.init(jwt)
+      widgetWSClient.init(jwt, inboxId)
     }
   }
   return widgetWSClient
 }
 
 export const sendWidgetMessage = message => widgetWSClient?.send(message)
-export const sendWidgetTyping = (isTyping = true) => widgetWSClient?.sendTyping(isTyping)
+export const sendWidgetTyping = (isTyping = true, conversationUUID = null) => widgetWSClient?.sendTyping(isTyping, conversationUUID)
 export const closeWidgetWebSocket = () => widgetWSClient?.close()
-export const joinNewConversation = () => widgetWSClient?.joinNewConversation()
+export const reOpenWidgetWebSocket = () => widgetWSClient?.reOpen()

@@ -1,12 +1,8 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -14,24 +10,16 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	bhmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
-)
-
-const (
-	// TODO: Can have a global route that serves media files with a signature and expiry.
-	// Or use the same existing `/uploads`
-	chatWidgetMediaURL = "/api/v1/widget/media/%s?signature=%s&expires=%d"
 )
 
 type onlyJWT struct {
@@ -57,13 +45,66 @@ type chatInitReq struct {
 }
 
 type conversationResp struct {
-	Conversation models.ChatConversation `json:"conversation"`
-	Messages     []models.ChatMessage    `json:"messages"`
+	Conversation cmodels.ChatConversation `json:"conversation"`
+	Messages     []cmodels.ChatMessage    `json:"messages"`
 }
 
 type chatMessageReq struct {
 	Message string `json:"message"`
 	onlyJWT
+}
+
+type chatSettingsResponse struct {
+	livechat.Config
+	BusinessHours          []bhmodels.BusinessHours `json:"business_hours,omitempty"`
+	DefaultBusinessHoursID int                      `json:"default_business_hours_id,omitempty"`
+}
+
+// conversationResponseWithBusinessHours includes business hours info for the widget
+type conversationResponseWithBusinessHours struct {
+	conversationResp
+	BusinessHoursID       *int `json:"business_hours_id,omitempty"`
+	WorkingHoursUTCOffset *int `json:"working_hours_utc_offset,omitempty"`
+}
+
+//	TODO: live chat widget can have a different language setting than the main app, handle this.
+//
+// handleGetChatLauncherSettings returns the live chat launcher settings for the widget
+func handleGetChatLauncherSettings(r *fastglue.Request) error {
+	var (
+		app     = r.Context.(*App)
+		inboxID = r.RequestCtx.QueryArgs().GetUintOrZero("inbox_id")
+	)
+
+	if inboxID <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+	}
+
+	// Get inbox configuration
+	inbox, err := app.inbox.GetDBRecord(inboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox", "inbox_id", inboxID, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.NotFoundError)
+	}
+
+	if inbox.Channel != livechat.ChannelLiveChat {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+	}
+
+	if !inbox.Enabled {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+	}
+
+	var config livechat.Config
+	if err := json.Unmarshal(inbox.Config, &config); err != nil {
+		app.lo.Error("error parsing live chat config", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+	}
+
+	return r.SendEnvelope(map[string]any{
+		"launcher": config.Launcher,
+		"colors":   config.Colors,
+	})
 }
 
 // handleGetChatSettings returns the live chat settings for the widget
@@ -98,7 +139,35 @@ func handleGetChatSettings(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
 
-	return r.SendEnvelope(config)
+	// Get business hours data if office hours feature is enabled.
+	response := chatSettingsResponse{
+		Config: config,
+	}
+
+	if config.ShowOfficeHoursInChat {
+		// Get all business hours.
+		businessHours, err := app.businessHours.GetAll()
+		if err != nil {
+			app.lo.Error("error fetching business hours", "error", err)
+		} else {
+			response.BusinessHours = businessHours
+		}
+
+		// Get default business hours ID from general settings which is the default / fallback.
+		out, err := app.setting.GetByPrefix("app")
+		if err != nil {
+			app.lo.Error("error fetching general settings", "error", err)
+		} else {
+			var settings map[string]any
+			if err := json.Unmarshal(out, &settings); err == nil {
+				if bhID, ok := settings["app.business_hours_id"].(string); ok {
+					response.DefaultBusinessHoursID, _ = strconv.Atoi(bhID)
+				}
+			}
+		}
+	}
+
+	return r.SendEnvelope(response)
 }
 
 // handleChatInit initializes a new chat session.
@@ -128,7 +197,6 @@ func handleChatInit(r *fastglue.Request) error {
 	if !inbox.Enabled {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
 	}
-
 	if inbox.Channel != livechat.ChannelLiveChat {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
 	}
@@ -139,11 +207,11 @@ func handleChatInit(r *fastglue.Request) error {
 		app.lo.Error("error parsing live chat config", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
-
-	var contactID int
-	var conversationUUID string
-	var isVisitor bool
-
+	var (
+		contactID        int
+		conversationUUID string
+		isVisitor        bool
+	)
 	// Handle authenticated user
 	if req.JWT != "" {
 		claims, err := verifyStandardJWT(req.JWT)
@@ -174,6 +242,36 @@ func handleChatInit(r *fastglue.Request) error {
 		}
 	}
 
+	// Check conversation permissions based on user type.
+	userConfig := config.Visitors
+	if !isVisitor {
+		userConfig = config.Users
+	}
+
+	if !userConfig.AllowStartConversation {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("globals.messages.notAllowed}"), nil, envelope.PermissionError)
+	}
+
+	if userConfig.PreventMultipleConversations {
+		conversations, err := app.conversation.GetContactChatConversations(contactID)
+		if err != nil {
+			userType := "visitor"
+			if !isVisitor {
+				userType = "user"
+			}
+			app.lo.Error("error fetching "+userType+" conversations", "contact_id", contactID, "error", err)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
+		}
+		if len(conversations) > 0 {
+			userType := "visitor"
+			if !isVisitor {
+				userType = "user"
+			}
+			app.lo.Info(userType+" attempted to start new conversation but already has one", "contact_id", contactID, "conversations_count", len(conversations))
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("globals.messages.notAllowed}"), nil, envelope.PermissionError)
+		}
+	}
+
 	app.lo.Info("creating new live chat conversation for user", "user_id", contactID, "inbox_id", req.InboxID, "is_visitor", isVisitor)
 
 	// Create conversation.
@@ -191,14 +289,14 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 
 	// Insert initial message.
-	message := models.Message{
+	message := cmodels.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         contactID,
-		Type:             models.MessageIncoming,
-		SenderType:       models.SenderTypeContact,
-		Status:           models.MessageStatusReceived,
+		Type:             cmodels.MessageIncoming,
+		SenderType:       cmodels.SenderTypeContact,
+		Status:           cmodels.MessageStatusReceived,
 		Content:          req.Message,
-		ContentType:      models.ContentTypeText,
+		ContentType:      cmodels.ContentTypeText,
 		Private:          false,
 	}
 	if err := app.conversation.InsertMessage(&message); err != nil {
@@ -211,6 +309,11 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
 	}
 
+	// Process post-message hooks for the new conversation and initial message.
+	if err := app.conversation.ProcessIncomingMessageHooks(conversationUUID, true); err != nil {
+		app.lo.Error("error processing incoming message hooks for initial message", "conversation_uuid", conversationUUID, "error", err)
+	}
+
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
 	if err != nil {
 		app.lo.Error("error fetching created conversation", "conversation_uuid", conversationUUID, "error", err)
@@ -218,15 +321,17 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 
 	// Build response with conversation and messages.
-	resp, err := buildConversationResponse(app, conversation)
+	resp, err := buildConversationResponseWithBusinessHours(app, conversation)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
 	return r.SendEnvelope(map[string]any{
-		"conversation": resp.Conversation,
-		"messages":     resp.Messages,
-		"jwt":          req.JWT,
+		"conversation":             resp.Conversation,
+		"messages":                 resp.Messages,
+		"business_hours_id":        resp.BusinessHoursID,
+		"working_hours_utc_offset": resp.WorkingHoursUTCOffset,
+		"jwt":                      req.JWT,
 	})
 }
 
@@ -323,7 +428,7 @@ func handleChatGetConversation(r *fastglue.Request) error {
 	}
 
 	// Build conversation response with messages and attachments.
-	resp, err := buildConversationResponse(app, conversation)
+	resp, err := buildConversationResponseWithBusinessHours(app, conversation)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -366,7 +471,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 		app              = r.Context.(*App)
 		conversationUUID = r.RequestCtx.UserValue("uuid").(string)
 		req              = chatMessageReq{}
-		senderType       = models.SenderTypeContact
+		senderType       = cmodels.SenderTypeContact
 		senderID         = 0
 	)
 
@@ -385,6 +490,13 @@ func handleChatSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 	senderID = claims.UserID
+
+	// Fetch sender.
+	sender, err := app.user.Get(senderID, "", "")
+	if err != nil {
+		app.lo.Error("error fetching sender user", "sender_id", senderID, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+	}
 
 	// Fetch conversation to ensure it exists.
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
@@ -408,31 +520,57 @@ func handleChatSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
 	}
 
-	// Insert message.
-	message := models.Message{
+	// Insert incoming message and run post processing hooks.
+	message := cmodels.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
-		Type:             models.MessageIncoming,
+		Type:             cmodels.MessageIncoming,
 		SenderType:       senderType,
-		Status:           models.MessageStatusReceived,
+		Status:           cmodels.MessageStatusReceived,
 		Content:          req.Message,
-		ContentType:      models.ContentTypeText,
+		ContentType:      cmodels.ContentTypeText,
 		Private:          false,
 	}
-
-	if err := app.conversation.InsertMessage(&message); err != nil {
-		app.lo.Error("error inserting chat message", "error", err)
+	if message, err = app.conversation.ProcessIncomingMessage(cmodels.IncomingMessage{
+		Channel: livechat.ChannelLiveChat,
+		Message: message,
+		Contact: sender,
+		InboxID: inbox.ID,
+	}); err != nil {
+		app.lo.Error("error processing incoming message", "conversation_uuid", conversationUUID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
 	}
 
-	return r.SendEnvelope(map[string]bool{"success": true})
+	// Fetch just inserted message to return.
+	message, err = app.conversation.GetMessage(message.UUID)
+	if err != nil {
+		app.lo.Error("error fetching inserted message", "message_uuid", message.UUID, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+	}
+
+	return r.SendEnvelope(cmodels.ChatMessage{
+		UUID:             message.UUID,
+		CreatedAt:        message.CreatedAt,
+		Content:          message.Content,
+		TextContent:      message.TextContent,
+		ConversationUUID: message.ConversationUUID,
+		Status:           message.Status,
+		Author: umodels.ChatUser{
+			ID:                 sender.ID,
+			FirstName:          sender.FirstName,
+			LastName:           sender.LastName,
+			AvatarURL:          sender.AvatarURL,
+			AvailabilityStatus: sender.AvailabilityStatus,
+			Type:               sender.Type,
+		},
+		Attachments: message.Attachments,
+	})
 }
 
 // handleWidgetMediaUpload handles media uploads for the widget.
 func handleWidgetMediaUpload(r *fastglue.Request) error {
 	var (
 		app      = r.Context.(*App)
-		cleanUp  = false
 		senderID = 0
 	)
 
@@ -466,14 +604,12 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	// Set sender ID from JWT claims.
 	senderID = claims.UserID
 
-	// Verify conversation exists and user has access
+	// Make sure the conversation belongs to the sender
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
 	}
-
-	// Make sure the conversation belongs to the sender
 	if conversation.ContactID != senderID {
 		app.lo.Error("access denied: user attempted to access conversation owned by different contact", "conversation_uuid", conversationUUID, "requesting_contact_id", senderID, "conversation_owner_id", conversation.ContactID)
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
@@ -535,130 +671,65 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileTypeNotAllowed"), nil, envelope.InputError)
 	}
 
-	// Delete files on any error.
-	var uuid = uuid.New()
-	thumbName := thumbPrefix + uuid.String()
-	defer func() {
-		if cleanUp {
-			app.media.Delete(uuid.String())
-			app.media.Delete(thumbName)
-		}
-	}()
-
-	// Generate and upload thumbnail and store image dimensions in the media meta.
-	var meta = []byte("{}")
-	if slices.Contains(image.Exts, srcExt) {
-		file.Seek(0, 0)
-		thumbFile, err := image.CreateThumb(image.DefThumbSize, file)
-		if err != nil {
-			app.lo.Error("error creating thumb image", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.thumbnail}"), nil, envelope.GeneralError)
-		}
-		thumbName, err = app.media.Upload(thumbName, srcContentType, thumbFile)
-		if err != nil {
-			return sendErrorEnvelope(r, err)
-		}
-
-		// Store image dimensions in media meta, storing dimensions for image previews in future.
-		file.Seek(0, 0)
-		width, height, err := image.GetDimensions(file)
-		if err != nil {
-			cleanUp = true
-			app.lo.Error("error getting image dimensions", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorUploading", "name", "{globals.terms.media}"), nil, envelope.GeneralError)
-		}
-		meta, _ = json.Marshal(map[string]any{
-			"width":  width,
-			"height": height,
-		})
-	}
-
+	// Read file content into byte slice
 	file.Seek(0, 0)
-	_, err = app.media.Upload(uuid.String(), srcContentType, file)
-	if err != nil {
-		cleanUp = true
-		app.lo.Error("error uploading file", "error", err)
-		return sendErrorEnvelope(r, err)
+	fileContent := make([]byte, srcFileSize)
+	if _, err := file.Read(fileContent); err != nil {
+		app.lo.Error("error reading file content", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.terms.file}"), nil, envelope.GeneralError)
 	}
 
-	// Insert message with empty content and after insert link the media to the message.
-	message := models.Message{
+	// Get sender user for ProcessIncomingMessage
+	sender, err := app.user.Get(senderID, "", "")
+	if err != nil {
+		app.lo.Error("error fetching sender user", "sender_id", senderID, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+	}
+
+	// Create message with attachment using existing infrastructure
+	message := cmodels.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
-		Type:             models.MessageIncoming,
-		SenderType:       models.SenderTypeContact,
-		Status:           models.MessageStatusReceived,
+		Type:             cmodels.MessageIncoming,
+		SenderType:       cmodels.SenderTypeContact,
+		Status:           cmodels.MessageStatusReceived,
 		Content:          "",
-		ContentType:      models.ContentTypeText,
+		ContentType:      cmodels.ContentTypeText,
 		Private:          false,
-	}
-	if err := app.conversation.InsertMessage(&message); err != nil {
-		cleanUp = true
-		app.lo.Error("error inserting message", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+		Attachments: attachment.Attachments{
+			{
+				Name:        srcFileName,
+				ContentType: srcContentType,
+				Size:        int(srcFileSize),
+				Content:     fileContent,
+				Disposition: attachment.DispositionAttachment,
+			},
+		},
 	}
 
-	// Insert media linked to the just inserted message.
-	media, err := app.media.Insert(null.StringFrom(attachment.DispositionAttachment), srcFileName, srcContentType, "" /**content_id**/, null.NewString("messages", true), uuid.String(), null.NewInt(message.ID, true), int(srcFileSize), meta)
+	// Process the incoming message with attachment.
+	if message, err = app.conversation.ProcessIncomingMessage(cmodels.IncomingMessage{
+		Channel: livechat.ChannelLiveChat,
+		Message: message,
+		Contact: sender,
+		InboxID: inbox.ID,
+	}); err != nil {
+		app.lo.Error("error processing incoming message with attachment", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+	}
+
+	// Fetch the inserted message to get the media information.
+	insertedMessage, err := app.conversation.GetMessage(message.UUID)
 	if err != nil {
-		cleanUp = true
-		app.lo.Error("error inserting metadata into database", "error", err)
-		return sendErrorEnvelope(r, err)
+		app.lo.Error("error fetching inserted message", "message_uuid", message.UUID, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
 	}
 
-	return r.SendEnvelope(media)
-}
-
-// handleWidgetServeMedia serves media files for the widget
-func handleWidgetServeMedia(r *fastglue.Request) error {
-	var (
-		app        = r.Context.(*App)
-		uuid       = r.RequestCtx.UserValue("uuid").(string)
-		signature  = string(r.RequestCtx.QueryArgs().Peek("signature"))
-		expiresStr = string(r.RequestCtx.QueryArgs().Peek("expires"))
-	)
-
-	if uuid == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "uuid"), nil, envelope.InputError)
-	}
-
-	if signature == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Signature missing", nil, envelope.InputError)
-	}
-
-	if expiresStr == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Expiry missing", nil, envelope.InputError)
-	}
-
-	expires, err := strconv.ParseInt(expiresStr, 10, 64)
-	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid expiry", nil, envelope.InputError)
-	}
-
-	// Verify signature and expiration.
-	expiresAt := time.Unix(expires, 0)
-	if !VerifySignedURL(uuid, signature, expiresAt, getJWTSecret()) {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Get media DB record.
-	_, err = app.media.Get(0, uuid)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-
-	consts := app.consts.Load().(*constants)
-	switch consts.UploadProvider {
-	case "fs":
-		fasthttp.ServeFile(r.RequestCtx, filepath.Join(ko.String("upload.fs.upload_path"), uuid))
-	case "s3":
-		r.RequestCtx.Redirect(app.media.GetURL(uuid), http.StatusFound)
-	}
-	return nil
+	return r.SendEnvelope(insertedMessage)
 }
 
 // buildConversationResponse builds the response for a conversation including its messages
-func buildConversationResponse(app *App, conversation models.Conversation) (conversationResp, error) {
+func buildConversationResponse(app *App, conversation cmodels.Conversation) (conversationResp, error) {
 	var resp = conversationResp{}
 
 	// Fetch last 1000 messages, this should suffice as chats shouldn't have too many messages.
@@ -669,22 +740,48 @@ func buildConversationResponse(app *App, conversation models.Conversation) (conv
 		return resp, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
 	}
 
+	app.conversation.ProcessCSATStatus(messages)
+
 	// Convert to chat message format, Generate signed widget URL for all attachments - expires in 1 hour.
-	chatMessages := make([]models.ChatMessage, len(messages))
+	chatMessages := make([]cmodels.ChatMessage, len(messages))
+	userCache := make(map[int]umodels.User)
 	for i, msg := range messages {
 		attachments := msg.Attachments
 		for j := range attachments {
-			expiresAt := time.Now().Add(1 * time.Hour)
-			signature := GenerateSignedURL(attachments[j].UUID, expiresAt, getJWTSecret())
-			attachments[j].URL = fmt.Sprintf(chatWidgetMediaURL, attachments[j].UUID, signature, expiresAt.Unix())
+			expiresAt := time.Now().Add(8 * time.Hour)
+			attachments[j].URL = app.media.GetSignedURL(attachments[j].UUID, expiresAt)
 		}
-		chatMessages[i] = models.ChatMessage{
-			UUID:           msg.UUID,
-			Content:        msg.Content,
-			CreatedAt:      msg.CreatedAt,
-			SenderType:     msg.SenderType,
-			ConversationID: msg.ConversationUUID,
-			Attachments:    attachments,
+
+		// Check if sender is cached, if not fetch from user store.
+		var user umodels.User
+		if _, ok := userCache[msg.SenderID]; !ok {
+			user, err = app.user.Get(msg.SenderID, "", "")
+			if err != nil {
+				app.lo.Error("error fetching message sender user", "sender_id", msg.SenderID, "conversation_uuid", conversation.UUID, "error", err)
+			} else {
+				userCache[msg.SenderID] = user
+			}
+		} else {
+			user = userCache[msg.SenderID]
+		}
+
+		chatMessages[i] = cmodels.ChatMessage{
+			UUID:             msg.UUID,
+			Status:           msg.Status,
+			CreatedAt:        msg.CreatedAt,
+			Content:          msg.Content,
+			TextContent:      msg.TextContent,
+			ConversationUUID: msg.ConversationUUID,
+			Meta:             msg.Meta,
+			Author: umodels.ChatUser{
+				ID:                 user.ID,
+				FirstName:          user.FirstName,
+				LastName:           user.LastName,
+				AvatarURL:          user.AvatarURL,
+				AvailabilityStatus: user.AvailabilityStatus,
+				Type:               user.Type,
+			},
+			Attachments: attachments,
 		}
 	}
 
@@ -698,24 +795,32 @@ func buildConversationResponse(app *App, conversation models.Conversation) (conv
 		}
 
 		// Convert assignee avatar URL to widget format if set.
-		// TODO: Instead of this hardcoded URL, make it a central handler.
 		if assignee.AvatarURL.Valid && assignee.AvatarURL.String != "" {
 			avatarPath := assignee.AvatarURL.String
 			if strings.HasPrefix(avatarPath, "/uploads/") {
 				avatarUUID := strings.TrimPrefix(avatarPath, "/uploads/")
 				// Generate signed URL for avatar with 1 hour expiry
 				expiresAt := time.Now().Add(1 * time.Hour)
-				signature := GenerateSignedURL(avatarUUID, expiresAt, getJWTSecret())
-				assignee.AvatarURL = null.StringFrom(fmt.Sprintf(chatWidgetMediaURL, avatarUUID, signature, expiresAt.Unix()))
+				assignee.AvatarURL = null.StringFrom(app.media.GetSignedURL(avatarUUID, expiresAt))
 			}
 		}
 	}
 
 	resp = conversationResp{
-		Conversation: models.ChatConversation{
-			UUID:     conversation.UUID,
-			Status:   conversation.Status.String,
-			Assignee: assignee,
+		Conversation: cmodels.ChatConversation{
+			CreatedAt:          assignee.CreatedAt,
+			UUID:               conversation.UUID,
+			Status:             conversation.Status.String,
+			UnreadMessageCount: conversation.UnreadMessageCount,
+			Assignee: umodels.ChatUser{
+				ID:                 assignee.ID,
+				FirstName:          assignee.FirstName,
+				LastName:           assignee.LastName,
+				AvatarURL:          assignee.AvatarURL,
+				AvailabilityStatus: assignee.AvailabilityStatus,
+				Type:               assignee.Type,
+				ActiveAt:           assignee.LastActiveAt,
+			},
 		},
 		Messages: chatMessages,
 	}
@@ -723,33 +828,64 @@ func buildConversationResponse(app *App, conversation models.Conversation) (conv
 	return resp, nil
 }
 
-// GenerateSignedURL generates a signature for media access with expiration
-func GenerateSignedURL(uuid string, expiresAt time.Time, secret []byte) string {
-	exp := expiresAt.Unix()
-	payload := fmt.Sprintf("%s:%d", uuid, exp)
-	sig := hmacSha256(payload, secret)
-	return sig
-}
-
-// VerifySignedURL verifies a signed URL with expiration
-func VerifySignedURL(uuid, signature string, expiresAt time.Time, secret []byte) bool {
-	// Check if expired
-	if time.Now().After(expiresAt) {
-		return false
+// buildConversationResponseWithBusinessHours builds conversation response with business hours info
+func buildConversationResponseWithBusinessHours(app *App, conversation cmodels.Conversation) (conversationResponseWithBusinessHours, error) {
+	baseResp, err := buildConversationResponse(app, conversation)
+	if err != nil {
+		return conversationResponseWithBusinessHours{}, err
 	}
 
-	// Generate expected signature
-	expectedSignature := GenerateSignedURL(uuid, expiresAt, secret)
+	resp := conversationResponseWithBusinessHours{
+		conversationResp: baseResp,
+	}
 
-	// Compare signatures using constant time comparison to prevent timing attacks
-	return hmac.Equal([]byte(signature), []byte(expectedSignature))
-}
+	// Calculate business hours info if assigned to team or use default
+	var businessHoursID *int
+	var timezone string
 
-// hmacSha256 generates HMAC-SHA256 hash
-func hmacSha256(data string, secret []byte) string {
-	h := hmac.New(sha256.New, secret)
-	h.Write([]byte(data))
-	return hex.EncodeToString(h.Sum(nil))
+	// Check if conversation is assigned to a team with business hours
+	if conversation.AssignedTeamID.Valid {
+		team, err := app.team.Get(conversation.AssignedTeamID.Int)
+		if err == nil && team.BusinessHoursID.Valid {
+			businessHoursID = &team.BusinessHoursID.Int
+			timezone = team.Timezone
+		}
+	}
+
+	// Fallback to general settings if no team business hours
+	if businessHoursID == nil {
+		out, err := app.setting.GetByPrefix("app")
+		if err == nil {
+			var settings map[string]interface{}
+			if err := json.Unmarshal(out, &settings); err == nil {
+				if bhIDStr, ok := settings["app.business_hours_id"].(string); ok && bhIDStr != "" {
+					// Parse the business hours ID
+					if bhID, err := strconv.Atoi(bhIDStr); err == nil {
+						businessHoursID = &bhID
+					}
+				}
+				if tz, ok := settings["app.timezone"].(string); ok {
+					timezone = tz
+				}
+			}
+		}
+	}
+
+	// Set business hours info in response
+	if businessHoursID != nil {
+		resp.BusinessHoursID = businessHoursID
+
+		// Calculate UTC offset for the timezone
+		if timezone != "" {
+			if loc, err := time.LoadLocation(timezone); err == nil {
+				_, offset := time.Now().In(loc).Zone()
+				offsetMinutes := offset / 60 // Convert seconds to minutes
+				resp.WorkingHoursUTCOffset = &offsetMinutes
+			}
+		}
+	}
+
+	return resp, nil
 }
 
 // verifyJWT verifies and validates a JWT token with proper signature verification

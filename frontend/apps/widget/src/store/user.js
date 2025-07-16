@@ -14,13 +14,29 @@ export const useUserStore = defineStore('user', () => {
         return jwt.is_visitor
     })
 
+    const userID = computed(() => {
+        const token = userSessionToken.value
+        if (!token) return null
+        const jwt = parseJWT(token)
+        return jwt.user_id || null
+    })
+
     const clearSessionToken = () => {
         userSessionToken.value = ""
+    }
+
+    const setSessionToken = (token) => {
+        if (typeof token !== 'string') {
+            throw new Error('Session token must be a string')
+        }
+        userSessionToken.value = token
     }
 
     return {
         userSessionToken,
         isVisitor,
-        clearSessionToken
+        userID,
+        clearSessionToken,
+        setSessionToken
     }
 })

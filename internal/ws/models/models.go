@@ -7,6 +7,9 @@ const (
 	MessageTypeNewMessage                 = "new_message"
 	MessageTypeNewConversation            = "new_conversation"
 	MessageTypeError                      = "error"
+	MessageTypeConversationSubscribe      = "conversation_subscribe"
+	MessageTypeConversationSubscribed     = "conversation_subscribed"
+	MessageTypeTyping                     = "typing"
 )
 
 // WSMessage represents a WS message.
@@ -25,4 +28,16 @@ type Message struct {
 type BroadcastMessage struct {
 	Data  []byte `json:"data"`
 	Users []int  `json:"users"`
+}
+
+// ConversationSubscribe represents a conversation subscription message.
+type ConversationSubscribe struct {
+	ConversationUUID string `json:"conversation_uuid"`
+}
+
+// TypingMessage represents a typing indicator message.
+type TypingMessage struct {
+	ConversationUUID string `json:"conversation_uuid"`
+	IsTyping         bool   `json:"is_typing"`
+	UserID           int    `json:"user_id"`
 }

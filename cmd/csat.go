@@ -3,8 +3,15 @@ package main
 import (
 	"strconv"
 
+	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
+
+type csatResponse struct {
+	Rating   int    `json:"rating"`
+	Feedback string `json:"feedback"`
+}
 
 // handleShowCSAT renders the CSAT page for a given csat.
 func handleShowCSAT(r *fastglue.Request) error {
@@ -42,7 +49,7 @@ func handleShowCSAT(r *fastglue.Request) error {
 
 	return app.tmpl.RenderWebPage(r.RequestCtx, "csat", map[string]interface{}{
 		"Data": map[string]interface{}{
-			"Title":    "Rate your interaction with us",
+			"Title": "Rate your interaction with us",
 			"CSAT": map[string]interface{}{
 				"UUID": csat.UUID,
 			},
@@ -72,7 +79,7 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 		})
 	}
 
-	if ratingI < 1 || ratingI > 5 {
+	if ratingI < 0 || ratingI > 5 {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
 				"ErrorMessage": "Invalid `rating`",
@@ -102,4 +109,37 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 			"Message": "We appreciate you taking the time to submit your feedback.",
 		},
 	})
+}
+
+// handleSubmitCSATResponse handles CSAT response submission from the widget API.
+func handleSubmitCSATResponse(r *fastglue.Request) error {
+	var (
+		app  = r.Context.(*App)
+		uuid = r.RequestCtx.UserValue("uuid").(string)
+		req  = csatResponse{}
+	)
+
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid JSON", nil, envelope.InputError)
+	}
+
+	if req.Rating < 0 || req.Rating > 5 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Rating must be between 0 and 5 (0 means no rating)", nil, envelope.InputError)
+	}
+
+	// At least one of rating or feedback must be provided
+	if req.Rating == 0 && req.Feedback == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Either rating or feedback must be provided", nil, envelope.InputError)
+	}
+
+	if uuid == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid UUID", nil, envelope.InputError)
+	}
+
+	// Update CSAT response
+	if err := app.csat.UpdateResponse(uuid, req.Rating, req.Feedback); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(true)
 }

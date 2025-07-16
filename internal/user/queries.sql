@@ -63,7 +63,10 @@ FROM users u
 LEFT JOIN user_roles ur ON ur.user_id = u.id
 LEFT JOIN roles r ON r.id = ur.role_id
 LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
-WHERE (u.id = $1 OR u.email = $2) AND u.type = $3 AND u.deleted_at IS NULL
+WHERE u.deleted_at IS NULL 
+    AND ($1 = 0 OR u.id = $1) 
+    AND ($2 = '' OR u.email = $2)
+    AND ($3 = '' OR u.type::text = $3)
 GROUP BY u.id;
 
 -- name: set-user-password
@@ -152,16 +155,14 @@ RETURNING user_id;
 -- name: insert-contact
 INSERT INTO users (email, type, first_name, last_name, "password", avatar_url)
 VALUES ($1, 'contact', $2, $3, $4, $5)
-ON CONFLICT (email, type) WHERE deleted_at IS NULL
+ON CONFLICT (email) WHERE type = 'contact' AND deleted_at IS NULL
 DO UPDATE SET updated_at = now()
 RETURNING id;
 
 -- name: insert-visitor
-INSERT INTO users (email, type, first_name, last_name, "password", avatar_url)
-VALUES ($1, 'visitor', $2, $3, $4, $5)
-ON CONFLICT (email, type) WHERE deleted_at IS NULL
-DO UPDATE SET updated_at = now()
-RETURNING id;
+INSERT INTO users (email, type, first_name, last_name)
+VALUES ($1, 'visitor', $2, $3)
+RETURNING *;
 
 -- name: update-last-login-at
 UPDATE users

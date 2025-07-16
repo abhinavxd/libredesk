@@ -111,6 +111,7 @@ type userStore interface {
 
 type mediaStore interface {
 	GetBlob(name string) ([]byte, error)
+	GetURL(name string) string
 	Attach(id int, model string, modelID int) error
 	GetByModel(id int, model string) ([]mmodels.Media, error)
 	ContentIDExists(contentID string) (bool, string, error)
@@ -129,6 +130,7 @@ type settingsStore interface {
 
 type csatStore interface {
 	Create(conversationID int) (csatModels.CSATResponse, error)
+	Get(uuid string) (csatModels.CSATResponse, error)
 	MakePublicURL(appBaseURL, uuid string) string
 }
 
@@ -1146,4 +1148,36 @@ func (c *Manager) makeConversationsListQuery(userID int, teamIDs []int, listType
 		"conversations":         conversationsAllowedFields,
 		"conversation_statuses": conversationStatusAllowedFields,
 	})
+}
+
+// ProcessCSATStatus processes messages and adds CSAT submission status for CSAT messages.
+func (m *Manager) ProcessCSATStatus(messages []models.Message) {
+	for i := range messages {
+		msg := &messages[i]
+		if msg.HasCSAT() {
+			// Extract CSAT UUID from message content
+			csatUUID := msg.ExtractCSATUUID()
+			if csatUUID == "" {
+				// Fallback to basic censoring if UUID extraction fails
+				msg.CensorCSATContent()
+				continue
+			}
+			
+			// Get CSAT submission status
+			csat, err := m.csatStore.Get(csatUUID)
+			isSubmitted := false
+			rating := 0
+			feedback := ""
+			if err == nil && csat.ResponseTimestamp.Valid {
+				isSubmitted = true
+				rating = csat.Score
+				if csat.Feedback.Valid {
+					feedback = csat.Feedback.String
+				}
+			}
+			
+			// Censor content and add submission status
+			msg.CensorCSATContentWithStatus(isSubmitted, csatUUID, rating, feedback)
+		}
+	}
 }

@@ -53,9 +53,10 @@ func handleGetMessages(r *fastglue.Request) error {
 		for j := range messages[i].Attachments {
 			messages[i].Attachments[j].URL = app.media.GetURL(messages[i].Attachments[j].UUID)
 		}
-		// Redact CSAT survey link
-		messages[i].CensorCSATContent()
 	}
+
+	// Process CSAT status for all messages (will only affect CSAT messages)
+	app.conversation.ProcessCSATStatus(messages)
 
 	return r.SendEnvelope(envelope.PageResults{
 		Total:      total,
@@ -90,8 +91,10 @@ func handleGetMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Redact CSAT survey link
-	message.CensorCSATContent()
+	// Process CSAT status for the message (will only affect CSAT messages)
+	messages := []cmodels.Message{message}
+	app.conversation.ProcessCSATStatus(messages)
+	message = messages[0]
 
 	for j := range message.Attachments {
 		message.Attachments[j].URL = app.media.GetURL(message.Attachments[j].UUID)

@@ -8,12 +8,26 @@ import (
 
 // V0_8_0 updates the database schema to v0.8.0.
 func V0_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
-	// Add 'livechat' to the channels enum
-	_, err := db.Exec(`
-		ALTER TYPE channels ADD VALUE IF NOT EXISTS 'livechat';
+	// Add 'livechat' to the channels enum if not already present
+	var exists bool
+	err := db.Get(&exists, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM pg_enum
+			WHERE enumlabel = 'livechat'
+			AND enumtypid = (
+				SELECT oid FROM pg_type WHERE typname = 'channels'
+			)
+		)
 	`)
 	if err != nil {
 		return err
+	}
+	if !exists {
+		_, err = db.Exec(`ALTER TYPE channels ADD VALUE 'livechat'`)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Drop the foreign key constraint and column from conversations table first
@@ -64,5 +78,34 @@ func V0_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmts := []string{
+		/* ── drop index for e‑mail uniqueness and add seperate indexes for type of user ── */
+		`DROP INDEX IF EXISTS index_unique_users_on_email_and_type_when_deleted_at_is_null`,
+
+		/* ── add separate indexes for type of user, this excludes `visitor` type as there can be multiple visitors with the same email ── */
+		`CREATE UNIQUE INDEX IF NOT EXISTS
+		index_unique_users_on_email_when_type_is_contact
+		ON users(email)
+		WHERE type = 'contact' AND deleted_at IS NULL`,
+
+		`CREATE UNIQUE INDEX IF NOT EXISTS
+		index_unique_users_on_email_when_type_is_agent
+		ON users(email)
+		WHERE type = 'agent'   AND deleted_at IS NULL`,
+	}
+
+	for _, q := range stmts {
+		if _, err = tx.Exec(q); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 	return nil
 }

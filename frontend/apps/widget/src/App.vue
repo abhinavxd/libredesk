@@ -1,5 +1,5 @@
 <template>
-  <div class="libredesk-widget-app">
+  <div class="libredesk-widget-app text-foreground bg-background" :class="{ 'dark': widgetStore.config.dark_mode }">
     <div class="widget-container">
       <MainLayout />
     </div>
@@ -7,32 +7,75 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, watch, getCurrentInstance } from 'vue'
 import { useWidgetStore } from './store/widget.js'
-import api from '@widget/api/index.js'
+import { useChatStore } from '@widget/store/chat.js'
+import { useUserStore } from './store/user.js'
+import { initWidgetWS, closeWidgetWebSocket } from './websocket.js'
+import { useUnreadCount } from './composables/useUnreadCount.js'
 import MainLayout from '@widget/layouts/MainLayout.vue'
 
 const widgetStore = useWidgetStore()
+const chatStore = useChatStore()
+const userStore = useUserStore()
 
-onMounted(async () => {
-  await fetchWidgetSettings()
+// Initialize unread count tracking
+useUnreadCount()
+
+onMounted(() => {
+  // Use pre-fetched widget config from main.js
+  const widgetConfig = getCurrentInstance().appContext.config.globalProperties.$widgetConfig
+  if (widgetConfig) {
+    widgetStore.updateConfig(widgetConfig)
+  }
+  
+  initializeWebSocket()
   widgetStore.openWidget()
+  setupParentMessageListeners()
+  chatStore.fetchConversations()
 })
 
-// Fetch inbox widget settings from API
-const fetchWidgetSettings = async () => {
-  try {
-    const urlParams = new URLSearchParams(window.location.search)
-    const inboxID = urlParams.get('inbox_id')
-    if (!inboxID) {
-      throw new Error('`inbox_id` is missing in query parameters')
+// Listen for messages from parent window (widget.js)
+const setupParentMessageListeners = () => {
+  window.addEventListener('message', (event) => {
+    if (event.data.type === 'SET_MOBILE_STATE') {
+      widgetStore.setMobileFullScreen(event.data.isMobile)
     }
-    const response = await api.getWidgetSettings(inboxID)
-    widgetStore.updateConfig(response.data.data)
-  } catch (error) {
-    console.error('Failed to fetch widget settings:', error)
+  })
+}
+
+// Initialize WebSocket only when JWT token exists
+const initializeWebSocket = () => {
+  const jwt = userStore.userSessionToken
+  if (jwt) {
+    const urlParams = new URLSearchParams(window.location.search)
+    const inboxId = urlParams.get('inbox_id')
+    if (inboxId) {
+      initWidgetWS(jwt, inboxId)
+    } else {
+      console.error('Cannot initialize WebSocket: missing `inbox_id`')
+    }
+  } else {
+    closeWidgetWebSocket()
   }
 }
+
+// Re-initialize WebSocket when user gets authenticated
+const handleUserAuthentication = () => {
+  initializeWebSocket()
+}
+
+// Watch for changes in user session token to initialize WebSocket
+watch(
+  () => userStore.userSessionToken,
+  (newToken) => {
+    if (newToken) {
+      handleUserAuthentication()
+    } else {
+      closeWidgetWebSocket()
+    }
+  }
+)
 </script>
 
 <style scoped>

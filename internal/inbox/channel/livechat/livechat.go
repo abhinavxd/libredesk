@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/zerodha/logf"
 )
 
@@ -26,6 +26,7 @@ const (
 // Config holds the live chat inbox configuration.
 type Config struct {
 	BrandName string `json:"brand_name"`
+	DarkMode  bool   `json:"dark_mode"`
 	Language  string `json:"language"`
 	Users     struct {
 		AllowStartConversation       bool   `json:"allow_start_conversation"`
@@ -67,6 +68,7 @@ type Config struct {
 	IntroductionMessage            string   `json:"introduction_message"`
 	ShowOfficeHoursInChat          bool     `json:"show_office_hours_in_chat"`
 	ShowOfficeHoursAfterAssignment bool     `json:"show_office_hours_after_assignment"`
+	ChatReplyExpectationMessage    string   `json:"chat_reply_expectation_message"`
 }
 
 // Client represents a connected chat client
@@ -137,38 +139,49 @@ func (lc *LiveChat) Send(message models.Message) error {
 			}
 
 			for _, client := range clients {
+				// Set `content` in all attachments to `null` as attachments are sent with URLs and live chat uses URLs to fetch the content.
+				for i := range message.Attachments {
+					if message.Attachments[i].Content != nil {
+						message.Attachments[i].Content = nil
+					}
+				}
+
 				messageData := map[string]any{
 					"type": "new_message",
-					"data": map[string]any{
-						"created_at":        message.CreatedAt.Format(time.RFC3339),
-						"conversation_uuid": message.ConversationUUID,
-						"uuid":              message.UUID,
-						"content":           message.Content,
-						"text_content":      message.TextContent,
-						"sender_type":       message.SenderType,
-						"sender_name":       sender.FullName(),
-						"status":            message.Status,
+					"data": models.ChatMessage{
+						UUID:             message.UUID,
+						ConversationUUID: message.ConversationUUID,
+						CreatedAt:        message.CreatedAt,
+						Content:          message.Content,
+						TextContent:      message.TextContent,
+						Meta:             message.Meta,
+						Author: umodels.ChatUser{
+							ID:                 message.SenderID,
+							FirstName:          sender.FirstName,
+							LastName:           sender.LastName,
+							AvatarURL:          sender.AvatarURL,
+							AvailabilityStatus: sender.AvailabilityStatus,
+							Type:               sender.Type,
+						},
+						Attachments: message.Attachments,
 					},
 				}
 
-				// Convert messageData to JSON
+				// Marshal and send to client's channel.
 				messageJSON, err := json.Marshal(messageData)
 				if err != nil {
 					lc.lo.Error("failed to marshal message data", "error", err)
 					continue
 				}
-
-				// Send the message to the client's channel
 				select {
 				case client.Channel <- messageJSON:
 					lc.lo.Info("message sent to live chat client", "client_id", client.ID, "message_id", message.UUID)
 				default:
 					lc.lo.Warn("client channel full, dropping message", "client_id", client.ID, "message_id", message.UUID)
 				}
-				continue
 			}
 		} else {
-			lc.lo.Debug("client not connected for live chat message", "receiver_id", msgReceiverStr, "message_id", message.UUID)
+			lc.lo.Debug("websocket client not connected for live chat message", "receiver_id", msgReceiverStr, "message_id", message.UUID)
 			return ErrClientNotConnected
 		}
 	}
@@ -192,7 +205,7 @@ func (lc *LiveChat) Channel() string {
 }
 
 // AddClient adds a new client to the live chat session.
-func (lc *LiveChat) AddClient(userID, conversationUUID string) (*Client, error) {
+func (lc *LiveChat) AddClient(userID string) (*Client, error) {
 	lc.clientsMutex.Lock()
 	defer lc.clientsMutex.Unlock()
 
@@ -209,8 +222,6 @@ func (lc *LiveChat) AddClient(userID, conversationUUID string) (*Client, error) 
 
 	// Add the client to the clients map.
 	lc.clients[userID] = append(lc.clients[userID], client)
-
-	lc.lo.Info("client added to live chat", "client_id", userID, "conversation_uuid", conversationUUID)
 	return client, nil
 }
 
@@ -231,6 +242,39 @@ func (lc *LiveChat) RemoveClient(c *Client) {
 
 				lc.lo.Debug("client removed from live chat", "client_id", c.ID)
 				return
+			}
+		}
+	}
+}
+
+// BroadcastTypingToClients broadcasts typing status to all connected widget clients for a conversation.
+func (lc *LiveChat) BroadcastTypingToClients(conversationUUID string, isTyping bool) {
+	lc.clientsMutex.RLock()
+	defer lc.clientsMutex.RUnlock()
+
+	// Create typing status message for widget clients
+	typingMessage := map[string]interface{}{
+		"type": "typing",
+		"data": map[string]interface{}{
+			"conversation_uuid": conversationUUID,
+			"is_typing":         isTyping,
+		},
+	}
+
+	messageJSON, err := json.Marshal(typingMessage)
+	if err != nil {
+		lc.lo.Error("failed to marshal typing message", "error", err)
+		return
+	}
+
+	// Broadcast to all connected clients
+	for userID, clients := range lc.clients {
+		for _, client := range clients {
+			select {
+			case client.Channel <- messageJSON:
+				lc.lo.Debug("typing status sent to widget client", "user_id", userID, "client_id", client.ID, "conversation_uuid", conversationUUID, "is_typing", isTyping)
+			default:
+				lc.lo.Warn("client channel full, dropping typing message", "user_id", userID, "client_id", client.ID)
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"net/textproto"
+	"strings"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
@@ -52,26 +53,31 @@ var (
 	ContentTypeHTML = "html"
 )
 
+type LastChatMessage struct {
+	Content   string           `db:"content" json:"content"`
+	CreatedAt time.Time        `db:"created_at" json:"created_at"`
+	Author    umodels.ChatUser `db:"author" json:"author"`
+}
+
 type ChatConversation struct {
-	UUID                       string       `db:"uuid" json:"uuid"`
-	Status                     string       `db:"status" json:"status"`
-	LastMessage                string       `db:"last_message" json:"last_message"`
-	LastMessageAt              null.Time    `db:"last_message_at" json:"last_message_at"`
-	LastMessageSenderFirstName string       `db:"last_message_sender_first_name" json:"last_message_sender_first_name"`
-	LastMessageSenderLastName  string       `db:"last_message_sender_last_name" json:"last_message_sender_last_name"`
-	LastMessageSenderAvatarURL string       `db:"last_message_sender_avatar_url" json:"last_message_sender_avatar_url"`
-	UnreadMessageCount         int          `db:"unread_message_count" json:"unread_message_count"`
-	Assignee                   umodels.User `db:"assignee" json:"assignee"`
+	CreatedAt          time.Time        `db:"created_at" json:"created_at"`
+	UUID               string           `db:"uuid" json:"uuid"`
+	Status             string           `db:"status" json:"status"`
+	LastChatMessage    LastChatMessage  `db:"last_message" json:"last_message"`
+	UnreadMessageCount int              `db:"unread_message_count" json:"unread_message_count"`
+	Assignee           umodels.ChatUser `db:"assignee" json:"assignee"`
 }
 
 type ChatMessage struct {
-	CreatedAt      time.Time              `json:"created_at"`
-	UUID           string                 `json:"uuid"`
-	Content        string                 `json:"content"`
-	SenderType     string                 `json:"sender_type"`
-	SenderName     string                 `json:"sender_name"`
-	ConversationID string                 `json:"conversation_id"`
-	Attachments    attachment.Attachments `json:"attachments"`
+	UUID             string                 `json:"uuid"`
+	Status           string                 `json:"status"`
+	ConversationUUID string                 `json:"conversation_uuid"`
+	CreatedAt        time.Time              `json:"created_at"`
+	Content          string                 `json:"content"`
+	TextContent      string                 `json:"text_content"`
+	Author           umodels.ChatUser       `json:"author"`
+	Attachments      attachment.Attachments `json:"attachments"`
+	Meta             json.RawMessage        `json:"meta"`
 }
 
 type Conversation struct {
@@ -118,6 +124,13 @@ type Conversation struct {
 	Total                 int             `db:"total" json:"-"`
 }
 
+type IncomingMessage struct {
+	Channel string
+	Message Message
+	Contact umodels.User
+	InboxID int
+}
+
 type ConversationParticipant struct {
 	ID        string      `db:"id" json:"id"`
 	FirstName string      `db:"first_name" json:"first_name"`
@@ -139,39 +152,38 @@ type NewConversationsStats struct {
 
 // Message represents a message in a conversation
 type Message struct {
-	ID               int                    `db:"id" json:"id,omitempty"`
-	CreatedAt        time.Time              `db:"created_at" json:"created_at"`
-	UpdatedAt        time.Time              `db:"updated_at" json:"updated_at"`
-	UUID             string                 `db:"uuid" json:"uuid"`
-	Type             string                 `db:"type" json:"type"`
-	Status           string                 `db:"status" json:"status"`
-	ConversationID   int                    `db:"conversation_id" json:"conversation_id"`
-	Content          string                 `db:"content" json:"content"`
-	TextContent      string                 `db:"text_content" json:"text_content"`
-	ContentType      string                 `db:"content_type" json:"content_type"`
-	Private          bool                   `db:"private" json:"private"`
-	SourceID         null.String            `db:"source_id" json:"-"`
-	SenderID         int                    `db:"sender_id" json:"sender_id"`
-	SenderType       string                 `db:"sender_type" json:"sender_type"`
-	InboxID          int                    `db:"inbox_id" json:"-"`
-	Meta             json.RawMessage        `db:"meta" json:"meta"`
-	Attachments      attachment.Attachments `db:"attachments" json:"attachments"`
-	ConversationUUID string                 `db:"conversation_uuid" json:"-"`
-	From             string                 `db:"from"  json:"-"`
-	Subject          string                 `db:"subject" json:"-"`
-	Channel          string                 `db:"channel" json:"-"`
-	To               pq.StringArray         `db:"to"  json:"-"`
-	CC               pq.StringArray         `db:"cc" json:"-"`
-	BCC              pq.StringArray         `db:"bcc" json:"-"`
-	References       []string               `json:"-"`
-	InReplyTo        string                 `json:"-"`
-	Headers          textproto.MIMEHeader   `json:"-"`
-	AltContent       string                 `db:"-" json:"-"`
-	Media            []mmodels.Media        `db:"-" json:"-"`
-	IsCSAT           bool                   `db:"-" json:"-"`
-	// TODO: Figure if this field is needed or there's a better way.
-	MessageReceiverID int `db:"-" json:"-"`
-	Total             int `db:"total" json:"-"`
+	ID                int                    `db:"id" json:"id,omitempty"`
+	CreatedAt         time.Time              `db:"created_at" json:"created_at"`
+	UpdatedAt         time.Time              `db:"updated_at" json:"updated_at"`
+	UUID              string                 `db:"uuid" json:"uuid"`
+	Type              string                 `db:"type" json:"type"`
+	Status            string                 `db:"status" json:"status"`
+	ConversationID    int                    `db:"conversation_id" json:"conversation_id"`
+	Content           string                 `db:"content" json:"content"`
+	TextContent       string                 `db:"text_content" json:"text_content"`
+	ContentType       string                 `db:"content_type" json:"content_type"`
+	Private           bool                   `db:"private" json:"private"`
+	SourceID          null.String            `db:"source_id" json:"-"`
+	SenderID          int                    `db:"sender_id" json:"sender_id"`
+	SenderType        string                 `db:"sender_type" json:"sender_type"`
+	InboxID           int                    `db:"inbox_id" json:"-"`
+	Meta              json.RawMessage        `db:"meta" json:"meta"`
+	Attachments       attachment.Attachments `db:"attachments" json:"attachments"`
+	ConversationUUID  string                 `db:"conversation_uuid" json:"-"`
+	From              string                 `db:"from"  json:"-"`
+	Subject           string                 `db:"subject" json:"-"`
+	Channel           string                 `db:"channel" json:"-"`
+	To                pq.StringArray         `db:"to"  json:"-"`
+	CC                pq.StringArray         `db:"cc" json:"-"`
+	BCC               pq.StringArray         `db:"bcc" json:"-"`
+	MessageReceiverID int                    `db:"message_receiver_id" json:"-"`
+	References        []string               `json:"-"`
+	InReplyTo         string                 `json:"-"`
+	Headers           textproto.MIMEHeader   `json:"-"`
+	AltContent        string                 `db:"-" json:"-"`
+	Media             []mmodels.Media        `db:"-" json:"-"`
+	IsCSAT            bool                   `db:"-" json:"-"`
+	Total             int                    `db:"total" json:"-"`
 }
 
 // CensorCSATContent redacts the content of a CSAT message to prevent leaking the CSAT survey public link.
@@ -181,8 +193,37 @@ func (m *Message) CensorCSATContent() {
 		return
 	}
 	if isCsat, _ := meta["is_csat"].(bool); isCsat {
-		m.Content = "Please rate your experience with us"
+		m.Content = "Please rate this conversation"
 		m.TextContent = m.Content
+	}
+}
+
+// CensorCSATContentWithStatus redacts the content and adds submission status for CSAT messages.
+func (m *Message) CensorCSATContentWithStatus(csatSubmitted bool, csatUUID string, rating int, feedback string) {
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(m.Meta), &meta); err != nil {
+		return
+	}
+	if isCsat, _ := meta["is_csat"].(bool); isCsat {
+		m.Content = "Please rate this conversation"
+		m.TextContent = m.Content
+
+		// Add submission status and UUID to meta
+		meta["csat_submitted"] = csatSubmitted
+		meta["csat_uuid"] = csatUUID
+
+		// Add submitted rating and feedback if CSAT was submitted
+		if csatSubmitted {
+			if rating > 0 {
+				meta["submitted_rating"] = rating
+			}
+			meta["submitted_feedback"] = feedback
+		}
+
+		// Update the meta field
+		if updatedMeta, err := json.Marshal(meta); err == nil {
+			m.Meta = json.RawMessage(updatedMeta)
+		}
 	}
 }
 
@@ -196,11 +237,35 @@ func (m *Message) HasCSAT() bool {
 	return isCsat
 }
 
-// IncomingMessage links a message with the contact information and inbox id.
-type IncomingMessage struct {
-	Message Message
-	Contact umodels.User
-	InboxID int
+// ExtractCSATUUID extracts the CSAT UUID from the message content.
+func (m *Message) ExtractCSATUUID() string {
+	if !m.HasCSAT() {
+		return ""
+	}
+
+	// Extract UUID from the CSAT URL in the message content
+	// Pattern: <a href="http://localhost:8000/csat/3b68fa67-ad1a-4c5b-87eb-b262c420f43f">
+	content := m.Content
+	// Look for /csat/ followed by UUID pattern
+	start := strings.Index(content, "/csat/")
+	if start == -1 {
+		return ""
+	}
+	start += 6 // Skip "/csat/"
+
+	// Find the end of UUID (36 characters)
+	if len(content) < start+36 {
+		return ""
+	}
+
+	uuid := content[start : start+36]
+
+	// Basic validation - UUID should contain hyphens at positions 8, 13, 18, 23
+	if len(uuid) == 36 && uuid[8] == '-' && uuid[13] == '-' && uuid[18] == '-' && uuid[23] == '-' {
+		return uuid
+	}
+
+	return ""
 }
 
 type Status struct {

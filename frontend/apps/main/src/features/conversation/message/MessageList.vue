@@ -43,33 +43,20 @@
             </div>
           </div>
         </TransitionGroup>
+
+        <!-- Typing indicator -->
+        <div v-if="conversationStore.conversation.isTyping">
+          <TypingIndicator />
+        </div>
       </div>
     </div>
 
     <!-- Sticky container for the scroll arrow -->
-    <Transition
-      enter-active-class="transition ease-out duration-200"
-      enter-from-class="opacity-0 translate-y-1"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition ease-in duration-150"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 translate-y-1"
-    >
-      <div v-show="!isAtBottom" class="absolute bottom-5 right-6 z-10">
-        <button
-          @click="handleScrollToBottom"
-          class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border bg-background text-primary transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-        >
-          <ChevronDown size="18" />
-        </button>
-        <span
-          v-if="unReadMessages > 0"
-          class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-green-500 text-secondary text-xs font-medium flex items-center justify-center"
-        >
-          {{ unReadMessages }}
-        </span>
-      </div>
-    </Transition>
+    <ScrollToBottomButton
+      :is-at-bottom="isAtBottom"
+      :unread-count="unReadMessages"
+      @scroll-to-bottom="handleScrollToBottom"
+    />
   </div>
 </template>
 
@@ -81,10 +68,12 @@ import AgentMessageBubble from './AgentMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
-import { RefreshCw, ChevronDown } from 'lucide-vue-next'
+import { RefreshCw } from 'lucide-vue-next'
+import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import MessagesSkeleton from './MessagesSkeleton.vue'
+import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
@@ -108,7 +97,6 @@ const handleScroll = () => {
 }
 
 const handleScrollToBottom = () => {
-  unReadMessages.value = 0
   scrollToBottom()
 }
 
@@ -132,7 +120,11 @@ const handleNewMessage = () => {
     if (data.conversation_uuid === conversationStore.current.uuid) {
       if (data.message?.sender_id === userStore.userID) {
         scrollToBottom()
-      } else if (!isAtBottom.value) {
+      } else if (isAtBottom.value) {
+        // If user is at bottom, scroll to show new message
+        scrollToBottom()
+      } else {
+        // If user is not at bottom, increment unread counter but do not scroll
         unReadMessages.value++
       }
     }
@@ -152,6 +144,26 @@ watch(
       currentConversationUUID.value = conversationStore.current.uuid
       unReadMessages.value = 0
       scrollToBottom()
+    }
+  }
+)
+
+// Watch for typing indicator and auto-scroll if user is at bottom
+watch(
+  () => conversationStore.conversation.isTyping,
+  (isTyping) => {
+    if (isTyping && isAtBottom.value) {
+      scrollToBottom()
+    }
+  }
+)
+
+// Watch for isAtButtom and set unReadMessages to 0
+watch(
+  () => isAtBottom.value,
+  (atBottom) => {
+    if (atBottom) {
+      unReadMessages.value = 0
     }
   }
 )

@@ -462,10 +462,11 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n) *media.Manager {
 	}
 
 	media, err := media.New(media.Opts{
-		Store: store,
-		Lo:    lo,
-		DB:    db,
-		I18n:  i18n,
+		Store:  store,
+		Lo:     lo,
+		DB:     db,
+		I18n:   i18n,
+		Secret: ko.String("upload.secret"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)

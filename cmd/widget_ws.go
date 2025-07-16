@@ -24,14 +24,13 @@ const (
 
 // WidgetMessage represents a message sent through the widget WebSocket
 type WidgetMessage struct {
-	Type string      `json:"type"`
-	JWT  string      `json:"jwt,omitempty"`
-	Data interface{} `json:"data"`
+	Type string `json:"type"`
+	JWT  string `json:"jwt,omitempty"`
+	Data any    `json:"data"`
 }
 
-// WidgetJoinData represents data for joining a conversation
-type WidgetJoinData struct {
-	ConversationUUID string `json:"conversation_uuid"`
+type WidgetInboxJoinRequest struct {
+	InboxID int `json:"inbox_id"`
 }
 
 // WidgetMessageData represents a chat message through the widget
@@ -91,11 +90,11 @@ func handleWidgetWS(r *fastglue.Request) error {
 			}
 
 			switch msg.Type {
-			// Join conversation request.
+			// Inbox join request.
 			case WidgetMsgTypeJoin:
 				var joinedClient *livechat.Client
 				var joinedLiveChat *livechat.LiveChat
-				if joinedClient, joinedLiveChat, err = handleWidgetJoin(app, conn, &msg, claims); err != nil {
+				if joinedClient, joinedLiveChat, err = handleInboxJoin(app, conn, &msg, claims); err != nil {
 					app.lo.Error("error handling widget join", "error", err)
 					sendWidgetError(conn, "Failed to join conversation")
 					continue
@@ -124,8 +123,8 @@ func handleWidgetWS(r *fastglue.Request) error {
 	return nil
 }
 
-// handleWidgetJoin handles a client joining a conversation
-func handleWidgetJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims Claims) (*livechat.Client, *livechat.LiveChat, error) {
+// handleInboxJoin handles a websocket join request for a live chat inbox.
+func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims Claims) (*livechat.Client, *livechat.LiveChat, error) {
 	userID := claims.UserID
 
 	joinDataBytes, err := json.Marshal(msg.Data)
@@ -133,28 +132,16 @@ func handleWidgetJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims
 		return nil, nil, fmt.Errorf("invalid join data: %w", err)
 	}
 
-	var joinData WidgetJoinData
+	var joinData WidgetInboxJoinRequest
 	if err := json.Unmarshal(joinDataBytes, &joinData); err != nil {
 		return nil, nil, fmt.Errorf("invalid join data format: %w", err)
 	}
 
-	// Get conversation to find the inbox
-	conversation, err := app.conversation.GetConversation(0, joinData.ConversationUUID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("conversation not found: %w", err)
-	}
-
-	// Make sure conversation belongs to the user.
-	if conversation.ContactID != userID {
-		return nil, nil, fmt.Errorf("conversation does not belong to the user")
-	}
-
 	// Make sure inbox is active.
-	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
+	inbox, err := app.inbox.GetDBRecord(joinData.InboxID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("inbox not found: %w", err)
 	}
-
 	if !inbox.Enabled {
 		return nil, nil, fmt.Errorf("inbox is not enabled")
 	}
@@ -173,9 +160,9 @@ func handleWidgetJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims
 
 	// Add client to live chat session
 	userIDStr := fmt.Sprintf("%d", userID)
-	client, err := liveChat.AddClient(userIDStr, joinData.ConversationUUID)
+	client, err := liveChat.AddClient(userIDStr)
 	if err != nil {
-		app.lo.Error("error adding client to live chat", "error", err, "user_id", userIDStr, "conversation_uuid", joinData.ConversationUUID)
+		app.lo.Error("error adding client to live chat", "error", err, "user_id", userIDStr)
 		return nil, nil, err
 	}
 
@@ -193,14 +180,15 @@ func handleWidgetJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims
 	joinResp := WidgetMessage{
 		Type: WidgetMsgTypeJoined,
 		Data: map[string]string{
-			"message":           "Joined conversation successfully",
-			"conversation_uuid": joinData.ConversationUUID,
+			"message": "namaste!",
 		},
 	}
 
 	if err := conn.WriteJSON(joinResp); err != nil {
 		return nil, nil, err
 	}
+
+	app.lo.Debug("widget client joined live chat", "user_id", userIDStr, "inbox_id", joinData.InboxID)
 
 	return client, liveChat, nil
 }
@@ -219,8 +207,14 @@ func handleWidgetTyping(app *App, msg *WidgetMessage, claims Claims) error {
 		app.lo.Error("error unmarshalling typing data", "error", err)
 		return fmt.Errorf("invalid typing data format: %w", err)
 	}
-	// Broadcast this to agents.
-	app.lo.Debug("Received typing data for user", "user_id", userID, "is_typing", typingData.IsTyping, "conversation_uuid", typingData.ConversationUUID)
+
+	// Broadcast typing status to agents via conversation manager
+	// Set broadcastToWidgets=false to avoid echoing back to widget clients
+	if typingData.ConversationUUID != "" {
+		app.conversation.BroadcastTypingToConversation(typingData.ConversationUUID, typingData.IsTyping, false)
+	}
+
+	app.lo.Debug("Broadcasted typing data from widget user to agents", "user_id", userID, "is_typing", typingData.IsTyping, "conversation_uuid", typingData.ConversationUUID)
 	return nil
 }
 

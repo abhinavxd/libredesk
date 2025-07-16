@@ -474,11 +474,6 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Make sure a user is assigned before resolving conversation.
-	if status == cmodels.StatusResolved && conversation.AssignedUserID.Int == 0 {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("conversation.resolveWithoutAssignee"), nil))
-	}
-
 	// Update conversation status.
 	if err := app.conversation.UpdateConversationStatus(uuid, 0 /**status_id**/, status, snoozedUntil, user); err != nil {
 		return sendErrorEnvelope(r, err)

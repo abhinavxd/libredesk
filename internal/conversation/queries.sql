@@ -222,24 +222,35 @@ LIMIT 10;
 
 -- name: get-contact-chat-conversations
 SELECT
+    c.created_at,
     c.uuid,
-    COALESCE(c.meta->'last_chat_message'->>'text_content', '') as last_message,
-    COALESCE((c.meta->'last_chat_message'->>'created_at')::timestamptz, NULL) as last_message_at,
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'first_name', '') AS last_message_sender_first_name,
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'last_name', '') AS last_message_sender_last_name,
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'avatar_url', '') AS last_message_sender_avatar_url,
-    LEAST(10, COUNT(unread.id)) AS unread_message_count
-FROM conversations c
+    COALESCE(c.meta->'last_chat_message'->>'text_content', '') as "last_message.content",
+    COALESCE((c.meta->'last_chat_message'->>'created_at')::timestamptz, NULL) as "last_message.created_at",
+    COALESCE(c.meta->'last_chat_message'->'sender'->>'id', '') AS "last_message.author.id",
+    COALESCE(c.meta->'last_chat_message'->'sender'->>'first_name', '') AS "last_message.author.first_name",
+    COALESCE(c.meta->'last_chat_message'->'sender'->>'last_name', '') AS "last_message.author.last_name",
+    COALESCE(c.meta->'last_chat_message'->'sender'->>'avatar_url', '') AS "last_message.author.avatar_url",
+    LEAST(10, COUNT(unread.id)) AS unread_message_count,
+    COALESCE(au.availability_status::TEXT, '') as "assignee.availability_status",
+    au.avatar_url as "assignee.avatar_url",
+    COALESCE(au.first_name, '') as "assignee.first_name",
+    COALESCE(au.id, 0) as "assignee.id",
+    COALESCE(au.last_name, '') as "assignee.last_name",
+    COALESCE(au.type::TEXT, '') as "assignee.type"
+FROM conversations c inner join inboxes inb on c.inbox_id = inb.id
+LEFT JOIN users au ON c.assigned_user_id = au.id
 LEFT JOIN conversation_messages unread ON unread.conversation_id = c.id 
     AND unread.created_at > c.contact_last_seen_at
     AND unread.type IN ('incoming', 'outgoing') AND unread.private = false
-WHERE c.contact_id = $1
-GROUP BY c.id, c.uuid, 
+WHERE c.contact_id = $1 AND inb.channel = 'livechat' AND inb.deleted_at IS NULL AND inb.enabled = true
+GROUP BY c.id, c.uuid, c.created_at,
     c.meta->'last_chat_message'->>'text_content', 
     (c.meta->'last_chat_message'->>'created_at')::timestamptz,
+    c.meta->'last_chat_message'->'sender'->>'id',
     c.meta->'last_chat_message'->'sender'->>'first_name',
     c.meta->'last_chat_message'->'sender'->>'last_name',
-    c.meta->'last_chat_message'->'sender'->>'avatar_url'
+    c.meta->'last_chat_message'->'sender'->>'avatar_url',
+    au.availability_status, au.avatar_url, au.first_name, au.id, au.last_name, au.type
 ORDER BY c.created_at DESC
 LIMIT 100;
 
@@ -473,15 +484,19 @@ SELECT
     m.private,
     m.status,
     m.content,
+    m.text_content,
+    m.sender_type,
     m.conversation_id,
     m.content_type,
     m.source_id,
+    m.meta,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'cc')) AS cc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'bcc')) AS bcc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'to')) AS to,
     c.inbox_id,
     c.uuid as conversation_uuid,
-    c.subject
+    c.subject,
+    c.contact_id as message_receiver_id
 FROM conversation_messages m
 INNER JOIN conversations c ON c.id = m.conversation_id
 WHERE m.status = 'pending' AND m.type = 'outgoing' AND m.private = false

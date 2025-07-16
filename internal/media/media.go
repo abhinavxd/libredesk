@@ -18,6 +18,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/volatiletech/null/v9"
+	"github.com/zerodha/fastglue"
 	"github.com/zerodha/logf"
 )
 
@@ -35,19 +36,29 @@ type Store interface {
 	Name() string
 }
 
+// SignedURLStore defines the interface for stores that support signed URLs.
+// This is optional and only implemented by stores that need signed URL functionality (like fs).
+type SignedURLStore interface {
+	Store
+	GetSignedURL(name string, expiresAt time.Time, secret []byte) string
+	VerifySignature(name, signature string, expiresAt time.Time, secret []byte) bool
+}
+
 type Manager struct {
 	store   Store
 	lo      *logf.Logger
 	i18n    *i18n.I18n
 	queries queries
+	secret  string
 }
 
 // Opts provides options for configuring the Manager.
 type Opts struct {
-	Store Store
-	Lo    *logf.Logger
-	DB    *sqlx.DB
-	I18n  *i18n.I18n
+	Store  Store
+	Lo     *logf.Logger
+	DB     *sqlx.DB
+	I18n   *i18n.I18n
+	Secret string
 }
 
 // New initializes and returns a new Manager instance for handling media operations.
@@ -61,6 +72,7 @@ func New(opt Opts) (*Manager, error) {
 		lo:      opt.Lo,
 		i18n:    opt.I18n,
 		queries: q,
+		secret:  opt.Secret,
 	}, nil
 }
 
@@ -215,5 +227,51 @@ func (m *Manager) deleteUnlinkedMessageMedia() error {
 			continue
 		}
 	}
+	return nil
+}
+
+// GetSignedURL returns a signed URL for accessing a media file with expiration.
+// This delegates to the store if it supports signed URLs (like fs), otherwise returns the normal URL.
+func (m *Manager) GetSignedURL(name string, expiresAt time.Time) string {
+	// Check if the store supports signed URLs
+	if signedStore, ok := m.store.(SignedURLStore); ok {
+		return signedStore.GetSignedURL(name, expiresAt, []byte(m.secret))
+	}
+	// Fallback to regular URL for stores that handle signing internally (like S3)
+	return m.store.GetURL(name)
+}
+
+// VerifySignature verifies a signed URL signature using the request parameters.
+// This is used by middleware to verify widget media access.
+func (m *Manager) VerifySignature(r *fastglue.Request) error {
+	uuid := r.RequestCtx.UserValue("uuid")
+	if uuid == nil {
+		return fmt.Errorf("missing uuid parameter")
+	}
+	
+	signature := string(r.RequestCtx.QueryArgs().Peek("signature"))
+	expiresStr := string(r.RequestCtx.QueryArgs().Peek("expires"))
+	
+	if signature == "" || expiresStr == "" {
+		return fmt.Errorf("missing signature or expires parameter")
+	}
+	
+	// Parse expiration time
+	var expires int64
+	if _, err := fmt.Sscanf(expiresStr, "%d", &expires); err != nil {
+		return fmt.Errorf("invalid expires parameter: %v", err)
+	}
+	
+	expiresAt := time.Unix(expires, 0)
+	
+	// Check if store supports signature verification
+	if signedStore, ok := m.store.(SignedURLStore); ok {
+		if !signedStore.VerifySignature(uuid.(string), signature, expiresAt, []byte(m.secret)) {
+			return fmt.Errorf("signature verification failed")
+		}
+		return nil
+	}
+	
+	// For stores that don't support signing (like S3), always allow
 	return nil
 }

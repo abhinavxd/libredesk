@@ -210,21 +210,26 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Actvity logs.
 	g.GET("/api/v1/activity-logs", perm(handleGetActivityLogs, "activity_logs:manage"))
 
+	// CSAT.
+	g.POST("/api/v1/csat/{uuid}/response", handleSubmitCSATResponse)
+
 	// WebSocket.
 	g.GET("/ws", auth(func(r *fastglue.Request) error {
 		return handleWS(r, hub)
 	}))
 
-	// Live chat widget.
+	// Live chat widget websocket.
 	g.GET("/widget/ws", handleWidgetWS)
-	g.GET("/api/v1/widget/chat/settings", handleGetChatSettings)
-	g.POST("/api/v1/widget/chat/conversations/init", handleChatInit)
-	g.POST("/api/v1/widget/chat/conversations", handleGetConversations)
-	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", handleChatUpdateLastSeen)
-	g.POST("/api/v1/widget/chat/conversations/{uuid}", handleChatGetConversation)
-	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", handleChatSendMessage)
-	g.POST("/api/v1/widget/media/upload", handleWidgetMediaUpload)
-	g.GET("/api/v1/widget/media/{uuid}", handleWidgetServeMedia)
+
+	// Widget APIs.
+	g.GET("/api/v1/widget/chat/settings/launcher", widgetOrigin(handleGetChatLauncherSettings))
+	g.GET("/api/v1/widget/chat/settings", widgetOrigin(handleGetChatSettings))
+	g.POST("/api/v1/widget/chat/conversations/init", widgetOrigin(handleChatInit))
+	g.POST("/api/v1/widget/chat/conversations", widgetOrigin(handleGetConversations))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", widgetOrigin(handleChatUpdateLastSeen))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}", widgetOrigin(handleChatGetConversation))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", widgetOrigin(handleChatSendMessage))
+	g.POST("/api/v1/widget/media/upload", widgetOrigin(handleWidgetMediaUpload))
 
 	// Frontend pages.
 	g.GET("/", notAuthPage(serveIndexPage))

@@ -1,5 +1,5 @@
 import { useConversationStore } from './stores/conversation'
-import { WS_EVENT } from './constants/websocket'
+import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
 
 export class WebSocketClient {
   constructor() {
@@ -13,6 +13,10 @@ export class WebSocketClient {
     this.pingInterval = null
     this.lastPong = Date.now()
     this.convStore = useConversationStore()
+    this.messageQueue = []
+    this.maxQueueSize = 50
+    // 30 sec.
+    this.queueTimeoutMs = 30000
   }
 
   init () {
@@ -42,6 +46,8 @@ export class WebSocketClient {
     this.isReconnecting = false
     this.lastPong = Date.now()
     this.setupPing()
+    // Send any queued messages after connection is established.
+    this.flushMessageQueue()
   }
 
   handleMessage (event) {
@@ -61,7 +67,13 @@ export class WebSocketClient {
           this.convStore.updateConversationMessage(data.data)
         },
         [WS_EVENT.MESSAGE_PROP_UPDATE]: () => this.convStore.updateMessageProp(data.data),
-        [WS_EVENT.CONVERSATION_PROP_UPDATE]: () => this.convStore.updateConversationProp(data.data)
+        [WS_EVENT.CONVERSATION_PROP_UPDATE]: () => this.convStore.updateConversationProp(data.data),
+        [WS_EVENT.CONVERSATION_SUBSCRIBED]: () => {
+          console.log('Successfully subscribed to conversation:', data.data.conversation_uuid)
+        },
+        [WS_EVENT.TYPING]: () => {
+          this.convStore.updateTypingStatus(data.data)
+        }
       }
 
       const handler = handlers[data.type]
@@ -144,8 +156,89 @@ export class WebSocketClient {
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message))
     } else {
-      console.warn('WebSocket is not open. Message not sent:', message)
+      console.warn('WebSocket is not open. Queueing message:', message)
+      this.queueMessage(message)
     }
+  }
+
+  queueMessage (message) {
+    // Don't queue ephemeral message types.
+    if (WS_EPHEMERAL_TYPES.includes(message.type)) {
+      console.log('Skipping queue for ephemeral message type:', message.type)
+      return
+    }
+
+    // Remove expired messages from queue.
+    const now = Date.now()
+    this.messageQueue = this.messageQueue.filter(item =>
+      now - item.timestamp < this.queueTimeoutMs
+    )
+
+    // Remove all existing conversation subscriptions since only one is allowed.
+    if (message.type === WS_EVENT.CONVERSATION_SUBSCRIBE) {
+      this.messageQueue = this.messageQueue.filter(item =>
+        item.type !== WS_EVENT.CONVERSATION_SUBSCRIBE
+      )
+    }
+
+    // Evict oldest message if queue is full.
+    if (this.messageQueue.length >= this.maxQueueSize) {
+      console.warn('Message queue is full, removing oldest message')
+      this.messageQueue.shift()
+    }
+
+    // Push.
+    this.messageQueue.push({
+      ...message,
+      timestamp: now
+    })
+  }
+
+  flushMessageQueue () {
+    if (this.messageQueue.length === 0) return
+
+    // Remove expired messages before sending
+    const now = Date.now()
+    this.messageQueue = this.messageQueue.filter(item =>
+      now - item.timestamp < this.queueTimeoutMs
+    )
+
+    if (this.messageQueue.length === 0) return
+
+    console.log(`Sending ${this.messageQueue.length} queued messages`)
+    while (this.messageQueue.length > 0 && this.socket?.readyState === WebSocket.OPEN) {
+      const queuedItem = this.messageQueue.shift()
+      // Remove timestamp before sending
+      delete queuedItem.timestamp
+      this.socket.send(JSON.stringify(queuedItem))
+    }
+  }
+
+  subscribeToConversation (conversationUUID) {
+    if (!conversationUUID) return
+
+    const subscribeMessage = {
+      type: WS_EVENT.CONVERSATION_SUBSCRIBE,
+      data: {
+        conversation_uuid: conversationUUID
+      }
+    }
+
+    this.send(subscribeMessage)
+  }
+
+  sendTypingIndicator (conversationUUID, isTyping) {
+    if (!conversationUUID) return
+
+    const typingMessage = {
+      type: WS_EVENT.TYPING,
+      data: {
+        conversation_uuid: conversationUUID,
+        is_typing: isTyping
+      }
+    }
+
+    this.send(typingMessage)
   }
 
   close () {
@@ -168,4 +261,6 @@ export function initWS () {
 }
 
 export const sendMessage = message => wsClient?.send(message)
+export const subscribeToConversation = conversationUUID => wsClient?.subscribeToConversation(conversationUUID)
+export const sendTypingIndicator = (conversationUUID, isTyping) => wsClient?.sendTypingIndicator(conversationUUID, isTyping)
 export const closeWebSocket = () => wsClient?.close()

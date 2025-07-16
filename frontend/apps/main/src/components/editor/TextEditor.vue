@@ -118,6 +118,8 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
+import { useTypingIndicator } from '@shared-ui/composables'
+import { useConversationStore } from '@main/stores/conversation'
 
 const textContent = defineModel('textContent', { default: '' })
 const htmlContent = defineModel('htmlContent', { default: '' })
@@ -140,6 +142,10 @@ const props = defineProps({
 const emit = defineEmits(['send', 'aiPromptSelected'])
 
 const emitPrompt = (key) => emit('aiPromptSelected', key)
+
+// Set up typing indicator
+const conversationStore = useConversationStore()
+const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyping)
 
 // To preseve the table styling in emails, need to set the table style inline.
 // Created these custom extensions to set the table style inline.
@@ -201,6 +207,8 @@ const editor = useEditor({
     handleKeyDown: (view, event) => {
       if (event.ctrlKey && event.key === 'Enter') {
         emit('send')
+        // Stop typing when sending
+        stopTyping()
         return true
       }
     }
@@ -211,6 +219,13 @@ const editor = useEditor({
     htmlContent.value = editor.getHTML()
     textContent.value = editor.getText()
     isInternalUpdate.value = false
+
+    // Trigger typing indicator when user types
+    startTyping()
+  },
+  onBlur: () => {
+    // Stop typing when editor loses focus
+    stopTyping()
   }
 })
 

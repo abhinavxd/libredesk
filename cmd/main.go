@@ -203,9 +203,13 @@ func main() {
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template, webhook)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 	)
+
+	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
 
+	// Start inboxes.
 	startInboxes(ctx, inbox, conversation, user)
+
 	go automation.Run(ctx, automationWorkers)
 	go autoassigner.Run(ctx, autoAssignInterval)
 	go conversation.Run(ctx, messageIncomingQWorkers, messageOutgoingQWorkers, messageOutgoingScanInterval)

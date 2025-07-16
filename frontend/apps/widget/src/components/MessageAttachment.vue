@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-wrap gap-2 mt-2">
+  <div class="flex flex-wrap gap-2" v-if="attachments && attachments.length > 0">
     <div
       v-for="attachment in attachments"
       :key="attachment.uuid"

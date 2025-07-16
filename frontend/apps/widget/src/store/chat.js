@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
-import { initWidgetWS } from '../websocket.js'
 import api from '../api/index.js'
 import MessageCache from '@main/utils/conversation-message-cache.js'
 import { useUserStore } from './user.js'
@@ -14,75 +13,121 @@ export const useChatStore = defineStore('chat', () => {
     // Conversation messages cache, evict old conversation messages after 50 conversations.
     const messageCache = reactive(new MessageCache(50))
     const isLoadingConversations = ref(false)
+    // Reactivity trigger for message cache changes this is easier than making the whole messageCache reactive.
+    const messageCacheVersion = ref(0)
 
     // Getters
-    const getCurrentConversationMessages = () => {
+    const getCurrentConversationMessages = computed(() => {
+        messageCacheVersion.value // Force reactivity tracking
         const convId = currentConversation.value?.uuid
         if (!convId) return []
         return messageCache.getAllPagesMessages(convId)
-    }
+    })
     const hasConversations = computed(() => conversations.value?.length > 0)
     const getConversations = computed(() => {
-        // Sort by `last_message_at` descending.
+        // Sort by `last_message.created_at` descending.
         if (conversations.value) {
-            return conversations.value.sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at))
+            return conversations.value.sort((a, b) => new Date(b.last_message.created_at) - new Date(a.last_message.created_at))
         }
         return []
     })
 
-    // Actions
+    const updateConversationListLastMessage = (conversationUUID, message, incrementUnread = false) => {
+        if (!conversations.value || !Array.isArray(conversations.value)) return
+
+        // Find conversation in the list
+        const conv = conversations.value.find(c => c.uuid === conversationUUID)
+        if (!conv) return
+
+        // Update last_message in the conversation
+        conv.last_message = {
+            content: message.text_content !== '' ? message.text_content : message.content,
+            created_at: message.created_at,
+            status: message.status,
+            author: {
+                id: message.author.id,
+                first_name: message.author.first_name || '',
+                last_name: message.author.last_name || '',
+                avatar_url: message.author.avatar_url || '',
+                availability_status: message.author.availability_status || '',
+                type: message.author.type || '',
+                active_at: message.author.active_at || null
+            }
+        }
+
+        // Increment unread count if needed
+        if (incrementUnread) {
+            conv.unread_message_count = (conv.unread_message_count || 0) + 1
+        }
+    }
+
     const addMessageToConversation = (conversationUUID, message) => {
         messageCache.addMessage(conversationUUID, message)
-        // Update `last_message` for the conversations list.
-        const conv = conversations.value.find(c => c.uuid === conversationUUID)
-        if (conv) {
-            conv.last_message = message.text_content
-            conv.last_message_at = message.created_at
-        }
+        messageCacheVersion.value++ // Trigger reactivity
+        // Check if we should increment unread count (message from other user)
+        const shouldIncrementUnread = message.author.id !== userStore.userID
+        updateConversationListLastMessage(conversationUUID, message, shouldIncrementUnread)
     }
 
-    const fetchCurrentConversation = async () => {
-        const conversationUUID = currentConversation.value?.uuid
-        if (!conversationUUID) return
-
-        // Set unread message count to 0 for the current conversation
-        const conv = conversations.value.find(c => c.uuid === conversationUUID)
-        if (conv) {
-            conv.unread_message_count = 0
+    const addPendingMessage = (conversationUUID, messageText, authorType, authorId) => {
+        // Pending message is a temporary message that will be replaced with actual message later after sending.
+        const pendingMessage = {
+            content: messageText,
+            author: {
+                type: authorType,
+                id: authorId,
+                first_name: userStore.firstName || '',
+                last_name: userStore.lastName || '',
+                avatar_url: userStore.avatarUrl || '',
+                availability_status: '',
+                active_at: null
+            },
+            attachments: [],
+            uuid: `pending-${Date.now()}`,
+            status: 'sending',
+            created_at: new Date().toISOString()
         }
+        messageCache.addMessage(conversationUUID, pendingMessage)
+        messageCacheVersion.value++ // Trigger reactivity
 
-        // If messages are already loaded, do nothing.
-        if (messageCache.hasConversation(conversationUUID)) {
-            return
-        }
+        // Update conversations list with pending message
+        updateConversationListLastMessage(conversationUUID, pendingMessage)
 
-        // Fetch entire conversation and replace messages and conversation data
-        try {
-            const resp = await api.getChatConversation(conversationUUID)
-            replaceMessages(resp.data.data.messages)
-            currentConversation.value = resp.data.data.conversation
-        } catch (error) {
-            console.error('Error fetching conversation:', error)
-        }
+        return pendingMessage.uuid
     }
 
-    const fetchAndReplaceConversationAndMessages = async () => {
-        const conversationUUID = currentConversation.value?.uuid
-        if (!conversationUUID) return
-        // Fetch entire conversation and replace messages
+    const replaceMessage = (conversationUUID, msgID, actualMessage) => {
+        messageCache.updateMessage(conversationUUID, msgID, actualMessage)
+        messageCacheVersion.value++ // Trigger reactivity
+        updateConversationListLastMessage(conversationUUID, actualMessage)
+    }
+
+    const removeMessage = (conversationUUID, msgID) => {
+        messageCache.removeMessage(conversationUUID, msgID)
+        messageCacheVersion.value++ // Trigger reactivity
+    }
+
+    const loadConversation = async (conversationUUID, force = false) => {
+        if (!conversationUUID) return false
+
+        // If the conversation is already loaded, do not fetch again unless forced.
+        if (currentConversation.value?.uuid === conversationUUID && !force) {
+            return true
+        }
+
         try {
             const resp = await api.getChatConversation(conversationUUID)
+            setCurrentConversation(resp.data.data.conversation)
             replaceMessages(resp.data.data.messages)
             currentConversation.value = resp.data.data.conversation
-            // Set last message for the conversation
-            const conv = conversations.value.find(c => c.uuid === conversationUUID)
-            if (conv) {
-                conv.last_message = resp.data.data.messages[0]?.content || ''
-                conv.last_message_at = resp.data.data.messages[0]?.created_at || new Date().toISOString()
+            if (resp.data.data.messages.length > 0) {
+                updateConversationListLastMessage(conversationUUID, resp.data.data.messages[0], false)
             }
         } catch (error) {
             console.error('Error fetching conversation:', error)
+            return false
         }
+        return true
     }
 
     const replaceMessages = (newMessages) => {
@@ -93,16 +138,22 @@ export const useChatStore = defineStore('chat', () => {
             messageCache.purgeConversation(convId)
             messageCache.addMessages(convId, newMessages, 1, 1)
         }
+        messageCacheVersion.value++ // Trigger reactivity
     }
 
     const clearMessages = () => {
         const convId = currentConversation.value?.uuid
         if (!convId) return
-        // Clear messages for current conversation by setting empty array.
+        // Clear messages for current conversation by setting empty values.
         messageCache.addMessages(convId, [], 1, 1)
+        messageCacheVersion.value++ // Trigger reactivity
     }
 
-    const setTypingStatus = (status) => {
+    const setTypingStatus = (conversationUUID, status) => {
+        if (!conversationUUID) return
+        if (currentConversation.value?.uuid !== conversationUUID) {
+            return
+        }
         isTyping.value = status
     }
 
@@ -110,27 +161,22 @@ export const useChatStore = defineStore('chat', () => {
         if (conversation === null) {
             conversation = {}
         }
+        // Clear messages if conversation is null or empty.
+        if (!conversation) {
+            clearMessages()
+        }
         currentConversation.value = conversation
     }
 
-    const openConversation = (conversation) => {
-        // Set the current conversation
-        setCurrentConversation(conversation)
-
-        // Init WebSocket connection if not already initialized.
-        const jwt = userStore.userSessionToken
-        if (jwt) {
-            initWidgetWS(jwt)
-        }
-    }
-
     const fetchConversations = async () => {
+        // No session token means no conversations can be fetched simply return empty.
         if (!userStore.userSessionToken) {
             conversations.value = []
             return
         }
 
-        if (conversations.value !== null) {
+        // If conversations are already loaded and is an array, do not fetch again.
+        if (Array.isArray(conversations.value)) {
             return
         }
 
@@ -154,7 +200,15 @@ export const useChatStore = defineStore('chat', () => {
     const updateCurrentConversationLastSeen = async () => {
         const conversationUUID = currentConversation.value?.uuid
         if (!conversationUUID) return
-        api.updateConversationLastSeen(conversationUUID)
+
+        // Reset unread count for current conversation
+        if (conversations.value && Array.isArray(conversations.value)) {
+            const conv = conversations.value.find(c => c.uuid === conversationUUID)
+            if (conv) {
+                conv.unread_message_count = 0
+            }
+        }
+        await api.updateConversationLastSeen(conversationUUID)
     }
 
     return {
@@ -172,14 +226,16 @@ export const useChatStore = defineStore('chat', () => {
 
         // Actions
         addMessageToConversation,
-        fetchCurrentConversation,
+        addPendingMessage,
+        replaceMessage,
+        removeMessage,
         replaceMessages,
         clearMessages,
         setTypingStatus,
         setCurrentConversation,
-        openConversation,
         fetchConversations,
-        fetchAndReplaceConversationAndMessages,
-        updateCurrentConversationLastSeen
+        loadConversation,
+        updateCurrentConversationLastSeen,
+        updateConversationListLastMessage
     }
 })
