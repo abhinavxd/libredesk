@@ -40,6 +40,8 @@ const setupParentMessageListeners = () => {
   window.addEventListener('message', (event) => {
     if (event.data.type === 'SET_MOBILE_STATE') {
       widgetStore.setMobileFullScreen(event.data.isMobile)
+    } else if (event.data.type === 'WIDGET_EXPANDED') {
+      widgetStore.setExpanded(event.data.isExpanded)
     }
   })
 }

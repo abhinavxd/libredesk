@@ -6,16 +6,32 @@
       </Button>
       <ChatTitle />
     </div>
-    <!-- Close Button - only visible on mobile (full screen mode) -->
-    <CloseWidgetButton class="absolute right-4" />
+    <div class="flex items-center gap-2 ml-auto">
+      <!-- Expand/Collapse Button - only visible on desktop -->
+      <Button 
+        v-if="!widgetStore.isMobileFullScreen" 
+        @click="widgetStore.toggleExpand" 
+        variant="ghost" 
+        size="sm"
+        :title="widgetStore.isExpanded ? 'Collapse' : 'Expand'"
+      >
+        <Maximize2 v-if="!widgetStore.isExpanded" class="w-4 h-4" />
+        <Minimize2 v-else class="w-4 h-4" />
+      </Button>
+      <!-- Close Button - only visible on mobile (full screen mode) -->
+      <CloseWidgetButton />
+    </div>
   </div>
 </template>
 
 <script setup>
 import { Button } from '@shared-ui/components/ui/button'
-import { ArrowLeft } from 'lucide-vue-next'
+import { ArrowLeft, Maximize2, Minimize2 } from 'lucide-vue-next'
 import ChatTitle from './ChatTitle.vue'
 import CloseWidgetButton from './CloseWidgetButton.vue'
+import { useWidgetStore } from '@widget/store/widget.js'
+
+const widgetStore = useWidgetStore()
 
 defineEmits(['goBack'])
 </script>

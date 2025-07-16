@@ -29,6 +29,7 @@
             this.widgetSettings = null;
             this.unreadCount = 0;
             this.isMobile = window.innerWidth <= 600;
+            this.isExpanded = false;
             this.init();
         }
 
@@ -193,6 +194,10 @@
                         this.hideChat();
                     } else if (event.data.type === 'UPDATE_UNREAD_COUNT') {
                         this.updateUnreadCount(event.data.count);
+                    } else if (event.data.type === 'EXPAND_WIDGET') {
+                        this.expandWidget();
+                    } else if (event.data.type === 'COLLAPSE_WIDGET') {
+                        this.collapseWidget();
                     }
                 }
             });
@@ -242,13 +247,21 @@
                     this.iframe.style.display = 'block';
                     this.iframe.style.position = 'fixed';
                     this.iframe.style.width = '400px';
-                    this.iframe.style.height = '700px';
                     this.iframe.style.borderRadius = '10px';
                     this.iframe.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)';
                     this.iframe.style.top = '';
                     this.iframe.style.left = '';
-                    this.setLauncherPosition();
                     this.widgetButtonWrapper.style.display = '';
+                    
+                    // Apply expanded or normal height based on current state
+                    if (this.isExpanded) {
+                        this.iframe.style.height = '100vh';
+                        this.iframe.style.bottom = '0';
+                        this.iframe.style.top = '0';
+                    } else {
+                        this.iframe.style.height = '700px';
+                        this.setLauncherPosition();
+                    }
                 }
                 this.isChatVisible = true;
                 this.toggleButton.style.transform = 'scale(0.9)';
@@ -260,6 +273,7 @@
             if (this.iframe) {
                 this.iframe.style.display = 'none';
                 this.isChatVisible = false;
+                this.isExpanded = false;
                 this.toggleButton.style.transform = 'scale(1)';
                 this.widgetButtonWrapper.style.display = '';
             }
@@ -273,6 +287,46 @@
                 this.unreadBadge.style.display = 'flex';
             } else {
                 this.unreadBadge.style.display = 'none';
+            }
+        }
+
+        expandWidget () {
+            if (this.iframe && this.isChatVisible && !this.isMobile) {
+                this.isExpanded = true;
+                
+                // Expand to a larger size (wider and taller)
+                this.iframe.style.width = '600px';
+                this.iframe.style.height = '80vh';
+                this.iframe.style.maxHeight = '800px';
+                
+                // Set launcher position to avoid covering it
+                this.setLauncherPosition();
+                
+                // Send expanded state to iframe
+                this.iframe.contentWindow.postMessage({
+                    type: 'WIDGET_EXPANDED',
+                    isExpanded: true
+                }, '*');
+            }
+        }
+
+        collapseWidget () {
+            if (this.iframe && this.isChatVisible && !this.isMobile) {
+                this.isExpanded = false;
+                
+                // Reset to original size
+                this.iframe.style.width = '400px';
+                this.iframe.style.height = '700px';
+                this.iframe.style.maxHeight = 'none';
+                
+                // Set launcher position to avoid covering it
+                this.setLauncherPosition();
+                
+                // Send collapsed state to iframe
+                this.iframe.contentWindow.postMessage({
+                    type: 'WIDGET_EXPANDED',
+                    isExpanded: false
+                }, '*');
             }
         }
 
