@@ -33,8 +33,9 @@
       <button
         @click="submitRating"
         :disabled="(!selectedRating && !feedback.trim()) || isSubmitting"
-        class="w-full py-2 bg-primary text-primary-foreground rounded-md text-sm disabled:opacity-50"
+        class="w-full py-2 bg-primary text-primary-foreground rounded-md text-sm disabled:opacity-50 flex items-center justify-center gap-2"
       >
+        <div v-if="isSubmitting" class="w-4 h-4 border border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
         <span v-if="isSubmitting">Submitting...</span>
         <span v-else>Submit feedback</span>
       </button>

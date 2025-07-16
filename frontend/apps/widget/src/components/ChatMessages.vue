@@ -1,5 +1,10 @@
 <template>
   <div class="flex flex-col relative flex-1 min-h-0">
+    <!-- Loading conversation overlay -->
+    <div v-if="isLoadingConversation" class="absolute inset-0 bg-background/80 backdrop-blur-sm z-10">
+      <Spinner size="md" text="Loading conversation..." absolute />
+    </div>
+    
     <div
       class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
       ref="messagesContainer"
@@ -117,6 +122,7 @@ import NoticeBanner from './NoticeBanner.vue'
 import MessageAttachment from './MessageAttachment.vue'
 import CSATMessageBubble from './CSATMessageBubble.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
@@ -127,6 +133,7 @@ const currentConversationUUID = ref('')
 
 const config = computed(() => widgetStore.config)
 const isTyping = computed(() => chatStore.isTyping)
+const isLoadingConversation = computed(() => chatStore.isLoadingConversation)
 
 const getMessageTime = (timestamp) => {
   return useRelativeTime(new Date(timestamp)).value

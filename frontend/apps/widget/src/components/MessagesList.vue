@@ -1,8 +1,8 @@
 <template>
   <div>
     <!-- Loading State -->
-    <div v-if="isLoadingConversations" class="flex items-center justify-center py-8">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <div v-if="isLoadingConversations" class="py-8">
+      <Spinner size="md" text="Loading conversations..." />
     </div>
 
     <!-- Empty State -->
@@ -59,6 +59,7 @@ import { useWidgetStore } from '../store/widget.js'
 import { useUserStore } from '@widget/store/user.js'
 import { useRelativeTime } from '@widget/composables/useRelativeTime.js'
 import UnreadCountBadge from './UnreadCountBadge.vue'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()

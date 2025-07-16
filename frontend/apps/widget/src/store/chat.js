@@ -13,6 +13,7 @@ export const useChatStore = defineStore('chat', () => {
     // Conversation messages cache, evict old conversation messages after 50 conversations.
     const messageCache = reactive(new MessageCache(50))
     const isLoadingConversations = ref(false)
+    const isLoadingConversation = ref(false)
     // Reactivity trigger for message cache changes this is easier than making the whole messageCache reactive.
     const messageCacheVersion = ref(0)
 
@@ -116,6 +117,7 @@ export const useChatStore = defineStore('chat', () => {
         }
 
         try {
+            isLoadingConversation.value = true
             const resp = await api.getChatConversation(conversationUUID)
             setCurrentConversation(resp.data.data.conversation)
             replaceMessages(resp.data.data.messages)
@@ -126,6 +128,8 @@ export const useChatStore = defineStore('chat', () => {
         } catch (error) {
             console.error('Error fetching conversation:', error)
             return false
+        } finally {
+            isLoadingConversation.value = false
         }
         return true
     }
@@ -201,14 +205,18 @@ export const useChatStore = defineStore('chat', () => {
         const conversationUUID = currentConversation.value?.uuid
         if (!conversationUUID) return
 
-        // Reset unread count for current conversation
-        if (conversations.value && Array.isArray(conversations.value)) {
-            const conv = conversations.value.find(c => c.uuid === conversationUUID)
-            if (conv) {
-                conv.unread_message_count = 0
+        try {
+            // Reset unread count for current conversation
+            if (conversations.value && Array.isArray(conversations.value)) {
+                const conv = conversations.value.find(c => c.uuid === conversationUUID)
+                if (conv) {
+                    conv.unread_message_count = 0
+                }
             }
+            await api.updateConversationLastSeen(conversationUUID)
+        } catch (error) {
+            console.error('Error updating last seen:', error)
         }
-        await api.updateConversationLastSeen(conversationUUID)
     }
 
     return {
@@ -218,6 +226,7 @@ export const useChatStore = defineStore('chat', () => {
         conversations,
         currentConversation,
         isLoadingConversations,
+        isLoadingConversation,
 
         // Getters
         getCurrentConversationMessages,

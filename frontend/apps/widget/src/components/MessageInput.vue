@@ -31,9 +31,10 @@
             @click="sendMessage"
             size="sm"
             class="h-8 px-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed border-0"
-            :disabled="!newMessage.trim() || isUploading"
+            :disabled="!newMessage.trim() || isUploading || isSending"
           >
-            <ArrowUp class="w-4 h-4" />
+            <div v-if="isSending" class="w-4 h-4 border border-background border-t-current rounded-full animate-spin"></div>
+            <ArrowUp v-else class="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -65,6 +66,7 @@ const userStore = useUserStore()
 const messageInput = ref(null)
 const newMessage = ref('')
 const isUploading = ref(false)
+const isSending = ref(false)
 const config = computed(() => widgetStore.config)
 
 // Setup typing indicator
@@ -138,6 +140,7 @@ const sendMessage = async () => {
   // Temporary message ID for pending messages.
   let tempMessageID = null
   try {
+    isSending.value = true
     // No current conversation ID? Start a new conversation.
     if (!chatStore.currentConversation.uuid) {
       await initChatConversation(messageText)
@@ -159,6 +162,7 @@ const sendMessage = async () => {
     }
     emit('error', handleHTTPError(error).message)
   } finally {
+    isSending.value = false
     await chatStore.updateCurrentConversationLastSeen()
   }
 }
