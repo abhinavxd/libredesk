@@ -6,7 +6,7 @@
     'use strict';
 
     // Prevent multiple initializations
-    if (window.LibredeskWidget) {
+    if (window.LibredeskWidget && window.LibredeskWidget instanceof Function) {
         return;
     }
 
@@ -106,7 +106,7 @@
                 align-items: center;
                 transition: transform 0.3s ease;
             `;
-            
+
             if (launcher.logo_url) {
                 this.defaultIcon = document.createElement('img');
                 this.defaultIcon.src = launcher.logo_url;
@@ -117,7 +117,7 @@
                 `;
                 this.iconContainer.appendChild(this.defaultIcon);
             }
-            
+
             // Create downward arrow SVG
             this.arrowIcon = document.createElement('div');
             this.arrowIcon.innerHTML = `
@@ -133,7 +133,7 @@
                 align-items: center;
             `;
             this.iconContainer.appendChild(this.arrowIcon);
-            
+
             this.toggleButton.appendChild(this.iconContainer);
 
             // Create unread badge
@@ -255,6 +255,14 @@
             this.isVueAppReady = true;
             // Show the widget button now that Vue app is ready
             this.widgetButtonWrapper.style.display = '';
+
+            // Send JWT token if provided in config
+            if (this.config.libredesk_user_jwt) {
+                this.iframe.contentWindow.postMessage({
+                    type: 'SET_JWT_TOKEN',
+                    jwt: this.config.libredesk_user_jwt
+                }, '*');
+            }
         }
 
         toggle () {
@@ -291,7 +299,7 @@
                     this.iframe.style.top = '';
                     this.iframe.style.left = '';
                     this.widgetButtonWrapper.style.display = '';
-                    
+
                     // Apply expanded or normal height based on current state
                     if (this.isExpanded) {
                         this.iframe.style.height = '100vh';
@@ -305,7 +313,7 @@
                 this.isChatVisible = true;
                 this.toggleButton.style.transform = 'scale(0.9)';
                 this.unreadBadge.style.display = 'none';
-                
+
                 // Switch to arrow icon
                 if (this.defaultIcon) this.defaultIcon.style.display = 'none';
                 this.arrowIcon.style.display = 'flex';
@@ -319,7 +327,7 @@
                 this.isExpanded = false;
                 this.toggleButton.style.transform = 'scale(1)';
                 this.widgetButtonWrapper.style.display = '';
-                
+
                 // Switch back to default icon
                 if (this.defaultIcon) this.defaultIcon.style.display = 'block';
                 this.arrowIcon.style.display = 'none';
@@ -340,15 +348,15 @@
         expandWidget () {
             if (this.iframe && this.isChatVisible && !this.isMobile) {
                 this.isExpanded = true;
-                
+
                 // Expand to a larger size (wider and taller)
                 this.iframe.style.width = '600px';
                 this.iframe.style.height = '80vh';
                 this.iframe.style.maxHeight = '800px';
-                
+
                 // Set launcher position to avoid covering it
                 this.setLauncherPosition();
-                
+
                 // Send expanded state to iframe
                 this.iframe.contentWindow.postMessage({
                     type: 'WIDGET_EXPANDED',
@@ -360,15 +368,15 @@
         collapseWidget () {
             if (this.iframe && this.isChatVisible && !this.isMobile) {
                 this.isExpanded = false;
-                
+
                 // Reset to original size
                 this.iframe.style.width = '400px';
                 this.iframe.style.height = '700px';
                 this.iframe.style.maxHeight = 'none';
-                
+
                 // Set launcher position to avoid covering it
                 this.setLauncherPosition();
-                
+
                 // Send collapsed state to iframe
                 this.iframe.contentWindow.postMessage({
                     type: 'WIDGET_EXPANDED',
@@ -397,16 +405,49 @@
 
     // Auto-initialize if configuration is provided
     if (window.LibredeskConfig) {
-        window.libreDeskWidget = new LibredeskWidget(window.LibredeskConfig);
+        window.LibredeskWidget = new LibredeskWidget(window.LibredeskConfig);
     }
 
     window.initLibreDeskWidget = function (config = {}) {
-        if (window.libreDeskWidget) {
+        if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
             console.warn('Libredesk Widget is already initialized');
-            return window.libreDeskWidget;
+            return window.LibredeskWidget;
         }
-        window.libreDeskWidget = new LibredeskWidget(config);
-        return window.libreDeskWidget;
+        window.LibredeskWidget = new LibredeskWidget(config);
+        return window.LibredeskWidget;
+    };
+
+    LibredeskWidget.show = function () {
+        if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
+            window.LibredeskWidget.showChat();
+        } else {
+            console.warn('Libredesk Widget is not initialized. Call initLibreDeskWidget() first.');
+        }
+    };
+
+    LibredeskWidget.hide = function () {
+        if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
+            window.LibredeskWidget.hideChat();
+        } else {
+            console.warn('Libredesk Widget is not initialized. Call initLibreDeskWidget() first.');
+        }
+    };
+
+    LibredeskWidget.toggle = function () {
+        if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
+            window.LibredeskWidget.toggle();
+        } else {
+            console.warn('Libredesk Widget is not initialized. Call initLibreDeskWidget() first.');
+        }
+    };
+
+    LibredeskWidget.isVisible = function () {
+        if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
+            return window.LibredeskWidget.isChatVisible;
+        } else {
+            console.warn('Libredesk Widget is not initialized. Call initLibreDeskWidget() first.');
+            return false;
+        }
     };
 
 })();
