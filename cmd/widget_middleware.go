@@ -87,8 +87,11 @@ func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) erro
 		// Resolve user/contact ID from JWT claims
 		contactID, err := resolveUserIDFromClaims(app, claims)
 		if err != nil {
-			app.lo.Error("error resolving user ID from JWT claims", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+			envErr, ok := err.(envelope.Error)
+			if ok && envErr.ErrorType != envelope.NotFoundError {
+				app.lo.Error("error resolving user ID from JWT claims", "error", err)
+				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+			}
 		}
 
 		// Store authenticated data in request context for downstream handlers

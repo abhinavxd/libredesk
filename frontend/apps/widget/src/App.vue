@@ -22,7 +22,7 @@ const userStore = useUserStore()
 // Initialize unread count tracking and sending to parent window.
 useUnreadCount()
 
-onMounted(() => {
+onMounted(async () => {
   // Use pre-fetched widget config from main.js
   const widgetConfig = getCurrentInstance().appContext.config.globalProperties.$widgetConfig
   if (widgetConfig) {
@@ -30,9 +30,12 @@ onMounted(() => {
   }
   
   initializeWebSocket()
+  
   widgetStore.openWidget()
+  
   setupParentMessageListeners()
-  chatStore.fetchConversations()
+  
+  await chatStore.fetchConversations()
   
   // Notify parent window that Vue app is ready
   window.parent.postMessage({

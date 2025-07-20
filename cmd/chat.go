@@ -176,13 +176,11 @@ func handleChatInit(r *fastglue.Request) error {
 	// Get authenticated data from context (set by middleware)
 	// Middleware always validates inbox, so we can safely use non-optional getters
 	claims := getWidgetClaimsOptional(r)
-	
 	inboxID, err := getWidgetInboxID(r)
 	if err != nil {
 		app.lo.Error("error getting inbox ID from middleware context", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
-	
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
 		app.lo.Error("error getting inbox from middleware context", "error", err)
@@ -205,13 +203,6 @@ func handleChatInit(r *fastglue.Request) error {
 
 	// Handle authenticated user vs visitor
 	if claims != nil {
-		// Use authenticated contact ID from middleware
-		contactID, err = getWidgetContactID(r)
-		if err != nil {
-			app.lo.Error("error getting contact ID from middleware context", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
-		}
-
 		// Handle existing contacts with external user id - check if we need to create user
 		if claims.ExternalUserID != "" {
 			// Find or create user based on external_user_id.
@@ -235,26 +226,54 @@ func handleChatInit(r *fastglue.Request) error {
 				}
 
 				// Create new contact with external user ID.
-				err = app.user.CreateContact(&umodels.User{
+				var user = umodels.User{
 					FirstName:        firstName,
 					LastName:         lastName,
 					Email:            null.NewString(claims.Email, claims.Email != ""),
 					ExternalUserID:   null.NewString(claims.ExternalUserID, claims.ExternalUserID != ""),
 					CustomAttributes: customAttribJSON,
-				})
+				}
+				err = app.user.CreateContact(&user)
 				if err != nil {
 					app.lo.Error("error creating contact with external ID", "external_user_id", claims.ExternalUserID, "error", err)
 					return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 				}
+				contactID = user.ID
+			} else {
+				contactID = user.ID
 			}
-			contactID = user.ID
 			isVisitor = false
 		} else {
 			isVisitor = claims.IsVisitor
+			contactID, err = getWidgetContactID(r)
+			if err != nil {
+				app.lo.Error("error getting contact ID from middleware context", "error", err)
+				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+			}
 		}
 	} else {
 		// Visitor user not authenticated, create a new visitor contact.
 		isVisitor = true
+
+		// Validate visitor contact info based on configuration
+		switch config.Visitors.RequireContactInfo {
+		case "required":
+			if req.VisitorName == "" {
+				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "Name"), nil, envelope.InputError)
+			}
+			if req.VisitorEmail == "" {
+				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "Email"), nil, envelope.InputError)
+			}
+		case "optional":
+			// Allow empty fields, but if provided, validate email format
+			if req.VisitorEmail != "" && !stringutil.ValidEmail(req.VisitorEmail) {
+				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "Email"), nil, envelope.InputError)
+			}
+		default:
+			req.VisitorEmail = ""
+			req.VisitorName = ""
+		}
+
 		visitor := umodels.User{
 			Email:     null.NewString(req.VisitorEmail, req.VisitorEmail != ""),
 			FirstName: req.VisitorName,
@@ -274,16 +293,20 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 
 	// Check conversation permissions based on user type.
-	userConfig := config.Visitors
-	if !isVisitor {
-		userConfig = config.Users
+	var allowStartConversation, preventMultipleConversations bool
+	if isVisitor {
+		allowStartConversation = config.Visitors.AllowStartConversation
+		preventMultipleConversations = config.Visitors.PreventMultipleConversations
+	} else {
+		allowStartConversation = config.Users.AllowStartConversation
+		preventMultipleConversations = config.Users.PreventMultipleConversations
 	}
 
-	if !userConfig.AllowStartConversation {
+	if !allowStartConversation {
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("globals.messages.notAllowed}"), nil, envelope.PermissionError)
 	}
 
-	if userConfig.PreventMultipleConversations {
+	if preventMultipleConversations {
 		conversations, err := app.conversation.GetContactChatConversations(contactID, inboxID)
 		if err != nil {
 			userType := "visitor"
@@ -364,12 +387,12 @@ func handleChatInit(r *fastglue.Request) error {
 		"business_hours_id":        resp.BusinessHoursID,
 		"working_hours_utc_offset": resp.WorkingHoursUTCOffset,
 	}
-	
+
 	// Only add JWT for visitor creation
 	if newJWT != "" {
 		response["jwt"] = newJWT
 	}
-	
+
 	return r.SendEnvelope(response)
 }
 
@@ -409,7 +432,18 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	return r.SendEnvelope(map[string]bool{"success": true})
+	// Also update custom attributes from JWT claims, if present.
+	// This avoids a separate handler and ensures contact attributes stay in sync.
+	// Since this endpoint is hit frequently during chat, it's a good place to keep them updated.
+	claims := getWidgetClaimsOptional(r)
+	if claims != nil && len(claims.CustomAttributes) > 0 {
+		if err := app.user.SaveCustomAttributes(contactID, claims.CustomAttributes, false); err != nil {
+			app.lo.Error("error updating contact custom attributes", "contact_id", contactID, "error", err)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+		}
+	}
+
+	return r.SendEnvelope(true)
 }
 
 // handleChatGetConversation fetches a chat conversation by ID
@@ -907,7 +941,7 @@ func resolveUserIDFromClaims(app *App, claims Claims) (int, error) {
 		user, err := app.user.GetByExternalID(claims.ExternalUserID)
 		if err != nil {
 			app.lo.Error("error fetching user by external ID", "external_user_id", claims.ExternalUserID, "error", err)
-			return 0, fmt.Errorf("user not found for external_user_id: %s", claims.ExternalUserID)
+			return 0, fmt.Errorf("user not found for external_user_id %s: %w", claims.ExternalUserID, err)
 		}
 		return user.ID, nil
 	}

@@ -59,6 +59,8 @@ export const createFormSchema = (t) => z.object({
       start_conversation_button_text: z.string(),
       allow_start_conversation: z.boolean(),
       prevent_multiple_conversations: z.boolean(),
+      require_contact_info: z.enum(['disabled', 'optional', 'required']).default('disabled'),
+      contact_info_message: z.string().optional(),
     }),
     users: z.object({
       start_conversation_button_text: z.string(),

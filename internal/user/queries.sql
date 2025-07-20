@@ -107,6 +107,12 @@ SET custom_attributes = $2,
 updated_at = now()
 WHERE id = $1;
 
+-- name: upsert-custom-attributes
+UPDATE users
+SET custom_attributes = COALESCE(custom_attributes, '{}'::jsonb) || $2,
+updated_at = now()
+WHERE id = $1
+
 -- name: update-avatar
 UPDATE users  
 SET avatar_url = $2, updated_at = now()
@@ -154,8 +160,8 @@ JOIN roles r ON r.name = role_name
 RETURNING user_id;
 
 -- name: insert-contact-with-external-id
-INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id)
-VALUES ($1, 'contact', $2, $3, $4, $5, $6)
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes)
+VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7)
 ON CONFLICT (external_user_id) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL
 DO UPDATE SET updated_at = now()
 RETURNING id;

@@ -53,6 +53,8 @@ type Config struct {
 		AllowStartConversation       bool   `json:"allow_start_conversation"`
 		PreventMultipleConversations bool   `json:"prevent_multiple_conversations"`
 		StartConversationButtonText  string `json:"start_conversation_button_text"`
+		RequireContactInfo           string `json:"require_contact_info"` // "disabled", "optional", "required"
+		ContactInfoMessage           string `json:"contact_info_message"` // Custom message for the form
 	} `json:"visitors"`
 	NoticeBanner struct {
 		Text    string `json:"text"`

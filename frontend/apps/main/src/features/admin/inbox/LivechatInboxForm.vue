@@ -572,6 +572,58 @@
                     </FormControl>
                   </FormItem>
                 </FormField>
+
+                <FormField
+                  v-slot="{ componentField }"
+                  name="config.visitors.require_contact_info"
+                >
+                  <FormItem>
+                    <FormLabel>{{ $t('admin.inbox.livechat.requireContactInfo') }}</FormLabel>
+                    <FormControl>
+                      <Select v-bind="componentField">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="disabled">
+                            {{ $t('admin.inbox.livechat.requireContactInfo.disabled') }}
+                          </SelectItem>
+                          <SelectItem value="optional">
+                            {{ $t('admin.inbox.livechat.requireContactInfo.optional') }}
+                          </SelectItem>
+                          <SelectItem value="required">
+                            {{ $t('admin.inbox.livechat.requireContactInfo.required') }}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>{{
+                      $t('admin.inbox.livechat.requireContactInfo.visitors.description')
+                    }}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+
+                <FormField
+                  v-if="form.values.config?.visitors?.require_contact_info !== 'disabled'"
+                  v-slot="{ componentField }"
+                  name="config.visitors.contact_info_message"
+                >
+                  <FormItem>
+                    <FormLabel>{{ $t('admin.inbox.livechat.contactInfoMessage') }}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        v-bind="componentField"
+                        placeholder="Please provide your contact information so we can assist you better."
+                        rows="2"
+                      />
+                    </FormControl>
+                    <FormDescription>{{
+                      $t('admin.inbox.livechat.contactInfoMessage.visitors.description')
+                    }}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
               </div>
 
               <!-- Users Settings -->
@@ -666,7 +718,7 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
-import { Copy, Plus, X } from 'lucide-vue-next'
+import { Plus, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
@@ -735,7 +787,9 @@ const form = useForm({
       visitors: {
         start_conversation_button_text: 'Start conversation',
         allow_start_conversation: true,
-        prevent_multiple_conversations: false
+        prevent_multiple_conversations: false,
+        require_contact_info: 'disabled',
+        contact_info_message: ''
       },
       users: {
         start_conversation_button_text: 'Start conversation',

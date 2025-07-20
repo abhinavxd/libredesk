@@ -69,6 +69,7 @@ type queries struct {
 	UpdateContact          *sqlx.Stmt `query:"update-contact"`
 	UpdateAgent            *sqlx.Stmt `query:"update-agent"`
 	UpdateCustomAttributes *sqlx.Stmt `query:"update-custom-attributes"`
+	UpsertCustomAttributes *sqlx.Stmt `query:"upsert-custom-attributes"`
 	UpdateAvatar           *sqlx.Stmt `query:"update-avatar"`
 	UpdateAvailability     *sqlx.Stmt `query:"update-availability"`
 	UpdateLastActiveAt     *sqlx.Stmt `query:"update-last-active-at"`
@@ -258,19 +259,23 @@ func (u *Manager) UpdateLastActive(id int) error {
 	return nil
 }
 
-// UpdateCustomAttributes updates the custom attributes of an user.
-func (u *Manager) UpdateCustomAttributes(id int, customAttributes map[string]any) error {
-	// Convert custom attributes to JSON.
+// SaveCustomAttributes sets or merges custom attributes for a user.
+// If replace is true, existing attributes are overwritten. Otherwise, attributes are merged.
+func (u *Manager) SaveCustomAttributes(id int, customAttributes map[string]any, replace bool) error {
 	jsonb, err := json.Marshal(customAttributes)
 	if err != nil {
-		u.lo.Error("error marshalling custom attributes to JSON", "error", err)
+		u.lo.Error("error marshalling custom attributes", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
 	}
-	// Update custom attributes in the database.
-	if _, err := u.q.UpdateCustomAttributes.Exec(id, jsonb); err != nil {
-		u.lo.Error("error updating user custom attributes", "error", err)
+	var execErr error
+	if replace {
+		_, execErr = u.q.UpdateCustomAttributes.Exec(id, jsonb)
+	} else {
+		_, execErr = u.q.UpsertCustomAttributes.Exec(id, jsonb)
+	}
+	if execErr != nil {
+		u.lo.Error("error saving custom attributes", "error", execErr)
 		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
-
 	}
 	return nil
 }

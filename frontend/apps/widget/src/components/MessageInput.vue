@@ -1,6 +1,10 @@
 <template>
   <div class="border-t focus:ring-0 focus:outline-none">
-    <div class="p-2">
+    <!-- Visitor Info Form -->
+    <VisitorInfoForm v-if="showVisitorForm" @submit="handleVisitorInfoSubmit" />
+
+    <!-- Message Input -->
+    <div v-if="!showVisitorForm" class="p-2">
       <!-- Unified Input Container -->
       <div class="border border-input rounded-lg bg-background focus-within:border-primary">
         <!-- Textarea Container -->
@@ -58,6 +62,7 @@ import { sendWidgetTyping } from '../websocket.js'
 import { convertTextToHtml } from '@shared-ui/utils/string.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageInputActions from './MessageInputActions.vue'
+import VisitorInfoForm from './VisitorInfoForm.vue'
 import api from '@widget/api/index.js'
 
 const emit = defineEmits(['error'])
@@ -68,7 +73,22 @@ const messageInput = ref(null)
 const newMessage = ref('')
 const isUploading = ref(false)
 const isSending = ref(false)
+const visitorInfo = ref({ name: '', email: '' })
+const visitorInfoSubmitted = ref(false)
 const config = computed(() => widgetStore.config)
+
+// Determine if visitor form should be shown
+const showVisitorForm = computed(() => {
+  if (!userStore.isVisitor || userStore.userSessionToken) return false
+
+  const requireContactInfo = config.value?.visitors?.require_contact_info || 'disabled'
+
+  if (requireContactInfo !== 'disabled' && !visitorInfoSubmitted.value) {
+    return true
+  }
+
+  return false
+})
 
 // Setup typing indicator
 const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
@@ -77,10 +97,24 @@ const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
   }
 })
 
+// Handle visitor info form submission
+const handleVisitorInfoSubmit = (info) => {
+  visitorInfo.value = info
+  visitorInfoSubmitted.value = true
+}
+
 const initChatConversation = async (messageText) => {
-  const resp = await api.initChatConversation({
+  const payload = {
     message: messageText
-  })
+  }
+
+  // Add visitor info if user is a visitor
+  if (userStore.isVisitor) {
+    payload.visitor_name = visitorInfo.value.name
+    payload.visitor_email = visitorInfo.value.email
+  }
+
+  const resp = await api.initChatConversation(payload)
   const { conversation, jwt, messages } = resp.data.data
 
   // Set user session token if not already set.

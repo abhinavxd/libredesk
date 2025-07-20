@@ -22,7 +22,7 @@ func (u *Manager) CreateContact(user *models.User) error {
 
 	// If external_user_id is provided, insert with it.
 	if user.ExternalUserID.Valid {
-		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID).Scan(&user.ID); err != nil {
+		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes).Scan(&user.ID); err != nil {
 			u.lo.Error("error inserting contact with external ID", "error", err)
 			return fmt.Errorf("insert contact with external ID: %w", err)
 		}
