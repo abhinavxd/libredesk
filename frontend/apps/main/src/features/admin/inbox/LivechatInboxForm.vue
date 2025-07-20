@@ -56,7 +56,7 @@
 
           <FormField v-slot="{ componentField }" name="config.brand_name">
             <FormItem>
-              <FormLabel>{{ $t('globals.terms.brandName') }}</FormLabel>
+              <FormLabel>{{ $t('globals.terms.brand') + ' ' + $t('globals.terms.name').toLowerCase() }}</FormLabel>
               <FormControl>
                 <Input type="text" placeholder="" v-bind="componentField" />
               </FormControl>
@@ -303,6 +303,53 @@
               </FormItem>
             </FormField>
           </div>
+
+          <!-- Notice Banner -->
+          <div class="space-y-4">
+            <h4 class="font-medium text-foreground">
+              {{ $t('admin.inbox.livechat.noticeBanner') }}
+            </h4>
+
+            <FormField
+              v-slot="{ componentField, handleChange }"
+              name="config.notice_banner.enabled"
+            >
+              <FormItem class="flex flex-row items-center justify-between box p-4">
+                <div class="space-y-0.5">
+                  <FormLabel class="text-base">{{
+                    $t('admin.inbox.livechat.noticeBanner.enabled')
+                  }}</FormLabel>
+                  <FormDescription>{{
+                    $t('admin.inbox.livechat.noticeBanner.enabled.description')
+                  }}</FormDescription>
+                </div>
+                <FormControl>
+                  <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
+                </FormControl>
+              </FormItem>
+            </FormField>
+
+            <FormField
+              v-slot="{ componentField }"
+              name="config.notice_banner.text"
+              v-if="form.values.config?.notice_banner?.enabled"
+            >
+              <FormItem>
+                <FormLabel>{{ $t('admin.inbox.livechat.noticeBanner.text') }}</FormLabel>
+                <FormControl>
+                  <Textarea
+                    v-bind="componentField"
+                    placeholder="Our response times are slower than usual. We're working hard to get to your message."
+                    rows="2"
+                  />
+                </FormControl>
+                <FormDescription>{{
+                  $t('admin.inbox.livechat.noticeBanner.text.description')
+                }}</FormDescription>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+          </div>
         </div>
 
         <!-- Features Tab -->
@@ -419,35 +466,19 @@
         <!-- Security Tab -->
         <div v-show="activeTab === 'security'" class="space-y-6">
           <!-- Secret Key (readonly) -->
-          <div v-if="hasSecretKey">
-            <FormField v-slot="{ componentField }" name="config.secret_key">
-              <FormItem>
-                <FormLabel>{{ $t('admin.inbox.livechat.secretKey') }}</FormLabel>
-                <FormControl>
-                  <div class="flex items-center gap-2">
-                    <Input
-                      type="text"
-                      v-bind="componentField"
-                      readonly
-                      class="font-mono text-sm bg-muted"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      @click="copyToClipboard(componentField.modelValue)"
-                    >
-                      <Copy class="w-4 h-4" />
-                    </Button>
-                  </div>
-                </FormControl>
-                <FormDescription>{{
-                  $t('admin.inbox.livechat.secretKey.description')
-                }}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-          </div>
+
+          <FormField v-slot="{ componentField }" name="secret">
+            <FormItem>
+              <FormLabel>{{ $t('admin.inbox.livechat.secretKey') }}</FormLabel>
+              <FormControl>
+                <Input type="password" v-bind="componentField"/>
+              </FormControl>
+              <FormDescription>{{
+                $t('admin.inbox.livechat.secretKey.description')
+              }}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
           <!-- Trusted Domains -->
           <div class="space-y-4">
@@ -467,53 +498,6 @@
                 </FormControl>
                 <FormDescription>{{
                   $t('admin.inbox.livechat.trustedDomains.description')
-                }}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-          </div>
-
-          <!-- Notice Banner -->
-          <div class="space-y-4">
-            <h4 class="font-medium text-foreground">
-              {{ $t('admin.inbox.livechat.noticeBanner') }}
-            </h4>
-
-            <FormField
-              v-slot="{ componentField, handleChange }"
-              name="config.notice_banner.enabled"
-            >
-              <FormItem class="flex flex-row items-center justify-between box p-4">
-                <div class="space-y-0.5">
-                  <FormLabel class="text-base">{{
-                    $t('admin.inbox.livechat.noticeBanner.enabled')
-                  }}</FormLabel>
-                  <FormDescription>{{
-                    $t('admin.inbox.livechat.noticeBanner.enabled.description')
-                  }}</FormDescription>
-                </div>
-                <FormControl>
-                  <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
-                </FormControl>
-              </FormItem>
-            </FormField>
-
-            <FormField
-              v-slot="{ componentField }"
-              name="config.notice_banner.text"
-              v-if="form.values.config?.notice_banner?.enabled"
-            >
-              <FormItem>
-                <FormLabel>{{ $t('admin.inbox.livechat.noticeBanner.text') }}</FormLabel>
-                <FormControl>
-                  <Textarea
-                    v-bind="componentField"
-                    placeholder="Our response times are slower than usual. We're working hard to get to your message."
-                    rows="2"
-                  />
-                </FormControl>
-                <FormDescription>{{
-                  $t('admin.inbox.livechat.noticeBanner.text.description')
                 }}</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -714,13 +698,13 @@ const form = useForm({
   initialValues: {
     name: '',
     enabled: true,
+    secret: '',
     csat_enabled: false,
     config: {
       brand_name: '',
       dark_mode: false,
       language: 'en',
       logo_url: '',
-      secret_key: '',
       launcher: {
         position: 'right',
         logo_url: '',
@@ -766,18 +750,6 @@ const submitLabel = computed(() => {
   return props.submitLabel || t('globals.messages.save')
 })
 
-const hasSecretKey = computed(() => {
-  return form.values.config?.secret_key && form.values.config.secret_key.trim() !== ''
-})
-
-const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text)
-  } catch (err) {
-    console.error('Failed to copy text: ', err)
-  }
-}
-
 const addExternalLink = () => {
   externalLinks.value.push({ text: '', url: '' })
   updateExternalLinks()
@@ -799,6 +771,8 @@ const onSubmit = form.handleSubmit(async (values) => {
       .split('\n')
       .map((domain) => domain.trim())
       .filter((domain) => domain)
+  } else {
+    values.config.trusted_domains = []
   }
 
   // Filter out incomplete external links before submission

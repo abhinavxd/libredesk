@@ -161,6 +161,7 @@ SELECT
    ct.enabled as "contact.enabled",
    ct.last_active_at as "contact.last_active_at",
    ct.last_login_at as "contact.last_login_at",
+   ct.external_user_id as "contact.external_user_id",
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
    as_latest.id as applied_sla_id,
@@ -224,12 +225,14 @@ LIMIT 10;
 SELECT
     c.created_at,
     c.uuid,
+    cs.name as status,
     COALESCE(c.meta->'last_chat_message'->>'text_content', '') as "last_message.content",
     COALESCE((c.meta->'last_chat_message'->>'created_at')::timestamptz, NULL) as "last_message.created_at",
     COALESCE(c.meta->'last_chat_message'->'sender'->>'id', '') AS "last_message.author.id",
     COALESCE(c.meta->'last_chat_message'->'sender'->>'first_name', '') AS "last_message.author.first_name",
     COALESCE(c.meta->'last_chat_message'->'sender'->>'last_name', '') AS "last_message.author.last_name",
     COALESCE(c.meta->'last_chat_message'->'sender'->>'avatar_url', '') AS "last_message.author.avatar_url",
+    COALESCE(c.meta->'last_chat_message'->'sender'->>'type', '') AS "last_message.author.type",
     LEAST(10, COUNT(unread.id)) AS unread_message_count,
     COALESCE(au.availability_status::TEXT, '') as "assignee.availability_status",
     au.avatar_url as "assignee.avatar_url",
@@ -237,12 +240,17 @@ SELECT
     COALESCE(au.id, 0) as "assignee.id",
     COALESCE(au.last_name, '') as "assignee.last_name",
     COALESCE(au.type::TEXT, '') as "assignee.type"
-FROM conversations c inner join inboxes inb on c.inbox_id = inb.id
+FROM conversations c
+INNER JOIN inboxes inb on c.inbox_id = inb.id
+INNER JOIN users con ON c.contact_id = con.id
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 LEFT JOIN users au ON c.assigned_user_id = au.id
 LEFT JOIN conversation_messages unread ON unread.conversation_id = c.id 
     AND unread.created_at > c.contact_last_seen_at
     AND unread.type IN ('incoming', 'outgoing') AND unread.private = false
-WHERE c.contact_id = $1 AND inb.channel = 'livechat' AND inb.deleted_at IS NULL AND inb.enabled = true
+WHERE c.contact_id = $1 AND c.inbox_id = $2
+AND inb.deleted_at IS NULL
+AND con.deleted_at IS NULL
 GROUP BY c.id, c.uuid, c.created_at,
     c.meta->'last_chat_message'->>'text_content', 
     (c.meta->'last_chat_message'->>'created_at')::timestamptz,
@@ -250,9 +258,9 @@ GROUP BY c.id, c.uuid, c.created_at,
     c.meta->'last_chat_message'->'sender'->>'first_name',
     c.meta->'last_chat_message'->'sender'->>'last_name',
     c.meta->'last_chat_message'->'sender'->>'avatar_url',
-    au.availability_status, au.avatar_url, au.first_name, au.id, au.last_name, au.type
+    au.availability_status, au.avatar_url, au.first_name, au.id, au.last_name, au.type, cs.name
 ORDER BY c.created_at DESC
-LIMIT 100;
+LIMIT 500;
 
 -- name: get-conversation-uuid
 SELECT uuid from conversations where id = $1;

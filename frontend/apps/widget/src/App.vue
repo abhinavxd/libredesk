@@ -19,7 +19,7 @@ const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 
-// Initialize unread count tracking
+// Initialize unread count tracking and sending to parent window.
 useUnreadCount()
 
 onMounted(() => {
@@ -33,6 +33,11 @@ onMounted(() => {
   widgetStore.openWidget()
   setupParentMessageListeners()
   chatStore.fetchConversations()
+  
+  // Notify parent window that Vue app is ready
+  window.parent.postMessage({
+    type: 'VUE_APP_READY'
+  }, '*')
 })
 
 // Listen for messages from parent window (widget.js)
@@ -42,6 +47,11 @@ const setupParentMessageListeners = () => {
       widgetStore.setMobileFullScreen(event.data.isMobile)
     } else if (event.data.type === 'WIDGET_EXPANDED') {
       widgetStore.setExpanded(event.data.isExpanded)
+    } else if (event.data.type === 'SET_JWT_TOKEN') {
+      // Set the JWT token in user store when received from parent
+      if (event.data.jwt) {
+        userStore.setSessionToken(event.data.jwt)
+      }
     }
   })
 }

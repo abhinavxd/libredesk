@@ -37,7 +37,6 @@ import UnreadCountBadge from '@widget/components/UnreadCountBadge.vue'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useWidgetStore } from '@widget/store/widget.js'
-import { useUserStore } from '@widget/store/user.js'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
@@ -49,14 +48,12 @@ const props = defineProps({
 
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()
-const userStore = useUserStore()
 const { t } = useI18n()
 
 const authorDisplayName = computed(() => {
   const author = props.conversation.last_message.author
   if (!author) return t('globals.terms.someone')
-  // Check if the author is the current user
-  if (author.id === userStore.userID) {
+  if (author.type === 'visitor' || author.type === 'contact') {
     return t('globals.terms.you')
   }
   return author.first_name || t('globals.terms.someone')

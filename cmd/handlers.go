@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"mime"
 	"net/http"
 	"path"
@@ -8,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -222,14 +225,14 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/widget/ws", handleWidgetWS)
 
 	// Widget APIs.
-	g.GET("/api/v1/widget/chat/settings/launcher", widgetOrigin(handleGetChatLauncherSettings))
-	g.GET("/api/v1/widget/chat/settings", widgetOrigin(handleGetChatSettings))
-	g.POST("/api/v1/widget/chat/conversations/init", widgetOrigin(handleChatInit))
-	g.POST("/api/v1/widget/chat/conversations", widgetOrigin(handleGetConversations))
-	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", widgetOrigin(handleChatUpdateLastSeen))
-	g.POST("/api/v1/widget/chat/conversations/{uuid}", widgetOrigin(handleChatGetConversation))
-	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", widgetOrigin(handleChatSendMessage))
-	g.POST("/api/v1/widget/media/upload", widgetOrigin(handleWidgetMediaUpload))
+	g.GET("/api/v1/widget/chat/settings/launcher", handleGetChatLauncherSettings)
+	g.GET("/api/v1/widget/chat/settings", handleGetChatSettings)
+	g.POST("/api/v1/widget/chat/conversations/init", handleChatInit)
+	g.POST("/api/v1/widget/chat/conversations", handleGetConversations)
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", handleChatUpdateLastSeen)
+	g.POST("/api/v1/widget/chat/conversations/{uuid}", handleChatGetConversation)
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", handleChatSendMessage)
+	g.POST("/api/v1/widget/media/upload", handleWidgetMediaUpload)
 
 	// Frontend pages.
 	g.GET("/", notAuthPage(serveIndexPage))
@@ -285,9 +288,60 @@ func serveIndexPage(r *fastglue.Request) error {
 	return nil
 }
 
+// validateWidgetReferer validates the Referer header against trusted domains configured in the live chat inbox settings.
+func validateWidgetReferer(app *App, r *fastglue.Request, inboxID int) error {
+	// Get the Referer header from the request
+	referer := string(r.RequestCtx.Request.Header.Peek("Referer"))
+
+	// If no referer header is present, allow direct access.
+	if referer == "" {
+		return nil
+	}
+
+	// Get inbox configuration
+	inbox, err := app.inbox.GetDBRecord(inboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox for referer check", "inbox_id", inboxID, "error", err)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.NotFoundError)
+	}
+
+	if !inbox.Enabled {
+		return r.SendErrorEnvelope(http.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+	}
+
+	// Parse the live chat config
+	var config livechat.Config
+	if err := json.Unmarshal(inbox.Config, &config); err != nil {
+		app.lo.Error("error parsing live chat config for referer check", "error", err)
+		return r.SendErrorEnvelope(http.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+	}
+
+	// If trusted domains list is empty, allow all referers
+	if len(config.TrustedDomains) == 0 {
+		return nil
+	}
+
+	// Check if the referer matches any of the trusted domains
+	if !httputil.IsOriginTrusted(referer, config.TrustedDomains) {
+		app.lo.Warn("widget request from untrusted referer blocked",
+			"referer", referer,
+			"inbox_id", inboxID,
+			"trusted_domains", config.TrustedDomains)
+		return r.SendErrorEnvelope(http.StatusForbidden, "Widget not allowed from this origin: "+referer, nil, envelope.PermissionError)
+	}
+	app.lo.Debug("widget request from trusted referer allowed", "referer", referer, "inbox_id", inboxID)
+	return nil
+}
+
 // serveWidgetIndexPage serves the widget index page of the application.
 func serveWidgetIndexPage(r *fastglue.Request) error {
 	app := r.Context.(*App)
+
+	// Extract inbox ID and validate trusted domains if present
+	inboxID := r.RequestCtx.QueryArgs().GetUintOrZero("inbox_id")
+	if err := validateWidgetReferer(app, r, inboxID); err != nil {
+		return err
+	}
 
 	// Prevent caching of the index page.
 	r.RequestCtx.Response.Header.Add("Cache-Control", "no-store, no-cache, must-revalidate, post-check=0, pre-check=0")

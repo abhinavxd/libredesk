@@ -130,6 +130,7 @@ export const useChatStore = defineStore('chat', () => {
             return false
         } finally {
             isLoadingConversation.value = false
+            await updateCurrentConversationLastSeen()
         }
         return true
     }
@@ -175,7 +176,6 @@ export const useChatStore = defineStore('chat', () => {
     const fetchConversations = async () => {
         // No session token means no conversations can be fetched simply return empty.
         if (!userStore.userSessionToken) {
-            conversations.value = []
             return
         }
 
@@ -195,7 +195,6 @@ export const useChatStore = defineStore('chat', () => {
                 conversations.value = null
                 return
             }
-            console.error('Error fetching conversations:', error)
         } finally {
             isLoadingConversations.value = false
         }
@@ -204,8 +203,8 @@ export const useChatStore = defineStore('chat', () => {
     const updateCurrentConversationLastSeen = async () => {
         const conversationUUID = currentConversation.value?.uuid
         if (!conversationUUID) return
-
         try {
+            await api.updateConversationLastSeen(conversationUUID)
             // Reset unread count for current conversation
             if (conversations.value && Array.isArray(conversations.value)) {
                 const conv = conversations.value.find(c => c.uuid === conversationUUID)
@@ -213,7 +212,6 @@ export const useChatStore = defineStore('chat', () => {
                     conv.unread_message_count = 0
                 }
             }
-            await api.updateConversationLastSeen(conversationUUID)
         } catch (error) {
             console.error('Error updating last seen:', error)
         }

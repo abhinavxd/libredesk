@@ -22,26 +22,29 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-type onlyJWT struct {
-	JWT string `json:"jwt"`
+type reqCommon struct {
+	JWT     string `json:"jwt"`
+	InboxID int    `json:"inbox_id"`
 }
 
 // Define JWT claims structure
 type Claims struct {
-	UserID    int    `json:"user_id,omitempty"`
-	IsVisitor bool   `json:"is_visitor,omitempty"`
-	Username  string `json:"username,omitempty"`
-	Email     string `json:"email,omitempty"`
+	UserID           int            `json:"user_id,omitempty"`
+	ExternalUserID   string         `json:"external_user_id,omitempty"`
+	IsVisitor        bool           `json:"is_visitor,omitempty"`
+	Email            string         `json:"email,omitempty"`
+	FirstName        string         `json:"first_name,omitempty"`
+	LastName         string         `json:"last_name,omitempty"`
+	CustomAttributes map[string]any `json:"custom_attributes,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // Chat widget initialization request
 type chatInitReq struct {
-	onlyJWT
+	reqCommon
 	VisitorName  string `json:"visitor_name,omitempty"`
 	VisitorEmail string `json:"visitor_email,omitempty"`
 	Message      string `json:"message,omitempty"`
-	InboxID      int    `json:"inbox_id"`
 }
 
 type conversationResp struct {
@@ -51,7 +54,7 @@ type conversationResp struct {
 
 type chatMessageReq struct {
 	Message string `json:"message"`
-	onlyJWT
+	reqCommon
 }
 
 type chatSettingsResponse struct {
@@ -80,11 +83,10 @@ func handleGetChatLauncherSettings(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
 	}
 
-	// Get inbox configuration
 	inbox, err := app.inbox.GetDBRecord(inboxID)
 	if err != nil {
 		app.lo.Error("error fetching inbox", "inbox_id", inboxID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.NotFoundError)
+		return sendErrorEnvelope(r, err)
 	}
 
 	if inbox.Channel != livechat.ChannelLiveChat {
@@ -118,11 +120,10 @@ func handleGetChatSettings(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
 	}
 
-	// Get inbox configuration
 	inbox, err := app.inbox.GetDBRecord(inboxID)
 	if err != nil {
 		app.lo.Error("error fetching inbox", "inbox_id", inboxID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.NotFoundError)
+		return sendErrorEnvelope(r, err)
 	}
 
 	if inbox.Channel != livechat.ChannelLiveChat {
@@ -186,14 +187,12 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
 	}
 
-	// Get inbox configuration
+	// Make sure the inbox is enabled and of the correct type.
 	inbox, err := app.inbox.GetDBRecord(req.InboxID)
 	if err != nil {
 		app.lo.Error("error fetching inbox", "inbox_id", req.InboxID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.NotFoundError)
+		return sendErrorEnvelope(r, err)
 	}
-
-	// Make sure the inbox is enabled and of the correct type
 	if !inbox.Enabled {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
 	}
@@ -201,27 +200,73 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
 	}
 
-	// Parse inbox config
-	var config livechat.Config
-	if err := json.Unmarshal(inbox.Config, &config); err != nil {
-		app.lo.Error("error parsing live chat config", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
-	}
 	var (
 		contactID        int
 		conversationUUID string
 		isVisitor        bool
+		config           livechat.Config
 	)
-	// Handle authenticated user
+
+	// Parse inbox config
+	if err := json.Unmarshal(inbox.Config, &config); err != nil {
+		app.lo.Error("error parsing live chat config", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+	}
+
+	// Handle authenticated user.
 	if req.JWT != "" {
-		claims, err := verifyStandardJWT(req.JWT)
+		var claims Claims
+		var err error
+
+		claims, err = verifyStandardJWT(req.JWT, inbox.Secret.String)
 		if err != nil {
-			app.lo.Error("invalid JWT", "jwt", req.JWT, "error", err)
+			app.lo.Error("invalid inbox JWT", "jwt", req.JWT, "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.messages.sessionExpired"), nil, envelope.UnauthorizedError)
 		}
-		contactID = claims.UserID
-		isVisitor = claims.IsVisitor
+
+		// Handle existing contacts they all external user id.
+		if claims.ExternalUserID != "" {
+			// Find or create user based on external_user_id.
+			user, err := app.user.GetByExternalID(claims.ExternalUserID)
+			if err != nil {
+				envErr, ok := err.(envelope.Error)
+				if ok && envErr.ErrorType != envelope.NotFoundError {
+					app.lo.Error("error fetching user by external ID", "external_user_id", claims.ExternalUserID, "error", err)
+					return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+				}
+
+				// User doesn't exist, create new contact
+				firstName := claims.FirstName
+				lastName := claims.LastName
+
+				// Marshal custom attribute.
+				customAttribJSON, err := json.Marshal(claims.CustomAttributes)
+				if err != nil {
+					app.lo.Error("error marshalling custom attributes", "error", err)
+					customAttribJSON = []byte("{}")
+				}
+
+				// Create new contact with external user ID.
+				err = app.user.CreateContact(&umodels.User{
+					FirstName:        firstName,
+					LastName:         lastName,
+					Email:            null.NewString(claims.Email, claims.Email != ""),
+					ExternalUserID:   null.NewString(claims.ExternalUserID, claims.ExternalUserID != ""),
+					CustomAttributes: customAttribJSON,
+				})
+				if err != nil {
+					app.lo.Error("error creating contact with external ID", "external_user_id", claims.ExternalUserID, "error", err)
+					return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+				}
+			}
+			contactID = user.ID
+			isVisitor = false
+		} else {
+			contactID = claims.UserID
+			isVisitor = claims.IsVisitor
+		}
 	} else {
+		// Visitor user not authenticated, create a new visitor contact.
 		isVisitor = true
 		visitor := umodels.User{
 			Email:     null.NewString(req.VisitorEmail, req.VisitorEmail != ""),
@@ -233,9 +278,8 @@ func handleChatInit(r *fastglue.Request) error {
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 		}
 		contactID = visitor.ID
-
-		// Generate visitor JWT it has longer expiry as short lived jwts will create new visitors every time.
-		req.JWT, err = generateUserJWT(contactID, isVisitor, time.Now().Add(87600*time.Hour)) // 10 years
+		secretToUse := []byte(inbox.Secret.String)
+		req.JWT, err = generateUserJWTWithSecret(contactID, isVisitor, time.Now().Add(87600*time.Hour), secretToUse) // 10 years
 		if err != nil {
 			app.lo.Error("error generating visitor JWT", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.session}"), nil, envelope.GeneralError)
@@ -253,7 +297,7 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 
 	if userConfig.PreventMultipleConversations {
-		conversations, err := app.conversation.GetContactChatConversations(contactID)
+		conversations, err := app.conversation.GetContactChatConversations(contactID, req.InboxID)
 		if err != nil {
 			userType := "visitor"
 			if !isVisitor {
@@ -320,7 +364,7 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
 	}
 
-	// Build response with conversation and messages.
+	// Build response with conversation and messages and add business hours info.
 	resp, err := buildConversationResponseWithBusinessHours(app, conversation)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -340,7 +384,7 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 	var (
 		app              = r.Context.(*App)
 		conversationUUID = r.RequestCtx.UserValue("uuid").(string)
-		req              = onlyJWT{}
+		req              = reqCommon{}
 	)
 
 	if conversationUUID == "" {
@@ -352,22 +396,30 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
 	}
 
-	// Verify JWT.
-	claims, err := verifyStandardJWT(req.JWT)
-	if err != nil {
-		app.lo.Error("invalid JWT", "jwt", req.JWT, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-	contactID := claims.UserID
-	if contactID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Fetch conversation.
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
+	}
+
+	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox", "inbox_id", conversation.InboxID, "error", err)
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Verify JWT.
+	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
+	if err != nil {
+		app.lo.Error("invalid JWT", "jwt", req.JWT, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+	}
+
+	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
+	contactID, err := resolveUserIDFromClaims(app, claims)
+	if err != nil {
+		app.lo.Error("error resolving user ID from JWT claims", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
 	// Make sure the conversation belongs to the contact.
@@ -403,22 +455,32 @@ func handleChatGetConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
 	}
 
-	// Verify JWT.
-	claims, err := verifyStandardJWT(chatReq.JWT)
-	if err != nil {
-		app.lo.Error("invalid JWT", "jwt", chatReq.JWT, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-	contactID := claims.UserID
-	if contactID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Fetch conversation.
+	// Fetch conversation first to get inbox info
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
+	}
+
+	// Get inbox to retrieve secret for JWT verification
+	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox", "inbox_id", conversation.InboxID, "error", err)
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Verify JWT.
+	claims, err := verifyStandardJWT(chatReq.JWT, inbox.Secret.String)
+	if err != nil {
+		app.lo.Error("invalid JWT", "jwt", chatReq.JWT, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+	}
+
+	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
+	contactID, err := resolveUserIDFromClaims(app, claims)
+	if err != nil {
+		app.lo.Error("error resolving user ID from JWT claims", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
 	// Make sure the conversation belongs to the contact.
@@ -440,7 +502,7 @@ func handleChatGetConversation(r *fastglue.Request) error {
 func handleGetConversations(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req = onlyJWT{}
+		req = reqCommon{}
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
@@ -448,17 +510,31 @@ func handleGetConversations(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
 	}
 
+	// Get inbox to retrieve secret for JWT verification
+	inbox, err := app.inbox.GetDBRecord(req.InboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox", "inbox_id", req.InboxID, "error", err)
+		return sendErrorEnvelope(r, err)
+	}
+
 	// Verify JWT.
-	claims, err := verifyStandardJWT(req.JWT)
+	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
 	if err != nil {
 		app.lo.Error("invalid JWT", "jwt", req.JWT, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
-	// Fetch conversations for the contact and convert to ChatConversation format.
-	chatConversations, err := app.conversation.GetContactChatConversations(claims.UserID)
+	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
+	contactID, err := resolveUserIDFromClaims(app, claims)
 	if err != nil {
-		app.lo.Error("error fetching conversations for contact", "contact_id", claims.UserID, "error", err)
+		app.lo.Error("error resolving user ID from JWT claims", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+	}
+
+	// Fetch conversations for the contact and convert to ChatConversation format.
+	chatConversations, err := app.conversation.GetContactChatConversations(contactID, req.InboxID)
+	if err != nil {
+		app.lo.Error("error fetching conversations for contact", "contact_id", contactID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
 	}
 
@@ -484,25 +560,38 @@ func handleChatSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
 	}
 
-	claims, err := verifyStandardJWT(req.JWT)
+	// Fetch conversation to ensure it exists and get inbox info.
+	conversation, err := app.conversation.GetConversation(0, conversationUUID)
+	if err != nil {
+		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Get inbox to retrieve secret for JWT verification
+	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox", "inbox_id", conversation.InboxID, "error", err)
+		return sendErrorEnvelope(r, err)
+	}
+
+	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
 	if err != nil {
 		app.lo.Error("invalid JWT", "jwt", req.JWT, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
-	senderID = claims.UserID
+
+	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
+	senderID, err = resolveUserIDFromClaims(app, claims)
+	if err != nil {
+		app.lo.Error("error resolving user ID from JWT claims", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+	}
 
 	// Fetch sender.
 	sender, err := app.user.Get(senderID, "", "")
 	if err != nil {
 		app.lo.Error("error fetching sender user", "sender_id", senderID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
-	}
-
-	// Fetch conversation to ensure it exists.
-	conversation, err := app.conversation.GetConversation(0, conversationUUID)
-	if err != nil {
-		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
-		return sendErrorEnvelope(r, err)
 	}
 
 	// Make sure the conversation belongs to the sender.
@@ -512,10 +601,6 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	}
 
 	// Make sure the inbox is enabled.
-	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
 	if !inbox.Enabled {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
 	}
@@ -594,34 +679,42 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	}
 	conversationUUID := conversationValues[0]
 
-	// Verify JWT and get user information
-	claims, err := verifyStandardJWT(jwtToken)
-	if err != nil {
-		app.lo.Error("invalid JWT", "jwt", jwtToken, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Set sender ID from JWT claims.
-	senderID = claims.UserID
-
 	// Make sure the conversation belongs to the sender
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
 	}
-	if conversation.ContactID != senderID {
-		app.lo.Error("access denied: user attempted to access conversation owned by different contact", "conversation_uuid", conversationUUID, "requesting_contact_id", senderID, "conversation_owner_id", conversation.ContactID)
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
+
+	// Get inbox to retrieve secret for JWT verification
+	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox", "inbox_id", conversation.InboxID, "error", err)
+		return sendErrorEnvelope(r, err)
 	}
 
 	// Make sure the inbox is enabled.
-	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
 	if !inbox.Enabled {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+	}
+
+	// Verify JWT and get user information
+	claims, err := verifyStandardJWT(jwtToken, inbox.Secret.String)
+	if err != nil {
+		app.lo.Error("invalid JWT", "jwt", jwtToken, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+	}
+
+	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
+	senderID, err = resolveUserIDFromClaims(app, claims)
+	if err != nil {
+		app.lo.Error("error resolving user ID from JWT claims", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+	}
+
+	if conversation.ContactID != senderID {
+		app.lo.Error("access denied: user attempted to access conversation owned by different contact", "conversation_uuid", conversationUUID, "requesting_contact_id", senderID, "conversation_owner_id", conversation.ContactID)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
 	}
 
 	// Make sure file upload is enabled for the inbox.
@@ -856,7 +949,7 @@ func buildConversationResponseWithBusinessHours(app *App, conversation cmodels.C
 	if businessHoursID == nil {
 		out, err := app.setting.GetByPrefix("app")
 		if err == nil {
-			var settings map[string]interface{}
+			var settings map[string]any
 			if err := json.Unmarshal(out, &settings); err == nil {
 				if bhIDStr, ok := settings["app.business_hours_id"].(string); ok && bhIDStr != "" {
 					// Parse the business hours ID
@@ -888,6 +981,27 @@ func buildConversationResponseWithBusinessHours(app *App, conversation cmodels.C
 	return resp, nil
 }
 
+// resolveUserIDFromClaims resolves the actual user ID from JWT claims,
+// handling both regular user_id and external_user_id cases
+func resolveUserIDFromClaims(app *App, claims Claims) (int, error) {
+	// If UserID is already set and valid, use it directly
+	if claims.UserID > 0 {
+		return claims.UserID, nil
+	}
+
+	// If UserID is not set but ExternalUserID is available, resolve it
+	if claims.ExternalUserID != "" {
+		user, err := app.user.GetByExternalID(claims.ExternalUserID)
+		if err != nil {
+			app.lo.Error("error fetching user by external ID", "external_user_id", claims.ExternalUserID, "error", err)
+			return 0, fmt.Errorf("user not found for external_user_id: %s", claims.ExternalUserID)
+		}
+		return user.ID, nil
+	}
+
+	return 0, fmt.Errorf("no valid user ID found in JWT claims")
+}
+
 // verifyJWT verifies and validates a JWT token with proper signature verification
 func verifyJWT(tokenString string, secretKey []byte) (*Claims, error) {
 	// Parse and verify the token
@@ -911,13 +1025,17 @@ func verifyJWT(tokenString string, secretKey []byte) (*Claims, error) {
 	return nil, fmt.Errorf("invalid token")
 }
 
-// verifyStandardJWT verifies a standard JWT token using proper JWT library
-func verifyStandardJWT(jwtToken string) (Claims, error) {
+// verifyStandardJWT verifies a JWT token using inbox secret
+func verifyStandardJWT(jwtToken string, inboxSecret string) (Claims, error) {
 	if jwtToken == "" {
 		return Claims{}, fmt.Errorf("JWT token is empty")
 	}
 
-	claims, err := verifyJWT(jwtToken, getJWTSecret())
+	if inboxSecret == "" {
+		return Claims{}, fmt.Errorf("inbox `secret` is not configured for JWT verification")
+	}
+
+	claims, err := verifyJWT(jwtToken, []byte(inboxSecret))
 	if err != nil {
 		return Claims{}, err
 	}
@@ -925,14 +1043,8 @@ func verifyStandardJWT(jwtToken string) (Claims, error) {
 	return *claims, nil
 }
 
-// getJWTSecret gets the JWT secret key from configuration or uses a default
-func getJWTSecret() []byte {
-	// TODO: Update this to pick from inbox config in db.
-	return []byte("your-secret-key-change-this-in-production")
-}
-
-// generateUserJWT generates a JWT token for a user
-func generateUserJWT(userID int, isVisitor bool, expirationTime time.Time) (string, error) {
+// generateUserJWTWithSecret generates a JWT token for a user with a specific secret
+func generateUserJWTWithSecret(userID int, isVisitor bool, expirationTime time.Time, secret []byte) (string, error) {
 	claims := &Claims{
 		UserID:    userID,
 		IsVisitor: isVisitor,
@@ -943,7 +1055,7 @@ func generateUserJWT(userID int, isVisitor bool, expirationTime time.Time) (stri
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(getJWTSecret())
+	tokenString, err := token.SignedString(secret)
 	if err != nil {
 		return "", err
 	}

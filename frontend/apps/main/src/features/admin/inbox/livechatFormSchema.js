@@ -4,6 +4,7 @@ export const createFormSchema = (t) => z.object({
   name: z.string().min(1, { message: t('globals.messages.required') }),
   enabled: z.boolean(),
   csat_enabled: z.boolean(),
+  secret: z.string(),
   config: z.object({
     brand_name: z.string().min(1, { message: t('globals.messages.required') }),
     dark_mode: z.boolean(),
@@ -13,7 +14,6 @@ export const createFormSchema = (t) => z.object({
         name: t('globals.terms.url').toLowerCase()
       })
     }).optional().or(z.literal('')),
-    secret_key: z.string().optional(),
     launcher: z.object({
       position: z.enum(['left', 'right']),
       logo_url: z.string().url({

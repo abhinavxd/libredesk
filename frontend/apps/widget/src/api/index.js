@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-function getInboxIdFromQuery () {
+function getInboxIDFromQuery () {
     const params = new URLSearchParams(window.location.search)
     const inboxId = params.get('inbox_id')
     return inboxId ? parseInt(inboxId, 10) : null
@@ -22,7 +22,7 @@ http.interceptors.request.use((request) => {
         const libredeskSession = localStorage.getItem('libredesk_session')
         request.data = {
             ...request.data,
-            inbox_id: getInboxIdFromQuery(),
+            inbox_id: getInboxIDFromQuery(),
             jwt: libredeskSession
         }
     }
@@ -46,7 +46,7 @@ const uploadMedia = (conversationUUID, files) => {
     const libredeskSession = localStorage.getItem('libredesk_session')
     formData.append('jwt', libredeskSession)
     formData.append('conversation_uuid', conversationUUID)
-    formData.append('inbox_id', getInboxIdFromQuery())
+    formData.append('inbox_id', getInboxIDFromQuery())
 
     // Add files
     for (let i = 0; i < files.length; i++) {

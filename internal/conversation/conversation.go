@@ -298,9 +298,9 @@ func (c *Manager) GetContactConversations(contactID int) ([]models.Conversation,
 }
 
 // GetContactChatConversations retrieves conversations for a chat.
-func (c *Manager) GetContactChatConversations(contactID int) ([]models.ChatConversation, error) {
+func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.ChatConversation, error) {
 	var conversations = make([]models.ChatConversation, 0)
-	if err := c.q.GetContactChatConversations.Select(&conversations, contactID); err != nil {
+	if err := c.q.GetContactChatConversations.Select(&conversations, contactID, inboxID); err != nil {
 		c.lo.Error("error fetching conversations", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
 	}
@@ -1162,7 +1162,7 @@ func (m *Manager) ProcessCSATStatus(messages []models.Message) {
 				msg.CensorCSATContent()
 				continue
 			}
-			
+
 			// Get CSAT submission status
 			csat, err := m.csatStore.Get(csatUUID)
 			isSubmitted := false
@@ -1175,7 +1175,7 @@ func (m *Manager) ProcessCSATStatus(messages []models.Message) {
 					feedback = csat.Feedback.String
 				}
 			}
-			
+
 			// Censor content and add submission status
 			msg.CensorCSATContentWithStatus(isSubmitted, csatUUID, rating, feedback)
 		}

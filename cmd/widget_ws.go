@@ -75,26 +75,13 @@ func handleWidgetWS(r *fastglue.Request) error {
 				break
 			}
 
-			var (
-				claims Claims
-				err    error
-			)
-			// Validate JWT if present, except for ping messages
-			if msg.Type != WidgetMsgTypePing {
-				claims, err = validateWidgetMessageJWT(msg.JWT)
-				if err != nil {
-					app.lo.Error("invalid JWT in widget message", "error", err)
-					sendWidgetError(conn, "Invalid JWT token")
-					continue
-				}
-			}
-
 			switch msg.Type {
 			// Inbox join request.
 			case WidgetMsgTypeJoin:
 				var joinedClient *livechat.Client
 				var joinedLiveChat *livechat.LiveChat
-				if joinedClient, joinedLiveChat, err = handleInboxJoin(app, conn, &msg, claims); err != nil {
+				var err error
+				if joinedClient, joinedLiveChat, err = handleInboxJoin(app, conn, &msg); err != nil {
 					app.lo.Error("error handling widget join", "error", err)
 					sendWidgetError(conn, "Failed to join conversation")
 					continue
@@ -104,7 +91,7 @@ func handleWidgetWS(r *fastglue.Request) error {
 				liveChat = joinedLiveChat
 			// Typing.
 			case WidgetMsgTypeTyping:
-				if err := handleWidgetTyping(app, &msg, claims); err != nil {
+				if err := handleWidgetTyping(app, &msg); err != nil {
 					app.lo.Error("error handling widget typing", "error", err)
 					continue
 				}
@@ -124,9 +111,7 @@ func handleWidgetWS(r *fastglue.Request) error {
 }
 
 // handleInboxJoin handles a websocket join request for a live chat inbox.
-func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims Claims) (*livechat.Client, *livechat.LiveChat, error) {
-	userID := claims.UserID
-
+func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage) (*livechat.Client, *livechat.LiveChat, error) {
 	joinDataBytes, err := json.Marshal(msg.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid join data: %w", err)
@@ -135,6 +120,18 @@ func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims 
 	var joinData WidgetInboxJoinRequest
 	if err := json.Unmarshal(joinDataBytes, &joinData); err != nil {
 		return nil, nil, fmt.Errorf("invalid join data format: %w", err)
+	}
+
+	// Validate JWT with inbox secret
+	claims, err := validateWidgetMessageJWT(app, msg.JWT, joinData.InboxID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("JWT validation failed: %w", err)
+	}
+
+	// Resolve user ID.
+	userID, err := resolveUserIDFromClaims(app, claims)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve user ID from claims: %w", err)
 	}
 
 	// Make sure inbox is active.
@@ -194,8 +191,7 @@ func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage, claims 
 }
 
 // handleWidgetTyping handles typing indicators
-func handleWidgetTyping(app *App, msg *WidgetMessage, claims Claims) error {
-	userID := claims.UserID
+func handleWidgetTyping(app *App, msg *WidgetMessage) error {
 	typingDataBytes, err := json.Marshal(msg.Data)
 	if err != nil {
 		app.lo.Error("error marshalling typing data", "error", err)
@@ -208,25 +204,59 @@ func handleWidgetTyping(app *App, msg *WidgetMessage, claims Claims) error {
 		return fmt.Errorf("invalid typing data format: %w", err)
 	}
 
+	// Get conversation to retrieve inbox ID for JWT validation
+	if typingData.ConversationUUID == "" {
+		return fmt.Errorf("conversation UUID is required for typing messages")
+	}
+
+	conversation, err := app.conversation.GetConversation(0, typingData.ConversationUUID)
+	if err != nil {
+		app.lo.Error("error fetching conversation for typing", "conversation_uuid", typingData.ConversationUUID, "error", err)
+		return fmt.Errorf("conversation not found: %w", err)
+	}
+
+	// Validate JWT with inbox secret
+	claims, err := validateWidgetMessageJWT(app, msg.JWT, conversation.InboxID)
+	if err != nil {
+		return fmt.Errorf("JWT validation failed: %w", err)
+	}
+
+	userID := claims.UserID
+
 	// Broadcast typing status to agents via conversation manager
 	// Set broadcastToWidgets=false to avoid echoing back to widget clients
-	if typingData.ConversationUUID != "" {
-		app.conversation.BroadcastTypingToConversation(typingData.ConversationUUID, typingData.IsTyping, false)
-	}
+	app.conversation.BroadcastTypingToConversation(typingData.ConversationUUID, typingData.IsTyping, false)
 
 	app.lo.Debug("Broadcasted typing data from widget user to agents", "user_id", userID, "is_typing", typingData.IsTyping, "conversation_uuid", typingData.ConversationUUID)
 	return nil
 }
 
-// validateWidgetMessageJWT validates the incoming widget message JWT and returns the claims
-func validateWidgetMessageJWT(jwt string) (Claims, error) {
-	// Verify JWT
-	claims, err := verifyStandardJWT(jwt)
-	if err != nil {
-		return Claims{}, fmt.Errorf("invalid JWT token: %w", err)
+// validateWidgetMessageJWT validates the incoming widget message JWT using inbox secret
+func validateWidgetMessageJWT(app *App, jwtToken string, inboxID int) (Claims, error) {
+	if jwtToken == "" {
+		return Claims{}, fmt.Errorf("JWT token is empty")
 	}
 
-	// Return claims as a map
+	if inboxID <= 0 {
+		return Claims{}, fmt.Errorf("inbox ID is required for JWT validation")
+	}
+
+	// Get inbox to retrieve secret for JWT verification
+	inbox, err := app.inbox.GetDBRecord(inboxID)
+	if err != nil {
+		return Claims{}, fmt.Errorf("inbox not found: %w", err)
+	}
+
+	if !inbox.Secret.Valid || inbox.Secret.String == "" {
+		return Claims{}, fmt.Errorf("inbox secret not configured for JWT verification")
+	}
+
+	// Use the existing verifyStandardJWT function which properly validates with inbox secret
+	claims, err := verifyStandardJWT(jwtToken, inbox.Secret.String)
+	if err != nil {
+		return Claims{}, fmt.Errorf("JWT validation failed: %w", err)
+	}
+
 	return claims, nil
 }
 

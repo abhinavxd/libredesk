@@ -1,10 +1,12 @@
 <template>
   <div class="flex flex-col relative flex-1 min-h-0">
     <!-- Loading conversation overlay -->
-    <div v-if="isLoadingConversation" class="absolute inset-0 bg-background/80 backdrop-blur-sm z-10">
+    <div
+      v-if="isLoadingConversation"
+      class="absolute inset-0 bg-background/80 backdrop-blur-sm z-10"
+    >
       <Spinner size="md" :text="$t('globals.terms.loading')" absolute />
     </div>
-    
     <div
       class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
       ref="messagesContainer"
@@ -200,9 +202,6 @@ onMounted(() => {
   setTimeout(() => {
     scrollToBottom()
   }, 200)
-
-  // Update conversation last seen timestamp.
-  chatStore.updateCurrentConversationLastSeen()
 })
 
 // Only auto-scroll for user's own messages or when at bottom

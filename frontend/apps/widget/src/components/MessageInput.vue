@@ -33,7 +33,10 @@
             class="h-8 px-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed border-0"
             :disabled="!newMessage.trim() || isUploading || isSending"
           >
-            <div v-if="isSending" class="w-4 h-4 border border-background border-t-current rounded-full animate-spin"></div>
+            <div
+              v-if="isSending"
+              class="w-4 h-4 border border-background border-t-current rounded-full animate-spin"
+            ></div>
             <ArrowUp v-else class="w-4 h-4" />
           </Button>
         </div>
@@ -57,9 +60,7 @@ import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js
 import MessageInputActions from './MessageInputActions.vue'
 import api from '@widget/api/index.js'
 
-// Define emits
 const emit = defineEmits(['error'])
-
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
@@ -86,6 +87,11 @@ const initChatConversation = async (messageText) => {
   if (!userStore.userSessionToken) {
     userStore.setSessionToken(jwt)
   }
+
+  // Refetch conversations list.
+  nextTick(() => {
+    chatStore.fetchConversations()
+  })
 
   // Update chat store with new conversation and messages.
   chatStore.setCurrentConversation(conversation)

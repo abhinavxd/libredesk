@@ -52,6 +52,18 @@
         {{ phoneNumber }}
       </span>
     </div>
+    <div
+      class="text-sm text-muted-foreground flex gap-2 items-center"
+      v-if="conversation?.contact?.external_user_id"
+    >
+      <IdCard size="16" class="flex-shrink-0" />
+      <span v-if="conversationStore.conversation.loading">
+        <Skeleton class="w-32 h-4" />
+      </span>
+      <span v-else>
+        {{ conversation.contact.external_user_id }}
+      </span>
+    </div>
   </div>
 </template>
 
@@ -60,7 +72,7 @@ import { computed } from 'vue'
 import { ViewVerticalIcon } from '@radix-icons/vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
-import { Mail, Phone, ExternalLink } from 'lucide-vue-next'
+import { Mail, Phone, ExternalLink, IdCard } from 'lucide-vue-next'
 import { useEmitter } from '../../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useConversationStore } from '../../../stores/conversation'

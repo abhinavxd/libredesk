@@ -28,7 +28,9 @@
               class="text-xs text-muted-foreground flex items-center gap-1"
               v-if="conversation.last_message && conversation.last_message.author"
             >
-              <span v-if="conversation.last_message?.author?.id !== userStore.userID">
+              <span
+                v-if="!['contact', 'visitor'].includes(conversation.last_message?.author?.type)"
+              >
                 {{
                   conversation.last_message?.author.first_name +
                   ' ' +
