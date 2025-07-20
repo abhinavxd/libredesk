@@ -64,6 +64,7 @@ type queries struct {
 	GetUsers               string     `query:"get-users"`
 	GetNotes               *sqlx.Stmt `query:"get-notes"`
 	GetNote                *sqlx.Stmt `query:"get-note"`
+	GetUserByExternalID    *sqlx.Stmt `query:"get-user-by-external-id"`
 	GetAgentsCompact       *sqlx.Stmt `query:"get-agents-compact"`
 	UpdateContact          *sqlx.Stmt `query:"update-contact"`
 	UpdateAgent            *sqlx.Stmt `query:"update-agent"`
@@ -79,7 +80,8 @@ type queries struct {
 	SetPassword            *sqlx.Stmt `query:"set-password"`
 	DeleteNote             *sqlx.Stmt `query:"delete-note"`
 	InsertAgent            *sqlx.Stmt `query:"insert-agent"`
-	InsertContact          *sqlx.Stmt `query:"insert-contact"`
+	InsertContactWithExtID *sqlx.Stmt `query:"insert-contact-with-external-id"`
+	InsertContactNoExtID   *sqlx.Stmt `query:"insert-contact-without-external-id"`
 	InsertNote             *sqlx.Stmt `query:"insert-note"`
 	InsertVisitor          *sqlx.Stmt `query:"insert-visitor"`
 	ToggleEnable           *sqlx.Stmt `query:"toggle-enable"`
@@ -169,6 +171,19 @@ func (u *Manager) Get(id int, email, type_ string) (models.User, error) {
 // GetSystemUser retrieves the system user.
 func (u *Manager) GetSystemUser() (models.User, error) {
 	return u.Get(0, models.SystemUserEmail, models.UserTypeAgent)
+}
+
+// GetByExternalID retrieves a user by external user ID.
+func (u *Manager) GetByExternalID(externalUserID string) (models.User, error) {
+	var user models.User
+	if err := u.q.GetUserByExternalID.Get(&user, externalUserID); err != nil {
+		if err == sql.ErrNoRows {
+			return user, envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.user}"), nil)
+		}
+		u.lo.Error("error fetching user by external ID", "external_user_id", externalUserID, "error", err)
+		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+	}
+	return user, nil
 }
 
 // UpdateAvatar updates the user avatar.

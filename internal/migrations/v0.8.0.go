@@ -87,16 +87,11 @@ func V0_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		/* ── drop index for e‑mail uniqueness and add seperate indexes for type of user ── */
 		`DROP INDEX IF EXISTS index_unique_users_on_email_and_type_when_deleted_at_is_null`,
 
-		/* ── add separate indexes for type of user, this excludes `visitor` type as there can be multiple visitors with the same email ── */
-		`CREATE UNIQUE INDEX IF NOT EXISTS
-		index_unique_users_on_email_when_type_is_contact
-		ON users(email)
-		WHERE type = 'contact' AND deleted_at IS NULL`,
-
+		/* ── email for agents are unique ── */
 		`CREATE UNIQUE INDEX IF NOT EXISTS
 		index_unique_users_on_email_when_type_is_agent
-		ON users(email)
-		WHERE type = 'agent'   AND deleted_at IS NULL`,
+			ON users(email)
+			WHERE type = 'agent'  AND deleted_at IS NULL`,
 	}
 
 	for _, q := range stmts {
@@ -105,6 +100,43 @@ func V0_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		}
 	}
 	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	tx2, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx2.Rollback()
+
+	jwtStmts := []string{
+		/* ── Add secret column to inboxes table for JWT signing (livechat only) ── */
+		`ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS secret TEXT NULL`,
+
+		/* ── Add external_user_id column to users table for 3rd party user mapping ── */
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS external_user_id TEXT NULL`,
+
+		/* ──  ── */
+		`
+		CREATE UNIQUE INDEX index_unique_users_on_ext_id_when_type_is_contact 
+		ON users (external_user_id) 
+		WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL;
+		`,
+
+		`
+		CREATE UNIQUE INDEX index_unique_users_on_email_when_no_ext_id_contact
+		ON users (email) 
+		WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL;
+		`,
+	}
+
+	for _, q := range jwtStmts {
+		if _, err = tx2.Exec(q); err != nil {
+			return err
+		}
+	}
+
+	if err := tx2.Commit(); err != nil {
 		return err
 	}
 	return nil

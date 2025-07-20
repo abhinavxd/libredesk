@@ -51,6 +51,7 @@ type User struct {
 	Permissions            pq.StringArray  `db:"permissions" json:"permissions"`
 	Meta                   pq.StringArray  `db:"meta" json:"meta"`
 	CustomAttributes       json.RawMessage `db:"custom_attributes" json:"custom_attributes"`
+	ExternalUserID         null.String     `db:"external_user_id" json:"external_user_id"`
 	Teams                  tmodels.Teams   `db:"teams" json:"teams"`
 	NewPassword            string          `db:"-" json:"new_password,omitempty"`
 	SendWelcomeEmail       bool            `db:"-" json:"send_welcome_email,omitempty"`

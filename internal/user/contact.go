@@ -20,7 +20,16 @@ func (u *Manager) CreateContact(user *models.User) error {
 	// Normalize email address.
 	user.Email = null.NewString(strings.ToLower(user.Email.String), user.Email.Valid)
 
-	if err := u.q.InsertContact.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL).Scan(&user.ID); err != nil {
+	// If external_user_id is provided, insert with it.
+	if user.ExternalUserID.Valid {
+		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID).Scan(&user.ID); err != nil {
+			u.lo.Error("error inserting contact with external ID", "error", err)
+			return fmt.Errorf("insert contact with external ID: %w", err)
+		}
+		return nil
+	}
+	// Insert without external_user_id.
+	if err := u.q.InsertContactNoExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL).Scan(&user.ID); err != nil {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
 	}

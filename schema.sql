@@ -82,6 +82,7 @@ CREATE TABLE inboxes (
 	csat_enabled bool DEFAULT false NOT NULL,
 	config jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"from" TEXT NULL,
+	secret TEXT NULL,
 	CONSTRAINT constraint_inboxes_on_name CHECK (length("name") <= 140)
 );
 
@@ -135,6 +136,7 @@ CREATE TABLE users (
     "password" VARCHAR(150) NULL,
     avatar_url TEXT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
+	external_user_id TEXT NULL,
     reset_password_token TEXT NULL,
     reset_password_token_expiry TIMESTAMPTZ NULL,
 	availability_status user_availability_status DEFAULT 'offline' NOT NULL,
@@ -151,14 +153,17 @@ CREATE TABLE users (
     CONSTRAINT constraint_users_on_first_name CHECK (LENGTH(first_name) <= 140),
     CONSTRAINT constraint_users_on_last_name CHECK (LENGTH(last_name) <= 140)
 );
-CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_contact
-       ON users(email)
-       WHERE type = 'contact' AND deleted_at IS NULL;
-CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
-       ON users(email)
-       WHERE type = 'agent' AND deleted_at IS NULL;
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
+CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
+	ON users(email)
+	WHERE type = 'agent' AND deleted_at IS NULL;
+CREATE UNIQUE INDEX index_unique_users_on_ext_id_when_type_is_contact 
+	ON users (external_user_id) 
+	WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL;
+CREATE UNIQUE INDEX index_unique_users_on_email_when_no_ext_id_contact
+	ON users (email) 
+	WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL;
 
 DROP TABLE IF EXISTS user_roles CASCADE;
 CREATE TABLE user_roles (
