@@ -11,19 +11,25 @@ const http = axios.create({
     responseType: 'json'
 })
 
-// Set content type if not specified and add libredesk_session to POST/PUT requests
+// Set content type and authentication headers
 http.interceptors.request.use((request) => {
     if ((request.method === 'post' || request.method === 'put') && !request.headers['Content-Type']) {
         request.headers['Content-Type'] = 'application/json'
     }
 
-    // Add libredesk_session to POST/PUT request data
-    if (request.method === 'post' || request.method === 'put') {
+    // Add authentication headers for widget API endpoints
+    if (request.url && request.url.includes('/api/v1/widget/')) {
         const libredeskSession = localStorage.getItem('libredesk_session')
-        request.data = {
-            ...request.data,
-            inbox_id: getInboxIDFromQuery(),
-            jwt: libredeskSession
+        const inboxId = getInboxIDFromQuery()
+        
+        // Add JWT to Authorization header
+        if (libredeskSession) {
+            request.headers['Authorization'] = `Bearer ${libredeskSession}`
+        }
+        
+        // Add inbox ID to custom header
+        if (inboxId) {
+            request.headers['X-Libredesk-Inbox-ID'] = inboxId.toString()
         }
     }
 
@@ -41,22 +47,33 @@ const sendChatMessage = (uuid, data) => http.post(`/api/v1/widget/chat/conversat
 const closeChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/close`)
 const uploadMedia = (conversationUUID, files) => {
     const formData = new FormData()
-
-    // Add JWT token
-    const libredeskSession = localStorage.getItem('libredesk_session')
-    formData.append('jwt', libredeskSession)
+    
+    // Only add conversation UUID to form data now
     formData.append('conversation_uuid', conversationUUID)
-    formData.append('inbox_id', getInboxIDFromQuery())
 
     // Add files
     for (let i = 0; i < files.length; i++) {
         formData.append('files', files[i])
     }
 
+    // Get authentication data for headers
+    const libredeskSession = localStorage.getItem('libredesk_session')
+    const inboxId = getInboxIDFromQuery()
+
+    const headers = {
+        'Content-Type': 'multipart/form-data'
+    }
+
+    // Add authentication headers
+    if (libredeskSession) {
+        headers['Authorization'] = `Bearer ${libredeskSession}`
+    }
+    if (inboxId) {
+        headers['X-Libredesk-Inbox-ID'] = inboxId.toString()
+    }
+
     return axios.post('/api/v1/widget/media/upload', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        },
+        headers,
         timeout: 30000
     })
 }

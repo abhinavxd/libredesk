@@ -22,11 +22,6 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-type reqCommon struct {
-	JWT     string `json:"jwt"`
-	InboxID int    `json:"inbox_id"`
-}
-
 // Define JWT claims structure
 type Claims struct {
 	UserID           int            `json:"user_id,omitempty"`
@@ -39,22 +34,9 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// Chat widget initialization request
-type chatInitReq struct {
-	reqCommon
-	VisitorName  string `json:"visitor_name,omitempty"`
-	VisitorEmail string `json:"visitor_email,omitempty"`
-	Message      string `json:"message,omitempty"`
-}
-
 type conversationResp struct {
 	Conversation cmodels.ChatConversation `json:"conversation"`
 	Messages     []cmodels.ChatMessage    `json:"messages"`
-}
-
-type chatMessageReq struct {
-	Message string `json:"message"`
-	reqCommon
 }
 
 type chatSettingsResponse struct {
@@ -175,7 +157,11 @@ func handleGetChatSettings(r *fastglue.Request) error {
 func handleChatInit(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req = chatInitReq{}
+		req = struct {
+			VisitorName  string `json:"visitor_name,omitempty"`
+			VisitorEmail string `json:"visitor_email,omitempty"`
+			Message      string `json:"message,omitempty"`
+		}{}
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
@@ -187,17 +173,20 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
 	}
 
-	// Make sure the inbox is enabled and of the correct type.
-	inbox, err := app.inbox.GetDBRecord(req.InboxID)
+	// Get authenticated data from context (set by middleware)
+	// Middleware always validates inbox, so we can safely use non-optional getters
+	claims := getWidgetClaimsOptional(r)
+	
+	inboxID, err := getWidgetInboxID(r)
 	if err != nil {
-		app.lo.Error("error fetching inbox", "inbox_id", req.InboxID, "error", err)
-		return sendErrorEnvelope(r, err)
+		app.lo.Error("error getting inbox ID from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
-	if !inbox.Enabled {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
-	}
-	if inbox.Channel != livechat.ChannelLiveChat {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+	
+	inbox, err := getWidgetInbox(r)
+	if err != nil {
+		app.lo.Error("error getting inbox from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
 
 	var (
@@ -205,6 +194,7 @@ func handleChatInit(r *fastglue.Request) error {
 		conversationUUID string
 		isVisitor        bool
 		config           livechat.Config
+		newJWT           string
 	)
 
 	// Parse inbox config
@@ -213,18 +203,16 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
 
-	// Handle authenticated user.
-	if req.JWT != "" {
-		var claims Claims
-		var err error
-
-		claims, err = verifyStandardJWT(req.JWT, inbox.Secret.String)
+	// Handle authenticated user vs visitor
+	if claims != nil {
+		// Use authenticated contact ID from middleware
+		contactID, err = getWidgetContactID(r)
 		if err != nil {
-			app.lo.Error("invalid inbox JWT", "jwt", req.JWT, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.messages.sessionExpired"), nil, envelope.UnauthorizedError)
+			app.lo.Error("error getting contact ID from middleware context", "error", err)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 		}
 
-		// Handle existing contacts they all external user id.
+		// Handle existing contacts with external user id - check if we need to create user
 		if claims.ExternalUserID != "" {
 			// Find or create user based on external_user_id.
 			user, err := app.user.GetByExternalID(claims.ExternalUserID)
@@ -262,7 +250,6 @@ func handleChatInit(r *fastglue.Request) error {
 			contactID = user.ID
 			isVisitor = false
 		} else {
-			contactID = claims.UserID
 			isVisitor = claims.IsVisitor
 		}
 	} else {
@@ -279,7 +266,7 @@ func handleChatInit(r *fastglue.Request) error {
 		}
 		contactID = visitor.ID
 		secretToUse := []byte(inbox.Secret.String)
-		req.JWT, err = generateUserJWTWithSecret(contactID, isVisitor, time.Now().Add(87600*time.Hour), secretToUse) // 10 years
+		newJWT, err = generateUserJWTWithSecret(contactID, isVisitor, time.Now().Add(87600*time.Hour), secretToUse) // 10 years
 		if err != nil {
 			app.lo.Error("error generating visitor JWT", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.session}"), nil, envelope.GeneralError)
@@ -297,7 +284,7 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 
 	if userConfig.PreventMultipleConversations {
-		conversations, err := app.conversation.GetContactChatConversations(contactID, req.InboxID)
+		conversations, err := app.conversation.GetContactChatConversations(contactID, inboxID)
 		if err != nil {
 			userType := "visitor"
 			if !isVisitor {
@@ -316,12 +303,12 @@ func handleChatInit(r *fastglue.Request) error {
 		}
 	}
 
-	app.lo.Info("creating new live chat conversation for user", "user_id", contactID, "inbox_id", req.InboxID, "is_visitor", isVisitor)
+	app.lo.Info("creating new live chat conversation for user", "user_id", contactID, "inbox_id", inboxID, "is_visitor", isVisitor)
 
 	// Create conversation.
 	_, conversationUUID, err = app.conversation.CreateConversation(
 		contactID,
-		req.InboxID,
+		inboxID,
 		"",
 		time.Now(),
 		"",
@@ -370,13 +357,20 @@ func handleChatInit(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	return r.SendEnvelope(map[string]any{
+	// For visitors, return the new JWT. For authenticated users, no JWT is needed in response.
+	response := map[string]any{
 		"conversation":             resp.Conversation,
 		"messages":                 resp.Messages,
 		"business_hours_id":        resp.BusinessHoursID,
 		"working_hours_utc_offset": resp.WorkingHoursUTCOffset,
-		"jwt":                      req.JWT,
-	})
+	}
+	
+	// Only add JWT for visitor creation
+	if newJWT != "" {
+		response["jwt"] = newJWT
+	}
+	
+	return r.SendEnvelope(response)
 }
 
 // handleChatUpdateLastSeen updates contact last seen timestamp for a conversation
@@ -384,42 +378,23 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 	var (
 		app              = r.Context.(*App)
 		conversationUUID = r.RequestCtx.UserValue("uuid").(string)
-		req              = reqCommon{}
 	)
 
 	if conversationUUID == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.conversation}"), nil, envelope.InputError)
 	}
 
-	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error unmarshalling chat update last seen request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+	// Get authenticated data from middleware context
+	contactID, err := getWidgetContactID(r)
+	if err != nil {
+		app.lo.Error("error getting contact ID from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 	}
 
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
-	}
-
-	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-	if err != nil {
-		app.lo.Error("error fetching inbox", "inbox_id", conversation.InboxID, "error", err)
-		return sendErrorEnvelope(r, err)
-	}
-
-	// Verify JWT.
-	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
-	if err != nil {
-		app.lo.Error("invalid JWT", "jwt", req.JWT, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
-	contactID, err := resolveUserIDFromClaims(app, claims)
-	if err != nil {
-		app.lo.Error("error resolving user ID from JWT claims", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
 	// Make sure the conversation belongs to the contact.
@@ -442,45 +417,24 @@ func handleChatGetConversation(r *fastglue.Request) error {
 	var (
 		app              = r.Context.(*App)
 		conversationUUID = r.RequestCtx.UserValue("uuid").(string)
-		chatReq          = chatInitReq{}
 	)
 
 	if conversationUUID == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "conversation_id is required", nil, envelope.InputError)
 	}
 
-	// Decode chat request if present
-	if err := r.Decode(&chatReq, "json"); err != nil {
-		app.lo.Error("error unmarshalling chat request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+	// Get authenticated data from middleware context
+	contactID, err := getWidgetContactID(r)
+	if err != nil {
+		app.lo.Error("error getting contact ID from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 	}
 
-	// Fetch conversation first to get inbox info
+	// Fetch conversation
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
-	}
-
-	// Get inbox to retrieve secret for JWT verification
-	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-	if err != nil {
-		app.lo.Error("error fetching inbox", "inbox_id", conversation.InboxID, "error", err)
-		return sendErrorEnvelope(r, err)
-	}
-
-	// Verify JWT.
-	claims, err := verifyStandardJWT(chatReq.JWT, inbox.Secret.String)
-	if err != nil {
-		app.lo.Error("invalid JWT", "jwt", chatReq.JWT, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
-	contactID, err := resolveUserIDFromClaims(app, claims)
-	if err != nil {
-		app.lo.Error("error resolving user ID from JWT claims", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
 	// Make sure the conversation belongs to the contact.
@@ -502,37 +456,23 @@ func handleChatGetConversation(r *fastglue.Request) error {
 func handleGetConversations(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req = reqCommon{}
 	)
 
-	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error unmarshalling chat conversations request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+	// Get authenticated data from middleware context
+	contactID, err := getWidgetContactID(r)
+	if err != nil {
+		app.lo.Error("error getting contact ID from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 	}
 
-	// Get inbox to retrieve secret for JWT verification
-	inbox, err := app.inbox.GetDBRecord(req.InboxID)
+	inboxID, err := getWidgetInboxID(r)
 	if err != nil {
-		app.lo.Error("error fetching inbox", "inbox_id", req.InboxID, "error", err)
-		return sendErrorEnvelope(r, err)
-	}
-
-	// Verify JWT.
-	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
-	if err != nil {
-		app.lo.Error("invalid JWT", "jwt", req.JWT, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
-	contactID, err := resolveUserIDFromClaims(app, claims)
-	if err != nil {
-		app.lo.Error("error resolving user ID from JWT claims", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+		app.lo.Error("error getting inbox ID from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
 
 	// Fetch conversations for the contact and convert to ChatConversation format.
-	chatConversations, err := app.conversation.GetContactChatConversations(contactID, req.InboxID)
+	chatConversations, err := app.conversation.GetContactChatConversations(contactID, inboxID)
 	if err != nil {
 		app.lo.Error("error fetching conversations for contact", "contact_id", contactID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
@@ -546,9 +486,10 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	var (
 		app              = r.Context.(*App)
 		conversationUUID = r.RequestCtx.UserValue("uuid").(string)
-		req              = chatMessageReq{}
-		senderType       = cmodels.SenderTypeContact
-		senderID         = 0
+		req              = struct {
+			Message string `json:"message"`
+		}{}
+		senderType = cmodels.SenderTypeContact
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
@@ -560,31 +501,24 @@ func handleChatSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
 	}
 
-	// Fetch conversation to ensure it exists and get inbox info.
+	// Get authenticated data from middleware context
+	senderID, err := getWidgetContactID(r)
+	if err != nil {
+		app.lo.Error("error getting contact ID from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+	}
+
+	inbox, err := getWidgetInbox(r)
+	if err != nil {
+		app.lo.Error("error getting inbox from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+	}
+
+	// Fetch conversation to ensure it exists
 	conversation, err := app.conversation.GetConversation(0, conversationUUID)
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
-	}
-
-	// Get inbox to retrieve secret for JWT verification
-	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-	if err != nil {
-		app.lo.Error("error fetching inbox", "inbox_id", conversation.InboxID, "error", err)
-		return sendErrorEnvelope(r, err)
-	}
-
-	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
-	if err != nil {
-		app.lo.Error("invalid JWT", "jwt", req.JWT, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
-	senderID, err = resolveUserIDFromClaims(app, claims)
-	if err != nil {
-		app.lo.Error("error resolving user ID from JWT claims", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
 	// Fetch sender.
@@ -655,8 +589,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 // handleWidgetMediaUpload handles media uploads for the widget.
 func handleWidgetMediaUpload(r *fastglue.Request) error {
 	var (
-		app      = r.Context.(*App)
-		senderID = 0
+		app = r.Context.(*App)
 	)
 
 	form, err := r.RequestCtx.MultipartForm()
@@ -665,12 +598,18 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.GeneralError)
 	}
 
-	// Get JWT token from form data
-	jwtValues, jwtOk := form.Value["jwt"]
-	if !jwtOk || len(jwtValues) == 0 || jwtValues[0] == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+	// Get authenticated data from middleware context
+	senderID, err := getWidgetContactID(r)
+	if err != nil {
+		app.lo.Error("error getting contact ID from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 	}
-	jwtToken := jwtValues[0]
+
+	inbox, err := getWidgetInbox(r)
+	if err != nil {
+		app.lo.Error("error getting inbox from middleware context", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+	}
 
 	// Get conversation UUID from form data
 	conversationValues, convOk := form.Value["conversation_uuid"]
@@ -684,32 +623,6 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
-	}
-
-	// Get inbox to retrieve secret for JWT verification
-	inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-	if err != nil {
-		app.lo.Error("error fetching inbox", "inbox_id", conversation.InboxID, "error", err)
-		return sendErrorEnvelope(r, err)
-	}
-
-	// Make sure the inbox is enabled.
-	if !inbox.Enabled {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
-	}
-
-	// Verify JWT and get user information
-	claims, err := verifyStandardJWT(jwtToken, inbox.Secret.String)
-	if err != nil {
-		app.lo.Error("invalid JWT", "jwt", jwtToken, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
-	}
-
-	// Resolve user ID from JWT claims (handles both user_id and external_user_id)
-	senderID, err = resolveUserIDFromClaims(app, claims)
-	if err != nil {
-		app.lo.Error("error resolving user ID from JWT claims", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
 	if conversation.ContactID != senderID {

@@ -227,12 +227,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Widget APIs.
 	g.GET("/api/v1/widget/chat/settings/launcher", handleGetChatLauncherSettings)
 	g.GET("/api/v1/widget/chat/settings", handleGetChatSettings)
-	g.POST("/api/v1/widget/chat/conversations/init", handleChatInit)
-	g.POST("/api/v1/widget/chat/conversations", handleGetConversations)
-	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", handleChatUpdateLastSeen)
-	g.POST("/api/v1/widget/chat/conversations/{uuid}", handleChatGetConversation)
-	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", handleChatSendMessage)
-	g.POST("/api/v1/widget/media/upload", handleWidgetMediaUpload)
+	g.POST("/api/v1/widget/chat/conversations/init", widgetAuth(handleChatInit))
+	g.POST("/api/v1/widget/chat/conversations", widgetAuth(handleGetConversations))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", widgetAuth(handleChatUpdateLastSeen))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}", widgetAuth(handleChatGetConversation))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", widgetAuth(handleChatSendMessage))
+	g.POST("/api/v1/widget/media/upload", widgetAuth(handleWidgetMediaUpload))
 
 	// Frontend pages.
 	g.GET("/", notAuthPage(serveIndexPage))
