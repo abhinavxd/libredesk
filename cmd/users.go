@@ -11,6 +11,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/image"
+	"github.com/abhinavxd/libredesk/internal/csv_parser"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -575,5 +576,75 @@ func handleRevokeAPIKey(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	return r.SendEnvelope(true)
+}
+
+// handleBulkImportAgents handles the bulk import of agents from a CSV file.
+func handleBulkImportAgents(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+	)
+
+	// Parse the uploaded file
+	form, err := r.RequestCtx.MultipartForm()
+	if err != nil {
+		app.lo.Error("error parsing form data", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.file}"), nil, envelope.InputError)
+	}
+
+	files, ok := form.File["file"]
+	if !ok || len(files) == 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "{globals.terms.file}"), nil, envelope.InputError)
+	}
+
+	fileHeader := files[0]
+	file, err := fileHeader.Open()
+	if err != nil {
+		app.lo.Error("error opening uploaded file", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.terms.file}"), nil, envelope.GeneralError)
+	}
+	defer file.Close()
+
+	// Print some values for debugging
+	fmt.Println("Uploaded file name:", fileHeader.Filename)
+	fmt.Println("Uploaded file size:", fileHeader.Size)
+	fmt.Println("Uploaded file content type:", fileHeader.Header.Get("Content-Type"))
+	// Parse the CSV file
+	records, err := csvParser.ParseCSV(file)
+	if err != nil {
+		app.lo.Error("error parsing CSV file", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.file}"), nil, envelope.InputError)
+	}
+
+	// Validate and process each record
+	for _, record := range records {
+		user := models.User{
+			Email:     null.StringFrom(strings.TrimSpace(strings.ToLower(record["email"]))),
+			FirstName: strings.TrimSpace(record["first_name"]),
+			LastName:  strings.TrimSpace(record["last_name"]),
+			Roles:     []string{record["roles"]},
+		}
+
+		if user.Email.String == "" || user.FirstName == "" || user.Roles == nil {
+			app.lo.Warn("invalid record in CSV", "record", record)
+			continue
+		}
+
+
+		// Create the agent
+		if err := app.user.CreateAgent(&user); err != nil {
+			app.lo.Error("error creating agent", "error", err, "record", record, "stacktrace", fmt.Sprintf("%+v", err))
+			app.lo.Error("error creating agent", "error", err, "record", record)
+			continue
+		}
+
+		// Assign teams if provided
+		if teams, ok := record["teams"]; ok && teams != "" {
+			teamNames := strings.Split(teams, ",")
+			if err := app.team.UpsertUserTeams(user.ID, teamNames); err != nil {
+				app.lo.Error("error assigning teams to agent", "error", err, "record", record)
+			}
+		}
+	}
 	return r.SendEnvelope(true)
 }
