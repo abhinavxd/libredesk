@@ -634,7 +634,6 @@ func handleBulkImportAgents(r *fastglue.Request) error {
 		// Create the agent
 		if err := app.user.CreateAgent(&user); err != nil {
 			app.lo.Error("error creating agent", "error", err, "record", record, "stacktrace", fmt.Sprintf("%+v", err))
-			app.lo.Error("error creating agent", "error", err, "record", record)
 			continue
 		}
 
