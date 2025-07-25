@@ -605,11 +605,6 @@ func handleBulkImportAgents(r *fastglue.Request) error {
 	}
 	defer file.Close()
 
-	// Print some values for debugging
-	fmt.Println("Uploaded file name:", fileHeader.Filename)
-	fmt.Println("Uploaded file size:", fileHeader.Size)
-	fmt.Println("Uploaded file content type:", fileHeader.Header.Get("Content-Type"))
-
 	// Parse the CSV file
 	records, err := csvParser.ParseCSV(file)
 	if err != nil {

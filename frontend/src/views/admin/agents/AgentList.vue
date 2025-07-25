@@ -1,7 +1,7 @@
 <template>
   <Spinner v-if="isLoading" />
   <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
-  <input id="fileUpload" type="file" hidden @change="handleFileUpload">
+  <input id="fileUpload" type="file" accept=".csv" hidden @change="handleFileUpload" >
     <div class="flex justify-end mb-5">
      <Button @click="importAgent" class="mr-5" variant="secondary">{{
       $t('globals.messages.import', {
