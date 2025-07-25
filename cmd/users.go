@@ -11,6 +11,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/image"
+	"github.com/abhinavxd/libredesk/internal/csv_parser"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -576,4 +577,128 @@ func handleRevokeAPIKey(r *fastglue.Request) error {
 	}
 
 	return r.SendEnvelope(true)
+}
+
+// handleBulkImportAgents handles the bulk import of agents from a CSV file.
+func handleBulkImportAgents(r *fastglue.Request) error {
+	var app = r.Context.(*App)
+
+	// Parse the uploaded file
+	file, err := parseUploadedFile(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	defer file.Close()
+
+	// Parse the CSV file
+	records, err := csvParser.ParseCSV(file)
+	if err != nil {
+		app.lo.Error("error parsing CSV file", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.file}"), nil, envelope.InputError)
+	}
+
+	// Process records
+	successes, errors := processCSVRecords(app, records)
+
+	// Prepare the response report as CSV
+	csvString := prepareCSVResponse(successes, errors)
+
+	return r.SendString(fasthttp.StatusOK, csvString)
+}
+
+func parseUploadedFile(r *fastglue.Request) (multipart.File, error) {
+	var app = r.Context.(*App)
+
+	form, err := r.RequestCtx.MultipartForm()
+	if err != nil {
+		app.lo.Error("error parsing form data", "error", err)
+		return nil, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.file}"), nil)
+	}
+
+	files, ok := form.File["file"]
+	if !ok || len(files) == 0 {
+		return nil, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "{globals.terms.file}"), nil)
+	}
+
+	fileHeader := files[0]
+	file, err := fileHeader.Open()
+	if err != nil {
+		app.lo.Error("error opening uploaded file", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.terms.file}"), nil)
+	}
+
+	return file, nil
+}
+
+func processCSVRecords(app *App, records []map[string]string) ([]map[string]string, []map[string]string) {
+	var (
+		successes []map[string]string
+		errors    []map[string]string
+	)
+
+	for _, record := range records {
+		if err := processCSVRecord(app, record); err != nil {
+			errors = append(errors, map[string]string{
+				"record": fmt.Sprintf("%v", record["email"]),
+				"error":  err.Error(),
+			})
+		} else {
+			successes = append(successes, map[string]string{
+				"record": fmt.Sprintf("%v", record["email"]),
+				"status": "Success",
+			})
+		}
+	}
+
+	return successes, errors
+}
+
+func processCSVRecord(app *App, record map[string]string) error {
+	user := models.User{
+		Email:     null.StringFrom(strings.TrimSpace(strings.ToLower(record["email"]))),
+		FirstName: strings.TrimSpace(record["first_name"]),
+		LastName:  strings.TrimSpace(record["last_name"]),
+		Roles:     []string{record["roles"]},
+	}
+
+	if user.Email.String == "" || user.FirstName == "" || user.Roles == nil {
+		app.lo.Warn("invalid record in CSV", "record", record)
+		return fmt.Errorf("Invalid record: missing required fields")
+	}
+
+	// Create the agent
+	if err := app.user.CreateAgent(&user); err != nil {
+		app.lo.Error("error creating agent", "error", err, "record", record)
+		return fmt.Errorf("Error creating agent: %v", err)
+	}
+
+	// Assign teams if provided
+	if teams, ok := record["teams"]; ok && teams != "" {
+		teamNames := strings.Split(teams, ",")
+		if err := app.team.UpsertUserTeams(user.ID, teamNames); err != nil {
+			app.lo.Error("error assigning teams to agent", "error", err, "record", record)
+			return fmt.Errorf("Error assigning teams: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func prepareCSVResponse(successes, errors []map[string]string) string {
+	csvData := [][]string{
+		{"Record", "Status/Error"},
+	}
+	for _, success := range successes {
+		csvData = append(csvData, []string{success["record"], success["status"]})
+	}
+	for _, err := range errors {
+		csvData = append(csvData, []string{err["record"], err["error"]})
+	}
+
+	var sb strings.Builder
+	for _, row := range csvData {
+		sb.WriteString(strings.Join(row, ","))
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
