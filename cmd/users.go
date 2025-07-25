@@ -609,6 +609,7 @@ func handleBulkImportAgents(r *fastglue.Request) error {
 	fmt.Println("Uploaded file name:", fileHeader.Filename)
 	fmt.Println("Uploaded file size:", fileHeader.Size)
 	fmt.Println("Uploaded file content type:", fileHeader.Header.Get("Content-Type"))
+
 	// Parse the CSV file
 	records, err := csvParser.ParseCSV(file)
 	if err != nil {
@@ -617,6 +618,13 @@ func handleBulkImportAgents(r *fastglue.Request) error {
 	}
 
 	// Validate and process each record
+	var (
+		successCount int
+		errorCount   int
+		errors       []map[string]string
+		successes    []map[string]string
+	)
+
 	for _, record := range records {
 		user := models.User{
 			Email:     null.StringFrom(strings.TrimSpace(strings.ToLower(record["email"]))),
@@ -627,13 +635,22 @@ func handleBulkImportAgents(r *fastglue.Request) error {
 
 		if user.Email.String == "" || user.FirstName == "" || user.Roles == nil {
 			app.lo.Warn("invalid record in CSV", "record", record)
+			errorCount++
+			errors = append(errors, map[string]string{
+				"record": fmt.Sprintf("%v", record["email"]),
+				"error":  "Invalid record: missing required fields",
+			})
 			continue
 		}
-
 
 		// Create the agent
 		if err := app.user.CreateAgent(&user); err != nil {
 			app.lo.Error("error creating agent", "error", err, "record", record, "stacktrace", fmt.Sprintf("%+v", err))
+			errorCount++
+			errors = append(errors, map[string]string{
+				"record": fmt.Sprintf("%v", record["email"]),
+				"error":  fmt.Sprintf("Error creating agent: %v", err),
+			})
 			continue
 		}
 
@@ -642,8 +659,37 @@ func handleBulkImportAgents(r *fastglue.Request) error {
 			teamNames := strings.Split(teams, ",")
 			if err := app.team.UpsertUserTeams(user.ID, teamNames); err != nil {
 				app.lo.Error("error assigning teams to agent", "error", err, "record", record)
+				errors = append(errors, map[string]string{
+					"record": fmt.Sprintf("%v", record["email"]),
+					"error":  fmt.Sprintf("Error assigning teams: %v", err),
+				})
 			}
 		}
+
+		successCount++
+		successes = append(successes, map[string]string{
+			"record": fmt.Sprintf("%v", record["email"]),
+			"status": "Success",
+		})
 	}
-	return r.SendEnvelope(true)
+
+	// Prepare the response report as CSV
+	csvData := [][]string{
+		{"Record", "Status/Error"},
+	}
+	for _, success := range successes {
+		csvData = append(csvData, []string{success["record"], success["status"]})
+	}
+	for _, err := range errors {
+		csvData = append(csvData, []string{err["record"], err["error"]})
+	}
+
+	var sb strings.Builder
+	for _, row := range csvData {
+		sb.WriteString(strings.Join(row, ","))
+		sb.WriteString("\n")
+	}
+	csvString := sb.String()
+
+	return r.SendString(fasthttp.StatusOK, csvString)
 }

@@ -79,12 +79,12 @@ const handleFileUpload = async (event) => {
   try {
     isLoading.value = true
     const response = await api.importAgents(formData)
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'success',
-      description: t('globals.messages.importSuccess', {
-        name: t('globals.terms.agent', 1)
-      })
-    })
+    const blob = new Blob([response.data], { type: response.headers['content-type'] })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'imported_agents.csv' // Adjust the filename as needed
+    link.click()
+    URL.revokeObjectURL(link.href)
     getData()
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
