@@ -621,5 +621,6 @@
   "contact.unblockConfirm": "Are you sure you want to unblock this contact? They will be able to interact with you again.",
   "contact.alreadyExistsWithEmail": "Another contact with same email already exists",
   "contact.notes.empty": "No notes yet",
-  "contact.notes.help": "Add note for this contact to keep track of important information and conversations."
+  "contact.notes.help": "Add note for this contact to keep track of important information and conversations.",
+  "globals.message.import":"Import"
 }
