@@ -83,6 +83,23 @@ export const adminNavItems = [
     ]
   },
   {
+    titleKey: 'globals.terms.ai',
+    children: [
+      {
+        titleKey: 'globals.terms.aiAssistant',
+        isTitleKeyPlural: true,
+        href: '/admin/ai/assistants',
+        permission: 'ai:manage'
+      },
+      {
+        titleKey: 'globals.terms.customAnswer',
+        isTitleKeyPlural: true,
+        href: '/admin/ai/custom-answers',
+        permission: 'ai:manage'
+      },
+    ]
+  },
+  {
     titleKey: 'globals.terms.automation',
     children: [
       {
@@ -142,7 +159,17 @@ export const adminNavItems = [
         permission: 'webhooks:manage'
       }
     ]
-  }
+  },
+  {
+    titleKey: 'globals.terms.helpCenter',
+    children: [
+      {
+        titleKey: 'globals.terms.helpCenter',
+        href: '/admin/help-center',
+        permission: 'help_center:manage'
+      }
+    ]
+  },
 ]
 
 export const accountNavItems = [

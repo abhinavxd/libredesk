@@ -13,6 +13,8 @@ import (
 
 	_ "time/tzdata"
 
+	_ "github.com/pgvector/pgvector-go"
+
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
 	"github.com/abhinavxd/libredesk/internal/ai"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
@@ -21,6 +23,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/colorlog"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/report"
@@ -95,6 +98,7 @@ type App struct {
 	customAttribute *customAttribute.Manager
 	report          *report.Manager
 	webhook         *webhook.Manager
+	helpcenter      *helpcenter.Manager
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -202,10 +206,14 @@ func main() {
 		sla                         = initSLA(db, team, settings, businessHours, notifier, template, user, i18n)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template, webhook)
 		autoassigner                = initAutoAssigner(team, user, conversation)
+		helpcenter                  = initHelpCenter(db, i18n)
+		ai                          = initAI(db, i18n, conversation, helpcenter, user)
 	)
 
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
+	conversation.SetAIStore(ai)
+	helpcenter.SetAIStore(ai)
 
 	// Start inboxes.
 	startInboxes(ctx, inbox, conversation, user)
@@ -220,6 +228,7 @@ func main() {
 	go sla.SendNotifications(ctx)
 	go media.DeleteUnlinkedMedia(ctx)
 	go user.MonitorAgentAvailability(ctx)
+	go ai.StartConversationCompletions()
 
 	var app = &App{
 		lo:              lo,
@@ -251,8 +260,9 @@ func main() {
 		role:            initRole(db, i18n),
 		tag:             initTag(db, i18n),
 		macro:           initMacro(db, i18n),
-		ai:              initAI(db, i18n),
+		ai:              ai,
 		webhook:         webhook,
+		helpcenter:      helpcenter,
 	}
 	app.consts.Store(constants)
 
@@ -300,6 +310,8 @@ func main() {
 	webhook.Close()
 	colorlog.Red("Shutting down conversation...")
 	conversation.Close()
+	colorlog.Red("Shutting down AI...")
+	app.ai.StopConversationCompletions()
 	colorlog.Red("Shutting down SLA...")
 	sla.Close()
 	colorlog.Red("Shutting down database...")

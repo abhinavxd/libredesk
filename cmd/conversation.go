@@ -469,7 +469,7 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	conversation, err := enforceConversationAccess(app, uuid, user)
+	_, err = enforceConversationAccess(app, uuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -479,19 +479,6 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// If status is `Resolved`, send CSAT survey if enabled on inbox.
-	if status == cmodels.StatusResolved {
-		// Check if CSAT is enabled on the inbox and send CSAT survey message.
-		inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-		if err != nil {
-			return sendErrorEnvelope(r, err)
-		}
-		if inbox.CSATEnabled {
-			if err := app.conversation.SendCSATReply(user.ID, *conversation); err != nil {
-				return sendErrorEnvelope(r, err)
-			}
-		}
-	}
 	return r.SendEnvelope(true)
 }
 

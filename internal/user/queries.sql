@@ -1,7 +1,8 @@
 -- name: get-users
-SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled
+SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name,
+users.last_name, users.email, users.enabled, users.meta
 FROM users
-WHERE users.email != 'System' AND users.deleted_at IS NULL AND type = $1
+WHERE (users.email IS NULL OR users.email != 'System') AND users.deleted_at IS NULL AND type = $1
 
 -- name: soft-delete-agent
 WITH soft_delete AS (
@@ -26,7 +27,7 @@ SELECT 1;
 -- name: get-agents-compact
 SELECT u.id, u.type, u.first_name, u.last_name, u.enabled, u.avatar_url
 FROM users u
-WHERE u.email != 'System' AND u.deleted_at IS NULL AND u.type = 'agent'
+WHERE (u.email != 'System' OR u.email IS NULL) AND u.deleted_at IS NULL AND u.type in ('agent', 'ai_assistant')
 ORDER BY u.updated_at DESC;
 
 -- name: get-user
@@ -51,6 +52,7 @@ SELECT
     u.api_key,
     u.api_key_last_used_at,
     u.external_user_id,
+    u.meta,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -325,3 +327,24 @@ LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
 WHERE u.deleted_at IS NULL 
     AND u.external_user_id = $1
 GROUP BY u.id;
+
+-- name: insert-ai-assistant
+INSERT INTO users (email, type, first_name, last_name, avatar_url, meta)
+VALUES ($1, 'ai_assistant', $2, $3, $4, $5)
+RETURNING id;
+
+-- name: update-ai-assistant
+UPDATE users
+SET first_name = COALESCE($2, first_name),
+    last_name = COALESCE($3, last_name),
+    email = COALESCE($4, email),
+    avatar_url = COALESCE($5, avatar_url),
+    meta = COALESCE($6, meta),
+    enabled = COALESCE($7, enabled),
+    updated_at = now()
+WHERE id = $1 AND type = 'ai_assistant';
+
+-- name: soft-delete-ai-assistant
+UPDATE users
+SET deleted_at = now(), updated_at = now()
+WHERE id = $1 AND type = 'ai_assistant';

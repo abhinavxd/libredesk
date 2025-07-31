@@ -93,6 +93,20 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/tags/{id}", perm(handleUpdateTag, "tags:manage"))
 	g.DELETE("/api/v1/tags/{id}", perm(handleDeleteTag, "tags:manage"))
 
+	// AI Assistants.
+	g.GET("/api/v1/ai-assistants", perm(handleGetAIAssistants, "ai:manage"))
+	g.GET("/api/v1/ai-assistants/{id}", perm(handleGetAIAssistant, "ai:manage"))
+	g.POST("/api/v1/ai-assistants", perm(handleCreateAIAssistant, "ai:manage"))
+	g.PUT("/api/v1/ai-assistants/{id}", perm(handleUpdateAIAssistant, "ai:manage"))
+	g.DELETE("/api/v1/ai-assistants/{id}", perm(handleDeleteAIAssistant, "ai:manage"))
+
+	// AI Custom Answers.
+	g.GET("/api/v1/ai-custom-answers", perm(handleGetAICustomAnswers, "ai:manage"))
+	g.GET("/api/v1/ai-custom-answers/{id}", perm(handleGetAICustomAnswer, "ai:manage"))
+	g.POST("/api/v1/ai-custom-answers", perm(handleCreateAICustomAnswer, "ai:manage"))
+	g.PUT("/api/v1/ai-custom-answers/{id}", perm(handleUpdateAICustomAnswer, "ai:manage"))
+	g.DELETE("/api/v1/ai-custom-answers/{id}", perm(handleDeleteAICustomAnswer, "ai:manage"))
+
 	// Macros.
 	g.GET("/api/v1/macros", auth(handleGetMacros))
 	g.GET("/api/v1/macros/{id}", perm(handleGetMacro, "macros:manage"))
@@ -212,6 +226,34 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Actvity logs.
 	g.GET("/api/v1/activity-logs", perm(handleGetActivityLogs, "activity_logs:manage"))
+
+	// Help Centers.
+	g.GET("/api/v1/help-centers", auth(handleGetHelpCenters))
+	g.GET("/api/v1/help-centers/{id}", auth(handleGetHelpCenter))
+	g.GET("/api/v1/help-centers/{id}/tree", auth(handleGetHelpCenterTree))
+	g.POST("/api/v1/help-centers", perm(handleCreateHelpCenter, "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{id}", perm(handleUpdateHelpCenter, "help_center:manage"))
+	g.DELETE("/api/v1/help-centers/{id}", perm(handleDeleteHelpCenter, "help_center:manage"))
+
+	// Collections.
+	g.GET("/api/v1/help-centers/{hc_id}/collections", auth(handleGetCollections))
+	g.GET("/api/v1/help-centers/{hc_id}/collections/{id}", auth(handleGetCollection))
+	g.POST("/api/v1/help-centers/{hc_id}/collections", perm(handleCreateCollection, "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleUpdateCollection, "help_center:manage"))
+	g.DELETE("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleDeleteCollection, "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{hc_id}/collections/reorder", perm(handleReorderCollections, "help_center:manage"))
+	g.PUT("/api/v1/collections/{id}/move", perm(handleMoveCollection, "help_center:manage"))
+	g.PUT("/api/v1/collections/{id}/toggle", perm(handleToggleCollection, "help_center:manage"))
+
+	// Articles.
+	g.GET("/api/v1/collections/{col_id}/articles", auth(handleGetArticles))
+	g.GET("/api/v1/collections/{col_id}/articles/{id}", auth(handleGetArticle))
+	g.POST("/api/v1/collections/{col_id}/articles", perm(handleCreateArticle, "help_center:manage"))
+	g.PUT("/api/v1/collections/{col_id}/articles/{id}", perm(handleUpdateArticle, "help_center:manage"))
+	g.DELETE("/api/v1/collections/{col_id}/articles/{id}", perm(handleDeleteArticle, "help_center:manage"))
+	g.PUT("/api/v1/collections/{col_id}/articles/reorder", perm(handleReorderArticles, "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}/move", perm(handleMoveArticle, "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}/status", perm(handleUpdateArticleStatus, "help_center:manage"))
 
 	// CSAT.
 	g.POST("/api/v1/csat/{uuid}/response", handleSubmitCSATResponse)

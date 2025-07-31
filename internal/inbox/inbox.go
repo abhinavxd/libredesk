@@ -71,8 +71,8 @@ type MessageStore interface {
 
 // UserStore defines methods for fetching user information.
 type UserStore interface {
+	Get(int, string, string) (umodels.User, error)
 	GetContact(id int, email string) (umodels.User, error)
-	GetAgent(id int, email string) (umodels.User, error)
 }
 
 // Opts contains the options for initializing the inbox manager.

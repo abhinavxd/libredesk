@@ -91,6 +91,10 @@ type queries struct {
 	GenerateAPIKey       *sqlx.Stmt `query:"generate-api-key"`
 	RevokeAPIKey         *sqlx.Stmt `query:"revoke-api-key"`
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
+	// AI Assistant queries
+	InsertAIAssistant      *sqlx.Stmt `query:"insert-ai-assistant"`
+	UpdateAIAssistant      *sqlx.Stmt `query:"update-ai-assistant"`
+	SoftDeleteAIAssistant  *sqlx.Stmt `query:"soft-delete-ai-assistant"`
 }
 
 // New creates and returns a new instance of the Manager.

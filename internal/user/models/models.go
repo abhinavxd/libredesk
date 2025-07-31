@@ -17,9 +17,10 @@ const (
 	SystemUserEmail = "System"
 
 	// User types
-	UserTypeAgent   = "agent"
-	UserTypeContact = "contact"
-	UserTypeVisitor = "visitor"
+	UserTypeAgent       = "agent"
+	UserTypeContact     = "contact"
+	UserTypeVisitor     = "visitor"
+	UserTypeAIAssistant = "ai_assistant"
 
 	// User availability statuses
 	Online  = "online"
@@ -49,7 +50,7 @@ type User struct {
 	LastLoginAt            null.Time       `db:"last_login_at" json:"last_login_at"`
 	Roles                  pq.StringArray  `db:"roles" json:"roles"`
 	Permissions            pq.StringArray  `db:"permissions" json:"permissions"`
-	Meta                   pq.StringArray  `db:"meta" json:"meta"`
+	Meta                   json.RawMessage `db:"meta" json:"meta"`
 	CustomAttributes       json.RawMessage `db:"custom_attributes" json:"custom_attributes"`
 	ExternalUserID         null.String     `db:"external_user_id" json:"external_user_id"`
 	Teams                  tmodels.Teams   `db:"teams" json:"teams"`
@@ -97,4 +98,18 @@ func (u *User) HasAdminRole() bool {
 
 func (u *User) IsSystemUser() bool {
 	return u.Email.String == SystemUserEmail
+}
+
+func (u *User) IsAiAssistant() bool {
+	return u.Type == UserTypeAIAssistant
+}
+
+// AIAssistantMeta represents the meta fields for AI assistants
+type AIAssistantMeta struct {
+	ProductName        string `json:"product_name"`
+	ProductDescription string `json:"product_description"`
+	AnswerLength       string `json:"answer_length"`
+	AnswerTone         string `json:"answer_tone"`
+	HandOff            bool   `json:"hand_off"`
+	HandOffTeam        int    `json:"hand_off_team"`
 }
