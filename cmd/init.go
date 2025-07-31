@@ -25,6 +25,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
@@ -248,6 +249,20 @@ func initTag(db *sqlx.DB, i18n *i18n.I18n) *tag.Manager {
 	})
 	if err != nil {
 		log.Fatalf("error initializing tags: %v", err)
+	}
+	return mgr
+}
+
+// initHelpCenter inits helpcenter manager.
+func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n) *helpcenter.Manager {
+	var lo = initLogger("helpcenter_manager")
+	mgr, err := helpcenter.New(helpcenter.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing helpcenter: %v", err)
 	}
 	return mgr
 }
@@ -805,9 +820,33 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(db *sqlx.DB, i18n *i18n.I18n) *ai.Manager {
+func initAI(db *sqlx.DB, i18n *i18n.I18n, conversationStore *conversation.Manager, helpCenterStore *helpcenter.Manager, userStore *user.Manager) *ai.Manager {
 	lo := initLogger("ai")
-	m, err := ai.New(ai.Opts{
+
+	embeddingCfg := ai.EmbeddingConfig{
+		Provider: ko.String("ai.embedding.provider"),
+		URL:      ko.String("ai.embedding.url"),
+		APIKey:   ko.String("ai.embedding.api_key"),
+		Model:    ko.String("ai.embedding.model"),
+		Timeout:  ko.Duration("ai.embedding.timeout"),
+	}
+
+	completionCfg := ai.CompletionConfig{
+		Provider:    ko.String("ai.completion.provider"),
+		URL:         ko.String("ai.completion.url"),
+		APIKey:      ko.String("ai.completion.api_key"),
+		Model:       ko.String("ai.completion.model"),
+		Timeout:     ko.Duration("ai.completion.timeout"),
+		MaxTokens:   ko.Int("ai.completion.max_tokens"),
+		Temperature: ko.Float64("ai.completion.temperature"),
+	}
+
+	workerCfg := ai.WorkerConfig{
+		Workers:  ko.Int("ai.worker.workers"),
+		Capacity: ko.Int("ai.worker.capacity"),
+	}
+
+	m, err := ai.New(embeddingCfg, completionCfg, workerCfg, conversationStore, helpCenterStore, userStore, ai.Opts{
 		DB:   db,
 		Lo:   lo,
 		I18n: i18n,

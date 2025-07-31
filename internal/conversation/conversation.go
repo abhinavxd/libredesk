@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/automation"
 	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -65,6 +66,7 @@ type Manager struct {
 	statusStore                statusStore
 	priorityStore              priorityStore
 	slaStore                   slaStore
+	aiStore                    aiStore
 	settingsStore              settingsStore
 	csatStore                  csatStore
 	webhookStore               webhookStore
@@ -107,6 +109,10 @@ type slaStore interface {
 	SetLatestSLAEventMetAt(appliedSLAID int, metric string) (time.Time, error)
 }
 
+type aiStore interface {
+	EnqueueConversationCompletion(req aimodels.ConversationCompletionRequest) error
+}
+
 type statusStore interface {
 	Get(int) (smodels.Status, error)
 }
@@ -123,8 +129,6 @@ type teamStore interface {
 type userStore interface {
 	Get(int, string, string) (umodels.User, error)
 	GetAgent(int, string) (umodels.User, error)
-	GetContact(int, string) (umodels.User, error)
-	GetVisitor(int) (umodels.User, error)
 	GetSystemUser() (umodels.User, error)
 	CreateContact(user *umodels.User) error
 }
@@ -265,6 +269,11 @@ type queries struct {
 	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
 	MessageExistsBySourceID            *sqlx.Stmt `query:"message-exists-by-source-id"`
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
+}
+
+// SetAIStore sets the AI store for the conversation manager
+func (m *Manager) SetAIStore(aiStore aiStore) {
+	m.aiStore = aiStore
 }
 
 // CreateConversation creates a new conversation and returns its ID and UUID.
@@ -773,6 +782,20 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	// Broadcast conversation update to widget clients
 	c.BroadcastConversationToWidget(uuid)
 
+	// If status is `Resolved`, send CSAT survey if enabled on inbox.
+	if status == models.StatusResolved {
+		inbox, err := c.inboxStore.GetDBRecord(conversation.InboxID)
+		if err != nil {
+			c.lo.Error("error fetching inbox for CSAT", "inbox_id", conversation.InboxID, "error", err)
+			return nil
+		}
+		if inbox.CSATEnabled {
+			if err := c.SendCSATReply(actor.ID, conversation); err != nil {
+				c.lo.Error("error sending CSAT reply", "conversation_uuid", uuid, "error", err)
+				return nil
+			}
+		}
+	}
 	return nil
 }
 
@@ -1418,4 +1441,30 @@ func (m *Manager) calculateBusinessHoursInfo(conversation models.Conversation) (
 	}
 
 	return businessHoursID, utcOffset
+}
+
+// enqueueAICompletion enqueues an AI completion request for the conversation
+func (m *Manager) enqueueAICompletion(messages []models.Message, conversationUUID string, inboxID, contactID, aiAssistantID, helpCenterID int, locale string) {
+	if m.aiStore == nil {
+		m.lo.Warn("AI store not configured, skipping AI completion request")
+		return
+	}
+
+	req := aimodels.ConversationCompletionRequest{
+		Messages:         messages,
+		InboxID:          inboxID,
+		ContactID:        contactID,
+		ConversationUUID: conversationUUID,
+		HelpCenterID:     helpCenterID,
+		Locale:           locale,
+		AIAssistantID:    aiAssistantID,
+	}
+
+	err := m.aiStore.EnqueueConversationCompletion(req)
+	if err != nil {
+		m.lo.Error("error enqueuing AI completion request", "error", err)
+		return
+	}
+
+	m.lo.Info("AI completion request enqueued", "conversation_uuid", conversationUUID)
 }

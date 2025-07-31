@@ -147,7 +147,7 @@ func (lc *LiveChat) Send(message models.Message) error {
 		lc.clientsMutex.RUnlock()
 
 		if exists {
-			sender, err := lc.userStore.GetAgent(message.SenderID, "")
+			sender, err := lc.userStore.Get(message.SenderID, "", "")
 			if err != nil {
 				lc.lo.Error("failed to get sender name", "sender_id", message.SenderID, "error", err)
 				return fmt.Errorf("failed to get sender name: %w", err)

@@ -27,6 +27,7 @@ require (
 	github.com/knadh/stuffbin v1.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mr-karan/balance v0.0.0-20250317053523-d32c6ade6cf1
+	github.com/pgvector/pgvector-go v0.3.0
 	github.com/redis/go-redis/v9 v9.5.5
 	github.com/rhnvrm/simples3 v0.9.1
 	github.com/spf13/pflag v1.0.5
@@ -39,7 +40,7 @@ require (
 	github.com/zerodha/simplesessions/stores/redis/v3 v3.0.0
 	github.com/zerodha/simplesessions/v3 v3.0.0
 	golang.org/x/crypto v0.38.0
-	golang.org/x/mod v0.17.0
+	golang.org/x/mod v0.24.0
 	golang.org/x/oauth2 v0.21.0
 )
 

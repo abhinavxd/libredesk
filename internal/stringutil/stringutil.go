@@ -46,6 +46,51 @@ func SanitizeFilename(fName string) string {
 	return filepath.Base(name)
 }
 
+// GenerateSlug generates a URL-friendly slug from a title or name.
+func GenerateSlug(title string, prefixRandom bool) string {
+	// Trim whitespace
+	slug := strings.TrimSpace(title)
+
+	// Convert to lowercase
+	slug = strings.ToLower(slug)
+
+	// Replace spaces and special characters with hyphens
+	slug = regexpSpaces.ReplaceAllString(slug, "-")
+
+	// Remove any non-alphanumeric characters except hyphens and underscores
+	slugRegex := regexp.MustCompile(`[^a-z0-9\-_]+`)
+	slug = slugRegex.ReplaceAllString(slug, "")
+
+	// Remove multiple consecutive hyphens
+	multiHyphens := regexp.MustCompile(`-+`)
+	slug = multiHyphens.ReplaceAllString(slug, "-")
+
+	// Trim leading/trailing hyphens
+	slug = strings.Trim(slug, "-")
+
+	// If slug is empty after processing, generate a random string as slug
+	if slug == "" {
+		randomSlug, err := RandomAlphanumeric(12)
+		if err != nil {
+			slug = "untitled"
+		} else {
+			slug = randomSlug
+		}
+	}
+
+	if prefixRandom {
+		// Generate a random alphanumeric prefix
+		randomPrefix, err := RandomAlphanumeric(12)
+		if err != nil {
+			return "untitled"
+		}
+		// Prepend the random prefix to the slug
+		slug = fmt.Sprintf("%s-%s", randomPrefix, slug)
+	}
+
+	return slug
+}
+
 // RandomAlphanumeric generates a random alphanumeric string of length n.
 func RandomAlphanumeric(n int) (string, error) {
 	const dictionary = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

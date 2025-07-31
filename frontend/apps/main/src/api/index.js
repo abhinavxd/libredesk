@@ -431,6 +431,111 @@ const generateAPIKey = (id) =>
 
 const revokeAPIKey = (id) => http.delete(`/api/v1/agents/${id}/api-key`)
 
+// Help center.
+const getHelpCenters = () => http.get('/api/v1/help-centers')
+const getHelpCenter = (id) => http.get(`/api/v1/help-centers/${id}`)
+const createHelpCenter = (data) => http.post('/api/v1/help-centers', data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const updateHelpCenter = (id, data) => http.put(`/api/v1/help-centers/${id}`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const deleteHelpCenter = (id) => http.delete(`/api/v1/help-centers/${id}`)
+const getHelpCenterTree = (id, params) => http.get(`/api/v1/help-centers/${id}/tree`, { params })
+
+const getCollections = (helpCenterId, params) => http.get(`/api/v1/help-centers/${helpCenterId}/collections`, { params })
+const getCollection = (id) => http.get(`/api/v1/help-centers/*/collections/${id}`)
+const createCollection = (helpCenterId, data) => http.post(`/api/v1/help-centers/${helpCenterId}/collections`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const updateCollection = (helpCenterId, id, data) => http.put(`/api/v1/help-centers/${helpCenterId}/collections/${id}`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const deleteCollection = (helpCenterId, id) => http.delete(`/api/v1/help-centers/${helpCenterId}/collections/${id}`)
+const moveCollection = (id, data) => http.put(`/api/v1/collections/${id}/move`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const toggleCollection = (id) => http.put(`/api/v1/collections/${id}/toggle`)
+const reorderCollections = (helpCenterId, data) => http.put(`/api/v1/help-centers/${helpCenterId}/collections/reorder`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+const getArticles = (collectionId, params) => http.get(`/api/v1/collections/${collectionId}/articles`, { params })
+const getArticle = (id) => http.get(`/api/v1/collections/*/articles/${id}`)
+const createArticle = (collectionId, data) => http.post(`/api/v1/collections/${collectionId}/articles`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const updateArticle = (collectionId, id, data) => http.put(`/api/v1/collections/${collectionId}/articles/${id}`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const deleteArticle = (collectionId, id) => http.delete(`/api/v1/collections/${collectionId}/articles/${id}`)
+const moveArticle = (id, data) => http.put(`/api/v1/articles/${id}/move`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+const reorderArticles = (collectionId, data) => http.put(`/api/v1/collections/${collectionId}/articles/reorder`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// AI Assistants
+const getAIAssistants = () => http.get('/api/v1/ai-assistants')
+const getAIAssistant = (id) => http.get(`/api/v1/ai-assistants/${id}`)
+const createAIAssistant = (data) =>
+  http.post('/api/v1/ai-assistants', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const updateAIAssistant = (id, data) =>
+  http.put(`/api/v1/ai-assistants/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const deleteAIAssistant = (id) => http.delete(`/api/v1/ai-assistants/${id}`)
+
+// AI Custom Answers
+const getAICustomAnswers = () => http.get('/api/v1/ai-custom-answers')
+const getAICustomAnswer = (id) => http.get(`/api/v1/ai-custom-answers/${id}`)
+const createAICustomAnswer = (data) =>
+  http.post('/api/v1/ai-custom-answers', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const updateAICustomAnswer = (id, data) =>
+  http.put(`/api/v1/ai-custom-answers/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const deleteAICustomAnswer = (id) => http.delete(`/api/v1/ai-custom-answers/${id}`)
+
+
 export default {
   login,
   deleteUser,
@@ -504,6 +609,18 @@ export default {
   sendMessage,
   retryMessage,
   createUser,
+  // AI Assistants
+  getAIAssistants,
+  getAIAssistant,
+  createAIAssistant,
+  updateAIAssistant,
+  deleteAIAssistant,
+  // AI Custom Answers
+  getAICustomAnswers,
+  getAICustomAnswer,
+  createAICustomAnswer,
+  updateAICustomAnswer,
+  deleteAICustomAnswer,
   createInbox,
   updateInbox,
   deleteInbox,
@@ -567,5 +684,28 @@ export default {
   toggleWebhook,
   testWebhook,
   generateAPIKey,
-  revokeAPIKey
+  revokeAPIKey,
+  // Help Center
+  getHelpCenters,
+  getHelpCenter,
+  createHelpCenter,
+  updateHelpCenter,
+  deleteHelpCenter,
+  getHelpCenterTree,
+  getCollections,
+  getCollection,
+  createCollection,
+  updateCollection,
+  deleteCollection,
+  moveCollection,
+  toggleCollection,
+  reorderCollections,
+  getArticles,
+  getArticle,
+  createArticle,
+  updateArticle,
+  deleteArticle,
+  moveArticle,
+  updateArticleStatus,
+  reorderArticles
 }

@@ -234,7 +234,7 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 			return fmt.Errorf("fetching conversation: %w", err)
 		}
 
-		sender, err := m.userStore.GetAgent(message.SenderID, "")
+		sender, err := m.userStore.Get(message.SenderID, "", "")
 		if err != nil {
 			m.lo.Error("error fetching message sender user", "sender_id", message.SenderID, "error", err)
 			return fmt.Errorf("fetching message sender user: %w", err)
@@ -268,7 +268,7 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 		}
 
 		// For automated replies set author fields to empty strings as the recipients will see name as System.
-		if sender.IsSystemUser() {
+		if sender.IsSystemUser() || sender.IsAiAssistant() {
 			data["Author"] = map[string]any{
 				"FirstName": "",
 				"LastName":  "",
@@ -499,21 +499,11 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		lastInteractionAt = null.Time{}
 		err               error
 	)
-	switch message.SenderType {
-	case models.SenderTypeAgent:
-		sender, err = m.userStore.GetAgent(message.SenderID, "")
-		if err != nil {
-			m.lo.Error("error fetching message sender user", "sender_id", message.SenderID, "error", err)
-		}
-	case models.SenderTypeContact:
-		sender, err = m.userStore.GetContact(message.SenderID, "")
-		if err != nil {
-			m.lo.Error("error fetching message contact user", "contact_id", message.SenderID, "error", err)
-			sender, err = m.userStore.GetVisitor(message.SenderID)
-			if err != nil {
-				m.lo.Error("error fetching message visitor user", "visitor_id", message.SenderID, "error", err)
-			}
-		}
+
+	sender, err = m.userStore.Get(message.SenderID, "", "")
+	if err != nil {
+		m.lo.Error("error fetching message sender user", "sender_id", message.SenderID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil)
 	}
 
 	// Censor CSAT content before saving last message details.
@@ -562,6 +552,39 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	} else {
 		m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, updatedMessage)
 	}
+
+	// Enqueue message for AI completion if the conversation is assigned to an `ai_assistant`.
+	conversation, err := m.GetConversation(updatedMessage.ConversationID, "")
+	if err != nil {
+		m.lo.Error("error fetching conversation for AI completion", "conversation_id", updatedMessage.ConversationID, "error", err)
+		return nil
+	}
+	if conversation.AssignedUserID.Int > 0 {
+		assigneUser, err := m.userStore.Get(conversation.AssignedUserID.Int, "", "")
+		if err != nil {
+			m.lo.Error("error fetching assignee user for AI completion", "assignee_user_id", conversation.AssignedUserID.Int, "error", err)
+			return nil
+		}
+		if assigneUser.IsAiAssistant() {
+			if updatedMessage.Type == models.MessageIncoming && updatedMessage.SenderType == models.SenderTypeContact {
+				messages, _, err := m.GetConversationMessages(message.ConversationUUID, []string{models.MessageIncoming, models.MessageOutgoing}, nil, 1, 50)
+				if err != nil {
+					m.lo.Error("error fetching conversation messages", "conversation_uuid", message.ConversationUUID, "error", err)
+				} else {
+					m.enqueueAICompletion(
+						messages,
+						message.ConversationUUID,
+						conversation.InboxID,
+						conversation.ContactID,
+						assigneUser.ID,
+						1,    // TODO: Fill this from inbox.
+						"en", // TODO: Fill this from somewhere?
+					)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -573,7 +596,7 @@ func (m *Manager) RecordAssigneeUserChange(conversationUUID string, assigneeID i
 	}
 
 	// Assignment to another user.
-	assignee, err := m.userStore.GetAgent(assigneeID, "")
+	assignee, err := m.userStore.Get(assigneeID, "", "")
 	if err != nil {
 		return err
 	}

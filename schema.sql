@@ -1,4 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS vector;
 
 DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email', 'livechat');
 DROP TYPE IF EXISTS "message_type" CASCADE; CREATE TYPE "message_type" AS ENUM ('incoming','outgoing','activity');
@@ -7,7 +8,7 @@ DROP TYPE IF EXISTS "message_status" CASCADE; CREATE TYPE "message_status" AS EN
 DROP TYPE IF EXISTS "content_type" CASCADE; CREATE TYPE "content_type" AS ENUM ('text','html');
 DROP TYPE IF EXISTS "conversation_assignment_type" CASCADE; CREATE TYPE "conversation_assignment_type" AS ENUM ('Round robin','Manual');
 DROP TYPE IF EXISTS "template_type" CASCADE; CREATE TYPE "template_type" AS ENUM ('email_outgoing', 'email_notification');
-DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact', 'visitor');
+DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact', 'visitor', 'ai_assistant');
 DROP TYPE IF EXISTS "ai_provider" CASCADE; CREATE TYPE "ai_provider" AS ENUM ('openai');
 DROP TYPE IF EXISTS "automation_execution_mode" CASCADE; CREATE TYPE "automation_execution_mode" AS ENUM ('all', 'first_match');
 DROP TYPE IF EXISTS "macro_visibility" CASCADE; CREATE TYPE "macro_visibility" AS ENUM ('all', 'team', 'user');
@@ -136,6 +137,7 @@ CREATE TABLE users (
     "password" VARCHAR(150) NULL,
     avatar_url TEXT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
+	meta JSONB DEFAULT '{}'::jsonb NOT NULL,
 	external_user_id TEXT NULL,
     reset_password_token TEXT NULL,
     reset_password_token_expiry TIMESTAMPTZ NULL,
@@ -597,6 +599,103 @@ CREATE TABLE webhooks (
 	CONSTRAINT constraint_webhooks_on_secret CHECK (length(secret) <= 255),
 	CONSTRAINT constraint_webhooks_on_events_not_empty CHECK (array_length(events, 1) > 0)
 );
+
+DROP TABLE IF EXISTS help_centers CASCADE;
+CREATE TABLE help_centers (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	name VARCHAR(255) NOT NULL,
+	slug VARCHAR(100) UNIQUE NOT NULL,
+	page_title VARCHAR(255) NOT NULL,
+	view_count INTEGER DEFAULT 0
+);
+CREATE INDEX index_help_centers_on_slug ON help_centers(slug);
+
+DROP TABLE IF EXISTS article_collections CASCADE;
+CREATE TABLE article_collections (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	help_center_id INTEGER NOT NULL REFERENCES help_centers(id) ON DELETE CASCADE,
+	slug VARCHAR(255) NOT NULL,
+	parent_id INTEGER REFERENCES article_collections(id) ON DELETE CASCADE,
+	locale VARCHAR(10) NOT NULL DEFAULT 'en',
+	name VARCHAR(255) NOT NULL,
+	description TEXT,
+	sort_order INTEGER DEFAULT 0,
+	is_published BOOLEAN DEFAULT false
+);
+CREATE INDEX index_article_collections_on_help_center_id ON article_collections(help_center_id);
+CREATE INDEX index_article_collections_on_parent_id ON article_collections(parent_id);
+CREATE INDEX index_article_collections_on_locale ON article_collections(help_center_id, locale, is_published);
+CREATE INDEX index_article_collections_on_ordering ON article_collections(help_center_id, parent_id, sort_order);
+CREATE UNIQUE INDEX index_article_collections_slug_per_help_center_locale ON article_collections(help_center_id, slug, locale);
+
+DROP TABLE IF EXISTS help_articles CASCADE;
+CREATE TABLE help_articles (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	collection_id INTEGER NOT NULL REFERENCES article_collections(id) ON DELETE CASCADE,
+	slug VARCHAR(255) NOT NULL,
+	locale VARCHAR(10) NOT NULL DEFAULT 'en',
+	title VARCHAR(255) NOT NULL,
+	content TEXT NOT NULL,
+	sort_order INTEGER DEFAULT 0,
+	status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+	view_count INTEGER DEFAULT 0,
+	ai_enabled BOOLEAN DEFAULT false
+);
+CREATE INDEX index_help_articles_on_collection_id ON help_articles(collection_id);
+CREATE INDEX index_help_articles_on_locale ON help_articles(collection_id, locale, status);
+CREATE INDEX index_help_articles_on_ordering ON help_articles(collection_id, sort_order);
+CREATE UNIQUE INDEX index_help_articles_slug_per_collection_locale ON help_articles(collection_id, slug, locale);
+
+DROP TABLE IF EXISTS ai_custom_answers CASCADE;
+CREATE TABLE ai_custom_answers (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	question TEXT NOT NULL,
+	answer TEXT NOT NULL,
+	embedding vector(1536) NOT NULL,
+	enabled BOOLEAN DEFAULT true
+);
+CREATE INDEX index_ai_custom_answers_embedding ON ai_custom_answers USING hnsw (embedding vector_cosine_ops);
+
+DROP TABLE IF EXISTS embeddings CASCADE;
+CREATE TABLE embeddings (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	source_type TEXT NOT NULL,
+	source_id BIGINT NOT NULL,
+	chunk_text TEXT NOT NULL,
+	embedding vector(1536),
+	meta JSONB DEFAULT '{}' NOT NULL
+);
+CREATE INDEX index_embeddings_on_source_type_source_id ON embeddings(source_type, source_id);
+CREATE INDEX index_embeddings_embedding ON embeddings USING hnsw (embedding vector_cosine_ops);
+
+-- Function to enforce collection max depth of 3 levels in article_collections.
+CREATE OR REPLACE FUNCTION enforce_collection_max_depth()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.parent_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM article_collections p1
+        JOIN article_collections p2 ON p1.parent_id = p2.id
+        WHERE p1.id = NEW.parent_id AND p2.parent_id IS NOT NULL
+    ) THEN
+        RAISE EXCEPTION 'Collections can only be nested up to 3 levels deep';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+-- Trigger to enforce collection depth limit in article_collections.
+CREATE TRIGGER trg_enforce_collection_depth_limit
+BEFORE INSERT OR UPDATE ON article_collections
+FOR EACH ROW EXECUTE FUNCTION enforce_collection_max_depth();
 
 INSERT INTO ai_providers
 ("name", provider, config, is_default)
