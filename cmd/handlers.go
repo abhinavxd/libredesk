@@ -115,6 +115,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/agents/reset-password", tryAuth(handleResetPassword))
 	g.POST("/api/v1/agents/set-password", tryAuth(handleSetPassword))
 	g.POST("/api/v1/agents/import", perm(handleBulkImportAgents, "users:manage"))
+	g.GET("/api/v1/agents/import/status", perm(statusHandler, "users:manage"))
 
 	// Contacts.
 	g.GET("/api/v1/contacts", perm(handleGetContacts, "contacts:read_all"))

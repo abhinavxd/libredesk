@@ -7,11 +7,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"io"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/csv_parser"
+	"github.com/abhinavxd/libredesk/internal/importer"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -579,32 +581,80 @@ func handleRevokeAPIKey(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
-// handleBulkImportAgents handles the bulk import of agents from a CSV file.
+var imp = importer.NewImporter()
 func handleBulkImportAgents(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	jobID := "import_agents"
+	if jobID == "" {
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Missing job ID", nil))
+	}
 
-	// Parse the uploaded file
 	file, err := parseUploadedFile(r)
 	if err != nil {
-		return sendErrorEnvelope(r, err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Error reading file", nil))
 	}
 	defer file.Close()
 
-	// Parse the CSV file
-	records, err := csvParser.ParseCSV(file)
-	if err != nil {
-		app.lo.Error("error parsing CSV file", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.file}"), nil, envelope.InputError)
+	// Copy file to pipe
+	pr, pw := io.Pipe()
+	go func() {
+			io.Copy(pw, file)
+			pw.Close()
+	}()
+
+	csvParserWithHeaders := func(file io.Reader) ([]map[string]string, error) {
+			records, err := csvParser.ParseCSV(file)
+			if err != nil {
+					return nil, fmt.Errorf("error parsing CSV: %w", err)
+			}
+			return records, nil
 	}
 
-	// Process records
-	successes, errors := processCSVRecords(app, records)
+	processFn := func(record map[string]string) error {
+			app := r.Context.(*App) // Bind app to default value
+			// Your custom row logic here
+			// e.g., validate length
+			if len(record) < 2 {
+					return fmt.Errorf("invalid row")
+			}
+			// Simulate processing
+			processCSVRecord(app, record)
+			return nil
+	}
 
-	// Prepare the response report as CSV
-	csvString := prepareCSVResponse(successes, errors)
-
-	return r.SendString(fasthttp.StatusOK, csvString)
+	err = imp.Submit(jobID, pr, csvParserWithHeaders, processFn)
+	if err != nil {
+			return sendErrorEnvelope(r, err)
+	}
+	
+	return r.SendEnvelope(true)
 }
+
+func statusHandler(r *fastglue.Request) error {
+	jobID := "import_agents"
+	if jobID == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Missing job ID", nil))
+	}
+
+	status, exists := imp.Get(jobID)
+	if !exists {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, "Job not found", nil))
+	}
+
+	if status.Running {
+		return r.SendEnvelope(status)
+	}
+	return r.SendEnvelope(map[string]interface{}{
+		"success": status.Success,
+		"errors":  status.Errors,
+		"logs":    status.Logs,
+		"total":   status.Total,
+		"started_at": status.StartedAt,
+		"ended_at":   status.EndedAt,
+		"running":    status.Running,
+		"job_id":     jobID,
+	})
+}
+
 
 func parseUploadedFile(r *fastglue.Request) (multipart.File, error) {
 	var app = r.Context.(*App)
