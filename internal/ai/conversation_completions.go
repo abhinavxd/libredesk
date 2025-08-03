@@ -21,7 +21,8 @@ You are %s - a knowledgeable and approachable support assistant dedicated exclus
 Your scope is strictly limited to this product and related matters.
 
 Guidelines:
-- If the user message (case-insensitive) is or contains gratitude/acknowledgment or brief positive feedback such as: thanks, thank you, cool, nice, great, awesome, perfect, good job, appreciate it, sounds good, ok, okay, yep, yeah, works, solved, correct — respond only with: "Did that answer your question?" Do not apply out-of-scope, clarification, or additional-answer logic in that case.
+- If the user message is or contains gratitude/acknowledgment or brief positive feedback such as: thanks, thank you, cool, nice, great, awesome, perfect, good job, appreciate it,
+sounds good, ok, okay, yep, yeah, works, solved, correct — respond only with: "Did that answer your question?" Do not apply out-of-scope, clarification, or additional-answer logic in that case.
 - Every other response: Provide direct, helpful answers.
 - Keep the conversation human-like and engaging, but focused on the product.
 - Avoid speculating or providing unverified information. If you cannot answer from available knowledge, say so clearly.
@@ -80,10 +81,10 @@ func getLengthInstruction(length string) string {
 }
 
 // buildSystemPrompt creates the final system prompt with tone and length instructions
-func buildSystemPrompt(assistantName, productName, productDescription, tone, length string, handOff bool) string {
+func buildSystemPrompt(assistantName, productName, productDescription, tone, length string) string {
 	toneInstruction := getToneInstruction(tone)
 	lengthInstruction := getLengthInstruction(length)
-	return fmt.Sprintf(baseSystemPrompt, assistantName, productName, productDescription, productName, toneInstruction, lengthInstruction, productName)
+	return fmt.Sprintf(baseSystemPrompt, assistantName, productName, productDescription, productName, toneInstruction, lengthInstruction)
 }
 
 // ConversationCompletionsService handles AI-powered chat completions for customer support
@@ -230,7 +231,7 @@ func (s *ConversationCompletionsService) processCompletionRequest(req models.Con
 	}
 
 	// Build chat messages array with proper roles
-	chatMessages := s.buildChatMessages(context, messages, latestContactMessage, aiAssistant, aiAssistantMeta)
+	chatMessages := s.buildChatMessages(context, messages, aiAssistant, aiAssistantMeta)
 
 	// Send AI completion request to the provider
 	upstreamStartAt := time.Now()
@@ -338,7 +339,7 @@ func (s *ConversationCompletionsService) buildHelpCenterContext(req models.Conve
 		return "", nil
 	}
 
-	// Use the provided latest customer message as query
+	// Use the provided latest contact message as query
 	if latestContactMessage == "" {
 		return "", nil
 	}
@@ -384,7 +385,7 @@ func (s *ConversationCompletionsService) buildHelpCenterContext(req models.Conve
 }
 
 // buildChatMessages creates a properly structured chat messages array for AI completion
-func (s *ConversationCompletionsService) buildChatMessages(helpCenterContext string, messages []cmodels.Message, latestContactMessage string, senderUser umodels.User, aiAssistantMeta umodels.AIAssistantMeta) []models.ChatMessage {
+func (s *ConversationCompletionsService) buildChatMessages(helpCenterContext string, messages []cmodels.Message, senderUser umodels.User, aiAssistantMeta umodels.AIAssistantMeta) []models.ChatMessage {
 	var chatMessages []models.ChatMessage
 
 	// 1. Add system prompt with dynamic assistant name and product
@@ -411,13 +412,19 @@ func (s *ConversationCompletionsService) buildChatMessages(helpCenterContext str
 		assistantName = senderUser.FirstName
 	}
 
+	// Inject help center context into the system prompt if present
+	systemPrompt := buildSystemPrompt(assistantName, productName, productDescription, answerTone, answerLength)
+	if helpCenterContext != "" {
+		systemPrompt += "\n\nKnowledge base context (for reference):\n" + helpCenterContext
+	}
+
 	chatMessages = append(chatMessages, models.ChatMessage{
 		Role:    "system",
-		Content: buildSystemPrompt(assistantName, productName, productDescription, answerTone, answerLength, aiAssistantMeta.HandOff),
+		Content: systemPrompt,
 	})
 
 	// 2. Add conversation history with proper roles
-	for i := range messages {
+	for i := len(messages) - 1; i >= 0; i-- {
 		msg := messages[i]
 
 		// Skip private messages
@@ -435,18 +442,6 @@ func (s *ConversationCompletionsService) buildChatMessages(helpCenterContext str
 			Content: msg.TextContent,
 		})
 	}
-
-	// 3. Add final user message with knowledge base context and latest query
-	finalUserContent := ""
-	if helpCenterContext != "" {
-		finalUserContent += helpCenterContext + "\n\n"
-	}
-	finalUserContent += fmt.Sprintf("Customer's current question: %s", latestContactMessage)
-
-	chatMessages = append(chatMessages, models.ChatMessage{
-		Role:    "user",
-		Content: finalUserContent,
-	})
 
 	return chatMessages
 }

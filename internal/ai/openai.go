@@ -50,12 +50,6 @@ func (o *OpenAIClient) makeRequest(requestBody any, operation string) (*http.Res
 		return nil, fmt.Errorf("marshalling %s request body: %w", operation, err)
 	}
 
-	// Log request JSON
-	var prettyJSON bytes.Buffer
-	if err := json.Indent(&prettyJSON, bodyBytes, "", "  "); err == nil {
-		o.lo.Debug(operation+" request body", "body", prettyJSON.String())
-	}
-
 	req, err := http.NewRequest(fasthttp.MethodPost, o.url, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		o.lo.Error("error creating "+operation+" request", "error", err)
@@ -149,6 +143,12 @@ func (o *OpenAIClient) SendChatCompletion(payload models.ChatCompletionPayload) 
 		"messages":    openAIMessages,
 		"max_tokens":  o.max_tokens,
 		"temperature": o.temperature,
+	}
+
+	// TODO: Remove after debugging
+	for i, msg := range openAIMessages {
+		fmt.Println("openai chat message", "index", i)
+		fmt.Printf("Role: %s\nContent: %s\n\n\n", msg["role"], msg["content"])
 	}
 
 	resp, err := o.makeRequest(requestBody, "chat completion")
