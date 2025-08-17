@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
@@ -20,6 +22,10 @@ import (
 	"github.com/knadh/go-i18n"
 	"github.com/pgvector/pgvector-go"
 	"github.com/zerodha/logf"
+)
+
+const (
+	maxPendingRequestsPerConversation = 2
 )
 
 var (
@@ -54,6 +60,7 @@ type Manager struct {
 	workerCfg                      WorkerConfig
 	conversationCompletionsService *ConversationCompletionsService
 	helpCenterStore                HelpCenterStore
+	pendingRequests                sync.Map // conversationUUID -> *atomic.Int64
 }
 
 type EmbeddingConfig struct {
@@ -280,6 +287,8 @@ func (m *Manager) StartConversationCompletions() {
 	if m.conversationCompletionsService != nil {
 		m.conversationCompletionsService.Start()
 	}
+	// Clean up conversations from rate limiting map
+	m.startCleanupWorker()
 }
 
 // StopConversationCompletions stops the conversation completions service
@@ -294,7 +303,66 @@ func (m *Manager) EnqueueConversationCompletion(req models.ConversationCompletio
 	if m.conversationCompletionsService == nil {
 		return fmt.Errorf("conversation completions service not initialized")
 	}
+
+	// Check rate limit per conversation
+	if !m.tryAcquireConversationSlot(req.ConversationUUID) {
+		m.lo.Warn("AI completion request rate limited", "conversation_uuid", req.ConversationUUID)
+		return nil
+	}
+
 	return m.conversationCompletionsService.EnqueueRequest(req)
+}
+
+// tryAcquireConversationSlot attempts to acquire a slot for AI completion for the given conversation.
+// Returns true if slot was acquired, false if rate limit is reached, this prevents excessive enqueueing.
+func (m *Manager) tryAcquireConversationSlot(conversationUUID string) bool {
+	value, _ := m.pendingRequests.LoadOrStore(conversationUUID, &atomic.Int64{})
+	counter := value.(*atomic.Int64)
+
+	// Try to increment the counter
+	newCount := counter.Add(1)
+	if newCount > maxPendingRequestsPerConversation {
+		// Rate limit exceeded, decrement back and return false
+		counter.Add(-1)
+		return false
+	}
+
+	return true
+}
+
+// releaseConversationSlot releases a slot for the given conversation when AI completion is done.
+func (m *Manager) releaseConversationSlot(conversationUUID string) {
+	if value, ok := m.pendingRequests.Load(conversationUUID); ok {
+		counter := value.(*atomic.Int64)
+		counter.Add(-1)
+	}
+}
+
+// startCleanupWorker starts a background goroutine that cleans up inactive conversation entries every hour
+func (m *Manager) startCleanupWorker() {
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			var keysToDelete []any
+			m.pendingRequests.Range(func(key, value any) bool {
+				counter := value.(*atomic.Int64)
+				if counter.Load() <= 0 {
+					keysToDelete = append(keysToDelete, key)
+				}
+				return true
+			})
+
+			for _, key := range keysToDelete {
+				m.pendingRequests.Delete(key)
+			}
+
+			if len(keysToDelete) > 0 {
+				m.lo.Debug("AI rate limiter cleanup completed", "cleaned_conversations", len(keysToDelete))
+			}
+		}
+	}()
 }
 
 // handleProviderError handles errors from the provider.
@@ -490,7 +558,6 @@ func (m *Manager) searchHelpCenter(helpCenterID int, query, locale string, thres
 
 	return results, nil
 }
-
 
 // GetChunkConfig returns the configured chunking configuration
 func (m *Manager) GetChunkConfig() stringutil.ChunkConfig {

@@ -132,6 +132,8 @@ func (s *ConversationCompletionsService) EnqueueRequest(req models.ConversationC
 	defer s.closedMu.RUnlock()
 
 	if s.closed {
+		// Release the slot since request can't be processed
+		s.manager.releaseConversationSlot(req.ConversationUUID)
 		return fmt.Errorf("conversation completions service is closed")
 	}
 
@@ -139,6 +141,8 @@ func (s *ConversationCompletionsService) EnqueueRequest(req models.ConversationC
 	case s.requestQueue <- req:
 		return nil
 	default:
+		// Release the slot since request is being dropped
+		s.manager.releaseConversationSlot(req.ConversationUUID)
 		s.lo.Warn("AI completion request queue is full, dropping request", "conversation_uuid", req.ConversationUUID)
 		return fmt.Errorf("request queue is full")
 	}
@@ -193,6 +197,9 @@ func (s *ConversationCompletionsService) processCompletionRequest(req models.Con
 		aiAssistantMeta umodels.AIAssistantMeta
 	)
 	s.lo.Info("processing AI completion request", "conversation_uuid", req.ConversationUUID)
+
+	// Ensure we always release the conversation slot when done
+	defer s.manager.releaseConversationSlot(req.ConversationUUID)
 
 	if req.AIAssistant.ID == 0 {
 		s.lo.Warn("AI assistant not found, skipping AI completion", "conversation_uuid", req.ConversationUUID)
