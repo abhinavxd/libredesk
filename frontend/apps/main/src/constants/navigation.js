@@ -92,9 +92,9 @@ export const adminNavItems = [
         permission: 'ai:manage'
       },
       {
-        titleKey: 'globals.terms.customAnswer',
+        titleKey: 'globals.terms.snippet',
         isTitleKeyPlural: true,
-        href: '/admin/ai/custom-answers',
+        href: '/admin/ai/snippets',
         permission: 'ai:manage'
       },
     ]

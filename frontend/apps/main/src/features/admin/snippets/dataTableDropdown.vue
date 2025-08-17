@@ -7,7 +7,7 @@
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>
-      <DropdownMenuItem @click="editCustomAnswer(props.customAnswer.id)">{{
+      <DropdownMenuItem @click="editSnippet(props.snippet.id)">{{
         $t('globals.messages.edit')
       }}</DropdownMenuItem>
       <DropdownMenuItem @click="() => (alertOpen = true)">{{
@@ -20,7 +20,7 @@
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
-        <AlertDialogDescription>{{ $t('ai.customAnswer.deleteConfirmation') }}</AlertDialogDescription>
+        <AlertDialogDescription>{{ $t('ai.snippet.deleteConfirmation') }}</AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
@@ -63,7 +63,7 @@ const emit = useEmitter()
 const router = useRouter()
 
 const props = defineProps({
-  customAnswer: {
+  snippet: {
     type: Object,
     required: true,
     default: () => ({
@@ -72,15 +72,15 @@ const props = defineProps({
   }
 })
 
-function editCustomAnswer(id) {
-  router.push({ path: `/admin/ai/custom-answers/${id}/edit` })
+function editSnippet(id) {
+  router.push({ path: `/admin/ai/snippets/${id}/edit` })
 }
 
 async function handleDelete() {
   try {
-    await api.deleteAICustomAnswer(props.customAnswer.id)
+    await api.deleteAISnippet(props.snippet.id)
     alertOpen.value = false
-    emitRefreshCustomAnswerList()
+    emitRefreshSnippetList()
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -89,9 +89,9 @@ async function handleDelete() {
   }
 }
 
-const emitRefreshCustomAnswerList = () => {
+const emitRefreshSnippetList = () => {
   emit.emit(EMITTER_EVENTS.REFRESH_LIST, {
-    model: 'ai_custom_answer'
+    model: 'ai_snippet'
   })
 }
 </script>

@@ -28,22 +28,6 @@ var (
 	}
 )
 
-// handleGetCustomAttribute retrieves a custom attribute by its ID.
-func handleGetCustomAttribute(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
-	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
-	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
-	}
-
-	attribute, err := app.customAttribute.Get(id)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	return r.SendEnvelope(attribute)
-}
 
 // handleGetCustomAttributes retrieves all custom attributes from the database.
 func handleGetCustomAttributes(r *fastglue.Request) error {

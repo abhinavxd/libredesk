@@ -11,16 +11,17 @@ import (
 
 // Inbox represents a inbox record in DB.
 type Inbox struct {
-	ID          int             `db:"id" json:"id"`
-	CreatedAt   time.Time       `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time       `db:"updated_at" json:"updated_at"`
-	Name        string          `db:"name" json:"name"`
-	Channel     string          `db:"channel" json:"channel"`
-	Enabled     bool            `db:"enabled" json:"enabled"`
-	CSATEnabled bool            `db:"csat_enabled" json:"csat_enabled"`
-	From        string          `db:"from" json:"from"`
-	Config      json.RawMessage `db:"config" json:"config"`
-	Secret      null.String     `db:"secret" json:"secret,omitempty"`
+	ID           int             `db:"id" json:"id"`
+	CreatedAt    time.Time       `db:"created_at" json:"created_at"`
+	UpdatedAt    time.Time       `db:"updated_at" json:"updated_at"`
+	Name         string          `db:"name" json:"name"`
+	Channel      string          `db:"channel" json:"channel"`
+	Enabled      bool            `db:"enabled" json:"enabled"`
+	CSATEnabled  bool            `db:"csat_enabled" json:"csat_enabled"`
+	From         string          `db:"from" json:"from"`
+	Config       json.RawMessage `db:"config" json:"config"`
+	Secret       null.String     `db:"secret" json:"secret"`
+	HelpCenterID null.Int        `db:"help_center_id" json:"help_center_id"`
 }
 
 // ClearPasswords masks all config passwords

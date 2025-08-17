@@ -124,6 +124,35 @@ unsnooze_interval = "5m"
 evaluation_interval = "5m"
 
 [rate_limit]
-  [rate_limit.widget]
-    enabled = true
-    requests_per_minute = 100
+[rate_limit.widget]
+enabled = true
+requests_per_minute = 100
+
+[ai]
+[ai.embedding]
+provider = "openai"
+url = "https://api.openai.com/v1/embeddings"
+api_key = "secret"
+model = "text-embedding-3-small"
+timeout = "20s"
+
+[ai.embedding.chunking]
+# Maximum tokens per chunk (increase for larger context models)
+max_tokens = 2000
+# Minimum tokens per chunk (smaller chunks may lack context)
+min_tokens = 400
+# Overlap tokens between chunks for context continuity
+overlap_tokens = 150
+
+[ai.completion]
+provider = "openai"
+url = "https://api.openai.com/v1/chat/completions"
+api_key = "secret"
+model = "gpt-oss:20b"
+temperature = 0.2
+max_tokens = 1000
+timeout = "30s"
+
+[ai.worker]
+workers = 50
+capacity = 10000

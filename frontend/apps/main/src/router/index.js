@@ -446,6 +446,81 @@ const routes = [
             ]
           },
           {
+            path: 'ai',
+            meta: { title: 'AI' },
+            children: [
+              {
+                path: 'assistants',
+                component: () => import('@main/views/admin/ai-assistants/AIAssistants.vue'),
+                meta: { title: 'AI Assistants' },
+                children: [
+                  {
+                    path: '',
+                    name: 'ai-assistant-list',
+                    component: () => import('@main/views/admin/ai-assistants/AIAssistantList.vue')
+                  },
+                  {
+                    path: 'new',
+                    name: 'new-ai-assistant',
+                    component: () => import('@main/views/admin/ai-assistants/CreateAIAssistant.vue'),
+                    meta: { title: 'Create AI Assistant' }
+                  },
+                  {
+                    path: ':id/edit',
+                    props: true,
+                    name: 'edit-ai-assistant',
+                    component: () => import('@main/views/admin/ai-assistants/EditAIAssistant.vue'),
+                    meta: { title: 'Edit AI Assistant' }
+                  }
+                ]
+              },
+              {
+                path: 'snippets',
+                component: () => import('@main/views/admin/snippets/Snippets.vue'),
+                meta: { title: 'Snippets' },
+                children: [
+                  {
+                    path: '',
+                    name: 'snippet-list',
+                    component: () => import('@main/views/admin/snippets/SnippetList.vue')
+                  },
+                  {
+                    path: 'new',
+                    name: 'new-snippet',
+                    component: () => import('@main/views/admin/snippets/CreateSnippet.vue'),
+                    meta: { title: 'Create Snippet' }
+                  },
+                  {
+                    path: ':id/edit',
+                    props: true,
+                    name: 'edit-snippet',
+                    component: () => import('@main/views/admin/snippets/EditSnippet.vue'),
+                    meta: { title: 'Edit Snippet' }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            path: 'help-center',
+            component: () => import('@main/views/admin/help-center/HelpCenter.vue'),
+            meta: { title: 'Help Center' },
+            children: [
+              {
+                path: '',
+                name: 'help-center-list',
+                component: () => import('@main/views/admin/help-center/HelpCenterList.vue')
+              },
+              {
+                path: ':id/tree',
+                name: 'help-center-tree',
+                props: true,
+                component: () => import('@main/views/admin/help-center/HelpCenterTree.vue'),
+                meta: { title: 'Help Center' }
+              }
+            ]
+          },
+          {
             path: 'conversations',
             meta: { title: 'Conversations' },
             children: [

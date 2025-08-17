@@ -3,6 +3,7 @@ import { isGoDuration } from '../../../utils/strings'
 
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, t('globals.messages.required')),
+  help_center_id: z.number().optional(),
   from: z.string().min(1, t('globals.messages.required')),
   enabled: z.boolean().optional(),
   csat_enabled: z.boolean().optional(),

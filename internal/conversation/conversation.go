@@ -1442,29 +1442,3 @@ func (m *Manager) calculateBusinessHoursInfo(conversation models.Conversation) (
 
 	return businessHoursID, utcOffset
 }
-
-// enqueueAICompletion enqueues an AI completion request for the conversation
-func (m *Manager) enqueueAICompletion(messages []models.Message, conversationUUID string, inboxID, contactID, aiAssistantID, helpCenterID int, locale string) {
-	if m.aiStore == nil {
-		m.lo.Warn("AI store not configured, skipping AI completion request")
-		return
-	}
-
-	req := aimodels.ConversationCompletionRequest{
-		Messages:         messages,
-		InboxID:          inboxID,
-		ContactID:        contactID,
-		ConversationUUID: conversationUUID,
-		HelpCenterID:     helpCenterID,
-		Locale:           locale,
-		AIAssistantID:    aiAssistantID,
-	}
-
-	err := m.aiStore.EnqueueConversationCompletion(req)
-	if err != nil {
-		m.lo.Error("error enqueuing AI completion request", "error", err)
-		return
-	}
-
-	m.lo.Info("AI completion request enqueued", "conversation_uuid", conversationUUID)
-}

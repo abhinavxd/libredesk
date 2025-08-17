@@ -6,8 +6,8 @@ SELECT id, created_at, updated_at, name, channel, enabled from inboxes where del
 
 -- name: insert-inbox
 INSERT INTO inboxes
-(channel, config, "name", "from", csat_enabled, secret)
-VALUES($1, $2, $3, $4, $5, $6)
+(channel, config, "name", "from", csat_enabled, secret, help_center_id)
+VALUES($1, $2, $3, $4, $5, $6, $7)
 RETURNING *
 
 -- name: get-inbox
@@ -15,7 +15,7 @@ SELECT * from inboxes where id = $1 and deleted_at is NULL;
 
 -- name: update
 UPDATE inboxes
-set channel = $2, config = $3, "name" = $4, "from" = $5, csat_enabled = $6, enabled = $7, secret = $8, updated_at = now()
+set channel = $2, config = $3, "name" = $4, "from" = $5, csat_enabled = $6, enabled = $7, secret = $8, help_center_id = $9, updated_at = now()
 where id = $1 and deleted_at is NULL
 RETURNING *;
 

@@ -820,7 +820,7 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(db *sqlx.DB, i18n *i18n.I18n, conversationStore *conversation.Manager, helpCenterStore *helpcenter.Manager, userStore *user.Manager) *ai.Manager {
+func initAI(db *sqlx.DB, i18n *i18n.I18n, conversationStore *conversation.Manager, helpCenterStore *helpcenter.Manager) *ai.Manager {
 	lo := initLogger("ai")
 
 	embeddingCfg := ai.EmbeddingConfig{
@@ -829,6 +829,12 @@ func initAI(db *sqlx.DB, i18n *i18n.I18n, conversationStore *conversation.Manage
 		APIKey:   ko.String("ai.embedding.api_key"),
 		Model:    ko.String("ai.embedding.model"),
 		Timeout:  ko.Duration("ai.embedding.timeout"),
+	}
+
+	chunkingCfg := ai.ChunkingConfig{
+		MaxTokens:     ko.Int("ai.embedding.chunking.max_tokens"),
+		MinTokens:     ko.Int("ai.embedding.chunking.min_tokens"),
+		OverlapTokens: ko.Int("ai.embedding.chunking.overlap_tokens"),
 	}
 
 	completionCfg := ai.CompletionConfig{
@@ -846,7 +852,7 @@ func initAI(db *sqlx.DB, i18n *i18n.I18n, conversationStore *conversation.Manage
 		Capacity: ko.Int("ai.worker.capacity"),
 	}
 
-	m, err := ai.New(embeddingCfg, completionCfg, workerCfg, conversationStore, helpCenterStore, userStore, ai.Opts{
+	m, err := ai.New(embeddingCfg, chunkingCfg, completionCfg, workerCfg, conversationStore, helpCenterStore, ai.Opts{
 		DB:   db,
 		Lo:   lo,
 		I18n: i18n,

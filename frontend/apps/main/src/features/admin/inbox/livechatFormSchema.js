@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, { message: t('globals.messages.required') }),
+  help_center_id: z.number().optional(),
   enabled: z.boolean(),
   csat_enabled: z.boolean(),
   secret: z.string(),

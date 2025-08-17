@@ -27,6 +27,7 @@ require (
 	github.com/knadh/stuffbin v1.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mr-karan/balance v0.0.0-20250317053523-d32c6ade6cf1
+	github.com/pemistahl/lingua-go v1.4.0
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/redis/go-redis/v9 v9.5.5
 	github.com/rhnvrm/simples3 v0.9.1
@@ -35,12 +36,14 @@ require (
 	github.com/taion809/haikunator v0.0.0-20150324135039-4e414e676fd1
 	github.com/valyala/fasthttp v1.62.0
 	github.com/volatiletech/null/v9 v9.0.0
+	github.com/yuin/goldmark v1.7.13
 	github.com/zerodha/fastglue v1.8.0
 	github.com/zerodha/logf v0.5.5
 	github.com/zerodha/simplesessions/stores/redis/v3 v3.0.0
 	github.com/zerodha/simplesessions/v3 v3.0.0
 	golang.org/x/crypto v0.38.0
 	golang.org/x/mod v0.24.0
+	golang.org/x/net v0.40.0
 	golang.org/x/oauth2 v0.21.0
 )
 
@@ -72,11 +75,13 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/savsgio/gotils v0.0.0-20240303185622-093b76447511 // indirect
+	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	golang.org/x/exp v0.0.0-20221106115401-f9659909a136 // indirect
 	golang.org/x/image v0.18.0 // indirect
-	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

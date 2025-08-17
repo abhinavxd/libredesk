@@ -18,6 +18,10 @@ func V0_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		// Enable pgvector extension
 		`CREATE EXTENSION IF NOT EXISTS vector`,
 
+		// Create AI knowledge type enum
+		`DROP TYPE IF EXISTS "ai_knowledge_type" CASCADE;
+		CREATE TYPE "ai_knowledge_type" AS ENUM ('snippet')`,
+
 		// Create help_centers table
 		`CREATE TABLE IF NOT EXISTS help_centers (
 			id SERIAL PRIMARY KEY,
@@ -26,7 +30,8 @@ func V0_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			name VARCHAR(255) NOT NULL,
 			slug VARCHAR(100) UNIQUE NOT NULL,
 			page_title VARCHAR(255) NOT NULL,
-			view_count INTEGER DEFAULT 0
+			view_count INTEGER DEFAULT 0,
+			default_locale VARCHAR(10) DEFAULT 'en' NOT NULL
 		)`,
 
 		// Create article_collections table
@@ -60,7 +65,7 @@ func V0_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			title VARCHAR(255) NOT NULL,
 			content TEXT NOT NULL,
 			sort_order INTEGER DEFAULT 0,
-			status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+			status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
 			view_count INTEGER DEFAULT 0,
 			ai_enabled BOOLEAN DEFAULT false
 		);
@@ -68,14 +73,13 @@ func V0_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		ON help_articles(collection_id, slug, locale);
 		`,
 
-		// Create AI custom answers table
-		`CREATE TABLE IF NOT EXISTS ai_custom_answers (
+		// Create AI knowledge base table
+		`CREATE TABLE IF NOT EXISTS ai_knowledge_base (
 			id SERIAL PRIMARY KEY,
 			created_at TIMESTAMPTZ DEFAULT NOW(),
 			updated_at TIMESTAMPTZ DEFAULT NOW(),
-			question TEXT NOT NULL,
-			answer TEXT NOT NULL,
-			embedding vector(1536) NOT NULL,
+			type ai_knowledge_type NOT NULL DEFAULT 'snippet',
+			content TEXT NOT NULL,
 			enabled BOOLEAN DEFAULT true
 		)`,
 
@@ -105,11 +109,13 @@ func V0_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		`CREATE INDEX IF NOT EXISTS index_articles_locale ON help_articles(collection_id, locale, status)`,
 		`CREATE INDEX IF NOT EXISTS index_articles_ordering ON help_articles(collection_id, sort_order)`,
 
+		// Create index for ai_knowledge_base
+		`CREATE INDEX IF NOT EXISTS index_ai_knowledge_base_type_enabled ON ai_knowledge_base(type, enabled)`,
+
 		// Create index for embeddings
 		`CREATE INDEX IF NOT EXISTS index_embeddings_on_source_type_source_id ON embeddings(source_type, source_id)`,
 
-		// Create HNSW indexes for vector similarity search
-		`CREATE INDEX IF NOT EXISTS index_ai_custom_answers_embedding ON ai_custom_answers USING hnsw (embedding vector_cosine_ops)`,
+		// Create HNSW index for vector similarity search on embeddings table
 		`CREATE INDEX IF NOT EXISTS index_embeddings_embedding ON embeddings USING hnsw (embedding vector_cosine_ops)`,
 	}
 
@@ -175,6 +181,14 @@ func V0_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	// Add 'meta' column to users table if it does not exist
 	_, err = tx.Exec(`
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}'::jsonb NOT NULL;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Add 'help_center_id' column to inboxes table if it does not exist
+	_, err = tx.Exec(`
+		ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS help_center_id INT REFERENCES help_centers(id);
 	`)
 	if err != nil {
 		return err

@@ -100,12 +100,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/ai-assistants/{id}", perm(handleUpdateAIAssistant, "ai:manage"))
 	g.DELETE("/api/v1/ai-assistants/{id}", perm(handleDeleteAIAssistant, "ai:manage"))
 
-	// AI Custom Answers.
-	g.GET("/api/v1/ai-custom-answers", perm(handleGetAICustomAnswers, "ai:manage"))
-	g.GET("/api/v1/ai-custom-answers/{id}", perm(handleGetAICustomAnswer, "ai:manage"))
-	g.POST("/api/v1/ai-custom-answers", perm(handleCreateAICustomAnswer, "ai:manage"))
-	g.PUT("/api/v1/ai-custom-answers/{id}", perm(handleUpdateAICustomAnswer, "ai:manage"))
-	g.DELETE("/api/v1/ai-custom-answers/{id}", perm(handleDeleteAICustomAnswer, "ai:manage"))
+	// AI Snippets.
+	g.GET("/api/v1/ai-snippets", perm(handleGetAISnippets, "ai:manage"))
+	g.GET("/api/v1/ai-snippets/{id}", perm(handleGetAISnippet, "ai:manage"))
+	g.POST("/api/v1/ai-snippets", perm(handleCreateAISnippet, "ai:manage"))
+	g.PUT("/api/v1/ai-snippets/{id}", perm(handleUpdateAISnippet, "ai:manage"))
+	g.DELETE("/api/v1/ai-snippets/{id}", perm(handleDeleteAISnippet, "ai:manage"))
 
 	// Macros.
 	g.GET("/api/v1/macros", auth(handleGetMacros))
@@ -220,7 +220,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))
 	g.POST("/api/v1/custom-attributes", perm(handleCreateCustomAttribute, "custom_attributes:manage"))
-	g.GET("/api/v1/custom-attributes/{id}", perm(handleGetCustomAttribute, "custom_attributes:manage"))
 	g.PUT("/api/v1/custom-attributes/{id}", perm(handleUpdateCustomAttribute, "custom_attributes:manage"))
 	g.DELETE("/api/v1/custom-attributes/{id}", perm(handleDeleteCustomAttribute, "custom_attributes:manage"))
 
@@ -241,8 +240,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/help-centers/{hc_id}/collections", perm(handleCreateCollection, "help_center:manage"))
 	g.PUT("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleUpdateCollection, "help_center:manage"))
 	g.DELETE("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleDeleteCollection, "help_center:manage"))
-	g.PUT("/api/v1/help-centers/{hc_id}/collections/reorder", perm(handleReorderCollections, "help_center:manage"))
-	g.PUT("/api/v1/collections/{id}/move", perm(handleMoveCollection, "help_center:manage"))
 	g.PUT("/api/v1/collections/{id}/toggle", perm(handleToggleCollection, "help_center:manage"))
 
 	// Articles.
@@ -250,9 +247,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/collections/{col_id}/articles/{id}", auth(handleGetArticle))
 	g.POST("/api/v1/collections/{col_id}/articles", perm(handleCreateArticle, "help_center:manage"))
 	g.PUT("/api/v1/collections/{col_id}/articles/{id}", perm(handleUpdateArticle, "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}", perm(handleUpdateArticleByID, "help_center:manage"))
 	g.DELETE("/api/v1/collections/{col_id}/articles/{id}", perm(handleDeleteArticle, "help_center:manage"))
-	g.PUT("/api/v1/collections/{col_id}/articles/reorder", perm(handleReorderArticles, "help_center:manage"))
-	g.PUT("/api/v1/articles/{id}/move", perm(handleMoveArticle, "help_center:manage"))
 	g.PUT("/api/v1/articles/{id}/status", perm(handleUpdateArticleStatus, "help_center:manage"))
 
 	// CSAT.

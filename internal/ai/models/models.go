@@ -4,6 +4,8 @@ import (
 	"time"
 
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/volatiletech/null/v9"
 )
 
 type Provider struct {
@@ -27,13 +29,12 @@ type Prompt struct {
 
 // ConversationCompletionRequest represents a request for AI conversation completion
 type ConversationCompletionRequest struct {
-	Messages         []cmodels.Message `json:"messages"`
-	InboxID          int               `json:"inbox_id"`
-	ContactID        int               `json:"contact_id"`
-	ConversationUUID string            `json:"conversation_uuid"`
-	HelpCenterID     int               `json:"help_center_id"`
-	Locale           string            `json:"locale"`
-	AIAssistantID    int               `json:"ai_assistant_id"`
+	Messages         []cmodels.Message
+	InboxID          int
+	ContactID        int
+	ConversationUUID string
+	AIAssistant      umodels.User
+	HelpCenterID     null.Int
 }
 
 // ChatMessage represents a single message in a chat
@@ -53,28 +54,28 @@ type PromptPayload struct {
 	UserPrompt   string `json:"user_prompt"`
 }
 
-// CustomAnswer represents an AI custom answer record
-type CustomAnswer struct {
+// KnowledgeBase represents an AI knowledge base record
+type KnowledgeBase struct {
 	ID        int       `db:"id" json:"id"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
-	Question  string    `db:"question" json:"question"`
-	Answer    string    `db:"answer" json:"answer"`
+	Type      string    `db:"type" json:"type"`
+	Content   string    `db:"content" json:"content"`
 	Enabled   bool      `db:"enabled" json:"enabled"`
 }
 
-// CustomAnswerResult represents a custom answer with similarity score
-type CustomAnswerResult struct {
+// KnowledgeBaseResult represents a knowledge base entry with similarity score
+type KnowledgeBaseResult struct {
 	ID         int       `db:"id" json:"id"`
 	CreatedAt  time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt  time.Time `db:"updated_at" json:"updated_at"`
-	Question   string    `db:"question" json:"question"`
-	Answer     string    `db:"answer" json:"answer"`
+	Type       string    `db:"type" json:"type"`
+	Content    string    `db:"content" json:"content"`
 	Similarity float64   `db:"similarity" json:"similarity"`
 }
 
-// KnowledgeBaseResult represents a unified search result from knowledge base
-type KnowledgeBaseResult struct {
+// UnifiedKnowledgeResult represents a unified search result from knowledge base
+type UnifiedKnowledgeResult struct {
 	SourceType   string  `db:"source_type" json:"source_type"`
 	SourceID     int     `db:"source_id" json:"source_id"`
 	Title        string  `db:"title" json:"title"`

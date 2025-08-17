@@ -289,7 +289,7 @@ const viewInboxOpen = useStorage('viewInboxOpen', true)
                       <SidebarMenuSubItem v-for="child in item.children" :key="child.titleKey">
                         <SidebarMenuButton size="sm" :isActive="isActiveParent(child.href)" asChild>
                           <router-link :to="child.href">
-                            <span>{{ t(child.titleKey) }}</span>
+                            <span>{{ t(child.titleKey, child.isTitleKeyPlural === true ? 2 : 1) }}</span>
                           </router-link>
                         </SidebarMenuButton>
                       </SidebarMenuSubItem>

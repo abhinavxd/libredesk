@@ -47,7 +47,6 @@ const createCustomAttribute = (data) =>
       'Content-Type': 'application/json'
     }
   })
-const getCustomAttribute = (id) => http.get(`/api/v1/custom-attributes/${id}`)
 const updateCustomAttribute = (id, data) =>
   http.put(`/api/v1/custom-attributes/${id}`, data, {
     headers: {
@@ -460,17 +459,7 @@ const updateCollection = (helpCenterId, id, data) => http.put(`/api/v1/help-cent
   }
 })
 const deleteCollection = (helpCenterId, id) => http.delete(`/api/v1/help-centers/${helpCenterId}/collections/${id}`)
-const moveCollection = (id, data) => http.put(`/api/v1/collections/${id}/move`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
 const toggleCollection = (id) => http.put(`/api/v1/collections/${id}/toggle`)
-const reorderCollections = (helpCenterId, data) => http.put(`/api/v1/help-centers/${helpCenterId}/collections/reorder`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
 
 const getArticles = (collectionId, params) => http.get(`/api/v1/collections/${collectionId}/articles`, { params })
 const getArticle = (id) => http.get(`/api/v1/collections/*/articles/${id}`)
@@ -484,18 +473,13 @@ const updateArticle = (collectionId, id, data) => http.put(`/api/v1/collections/
     'Content-Type': 'application/json'
   }
 })
+const updateArticleByID = (id, data) => http.put(`/api/v1/articles/${id}`, data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
 const deleteArticle = (collectionId, id) => http.delete(`/api/v1/collections/${collectionId}/articles/${id}`)
-const moveArticle = (id, data) => http.put(`/api/v1/articles/${id}/move`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
 const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const reorderArticles = (collectionId, data) => http.put(`/api/v1/collections/${collectionId}/articles/reorder`, data, {
   headers: {
     'Content-Type': 'application/json'
   }
@@ -518,22 +502,22 @@ const updateAIAssistant = (id, data) =>
   })
 const deleteAIAssistant = (id) => http.delete(`/api/v1/ai-assistants/${id}`)
 
-// AI Custom Answers
-const getAICustomAnswers = () => http.get('/api/v1/ai-custom-answers')
-const getAICustomAnswer = (id) => http.get(`/api/v1/ai-custom-answers/${id}`)
-const createAICustomAnswer = (data) =>
-  http.post('/api/v1/ai-custom-answers', data, {
+// AI Snippets
+const getAISnippets = () => http.get('/api/v1/ai-snippets')
+const getAISnippet = (id) => http.get(`/api/v1/ai-snippets/${id}`)
+const createAISnippet = (data) =>
+  http.post('/api/v1/ai-snippets', data, {
     headers: {
       'Content-Type': 'application/json'
     }
   })
-const updateAICustomAnswer = (id, data) =>
-  http.put(`/api/v1/ai-custom-answers/${id}`, data, {
+const updateAISnippet = (id, data) =>
+  http.put(`/api/v1/ai-snippets/${id}`, data, {
     headers: {
       'Content-Type': 'application/json'
     }
   })
-const deleteAICustomAnswer = (id) => http.delete(`/api/v1/ai-custom-answers/${id}`)
+const deleteAISnippet = (id) => http.delete(`/api/v1/ai-snippets/${id}`)
 
 
 export default {
@@ -615,12 +599,12 @@ export default {
   createAIAssistant,
   updateAIAssistant,
   deleteAIAssistant,
-  // AI Custom Answers
-  getAICustomAnswers,
-  getAICustomAnswer,
-  createAICustomAnswer,
-  updateAICustomAnswer,
-  deleteAICustomAnswer,
+  // AI Snippets
+  getAISnippets,
+  getAISnippet,
+  createAISnippet,
+  updateAISnippet,
+  deleteAISnippet,
   createInbox,
   updateInbox,
   deleteInbox,
@@ -671,7 +655,6 @@ export default {
   createCustomAttribute,
   updateCustomAttribute,
   deleteCustomAttribute,
-  getCustomAttribute,
   getContactNotes,
   createContactNote,
   deleteContactNote,
@@ -697,15 +680,12 @@ export default {
   createCollection,
   updateCollection,
   deleteCollection,
-  moveCollection,
   toggleCollection,
-  reorderCollections,
   getArticles,
   getArticle,
   createArticle,
   updateArticle,
+  updateArticleByID,
   deleteArticle,
-  moveArticle,
   updateArticleStatus,
-  reorderArticles
 }

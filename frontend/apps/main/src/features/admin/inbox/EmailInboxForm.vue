@@ -12,6 +12,31 @@
       </FormItem>
     </FormField>
 
+    <FormField v-slot="{ componentField }" name="help_center_id">
+      <FormItem>
+        <FormLabel>{{ $t('admin.inbox.helpCenter') }}</FormLabel>
+        <FormControl>
+          <Select v-bind="componentField">
+            <SelectTrigger>
+              <SelectValue :placeholder="t('admin.inbox.helpCenter.placeholder')" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
+              <SelectItem
+                v-for="helpCenter in helpCenters"
+                :key="helpCenter.id"
+                :value="helpCenter.id.toString()"
+              >
+                {{ helpCenter.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </FormControl>
+        <FormDescription>{{ $t('admin.inbox.helpCenter.description') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <FormField v-slot="{ componentField }" name="from">
       <FormItem>
         <FormLabel>{{ $t('globals.terms.fromEmailAddress') }}</FormLabel>
@@ -85,11 +110,7 @@
         <FormItem>
           <FormLabel>{{ $t('admin.inbox.mailbox') }}</FormLabel>
           <FormControl>
-            <Input
-              type="text"
-              placeholder="INBOX"
-              v-bind="componentField"
-            />
+            <Input type="text" placeholder="INBOX" v-bind="componentField" />
           </FormControl>
           <FormDescription>
             {{ $t('admin.inbox.mailbox.description') }}
@@ -349,10 +370,11 @@
 </template>
 
 <script setup>
-import { watch, computed } from 'vue'
+import { watch, computed, ref, onMounted } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './formSchema.js'
+import api from '@main/api'
 import {
   FormControl,
   FormField,
@@ -393,10 +415,13 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
+const helpCenters = ref([])
+
 const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t)),
   initialValues: {
     name: '',
+    help_center_id: 0,
     from: '',
     enabled: true,
     csat_enabled: false,
@@ -446,4 +471,13 @@ watch(
   },
   { deep: true, immediate: true }
 )
+
+onMounted(async () => {
+  try {
+    const { data } = await api.getHelpCenters()
+    helpCenters.value = data.data
+  } catch (error) {
+    console.error('Error fetching help centers:', error)
+  }
+})
 </script>

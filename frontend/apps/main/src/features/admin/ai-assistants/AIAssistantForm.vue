@@ -30,19 +30,17 @@
       </FormItem>
     </FormField>
 
-    <!-- Profile Picture URL (Optional) -->
+    <!-- Avatar url -->
     <FormField v-slot="{ componentField }" name="avatar_url">
       <FormItem>
-        <FormLabel>{{ t('ai.assistant.profilePictureUrl') }}</FormLabel>
+        <FormLabel>{{ t('globals.terms.avatar') }} {{ t('globals.terms.url') }}</FormLabel>
         <FormControl>
           <Input
             type="url"
-            :placeholder="t('ai.assistant.profilePicturePlaceholder')"
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>{{ t('ai.assistant.profilePictureDescription') }}</FormDescription>
-        <FormMessage />
+        <FormMessage></FormMessage>
       </FormItem>
     </FormField>
 

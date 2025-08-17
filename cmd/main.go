@@ -210,7 +210,7 @@ func main() {
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
 		helpcenter                  = initHelpCenter(db, i18n)
-		ai                          = initAI(db, i18n, conversation, helpcenter, user)
+		ai                          = initAI(db, i18n, conversation, helpcenter)
 	)
 
 	wsHub.SetConversationStore(conversation)

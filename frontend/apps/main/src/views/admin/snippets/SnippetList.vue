@@ -2,10 +2,10 @@
   <Spinner v-if="isLoading" />
   <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
     <div class="flex justify-end mb-5">
-      <router-link :to="{ name: 'new-custom-answer' }">
+      <router-link :to="{ name: 'new-snippet' }">
         <Button>{{
           $t('globals.messages.new', {
-            name: $t('globals.terms.customAnswer', 1)
+            name: $t('globals.terms.snippet', 1)
           })
         }}</Button>
       </router-link>
@@ -18,7 +18,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { createColumns } from '../../../features/admin/custom-answers/dataTableColumns.js'
+import { createColumns } from '../../../features/admin/snippets/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import { handleHTTPError } from '../../../utils/http'
@@ -36,14 +36,14 @@ const emitter = useEmitter()
 onMounted(async () => {
   getData()
   emitter.on(EMITTER_EVENTS.REFRESH_LIST, (data) => {
-    if (data?.model === 'ai_custom_answer') getData()
+    if (data?.model === 'ai_snippet') getData()
   })
 })
 
 const getData = async () => {
   try {
     isLoading.value = true
-    const response = await api.getAICustomAnswers()
+    const response = await api.getAISnippets()
     data.value = response.data.data
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

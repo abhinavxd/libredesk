@@ -43,6 +43,10 @@ const breadcrumbLinks = [
 
 const submitForm = (values) => {
   let payload
+
+  if (values.help_center_id === 0) {
+    values.help_center_id = null
+  }
   
   if (inbox.value.channel === 'email') {
     payload = {

@@ -28,6 +28,31 @@
             </FormItem>
           </FormField>
 
+          <FormField v-slot="{ componentField }" name="help_center_id">
+            <FormItem>
+              <FormLabel>{{ $t('admin.inbox.helpCenter') }}</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="t('admin.inbox.helpCenter.placeholder')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
+                    <SelectItem
+                      v-for="helpCenter in helpCenters"
+                      :key="helpCenter.id"
+                      :value="helpCenter.id"
+                    >
+                      {{ helpCenter.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormDescription>{{ $t('admin.inbox.helpCenter.description') }}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
           <FormField v-slot="{ componentField, handleChange }" name="enabled">
             <FormItem class="flex flex-row items-center justify-between box p-4">
               <div class="space-y-0.5">
@@ -57,7 +82,9 @@
 
           <FormField v-slot="{ componentField }" name="config.brand_name">
             <FormItem>
-              <FormLabel>{{ $t('globals.terms.brand') + ' ' + $t('globals.terms.name').toLowerCase() }}</FormLabel>
+              <FormLabel>{{
+                $t('globals.terms.brand') + ' ' + $t('globals.terms.name').toLowerCase()
+              }}</FormLabel>
               <FormControl>
                 <Input type="text" placeholder="" v-bind="componentField" />
               </FormControl>
@@ -249,9 +276,6 @@
                   rows="2"
                 />
               </FormControl>
-              <FormDescription>{{
-                $t('admin.inbox.livechat.chatIntroduction.description')
-              }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
@@ -344,9 +368,6 @@
                     rows="2"
                   />
                 </FormControl>
-                <FormDescription>{{
-                  $t('admin.inbox.livechat.noticeBanner.text.description')
-                }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
@@ -472,7 +493,7 @@
             <FormItem>
               <FormLabel>{{ $t('admin.inbox.livechat.secretKey') }}</FormLabel>
               <FormControl>
-                <Input type="password" v-bind="componentField"/>
+                <Input type="password" v-bind="componentField" />
               </FormControl>
               <FormDescription>{{
                 $t('admin.inbox.livechat.secretKey.description')
@@ -583,6 +604,54 @@
                   </FormItem>
                 </FormField>
 
+                <FormField v-slot="{ componentField }" name="config.visitors.require_contact_info">
+                  <FormItem>
+                    <FormLabel>{{ $t('admin.inbox.livechat.requireContactInfo') }}</FormLabel>
+                    <FormControl>
+                      <Select v-bind="componentField">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="disabled">
+                            {{ $t('admin.inbox.livechat.requireContactInfo.disabled') }}
+                          </SelectItem>
+                          <SelectItem value="optional">
+                            {{ $t('admin.inbox.livechat.requireContactInfo.optional') }}
+                          </SelectItem>
+                          <SelectItem value="required">
+                            {{ $t('admin.inbox.livechat.requireContactInfo.required') }}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>{{
+                      $t('admin.inbox.livechat.requireContactInfo.visitors.description')
+                    }}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+
+                <FormField
+                  v-if="form.values.config?.visitors?.require_contact_info !== 'disabled'"
+                  v-slot="{ componentField }"
+                  name="config.visitors.contact_info_message"
+                >
+                  <FormItem>
+                    <FormLabel>{{ $t('admin.inbox.livechat.contactInfoMessage') }}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        v-bind="componentField"
+                        placeholder="Please provide your contact information so we can assist you better."
+                        rows="2"
+                      />
+                    </FormControl>
+                    <FormDescription>{{
+                      $t('admin.inbox.livechat.contactInfoMessage.visitors.description')
+                    }}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
               </div>
 
               <!-- Users Settings -->
@@ -653,10 +722,11 @@
 </template>
 
 <script setup>
-import { watch, computed, ref } from 'vue'
+import { watch, computed, ref, onMounted } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './livechatFormSchema.js'
+import api from '@main/api'
 import {
   FormControl,
   FormField,
@@ -680,7 +750,6 @@ import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { Plus, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import PreChatFormConfig from './PreChatFormConfig.vue'
-import api from '@/api'
 
 const props = defineProps({
   initialValues: {
@@ -706,11 +775,13 @@ const activeTab = ref('general')
 const selectedUserTab = ref('visitors')
 const externalLinks = ref([])
 const customAttributes = ref([])
+const helpCenters = ref([])
 
 const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t)),
   initialValues: {
     name: '',
+    help_center_id: 0,
     enabled: true,
     secret: '',
     csat_enabled: false,
@@ -823,6 +894,10 @@ const fetchCustomAttributes = async () => {
 }
 
 const onSubmit = form.handleSubmit(async (values) => {
+  if (values.help_center_id === 0 || values.help_center_id === '') {
+    values.help_center_id = null
+  }
+
   // Transform trusted_domains from textarea to array
   if (values.config.trusted_domains) {
     values.config.trusted_domains = values.config.trusted_domains
@@ -863,4 +938,14 @@ watch(
   },
   { deep: true, immediate: true }
 )
+
+// Fetch help centers on component mount
+onMounted(async () => {
+  try {
+    const { data } = await api.getHelpCenters()
+    helpCenters.value = data.data
+  } catch (error) {
+    console.error('Error fetching help centers:', error)
+  }
+})
 </script>

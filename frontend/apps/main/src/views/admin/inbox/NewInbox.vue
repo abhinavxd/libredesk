@@ -55,12 +55,16 @@
         <MenuCard
           v-for="channel in channels"
           :key="channel.title"
-          :onClick="channel.onClick"
-          :title="channel.title"
-          :subTitle="channel.subTitle"
-          :icon="channel.icon"
-          class="w-full max-w-sm cursor-pointer"
+          class="w-full max-w-sm"
+          @click="channel.onClick"
         >
+          <template #title>
+            <component :is="channel.icon" size="24" class="mr-2 text-primary" />
+            {{ channel.title }}
+          </template>
+          <template #subtitle>
+            <p class="text-sm mb-3">{{ channel.subTitle }}</p>
+          </template>
         </MenuCard>
       </div>
 
@@ -86,10 +90,10 @@
 <script setup>
 import { ref } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
+import MenuCard from '@shared-ui/components/ui/menu-card/MenuCard.vue'
 import { useRouter } from 'vue-router'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import { Check, Mail, MessageCircle } from 'lucide-vue-next'
-import MenuCard from '@main/components/layout/MenuCard.vue'
 import {
   Stepper,
   StepperDescription,
@@ -167,6 +171,9 @@ const goInboxList = () => {
 }
 
 const submitForm = (values) => {
+  if (values.help_center_id === 0) {
+    values.help_center_id = null
+  }
   const channelName = selectedChannel.value.toLowerCase()
   const payload = {
     name: values.name,
@@ -181,6 +188,9 @@ const submitForm = (values) => {
 }
 
 const submitLiveChatForm = (values) => {
+  if (values.help_center_id === 0) {
+    values.help_center_id = null
+  }
   const payload = {
     name: values.name,
     channel: 'livechat',

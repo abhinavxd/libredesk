@@ -1,6 +1,3 @@
--- name: get-default-provider
-SELECT id, name, provider, config, is_default FROM ai_providers where is_default is true;
-
 -- name: get-prompt
 SELECT id, key, title, content FROM ai_prompts where key = $1;
 
@@ -16,41 +13,60 @@ SET config = jsonb_set(
 ) 
 WHERE provider = 'openai';
 
--- name: get-ai-custom-answers
-SELECT id, created_at, updated_at, question, answer, enabled
-FROM ai_custom_answers
+-- name: get-knowledge-base-items
+SELECT id, created_at, updated_at, type, content, enabled
+FROM ai_knowledge_base
 ORDER BY created_at DESC;
 
--- name: get-ai-custom-answer
-SELECT id, created_at, updated_at, question, answer, enabled
-FROM ai_custom_answers
+-- name: get-knowledge-base-item
+SELECT id, created_at, updated_at, type, content, enabled
+FROM ai_knowledge_base
 WHERE id = $1;
 
--- name: insert-ai-custom-answer
-INSERT INTO ai_custom_answers (question, answer, embedding, enabled)
-VALUES ($1, $2, $3::vector, $4)
-RETURNING id, created_at, updated_at, question, answer, enabled;
+-- name: insert-knowledge-base-item
+INSERT INTO ai_knowledge_base (type, content, enabled)
+VALUES ($1, $2, $3)
+RETURNING id, created_at, updated_at, type, content, enabled;
 
--- name: update-ai-custom-answer
-UPDATE ai_custom_answers 
-SET question = $2, answer = $3, embedding = $4::vector, enabled = $5, updated_at = NOW()
+-- name: update-knowledge-base-item
+UPDATE ai_knowledge_base 
+SET type = $2, content = $3, enabled = $4, updated_at = NOW()
 WHERE id = $1
-RETURNING id, created_at, updated_at, question, answer, enabled;
+RETURNING id, created_at, updated_at, type, content, enabled;
 
--- name: delete-ai-custom-answer
-DELETE FROM ai_custom_answers WHERE id = $1;
+-- name: delete-knowledge-base-item
+DELETE FROM ai_knowledge_base WHERE id = $1;
 
--- name: search-custom-answers
-SELECT
+-- name: insert-embedding
+INSERT INTO embeddings (source_type, source_id, chunk_text, embedding, meta)
+VALUES ($1, $2, $3, $4::vector, $5)
+RETURNING id;
+
+-- name: delete-embeddings-by-source
+DELETE FROM embeddings 
+WHERE source_type = $1 AND source_id = $2;
+
+-- name: search-knowledge-base
+WITH knowledge_results AS (
+    SELECT
+        kb.id,
+        kb.created_at,
+        kb.updated_at,
+        kb.type,
+        kb.content,
+        (1 - (e.embedding <=> $1::vector)) as similarity
+    FROM ai_knowledge_base kb
+    JOIN embeddings e ON e.source_type = 'knowledge_base' AND e.source_id = kb.id
+    WHERE kb.enabled = true
+    AND (1 - (e.embedding <=> $1::vector)) >= $2
+)
+SELECT DISTINCT ON (id) 
     id,
     created_at,
     updated_at,
-    question,
-    answer,
-    1 - (embedding <=> $1::vector) AS similarity
-FROM ai_custom_answers
-WHERE enabled = true
-  AND embedding IS NOT NULL
-  AND 1 - (embedding <=> $1::vector) >= $2  -- confidence threshold
-ORDER BY embedding <=> $1::vector
-LIMIT 1;
+    type,
+    content,
+    similarity
+FROM knowledge_results
+ORDER BY id, similarity DESC
+LIMIT $3;

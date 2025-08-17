@@ -4,12 +4,12 @@
       :editor="editor"
       :tippy-options="{ duration: 100 }"
       v-if="editor"
-      class="bg-background p-1 box will-change-transform"
+      class="bg-background p-2 box will-change-transform max-w-fit"
     >
-      <div class="flex space-x-1 items-center">
+      <div class="flex gap-1 items-center justify-start whitespace-nowrap">
         <DropdownMenu v-if="aiPrompts.length > 0">
           <DropdownMenuTrigger>
-            <Button size="sm" variant="ghost" class="flex items-center justify-center">
+            <Button size="sm" variant="ghost" class="flex items-center justify-center" title="AI Prompts">
               <span class="flex items-center">
                 <span class="text-medium">AI</span>
                 <Bot size="14" class="ml-1" />
@@ -27,11 +27,43 @@
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <!-- Heading Dropdown for Article Mode -->
+        <DropdownMenu v-if="editorType === 'article'">
+          <DropdownMenuTrigger>
+            <Button size="sm" variant="ghost" class="flex items-center justify-center" title="Heading Options">
+              <span class="flex items-center">
+                <Type size="14" />
+                <span class="ml-1 text-xs font-medium">{{ getCurrentHeadingText() }}</span>
+                <ChevronDown class="w-3 h-3 ml-1" />
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem @select="setParagraph" title="Set Paragraph">
+              <span class="font-normal">Paragraph</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem @select="() => setHeading(1)" title="Set Heading 1">
+              <span class="text-xl font-bold">Heading 1</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem @select="() => setHeading(2)" title="Set Heading 2">
+              <span class="text-lg font-bold">Heading 2</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem @select="() => setHeading(3)" title="Set Heading 3">
+              <span class="text-base font-semibold">Heading 3</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem @select="() => setHeading(4)" title="Set Heading 4">
+              <span class="text-sm font-semibold">Heading 4</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Button
           size="sm"
           variant="ghost"
           @click.prevent="editor?.chain().focus().toggleBold().run()"
           :class="{ 'bg-gray-200 dark:bg-secondary': editor?.isActive('bold') }"
+          title="Bold"
         >
           <Bold size="14" />
         </Button>
@@ -40,6 +72,7 @@
           variant="ghost"
           @click.prevent="editor?.chain().focus().toggleItalic().run()"
           :class="{ 'bg-gray-200 dark:bg-secondary': editor?.isActive('italic') }"
+          title="Italic"
         >
           <Italic size="14" />
         </Button>
@@ -48,6 +81,7 @@
           variant="ghost"
           @click.prevent="editor?.chain().focus().toggleBulletList().run()"
           :class="{ 'bg-gray-200 dark:bg-secondary': editor?.isActive('bulletList') }"
+          title="Bullet List"
         >
           <List size="14" />
         </Button>
@@ -57,6 +91,7 @@
           variant="ghost"
           @click.prevent="editor?.chain().focus().toggleOrderedList().run()"
           :class="{ 'bg-gray-200 dark:bg-secondary': editor?.isActive('orderedList') }"
+          title="Ordered List"
         >
           <ListOrdered size="14" />
         </Button>
@@ -65,9 +100,32 @@
           variant="ghost"
           @click.prevent="openLinkModal"
           :class="{ 'bg-gray-200 dark:bg-secondary': editor?.isActive('link') }"
+          title="Insert Link"
         >
           <LinkIcon size="14" />
         </Button>
+
+        <!-- Additional tools for Article Mode -->
+        <template v-if="editorType === 'article'">
+          <Button
+            size="sm"
+            variant="ghost"
+            @click.prevent="editor?.chain().focus().toggleCodeBlock().run()"
+            :class="{ 'bg-gray-200 dark:bg-secondary': editor?.isActive('codeBlock') }"
+            title="Code Block"
+          >
+            <Code size="14" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            @click.prevent="editor?.chain().focus().toggleBlockquote().run()"
+            :class="{ 'bg-gray-200 dark:bg-secondary': editor?.isActive('blockquote') }"
+            title="Blockquote"
+          >
+            <Quote size="14" />
+          </Button>
+        </template>
         <div v-if="showLinkInput" class="flex space-x-2 p-2 bg-background border rounded">
           <Input
             v-model="linkUrl"
@@ -75,10 +133,10 @@
             placeholder="Enter link URL"
             class="border p-1 text-sm w-[200px]"
           />
-          <Button size="sm" @click="setLink">
+          <Button size="sm" @click="setLink" title="Set Link">
             <Check size="14" />
           </Button>
-          <Button size="sm" @click="unsetLink">
+          <Button size="sm" @click="unsetLink" title="Unset Link">
             <X size="14" />
           </Button>
         </div>
@@ -100,7 +158,10 @@ import {
   ListOrdered,
   Link as LinkIcon,
   Check,
-  X
+  X,
+  Type,
+  Code,
+  Quote
 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
@@ -136,6 +197,11 @@ const props = defineProps({
   aiPrompts: {
     type: Array,
     default: () => []
+  },
+  editorType: {
+    type: String,
+    default: 'conversation',
+    validator: (value) => ['conversation', 'article'].includes(value)
   }
 })
 
@@ -189,17 +255,39 @@ const CustomTableHeader = TableHeader.extend({
 
 const isInternalUpdate = ref(false)
 
-const editor = useEditor({
-  extensions: [
-    StarterKit.configure(),
+// Configure extensions based on editor type
+const getExtensions = () => {
+  const baseExtensions = [
+    StarterKit.configure({
+      heading: props.editorType === 'article' ? { levels: [1, 2, 3, 4] } : false
+    }),
     Image.configure({ HTMLAttributes: { class: 'inline-image' } }),
     Placeholder.configure({ placeholder: () => props.placeholder }),
-    Link,
-    CustomTable.configure({ resizable: false }),
-    TableRow,
-    CustomTableCell,
-    CustomTableHeader
-  ],
+    Link
+  ]
+
+  // Add table extensions
+  if (props.editorType === 'article') {
+    baseExtensions.push(
+      CustomTable.configure({ resizable: true }),
+      TableRow,
+      CustomTableCell,
+      CustomTableHeader
+    )
+  } else {
+    baseExtensions.push(
+      CustomTable.configure({ resizable: false }),
+      TableRow,
+      CustomTableCell,
+      CustomTableHeader
+    )
+  }
+
+  return baseExtensions
+}
+
+const editor = useEditor({
+  extensions: getExtensions(),
   autofocus: props.autoFocus,
   content: htmlContent.value,
   editorProps: {
@@ -272,6 +360,32 @@ const setLink = () => {
 const unsetLink = () => {
   editor.value?.chain().focus().unsetLink().run()
   showLinkInput.value = false
+}
+
+// Heading functions for article mode
+const setHeading = (level) => {
+  editor.value?.chain().focus().toggleHeading({ level }).run()
+}
+
+const setParagraph = () => {
+  editor.value?.chain().focus().setParagraph().run()
+}
+
+const getCurrentHeadingLevel = () => {
+  if (!editor.value) return null
+  for (let level = 1; level <= 4; level++) {
+    if (editor.value.isActive('heading', { level })) {
+      return level
+    }
+  }
+  return null
+}
+
+const getCurrentHeadingText = () => {
+  const level = getCurrentHeadingLevel()
+  if (level) return `H${level}`
+  if (editor.value?.isActive('paragraph')) return 'P'
+  return 'T'
 }
 </script>
 

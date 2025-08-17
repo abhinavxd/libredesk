@@ -2,6 +2,7 @@
 package stringutil
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -14,6 +15,9 @@ import (
 	"time"
 
 	"github.com/k3a/html2text"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
 const (
@@ -300,4 +304,45 @@ func ComputeRecipients(
 	finalBCC = []string{}
 
 	return
+}
+
+// MarkdownToHTML converts markdown content to HTML using goldmark.
+func MarkdownToHTML(markdown string) (string, error) {
+	// Create goldmark parser with safe configuration
+	md := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(
+			html.WithHardWraps(),
+			html.WithXHTML(),
+		),
+	)
+
+	var buf bytes.Buffer
+	if err := md.Convert([]byte(markdown), &buf); err != nil {
+		return "", fmt.Errorf("error converting markdown to HTML: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// CleanJSONResponse removes markdown code blocks from LLM responses.
+// This handles cases where LLMs wrap JSON in ```json ... ``` blocks despite explicit instructions.
+func CleanJSONResponse(response string) string {
+	response = strings.TrimSpace(response)
+
+	// Handle ```json ... ``` blocks
+	if strings.HasPrefix(response, "```json") && strings.HasSuffix(response, "```") {
+		cleaned := strings.TrimPrefix(response, "```json")
+		cleaned = strings.TrimSuffix(cleaned, "```")
+		return strings.TrimSpace(cleaned)
+	}
+
+	// Handle generic ``` ... ``` blocks
+	if strings.HasPrefix(response, "```") && strings.HasSuffix(response, "```") {
+		cleaned := strings.TrimPrefix(response, "```")
+		cleaned = strings.TrimSuffix(cleaned, "```")
+		return strings.TrimSpace(cleaned)
+	}
+
+	return response
 }

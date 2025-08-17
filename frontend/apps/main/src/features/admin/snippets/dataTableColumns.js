@@ -1,33 +1,20 @@
 import { h } from 'vue'
-import CustomAnswerDataTableDropDown from '@/features/admin/custom-answers/dataTableDropdown.vue'
+import SnippetDataTableDropDown from '@/features/admin/snippets/dataTableDropdown.vue'
 import { format } from 'date-fns'
+import { getTextFromHTML } from '@/utils/strings.js'
 
 export const createColumns = (t) => [
   {
-    accessorKey: 'question',
+    accessorKey: 'content',
     header: function () {
-      return h('div', { class: 'text-left' }, t('globals.terms.question'))
+      return h('div', { class: 'text-center' }, t('globals.terms.content'))
     },
     cell: function ({ row }) {
-      const question = row.getValue('question')
-      const truncated = question.length > 80 ? question.substring(0, 80) + '...' : question
-      return h('div', { 
-        class: 'text-left font-medium max-w-xs',
-        title: question // Show full text on hover
-      }, truncated)
-    }
-  },
-  {
-    accessorKey: 'answer',
-    header: function () {
-      return h('div', { class: 'text-left' }, t('globals.terms.answer'))
-    },
-    cell: function ({ row }) {
-      const answer = row.getValue('answer')
-      const truncated = answer.length > 100 ? answer.substring(0, 100) + '...' : answer
-      return h('div', { 
-        class: 'text-left font-medium max-w-sm',
-        title: answer // Show full text on hover
+      const content = getTextFromHTML(row.getValue('content'))
+      const truncated = content.length > 30 ? content.substring(0, 30) + '...' : content
+      return h('div', {
+        class: 'font-medium text-center',
+        title: content
       }, truncated)
     }
   },
@@ -70,12 +57,12 @@ export const createColumns = (t) => [
     id: 'actions',
     enableHiding: false,
     cell: ({ row }) => {
-      const customAnswer = row.original
+      const snippet = row.original
       return h(
         'div',
         { class: 'relative' },
-        h(CustomAnswerDataTableDropDown, {
-          customAnswer
+        h(SnippetDataTableDropDown, {
+          snippet
         })
       )
     }

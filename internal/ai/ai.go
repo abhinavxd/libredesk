@@ -6,14 +6,15 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
@@ -25,15 +26,13 @@ var (
 	//go:embed queries.sql
 	efs embed.FS
 
-	ErrInvalidAPIKey = errors.New("invalid API Key")
-	ErrApiKeyNotSet  = errors.New("api Key not set")
-
-	ErrCustomAnswerNotFound = errors.New("custom answer not found")
+	ErrInvalidAPIKey             = errors.New("invalid API Key")
+	ErrApiKeyNotSet              = errors.New("api Key not set")
+	ErrKnowledgeBaseItemNotFound = errors.New("knowledge base item not found")
 )
 
 type ConversationStore interface {
 	SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) error
-	GetConversationMessages(conversationUUID string, types []string, privateMsgs *bool, page, pageSize int) ([]cmodels.Message, int, error)
 	RemoveConversationAssignee(uuid, typ string, actor umodels.User) error
 	UpdateConversationTeamAssignee(uuid string, teamID int, actor umodels.User) error
 	UpdateConversationStatus(uuid string, statusID int, status, snoozeDur string, actor umodels.User) error
@@ -41,10 +40,7 @@ type ConversationStore interface {
 
 type HelpCenterStore interface {
 	SearchKnowledgeBase(helpCenterID int, query string, locale string, threshold float64, limit int) ([]hcmodels.KnowledgeBaseResult, error)
-}
-
-type UserStore interface {
-	GetAIAssistant(id int) (umodels.User, error)
+	GetHelpCenterByID(id int) (hcmodels.HelpCenter, error)
 }
 
 type Manager struct {
@@ -53,6 +49,7 @@ type Manager struct {
 	lo                             *logf.Logger
 	i18n                           *i18n.I18n
 	embeddingCfg                   EmbeddingConfig
+	chunkingCfg                    ChunkingConfig
 	completionCfg                  CompletionConfig
 	workerCfg                      WorkerConfig
 	conversationCompletionsService *ConversationCompletionsService
@@ -65,6 +62,12 @@ type EmbeddingConfig struct {
 	APIKey   string        `json:"api_key"`
 	Model    string        `json:"model"`
 	Timeout  time.Duration `json:"timeout"`
+}
+
+type ChunkingConfig struct {
+	MaxTokens     int `json:"max_tokens"`
+	MinTokens     int `json:"min_tokens"`
+	OverlapTokens int `json:"overlap_tokens"`
 }
 
 type CompletionConfig struct {
@@ -91,22 +94,21 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	GetDefaultProvider *sqlx.Stmt `query:"get-default-provider"`
-	GetPrompt          *sqlx.Stmt `query:"get-prompt"`
-	GetPrompts         *sqlx.Stmt `query:"get-prompts"`
-	SetOpenAIKey       *sqlx.Stmt `query:"set-openai-key"`
-	// Custom Answers
-	GetAICustomAnswers   *sqlx.Stmt `query:"get-ai-custom-answers"`
-	GetAICustomAnswer    *sqlx.Stmt `query:"get-ai-custom-answer"`
-	InsertAICustomAnswer *sqlx.Stmt `query:"insert-ai-custom-answer"`
-	UpdateAICustomAnswer *sqlx.Stmt `query:"update-ai-custom-answer"`
-	DeleteAICustomAnswer *sqlx.Stmt `query:"delete-ai-custom-answer"`
-	// AI Search Functions
-	SearchCustomAnswers *sqlx.Stmt `query:"search-custom-answers"`
+	GetPrompt                *sqlx.Stmt `query:"get-prompt"`
+	GetPrompts               *sqlx.Stmt `query:"get-prompts"`
+	SetOpenAIKey             *sqlx.Stmt `query:"set-openai-key"`
+	GetKnowledgeBaseItems    *sqlx.Stmt `query:"get-knowledge-base-items"`
+	GetKnowledgeBaseItem     *sqlx.Stmt `query:"get-knowledge-base-item"`
+	InsertKnowledgeBaseItem  *sqlx.Stmt `query:"insert-knowledge-base-item"`
+	UpdateKnowledgeBaseItem  *sqlx.Stmt `query:"update-knowledge-base-item"`
+	DeleteKnowledgeBaseItem  *sqlx.Stmt `query:"delete-knowledge-base-item"`
+	InsertEmbedding          *sqlx.Stmt `query:"insert-embedding"`
+	DeleteEmbeddingsBySource *sqlx.Stmt `query:"delete-embeddings-by-source"`
+	SearchKnowledgeBase      *sqlx.Stmt `query:"search-knowledge-base"`
 }
 
 // New creates and returns a new instance of the Manager.
-func New(embeddingCfg EmbeddingConfig, completionCfg CompletionConfig, workerCfg WorkerConfig, conversationStore ConversationStore, helpCenterStore HelpCenterStore, userStore UserStore, opts Opts) (*Manager, error) {
+func New(embeddingCfg EmbeddingConfig, chunkingCfg ChunkingConfig, completionCfg CompletionConfig, workerCfg WorkerConfig, conversationStore ConversationStore, helpCenterStore HelpCenterStore, opts Opts) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
 		return nil, err
@@ -118,6 +120,7 @@ func New(embeddingCfg EmbeddingConfig, completionCfg CompletionConfig, workerCfg
 		lo:              opts.Lo,
 		i18n:            opts.I18n,
 		embeddingCfg:    embeddingCfg,
+		chunkingCfg:     chunkingCfg,
 		completionCfg:   completionCfg,
 		workerCfg:       workerCfg,
 		helpCenterStore: helpCenterStore,
@@ -128,7 +131,6 @@ func New(embeddingCfg EmbeddingConfig, completionCfg CompletionConfig, workerCfg
 		manager,
 		conversationStore,
 		helpCenterStore,
-		userStore,
 		workerCfg.Workers,
 		workerCfg.Capacity,
 		opts.Lo,
@@ -309,172 +311,174 @@ func (m *Manager) handleProviderError(context string, err error) error {
 	return envelope.NewError(envelope.GeneralError, err.Error(), nil)
 }
 
-// Custom Answers CRUD
+// Knowledge Base CRUD
 
-// GetAICustomAnswers returns all AI custom answers
-func (m *Manager) GetAICustomAnswers() ([]models.CustomAnswer, error) {
-	var customAnswers []models.CustomAnswer
-	if err := m.q.GetAICustomAnswers.Select(&customAnswers); err != nil {
-		m.lo.Error("error fetching custom answers", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "custom answers"), nil)
+// GetKnowledgeBaseItems returns all knowledge base items
+func (m *Manager) GetKnowledgeBaseItems() ([]models.KnowledgeBase, error) {
+	var items = make([]models.KnowledgeBase, 0)
+	if err := m.q.GetKnowledgeBaseItems.Select(&items); err != nil {
+		m.lo.Error("error fetching knowledge base items", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "knowledge base items"), nil)
 	}
-	return customAnswers, nil
+	return items, nil
 }
 
-// GetAICustomAnswer returns a specific AI custom answer by ID
-func (m *Manager) GetAICustomAnswer(id int) (models.CustomAnswer, error) {
-	var customAnswer models.CustomAnswer
-	if err := m.q.GetAICustomAnswer.Get(&customAnswer, id); err != nil {
+// GetKnowledgeBaseItem returns a specific knowledge base item by ID
+func (m *Manager) GetKnowledgeBaseItem(id int) (models.KnowledgeBase, error) {
+	var item models.KnowledgeBase
+	if err := m.q.GetKnowledgeBaseItem.Get(&item, id); err != nil {
 		if err == sql.ErrNoRows {
-			return customAnswer, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "custom answer"), nil)
+			return item, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "knowledge base item"), nil)
 		}
-		m.lo.Error("error fetching custom answer", "error", err, "id", id)
-		return customAnswer, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "custom answer"), nil)
+		m.lo.Error("error fetching knowledge base item", "error", err, "id", id)
+		return item, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "knowledge base item"), nil)
 	}
-	return customAnswer, nil
+	return item, nil
 }
 
-// CreateAICustomAnswer creates a new AI custom answer with embeddings
-func (m *Manager) CreateAICustomAnswer(question, answer string, enabled bool) (models.CustomAnswer, error) {
-	// Generate embeddings for the question
-	embedding, err := m.GetEmbeddings(question)
-	if err != nil {
-		m.lo.Error("error generating embeddings for custom answer", "error", err, "question", question)
-		return models.CustomAnswer{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "custom answer"), nil)
+// CreateKnowledgeBaseItem creates a new knowledge base item and generates embeddings using chunking
+func (m *Manager) CreateKnowledgeBaseItem(itemType, content string, enabled bool) (models.KnowledgeBase, error) {
+	// First, insert the knowledge base item for immediate availability
+	var item models.KnowledgeBase
+	if err := m.q.InsertKnowledgeBaseItem.Get(&item, itemType, content, enabled); err != nil {
+		m.lo.Error("error creating knowledge base item", "error", err, "type", itemType)
+		return item, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "knowledge base item"), nil)
 	}
 
-	// Convert []float32 to pgvector.Vector for PostgreSQL
-	vector := pgvector.NewVector(embedding)
+	m.lo.Info("knowledge base item created successfully", "id", item.ID, "type", itemType)
 
-	var customAnswer models.CustomAnswer
-	if err := m.q.InsertAICustomAnswer.Get(&customAnswer, question, answer, vector, enabled); err != nil {
-		m.lo.Error("error creating custom answer", "error", err, "question", question)
-		return customAnswer, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "custom answer"), nil)
-	}
+	// Generate embeddings asynchronously using chunking
+	go m.processKnowledgeBaseContent(item.ID, content)
 
-	m.lo.Info("custom answer created successfully", "id", customAnswer.ID, "question", question)
-	return customAnswer, nil
+	return item, nil
 }
 
-// UpdateAICustomAnswer updates an existing AI custom answer
-func (m *Manager) UpdateAICustomAnswer(id int, question, answer string, enabled bool) (models.CustomAnswer, error) {
-	// Generate embeddings for the updated question
-	embedding, err := m.GetEmbeddings(question)
-	if err != nil {
-		m.lo.Error("error generating embeddings for custom answer update", "error", err, "id", id, "question", question)
-		return models.CustomAnswer{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "custom answer"), nil)
-	}
-
-	// Convert []float32 to pgvector.Vector for PostgreSQL
-	vector := pgvector.NewVector(embedding)
-
-	var customAnswer models.CustomAnswer
-	if err := m.q.UpdateAICustomAnswer.Get(&customAnswer, id, question, answer, vector, enabled); err != nil {
+// UpdateKnowledgeBaseItem updates an existing knowledge base item and regenerates embeddings
+func (m *Manager) UpdateKnowledgeBaseItem(id int, itemType, content string, enabled bool) (models.KnowledgeBase, error) {
+	// First, update the knowledge base item for immediate availability
+	var item models.KnowledgeBase
+	if err := m.q.UpdateKnowledgeBaseItem.Get(&item, id, itemType, content, enabled); err != nil {
 		if err == sql.ErrNoRows {
-			return customAnswer, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "custom answer"), nil)
+			return item, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "knowledge base item"), nil)
 		}
-		m.lo.Error("error updating custom answer", "error", err, "id", id)
-		return customAnswer, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "custom answer"), nil)
+		m.lo.Error("error updating knowledge base item", "error", err, "id", id)
+		return item, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "knowledge base item"), nil)
 	}
 
-	m.lo.Info("custom answer updated successfully", "id", id, "question", question)
-	return customAnswer, nil
+	m.lo.Info("knowledge base item updated successfully", "id", id, "type", itemType)
+
+	// Delete old embeddings and regenerate new ones asynchronously
+	go m.processKnowledgeBaseContent(id, content)
+
+	return item, nil
 }
 
-// DeleteAICustomAnswer deletes an AI custom answer
-func (m *Manager) DeleteAICustomAnswer(id int) error {
-	result, err := m.q.DeleteAICustomAnswer.Exec(id)
-	if err != nil {
-		m.lo.Error("error deleting custom answer", "error", err, "id", id)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "custom answer"), nil)
+// DeleteKnowledgeBaseItem deletes a knowledge base item and its embeddings
+func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
+	// Delete embeddings first
+	if _, err := m.q.DeleteEmbeddingsBySource.Exec("knowledge_base", id); err != nil {
+		m.lo.Error("error deleting embeddings for knowledge base item", "error", err, "id", id)
+		// Continue with deletion even if embedding deletion fails
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		m.lo.Error("error checking rows affected", "error", err, "id", id)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "custom answer"), nil)
+	// Delete the knowledge base item
+	if _, err := m.q.DeleteKnowledgeBaseItem.Exec(id); err != nil {
+		m.lo.Error("error deleting knowledge base item", "error", err, "id", id)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "knowledge base item"), nil)
 	}
-
-	if rowsAffected == 0 {
-		return envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "custom answer"), nil)
-	}
-
-	m.lo.Info("custom answer deleted successfully", "id", id)
 	return nil
 }
 
-// SmartSearch performs a two-tier search: custom answers first, then knowledge base fallback
-func (m *Manager) SmartSearch(helpCenterID int, query string, locale string) (any, error) {
+// SmartSearch performs unified search across knowledge base and help center articles
+func (m *Manager) SmartSearch(helpCenterID int, query, locale string) ([]models.UnifiedKnowledgeResult, error) {
 	const (
 		// TODO: These can be made configurable?
-		customAnswerThreshold  = 0.85 // High confidence for custom answers
-		knowledgeBaseThreshold = 0.25 // Lower threshold for knowledge base
-		maxResults             = 6
+		threshold  = 0.15
+		maxResults = 8
 	)
 
-	// Step 1: Search custom answers with high confidence
-	customAnswer, err := m.searchCustomAnswers(query, customAnswerThreshold)
-	if err != nil && err != ErrCustomAnswerNotFound {
+	// Search both knowledge base and help center concurrently with same threshold
+	knowledgeBaseResults, err := m.searchKnowledgeBaseItems(query, threshold, maxResults)
+	if err != nil && err != ErrKnowledgeBaseItemNotFound {
 		return nil, err
 	}
 
-	// If we found a high-confidence custom answer, return it
-	if customAnswer != nil {
-		m.lo.Info("found high-confidence custom answer", "similarity", customAnswer.Similarity, "query", query)
-		return customAnswer, nil
-	}
-
-	// Step 2: Search knowledge base with lower threshold
-	knowledgeResults, err := m.searchKnowledgeBase(helpCenterID, query, locale, knowledgeBaseThreshold, maxResults)
+	helpCenterResults, err := m.searchHelpCenter(helpCenterID, query, locale, threshold, maxResults)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(knowledgeResults) > 0 {
-		m.lo.Info("found knowledge base results", "count", len(knowledgeResults), "top_similarity", knowledgeResults[0].Similarity, "query", query)
-		return knowledgeResults, nil
+	// Combine results from both sources
+	var allResults []models.UnifiedKnowledgeResult
+
+	// Convert knowledge base results to UnifiedKnowledgeResult format
+	for _, kb := range knowledgeBaseResults {
+		allResults = append(allResults, models.UnifiedKnowledgeResult{
+			SourceType:   "knowledge_base",
+			SourceID:     kb.ID,
+			Title:        "",
+			Content:      kb.Content,
+			HelpCenterID: nil, // Knowledge base items are not tied to help centers
+			Similarity:   kb.Similarity,
+		})
 	}
 
-	// No results found
-	m.lo.Info("no results found in smart search", "query", query, "help_center_id", helpCenterID)
-	return []models.KnowledgeBaseResult{}, nil
+	// Add help center results
+	allResults = append(allResults, helpCenterResults...)
+
+	if len(allResults) == 0 {
+		m.lo.Info("no results found in smart search", "query", query)
+		return []models.UnifiedKnowledgeResult{}, nil
+	}
+
+	// Sort all results by similarity score (highest first)
+	sort.Slice(allResults, func(i, j int) bool {
+		return allResults[i].Similarity > allResults[j].Similarity
+	})
+
+	// Limit to maxResults
+	if len(allResults) > maxResults {
+		allResults = allResults[:maxResults]
+	}
+
+	m.lo.Info("found unified search results", "count", len(allResults), "top_similarity", allResults[0].Similarity, "query", query)
+	return allResults, nil
 }
 
-// searchCustomAnswers searches for custom answers with high confidence threshold
-func (m *Manager) searchCustomAnswers(query string, threshold float64) (*models.CustomAnswerResult, error) {
+// searchKnowledgeBaseItems searches for knowledge base items with the specified threshold and limit
+func (m *Manager) searchKnowledgeBaseItems(query string, threshold float64, limit int) ([]models.KnowledgeBaseResult, error) {
 	// Generate embeddings for the search query
 	embedding, err := m.GetEmbeddings(query)
 	if err != nil {
-		m.lo.Error("error generating embeddings for custom answer search", "error", err, "query", query)
-		return nil, fmt.Errorf("generating embeddings for custom answer search: %w", err)
+		m.lo.Error("error generating embeddings for knowledge base search", "error", err, "query", query)
+		return nil, fmt.Errorf("generating embeddings for knowledge base search: %w", err)
 	}
 
-	var result models.CustomAnswerResult
+	var results []models.KnowledgeBaseResult
 	// Convert []float32 to pgvector.Vector for PostgreSQL
 	vector := pgvector.NewVector(embedding)
-	if err = m.q.SearchCustomAnswers.Get(&result, vector, threshold); err != nil {
+	if err = m.q.SearchKnowledgeBase.Select(&results, vector, threshold, limit); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrCustomAnswerNotFound
+			return []models.KnowledgeBaseResult{}, ErrKnowledgeBaseItemNotFound
 		}
-		m.lo.Error("error searching custom answers", "error", err, "query", query)
-		return nil, fmt.Errorf("searching custom answers: %w", err)
+		m.lo.Error("error searching knowledge base", "error", err, "query", query)
+		return nil, fmt.Errorf("searching knowledge base: %w", err)
 	}
 
-	return &result, nil
+	return results, nil
 }
 
-// searchKnowledgeBase searches knowledge base (articles) with the specified threshold and limit.
-func (m *Manager) searchKnowledgeBase(helpCenterID int, query string, locale string, threshold float64, limit int) ([]models.KnowledgeBaseResult, error) {
-	// Use the helpcenter store to perform the search
+// searchHelpCenter searches help center articles with the specified threshold and limit.
+func (m *Manager) searchHelpCenter(helpCenterID int, query, locale string, threshold float64, limit int) ([]models.UnifiedKnowledgeResult, error) {
 	hcResults, err := m.helpCenterStore.SearchKnowledgeBase(helpCenterID, query, locale, threshold, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert help center results to our KnowledgeBaseResult format
-	results := make([]models.KnowledgeBaseResult, len(hcResults))
+	// Convert help center results to our UnifiedKnowledgeResult format
+	results := make([]models.UnifiedKnowledgeResult, len(hcResults))
 	for i, hcResult := range hcResults {
-		results[i] = models.KnowledgeBaseResult{
+		results[i] = models.UnifiedKnowledgeResult{
 			SourceType:   hcResult.SourceType,
 			SourceID:     hcResult.SourceID,
 			Title:        hcResult.Title,
@@ -485,4 +489,65 @@ func (m *Manager) searchKnowledgeBase(helpCenterID int, query string, locale str
 	}
 
 	return results, nil
+}
+
+
+// GetChunkConfig returns the configured chunking configuration
+func (m *Manager) GetChunkConfig() stringutil.ChunkConfig {
+	return stringutil.ChunkConfig{
+		MaxTokens:      m.chunkingCfg.MaxTokens,
+		MinTokens:      m.chunkingCfg.MinTokens,
+		OverlapTokens:  m.chunkingCfg.OverlapTokens,
+		TokenizerFunc:  nil, // Use default tokenizer
+		PreserveBlocks: []string{"pre", "code", "table"},
+		Logger:         m.lo,
+	}
+}
+
+// processKnowledgeBaseContent processes knowledge base content by chunking it and generating embeddings
+// This function is designed to be called asynchronously to avoid blocking the main operation
+func (m *Manager) processKnowledgeBaseContent(itemID int, content string) {
+	// First, delete any existing embeddings for this item
+	if _, err := m.q.DeleteEmbeddingsBySource.Exec("knowledge_base", itemID); err != nil {
+		m.lo.Error("error deleting existing embeddings in background", "error", err, "item_id", itemID)
+		// Continue with processing even if deletion fails
+	}
+
+	// Chunk the HTML content with configured parameters
+	chunks, err := stringutil.ChunkHTMLContent("", content, m.GetChunkConfig())
+	if err != nil {
+		m.lo.Error("error chunking HTML content", "error", err, "item_id", itemID)
+		return
+	}
+
+	if len(chunks) == 0 {
+		m.lo.Warn("no chunks generated for knowledge base item", "item_id", itemID)
+		return
+	}
+
+	// Process each chunk
+	for i, chunk := range chunks {
+		// Generate embeddings for the chunk text
+		embedding, err := m.GetEmbeddings(chunk.Text)
+		if err != nil {
+			m.lo.Error("error generating embeddings for chunk in background", "error", err, "item_id", itemID, "chunk", i)
+			continue // Skip this chunk but continue with others
+		}
+
+		// Convert []float32 to pgvector.Vector for PostgreSQL
+		vector := pgvector.NewVector(embedding)
+
+		// Create metadata for the chunk
+		meta := fmt.Sprintf(`{"chunk_index": %d, "total_chunks": %d, "has_heading": %t, "has_code": %t, "has_table": %t}`,
+			chunk.ChunkIndex, chunk.TotalChunks, chunk.HasHeading, chunk.HasCode, chunk.HasTable)
+
+		m.lo.Debug("ai knowledge base chunk metadata", "item_id", itemID, "chunk", i, "metadata", meta)
+
+		// Store the embedding in the centralized embeddings table
+		if _, err := m.q.InsertEmbedding.Exec("knowledge_base", itemID, chunk.Text, vector, meta); err != nil {
+			m.lo.Error("error storing embedding for chunk in background", "error", err, "item_id", itemID, "chunk", i)
+			continue // Skip this chunk but continue with others
+		}
+	}
+	m.lo.Info("knowledge base item embeddings processed successfully in background", "item_id", itemID, "chunks_processed", len(chunks))
 }

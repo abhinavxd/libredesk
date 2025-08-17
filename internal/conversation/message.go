@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -553,37 +554,8 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, updatedMessage)
 	}
 
-	// Enqueue message for AI completion if the conversation is assigned to an `ai_assistant`.
-	conversation, err := m.GetConversation(updatedMessage.ConversationID, "")
-	if err != nil {
-		m.lo.Error("error fetching conversation for AI completion", "conversation_id", updatedMessage.ConversationID, "error", err)
-		return nil
-	}
-	if conversation.AssignedUserID.Int > 0 {
-		assigneUser, err := m.userStore.Get(conversation.AssignedUserID.Int, "", "")
-		if err != nil {
-			m.lo.Error("error fetching assignee user for AI completion", "assignee_user_id", conversation.AssignedUserID.Int, "error", err)
-			return nil
-		}
-		if assigneUser.IsAiAssistant() {
-			if updatedMessage.Type == models.MessageIncoming && updatedMessage.SenderType == models.SenderTypeContact {
-				messages, _, err := m.GetConversationMessages(message.ConversationUUID, []string{models.MessageIncoming, models.MessageOutgoing}, nil, 1, 50)
-				if err != nil {
-					m.lo.Error("error fetching conversation messages", "conversation_uuid", message.ConversationUUID, "error", err)
-				} else {
-					m.enqueueAICompletion(
-						messages,
-						message.ConversationUUID,
-						conversation.InboxID,
-						conversation.ContactID,
-						assigneUser.ID,
-						1,    // TODO: Fill this from inbox.
-						"en", // TODO: Fill this from somewhere?
-					)
-				}
-			}
-		}
-	}
+	// Handle AI completion for AI assistant conversations.
+	m.enqueueMessageForAICompletion(updatedMessage, message)
 
 	return nil
 }
@@ -1087,4 +1059,68 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		}
 	}
 	return nil
+}
+
+// enqueueMessageForAICompletion enqueues message for AI completion if the conversation is assigned to an AI assistant
+// and if the inbox has help center attached.
+func (m *Manager) enqueueMessageForAICompletion(updatedMessage models.Message, message *models.Message) {
+	if m.aiStore == nil {
+		m.lo.Warn("AI store not configured, skipping AI completion request")
+		return
+	}
+
+	// Only process incoming messages from contacts.
+	if updatedMessage.Type != models.MessageIncoming || updatedMessage.SenderType != models.SenderTypeContact {
+		return
+	}
+
+	conversation, err := m.GetConversation(updatedMessage.ConversationID, "")
+	if err != nil {
+		m.lo.Error("error fetching conversation for AI completion", "conversation_id", updatedMessage.ConversationID, "error", err)
+		return
+	}
+
+	// Get the attached help center to the inbox.
+	inbox, err := m.inboxStore.GetDBRecord(conversation.InboxID)
+	if err != nil {
+		m.lo.Error("error fetching inbox for AI completion", "inbox_id", conversation.InboxID, "error", err)
+		return
+	}
+
+	// Check if conversation is assigned to a user and inbox has help center attached.
+	if conversation.AssignedUserID.Int <= 0 || !inbox.HelpCenterID.Valid {
+		return
+	}
+
+	// Check if assignee is an AI assistant and is enabled.
+	assigneUser, err := m.userStore.Get(conversation.AssignedUserID.Int, "", "")
+	if err != nil {
+		m.lo.Error("error fetching assignee user for AI completion", "assignee_user_id", conversation.AssignedUserID.Int, "error", err)
+		return
+	}
+	if !assigneUser.IsAiAssistant() || !assigneUser.Enabled {
+		return
+	}
+
+	messages, _, err := m.GetConversationMessages(message.ConversationUUID, []string{models.MessageIncoming, models.MessageOutgoing}, nil, 1, 50)
+	if err != nil {
+		m.lo.Error("error fetching conversation message history for AI completion", "conversation_uuid", message.ConversationUUID, "error", err)
+		return
+	}
+
+	req := aimodels.ConversationCompletionRequest{
+		Messages:         messages,
+		InboxID:          conversation.InboxID,
+		ContactID:        conversation.ContactID,
+		ConversationUUID: conversation.UUID,
+		AIAssistant:      assigneUser,
+		HelpCenterID:     inbox.HelpCenterID,
+	}
+
+	if err := m.aiStore.EnqueueConversationCompletion(req); err != nil {
+		m.lo.Error("error enqueuing AI completion request", "error", err)
+		return
+	}
+
+	m.lo.Info("AI completion request enqueued", "conversation_uuid", conversation.UUID)
 }

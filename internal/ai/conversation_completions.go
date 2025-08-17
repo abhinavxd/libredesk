@@ -1,54 +1,44 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/zerodha/logf"
 )
 
-var (
-	baseSystemPrompt = `
-Role Description:
-You are %s - a knowledgeable and approachable support assistant dedicated exclusively to supporting %s product inquiries which is "%s".
-Your scope is strictly limited to this product and related matters.
+// systemPromptData holds the data for generating the AI system prompt
+type systemPromptData struct {
+	AssistantName      string
+	ProductName        string
+	ProductDescription string
+	ToneInstruction    string
+	LengthInstruction  string
+	HandoffEnabled     bool
+}
 
-Guidelines:
-- If the user message is or contains gratitude/acknowledgment or brief positive feedback such as: thanks, thank you, cool, nice, great, awesome, perfect, good job, appreciate it,
-sounds good, ok, okay, yep, yeah, works, solved, correct — respond only with: "Did that answer your question?" Do not apply out-of-scope, clarification, or additional-answer logic in that case.
-- Every other response: Provide direct, helpful answers.
-- Keep the conversation human-like and engaging, but focused on the product.
-- Avoid speculating or providing unverified information. If you cannot answer from available knowledge, say so clearly.
-- If the user asks something outside the product's scope, politely redirect: "I can only help with %s related questions."
-- Detect user language and reply in the same language, never mix languages.
-- Avoid filler phrases. Keep answers simple; do not assume the user is technical.
-- If the question is too short or vague (and not caught by the gratitude rule), ask for clarification: "Could you please provide more details or clarify your question?"
-- If the user replies positively to "Did that answer your question?" (examples: yes, yep, yeah, correct, works, solved, perfect), respond with exactly: "conversation_resolve" and stop.
-- %s
-- %s
+type queryRefinementResponse struct {
+	OriginalLanguage string  `json:"original_language"`
+	TranslatedQuery  string  `json:"translated_query"`
+	RefinedQuery     string  `json:"refined_query"`
+	ConfidenceScore  float64 `json:"confidence_score"`
+}
 
-Special Response Commands:
-- To request handoff to human agent, respond with exactly: "conversation_handoff"
-- To mark conversation as resolved, respond with exactly: "conversation_resolve"
-
-Execution Protocol:
-- On each user message:
-  * First check for gratitude/acknowledgment or brief positive feedback; if present, reply only with "Did that answer your question?"
-  * If user confirms the question was answered, respond with "conversation_resolve".
-  * Detect language and respond in same language.
-  * If outside product scope, redirect appropriately.
-  * If vague, ask for clarification.
-  * Otherwise provide the direct answer.
-
-`
-)
+type aiConversationResponse struct {
+	Reasoning   string `json:"reasoning"`
+	Response    string `json:"response"`
+	UserMessage string `json:"user_message"`
+}
 
 // getToneInstruction returns the tone instruction based on the tone setting
 func getToneInstruction(tone string) string {
@@ -80,20 +70,12 @@ func getLengthInstruction(length string) string {
 	}
 }
 
-// buildSystemPrompt creates the final system prompt with tone and length instructions
-func buildSystemPrompt(assistantName, productName, productDescription, tone, length string) string {
-	toneInstruction := getToneInstruction(tone)
-	lengthInstruction := getLengthInstruction(length)
-	return fmt.Sprintf(baseSystemPrompt, assistantName, productName, productDescription, productName, toneInstruction, lengthInstruction)
-}
-
 // ConversationCompletionsService handles AI-powered chat completions for customer support
 type ConversationCompletionsService struct {
 	lo                *logf.Logger
 	manager           *Manager
 	conversationStore ConversationStore
 	helpCenterStore   HelpCenterStore
-	userStore         UserStore
 	requestQueue      chan models.ConversationCompletionRequest
 	workers           int
 	capacity          int
@@ -105,7 +87,7 @@ type ConversationCompletionsService struct {
 }
 
 // NewConversationCompletionsService creates a new conversation completions service
-func NewConversationCompletionsService(manager *Manager, conversationStore ConversationStore, helpCenterStore HelpCenterStore, userStore UserStore, workers, capacity int, lo *logf.Logger) *ConversationCompletionsService {
+func NewConversationCompletionsService(manager *Manager, conversationStore ConversationStore, helpCenterStore HelpCenterStore, workers, capacity int, lo *logf.Logger) *ConversationCompletionsService {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &ConversationCompletionsService{
@@ -113,7 +95,6 @@ func NewConversationCompletionsService(manager *Manager, conversationStore Conve
 		manager:           manager,
 		conversationStore: conversationStore,
 		helpCenterStore:   helpCenterStore,
-		userStore:         userStore,
 		requestQueue:      make(chan models.ConversationCompletionRequest, capacity),
 		workers:           workers,
 		capacity:          capacity,
@@ -163,6 +144,30 @@ func (s *ConversationCompletionsService) EnqueueRequest(req models.ConversationC
 	}
 }
 
+// buildSystemPrompt renders the final system prompt with tone and length instructions
+func buildSystemPrompt(assistantName, productName, productDescription, tone, length string, handoffEnabled bool) (string, error) {
+	data := systemPromptData{
+		AssistantName:      assistantName,
+		ProductName:        productName,
+		ProductDescription: productDescription,
+		ToneInstruction:    getToneInstruction(tone),
+		LengthInstruction:  getLengthInstruction(length),
+		HandoffEnabled:     handoffEnabled,
+	}
+
+	tmpl, err := template.New("systemPrompt").Parse(ConversationSystemPrompt)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse system prompt template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute system prompt template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
 // worker processes completion requests from the queue
 func (s *ConversationCompletionsService) worker() {
 	defer s.wg.Done()
@@ -182,56 +187,44 @@ func (s *ConversationCompletionsService) worker() {
 
 // processCompletionRequest handles a single completion request
 func (s *ConversationCompletionsService) processCompletionRequest(req models.ConversationCompletionRequest) {
-	if req.AIAssistantID == 0 {
-		s.lo.Warn("AI completion request without assistant ID, skipping", "conversation_uuid", req.ConversationUUID)
-		return
-	}
-
-	start := time.Now()
-	s.lo.Info("processing AI completion request", "conversation_uuid", req.ConversationUUID)
-
 	var (
-		aiAssistant     umodels.User
+		messages        = req.Messages
+		start           = time.Now()
 		aiAssistantMeta umodels.AIAssistantMeta
 	)
-	aiAssistant, err := s.userStore.GetAIAssistant(req.AIAssistantID)
-	if err == nil {
-		// Parse AI assistant meta data
-		if len(aiAssistant.Meta) > 0 {
-			if err := json.Unmarshal(aiAssistant.Meta, &aiAssistantMeta); err != nil {
-				s.lo.Error("error parsing AI assistant meta", "error", err, "assistant_id", req.AIAssistantID)
-				return
-			}
-		}
-	} else {
-		s.lo.Error("error getting AI assistant", "error", err, "assistant_id", req.AIAssistantID)
+	s.lo.Info("processing AI completion request", "conversation_uuid", req.ConversationUUID)
+
+	if req.AIAssistant.ID == 0 {
+		s.lo.Warn("AI assistant not found, skipping AI completion", "conversation_uuid", req.ConversationUUID)
 		return
 	}
 
-	if !aiAssistant.Enabled {
-		s.lo.Warn("AI assistant is disabled, skipping AI completion", "assistant_id", req.AIAssistantID, "conversation_uuid", req.ConversationUUID)
+	if err := json.Unmarshal(req.AIAssistant.Meta, &aiAssistantMeta); err != nil {
+		s.lo.Error("error parsing AI assistant meta", "error", err, "assistant_id", req.AIAssistant.ID, "conversation_uuid", req.ConversationUUID, "meta", req.AIAssistant.Meta)
 		return
 	}
 
-	// Fetch conversation messages for preparing history and context
-	messages, err := s.getConversationMessages(req.ConversationUUID)
-	if err != nil {
-		s.lo.Error("error getting conversation messages", "error", err, "conversation_uuid", req.ConversationUUID)
+	if !req.AIAssistant.Enabled {
+		s.lo.Warn("AI assistant is disabled, skipping AI completion", "assistant_id", req.AIAssistant.ID, "conversation_uuid", req.ConversationUUID)
 		return
 	}
 
-	// Get the latest message from the contact
+	// Get the latest message from contact
 	latestContactMessage := s.getLatestContactMessage(messages)
 
-	// Build context from help center articles
-	context, err := s.buildHelpCenterContext(req, latestContactMessage)
+	// Build context from latest contact message
+	context, err := s.buildSearchContext(req, latestContactMessage)
 	if err != nil {
 		s.lo.Error("error building help center context", "error", err, "conversation_uuid", req.ConversationUUID)
 		// Continue without help center context
 	}
 
 	// Build chat messages array with proper roles
-	chatMessages := s.buildChatMessages(context, messages, aiAssistant, aiAssistantMeta)
+	chatMessages, err := s.buildChatMessages(context, messages, req.AIAssistant, aiAssistantMeta)
+	if err != nil {
+		s.lo.Error("failed to build chat messages", "error", err, "conversation_uuid", req.ConversationUUID)
+		return
+	}
 
 	// Send AI completion request to the provider
 	upstreamStartAt := time.Now()
@@ -248,39 +241,76 @@ func (s *ConversationCompletionsService) processCompletionRequest(req models.Con
 	var (
 		handoffRequested bool
 		resolved         bool
+		finalResponse    string
+		reasoning        string
 	)
 
-	// Check for conversation handoff
-	finalResponse := strings.TrimSpace(aiResponse)
+	// Try to parse as JSON first
+	cleanedResponse := stringutil.CleanJSONResponse(aiResponse)
+	var structuredResponse aiConversationResponse
+	if err := json.Unmarshal([]byte(cleanedResponse), &structuredResponse); err != nil {
+		// Fallback: treat as plain text response
+		s.lo.Debug("AI response not in JSON format, using as plain text",
+			"conversation_uuid", req.ConversationUUID,
+			"response", aiResponse)
+		finalResponse = strings.TrimSpace(aiResponse)
+		reasoning = ""
+	} else {
+		// Successfully parsed JSON
+		finalResponse = strings.TrimSpace(structuredResponse.Response)
+		reasoning = strings.TrimSpace(structuredResponse.Reasoning)
+		s.lo.Info("AI reasoning captured",
+			"conversation_uuid", req.ConversationUUID,
+			"reasoning", reasoning)
+	}
+
+	// Check for conversation handoff and resolution
 	switch finalResponse {
 	case "conversation_handoff":
 		s.lo.Info("AI requested conversation handoff", "conversation_uuid", req.ConversationUUID)
-		finalResponse = "Connecting you with one of our support agents who can better assist you."
+		if structuredResponse.UserMessage != "" {
+			finalResponse = structuredResponse.UserMessage
+		} else {
+			finalResponse = "Connecting you with one of our support agents who can better assist you."
+		}
 		handoffRequested = true
 	case "conversation_resolve":
 		s.lo.Info("AI requested conversation resolution", "conversation_uuid", req.ConversationUUID)
 		finalResponse = ""
 		resolved = true
+	default:
+		// Convert markdown to HTML for consistent formatting with TipTap editor output, since LLMs often use markdown for formatting in their responses.
+		// Requesting HTML directly was not consistent.
+		finalResponse = s.convertMarkdownToHTML(finalResponse)
 	}
 
 	// Send AI response
 	if finalResponse != "" {
-		err = s.conversationStore.SendReply(
+		// Prepare metadata with reasoning if available
+		metaMap := map[string]any{
+			"ai_generated":       true,
+			"processing_time_ms": time.Since(start).Milliseconds(),
+			"ai_model":           s.manager.completionCfg.Model,
+			"ai_provider":        s.manager.completionCfg.Provider,
+		}
+
+		// Add reasoning if available
+		if reasoning != "" {
+			metaMap["ai_reasoning"] = reasoning
+		}
+
+		if err = s.conversationStore.SendReply(
 			nil, // No media attachments for AI responses
 			req.InboxID,
-			aiAssistant.ID,
+			req.AIAssistant.ID,
 			req.ContactID,
 			req.ConversationUUID,
 			finalResponse,
 			[]string{}, // to
 			[]string{}, // cc
 			[]string{}, // bcc
-			map[string]any{
-				"ai_generated":       true,
-				"processing_time_ms": time.Since(start).Milliseconds(),
-			},
-		)
-		if err != nil {
+			metaMap,
+		); err != nil {
 			s.lo.Error("error sending AI response", "conversation_uuid", req.ConversationUUID, "error", err)
 			return
 		}
@@ -289,7 +319,7 @@ func (s *ConversationCompletionsService) processCompletionRequest(req models.Con
 	// If handoff is requested and enabled for this AI assistant, remove conversation assignee and optionally update team assignee if team ID is set
 	if handoffRequested && aiAssistantMeta.HandOff {
 		// First unassign the conversation from the AI assistant
-		if err := s.conversationStore.RemoveConversationAssignee(req.ConversationUUID, "user", aiAssistant); err != nil {
+		if err := s.conversationStore.RemoveConversationAssignee(req.ConversationUUID, "user", req.AIAssistant); err != nil {
 			s.lo.Error("error removing conversation assignee", "conversation_uuid", req.ConversationUUID, "error", err)
 		} else {
 			s.lo.Info("conversation assignee removed for handoff", "conversation_uuid", req.ConversationUUID)
@@ -297,7 +327,7 @@ func (s *ConversationCompletionsService) processCompletionRequest(req models.Con
 
 		// Set the handoff team if specified
 		if aiAssistantMeta.HandOffTeam > 0 {
-			if err := s.conversationStore.UpdateConversationTeamAssignee(req.ConversationUUID, aiAssistantMeta.HandOffTeam, aiAssistant); err != nil {
+			if err := s.conversationStore.UpdateConversationTeamAssignee(req.ConversationUUID, aiAssistantMeta.HandOffTeam, req.AIAssistant); err != nil {
 				s.lo.Error("error updating conversation team assignee", "conversation_uuid", req.ConversationUUID, "team_id", aiAssistantMeta.HandOffTeam, "error", err)
 			} else {
 				s.lo.Info("conversation handoff to team", "conversation_uuid", req.ConversationUUID, "team_id", aiAssistantMeta.HandOffTeam)
@@ -307,20 +337,29 @@ func (s *ConversationCompletionsService) processCompletionRequest(req models.Con
 
 	// Resolve the conversation if requested
 	if resolved {
-		if err := s.conversationStore.UpdateConversationStatus(req.ConversationUUID, 0, cmodels.StatusResolved, "", aiAssistant); err != nil {
+		if err := s.conversationStore.UpdateConversationStatus(req.ConversationUUID, 0, cmodels.StatusResolved, "", req.AIAssistant); err != nil {
 			s.lo.Error("error updating conversation status to resolved", "conversation_uuid", req.ConversationUUID, "error", err)
 		} else {
 			s.lo.Info("conversation marked as resolved", "conversation_uuid", req.ConversationUUID)
 		}
 	}
 
-	s.lo.Info("AI completion request processed successfully", "conversation_uuid", req.ConversationUUID, "processing_time", time.Since(start))
-}
-
-// getConversationMessages fetches messages for a conversation
-func (s *ConversationCompletionsService) getConversationMessages(conversationUUID string) ([]cmodels.Message, error) {
-	messages, _, err := s.conversationStore.GetConversationMessages(conversationUUID, []string{cmodels.MessageOutgoing, cmodels.MessageIncoming}, nil, 1, 10)
-	return messages, err
+	// Log the reasoning if available
+	if reasoning != "" {
+		s.lo.Info("AI completion request processed successfully with reasoning",
+			"conversation_uuid", req.ConversationUUID,
+			"processing_time", time.Since(start),
+			"response_length", len(finalResponse),
+			"reasoning", reasoning,
+			"has_reasoning", true)
+	} else {
+		s.lo.Info("AI completion request processed successfully",
+			"conversation_uuid", req.ConversationUUID,
+			"processing_time", time.Since(start),
+			"response_length", len(finalResponse),
+			"response_type", "plain_text",
+			"has_reasoning", false)
+	}
 }
 
 // getLatestContactMessage returns the text content of the latest contact message
@@ -333,9 +372,9 @@ func (s *ConversationCompletionsService) getLatestContactMessage(messages []cmod
 	return ""
 }
 
-// buildHelpCenterContext searches for relevant content using smart search and builds context
-func (s *ConversationCompletionsService) buildHelpCenterContext(req models.ConversationCompletionRequest, latestContactMessage string) (string, error) {
-	if s.helpCenterStore == nil || req.HelpCenterID == 0 {
+// buildSearchContext performs context-aware search across knowledge sources and builds context
+func (s *ConversationCompletionsService) buildSearchContext(req models.ConversationCompletionRequest, latestContactMessage string) (string, error) {
+	if s.helpCenterStore == nil {
 		return "", nil
 	}
 
@@ -344,48 +383,107 @@ func (s *ConversationCompletionsService) buildHelpCenterContext(req models.Conve
 		return "", nil
 	}
 
-	// Use smart search to find the best answer
-	result, err := s.manager.SmartSearch(req.HelpCenterID, latestContactMessage, req.Locale)
+	// Get target language from help center's default locale
+	locale := ""
+	if req.HelpCenterID.Valid {
+		helpCenter, err := s.helpCenterStore.GetHelpCenterByID(req.HelpCenterID.Int)
+		if err != nil {
+			s.lo.Error("error fetching help center for default locale", "error", err, "help_center_id", req.HelpCenterID.Int)
+		} else {
+			locale = helpCenter.DefaultLocale
+		}
+	}
+
+	// Default fallback
+	if locale == "" {
+		s.lo.Warn("no help center locale found for completions, defaulting to English", "conversation_uuid", req.ConversationUUID)
+		locale = "en"
+	}
+
+	// Attempt context-aware query refinement
+	searchQuery := latestContactMessage
+	var confidence float64 = 0.0
+
+	refinementResponse, err := s.refineSearchQuery(latestContactMessage, locale, req.Messages)
+	if err != nil {
+		s.lo.Error("query refinement failed", "error", err, "original_query", latestContactMessage)
+		return "", err
+	} else {
+		confidence = refinementResponse.ConfidenceScore
+		// Use refined query if confidence is above threshold (0.7)
+		if confidence >= 0.7 && refinementResponse.RefinedQuery != "" {
+			searchQuery = refinementResponse.RefinedQuery
+			s.lo.Info("using refined query for search",
+				"original", latestContactMessage,
+				"refined", refinementResponse.RefinedQuery,
+				"confidence", confidence,
+				"locale", locale)
+		} else {
+			// Low confidence refinement - use translated query if available
+			if refinementResponse.TranslatedQuery != "" {
+				searchQuery = refinementResponse.TranslatedQuery
+				s.lo.Info("low confidence refinement, using translated query",
+					"original", latestContactMessage,
+					"translated", refinementResponse.TranslatedQuery,
+					"refined", refinementResponse.RefinedQuery,
+					"confidence", confidence)
+			} else {
+				// Both refinement and translation failed
+				searchQuery = latestContactMessage
+				s.lo.Warn("low confidence refinement and no translation, using original query",
+					"original", latestContactMessage,
+					"refined", refinementResponse.RefinedQuery,
+					"confidence", confidence)
+			}
+		}
+	}
+
+	result, err := s.manager.SmartSearch(req.HelpCenterID.Int, searchQuery, locale)
 	if err != nil {
 		return "", err
 	}
 
-	if result == nil {
+	if len(result) == 0 {
+		s.lo.Warn("no relevant help center content found",
+			"conversation_uuid", req.ConversationUUID,
+			"original_query", latestContactMessage,
+			"search_query", searchQuery,
+			"confidence", confidence)
 		return "", nil
 	}
 
-	// Build context based on result type
+	// Build context based on unified search results
 	var contextBuilder strings.Builder
 
-	// Check if it's a custom answer (high confidence)
-	if customAnswer, ok := result.(*models.CustomAnswerResult); ok {
-		contextBuilder.WriteString("High-confidence custom answer:\n\n")
-		contextBuilder.WriteString(fmt.Sprintf("Q: %s\n", customAnswer.Question))
-		contextBuilder.WriteString(fmt.Sprintf("A: %s\n\n", customAnswer.Answer))
-		contextBuilder.WriteString("Please use this exact answer as it's a verified response for this type of question.")
-		return contextBuilder.String(), nil
-	}
-
-	// Otherwise, it's knowledge base results
-	if knowledgeResults, ok := result.([]models.KnowledgeBaseResult); ok && len(knowledgeResults) > 0 {
+	if len(result) > 0 {
 		contextBuilder.WriteString("Relevant knowledge base content:\n\n")
 
-		for i, item := range knowledgeResults {
-			contextBuilder.WriteString(fmt.Sprintf("%d. %s\n", i+1, item.Title))
+		for i, item := range result {
+			// Different handling for snippets vs articles
+			if item.SourceType == "snippet" {
+				contextBuilder.WriteString(fmt.Sprintf("%d. [SNIPPET] %s\n", i+1, item.Title))
+			} else {
+				contextBuilder.WriteString(fmt.Sprintf("%d. [ARTICLE] %s\n", i+1, item.Title))
+			}
 			if item.Content != "" {
 				contextBuilder.WriteString(fmt.Sprintf("   %s\n\n", item.Content))
 			}
 		}
+
+		s.lo.Info("found relevant help center content",
+			"conversation_uuid", req.ConversationUUID,
+			"results_count", len(result),
+			"search_query", searchQuery,
+			"refinement_confidence", confidence)
+
 		return contextBuilder.String(), nil
 	}
-
-	s.lo.Warn("no relevant help center content found", "conversation_uuid", req.ConversationUUID, "query", latestContactMessage)
 
 	return "", nil
 }
 
 // buildChatMessages creates a properly structured chat messages array for AI completion
-func (s *ConversationCompletionsService) buildChatMessages(helpCenterContext string, messages []cmodels.Message, senderUser umodels.User, aiAssistantMeta umodels.AIAssistantMeta) []models.ChatMessage {
+func (s *ConversationCompletionsService) buildChatMessages(helpCenterContext string, messages []cmodels.Message, senderUser umodels.User, aiAssistantMeta umodels.AIAssistantMeta) ([]models.ChatMessage, error) {
 	var chatMessages []models.ChatMessage
 
 	// 1. Add system prompt with dynamic assistant name and product
@@ -413,9 +511,13 @@ func (s *ConversationCompletionsService) buildChatMessages(helpCenterContext str
 	}
 
 	// Inject help center context into the system prompt if present
-	systemPrompt := buildSystemPrompt(assistantName, productName, productDescription, answerTone, answerLength)
+	systemPrompt, err := buildSystemPrompt(assistantName, productName, productDescription, answerTone, answerLength, aiAssistantMeta.HandOff)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build system prompt: %w", err)
+	}
 	if helpCenterContext != "" {
 		systemPrompt += "\n\nKnowledge base context (for reference):\n" + helpCenterContext
+		systemPrompt += "\n\nNote: If the knowledge base content is in a different language than the customer's question, you may use it as reference but always respond in the customer's language."
 	}
 
 	chatMessages = append(chatMessages, models.ChatMessage{
@@ -443,5 +545,108 @@ func (s *ConversationCompletionsService) buildChatMessages(helpCenterContext str
 		})
 	}
 
-	return chatMessages
+	return chatMessages, nil
+}
+
+// convertMarkdownToHTML converts markdown content to HTML using stringutil and removes single paragraph wrapping
+func (s *ConversationCompletionsService) convertMarkdownToHTML(markdown string) string {
+	htmlContent, err := stringutil.MarkdownToHTML(markdown)
+	if err != nil {
+		s.lo.Error("error converting markdown to HTML", "error", err, "markdown", markdown)
+		// Return original markdown as fallback
+		return markdown
+	}
+
+	// Remove wrapping <p> tags if the content is a single paragraph
+	// This prevents double paragraph wrapping in the chat UI
+	htmlContent = strings.TrimSpace(htmlContent)
+	if strings.HasPrefix(htmlContent, "<p>") && strings.HasSuffix(htmlContent, "</p>") && strings.Count(htmlContent, "<p>") == 1 {
+		htmlContent = htmlContent[3 : len(htmlContent)-4]
+	}
+
+	return htmlContent
+}
+
+// prepareConversationContext formats the last N messages for the LLM prompt
+func (s *ConversationCompletionsService) prepareConversationContext(messages []cmodels.Message, maxMessages int, maxContentLength int) string {
+	var contextBuilder strings.Builder
+
+	// Get the last N messages (excluding the very latest one which is the current query)
+	messageCount := 0
+	for i := 1; i < len(messages) && messageCount < maxMessages; i++ {
+		msg := messages[i]
+
+		// Skip private messages
+		if msg.Private {
+			continue
+		}
+
+		// Determine role
+		role := "ASSISTANT"
+		if msg.SenderType == cmodels.SenderTypeContact {
+			role = "USER"
+		}
+
+		// Truncate content if too long
+		content := msg.TextContent
+		if len(content) > maxContentLength {
+			content = content[:maxContentLength] + "... [truncated]"
+		}
+
+		contextBuilder.WriteString(fmt.Sprintf("%s: %s\n", role, content))
+		messageCount++
+	}
+
+	if contextBuilder.Len() == 0 {
+		return "No prior conversation context."
+	}
+
+	return strings.TrimSpace(contextBuilder.String())
+}
+
+// refineSearchQuery performs context-aware query refinement using LLM
+func (s *ConversationCompletionsService) refineSearchQuery(query, targetLanguage string, messages []cmodels.Message) (queryRefinementResponse, error) {
+	// Prepare conversation context
+	conversationContext := s.prepareConversationContext(messages, 3, 200)
+
+	// Build the refinement prompt
+	prompt := fmt.Sprintf(QueryRefinementPrompt, targetLanguage, targetLanguage, conversationContext, query)
+
+	// Create chat messages for LLM call
+	chatMessages := []models.ChatMessage{
+		{
+			Role:    "system",
+			Content: QueryRefinementSystemMessage,
+		},
+		{
+			Role:    "user",
+			Content: prompt,
+		},
+	}
+
+	// Call LLM for refinement
+	response, err := s.manager.ChatCompletion(chatMessages)
+	if err != nil {
+		s.lo.Error("error calling LLM for query refinement", "error", err, "query", query)
+		return queryRefinementResponse{}, fmt.Errorf("LLM call failed: %w", err)
+	}
+
+	// Parse JSON response with safety net for markdown-wrapped responses
+	cleanedResponse := stringutil.CleanJSONResponse(response)
+	var refinementResponse queryRefinementResponse
+	if err := json.Unmarshal([]byte(cleanedResponse), &refinementResponse); err != nil {
+		s.lo.Error("error parsing LLM refinement response", "error", err,
+			"original_response", response,
+			"cleaned_response", cleanedResponse)
+		return queryRefinementResponse{}, fmt.Errorf("failed to parse LLM response: %w", err)
+	}
+
+	s.lo.Debug("query refinement completed",
+		"original_query", query,
+		"refined_query", refinementResponse.RefinedQuery,
+		"translated_query", refinementResponse.TranslatedQuery,
+		"confidence", refinementResponse.ConfidenceScore,
+		"target_language", targetLanguage)
+
+	return refinementResponse, nil
 }

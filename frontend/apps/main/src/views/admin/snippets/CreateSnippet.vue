@@ -2,12 +2,12 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <CustomAnswerForm @submit="onSubmit" @cancel="onCancel" :formLoading="formLoading" />
+  <SnippetForm @submit="onSubmit" :formLoading="formLoading" />
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import CustomAnswerForm from '@/features/admin/custom-answers/CustomAnswerForm.vue'
+import SnippetForm from '@/features/admin/snippets/SnippetForm.vue'
 import { handleHTTPError } from '../../../utils/http'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useRouter } from 'vue-router'
@@ -21,33 +21,29 @@ const emitter = useEmitter()
 const router = useRouter()
 const formLoading = ref(false)
 const breadcrumbLinks = [
-  { path: 'custom-answer-list', label: t('globals.terms.customAnswer', 2) },
+  { path: 'snippet-list', label: t('globals.terms.snippet', 2) },
   {
     path: '',
     label: t('globals.messages.new', {
-      name: t('globals.terms.customAnswer', 1).toLowerCase()
+      name: t('globals.terms.snippet', 1).toLowerCase()
     })
   }
 ]
 
 const onSubmit = (values) => {
-  createNewCustomAnswer(values)
+  createNewSnippet(values)
 }
 
-const onCancel = () => {
-  router.push({ name: 'custom-answer-list' })
-}
-
-const createNewCustomAnswer = async (values) => {
+const createNewSnippet = async (values) => {
   try {
     formLoading.value = true
-    await api.createAICustomAnswer(values)
+    await api.createAISnippet(values)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.customAnswer', 1)
+        name: t('globals.terms.snippet', 1)
       })
     })
-    router.push({ name: 'custom-answer-list' })
+    router.push({ name: 'snippet-list' })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

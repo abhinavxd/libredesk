@@ -10,6 +10,7 @@ DROP TYPE IF EXISTS "conversation_assignment_type" CASCADE; CREATE TYPE "convers
 DROP TYPE IF EXISTS "template_type" CASCADE; CREATE TYPE "template_type" AS ENUM ('email_outgoing', 'email_notification');
 DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact', 'visitor', 'ai_assistant');
 DROP TYPE IF EXISTS "ai_provider" CASCADE; CREATE TYPE "ai_provider" AS ENUM ('openai');
+DROP TYPE IF EXISTS "ai_knowledge_type" CASCADE; CREATE TYPE "ai_knowledge_type" AS ENUM ('snippet');
 DROP TYPE IF EXISTS "automation_execution_mode" CASCADE; CREATE TYPE "automation_execution_mode" AS ENUM ('all', 'first_match');
 DROP TYPE IF EXISTS "macro_visibility" CASCADE; CREATE TYPE "macro_visibility" AS ENUM ('all', 'team', 'user');
 DROP TYPE IF EXISTS "media_disposition" CASCADE; CREATE TYPE "media_disposition" AS ENUM ('inline', 'attachment');
@@ -84,6 +85,7 @@ CREATE TABLE inboxes (
 	config jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"from" TEXT NULL,
 	secret TEXT NULL,
+	help_center_id INT REFERENCES help_centers(id),
 	CONSTRAINT constraint_inboxes_on_name CHECK (length("name") <= 140)
 );
 
@@ -608,7 +610,8 @@ CREATE TABLE help_centers (
 	name VARCHAR(255) NOT NULL,
 	slug VARCHAR(100) UNIQUE NOT NULL,
 	page_title VARCHAR(255) NOT NULL,
-	view_count INTEGER DEFAULT 0
+	view_count INT DEFAULT 0,
+	default_locale VARCHAR(10) DEFAULT 'en' NOT NULL
 );
 CREATE INDEX index_help_centers_on_slug ON help_centers(slug);
 
@@ -617,13 +620,13 @@ CREATE TABLE article_collections (
 	id SERIAL PRIMARY KEY,
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
-	help_center_id INTEGER NOT NULL REFERENCES help_centers(id) ON DELETE CASCADE,
+	help_center_id INT NOT NULL REFERENCES help_centers(id) ON DELETE CASCADE,
 	slug VARCHAR(255) NOT NULL,
-	parent_id INTEGER REFERENCES article_collections(id) ON DELETE CASCADE,
+	parent_id INT REFERENCES article_collections(id) ON DELETE CASCADE,
 	locale VARCHAR(10) NOT NULL DEFAULT 'en',
 	name VARCHAR(255) NOT NULL,
 	description TEXT,
-	sort_order INTEGER DEFAULT 0,
+	sort_order INT DEFAULT 0,
 	is_published BOOLEAN DEFAULT false
 );
 CREATE INDEX index_article_collections_on_help_center_id ON article_collections(help_center_id);
@@ -637,14 +640,14 @@ CREATE TABLE help_articles (
 	id SERIAL PRIMARY KEY,
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
-	collection_id INTEGER NOT NULL REFERENCES article_collections(id) ON DELETE CASCADE,
+	collection_id INT NOT NULL REFERENCES article_collections(id) ON DELETE CASCADE,
 	slug VARCHAR(255) NOT NULL,
 	locale VARCHAR(10) NOT NULL DEFAULT 'en',
 	title VARCHAR(255) NOT NULL,
 	content TEXT NOT NULL,
-	sort_order INTEGER DEFAULT 0,
+	sort_order INT DEFAULT 0,
 	status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
-	view_count INTEGER DEFAULT 0,
+	view_count INT DEFAULT 0,
 	ai_enabled BOOLEAN DEFAULT false
 );
 CREATE INDEX index_help_articles_on_collection_id ON help_articles(collection_id);
@@ -652,17 +655,16 @@ CREATE INDEX index_help_articles_on_locale ON help_articles(collection_id, local
 CREATE INDEX index_help_articles_on_ordering ON help_articles(collection_id, sort_order);
 CREATE UNIQUE INDEX index_help_articles_slug_per_collection_locale ON help_articles(collection_id, slug, locale);
 
-DROP TABLE IF EXISTS ai_custom_answers CASCADE;
-CREATE TABLE ai_custom_answers (
+DROP TABLE IF EXISTS ai_knowledge_base CASCADE;
+CREATE TABLE ai_knowledge_base (
 	id SERIAL PRIMARY KEY,
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
-	question TEXT NOT NULL,
-	answer TEXT NOT NULL,
-	embedding vector(1536) NOT NULL,
+	type ai_knowledge_type NOT NULL DEFAULT 'snippet',
+	content TEXT NOT NULL,
 	enabled BOOLEAN DEFAULT true
 );
-CREATE INDEX index_ai_custom_answers_embedding ON ai_custom_answers USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX index_ai_knowledge_base_type_enabled ON ai_knowledge_base(type, enabled);
 
 DROP TABLE IF EXISTS embeddings CASCADE;
 CREATE TABLE embeddings (
@@ -693,6 +695,7 @@ BEGIN
 END;
 $$;
 -- Trigger to enforce collection depth limit in article_collections.
+DROP TRIGGER IF EXISTS trg_enforce_collection_depth_limit ON article_collections;
 CREATE TRIGGER trg_enforce_collection_depth_limit
 BEFORE INSERT OR UPDATE ON article_collections
 FOR EACH ROW EXECUTE FUNCTION enforce_collection_max_depth();

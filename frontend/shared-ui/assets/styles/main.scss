@@ -50,14 +50,40 @@
       padding-left: 0.25rem;
     }
 
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6 {
-      font-size: 1.25rem;
+    h1 {
+      font-size: 2rem;
       font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin-bottom: 0.875rem;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+
+    h4 {
+      font-size: 1.25rem;
+      font-weight: 500;
+      margin-bottom: 0.625rem;
+    }
+
+    h5 {
+      font-size: 1.125rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    h6 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
     }
 
     a {

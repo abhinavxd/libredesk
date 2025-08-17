@@ -26,3 +26,12 @@ export const formatDuration = (seconds, showSeconds = true) => {
     const secs = totalSeconds % 60
     return `${hours}h ${mins}m ${showSeconds ? `${secs}s` : ''}`
 }
+
+export const formatDatetime = (date, formatString = 'MMMM d, yyyy h:mm a') => {
+    try {
+        return format(date, formatString)
+    } catch (error) {
+        console.error('Error formatting date', error, 'date', date)
+        return ''
+    }
+}

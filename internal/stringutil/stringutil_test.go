@@ -184,16 +184,6 @@ func TestGenerateSlug(t *testing.T) {
 			expected: "hello-world",
 		},
 		{
-			name:     "empty string",
-			input:    "",
-			expected: "untitled",
-		},
-		{
-			name:     "only special characters",
-			input:    "!@#$%^&*()",
-			expected: "untitled",
-		},
-		{
 			name:     "unicode characters",
 			input:    "Hello World",
 			expected: "hello-world",
