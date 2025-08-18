@@ -70,7 +70,7 @@ export const useChatStore = defineStore('chat', () => {
         updateConversationListLastMessage(conversationUUID, message, shouldIncrementUnread)
     }
 
-    const addPendingMessage = (conversationUUID, messageText, authorType, authorId) => {
+    const addPendingMessage = (conversationUUID, messageText, authorType, authorId, files=[]) => {
         // Pending message is a temporary message that will be replaced with actual message later after sending.
         const pendingMessage = {
             content: messageText,
@@ -85,7 +85,7 @@ export const useChatStore = defineStore('chat', () => {
             },
             attachments: [],
             uuid: `pending-${Date.now()}`,
-            status: 'sending',
+            status: files.length > 0 ? 'uploading' : 'sending',
             created_at: new Date().toISOString()
         }
         messageCache.addMessage(conversationUUID, pendingMessage)

@@ -47,7 +47,7 @@
             message.author.type === 'contact' || message.author.type === 'visitor'
               ? [
                   'text-primary-foreground rounded-br-sm',
-                  message.status === 'sending'
+                  message.status === 'sending' || message.status === 'uploading'
                     ? 'bg-primary/60'
                     : message.status === 'failed'
                       ? 'bg-destructive/60'
@@ -80,11 +80,19 @@
             v-else-if="message.author.type === 'contact' || message.author.type === 'visitor'"
             class="flex items-center gap-1"
           >
-            <span v-if="message.status === 'sending'" class="flex items-center gap-1">
+            <span
+              v-if="message.status === 'sending' || message.status === 'uploading'"
+              class="flex items-center gap-1"
+            >
               <div
                 class="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"
               ></div>
-              {{ $t('globals.messages.sending') }}
+              <span v-if="message.status === 'sending'">
+                {{ $t('globals.messages.sending') }}
+              </span>
+              <span v-if="message.status === 'uploading'">
+                {{ $t('globals.messages.uploading') }}
+              </span>
             </span>
             <span v-else>
               {{ getMessageTime(message.created_at) }}

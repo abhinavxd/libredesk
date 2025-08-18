@@ -226,6 +226,23 @@ const handleFileUpload = async (files) => {
 
   isUploading.value = true
   emit('error', '')
+
+  // Create pending file message immediately
+  const fileNames = Array.from(files)
+    .map((f) => f.name)
+    .join(', ')
+
+  const trimmedFileNames =
+    fileNames.length > 40 ? fileNames.slice(0, 40).trimEnd() + '...' : fileNames
+  const pendingMessage = `${trimmedFileNames}`
+  const tempMessageID = chatStore.addPendingMessage(
+    chatStore.currentConversation.uuid,
+    pendingMessage,
+    userStore.isVisitor ? 'visitor' : 'contact',
+    userStore.userID,
+    Array.from(files)
+  )
+
   try {
     // Upload files using the widget API
     await api.uploadMedia(chatStore.currentConversation.uuid, files)
@@ -233,8 +250,18 @@ const handleFileUpload = async (files) => {
     // Refresh conversation to get updated messages with attachments
     const resp = await api.getChatConversation(chatStore.currentConversation.uuid)
     const msgs = resp.data.data.messages
+
+    // Remove the pending message since we're replacing all messages
+    if (tempMessageID) {
+      chatStore.removeMessage(chatStore.currentConversation.uuid, tempMessageID)
+    }
+
     chatStore.replaceMessages(msgs)
   } catch (error) {
+    // Remove failed upload message
+    if (tempMessageID) {
+      chatStore.removeMessage(chatStore.currentConversation.uuid, tempMessageID)
+    }
     emit('error', handleHTTPError(error).message)
   } finally {
     isUploading.value = false

@@ -252,6 +252,7 @@
   "globals.messages.revokedSuccessfully": "{name} revoked successfully",
   "globals.messages.errorRevoking": "Error revoking {name}",
   "globals.messages.generatedSuccessfully": "{name} generated successfully",
+  "globals.messages.uploading": "Uploading {name}",
   "globals.messages.generate": "Generate {name}",
   "globals.messages.generated": "{name} generated",
   "globals.messages.regenerate": "Regenerate",
