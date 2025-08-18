@@ -35,6 +35,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/tag"
@@ -95,6 +96,7 @@ type App struct {
 	customAttribute *customAttribute.Manager
 	report          *report.Manager
 	webhook         *webhook.Manager
+	rateLimit       *ratelimit.Limiter
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -202,6 +204,7 @@ func main() {
 		sla                         = initSLA(db, team, settings, businessHours, notifier, template, user, i18n)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template, webhook)
 		autoassigner                = initAutoAssigner(team, user, conversation)
+		rateLimiter                 = initRateLimit(rdb)
 	)
 
 	wsHub.SetConversationStore(conversation)
@@ -253,6 +256,7 @@ func main() {
 		macro:           initMacro(db, i18n),
 		ai:              initAI(db, i18n),
 		webhook:         webhook,
+		rateLimit:       rateLimiter,
 	}
 	app.consts.Store(constants)
 

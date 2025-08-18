@@ -36,6 +36,7 @@ import (
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
@@ -926,4 +927,13 @@ func getLogLevel(lvl string) logf.Level {
 	default:
 		return logf.InfoLevel
 	}
+}
+
+// initRateLimit initializes the rate limiter.
+func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
+	var config ratelimit.Config
+	if err := ko.UnmarshalWithConf("rate_limit", &config, koanf.UnmarshalConf{Tag: "toml"}); err != nil {
+		log.Fatalf("error unmarshalling rate limit config: %v", err)
+	}
+	return ratelimit.New(redisClient, config)
 }

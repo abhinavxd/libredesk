@@ -122,3 +122,8 @@ unsnooze_interval = "5m"
 [sla]
 # How often to evaluate SLA compliance for conversations
 evaluation_interval = "5m"
+
+[rate_limit]
+  [rate_limit.widget]
+    enabled = true
+    requests_per_minute = 100
