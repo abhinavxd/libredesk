@@ -42,7 +42,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { formatBytes } from '../../../../utils/file.js'
+import { formatBytes } from '@shared-ui/utils/file'
 import { X, Paperclip as PaperclipIcon } from 'lucide-vue-next'
 import { DotLoader } from '@shared-ui/components/ui/loader'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'

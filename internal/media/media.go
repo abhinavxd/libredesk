@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -266,7 +267,9 @@ func (m *Manager) VerifySignature(r *fastglue.Request) error {
 	
 	// Check if store supports signature verification
 	if signedStore, ok := m.store.(SignedURLStore); ok {
-		if !signedStore.VerifySignature(uuid.(string), signature, expiresAt, []byte(m.secret)) {
+		// Strip thumb_ prefix for signature verification to match the base UUID
+		verificationName := strings.TrimPrefix(uuid.(string), "thumb_")
+		if !signedStore.VerifySignature(verificationName, signature, expiresAt, []byte(m.secret)) {
 			return fmt.Errorf("signature verification failed")
 		}
 		return nil

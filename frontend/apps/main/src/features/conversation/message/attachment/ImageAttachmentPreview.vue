@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { formatBytes, getThumbFilepath } from '../../../../utils/file.js'
+import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 import { Download } from 'lucide-vue-next';
 
 const props = defineProps({

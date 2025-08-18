@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-import { formatBytes } from '../../../../utils/file.js'
+import { formatBytes } from '@shared-ui/utils/file'
 import { Download } from 'lucide-vue-next';
 
 const props = defineProps({

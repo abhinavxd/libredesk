@@ -8,7 +8,7 @@
       <!-- Image preview -->
       <div v-if="isImage(attachment)" class="relative">
         <img
-          :src="attachment.url"
+          :src="getThumbnailUrl(attachment)"
           :alt="attachment.name"
           class="max-w-48 max-h-32 rounded-lg object-cover"
           @click="openImage(attachment.url)"
@@ -35,7 +35,7 @@
 
 <script setup>
 import { File } from 'lucide-vue-next';
-import { formatBytes } from '@shared-ui/utils/file';
+import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file';
 defineProps({
   attachments: {
     type: Array,
@@ -45,6 +45,11 @@ defineProps({
 
 const isImage = (attachment) => {
   return attachment.content_type && attachment.content_type.startsWith('image/')
+}
+
+const getThumbnailUrl = (attachment) => {
+  if (!isImage(attachment)) return attachment.url
+  return getThumbFilepath(attachment.url)
 }
 
 const openImage = (url) => {
