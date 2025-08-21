@@ -1333,7 +1333,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 	var assignee umodels.User
 	if conversation.AssignedUserID.Int > 0 {
 		var err error
-		assignee, err = m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
+		assignee, err = m.userStore.Get(conversation.AssignedUserID.Int, "", "")
 		if err != nil {
 			m.lo.Error("error fetching conversation assignee", "conversation_uuid", conversation.UUID, "error", err)
 		} else {
