@@ -69,8 +69,9 @@ func (l *Limiter) CheckWidgetLimit(ctx *fasthttp.RequestCtx) error {
 	}
 
 	// Add current request to the sliding window
+	// Use nanoseconds as member to ensure uniqueness for multiple requests in same second
 	pipe := l.redis.Pipeline()
-	pipe.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: now})
+	pipe.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: time.Now().UnixNano()})
 	pipe.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatInt(windowStart, 10))
 	pipe.Expire(ctx, key, time.Minute*2) // Set expiry to cleanup old keys
 	_, err = pipe.Exec(ctx)

@@ -53,8 +53,6 @@ type Config struct {
 		AllowStartConversation       bool   `json:"allow_start_conversation"`
 		PreventMultipleConversations bool   `json:"prevent_multiple_conversations"`
 		StartConversationButtonText  string `json:"start_conversation_button_text"`
-		RequireContactInfo           string `json:"require_contact_info"` // "disabled", "optional", "required"
-		ContactInfoMessage           string `json:"contact_info_message"` // Custom message for the form
 	} `json:"visitors"`
 	NoticeBanner struct {
 		Text    string `json:"text"`
@@ -71,6 +69,21 @@ type Config struct {
 	ShowOfficeHoursInChat          bool     `json:"show_office_hours_in_chat"`
 	ShowOfficeHoursAfterAssignment bool     `json:"show_office_hours_after_assignment"`
 	ChatReplyExpectationMessage    string   `json:"chat_reply_expectation_message"`
+	PreChatForm struct {
+		Enabled bool   `json:"enabled"`
+		Title   string `json:"title"`
+		Fields  []struct {
+			Key               string `json:"key"`
+			Type              string `json:"type"`
+			Label             string `json:"label"`
+			Placeholder       string `json:"placeholder"`
+			Required          bool   `json:"required"`
+			Enabled           bool   `json:"enabled"`
+			Order             int    `json:"order"`
+			IsDefault         bool   `json:"is_default"`
+			CustomAttributeID int    `json:"custom_attribute_id,omitempty"`
+		} `json:"fields"`
+	} `json:"prechat_form"`
 }
 
 // Client represents a connected chat client
@@ -249,8 +262,8 @@ func (lc *LiveChat) RemoveClient(c *Client) {
 	}
 }
 
-// BroadcastTypingToClients broadcasts typing status to all connected widget clients for a conversation.
-func (lc *LiveChat) BroadcastTypingToClients(conversationUUID string, isTyping bool) {
+// BroadcastTypingToClients broadcasts typing status to specific widget clients for a conversation.
+func (lc *LiveChat) BroadcastTypingToClients(conversationUUID string, contactID int, isTyping bool) {
 	lc.clientsMutex.RLock()
 	defer lc.clientsMutex.RUnlock()
 
@@ -269,14 +282,48 @@ func (lc *LiveChat) BroadcastTypingToClients(conversationUUID string, isTyping b
 		return
 	}
 
-	// Broadcast to all connected clients
-	for userID, clients := range lc.clients {
+	// Only send to the specific contact's clients
+	contactIDStr := strconv.Itoa(contactID)
+	if clients, exists := lc.clients[contactIDStr]; exists {
 		for _, client := range clients {
 			select {
 			case client.Channel <- messageJSON:
-				lc.lo.Debug("typing status sent to widget client", "user_id", userID, "client_id", client.ID, "conversation_uuid", conversationUUID, "is_typing", isTyping)
+				lc.lo.Debug("typing status sent to widget client", "contact_id", contactID, "client_id", client.ID, "conversation_uuid", conversationUUID, "is_typing", isTyping)
 			default:
-				lc.lo.Warn("client channel full, dropping typing message", "user_id", userID, "client_id", client.ID)
+				lc.lo.Warn("client channel full, dropping typing message", "contact_id", contactID, "client_id", client.ID)
+			}
+		}
+	}
+}
+
+// BroadcastConversationToClients broadcasts conversation updates to specific widget clients.
+func (lc *LiveChat) BroadcastConversationToClients(conversationUUID string, contactID int, conversationData interface{}) {
+	lc.clientsMutex.RLock()
+	defer lc.clientsMutex.RUnlock()
+
+	// Create conversation update message for widget clients
+	conversationMessage := map[string]interface{}{
+		"type": "conversation_update",
+		"data": map[string]interface{}{
+			"conversation": conversationData,
+		},
+	}
+
+	messageJSON, err := json.Marshal(conversationMessage)
+	if err != nil {
+		lc.lo.Error("failed to marshal conversation update message", "error", err)
+		return
+	}
+
+	// Only send to the specific contact's clients
+	contactIDStr := strconv.Itoa(contactID)
+	if clients, exists := lc.clients[contactIDStr]; exists {
+		for _, client := range clients {
+			select {
+			case client.Channel <- messageJSON:
+				lc.lo.Debug("conversation update sent to widget client", "contact_id", contactID, "client_id", client.ID, "conversation_uuid", conversationUUID)
+			default:
+				lc.lo.Warn("client channel full, dropping conversation update", "contact_id", contactID, "client_id", client.ID)
 			}
 		}
 	}

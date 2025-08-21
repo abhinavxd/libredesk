@@ -217,6 +217,21 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
+    const updateCurrentConversation = (conversationData) => {
+        // Only update if it's the current conversation
+        if (currentConversation.value?.uuid === conversationData.uuid) {
+            currentConversation.value = conversationData
+        }
+        
+        // Also update in conversations list if present
+        if (conversations.value && Array.isArray(conversations.value)) {
+            const index = conversations.value.findIndex(c => c.uuid === conversationData.uuid)
+            if (index >= 0) {
+                conversations.value[index] = { ...conversations.value[index], ...conversationData }
+            }
+        }
+    }
+
     return {
         // State
         messageCache,
@@ -243,6 +258,7 @@ export const useChatStore = defineStore('chat', () => {
         fetchConversations,
         loadConversation,
         updateCurrentConversationLastSeen,
-        updateConversationListLastMessage
+        updateConversationListLastMessage,
+        updateCurrentConversation
     }
 })

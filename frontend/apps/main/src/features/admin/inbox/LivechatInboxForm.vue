@@ -2,7 +2,7 @@
   <form @submit="onSubmit" class="space-y-6 w-full">
     <!-- Main Tabs -->
     <Tabs v-model="activeTab" class="w-full">
-      <TabsList class="grid w-full grid-cols-6">
+      <TabsList class="grid w-full grid-cols-7">
         <TabsTrigger value="general">{{ $t('admin.inbox.livechat.tabs.general') }}</TabsTrigger>
         <TabsTrigger value="appearance">{{
           $t('admin.inbox.livechat.tabs.appearance')
@@ -10,6 +10,7 @@
         <TabsTrigger value="messages">{{ $t('admin.inbox.livechat.tabs.messages') }}</TabsTrigger>
         <TabsTrigger value="features">{{ $t('admin.inbox.livechat.tabs.features') }}</TabsTrigger>
         <TabsTrigger value="security">{{ $t('admin.inbox.livechat.tabs.security') }}</TabsTrigger>
+        <TabsTrigger value="prechat">{{ $t('admin.inbox.livechat.tabs.prechat') }}</TabsTrigger>
         <TabsTrigger value="users">{{ $t('admin.inbox.livechat.tabs.users') }}</TabsTrigger>
       </TabsList>
 
@@ -505,6 +506,15 @@
           </div>
         </div>
 
+        <!-- Pre-Chat Form Tab -->
+        <div v-show="activeTab === 'prechat'" class="space-y-6">
+          <PreChatFormConfig
+            :form="form"
+            :custom-attributes="customAttributes"
+            @fetch-custom-attributes="fetchCustomAttributes"
+          />
+        </div>
+
         <!-- Users Tab -->
         <div v-show="activeTab === 'users'" class="space-y-6">
           <Tabs :model-value="selectedUserTab" @update:model-value="selectedUserTab = $event">
@@ -573,57 +583,6 @@
                   </FormItem>
                 </FormField>
 
-                <FormField
-                  v-slot="{ componentField }"
-                  name="config.visitors.require_contact_info"
-                >
-                  <FormItem>
-                    <FormLabel>{{ $t('admin.inbox.livechat.requireContactInfo') }}</FormLabel>
-                    <FormControl>
-                      <Select v-bind="componentField">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="disabled">
-                            {{ $t('admin.inbox.livechat.requireContactInfo.disabled') }}
-                          </SelectItem>
-                          <SelectItem value="optional">
-                            {{ $t('admin.inbox.livechat.requireContactInfo.optional') }}
-                          </SelectItem>
-                          <SelectItem value="required">
-                            {{ $t('admin.inbox.livechat.requireContactInfo.required') }}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormDescription>{{
-                      $t('admin.inbox.livechat.requireContactInfo.visitors.description')
-                    }}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
-
-                <FormField
-                  v-if="form.values.config?.visitors?.require_contact_info !== 'disabled'"
-                  v-slot="{ componentField }"
-                  name="config.visitors.contact_info_message"
-                >
-                  <FormItem>
-                    <FormLabel>{{ $t('admin.inbox.livechat.contactInfoMessage') }}</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        v-bind="componentField"
-                        placeholder="Please provide your contact information so we can assist you better."
-                        rows="2"
-                      />
-                    </FormControl>
-                    <FormDescription>{{
-                      $t('admin.inbox.livechat.contactInfoMessage.visitors.description')
-                    }}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
               </div>
 
               <!-- Users Settings -->
@@ -720,6 +679,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { Plus, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import PreChatFormConfig from './PreChatFormConfig.vue'
+import api from '@/api'
 
 const props = defineProps({
   initialValues: {
@@ -744,6 +705,7 @@ const { t } = useI18n()
 const activeTab = ref('general')
 const selectedUserTab = ref('visitors')
 const externalLinks = ref([])
+const customAttributes = ref([])
 
 const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t)),
@@ -787,14 +749,38 @@ const form = useForm({
       visitors: {
         start_conversation_button_text: 'Start conversation',
         allow_start_conversation: true,
-        prevent_multiple_conversations: false,
-        require_contact_info: 'disabled',
-        contact_info_message: ''
+        prevent_multiple_conversations: false
       },
       users: {
         start_conversation_button_text: 'Start conversation',
         allow_start_conversation: true,
         prevent_multiple_conversations: false
+      },
+      prechat_form: {
+        enabled: false,
+        title: '',
+        fields: [
+          {
+            key: 'name',
+            type: 'text',
+            label: 'Full name',
+            placeholder: 'Enter your name',
+            required: true,
+            enabled: true,
+            order: 1,
+            is_default: true
+          },
+          {
+            key: 'email',
+            type: 'email',
+            label: 'Email address',
+            placeholder: 'your@email.com',
+            required: true,
+            enabled: true,
+            order: 2,
+            is_default: true
+          }
+        ]
       }
     }
   }
@@ -816,6 +802,24 @@ const removeExternalLink = (index) => {
 
 const updateExternalLinks = () => {
   form.setFieldValue('config.external_links', externalLinks.value)
+}
+
+const fetchCustomAttributes = async () => {
+  try {
+    // Fetch both contact and conversation custom attributes
+    const [contactAttrs, conversationAttrs] = await Promise.all([
+      api.getCustomAttributes('contact'),
+      api.getCustomAttributes('conversation')
+    ])
+    
+    customAttributes.value = [
+      ...(contactAttrs.data?.data || []),
+      ...(conversationAttrs.data?.data || [])
+    ]
+  } catch (error) {
+    console.error('Error fetching custom attributes:', error)
+    customAttributes.value = []
+  }
 }
 
 const onSubmit = form.handleSubmit(async (values) => {

@@ -174,8 +174,8 @@ DO UPDATE SET updated_at = now()
 RETURNING id;
 
 -- name: insert-visitor
-INSERT INTO users (email, type, first_name, last_name)
-VALUES ($1, 'visitor', $2, $3)
+INSERT INTO users (email, type, first_name, last_name, custom_attributes)
+VALUES ($1, 'visitor', $2, $3, $4)
 RETURNING *;
 
 -- name: update-last-login-at

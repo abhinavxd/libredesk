@@ -114,6 +114,35 @@ func (m *Manager) broadcastTypingToWidgetClients(conversationUUID string, isTypi
 	
 	// Check if it's a livechat inbox and broadcast typing status
 	if liveChatInbox, ok := inboxInstance.(*livechat.LiveChat); ok {
-		liveChatInbox.BroadcastTypingToClients(conversationUUID, isTyping)
+		liveChatInbox.BroadcastTypingToClients(conversationUUID, conversation.ContactID, isTyping)
+	}
+}
+
+// BroadcastConversationToWidget broadcasts full conversation data to widget clients when conversation properties change.
+func (m *Manager) BroadcastConversationToWidget(conversationUUID string) {
+	// Get the conversation with assignee details
+	conversation, err := m.GetConversation(0, conversationUUID)
+	if err != nil {
+		m.lo.Error("error getting conversation for widget broadcast", "error", err, "conversation_uuid", conversationUUID)
+		return
+	}
+	
+	// Build conversation view using the centralized method
+	conversationView, err := m.BuildWidgetConversationView(conversation)
+	if err != nil {
+		m.lo.Error("error building conversation data for widget", "error", err, "conversation_uuid", conversationUUID)
+		return
+	}
+	
+	// Get the inbox
+	inboxInstance, err := m.inboxStore.Get(conversation.InboxID)
+	if err != nil {
+		m.lo.Error("error getting inbox for widget conversation broadcast", "error", err, "inbox_id", conversation.InboxID)
+		return
+	}
+	
+	// Check if it's a livechat inbox and broadcast conversation update
+	if liveChatInbox, ok := inboxInstance.(*livechat.LiveChat); ok {
+		liveChatInbox.BroadcastConversationToClients(conversationUUID, conversation.ContactID, conversationView)
 	}
 }

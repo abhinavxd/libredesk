@@ -19,7 +19,7 @@ func (u *Manager) CreateVisitor(user *models.User) error {
 		user.FirstName = h.Haikunate()
 	}
 
-	if err := u.q.InsertVisitor.Get(user, user.Email, user.FirstName, user.LastName); err != nil {
+	if err := u.q.InsertVisitor.Get(user, user.Email, user.FirstName, user.LastName, user.CustomAttributes); err != nil {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
 	}

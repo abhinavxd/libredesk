@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -39,10 +40,16 @@ type conversationResp struct {
 	Messages     []cmodels.ChatMessage    `json:"messages"`
 }
 
+type customAttributeWidget struct {
+	ID     int      `json:"id"`
+	Values []string `json:"values"`
+}
+
 type chatSettingsResponse struct {
 	livechat.Config
-	BusinessHours          []bhmodels.BusinessHours `json:"business_hours,omitempty"`
-	DefaultBusinessHoursID int                      `json:"default_business_hours_id,omitempty"`
+	BusinessHours          []bhmodels.BusinessHours      `json:"business_hours,omitempty"`
+	DefaultBusinessHoursID int                           `json:"default_business_hours_id,omitempty"`
+	CustomAttributes       map[int]customAttributeWidget `json:"custom_attributes,omitempty"`
 }
 
 // conversationResponseWithBusinessHours includes business hours info for the widget
@@ -150,6 +157,33 @@ func handleGetChatSettings(r *fastglue.Request) error {
 		}
 	}
 
+	// Collect custom attribute IDs from pre-chat form fields
+	if config.PreChatForm.Enabled && len(config.PreChatForm.Fields) > 0 {
+		customAttrIDs := make(map[int]bool)
+		for _, field := range config.PreChatForm.Fields {
+			if field.Enabled && field.CustomAttributeID > 0 {
+				customAttrIDs[field.CustomAttributeID] = true
+			}
+		}
+
+		// Fetch custom attributes if any are referenced
+		if len(customAttrIDs) > 0 {
+			customAttributes := make(map[int]customAttributeWidget)
+			for id := range customAttrIDs {
+				attr, err := app.customAttribute.Get(id)
+				if err != nil {
+					app.lo.Error("failed to fetch custom attribute for widget", "id", id, "error", err)
+					continue
+				}
+				customAttributes[id] = customAttributeWidget{
+					ID:     attr.ID,
+					Values: attr.Values,
+				}
+			}
+			response.CustomAttributes = customAttributes
+		}
+	}
+
 	return r.SendEnvelope(response)
 }
 
@@ -158,9 +192,8 @@ func handleChatInit(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
 		req = struct {
-			VisitorName  string `json:"visitor_name,omitempty"`
-			VisitorEmail string `json:"visitor_email,omitempty"`
-			Message      string `json:"message,omitempty"`
+			Message  string         `json:"message"`
+			FormData map[string]any `json:"form_data,omitempty"`
 		}{}
 	)
 
@@ -217,9 +250,16 @@ func handleChatInit(r *fastglue.Request) error {
 				// User doesn't exist, create new contact
 				firstName := claims.FirstName
 				lastName := claims.LastName
+				email := claims.Email
 
-				// Marshal custom attribute.
-				customAttribJSON, err := json.Marshal(claims.CustomAttributes)
+				// Process form custom attributes
+				formCustomAttributes := processFormCustomAttributes(req.FormData, config, app)
+
+				// Merge JWT and form custom attributes (form takes precedence)
+				mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
+
+				// Marshal custom attributes
+				customAttribJSON, err := json.Marshal(mergedAttributes)
 				if err != nil {
 					app.lo.Error("error marshalling custom attributes", "error", err)
 					customAttribJSON = []byte("{}")
@@ -229,7 +269,7 @@ func handleChatInit(r *fastglue.Request) error {
 				var user = umodels.User{
 					FirstName:        firstName,
 					LastName:         lastName,
-					Email:            null.NewString(claims.Email, claims.Email != ""),
+					Email:            null.NewString(email, email != ""),
 					ExternalUserID:   null.NewString(claims.ExternalUserID, claims.ExternalUserID != ""),
 					CustomAttributes: customAttribJSON,
 				}
@@ -240,43 +280,77 @@ func handleChatInit(r *fastglue.Request) error {
 				}
 				contactID = user.ID
 			} else {
+				// User exists, update custom attributes from both JWT and form
+				// Don't override existing name and email.
+
+				// Process form custom attributes
+				formCustomAttributes := processFormCustomAttributes(req.FormData, config, app)
+
+				// Merge JWT and form custom attributes (form takes precedence)
+				mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
+
+				if len(mergedAttributes) > 0 {
+					fmt.Println("Updating custom attributes for user:", user.ID, "with attributes:", mergedAttributes)
+					if err := app.user.SaveCustomAttributes(user.ID, mergedAttributes, false); err != nil {
+						app.lo.Error("error updating contact custom attributes", "contact_id", user.ID, "error", err)
+						// Don't fail the request for custom attributes update failure
+					}
+				}
 				contactID = user.ID
 			}
 			isVisitor = false
 		} else {
+			// Authenticated visitor
 			isVisitor = claims.IsVisitor
 			contactID, err = getWidgetContactID(r)
 			if err != nil {
 				app.lo.Error("error getting contact ID from middleware context", "error", err)
 				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 			}
+
+			// Process form custom attributes
+			formCustomAttributes := processFormCustomAttributes(req.FormData, config, app)
+
+			// Merge JWT and form custom attributes (form takes precedence)
+			mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
+
+			// Update custom attributes from both JWT and form
+			if len(mergedAttributes) > 0 {
+				if err := app.user.SaveCustomAttributes(contactID, mergedAttributes, false); err != nil {
+					app.lo.Error("error updating contact custom attributes", "contact_id", contactID, "error", err)
+					// Don't fail the request for custom attributes update failure
+				}
+			}
 		}
 	} else {
 		// Visitor user not authenticated, create a new visitor contact.
 		isVisitor = true
 
-		// Validate visitor contact info based on configuration
-		switch config.Visitors.RequireContactInfo {
-		case "required":
-			if req.VisitorName == "" {
-				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "Name"), nil, envelope.InputError)
+		// Validate form data and get final name/email for new visitor
+		finalName, finalEmail, err := validateFormData(req.FormData, config, nil)
+		if err != nil {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, err.Error(), nil, envelope.InputError)
+		}
+
+		// Process custom attributes from form data
+		formCustomAttributes := processFormCustomAttributes(req.FormData, config, app)
+
+		// Marshal custom attributes for storage
+		var customAttribJSON []byte
+		if len(formCustomAttributes) > 0 {
+			customAttribJSON, err = json.Marshal(formCustomAttributes)
+			if err != nil {
+				app.lo.Error("error marshalling form custom attributes", "error", err)
+				customAttribJSON = []byte("{}")
 			}
-			if req.VisitorEmail == "" {
-				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "Email"), nil, envelope.InputError)
-			}
-		case "optional":
-			// Allow empty fields, but if provided, validate email format
-			if req.VisitorEmail != "" && !stringutil.ValidEmail(req.VisitorEmail) {
-				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "Email"), nil, envelope.InputError)
-			}
-		default:
-			req.VisitorEmail = ""
-			req.VisitorName = ""
+		} else {
+			customAttribJSON = []byte("{}")
 		}
 
 		visitor := umodels.User{
-			Email:     null.NewString(req.VisitorEmail, req.VisitorEmail != ""),
-			FirstName: req.VisitorName,
+			Email:            null.NewString(finalEmail, finalEmail != ""),
+			FirstName:        finalName,
+			CustomAttributes: customAttribJSON,
 		}
 
 		if err := app.user.CreateVisitor(&visitor); err != nil {
@@ -768,161 +842,20 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	return r.SendEnvelope(insertedMessage)
 }
 
-// buildConversationResponse builds the response for a conversation including its messages
-func buildConversationResponse(app *App, conversation cmodels.Conversation) (conversationResp, error) {
-	var resp = conversationResp{}
-
-	// Fetch last 1000 messages, this should suffice as chats shouldn't have too many messages.
-	private := false
-	messages, _, err := app.conversation.GetConversationMessages(conversation.UUID, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, &private, 1, 1000)
-	if err != nil {
-		app.lo.Error("error fetching conversation messages", "conversation_uuid", conversation.UUID, "error", err)
-		return resp, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
-	}
-
-	app.conversation.ProcessCSATStatus(messages)
-
-	// Convert to chat message format, Generate signed widget URL for all attachments - expires in 1 hour.
-	chatMessages := make([]cmodels.ChatMessage, len(messages))
-	userCache := make(map[int]umodels.User)
-	for i, msg := range messages {
-		attachments := msg.Attachments
-		for j := range attachments {
-			expiresAt := time.Now().Add(8 * time.Hour)
-			attachments[j].URL = app.media.GetSignedURL(attachments[j].UUID, expiresAt)
-		}
-
-		// Check if sender is cached, if not fetch from user store.
-		var user umodels.User
-		if _, ok := userCache[msg.SenderID]; !ok {
-			user, err = app.user.Get(msg.SenderID, "", "")
-			if err != nil {
-				app.lo.Error("error fetching message sender user", "sender_id", msg.SenderID, "conversation_uuid", conversation.UUID, "error", err)
-			} else {
-				userCache[msg.SenderID] = user
-			}
-		} else {
-			user = userCache[msg.SenderID]
-		}
-
-		chatMessages[i] = cmodels.ChatMessage{
-			UUID:             msg.UUID,
-			Status:           msg.Status,
-			CreatedAt:        msg.CreatedAt,
-			Content:          msg.Content,
-			TextContent:      msg.TextContent,
-			ConversationUUID: msg.ConversationUUID,
-			Meta:             msg.Meta,
-			Author: umodels.ChatUser{
-				ID:                 user.ID,
-				FirstName:          user.FirstName,
-				LastName:           user.LastName,
-				AvatarURL:          user.AvatarURL,
-				AvailabilityStatus: user.AvailabilityStatus,
-				Type:               user.Type,
-			},
-			Attachments: attachments,
-		}
-	}
-
-	var (
-		assignee umodels.User
-	)
-	if conversation.AssignedUserID.Int > 0 {
-		assignee, err = app.user.GetAgent(conversation.AssignedUserID.Int, "")
-		if err != nil {
-			app.lo.Error("error fetching conversation assignee", "conversation_uuid", conversation.UUID, "error", err)
-		}
-
-		// Convert assignee avatar URL to widget format if set.
-		if assignee.AvatarURL.Valid && assignee.AvatarURL.String != "" {
-			avatarPath := assignee.AvatarURL.String
-			if strings.HasPrefix(avatarPath, "/uploads/") {
-				avatarUUID := strings.TrimPrefix(avatarPath, "/uploads/")
-				// Generate signed URL for avatar with 1 hour expiry
-				expiresAt := time.Now().Add(1 * time.Hour)
-				assignee.AvatarURL = null.StringFrom(app.media.GetSignedURL(avatarUUID, expiresAt))
-			}
-		}
-	}
-
-	resp = conversationResp{
-		Conversation: cmodels.ChatConversation{
-			CreatedAt:          assignee.CreatedAt,
-			UUID:               conversation.UUID,
-			Status:             conversation.Status.String,
-			UnreadMessageCount: conversation.UnreadMessageCount,
-			Assignee: umodels.ChatUser{
-				ID:                 assignee.ID,
-				FirstName:          assignee.FirstName,
-				LastName:           assignee.LastName,
-				AvatarURL:          assignee.AvatarURL,
-				AvailabilityStatus: assignee.AvailabilityStatus,
-				Type:               assignee.Type,
-				ActiveAt:           assignee.LastActiveAt,
-			},
-		},
-		Messages: chatMessages,
-	}
-
-	return resp, nil
-}
-
 // buildConversationResponseWithBusinessHours builds conversation response with business hours info
 func buildConversationResponseWithBusinessHours(app *App, conversation cmodels.Conversation) (conversationResponseWithBusinessHours, error) {
-	baseResp, err := buildConversationResponse(app, conversation)
+	widgetResp, err := app.conversation.BuildWidgetConversationResponse(conversation, true)
 	if err != nil {
 		return conversationResponseWithBusinessHours{}, err
 	}
 
 	resp := conversationResponseWithBusinessHours{
-		conversationResp: baseResp,
-	}
-
-	// Calculate business hours info if assigned to team or use default
-	var businessHoursID *int
-	var timezone string
-
-	// Check if conversation is assigned to a team with business hours
-	if conversation.AssignedTeamID.Valid {
-		team, err := app.team.Get(conversation.AssignedTeamID.Int)
-		if err == nil && team.BusinessHoursID.Valid {
-			businessHoursID = &team.BusinessHoursID.Int
-			timezone = team.Timezone
-		}
-	}
-
-	// Fallback to general settings if no team business hours
-	if businessHoursID == nil {
-		out, err := app.setting.GetByPrefix("app")
-		if err == nil {
-			var settings map[string]any
-			if err := json.Unmarshal(out, &settings); err == nil {
-				if bhIDStr, ok := settings["app.business_hours_id"].(string); ok && bhIDStr != "" {
-					// Parse the business hours ID
-					if bhID, err := strconv.Atoi(bhIDStr); err == nil {
-						businessHoursID = &bhID
-					}
-				}
-				if tz, ok := settings["app.timezone"].(string); ok {
-					timezone = tz
-				}
-			}
-		}
-	}
-
-	// Set business hours info in response
-	if businessHoursID != nil {
-		resp.BusinessHoursID = businessHoursID
-
-		// Calculate UTC offset for the timezone
-		if timezone != "" {
-			if loc, err := time.LoadLocation(timezone); err == nil {
-				_, offset := time.Now().In(loc).Zone()
-				offsetMinutes := offset / 60 // Convert seconds to minutes
-				resp.WorkingHoursUTCOffset = &offsetMinutes
-			}
-		}
+		conversationResp: conversationResp{
+			Conversation: widgetResp.Conversation,
+			Messages:     widgetResp.Messages,
+		},
+		BusinessHoursID:       widgetResp.BusinessHoursID,
+		WorkingHoursUTCOffset: widgetResp.WorkingHoursUTCOffset,
 	}
 
 	return resp, nil
@@ -1007,4 +940,149 @@ func generateUserJWTWithSecret(userID int, isVisitor bool, expirationTime time.T
 		return "", err
 	}
 	return tokenString, nil
+}
+
+// mergeCustomAttributes merges JWT and form custom attributes with form taking precedence
+func mergeCustomAttributes(jwtAttributes, formAttributes map[string]interface{}) map[string]interface{} {
+	merged := make(map[string]interface{})
+
+	// Add JWT attributes first (as fallback)
+	maps.Copy(merged, jwtAttributes)
+
+	// Add form attributes second (takes precedence)
+	maps.Copy(merged, formAttributes)
+
+	return merged
+}
+
+// processFormCustomAttributes processes form data and extracts custom attributes
+// based on the pre-chat form configuration, skipping default fields like name and email
+func processFormCustomAttributes(formData map[string]interface{}, config livechat.Config, app *App) map[string]interface{} {
+	customAttributes := make(map[string]interface{})
+
+	if !config.PreChatForm.Enabled || len(formData) == 0 {
+		return customAttributes
+	}
+
+	// Validate total number of form fields
+	const maxFormFields = 50
+	if len(formData) > maxFormFields {
+		app.lo.Warn("form data exceeds maximum allowed fields", "received", len(formData), "max", maxFormFields)
+		return customAttributes
+	}
+
+	// Create a map of valid field keys for quick lookup
+	validFields := make(map[string]struct {
+		Key               string `json:"key"`
+		Type              string `json:"type"`
+		Label             string `json:"label"`
+		Placeholder       string `json:"placeholder"`
+		Required          bool   `json:"required"`
+		Enabled           bool   `json:"enabled"`
+		Order             int    `json:"order"`
+		IsDefault         bool   `json:"is_default"`
+		CustomAttributeID int    `json:"custom_attribute_id,omitempty"`
+	})
+	for _, field := range config.PreChatForm.Fields {
+		if field.Enabled {
+			validFields[field.Key] = field
+		}
+	}
+
+	// Process each form data field
+	for key, value := range formData {
+		// Validate field key length
+		const maxKeyLength = 100
+		if len(key) > maxKeyLength {
+			app.lo.Warn("form field key exceeds maximum length", "key", key, "length", len(key), "max", maxKeyLength)
+			continue
+		}
+
+		// Check if field is valid according to pre-chat form config
+		field, exists := validFields[key]
+		if !exists {
+			app.lo.Warn("form field not found in pre-chat form configuration", "key", key)
+			continue
+		}
+
+		// Skip default fields (name, email) - these are handled separately
+		if field.IsDefault {
+			continue
+		}
+
+		// Only process custom fields that have a custom_attribute_id
+		if field.CustomAttributeID == 0 {
+			continue
+		}
+
+		// Validate and process string values with length limits
+		if strValue, ok := value.(string); ok {
+			const maxValueLength = 1000
+			if len(strValue) > maxValueLength {
+				app.lo.Warn("form field value exceeds maximum length", "key", key, "length", len(strValue), "max", maxValueLength)
+				// Truncate the value instead of rejecting it
+				strValue = strValue[:maxValueLength]
+			}
+			customAttributes[field.Key] = strValue
+		}
+	}
+
+	return customAttributes
+}
+
+// validateFormData validates form data against pre-chat form configuration
+// Returns the final name/email to use and any validation errors
+func validateFormData(formData map[string]interface{}, config livechat.Config, existingUser *umodels.User) (string, string, error) {
+	var finalName, finalEmail string
+
+	if !config.PreChatForm.Enabled {
+		return finalName, finalEmail, nil
+	}
+
+	// Process each enabled field in the pre-chat form
+	for _, field := range config.PreChatForm.Fields {
+		if !field.Enabled {
+			continue
+		}
+
+		switch field.Key {
+		case "name":
+			if value, exists := formData[field.Key]; exists {
+				if nameStr, ok := value.(string); ok {
+					// For existing users, ignore form name if they already have one
+					if existingUser != nil && existingUser.FirstName != "" {
+						finalName = existingUser.FirstName
+					} else {
+						finalName = nameStr
+					}
+				}
+			}
+			// Validate required field
+			if field.Required && finalName == "" {
+				return "", "", fmt.Errorf("name is required")
+			}
+
+		case "email":
+			if value, exists := formData[field.Key]; exists {
+				if emailStr, ok := value.(string); ok {
+					// For existing users, ignore form email if they already have one
+					if existingUser != nil && existingUser.Email.Valid && existingUser.Email.String != "" {
+						finalEmail = existingUser.Email.String
+					} else {
+						finalEmail = emailStr
+					}
+				}
+			}
+			// Validate required field
+			if field.Required && finalEmail == "" {
+				return "", "", fmt.Errorf("email is required")
+			}
+			// Validate email format if provided
+			if finalEmail != "" && !stringutil.ValidEmail(finalEmail) {
+				return "", "", fmt.Errorf("invalid email format")
+			}
+		}
+	}
+
+	return finalName, finalEmail, nil
 }

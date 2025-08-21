@@ -1,10 +1,7 @@
 <template>
   <div class="border-t focus:ring-0 focus:outline-none">
-    <!-- Visitor Info Form -->
-    <VisitorInfoForm v-if="showVisitorForm" @submit="handleVisitorInfoSubmit" />
-
     <!-- Message Input -->
-    <div v-if="!showVisitorForm" class="p-2">
+    <div class="p-2">
       <!-- Unified Input Container -->
       <div class="border border-input rounded-lg bg-background focus-within:border-primary">
         <!-- Textarea Container -->
@@ -13,7 +10,7 @@
             v-model="newMessage"
             @keydown="handleKeydown"
             @input="handleTyping"
-            :placeholder="$t('globals.placeholders.typeMessage')"
+            :placeholder="$t('globals.terms.typeMessage')"
             class="w-full min-h-6 max-h-32 resize-none border-0 bg-transparent focus:ring-0 focus:outline-none focus-visible:ring-0 p-0 shadow-none"
             ref="messageInput"
           ></Textarea>
@@ -62,8 +59,14 @@ import { sendWidgetTyping } from '../websocket.js'
 import { convertTextToHtml } from '@shared-ui/utils/string.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageInputActions from './MessageInputActions.vue'
-import VisitorInfoForm from './VisitorInfoForm.vue'
 import api from '@widget/api/index.js'
+
+const props = defineProps({
+  formData: {
+    type: Object,
+    default: () => ({})
+  }
+})
 
 const emit = defineEmits(['error'])
 const widgetStore = useWidgetStore()
@@ -73,22 +76,7 @@ const messageInput = ref(null)
 const newMessage = ref('')
 const isUploading = ref(false)
 const isSending = ref(false)
-const visitorInfo = ref({ name: '', email: '' })
-const visitorInfoSubmitted = ref(false)
 const config = computed(() => widgetStore.config)
-
-// Determine if visitor form should be shown
-const showVisitorForm = computed(() => {
-  if (!userStore.isVisitor || userStore.userSessionToken) return false
-
-  const requireContactInfo = config.value?.visitors?.require_contact_info || 'disabled'
-
-  if (requireContactInfo !== 'disabled' && !visitorInfoSubmitted.value) {
-    return true
-  }
-
-  return false
-})
 
 // Setup typing indicator
 const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
@@ -97,21 +85,14 @@ const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
   }
 })
 
-// Handle visitor info form submission
-const handleVisitorInfoSubmit = (info) => {
-  visitorInfo.value = info
-  visitorInfoSubmitted.value = true
-}
-
 const initChatConversation = async (messageText) => {
   const payload = {
     message: messageText
   }
 
-  // Add visitor info if user is a visitor
-  if (userStore.isVisitor) {
-    payload.visitor_name = visitorInfo.value.name
-    payload.visitor_email = visitorInfo.value.email
+  // Add form data if user is a visitor and has provided info
+  if (userStore.isVisitor && Object.keys(props.formData).length > 0) {
+    payload.form_data = props.formData
   }
 
   const resp = await api.initChatConversation(payload)

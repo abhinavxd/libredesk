@@ -22,7 +22,7 @@
         </label>
         <textarea
           v-model="feedback"
-          :placeholder="$t('globals.placeholders.tellUsMore')"
+          :placeholder="$t('globals.terms.tellUsMore')"
           class="w-full p-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground"
           rows="2"
           maxlength="500"

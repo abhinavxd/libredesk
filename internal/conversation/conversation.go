@@ -35,6 +35,7 @@ import (
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/types"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
@@ -82,6 +83,24 @@ type Manager struct {
 	wg                         sync.WaitGroup
 }
 
+// WidgetConversationView represents the conversation data for widget clients
+type WidgetConversationView struct {
+	UUID                  string      `json:"uuid"`
+	Status                string      `json:"status"`
+	UnreadMessageCount    int         `json:"unread_message_count"`
+	Assignee              interface{} `json:"assignee"` // Can be null or an object
+	BusinessHoursID       *int        `json:"business_hours_id,omitempty"`
+	WorkingHoursUTCOffset *int        `json:"working_hours_utc_offset,omitempty"`
+}
+
+// WidgetConversationResponse represents the full conversation response for widget with messages
+type WidgetConversationResponse struct {
+	Conversation          models.ChatConversation `json:"conversation"`
+	Messages              []models.ChatMessage    `json:"messages"`
+	BusinessHoursID       *int                    `json:"business_hours_id,omitempty"`
+	WorkingHoursUTCOffset *int                    `json:"working_hours_utc_offset,omitempty"`
+}
+
 type slaStore interface {
 	ApplySLA(startTime time.Time, conversationID, assignedTeamID, slaID int) (slaModels.SLAPolicy, error)
 	CreateNextResponseSLAEvent(conversationID, appliedSLAID, slaPolicyID, assignedTeamID int) (time.Time, error)
@@ -102,6 +121,7 @@ type teamStore interface {
 }
 
 type userStore interface {
+	Get(int, string, string) (umodels.User, error)
 	GetAgent(int, string) (umodels.User, error)
 	GetContact(int, string) (umodels.User, error)
 	GetVisitor(int) (umodels.User, error)
@@ -112,6 +132,7 @@ type userStore interface {
 type mediaStore interface {
 	GetBlob(name string) ([]byte, error)
 	GetURL(name string) string
+	GetSignedURL(name string, expiresAt time.Time) string
 	Attach(id int, model string, modelID int) error
 	GetByModel(id int, model string) ([]mmodels.Media, error)
 	ContentIDExists(contentID string) (bool, string, error)
@@ -126,6 +147,7 @@ type inboxStore interface {
 
 type settingsStore interface {
 	GetAppRootURL() (string, error)
+	GetByPrefix(prefix string) (types.JSONText, error)
 }
 
 type csatStore interface {
@@ -556,6 +578,9 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
 	}
 
+	// Broadcast conversation update to widget clients
+	c.BroadcastConversationToWidget(uuid)
+
 	return nil
 }
 
@@ -601,6 +626,10 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 		// Evaluate automation rules for conversation team assignment.
 		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationTeamAssigned)
 	}
+
+	// Broadcast conversation update to widget clients
+	c.BroadcastConversationToWidget(uuid)
+
 	return nil
 }
 
@@ -740,6 +769,10 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		}
 		c.BroadcastConversationUpdate(uuid, "resolved_at", resolvedAt.Format(time.RFC3339))
 	}
+
+	// Broadcast conversation update to widget clients
+	c.BroadcastConversationToWidget(uuid)
+
 	return nil
 }
 
@@ -1005,6 +1038,9 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 			"conversation_uuid": uuid,
 			"actor_id":          actor.ID,
 		})
+
+		// Broadcast conversation update to widget clients when user assignee is removed
+		m.BroadcastConversationToWidget(uuid)
 	}
 
 	return nil
@@ -1180,4 +1216,206 @@ func (m *Manager) ProcessCSATStatus(messages []models.Message) {
 			msg.CensorCSATContentWithStatus(isSubmitted, csatUUID, rating, feedback)
 		}
 	}
+}
+
+// BuildWidgetConversationView builds the conversation view data for widget clients
+func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) (WidgetConversationView, error) {
+	view := WidgetConversationView{
+		UUID:               conversation.UUID,
+		Status:             conversation.Status.String,
+		UnreadMessageCount: conversation.UnreadMessageCount,
+		Assignee:           nil, // Default to null
+	}
+
+	// Fetch assignee details if assigned
+	if conversation.AssignedUserID.Int > 0 {
+		assignee, err := m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
+		if err != nil {
+			m.lo.Error("error fetching conversation assignee for widget", "conversation_uuid", conversation.UUID, "error", err)
+		} else {
+			// Convert assignee avatar URL to signed URL if needed
+			if assignee.AvatarURL.Valid && assignee.AvatarURL.String != "" {
+				avatarPath := assignee.AvatarURL.String
+				if strings.HasPrefix(avatarPath, "/uploads/") {
+					avatarUUID := strings.TrimPrefix(avatarPath, "/uploads/")
+					expiresAt := time.Now().Add(1 * time.Hour)
+					assignee.AvatarURL = null.StringFrom(m.mediaStore.GetSignedURL(avatarUUID, expiresAt))
+				}
+			}
+
+			// Build assignee object
+			view.Assignee = map[string]interface{}{
+				"id":                  assignee.ID,
+				"first_name":          assignee.FirstName,
+				"last_name":           assignee.LastName,
+				"avatar_url":          assignee.AvatarURL,
+				"availability_status": assignee.AvailabilityStatus,
+				"type":                assignee.Type,
+				"active_at":           assignee.LastActiveAt,
+			}
+		}
+	}
+
+	// Calculate business hours info
+	businessHoursID, utcOffset := m.calculateBusinessHoursInfo(conversation)
+	if businessHoursID != nil {
+		view.BusinessHoursID = businessHoursID
+	}
+	if utcOffset != nil {
+		view.WorkingHoursUTCOffset = utcOffset
+	}
+
+	return view, nil
+}
+
+// BuildWidgetConversationResponse builds the full conversation response for widget including messages
+func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversation, includeMessages bool) (WidgetConversationResponse, error) {
+	resp := WidgetConversationResponse{}
+
+	// Build messages if requested
+	if includeMessages {
+		private := false
+		messages, _, err := m.GetConversationMessages(conversation.UUID, []string{models.MessageIncoming, models.MessageOutgoing}, &private, 1, 1000)
+		if err != nil {
+			m.lo.Error("error fetching conversation messages", "conversation_uuid", conversation.UUID, "error", err)
+			return resp, envelope.NewError(envelope.GeneralError, "error fetching messages", nil)
+		}
+
+		m.ProcessCSATStatus(messages)
+
+		// Convert to chat message format
+		chatMessages := make([]models.ChatMessage, len(messages))
+		userCache := make(map[int]umodels.User)
+		for i, msg := range messages {
+			// Generate signed URLs for attachments
+			attachments := msg.Attachments
+			for j := range attachments {
+				expiresAt := time.Now().Add(8 * time.Hour)
+				attachments[j].URL = m.mediaStore.GetSignedURL(attachments[j].UUID, expiresAt)
+			}
+
+			// Fetch sender from cache or store
+			var user umodels.User
+			if cachedUser, ok := userCache[msg.SenderID]; ok {
+				user = cachedUser
+			} else {
+				user, err = m.userStore.Get(msg.SenderID, "", "")
+				if err != nil {
+					m.lo.Error("error fetching message sender user", "sender_id", msg.SenderID, "conversation_uuid", conversation.UUID, "error", err)
+				} else {
+					userCache[msg.SenderID] = user
+				}
+			}
+
+			chatMessages[i] = models.ChatMessage{
+				UUID:             msg.UUID,
+				Status:           msg.Status,
+				CreatedAt:        msg.CreatedAt,
+				Content:          msg.Content,
+				TextContent:      msg.TextContent,
+				ConversationUUID: msg.ConversationUUID,
+				Meta:             msg.Meta,
+				Author: umodels.ChatUser{
+					ID:                 user.ID,
+					FirstName:          user.FirstName,
+					LastName:           user.LastName,
+					AvatarURL:          user.AvatarURL,
+					AvailabilityStatus: user.AvailabilityStatus,
+					Type:               user.Type,
+				},
+				Attachments: attachments,
+			}
+		}
+		resp.Messages = chatMessages
+	}
+
+	// Build assignee for chat conversation
+	var assignee umodels.User
+	if conversation.AssignedUserID.Int > 0 {
+		var err error
+		assignee, err = m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
+		if err != nil {
+			m.lo.Error("error fetching conversation assignee", "conversation_uuid", conversation.UUID, "error", err)
+		} else {
+			// Convert assignee avatar URL to widget format
+			if assignee.AvatarURL.Valid && assignee.AvatarURL.String != "" {
+				avatarPath := assignee.AvatarURL.String
+				if strings.HasPrefix(avatarPath, "/uploads/") {
+					avatarUUID := strings.TrimPrefix(avatarPath, "/uploads/")
+					expiresAt := time.Now().Add(1 * time.Hour)
+					assignee.AvatarURL = null.StringFrom(m.mediaStore.GetSignedURL(avatarUUID, expiresAt))
+				}
+			}
+		}
+	}
+
+	resp.Conversation = models.ChatConversation{
+		CreatedAt:          assignee.CreatedAt,
+		UUID:               conversation.UUID,
+		Status:             conversation.Status.String,
+		UnreadMessageCount: conversation.UnreadMessageCount,
+		Assignee: umodels.ChatUser{
+			ID:                 assignee.ID,
+			FirstName:          assignee.FirstName,
+			LastName:           assignee.LastName,
+			AvatarURL:          assignee.AvatarURL,
+			AvailabilityStatus: assignee.AvailabilityStatus,
+			Type:               assignee.Type,
+			ActiveAt:           assignee.LastActiveAt,
+		},
+	}
+
+	// Calculate business hours info
+	businessHoursID, utcOffset := m.calculateBusinessHoursInfo(conversation)
+	resp.BusinessHoursID = businessHoursID
+	resp.WorkingHoursUTCOffset = utcOffset
+
+	return resp, nil
+}
+
+// calculateBusinessHoursInfo calculates business hours ID and UTC offset for a conversation
+func (m *Manager) calculateBusinessHoursInfo(conversation models.Conversation) (*int, *int) {
+	var (
+		businessHoursID *int
+		timezone        string
+		utcOffset       *int
+	)
+
+	// Check if conversation is assigned to a team with business hours
+	if conversation.AssignedTeamID.Valid {
+		team, err := m.teamStore.Get(conversation.AssignedTeamID.Int)
+		if err == nil && team.BusinessHoursID.Valid {
+			businessHoursID = &team.BusinessHoursID.Int
+			timezone = team.Timezone
+		}
+	}
+
+	// Fallback to general settings if no team business hours
+	if businessHoursID == nil {
+		out, err := m.settingsStore.GetByPrefix("app")
+		if err == nil {
+			var settings map[string]any
+			if err := json.Unmarshal([]byte(out), &settings); err == nil {
+				if bhIDStr, ok := settings["app.business_hours_id"].(string); ok && bhIDStr != "" {
+					if bhID, err := strconv.Atoi(bhIDStr); err == nil {
+						businessHoursID = &bhID
+					}
+				}
+				if tz, ok := settings["app.timezone"].(string); ok {
+					timezone = tz
+				}
+			}
+		}
+	}
+
+	// Calculate UTC offset for the timezone
+	if timezone != "" {
+		if loc, err := time.LoadLocation(timezone); err == nil {
+			_, offset := time.Now().In(loc).Zone()
+			offsetMinutes := offset / 60
+			utcOffset = &offsetMinutes
+		}
+	}
+
+	return businessHoursID, utcOffset
 }

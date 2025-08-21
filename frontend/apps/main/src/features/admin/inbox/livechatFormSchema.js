@@ -59,13 +59,26 @@ export const createFormSchema = (t) => z.object({
       start_conversation_button_text: z.string(),
       allow_start_conversation: z.boolean(),
       prevent_multiple_conversations: z.boolean(),
-      require_contact_info: z.enum(['disabled', 'optional', 'required']).default('disabled'),
-      contact_info_message: z.string().optional(),
     }),
     users: z.object({
       start_conversation_button_text: z.string(),
       allow_start_conversation: z.boolean(),
       prevent_multiple_conversations: z.boolean(),
+    }),
+    prechat_form: z.object({
+      enabled: z.boolean(),
+      title: z.string().optional(),
+      fields: z.array(z.object({
+        key: z.string().min(1),
+        type: z.enum(['text', 'email', 'number', 'checkbox', 'date', 'link', 'list']),
+        label: z.string().min(1, { message: t('globals.messages.required') }),
+        placeholder: z.string().optional(),
+        required: z.boolean(),
+        enabled: z.boolean(),
+        order: z.number().min(1),
+        is_default: z.boolean(),
+        custom_attribute_id: z.number().optional()
+      }))
     })
   })
 })

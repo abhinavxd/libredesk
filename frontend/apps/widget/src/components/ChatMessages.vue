@@ -13,11 +13,11 @@
       @scroll="handleScroll"
     >
       <!-- Chat Intro -->
-      <ChatIntro :introText="config.chat_introduction" />
+      <ChatIntro v-if="!props.showPreChatForm" :introText="config.chat_introduction" />
 
       <!-- Notice -->
       <NoticeBanner
-        v-if="config.notice_banner.enabled === true"
+        v-if="config.notice_banner.enabled === true && !props.showPreChatForm"
         :noticeText="config.notice_banner.text"
       />
 
@@ -133,6 +133,13 @@ import MessageAttachment from './MessageAttachment.vue'
 import CSATMessageBubble from './CSATMessageBubble.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+
+const props = defineProps({
+  showPreChatForm: {
+    type: Boolean,
+    default: false
+  }
+})
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()

@@ -41,8 +41,8 @@ const getWidgetSettings = (inboxID) => http.get('/api/v1/widget/chat/settings', 
 })
 const getLanguage = (lang) => http.get(`/api/v1/lang/${lang}`)
 const initChatConversation = (data) => http.post('/api/v1/widget/chat/conversations/init', data)
-const getChatConversations = () => http.post('/api/v1/widget/chat/conversations')
-const getChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}`)
+const getChatConversations = () => http.get('/api/v1/widget/chat/conversations')
+const getChatConversation = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}`)
 const sendChatMessage = (uuid, data) => http.post(`/api/v1/widget/chat/conversations/${uuid}/message`, data)
 const closeChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/close`)
 const uploadMedia = (conversationUUID, files) => {

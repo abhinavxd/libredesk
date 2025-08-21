@@ -10,6 +10,7 @@ export const WS_EVENT = {
   STATUS: 'status',
   JOINED: 'joined',
   PONG: 'pong',
+  CONVERSATION_UPDATE: 'conversation_update',
 }
 
 export class WidgetWebSocketClient {
@@ -92,6 +93,11 @@ export class WidgetWebSocketClient {
         [WS_EVENT.TYPING]: () => {
           if (data.data && data.data.is_typing !== undefined) {
             chatStore.setTypingStatus(data.data.conversation_uuid, data.data.is_typing)
+          }
+        },
+        [WS_EVENT.CONVERSATION_UPDATE]: () => {
+          if (data.data && data.data.conversation) {
+            chatStore.updateCurrentConversation(data.data.conversation)
           }
         }
       }
