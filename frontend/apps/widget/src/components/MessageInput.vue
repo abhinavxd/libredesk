@@ -20,7 +20,7 @@
         <div class="flex justify-between items-center px-3 pb-2">
           <!-- Message Input Actions (file upload + emoji) -->
           <MessageInputActions
-            :fileUploadEnabled="config.features?.file_upload || false"
+            :fileUploadEnabled="fileUploadEnabled"
             :emojiEnabled="config.features?.emoji || false"
             :uploading="isUploading"
             @fileUpload="handleFileUpload"
@@ -77,6 +77,14 @@ const newMessage = ref('')
 const isUploading = ref(false)
 const isSending = ref(false)
 const config = computed(() => widgetStore.config)
+
+// Disable file upload for AI assistants or if file upload is not enabled
+const fileUploadEnabled = computed(() => {
+  const isFeatureEnabled = config.value.features?.file_upload || false
+  const assignee = chatStore.currentConversation?.assignee
+  const isAiAssistant = assignee && assignee.type === 'ai_assistant'
+  return isFeatureEnabled && !isAiAssistant
+})
 
 // Setup typing indicator
 const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
