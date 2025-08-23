@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
@@ -38,7 +39,7 @@ var (
 )
 
 type ConversationStore interface {
-	SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) error
+	SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) (cmodels.Message, error)
 	RemoveConversationAssignee(uuid, typ string, actor umodels.User) error
 	UpdateConversationTeamAssignee(uuid string, teamID int, actor umodels.User) error
 	UpdateConversationStatus(uuid string, statusID int, status, snoozeDur string, actor umodels.User) error

@@ -306,16 +306,16 @@ func (s *ConversationCompletionsService) processCompletionRequest(req models.Con
 			metaMap["ai_reasoning"] = reasoning
 		}
 
-		if err = s.conversationStore.SendReply(
+		if _, err = s.conversationStore.SendReply(
 			nil, // No media attachments for AI responses
 			req.InboxID,
 			req.AIAssistant.ID,
 			req.ContactID,
 			req.ConversationUUID,
 			finalResponse,
-			[]string{}, // to
-			[]string{}, // cc
-			[]string{}, // bcc
+			nil, // to
+			nil, // cc
+			nil, // bcc
 			metaMap,
 		); err != nil {
 			s.lo.Error("error sending AI response", "conversation_uuid", req.ConversationUUID, "error", err)
