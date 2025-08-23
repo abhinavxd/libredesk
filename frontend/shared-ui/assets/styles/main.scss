@@ -207,10 +207,6 @@
 }
 // End Scrollbar
 
-.code-editor {
-  @apply rounded border shadow h-[65vh] min-h-[250px] w-full relative;
-}
-
 .show-quoted-text {
   blockquote {
     @apply block;

@@ -89,7 +89,7 @@ func New(opts Opts) (*Manager, error) {
 		db:            opts.DB,
 		deliveryQueue: make(chan DeliveryTask, opts.QueueSize),
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: opts.Timeout,
 			Transport: &http.Transport{
 				DialContext: (&net.Dialer{
 					Timeout:   3 * time.Second,

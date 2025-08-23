@@ -210,7 +210,7 @@ Triggered when an existing message is updated.
 
 ## Delivery and Retries
 
-- Webhooks are delivered with a 10-second timeout
+- Webhooks requests timeout can be configured in the `config.toml` file
 - Failed deliveries are not automatically retried
 - Webhook delivery runs in a background worker pool for better performance
 - If the webhook queue is full (configurable in config.toml file), new events may be dropped

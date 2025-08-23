@@ -32,6 +32,7 @@ nav:
       - Email Templates: templating.md
       - SSO Setup: sso.md
       - Webhooks: webhooks.md
+      - API Getting Started: api-getting-started.md
   - Contributions:
       - Developer Setup: developer-setup.md
       - Translate Libredesk: translations.md

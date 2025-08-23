@@ -69,11 +69,11 @@
       <Tooltip>
         <TooltipTrigger>
           <span class="text-muted-foreground text-xs mt-1">
-            {{ format(message.updated_at, 'h:mm a') }}
+            {{ formatMessageTimestamp(message.created_at) }}
           </span>
         </TooltipTrigger>
         <TooltipContent>
-          {{ format(message.updated_at, "MMMM dd, yyyy 'at' HH:mm") }}
+          {{ formatFullTimestamp(message.created_at) }}
         </TooltipContent>
       </Tooltip>
     </div>
@@ -82,17 +82,17 @@
 
 <script setup>
 import { computed } from 'vue'
-import { format } from 'date-fns'
-import { useConversationStore } from '../../../stores/conversation'
 import { Lock, RotateCcw, Check } from 'lucide-vue-next'
-import { revertCIDToImageSrc } from '../../../utils/strings'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
+import { useConversationStore } from '@/stores/conversation'
+import { revertCIDToImageSrc } from '@/utils/strings'
+import { formatMessageTimestamp, formatFullTimestamp } from '@/utils/datetime'
 import MessageAttachmentPreview from '@/features/conversation/message/attachment/MessageAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
-import api from '../../../api'
+import api from '@/api'
 
 const props = defineProps({
   message: Object

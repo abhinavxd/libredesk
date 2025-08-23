@@ -331,7 +331,7 @@ func (e *Engine) handleNewConversation(conversation cmodels.Conversation) {
 	e.lo.Debug("handling new conversation for automation rule evaluation", "uuid", conversation.UUID)
 	rules := e.filterRulesByType(models.RuleTypeNewConversation, "")
 	if len(rules) == 0 {
-		e.lo.Warn("no rules to evaluate for new conversation rule evaluation", "uuid", conversation.UUID)
+		e.lo.Info("no rules to evaluate for new conversation rule evaluation", "uuid", conversation.UUID)
 		return
 	}
 	e.evalConversationRules(rules, conversation)
@@ -342,7 +342,7 @@ func (e *Engine) handleUpdateConversation(conversation cmodels.Conversation, eve
 	e.lo.Debug("handling update conversation for automation rule evaluation", "uuid", conversation.UUID, "event_type", eventType)
 	rules := e.filterRulesByType(models.RuleTypeConversationUpdate, eventType)
 	if len(rules) == 0 {
-		e.lo.Warn("no rules to evaluate for conversation update", "uuid", conversation.UUID, "event_type", eventType)
+		e.lo.Info("no rules to evaluate for conversation update", "uuid", conversation.UUID, "event_type", eventType)
 		return
 	}
 	e.evalConversationRules(rules, conversation)
@@ -359,7 +359,7 @@ func (e *Engine) handleTimeTrigger() {
 	}
 	rules := e.filterRulesByType(models.RuleTypeTimeTrigger, "")
 	if len(rules) == 0 {
-		e.lo.Warn("no rules to evaluate for time trigger")
+		e.lo.Info("no rules to evaluate for time trigger")
 		return
 	}
 	e.lo.Info("fetched conversations for evaluating time triggers", "conversations_count", len(conversations), "rules_count", len(rules))

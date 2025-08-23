@@ -20,7 +20,7 @@ export const createColumns = (t) => [
     },
     cell: function ({ row }) {
       const url = row.getValue('url')
-      return h('div', { class: 'text-center font-mono text-sm max-w-sm truncate' }, url)
+      return h('div', { class: 'text-center font-mono mt-1 max-w-sm truncate' }, url)
     }
   },
   {
