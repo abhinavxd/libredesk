@@ -118,13 +118,13 @@ func V0_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 
 		/* ──  ── */
 		`
-		CREATE UNIQUE INDEX index_unique_users_on_ext_id_when_type_is_contact 
+		CREATE UNIQUE INDEX IF NOT EXISTS index_unique_users_on_ext_id_when_type_is_contact 
 		ON users (external_user_id) 
 		WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL;
 		`,
 
 		`
-		CREATE UNIQUE INDEX index_unique_users_on_email_when_no_ext_id_contact
+		CREATE UNIQUE INDEX IF NOT EXISTS index_unique_users_on_email_when_no_ext_id_contact
 		ON users (email) 
 		WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL;
 		`,
