@@ -736,7 +736,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 
 	// Send reply to the created conversation.
-	if err := app.conversation.SendReply(media, req.InboxID, auser.ID, contact.ID, conversationUUID, req.Content, to, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
+	if _, err := app.conversation.SendReply(media, req.InboxID, auser.ID, contact.ID, conversationUUID, req.Content, to, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
 		// Delete the conversation if reply fails.
 		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 			app.lo.Error("error deleting conversation", "error", err)
