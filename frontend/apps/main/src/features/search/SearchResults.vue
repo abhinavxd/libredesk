@@ -96,7 +96,7 @@
 import { computed, ref, watch } from 'vue'
 import { ChevronRightIcon, ClockIcon } from 'lucide-vue-next'
 import { format, parseISO } from 'date-fns'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 
 const props = defineProps({
   results: {
