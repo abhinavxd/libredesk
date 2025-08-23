@@ -94,6 +94,15 @@ export const useChatStore = defineStore('chat', () => {
         // Update conversations list with pending message
         updateConversationListLastMessage(conversationUUID, pendingMessage)
 
+        // Auto-remove after 10 seconds if still has temp ID
+        const tempId = pendingMessage.uuid
+        setTimeout(() => {
+            const messages = messageCache.getAllPagesMessages(conversationUUID)
+            if (messages.some(msg => msg.uuid === tempId)) {
+                removeMessage(conversationUUID, tempId)
+            }
+        }, 10000)
+
         return pendingMessage.uuid
     }
 
