@@ -369,8 +369,8 @@ func (m *Manager) MarkMessageAsPending(uuid string) error {
 	return nil
 }
 
-// SendPrivateNote inserts a private message for a conversation.
-func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string) error {
+// SendPrivateNote inserts a private message in a conversation.
+func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string) (models.Message, error) {
 	message := models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
@@ -382,18 +382,21 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 		Private:          true,
 		Media:            media,
 	}
-	return m.InsertMessage(&message)
+	if err := m.InsertMessage(&message); err != nil {
+		return models.Message{}, err
+	}
+	return message, nil
 }
 
 // SendReply inserts a reply message for a conversation.
-func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) error {
+func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) (models.Message, error) {
 	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
 	if err != nil {
-		return err
+		return models.Message{}, err
 	}
 
 	if !inboxRecord.Enabled {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil)
+		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil)
 	}
 
 	var sourceID = ""
@@ -413,18 +416,18 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID 
 			metaMap["bcc"] = bcc
 		}
 		if len(to) == 0 {
-			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "`to`"), nil)
+			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "`to`"), nil)
 		}
 		sourceID, err = stringutil.GenerateEmailMessageID(conversationUUID, inboxRecord.From)
 		if err != nil {
 			m.lo.Error("error generating source message id", "error", err)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
+			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
 		}
 	case inbox.ChannelLiveChat:
 		sourceID, err = stringutil.RandomAlphanumeric(35)
 		if err != nil {
 			m.lo.Error("error generating random source id", "error", err)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
+			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
 		}
 		sourceID = "livechat-" + sourceID
 	}
@@ -433,7 +436,7 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID 
 	metaJSON, err := json.Marshal(metaMap)
 	if err != nil {
 		m.lo.Error("error marshalling message meta map to JSON", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil)
+		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil)
 	}
 
 	// Insert the message into the database
@@ -452,19 +455,16 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID 
 		Meta:              metaJSON,
 	}
 	if err := m.InsertMessage(&message); err != nil {
-		return err
+		return models.Message{}, err
 	}
-
-	return nil
+	return message, nil
 }
 
 // InsertMessage inserts a message and attaches the media to the message.
 func (m *Manager) InsertMessage(message *models.Message) error {
-	// Private message is always sent.
 	if message.Private {
 		message.Status = models.MessageStatusSent
 	}
-
 	if len(message.Meta) == 0 || string(message.Meta) == "null" {
 		message.Meta = json.RawMessage(`{}`)
 	}
@@ -479,7 +479,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil)
 	}
 
-	// Attach message to the media in DB.
+	// Attach just inserted message to the media.
 	for _, media := range message.Media {
 		m.mediaStore.Attach(media.ID, mmodels.ModelMessages, message.ID)
 	}
@@ -546,16 +546,22 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	// Broadcast new message.
 	m.BroadcastNewMessage(message)
 
-	// Refetch message and send webhook event for message created.
-	updatedMessage, err := m.GetMessage(message.UUID)
-	if err != nil {
-		m.lo.Error("error fetching updated message for webhook event", "uuid", message.UUID, "error", err)
-	} else {
-		m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, updatedMessage)
+	// Refetch message if this message has media attachments, as media gets linked after inserting the message.
+	if len(message.Media) > 0 {
+		refetchedMessage, err := m.GetMessage(message.UUID)
+		if err != nil {
+			m.lo.Error("error fetching message after insert", "error", err)
+		} else {
+			// Replace the message in the struct with the refetched message.
+			*message = refetchedMessage
+		}
 	}
 
-	// Handle AI completion for AI assistant conversations.
-	m.enqueueMessageForAICompletion(updatedMessage, message)
+	// Enqueue for AI completion.
+	m.enqueueMessageForAICompletion(*message)
+
+	// Trigger webhook for new message created.
+	m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, message)
 
 	return nil
 }
@@ -614,7 +620,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 	content, err := m.getMessageActivityContent(activityType, newValue, actor.FullName())
 	if err != nil {
 		m.lo.Error("error could not generate activity content", "error", err)
-		return err
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.activityMessage}"), nil)
 	}
 
 	message := models.Message{
@@ -1061,22 +1067,21 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	return nil
 }
 
-// enqueueMessageForAICompletion enqueues message for AI completion if the conversation is assigned to an AI assistant
-// and if the inbox has help center attached.
-func (m *Manager) enqueueMessageForAICompletion(updatedMessage models.Message, message *models.Message) {
+// enqueueMessageForAICompletion enqueues message for AI completion if the conversation is assigned to an AI assistant and if the inbox has help center attached.
+func (m *Manager) enqueueMessageForAICompletion(message models.Message) {
 	if m.aiStore == nil {
 		m.lo.Warn("AI store not configured, skipping AI completion request")
 		return
 	}
 
 	// Only process incoming messages from contacts.
-	if updatedMessage.Type != models.MessageIncoming || updatedMessage.SenderType != models.SenderTypeContact {
+	if message.Type != models.MessageIncoming || message.SenderType != models.SenderTypeContact {
 		return
 	}
 
-	conversation, err := m.GetConversation(updatedMessage.ConversationID, "")
+	conversation, err := m.GetConversation(message.ConversationID, "")
 	if err != nil {
-		m.lo.Error("error fetching conversation for AI completion", "conversation_id", updatedMessage.ConversationID, "error", err)
+		m.lo.Error("error fetching conversation for AI completion", "conversation_id", message.ConversationID, "error", err)
 		return
 	}
 

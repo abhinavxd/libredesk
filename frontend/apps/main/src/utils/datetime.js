@@ -26,3 +26,11 @@ export const formatDuration = (seconds, showSeconds = true) => {
   const secs = totalSeconds % 60
   return `${hours}h ${mins}m ${showSeconds ? `${secs}s` : ''}`
 }
+
+export const formatMessageTimestamp = (time) => {
+  return format(time, 'd MMM, hh:mm a')
+}
+
+export const formatFullTimestamp = (time) => {
+  return format(time, 'd MMM yyyy, hh:mm a')
+}

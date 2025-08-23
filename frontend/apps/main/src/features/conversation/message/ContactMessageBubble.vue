@@ -60,12 +60,12 @@
       <Tooltip>
         <TooltipTrigger>
           <span class="text-muted-foreground text-xs mt-1">
-            {{ format(message.updated_at, 'h:mm a') }}
+            {{ formatMessageTimestamp(message.created_at) }}
           </span>
         </TooltipTrigger>
         <TooltipContent>
           <p>
-            {{ format(message.updated_at, "MMMM dd, yyyy 'at' HH:mm") }}
+            {{ formatFullTimestamp(message.created_at) }}
           </p>
         </TooltipContent>
       </Tooltip>
@@ -75,12 +75,12 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { format } from 'date-fns'
-import { useConversationStore } from '../../../stores/conversation'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Letter } from 'vue-letter'
-import { useAppSettingsStore } from '../../../stores/appSettings'
+import { useConversationStore } from '@/stores/conversation'
+import { formatMessageTimestamp, formatFullTimestamp } from '@/utils/datetime'
+import { useAppSettingsStore } from '@/stores/appSettings'
 import { useI18n } from 'vue-i18n'
 import MessageAttachmentPreview from '@/features/conversation/message/attachment/MessageAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'

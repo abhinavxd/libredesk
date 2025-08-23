@@ -62,7 +62,7 @@
                   :checked="!!selectedDays[day]"
                   @update:checked="handleDayToggle(day, $event)"
                 />
-                <Label :for="day" class="font-medium text-gray-800">{{ day }}</Label>
+                <Label :for="day" class="font-medium">{{ day }}</Label>
               </div>
               <div class="flex space-x-2 items-center">
                 <div class="flex flex-col items-start">
@@ -156,7 +156,7 @@
         </div>
         <DialogFooter>
           <Button :disabled="!holidayName || !holidayDate" @click="saveHoliday">
-            {{ t('globals.messages.saveChanges') }}
+            {{ t('globals.messages.add') }}
           </Button>
         </DialogFooter>
       </DialogContent>

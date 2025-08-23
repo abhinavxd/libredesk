@@ -1014,14 +1014,17 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 		}
 		return m.UpdateConversationStatus(conv.UUID, statusID, "", "", user)
 	case amodels.ActionSendPrivateNote:
-		return m.SendPrivateNote([]mmodels.Media{}, user.ID, conv.UUID, action.Value[0])
+		_, err := m.SendPrivateNote([]mmodels.Media{}, user.ID, conv.UUID, action.Value[0])
+		if err != nil {
+			return fmt.Errorf("sending private note: %w", err)
+		}
 	case amodels.ActionReply:
 		// Make recipient list.
 		to, cc, bcc, err := m.makeRecipients(conv.ID, conv.Contact.Email.String, conv.InboxMail)
 		if err != nil {
 			return fmt.Errorf("making recipients for reply action: %w", err)
 		}
-		return m.SendReply(
+		_, err = m.SendReply(
 			[]mmodels.Media{},
 			conv.InboxID,
 			user.ID,
@@ -1033,6 +1036,9 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			bcc,
 			map[string]any{}, /**meta**/
 		)
+		if err != nil {
+			return fmt.Errorf("sending reply: %w", err)
+		}
 	case amodels.ActionSetSLA:
 		slaID, err := strconv.Atoi(action.Value[0])
 		if err != nil {
@@ -1046,6 +1052,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 	default:
 		return fmt.Errorf("unknown action: %s", action.Type)
 	}
+	return nil
 }
 
 // RemoveConversationAssignee removes the assignee from the conversation.
@@ -1089,10 +1096,16 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 	// Make recipient list.
 	to, cc, bcc, err := m.makeRecipients(conversation.ID, conversation.Contact.Email.String, conversation.InboxMail)
 	if err != nil {
-		return fmt.Errorf("making recipients for CSAT reply: %w", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.csat}"), nil)
 	}
 
-	return m.SendReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, cc, bcc, meta)
+	// Send CSAT reply.
+	_, err = m.SendReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, cc, bcc, meta)
+	if err != nil {
+		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.csat}"), nil)
+	}
+	return nil
 }
 
 // DeleteConversation deletes a conversation.
@@ -1356,7 +1369,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 	var assignee umodels.User
 	if conversation.AssignedUserID.Int > 0 {
 		var err error
-		assignee, err = m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
+		assignee, err = m.userStore.Get(conversation.AssignedUserID.Int, "", "")
 		if err != nil {
 			m.lo.Error("error fetching conversation assignee", "conversation_uuid", conversation.UUID, "error", err)
 		} else {

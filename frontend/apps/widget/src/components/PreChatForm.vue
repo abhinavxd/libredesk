@@ -3,7 +3,7 @@
     <div v-if="showForm" class="flex-1 flex flex-col max-h-full">
       <div class="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50 p-4 space-y-4">
         <!-- Form title -->
-        <div v-if="formTitle" class="text-lg font-semibold text-foreground mb-2">
+        <div v-if="formTitle" class="text-xl text-foreground mb-2 text-center">
           {{ formTitle }}
         </div>
         

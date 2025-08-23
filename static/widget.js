@@ -92,7 +92,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
                 transition: transform 0.3s ease;
             `;
 
@@ -174,8 +174,8 @@
             this.iframe.style.cssText = `
                 position: fixed;
                 border: none;
-                border-radius: 10px;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+                border-radius: 12px;
+                box-shadow: 0 5px 80px rgba(0,0,0,0.3);
                 z-index: 9999;
                 width: 400px;
                 height: 700px;
@@ -293,17 +293,17 @@
                     this.iframe.style.display = 'block';
                     this.iframe.style.position = 'fixed';
                     this.iframe.style.width = '400px';
-                    this.iframe.style.borderRadius = '10px';
-                    this.iframe.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)';
+                    this.iframe.style.borderRadius = '12px';
+                    this.iframe.style.boxShadow = '0 5px 40px rgba(0,0,0,0.2)';
                     this.iframe.style.top = '';
                     this.iframe.style.left = '';
                     this.widgetButtonWrapper.style.display = '';
 
                     // Apply expanded or normal height based on current state
                     if (this.isExpanded) {
-                        this.iframe.style.height = '100vh';
-                        this.iframe.style.bottom = '0';
-                        this.iframe.style.top = '0';
+                        this.iframe.style.width = '650px';
+                        this.iframe.style.height = 'calc(100vh - 110px)';
+                        this.iframe.style.bottom = '90px';
                     } else {
                         this.iframe.style.height = '700px';
                         this.setLauncherPosition();
@@ -323,7 +323,6 @@
             if (this.iframe) {
                 this.iframe.style.display = 'none';
                 this.isChatVisible = false;
-                this.isExpanded = false;
                 this.toggleButton.style.transform = 'scale(1)';
                 this.widgetButtonWrapper.style.display = '';
 
@@ -348,13 +347,11 @@
             if (this.iframe && this.isChatVisible && !this.isMobile) {
                 this.isExpanded = true;
 
-                // Expand to a larger size (wider and taller)
-                this.iframe.style.width = '600px';
-                this.iframe.style.height = '80vh';
-                this.iframe.style.maxHeight = '800px';
-
-                // Set launcher position to avoid covering it
-                this.setLauncherPosition();
+                // Expand to nearly full viewport height with gaps and wider
+                this.iframe.style.width = '650px';
+                this.iframe.style.height = 'calc(100vh - 110px)';
+                this.iframe.style.bottom = '90px';
+                this.iframe.style.maxHeight = '';
 
                 // Send expanded state to iframe
                 this.iframe.contentWindow.postMessage({
@@ -368,12 +365,13 @@
             if (this.iframe && this.isChatVisible && !this.isMobile) {
                 this.isExpanded = false;
 
-                // Reset to original size
+                // Reset to original size and position
                 this.iframe.style.width = '400px';
                 this.iframe.style.height = '700px';
-                this.iframe.style.maxHeight = 'none';
+                this.iframe.style.maxHeight = '';
+                this.iframe.style.top = '';
 
-                // Set launcher position to avoid covering it
+                // Restore launcher position
                 this.setLauncherPosition();
 
                 // Send collapsed state to iframe

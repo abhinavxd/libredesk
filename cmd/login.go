@@ -3,7 +3,6 @@ package main
 import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -41,12 +40,6 @@ func handleLogin(r *fastglue.Request) error {
 	if !user.Enabled {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("user.accountDisabled"), nil))
 	}
-
-	// Set user availability status to online.
-	if err := app.user.UpdateAvailability(user.ID, umodels.Online); err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	user.AvailabilityStatus = umodels.Online
 
 	if err := app.auth.SaveSession(amodels.User{
 		ID:        user.ID,

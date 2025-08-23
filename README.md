@@ -15,7 +15,7 @@ Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**Live 
 ## Features
 
 - **Multi Shared Inbox**  
-  Libredesk supports multiple shares inboxes, letting you manage conversations across teams effortlessly.
+  Libredesk supports multiple shared inboxes, letting you manage conversations across teams effortlessly.
 - **Granular Permissions**  
   Create custom roles with granular permissions for teams and individual agents.
 - **Smart Automation**  
@@ -84,6 +84,11 @@ __________________
 
 ## Developers
 If you are interested in contributing, refer to the [developer setup](https://libredesk.io/docs/developer-setup/). The backend is written in Go and the frontend is Vue js 3 with Shadcn for UI components.
+
+## Development Status
+
+Libredesk is under active development.  
+Track roadmap and progress on the GitHub Project Board:   [https://github.com/users/abhinavxd/projects/1](https://github.com/users/abhinavxd/projects/1)
 
 
 ## Translators

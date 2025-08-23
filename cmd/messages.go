@@ -175,13 +175,16 @@ func handleSendMessage(r *fastglue.Request) error {
 	}
 
 	if req.Private {
-		if err := app.conversation.SendPrivateNote(media, user.ID, cuuid, req.Message); err != nil {
+		message, err := app.conversation.SendPrivateNote(media, user.ID, cuuid, req.Message)
+		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-	} else {
-		if err := app.conversation.SendReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/); err != nil {
-			return sendErrorEnvelope(r, err)
-		}
+		return r.SendEnvelope(message)
 	}
-	return r.SendEnvelope(true)
+
+	message, err := app.conversation.SendReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(message)
 }

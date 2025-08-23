@@ -1,10 +1,13 @@
 <template>
-    <div ref="codeEditor" id="code-editor" class="code-editor" />
+    <div ref="codeEditor" @click="editorView?.focus()" class="w-full h-[28rem] border rounded-md" />
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
-import CodeFlask from 'codeflask'
+import { ref, onMounted, watch, nextTick, useTemplateRef } from 'vue'
+import { EditorView, basicSetup } from 'codemirror'
+import { html } from '@codemirror/lang-html'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { useColorMode } from '@vueuse/core'
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -13,45 +16,38 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
-const codeEditor = ref(null)
 const data = ref('')
-const flask = ref(null)
+let editorView = null 
+const codeEditor = useTemplateRef('codeEditor')
 
 const initCodeEditor = (body) => {
-    const el = document.createElement('code-flask')
-    el.attachShadow({ mode: 'open' })
-    el.shadowRoot.innerHTML = `
-      <style>
-        .codeflask .codeflask__flatten {
-          font-size: 15px;
-          white-space: pre-wrap;
-          word-break: break-word;
-        }
-        .codeflask .codeflask__lines { background: #fafafa; z-index: 10; }
-        .codeflask .token.tag { font-weight: bold; }
-        .codeflask .token.attr-name { color: #111; }
-        .codeflask .token.attr-value { color: #000 !important; }
-      </style>
-      <div id="area"></div>
-    `
-    codeEditor.value.appendChild(el)
+    const isDark = useColorMode().value === 'dark'
 
-    flask.value = new CodeFlask(el.shadowRoot.getElementById('area'), {
-        language: props.language,
-        lineNumbers: false,
-        styleParent: el.shadowRoot,
-        readonly: props.disabled
+    editorView = new EditorView({
+        doc: body,
+        extensions: [
+            basicSetup,
+            html(),
+            ...(isDark ? [oneDark] : []),
+            EditorView.editable.of(!props.disabled),
+            EditorView.theme({
+                '&': { height: '100%' },
+                '.cm-editor': { height: '100%' },
+                '.cm-scroller': { overflow: 'auto' }
+            }),
+            EditorView.updateListener.of((update) => {
+                if (!update.docChanged) return
+                const v = update.state.doc.toString()
+                emit('update:modelValue', v)
+                data.value = v
+                
+            })
+        ],
+        parent: codeEditor.value
     })
-
-    flask.value.onUpdate((v) => {
-        emit('update:modelValue', v)
-        data.value = v
-    })
-
-    flask.value.updateCode(body)
 
     nextTick(() => {
-        document.querySelector('code-flask').shadowRoot.querySelector('textarea').focus()
+        editorView?.focus()
     })
 }
 
@@ -61,7 +57,9 @@ onMounted(() => {
 
 watch(() => props.modelValue, (newVal) => {
     if (newVal !== data.value) {
-        flask.value.updateCode(newVal)
+        editorView?.dispatch({
+            changes: { from: 0, to: editorView.state.doc.length, insert: newVal }
+        })
     }
 })
 </script>
