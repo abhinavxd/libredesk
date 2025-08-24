@@ -557,9 +557,6 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		}
 	}
 
-	// Enqueue for AI completion.
-	m.enqueueMessageForAICompletion(*message)
-
 	// Trigger webhook for new message created.
 	m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, message)
 
@@ -1064,24 +1061,32 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 			m.BroadcastConversationUpdate(conversationUUID, "next_response_met_at", nil)
 		}
 	}
+
+	// Enqueue conversation for AI completion if assigned to an AI assistant.
+	m.enqueueMessageForAICompletion(conversation)
+
 	return nil
 }
 
 // enqueueMessageForAICompletion enqueues message for AI completion if the conversation is assigned to an AI assistant and if the inbox has help center attached.
-func (m *Manager) enqueueMessageForAICompletion(message models.Message) {
+func (m *Manager) enqueueMessageForAICompletion(conversation models.Conversation) {
 	if m.aiStore == nil {
 		m.lo.Warn("AI store not configured, skipping AI completion request")
 		return
 	}
 
-	// Only process incoming messages from contacts.
-	if message.Type != models.MessageIncoming || message.SenderType != models.SenderTypeContact {
+	// Get the latest message to check if it's from a contact
+	latestMsg, err := m.getLatestMessage(conversation.ID,
+		[]string{models.MessageIncoming, models.MessageOutgoing},
+		[]string{models.MessageStatusSent, models.MessageStatusReceived},
+		true)
+	if err != nil {
+		m.lo.Error("error fetching latest message for AI completion", "conversation_id", conversation.ID, "error", err)
 		return
 	}
 
-	conversation, err := m.GetConversation(message.ConversationID, "")
-	if err != nil {
-		m.lo.Error("error fetching conversation for AI completion", "conversation_id", message.ConversationID, "error", err)
+	// Only process incoming messages from contacts.
+	if latestMsg.Type != models.MessageIncoming || latestMsg.SenderType != models.SenderTypeContact {
 		return
 	}
 
@@ -1107,9 +1112,9 @@ func (m *Manager) enqueueMessageForAICompletion(message models.Message) {
 		return
 	}
 
-	messages, _, err := m.GetConversationMessages(message.ConversationUUID, []string{models.MessageIncoming, models.MessageOutgoing}, nil, 1, 50)
+	messages, _, err := m.GetConversationMessages(conversation.UUID, []string{models.MessageIncoming, models.MessageOutgoing}, nil, 1, 50)
 	if err != nil {
-		m.lo.Error("error fetching conversation message history for AI completion", "conversation_uuid", message.ConversationUUID, "error", err)
+		m.lo.Error("error fetching conversation message history for AI completion", "conversation_uuid", conversation.UUID, "error", err)
 		return
 	}
 

@@ -618,20 +618,42 @@ update conversation_messages set status = $1, updated_at = NOW() where uuid = $2
 
 -- name: get-latest-message
 SELECT
+    m.id,
     m.created_at,
     m.updated_at,
     m.status,
-    m.type, 
+    m.type,
     m.content,
+    m.text_content,
+    m.content_type,
+    m.conversation_id,
     m.uuid,
     m.private,
-    m.sender_id,
     m.sender_type,
-    m.meta
+    m.sender_id,
+    m.meta,
+    c.uuid as conversation_uuid,
+    COALESCE(
+        json_agg(
+            json_build_object(
+                'name', media.filename,
+                'content_type', media.content_type,
+                'uuid', media.uuid,
+                'size', media.size,
+                'content_id', media.content_id,
+                'disposition', media.disposition
+            ) ORDER BY media.filename
+        ) FILTER (WHERE media.id IS NOT NULL),
+        '[]'::json
+    ) AS attachments
 FROM conversation_messages m
+INNER JOIN conversations c ON c.id = m.conversation_id
+LEFT JOIN media ON media.model_type = 'messages' AND media.model_id = m.id
 WHERE m.conversation_id = $1
 AND m.type = ANY($2)
 AND m.status = ANY($3)
-AND m.private = NOT $4
+AND ($4 = FALSE OR m.private = FALSE)
+GROUP BY 
+    m.id, m.created_at, m.updated_at, m.status, m.type, m.content, m.text_content, m.content_type, m.conversation_id, m.uuid, m.private, m.sender_type, m.sender_id, m.meta, c.uuid
 ORDER BY m.created_at DESC
 LIMIT 1;

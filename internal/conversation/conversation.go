@@ -575,6 +575,9 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		return err
 	}
 
+	// Enqueue conversation for AI completion if assigned to an AI assistant.
+	c.enqueueMessageForAICompletion(conversation)
+
 	// Evaluate automation rules.
 	c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationUserAssigned)
 

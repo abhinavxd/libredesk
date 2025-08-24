@@ -241,8 +241,9 @@ func (s *ConversationCompletionsService) processCompletionRequest(req models.Con
 		return
 	}
 
-	// Log upstream processing time
-	s.lo.Debug("AI chat completion upstream processing time", "conversation_uuid", req.ConversationUUID, "duration_ms", time.Since(upstreamStartAt).Milliseconds())
+	// Log response
+	s.lo.Debug("AI chat completion upstream processing time", "conversation_uuid", req.ConversationUUID, "duration_ms", time.Since(upstreamStartAt).Milliseconds(),
+		"response", aiResponse)
 
 	// Process AI response
 	var (
@@ -653,7 +654,8 @@ func (s *ConversationCompletionsService) refineSearchQuery(query, targetLanguage
 		"refined_query", refinementResponse.RefinedQuery,
 		"translated_query", refinementResponse.TranslatedQuery,
 		"confidence", refinementResponse.ConfidenceScore,
-		"target_language", targetLanguage)
+		"target_language", targetLanguage,
+		"cleaned_response", cleanedResponse)
 
 	return refinementResponse, nil
 }
