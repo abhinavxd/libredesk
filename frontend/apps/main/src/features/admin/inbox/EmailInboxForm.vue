@@ -14,18 +14,24 @@
 
     <FormField v-slot="{ componentField }" name="help_center_id">
       <FormItem>
-        <FormLabel>{{ $t('admin.inbox.helpCenter') }}</FormLabel>
+        <FormLabel>{{ $t('globals.terms.helpCenter') }}</FormLabel>
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger>
-              <SelectValue :placeholder="t('admin.inbox.helpCenter.placeholder')" />
+              <SelectValue
+                :placeholder="
+                  t('globals.messages.select', {
+                    name: $t('globals.terms.helpCenter').toLowerCase()
+                  })
+                "
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
               <SelectItem
                 v-for="helpCenter in helpCenters"
                 :key="helpCenter.id"
-                :value="helpCenter.id.toString()"
+                :value="helpCenter.id"
               >
                 {{ helpCenter.name }}
               </SelectItem>

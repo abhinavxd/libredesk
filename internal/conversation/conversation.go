@@ -1022,25 +1022,17 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			return fmt.Errorf("sending private note: %w", err)
 		}
 	case amodels.ActionReply:
-		// Make recipient list.
-		to, cc, bcc, err := m.makeRecipients(conv.ID, conv.Contact.Email.String, conv.InboxMail)
-		if err != nil {
-			return fmt.Errorf("making recipients for reply action: %w", err)
-		}
-		_, err = m.SendReply(
+		_, err := m.SendAutoReply(
 			[]mmodels.Media{},
 			conv.InboxID,
 			user.ID,
 			conv.ContactID,
 			conv.UUID,
 			action.Value[0],
-			to,
-			cc,
-			bcc,
 			map[string]any{}, /**meta**/
 		)
 		if err != nil {
-			return fmt.Errorf("sending reply: %w", err)
+			return fmt.Errorf("sending automated reply: %w", err)
 		}
 	case amodels.ActionSetSLA:
 		slaID, err := strconv.Atoi(action.Value[0])
@@ -1096,14 +1088,8 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		"is_csat": true,
 	}
 
-	// Make recipient list.
-	to, cc, bcc, err := m.makeRecipients(conversation.ID, conversation.Contact.Email.String, conversation.InboxMail)
-	if err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.csat}"), nil)
-	}
-
-	// Send CSAT reply.
-	_, err = m.SendReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, cc, bcc, meta)
+	// Send CSAT reply with auto-computed recipients.
+	_, err = m.SendAutoReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, meta)
 	if err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.csat}"), nil)

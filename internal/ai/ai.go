@@ -39,7 +39,7 @@ var (
 )
 
 type ConversationStore interface {
-	SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) (cmodels.Message, error)
+	SendAutoReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, metaMap map[string]any) (cmodels.Message, error)
 	RemoveConversationAssignee(uuid, typ string, actor umodels.User) error
 	UpdateConversationTeamAssignee(uuid string, teamID int, actor umodels.User) error
 	UpdateConversationStatus(uuid string, statusID int, status, snoozeDur string, actor umodels.User) error

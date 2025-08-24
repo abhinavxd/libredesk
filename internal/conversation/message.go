@@ -388,6 +388,26 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 	return message, nil
 }
 
+// SendAutoReply sends a reply with automatically computed recipients based on the conversation's last message.
+// For incoming messages: replies to the sender (from), CC'ing other participants.
+// For outgoing messages: continues the existing recipient list.
+// Used for AI responses, automation rules, and CSAT replies where manual recipient selection isn't needed.
+func (m *Manager) SendAutoReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, metaMap map[string]any) (models.Message, error) {
+	conv, err := m.GetConversation(0, conversationUUID)
+	if err != nil {
+		return models.Message{}, fmt.Errorf("fetching conversation for auto reply: %w", err)
+	}
+
+	// Compute recipients
+	to, cc, bcc, err := m.makeRecipients(conv.ID, conv.Contact.Email.String, conv.InboxMail)
+	if err != nil {
+		return models.Message{}, fmt.Errorf("computing recipients for auto reply: %w", err)
+	}
+
+	// Send reply with computed recipients
+	return m.SendReply(media, inboxID, senderID, contactID, conversationUUID, content, to, cc, bcc, metaMap)
+}
+
 // SendReply inserts a reply message for a conversation.
 func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) (models.Message, error) {
 	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
@@ -1045,6 +1065,9 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	if err != nil {
 		m.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 	} else {
+		// Enqueue conversation for AI completion if assigned to an AI assistant.
+		m.enqueueMessageForAICompletion(conversation)
+
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming)
 
@@ -1062,14 +1085,13 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		}
 	}
 
-	// Enqueue conversation for AI completion if assigned to an AI assistant.
-	m.enqueueMessageForAICompletion(conversation)
-
 	return nil
 }
 
 // enqueueMessageForAICompletion enqueues message for AI completion if the conversation is assigned to an AI assistant and if the inbox has help center attached.
 func (m *Manager) enqueueMessageForAICompletion(conversation models.Conversation) {
+	m.lo.Debug("checking conversation for AI completion", "conversation_id", conversation.ID)
+
 	if m.aiStore == nil {
 		m.lo.Warn("AI store not configured, skipping AI completion request")
 		return
@@ -1087,6 +1109,7 @@ func (m *Manager) enqueueMessageForAICompletion(conversation models.Conversation
 
 	// Only process incoming messages from contacts.
 	if latestMsg.Type != models.MessageIncoming || latestMsg.SenderType != models.SenderTypeContact {
+		m.lo.Debug("latest message is not from a contact, skipping AI completion", "conversation_id", conversation.ID, "type", latestMsg.Type, "sender_type", latestMsg.SenderType)
 		return
 	}
 
@@ -1097,8 +1120,15 @@ func (m *Manager) enqueueMessageForAICompletion(conversation models.Conversation
 		return
 	}
 
-	// Check if conversation is assigned to a user and inbox has help center attached.
-	if conversation.AssignedUserID.Int <= 0 || !inbox.HelpCenterID.Valid {
+	// Make sure the conversation has an assigned user.
+	if !conversation.AssignedUserID.Valid {
+		m.lo.Debug("conversation is not assigned to a user, skipping AI completion", "conversation_id", conversation.ID)
+		return
+	}
+
+	// Make sure there's an helpcenter linked to the inbox as AI completions use help center articles for context.
+	if !inbox.HelpCenterID.Valid {
+		m.lo.Debug("inbox is not linked to a help center, skipping AI completion", "inbox_id", conversation.InboxID)
 		return
 	}
 
@@ -1108,11 +1138,18 @@ func (m *Manager) enqueueMessageForAICompletion(conversation models.Conversation
 		m.lo.Error("error fetching assignee user for AI completion", "assignee_user_id", conversation.AssignedUserID.Int, "error", err)
 		return
 	}
-	if !assigneUser.IsAiAssistant() || !assigneUser.Enabled {
+
+	if !assigneUser.IsAiAssistant() {
+		m.lo.Debug("conversation is not assigned to an AI assistant, skipping AI completion", "conversation_id", conversation.ID)
 		return
 	}
 
-	messages, _, err := m.GetConversationMessages(conversation.UUID, []string{models.MessageIncoming, models.MessageOutgoing}, nil, 1, 50)
+	if !assigneUser.Enabled {
+		m.lo.Debug("AI assistant is not enabled, skipping AI completion", "conversation_id", conversation.ID)
+		return
+	}
+
+	messages, _, err := m.GetConversationMessages(conversation.UUID, []string{models.MessageIncoming, models.MessageOutgoing}, nil, 1, 20)
 	if err != nil {
 		m.lo.Error("error fetching conversation message history for AI completion", "conversation_uuid", conversation.UUID, "error", err)
 		return
