@@ -257,6 +257,13 @@ const createUser = (data) =>
       'Content-Type': 'application/json'
     }
   })
+
+const importAgents = (data) =>
+  http.post('/api/v1/agents/import', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
 const getTags = () => http.get('/api/v1/tags')
 const upsertTags = (uuid, data) => http.post(`/api/v1/conversations/${uuid}/tags`, data, {
   headers: {
@@ -504,6 +511,7 @@ export default {
   sendMessage,
   retryMessage,
   createUser,
+  importAgents,
   createInbox,
   updateInbox,
   deleteInbox,

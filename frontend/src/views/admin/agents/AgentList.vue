@@ -1,7 +1,13 @@
 <template>
   <Spinner v-if="isLoading" />
   <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
+  <input id="fileUpload" type="file" accept=".csv" hidden @change="handleFileUpload" >
     <div class="flex justify-end mb-5">
+     <Button @click="importAgent" class="mr-5" variant="secondary">{{
+      $t('globals.messages.import', {
+        name: $t('globals.terms.agent', 1)
+      })
+      }}</Button>
       <router-link :to="{ name: 'new-agent' }">
         <Button>{{
           $t('globals.messages.new', {
@@ -52,6 +58,42 @@ const getData = async () => {
     })
   } finally {
     isLoading.value = false
+  }
+}
+
+const importAgent = () => {
+  const fileInput = document.getElementById('fileUpload')
+  if (fileInput) {
+    fileInput.click()
+  }
+}
+
+const handleFileUpload = async (event) => {
+  console.log('Test')
+  const file = event.target.files[0]
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    isLoading.value = true
+    const response = await api.importAgents(formData)
+    const blob = new Blob([response.data], { type: response.headers['content-type'] })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'imported_agents.csv' // Adjust the filename as needed
+    link.click()
+    URL.revokeObjectURL(link.href)
+    getData()
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isLoading.value = false
+    event.target.value = ''
   }
 }
 </script>
