@@ -228,6 +228,7 @@ type queries struct {
 	GetConversations                   string     `query:"get-conversations"`
 	GetContactConversations            *sqlx.Stmt `query:"get-contact-conversations"`
 	GetContactChatConversations        *sqlx.Stmt `query:"get-contact-chat-conversations"`
+	GetChatConversation                *sqlx.Stmt `query:"get-chat-conversation"`
 	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
 	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
 	UpdateConversationFirstReplyAt     *sqlx.Stmt `query:"update-conversation-first-reply-at"`
@@ -319,7 +320,7 @@ func (c *Manager) GetContactConversations(contactID int) ([]models.Conversation,
 	return conversations, nil
 }
 
-// GetContactChatConversations retrieves conversations for a chat.
+// GetContactChatConversations retrieves chat conversations for a contact in a specific inbox.
 func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.ChatConversation, error) {
 	var conversations = make([]models.ChatConversation, 0)
 	if err := c.q.GetContactChatConversations.Select(&conversations, contactID, inboxID); err != nil {
@@ -327,6 +328,19 @@ func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
 	}
 	return conversations, nil
+}
+
+// GetChatConversation retrieves a single chat conversation by UUID
+func (c *Manager) GetChatConversation(conversationUUID string) (models.ChatConversation, error) {
+	var conversation models.ChatConversation
+	if err := c.q.GetChatConversation.Get(&conversation, conversationUUID); err != nil {
+		c.lo.Error("error fetching chat conversation", "uuid", conversationUUID, "error", err)
+		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
+	}
+	if conversation.Assignee.ID == 0 {
+		conversation.Assignee = nil
+	}
+	return conversation, nil
 }
 
 // GetConversationsCreatedAfter retrieves conversations created after the specified time.
@@ -1283,7 +1297,13 @@ func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) 
 
 // BuildWidgetConversationResponse builds the full conversation response for widget including messages
 func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversation, includeMessages bool) (WidgetConversationResponse, error) {
-	resp := WidgetConversationResponse{}
+	var resp = WidgetConversationResponse{}
+
+	chatConversation, err := m.GetChatConversation(conversation.UUID)
+	if err != nil {
+		return resp, err
+	}
+	resp.Conversation = chatConversation
 
 	// Build messages if requested
 	if includeMessages {
@@ -1340,42 +1360,6 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 			}
 		}
 		resp.Messages = chatMessages
-	}
-
-	// Build assignee for chat conversation
-	var assignee umodels.User
-	if conversation.AssignedUserID.Int > 0 {
-		var err error
-		assignee, err = m.userStore.Get(conversation.AssignedUserID.Int, "", "")
-		if err != nil {
-			m.lo.Error("error fetching conversation assignee", "conversation_uuid", conversation.UUID, "error", err)
-		} else {
-			// Convert assignee avatar URL to widget format
-			if assignee.AvatarURL.Valid && assignee.AvatarURL.String != "" {
-				avatarPath := assignee.AvatarURL.String
-				if strings.HasPrefix(avatarPath, "/uploads/") {
-					avatarUUID := strings.TrimPrefix(avatarPath, "/uploads/")
-					expiresAt := time.Now().Add(1 * time.Hour)
-					assignee.AvatarURL = null.StringFrom(m.mediaStore.GetSignedURL(avatarUUID, expiresAt))
-				}
-			}
-		}
-	}
-
-	resp.Conversation = models.ChatConversation{
-		CreatedAt:          assignee.CreatedAt,
-		UUID:               conversation.UUID,
-		Status:             conversation.Status.String,
-		UnreadMessageCount: conversation.UnreadMessageCount,
-		Assignee: umodels.ChatUser{
-			ID:                 assignee.ID,
-			FirstName:          assignee.FirstName,
-			LastName:           assignee.LastName,
-			AvatarURL:          assignee.AvatarURL,
-			AvailabilityStatus: assignee.AvailabilityStatus,
-			Type:               assignee.Type,
-			ActiveAt:           assignee.LastActiveAt,
-		},
 	}
 
 	// Calculate business hours info

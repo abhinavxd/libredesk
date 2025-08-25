@@ -70,7 +70,7 @@ export const useChatStore = defineStore('chat', () => {
         updateConversationListLastMessage(conversationUUID, message, shouldIncrementUnread)
     }
 
-    const addPendingMessage = (conversationUUID, messageText, authorType, authorId, files=[]) => {
+    const addPendingMessage = (conversationUUID, messageText, authorType, authorId, files = []) => {
         // Pending message is a temporary message that will be replaced with actual message later after sending.
         const pendingMessage = {
             content: messageText,
@@ -231,7 +231,7 @@ export const useChatStore = defineStore('chat', () => {
         if (currentConversation.value?.uuid === conversationData.uuid) {
             currentConversation.value = conversationData
         }
-        
+
         // Also update in conversations list if present
         if (conversations.value && Array.isArray(conversations.value)) {
             const index = conversations.value.findIndex(c => c.uuid === conversationData.uuid)
@@ -239,6 +239,19 @@ export const useChatStore = defineStore('chat', () => {
                 conversations.value[index] = { ...conversations.value[index], ...conversationData }
             }
         }
+    }
+
+    const addConversationToList = (conversation) => {
+        conversation.unread_message_count = 0
+        if (!conversations.value) {
+            conversations.value = []
+        }
+        const existingIndex = conversations.value.findIndex(c => c.uuid === conversation.uuid)
+        if (existingIndex >= 0) {
+            conversations.value[existingIndex] = conversation
+            return
+        }
+        conversations.value.push(conversation)
     }
 
     return {
@@ -268,6 +281,7 @@ export const useChatStore = defineStore('chat', () => {
         loadConversation,
         updateCurrentConversationLastSeen,
         updateConversationListLastMessage,
-        updateCurrentConversation
+        updateCurrentConversation,
+        addConversationToList
     }
 })

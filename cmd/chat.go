@@ -45,6 +45,11 @@ type customAttributeWidget struct {
 	Values []string `json:"values"`
 }
 
+type chatInitReq struct {
+	Message  string         `json:"message"`
+	FormData map[string]any `json:"form_data"`
+}
+
 type chatSettingsResponse struct {
 	livechat.Config
 	BusinessHours          []bhmodels.BusinessHours      `json:"business_hours,omitempty"`
@@ -191,10 +196,7 @@ func handleGetChatSettings(r *fastglue.Request) error {
 func handleChatInit(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req = struct {
-			Message  string         `json:"message"`
-			FormData map[string]any `json:"form_data,omitempty"`
-		}{}
+		req = chatInitReq{}
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
@@ -206,8 +208,7 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
 	}
 
-	// Get authenticated data from context (set by middleware)
-	// Middleware always validates inbox, so we can safely use non-optional getters
+	// Get authenticated data from context (set by middleware), middleware always validates inbox, so we can safely use non-optional getters
 	claims := getWidgetClaimsOptional(r)
 	inboxID, err := getWidgetInboxID(r)
 	if err != nil {

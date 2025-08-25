@@ -139,5 +139,15 @@ func V0_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	if err := tx2.Commit(); err != nil {
 		return err
 	}
+
+	// Add index on conversation_messages for conversation_id and created_at
+	_, err = db.Exec(`
+		CREATE INDEX IF NOT EXISTS index_conversation_messages_on_conversation_id_and_created_at
+		ON conversation_messages (conversation_id, created_at);
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -60,12 +60,12 @@ type LastChatMessage struct {
 }
 
 type ChatConversation struct {
-	CreatedAt          time.Time        `db:"created_at" json:"created_at"`
-	UUID               string           `db:"uuid" json:"uuid"`
-	Status             string           `db:"status" json:"status"`
-	LastChatMessage    LastChatMessage  `db:"last_message" json:"last_message"`
-	UnreadMessageCount int              `db:"unread_message_count" json:"unread_message_count"`
-	Assignee           umodels.ChatUser `db:"assignee" json:"assignee"`
+	CreatedAt          time.Time         `db:"created_at" json:"created_at"`
+	UUID               string            `db:"uuid" json:"uuid"`
+	Status             string            `db:"status" json:"status"`
+	LastChatMessage    LastChatMessage   `db:"last_message" json:"last_message"`
+	UnreadMessageCount int               `db:"unread_message_count" json:"unread_message_count"`
+	Assignee           *umodels.ChatUser `db:"assignee" json:"assignee"`
 }
 
 type ChatMessage struct {

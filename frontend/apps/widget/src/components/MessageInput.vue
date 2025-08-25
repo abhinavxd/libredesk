@@ -103,10 +103,8 @@ const initChatConversation = async (messageText) => {
     userStore.setSessionToken(jwt)
   }
 
-  // Refetch conversations list.
-  nextTick(() => {
-    chatStore.fetchConversations()
-  })
+  // Add the new conversation to the list
+  chatStore.addConversationToList(conversation)
 
   // Update chat store with new conversation and messages.
   chatStore.setCurrentConversation(conversation)

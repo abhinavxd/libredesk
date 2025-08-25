@@ -56,16 +56,14 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { MessageCircleDashed, ArrowRight } from 'lucide-vue-next'
-import { useChatStore } from '../store/chat.js'
-import { useWidgetStore } from '../store/widget.js'
-import { useUserStore } from '@widget/store/user.js'
+import { useChatStore } from '@widget/store/chat.js'
+import { useWidgetStore } from '@widget/store/widget.js'
 import { useRelativeTime } from '@widget/composables/useRelativeTime.js'
 import UnreadCountBadge from './UnreadCountBadge.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()
-const userStore = useUserStore()
 
 const hasConversations = computed(() => chatStore.hasConversations)
 const getConversations = computed(() => chatStore.getConversations)
