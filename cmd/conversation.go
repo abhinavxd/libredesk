@@ -474,11 +474,6 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Make sure a user is assigned before resolving conversation.
-	if status == cmodels.StatusResolved && conversation.AssignedUserID.Int == 0 {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("conversation.resolveWithoutAssignee"), nil))
-	}
-
 	// Update conversation status.
 	if err := app.conversation.UpdateConversationStatus(uuid, 0 /**status_id**/, status, snoozedUntil, user); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -583,7 +578,7 @@ func handleUpdateContactCustomAttributes(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if err := app.user.UpdateCustomAttributes(conversation.ContactID, attributes); err != nil {
+	if err := app.user.SaveCustomAttributes(conversation.ContactID, attributes, false); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	// Broadcast update.
@@ -707,11 +702,9 @@ func handleCreateConversation(r *fastglue.Request) error {
 
 	// Find or create contact.
 	contact := umodels.User{
-		Email:           null.StringFrom(req.Email),
-		SourceChannelID: null.StringFrom(req.Email),
-		FirstName:       req.FirstName,
-		LastName:        req.LastName,
-		InboxID:         req.InboxID,
+		Email:     null.StringFrom(req.Email),
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
 	}
 	if err := app.user.CreateContact(&contact); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.contact}"), nil))
@@ -720,7 +713,6 @@ func handleCreateConversation(r *fastglue.Request) error {
 	// Create conversation
 	conversationID, conversationUUID, err := app.conversation.CreateConversation(
 		contact.ID,
-		contact.ContactChannelID,
 		req.InboxID,
 		"",         /** last_message **/
 		time.Now(), /** last_message_at **/
@@ -744,7 +736,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 
 	// Send reply to the created conversation.
-	if _, err := app.conversation.SendReply(media, req.InboxID, auser.ID /**sender_id**/, conversationUUID, req.Content, to, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
+	if _, err := app.conversation.SendReply(media, req.InboxID, auser.ID, contact.ID, conversationUUID, req.Content, to, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
 		// Delete the conversation if reply fails.
 		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 			app.lo.Error("error deleting conversation", "error", err)

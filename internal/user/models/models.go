@@ -19,6 +19,7 @@ const (
 	// User types
 	UserTypeAgent   = "agent"
 	UserTypeContact = "contact"
+	UserTypeVisitor = "visitor"
 
 	// User availability statuses
 	Online  = "online"
@@ -43,20 +44,17 @@ type User struct {
 	PhoneNumber            null.String     `db:"phone_number" json:"phone_number"`
 	AvatarURL              null.String     `db:"avatar_url" json:"avatar_url"`
 	Enabled                bool            `db:"enabled" json:"enabled"`
-	Password               string          `db:"password" json:"-"`
+	Password               null.String     `db:"password" json:"-"`
 	LastActiveAt           null.Time       `db:"last_active_at" json:"last_active_at"`
 	LastLoginAt            null.Time       `db:"last_login_at" json:"last_login_at"`
 	Roles                  pq.StringArray  `db:"roles" json:"roles"`
 	Permissions            pq.StringArray  `db:"permissions" json:"permissions"`
 	Meta                   pq.StringArray  `db:"meta" json:"meta"`
 	CustomAttributes       json.RawMessage `db:"custom_attributes" json:"custom_attributes"`
+	ExternalUserID         null.String     `db:"external_user_id" json:"external_user_id"`
 	Teams                  tmodels.Teams   `db:"teams" json:"teams"`
-	ContactChannelID       int             `db:"contact_channel_id" json:"contact_channel_id,omitempty"`
 	NewPassword            string          `db:"-" json:"new_password,omitempty"`
 	SendWelcomeEmail       bool            `db:"-" json:"send_welcome_email,omitempty"`
-	InboxID                int             `json:"-"`
-	SourceChannel          null.String     `json:"-"`
-	SourceChannelID        null.String     `json:"-"`
 
 	// API Key fields
 	APIKey           null.String `db:"api_key" json:"api_key"`
@@ -64,6 +62,17 @@ type User struct {
 	APISecret        null.String `db:"api_secret" json:"-"`
 
 	Total int `json:"total,omitempty"`
+}
+
+// ChatUser is a user with limited fields for live chat.
+type ChatUser struct {
+	ID                 int         `db:"id" json:"id"`
+	FirstName          string      `db:"first_name" json:"first_name"`
+	LastName           string      `db:"last_name" json:"last_name"`
+	AvatarURL          null.String `db:"avatar_url" json:"avatar_url"`
+	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
+	Type               string      `db:"type" json:"type"`
+	ActiveAt           null.Time   `db:"active_at" json:"active_at"`
 }
 
 type Note struct {

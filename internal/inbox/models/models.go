@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/volatiletech/null/v9"
 )
 
 // Inbox represents a inbox record in DB.
@@ -19,6 +20,7 @@ type Inbox struct {
 	CSATEnabled bool            `db:"csat_enabled" json:"csat_enabled"`
 	From        string          `db:"from" json:"from"`
 	Config      json.RawMessage `db:"config" json:"config"`
+	Secret      null.String     `db:"secret" json:"secret,omitempty"`
 }
 
 // ClearPasswords masks all config passwords
@@ -50,7 +52,11 @@ func (m *Inbox) ClearPasswords() error {
 		}
 
 		m.Config = clearedConfig
-
+	case "livechat":
+		// Mask the secret field for livechat
+		if m.Secret.Valid && m.Secret.String != "" {
+			m.Secret = null.StringFrom(strings.Repeat(stringutil.PasswordDummy, 10))
+		}
 	default:
 		return nil
 	}

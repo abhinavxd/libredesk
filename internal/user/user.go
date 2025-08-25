@@ -64,10 +64,12 @@ type queries struct {
 	GetUsers               string     `query:"get-users"`
 	GetNotes               *sqlx.Stmt `query:"get-notes"`
 	GetNote                *sqlx.Stmt `query:"get-note"`
+	GetUserByExternalID    *sqlx.Stmt `query:"get-user-by-external-id"`
 	GetAgentsCompact       *sqlx.Stmt `query:"get-agents-compact"`
 	UpdateContact          *sqlx.Stmt `query:"update-contact"`
 	UpdateAgent            *sqlx.Stmt `query:"update-agent"`
 	UpdateCustomAttributes *sqlx.Stmt `query:"update-custom-attributes"`
+	UpsertCustomAttributes *sqlx.Stmt `query:"upsert-custom-attributes"`
 	UpdateAvatar           *sqlx.Stmt `query:"update-avatar"`
 	UpdateAvailability     *sqlx.Stmt `query:"update-availability"`
 	UpdateLastActiveAt     *sqlx.Stmt `query:"update-last-active-at"`
@@ -79,8 +81,10 @@ type queries struct {
 	SetPassword            *sqlx.Stmt `query:"set-password"`
 	DeleteNote             *sqlx.Stmt `query:"delete-note"`
 	InsertAgent            *sqlx.Stmt `query:"insert-agent"`
-	InsertContact          *sqlx.Stmt `query:"insert-contact"`
+	InsertContactWithExtID *sqlx.Stmt `query:"insert-contact-with-external-id"`
+	InsertContactNoExtID   *sqlx.Stmt `query:"insert-contact-without-external-id"`
 	InsertNote             *sqlx.Stmt `query:"insert-note"`
+	InsertVisitor          *sqlx.Stmt `query:"insert-visitor"`
 	ToggleEnable           *sqlx.Stmt `query:"toggle-enable"`
 	// API key queries
 	GetUserByAPIKey      *sqlx.Stmt `query:"get-user-by-api-key"`
@@ -114,7 +118,7 @@ func (u *Manager) VerifyPassword(email string, password []byte) (models.User, er
 		u.lo.Error("error fetching user from db", "error", err)
 		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
 	}
-	if err := u.verifyPassword(password, user.Password); err != nil {
+	if err := u.verifyPassword(password, user.Password.String); err != nil {
 		return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 	}
 	return user, nil
@@ -150,6 +154,10 @@ func (u *Manager) GetAllUsers(page, pageSize int, userType, order, orderBy strin
 
 // Get retrieves an user by ID or email.
 func (u *Manager) Get(id int, email, type_ string) (models.User, error) {
+	if id == 0 && email == "" {
+		return models.User{}, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.user}"), nil)
+	}
+
 	var user models.User
 	if err := u.q.GetUser.Get(&user, id, email, type_); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -164,6 +172,19 @@ func (u *Manager) Get(id int, email, type_ string) (models.User, error) {
 // GetSystemUser retrieves the system user.
 func (u *Manager) GetSystemUser() (models.User, error) {
 	return u.Get(0, models.SystemUserEmail, models.UserTypeAgent)
+}
+
+// GetByExternalID retrieves a user by external user ID.
+func (u *Manager) GetByExternalID(externalUserID string) (models.User, error) {
+	var user models.User
+	if err := u.q.GetUserByExternalID.Get(&user, externalUserID); err != nil {
+		if err == sql.ErrNoRows {
+			return user, envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.user}"), nil)
+		}
+		u.lo.Error("error fetching user by external ID", "external_user_id", externalUserID, "error", err)
+		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+	}
+	return user, nil
 }
 
 // UpdateAvatar updates the user avatar.
@@ -238,19 +259,23 @@ func (u *Manager) UpdateLastActive(id int) error {
 	return nil
 }
 
-// UpdateCustomAttributes updates the custom attributes of an user.
-func (u *Manager) UpdateCustomAttributes(id int, customAttributes map[string]any) error {
-	// Convert custom attributes to JSON.
+// SaveCustomAttributes sets or merges custom attributes for a user.
+// If replace is true, existing attributes are overwritten. Otherwise, attributes are merged.
+func (u *Manager) SaveCustomAttributes(id int, customAttributes map[string]any, replace bool) error {
 	jsonb, err := json.Marshal(customAttributes)
 	if err != nil {
-		u.lo.Error("error marshalling custom attributes to JSON", "error", err)
+		u.lo.Error("error marshalling custom attributes", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
 	}
-	// Update custom attributes in the database.
-	if _, err := u.q.UpdateCustomAttributes.Exec(id, jsonb); err != nil {
-		u.lo.Error("error updating user custom attributes", "error", err)
+	var execErr error
+	if replace {
+		_, execErr = u.q.UpdateCustomAttributes.Exec(id, jsonb)
+	} else {
+		_, execErr = u.q.UpsertCustomAttributes.Exec(id, jsonb)
+	}
+	if execErr != nil {
+		u.lo.Error("error saving custom attributes", "error", execErr)
 		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
-
 	}
 	return nil
 }

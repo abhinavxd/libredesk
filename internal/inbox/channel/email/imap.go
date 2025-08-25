@@ -318,12 +318,9 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 	// Make contact.
 	firstName, lastName := getContactName(env.From[0])
 	var contact = umodels.User{
-		InboxID:         inboxID,
 		FirstName:       firstName,
 		LastName:        lastName,
-		SourceChannel:   null.NewString(e.Channel(), true),
-		SourceChannelID: null.NewString(fromAddress, true),
-		Email:           null.NewString(fromAddress, true),
+		Email:           null.StringFrom(fromAddress),
 		Type:            umodels.UserTypeContact,
 	}
 
@@ -365,6 +362,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return fmt.Errorf("marshalling meta: %w", err)
 	}
 	incomingMsg := models.IncomingMessage{
+		Channel: ChannelEmail,
 		Message: models.Message{
 			Channel:    e.Channel(),
 			SenderType: models.SenderTypeContact,

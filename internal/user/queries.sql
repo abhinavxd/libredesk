@@ -50,6 +50,7 @@ SELECT
     u.phone_number,
     u.api_key,
     u.api_key_last_used_at,
+    u.external_user_id,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -63,7 +64,10 @@ FROM users u
 LEFT JOIN user_roles ur ON ur.user_id = u.id
 LEFT JOIN roles r ON r.id = ur.role_id
 LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
-WHERE (u.id = $1 OR u.email = $2) AND u.type = $3 AND u.deleted_at IS NULL
+WHERE u.deleted_at IS NULL 
+    AND ($1 = 0 OR u.id = $1) 
+    AND ($2 = '' OR u.email = $2)
+    AND ($3 = '' OR u.type::text = $3)
 GROUP BY u.id;
 
 -- name: set-user-password
@@ -102,6 +106,12 @@ UPDATE users
 SET custom_attributes = $2,
 updated_at = now()
 WHERE id = $1;
+
+-- name: upsert-custom-attributes
+UPDATE users
+SET custom_attributes = COALESCE(custom_attributes, '{}'::jsonb) || $2,
+updated_at = now()
+WHERE id = $1
 
 -- name: update-avatar
 UPDATE users  
@@ -149,18 +159,24 @@ FROM inserted_user, unnest($6::text[]) role_name
 JOIN roles r ON r.name = role_name
 RETURNING user_id;
 
--- name: insert-contact
-WITH contact AS (
-   INSERT INTO users (email, type, first_name, last_name, "password", avatar_url)
-   VALUES ($1, 'contact', $2, $3, $4, $5)
-   ON CONFLICT (email, type) WHERE deleted_at IS NULL
-   DO UPDATE SET updated_at = now()
-   RETURNING id
-)
-INSERT INTO contact_channels (contact_id, inbox_id, identifier)
-VALUES ((SELECT id FROM contact), $6, $7)
-ON CONFLICT (contact_id, inbox_id) DO UPDATE SET updated_at = now()
-RETURNING contact_id, id;
+-- name: insert-contact-with-external-id
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes)
+VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7)
+ON CONFLICT (external_user_id) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL
+DO UPDATE SET updated_at = now()
+RETURNING id;
+
+-- name: insert-contact-without-external-id
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id)
+VALUES ($1, 'contact', $2, $3, $4, $5, NULL)
+ON CONFLICT (email) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL
+DO UPDATE SET updated_at = now()
+RETURNING id;
+
+-- name: insert-visitor
+INSERT INTO users (email, type, first_name, last_name, custom_attributes)
+VALUES ($1, 'visitor', $2, $3, $4)
+RETURNING *;
 
 -- name: update-last-login-at
 UPDATE users
@@ -240,6 +256,7 @@ SELECT
     u.phone_number_calling_code,
     u.phone_number,
     u.api_secret,
+    u.external_user_id,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -270,3 +287,41 @@ WHERE id = $1;
 UPDATE users 
 SET api_key_last_used_at = now()
 WHERE id = $1;
+
+-- name: get-user-by-external-id
+SELECT
+    u.id,
+    u.created_at,
+    u.updated_at,
+    u.email,
+    u.password,
+    u.type,
+    u.enabled,
+    u.avatar_url,
+    u.first_name,
+    u.last_name,
+    u.availability_status,
+    u.last_active_at,
+    u.last_login_at,
+    u.phone_number_calling_code,
+    u.phone_number,
+    u.external_user_id,
+    u.custom_attributes,
+    u.api_key,
+    u.api_key_last_used_at,
+    array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
+    COALESCE(
+        (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
+         FROM team_members tm
+         JOIN teams t ON tm.team_id = t.id
+         WHERE tm.user_id = u.id),
+        '[]'
+    ) AS teams,
+    array_agg(DISTINCT p ORDER BY p) FILTER (WHERE p IS NOT NULL) AS permissions
+FROM users u
+LEFT JOIN user_roles ur ON ur.user_id = u.id
+LEFT JOIN roles r ON r.id = ur.role_id
+LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
+WHERE u.deleted_at IS NULL 
+    AND u.external_user_id = $1
+GROUP BY u.id;
