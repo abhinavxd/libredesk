@@ -7,10 +7,10 @@ select
 from automation_rules where enabled is TRUE ORDER BY weight ASC;
 
 -- name: get-all
-SELECT id, created_at, updated_at, enabled, name, description, type, events, rules, execution_mode from automation_rules where type = $1 ORDER BY weight ASC;
+SELECT id, created_at, updated_at, "name", description, "type", rules, events, enabled, weight, execution_mode from automation_rules where type = $1 ORDER BY weight ASC;
 
 -- name: get-rule
-SELECT id, created_at, updated_at, enabled, name, description, type, events, rules, execution_mode from automation_rules where id = $1;
+SELECT id, created_at, updated_at, "name", description, "type", rules, events, enabled, weight, execution_mode from automation_rules where id = $1;
 
 -- name: update-rule
 INSERT INTO automation_rules(id, name, description, type, events, rules, enabled)

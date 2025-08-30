@@ -1,8 +1,8 @@
 -- name: get-active-inboxes
-SELECT * from inboxes where enabled is TRUE and deleted_at is NULL;
+SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from" FROM inboxes where enabled is TRUE and deleted_at is NULL;
 
 -- name: get-all-inboxes
-SELECT id, created_at, updated_at, name, channel, enabled from inboxes where deleted_at is NULL;
+SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from" FROM inboxes where deleted_at is NULL;
 
 -- name: insert-inbox
 INSERT INTO inboxes
@@ -11,7 +11,7 @@ VALUES($1, $2, $3, $4, $5)
 RETURNING *
 
 -- name: get-inbox
-SELECT * from inboxes where id = $1 and deleted_at is NULL;
+SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from" FROM inboxes where id = $1 and deleted_at is NULL;
 
 -- name: update
 UPDATE inboxes
@@ -20,7 +20,7 @@ where id = $1 and deleted_at is NULL
 RETURNING *;
 
 -- name: soft-delete
-UPDATE inboxes set deleted_at = now(), config = '{}' where id = $1 and deleted_at is NULL;
+UPDATE inboxes set deleted_at = now(), updated_at = now(), config = '{}' where id = $1 and deleted_at is NULL;
 
 -- name: toggle
 UPDATE inboxes 

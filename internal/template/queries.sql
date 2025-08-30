@@ -19,19 +19,19 @@ WITH u AS (
 SELECT * FROM u LIMIT 1;
 
 -- name: get-default
-SELECT id, type, name, body, subject FROM templates WHERE is_default is TRUE;
+SELECT id, created_at, updated_at, type, body, is_default, name, subject, is_builtin FROM templates WHERE is_default is TRUE;
 
 -- name: get-all
-SELECT id, created_at, updated_at, type, name, is_default, is_builtin FROM templates WHERE type = $1 ORDER BY updated_at DESC;
+SELECT id, created_at, updated_at, type, body, is_default, name, subject, is_builtin FROM templates WHERE type = $1 ORDER BY updated_at DESC;
 
 -- name: get-template
-SELECT id, type, name, body, subject, is_default, type FROM templates WHERE id = $1;
+SELECT id, created_at, updated_at, type, body, is_default, name, subject, is_builtin FROM templates WHERE id = $1;
 
 -- name: delete
 DELETE FROM templates WHERE id = $1;
 
 -- name: get-by-name
-SELECT id, type, name, body, subject, is_default, type FROM templates WHERE name = $1;
+SELECT id, created_at, updated_at, type, body, is_default, name, subject, is_builtin FROM templates WHERE name = $1;
 
 -- name: is-builtin
 SELECT EXISTS(SELECT 1 FROM templates WHERE id = $1 AND is_builtin is TRUE);

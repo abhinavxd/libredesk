@@ -5,6 +5,7 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import api from '@/api'
 
+// TODO: rename this store to agents
 export const useUsersStore = defineStore('users', () => {
     const users = ref([])
     const emitter = useEmitter()
@@ -13,8 +14,8 @@ export const useUsersStore = defineStore('users', () => {
         value: String(user.id),
         avatar_url: user.avatar_url,
     })))
-    const fetchUsers = async () => {
-        if (users.value.length) return
+    const fetchUsers = async (force = false) => {
+        if (!force && users.value.length) return
         try {
             const response = await api.getUsersCompact()
             users.value = response?.data?.data || []

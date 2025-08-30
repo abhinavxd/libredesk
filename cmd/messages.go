@@ -99,7 +99,7 @@ func handleGetMessage(r *fastglue.Request) error {
 	return r.SendEnvelope(message)
 }
 
-// handleRetryMessage changes message status so it can be retried for sending.
+// handleRetryMessage changes message status to `pending`, so it's enqueued for sending.
 func handleRetryMessage(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -168,7 +168,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		}
 		return r.SendEnvelope(message)
 	}
-	message, err := app.conversation.SendReply(media, conv.InboxID, user.ID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/)
+	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

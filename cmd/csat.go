@@ -17,7 +17,7 @@ func handleShowCSAT(r *fastglue.Request) error {
 	if err != nil {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": "Page not found",
+				"ErrorMessage": app.i18n.T("globals.messages.pageNotFound"),
 			},
 		})
 	}
@@ -25,8 +25,8 @@ func handleShowCSAT(r *fastglue.Request) error {
 	if csat.ResponseTimestamp.Valid {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "info", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"Title":   "Thank you!",
-				"Message": "We appreciate you taking the time to submit your feedback.",
+				"Title":   app.i18n.T("globals.messages.thankYou"),
+				"Message": app.i18n.T("csat.thankYouMessage"),
 			},
 		})
 	}
@@ -35,14 +35,14 @@ func handleShowCSAT(r *fastglue.Request) error {
 	if err != nil {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": "Page not found",
+				"ErrorMessage": app.i18n.T("globals.messages.pageNotFound"),
 			},
 		})
 	}
 
 	return app.tmpl.RenderWebPage(r.RequestCtx, "csat", map[string]interface{}{
 		"Data": map[string]interface{}{
-			"Title":    "Rate your interaction with us",
+			"Title": app.i18n.T("csat.pageTitle"),
 			"CSAT": map[string]interface{}{
 				"UUID": csat.UUID,
 			},
@@ -67,7 +67,7 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 	if err != nil {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": "Invalid `rating`",
+				"ErrorMessage": app.i18n.T("globals.messages.somethingWentWrong"),
 			},
 		})
 	}
@@ -75,7 +75,7 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 	if ratingI < 1 || ratingI > 5 {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": "Invalid `rating`",
+				"ErrorMessage": app.i18n.T("globals.messages.somethingWentWrong"),
 			},
 		})
 	}
@@ -83,7 +83,7 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 	if uuid == "" {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": "Invalid `uuid`",
+				"ErrorMessage": app.i18n.T("globals.messages.somethingWentWrong"),
 			},
 		})
 	}
@@ -98,8 +98,8 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 
 	return app.tmpl.RenderWebPage(r.RequestCtx, "info", map[string]interface{}{
 		"Data": map[string]interface{}{
-			"Title":   "Thank you!",
-			"Message": "We appreciate you taking the time to submit your feedback.",
+			"Title":   app.i18n.T("csat.thankYou"),
+			"Message": app.i18n.T("csat.thankYouMessage"),
 		},
 	})
 }

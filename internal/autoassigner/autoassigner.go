@@ -33,7 +33,7 @@ type conversationStore interface {
 
 type teamStore interface {
 	GetAll() ([]tmodels.Team, error)
-	GetMembers(teamID int) ([]umodels.User, error)
+	GetMembers(teamID int) ([]tmodels.TeamMember, error)
 }
 
 // Engine represents a manager for assigning unassigned conversations

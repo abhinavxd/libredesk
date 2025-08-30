@@ -2,8 +2,6 @@ package user
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"strings"
 	"time"
 
@@ -69,13 +67,10 @@ func (u *Manager) InvalidateAgentCache(id int) {
 	delete(u.agentCache, id)
 }
 
-// GetAgentsCompact returns a compact list of users with limited fields.
-func (u *Manager) GetAgentsCompact() ([]models.User, error) {
-	var users = make([]models.User, 0)
-	if err := u.q.GetAgentsCompact.Select(&users); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return users, nil
-		}
+// GetAgentsCompact returns a compact list of agents with limited fields.
+func (u *Manager) GetAgentsCompact() ([]models.UserCompact, error) {
+	var users = make([]models.UserCompact, 0)
+	if err := u.db.Select(&users, u.q.GetUsersCompact, pq.Array([]string{models.UserTypeAgent})); err != nil {
 		u.lo.Error("error fetching users from db", "error", err)
 		return users, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", u.i18n.P("globals.terms.user")), nil)
 	}
@@ -83,36 +78,39 @@ func (u *Manager) GetAgentsCompact() ([]models.User, error) {
 }
 
 // CreateAgent creates a new agent user.
-func (u *Manager) CreateAgent(user *models.User) (error) {
+func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string) (models.User, error) {
 	password, err := u.generatePassword()
 	if err != nil {
 		u.lo.Error("error generating password", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil)
+		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil)
 	}
-	user.Email = null.NewString(strings.TrimSpace(strings.ToLower(user.Email.String)), user.Email.Valid)
-	if err := u.q.InsertAgent.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, pq.Array(user.Roles)).Scan(&user.ID); err != nil {
+
+	var id = 0
+	avatarURL := null.String{}
+	email = strings.TrimSpace(strings.ToLower(email))
+	if err := u.q.InsertAgent.QueryRow(email, firstName, lastName, password, avatarURL, pq.Array(roles)).Scan(&id); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
+			return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
 		}
 		u.lo.Error("error creating user", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil)
+		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil)
 	}
-	return nil
+	return u.Get(id, "", models.UserTypeAgent)
 }
 
-// UpdateAgent updates an agent in the database, including their password if provided.
-func (u *Manager) UpdateAgent(id int, user models.User) error {
+// UpdateAgent updates an agent with individual field parameters
+func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles []string, enabled bool, availabilityStatus, newPassword string) error {
 	var (
 		hashedPassword any
 		err            error
 	)
 
 	// Set password?
-	if user.NewPassword != "" {
-		if !IsStrongPassword(user.NewPassword) {
+	if newPassword != "" {
+		if !IsStrongPassword(newPassword) {
 			return envelope.NewError(envelope.InputError, PasswordHint, nil)
 		}
-		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(user.NewPassword), bcrypt.DefaultCost)
+		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 		if err != nil {
 			u.lo.Error("error generating bcrypt password", "error", err)
 			return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
@@ -121,7 +119,7 @@ func (u *Manager) UpdateAgent(id int, user models.User) error {
 	}
 
 	// Update user in the database and clear cache.
-	if _, err := u.q.UpdateAgent.Exec(id, user.FirstName, user.LastName, user.Email, pq.Array(user.Roles), user.AvatarURL, hashedPassword, user.Enabled, user.AvailabilityStatus); err != nil {
+	if _, err := u.q.UpdateAgent.Exec(id, firstName, lastName, email, pq.Array(roles), null.String{}, hashedPassword, enabled, availabilityStatus); err != nil {
 		u.lo.Error("error updating user", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
 	}
@@ -159,7 +157,7 @@ func (u *Manager) markInactiveAgentsOffline() {
 }
 
 // GetAllAgents returns a list of all agents.
-func (u *Manager) GetAgents() ([]models.User, error) {
+func (u *Manager) GetAgents() ([]models.UserCompact, error) {
 	// Some dirty hack.
 	return u.GetAllUsers(1, 999999999, models.UserTypeAgent, "desc", "users.updated_at", "")
 }

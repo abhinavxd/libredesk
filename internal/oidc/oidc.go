@@ -38,10 +38,9 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	GetAllOIDC    *sqlx.Stmt `query:"get-all-oidc"`
-	GetAllEnabled *sqlx.Stmt `query:"get-all-enabled"`
-	GetOIDC       *sqlx.Stmt `query:"get-oidc"`
-	InsertOIDC    *sqlx.Stmt `query:"insert-oidc"`
+	GetAllOIDC *sqlx.Stmt `query:"get-all-oidc"`
+	GetOIDC    *sqlx.Stmt `query:"get-oidc"`
+	InsertOIDC *sqlx.Stmt `query:"insert-oidc"`
 	UpdateOIDC    *sqlx.Stmt `query:"update-oidc"`
 	DeleteOIDC    *sqlx.Stmt `query:"delete-oidc"`
 }
@@ -106,19 +105,6 @@ func (o *Manager) GetAll() ([]models.OIDC, error) {
 	// Set logo and redirect URL.
 	for i := range oidc {
 		oidc[i].RedirectURI = fmt.Sprintf(rootURL+redirectURL, oidc[i].ID)
-		oidc[i].SetProviderLogo()
-	}
-	return oidc, nil
-}
-
-// GetAllEnabled retrieves all enabled oidc.
-func (o *Manager) GetAllEnabled() ([]models.OIDC, error) {
-	var oidc = make([]models.OIDC, 0)
-	if err := o.q.GetAllEnabled.Select(&oidc); err != nil {
-		o.lo.Error("error fetching oidc", "error", err)
-		return oidc, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.oidcProvider}"), nil)
-	}
-	for i := range oidc {
 		oidc[i].SetProviderLogo()
 	}
 	return oidc, nil

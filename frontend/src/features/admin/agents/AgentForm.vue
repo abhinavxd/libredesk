@@ -418,7 +418,6 @@ const onSubmit = form.handleSubmit((values) => {
   if (values.availability_status === 'active_group') {
     values.availability_status = 'online'
   }
-  values.teams = values.teams.map((team) => ({ name: team }))
   props.submitForm(values)
 })
 

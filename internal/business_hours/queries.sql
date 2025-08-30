@@ -15,7 +15,10 @@ SELECT id,
     created_at,
     updated_at,
     "name",
-    description
+    description,
+    is_always_open,
+    hours,
+    holidays
 FROM business_hours
 ORDER BY updated_at DESC;
 

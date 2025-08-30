@@ -2,8 +2,6 @@
 package envelope
 
 import (
-	"net/http"
-
 	"github.com/valyala/fasthttp"
 )
 
@@ -53,13 +51,13 @@ func NewError(etype string, message string, data interface{}) error {
 	case GeneralError:
 		err.Code = fasthttp.StatusInternalServerError
 	case PermissionError:
-		err.Code = http.StatusForbidden
+		err.Code = fasthttp.StatusForbidden
 	case InputError:
 		err.Code = fasthttp.StatusBadRequest
 	case DataError:
-		err.Code = http.StatusBadGateway
+		err.Code = fasthttp.StatusUnprocessableEntity
 	case NetworkError:
-		err.Code = http.StatusGatewayTimeout
+		err.Code = fasthttp.StatusGatewayTimeout
 	case NotFoundError:
 		err.Code = fasthttp.StatusNotFound
 	case ConflictError:

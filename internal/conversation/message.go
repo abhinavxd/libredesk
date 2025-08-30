@@ -167,7 +167,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	}
 
 	// References is sorted in DESC i.e newest message first, so reverse it to keep the references in order.
-	stringutil.ReverseSlice(message.References)
+	slices.Reverse(message.References)
 
 	// Remove the current message ID from the references.
 	message.References = stringutil.RemoveItemByValue(message.References, message.SourceID.String)
@@ -347,9 +347,10 @@ func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
 	return nil
 }
 
-// MarkMessageAsPending updates message status to `Pending`, so if it's a outgoing message it can be picked up again by a worker.
+// MarkMessageAsPending updates message status to `Pending`, enqueuing it for sending.
 func (m *Manager) MarkMessageAsPending(uuid string) error {
 	if err := m.UpdateMessageStatus(uuid, models.MessageStatusPending); err != nil {
+		m.lo.Error("error marking message as pending", "uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil)
 	}
 	return nil
@@ -374,8 +375,27 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 	return message, nil
 }
 
-// SendReply inserts a reply message in a conversation.
-func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conversationUUID, content string, to, cc, bcc []string, meta map[string]interface{}) (models.Message, error) {
+// CreateContactMessage creates a contact message in a conversation.
+func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, conversationUUID, content, contentType string) (models.Message, error) {
+	message := models.Message{
+		ConversationUUID: conversationUUID,
+		SenderID:         contactID,
+		Type:             models.MessageIncoming,
+		SenderType:       models.SenderTypeContact,
+		Status:           models.MessageStatusReceived,
+		Content:          content,
+		ContentType:      contentType,
+		Private:          false,
+		Media:            media,
+	}
+	if err := m.InsertMessage(&message); err != nil {
+		return models.Message{}, err
+	}
+	return message, nil
+}
+
+// QueueReply queues a reply message in a conversation.
+func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID int, conversationUUID, content string, to, cc, bcc []string, meta map[string]interface{}) (models.Message, error) {
 	var (
 		message = models.Message{}
 	)
@@ -402,7 +422,7 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID int, conver
 		return message, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorMarshalling", "name", "{globals.terms.meta}"), nil)
 	}
 
-	// Generage unique source ID i.e. message-id for email.
+	// Generate unique source ID i.e. message-id for email.
 	inbox, err := m.inboxStore.GetDBRecord(inboxID)
 	if err != nil {
 		return message, err

@@ -10,7 +10,7 @@
               })
             }}
           </DialogTitle>
-          <DialogDescription/>
+          <DialogDescription />
         </DialogHeader>
         <form @submit="createConversation" class="flex flex-col flex-1 overflow-hidden">
           <!-- Form Fields Section -->
@@ -263,6 +263,7 @@ import { useFileUpload } from '@/composables/useFileUpload'
 import Editor from '@/components/editor/TextEditor.vue'
 import { useMacroStore } from '@/stores/macro'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import { UserTypeAgent } from '@/constants/user'
 import api from '@/api'
 
 const dialogOpen = defineModel({
@@ -393,12 +394,14 @@ const selectContact = (contact) => {
 const createConversation = form.handleSubmit(async (values) => {
   loading.value = true
   try {
-    // convert ids to numbers if they are not already
+    // Convert ids to numbers if they are not already
     values.inbox_id = Number(values.inbox_id)
     values.team_id = values.team_id ? Number(values.team_id) : null
     values.agent_id = values.agent_id ? Number(values.agent_id) : null
-    // array of attachment ids.
+    // Array of attachment ids.
     values.attachments = mediaFiles.value.map((file) => file.id)
+    // Initiator of this conversation is always agent
+    values.initiator = UserTypeAgent
     const conversation = await api.createConversation(values)
     const conversationUUID = conversation.data.data.uuid
 

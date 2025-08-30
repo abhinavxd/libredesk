@@ -2,10 +2,7 @@
 {{ template "header" . }}
 <div class="csat-container">
     <div class="csat-header">
-        <h2>Rate your recent interaction</h2>
-        {{ if .Data.Conversation.Subject }}
-        <p class="conversation-subject"><i>{{ .Data.Conversation.Subject }}</i></p>
-        {{ end }}
+        <h2>{{ L.T "csat.rateYourInteraction" }}</h2>
     </div>
 
     <form action="/csat/{{ .Data.CSAT.UUID }}" method="POST" class="csat-form" novalidate>
@@ -16,7 +13,7 @@
                     <div class="emoji-wrapper">
                         <span class="emoji">😢</span>
                     </div>
-                    <span class="rating-text">Poor</span>
+                    <span class="rating-text">{{ L.T "csat.rating.poor" }}</span>
                 </label>
 
                 <input type="radio" id="rating-2" name="rating" value="2">
@@ -24,7 +21,7 @@
                     <div class="emoji-wrapper">
                         <span class="emoji">😕</span>
                     </div>
-                    <span class="rating-text">Fair</span>
+                    <span class="rating-text">{{ L.T "csat.rating.fair" }}</span>
                 </label>
 
                 <input type="radio" id="rating-3" name="rating" value="3">
@@ -32,7 +29,7 @@
                     <div class="emoji-wrapper">
                         <span class="emoji">😊</span>
                     </div>
-                    <span class="rating-text">Good</span>
+                    <span class="rating-text">{{ L.T "csat.rating.good" }}</span>
                 </label>
 
                 <input type="radio" id="rating-4" name="rating" value="4">
@@ -40,7 +37,7 @@
                     <div class="emoji-wrapper">
                         <span class="emoji">😃</span>
                     </div>
-                    <span class="rating-text">Great</span>
+                    <span class="rating-text">{{ L.T "csat.rating.great" }}</span>
                 </label>
 
                 <input type="radio" id="rating-5" name="rating" value="5">
@@ -48,18 +45,18 @@
                     <div class="emoji-wrapper">
                         <span class="emoji">🤩</span>
                     </div>
-                    <span class="rating-text">Excellent</span>
+                    <span class="rating-text">{{ L.T "csat.rating.excellent" }}</span>
                 </label>
             </div>
             <!-- Validation message for rating -->
             <div class="validation-message" id="ratingValidationMessage"
                 style="display: none; color: #dc2626; text-align: center; margin-top: 10px; font-size: 0.9em;">
-                Please select a rating before submitting.
+                {{ L.Ts "globals.messages.pleaseSelect" "name" "rating" }}
             </div>
         </div>
 
         <div class="feedback-container">
-            <label for="feedback" class="feedback-label">Additional feedback (optional)</label>
+            <label for="feedback" class="feedback-label">{{ L.T "globals.messages.additionalFeedback" }}</label>
             <textarea id="feedback" name="feedback" placeholder="" rows="6" maxlength="1000"
                 onkeyup="updateCharCount(this)"></textarea>
             <div class="char-counter">
@@ -67,7 +64,7 @@
             </div>
         </div>
 
-        <button type="submit" class="button submit-button">Submit</button>
+        <button type="submit" class="button submit-button">{{ L.T "globals.messages.submit" }}</button>
     </form>
 </div>
 
@@ -148,9 +145,9 @@
     .rating-options {
         display: flex;
         justify-content: center;
-        gap: 25px;
-        flex-wrap: wrap;
+        gap: 15px;
         margin-top: 30px;
+        align-items: center;
     }
 
     .rating-options input[type="radio"] {
@@ -163,9 +160,10 @@
         align-items: center;
         cursor: pointer;
         transition: all 0.3s ease;
-        padding: 15px;
+        padding: 12px;
         position: relative;
-        width: 110px;
+        min-width: 90px;
+        flex-shrink: 0;
     }
 
     .rating-option:hover {
@@ -173,7 +171,8 @@
     }
 
     .rating-option:focus {
-        outline: 2px solid #0055d4;
+        outline: 2px solid #3b82f6;
+        outline-offset: 2px;
         border-radius: 8px;
     }
 
@@ -181,41 +180,33 @@
         transform: translateY(-3px);
     }
 
-    .rating-options input[type="radio"]:checked+.rating-option::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 40px;
-        height: 3px;
-        background-color: #0055d4;
-        border-radius: 2px;
-    }
 
     .emoji-wrapper {
-        background: #f8f9ff;
+        background: #f8fafc;
         border-radius: 50%;
-        width: 70px;
-        height: 70px;
+        width: 65px;
+        height: 65px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         transition: all 0.3s ease;
-        border: 2px solid transparent;
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
     .rating-option:hover .emoji-wrapper {
-        transform: scale(1.1);
-        background: #f0f5ff;
-        border-color: #0055d4;
+        transform: scale(1.05);
+        background: #f1f5f9;
+        border-color: #3b82f6;
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.15);
     }
 
     .rating-options input[type="radio"]:checked+.rating-option .emoji-wrapper {
-        transform: scale(1.1);
-        background: #e8f0ff;
-        border-color: #0055d4;
+        transform: scale(1.05);
+        background: #dbeafe;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
 
     .emoji {
@@ -225,10 +216,11 @@
     }
 
     .rating-text {
-        font-size: 0.9em;
+        font-size: 0.85em;
         text-align: center;
-        color: #666;
+        color: #64748b;
         font-weight: 500;
+        line-height: 1.2;
     }
 
     .feedback-container {
@@ -254,8 +246,9 @@
     }
 
     textarea:focus {
-        border-color: #0055d4;
+        border-color: #3b82f6;
         outline: none;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
 
     .char-counter {
@@ -279,28 +272,23 @@
         transition: all 0.3s ease;
     }
 
-    @media screen and (max-width: 650px) {
-
+    @media screen and (max-width: 600px) {
         .csat-container {
             margin: 0;
-            padding: 30px;
+            padding: 20px;
             border-radius: 0;
         }
 
         .rating-options {
-            flex-direction: column;
+            gap: 8px;
         }
 
         .rating-option {
-            flex-direction: row;
-            justify-content: flex-start;
-            gap: 15px;
-            width: 100%;
-            padding: 15px;
+            min-width: 70px;
+            padding: 8px;
         }
 
         .emoji-wrapper {
-            margin-bottom: 0;
             width: 50px;
             height: 50px;
         }
@@ -310,7 +298,31 @@
         }
 
         .rating-text {
-            text-align: left;
+            font-size: 0.8em;
+        }
+    }
+
+    @media screen and (max-width: 480px) {
+        .rating-options {
+            gap: 5px;
+        }
+
+        .rating-option {
+            min-width: 60px;
+            padding: 6px;
+        }
+
+        .emoji-wrapper {
+            width: 45px;
+            height: 45px;
+        }
+
+        .emoji {
+            font-size: 1.6em;
+        }
+
+        .rating-text {
+            font-size: 0.75em;
         }
     }
 </style>

@@ -17,7 +17,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { createColumns } from '@/features/admin/agents/dataTableColumns.js'
 import { Button } from '@/components/ui/button'
 import DataTable from '@/components/datatable/DataTable.vue'
@@ -25,10 +25,11 @@ import { handleHTTPError } from '@/utils/http'
 import { Spinner } from '@/components/ui/spinner'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import api from '@/api'
+import { useUsersStore } from '@/stores/users'
 import { useI18n } from 'vue-i18n'
 
 const isLoading = ref(false)
+const usersStore = useUsersStore()
 const { t } = useI18n()
 const data = ref([])
 const emitter = useEmitter()
@@ -40,11 +41,15 @@ onMounted(async () => {
   })
 })
 
+onUnmounted(() => {
+  emitter.off(EMITTER_EVENTS.REFRESH_LIST)
+})
+
 const getData = async () => {
   try {
     isLoading.value = true
-    const response = await api.getUsers()
-    data.value = response.data.data
+    await usersStore.fetchUsers(true)
+    data.value = usersStore.users
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

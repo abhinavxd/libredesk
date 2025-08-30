@@ -214,6 +214,7 @@ func (m *Manager) deleteUnlinkedMessageMedia() error {
 			m.lo.Error("error deleting unlinked media", "error", err)
 			continue
 		}
+		// TODO: If it's an image also delete the `thumb_uuid` image.
 	}
 	return nil
 }

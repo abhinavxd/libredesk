@@ -159,8 +159,8 @@ onMounted(async () => {
 
 const fetchOIDCProviders = async () => {
   try {
-    const resp = await api.getAllEnabledOIDC()
-    oidcProviders.value = resp.data.data
+    const resp = await api.getConfig()
+    oidcProviders.value = resp.data.data.sso_providers || []
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

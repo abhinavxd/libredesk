@@ -4,9 +4,9 @@
     @click="handleClick">
     <div class="flex items-center mb-2">
       <component :is="icon" size="24" class="mr-2 text-primary" />
-      <h3 class="text-lg font-medium text-gray-800">{{ title }}</h3>
+      <h3 class="text-lg font-medium">{{ title }}</h3>
     </div>
-    <p class="text-sm text-gray-600">{{ subTitle }}</p>
+    <p class="text-sm text-gray-600 dark:text-gray-400">{{ subTitle }}</p>
   </div>
 </template>
 

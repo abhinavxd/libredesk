@@ -30,6 +30,20 @@ const (
 	AwayAndReassigning = "away_and_reassigning"
 )
 
+type UserCompact struct {
+	ID        int         `db:"id" json:"id"`
+	Type      string      `db:"type" json:"type"`
+	FirstName string      `db:"first_name" json:"first_name"`
+	LastName  string      `db:"last_name" json:"last_name"`
+	Email     null.String `db:"email" json:"email"`
+	Enabled   bool        `db:"enabled" json:"enabled"`
+	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
+	CreatedAt time.Time   `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time   `db:"updated_at" json:"updated_at"`
+
+	Total int `db:"total" json:"total"`
+}
+
 type User struct {
 	ID                     int             `db:"id" json:"id"`
 	CreatedAt              time.Time       `db:"created_at" json:"created_at"`
@@ -48,7 +62,6 @@ type User struct {
 	LastLoginAt            null.Time       `db:"last_login_at" json:"last_login_at"`
 	Roles                  pq.StringArray  `db:"roles" json:"roles"`
 	Permissions            pq.StringArray  `db:"permissions" json:"permissions"`
-	Meta                   pq.StringArray  `db:"meta" json:"meta"`
 	CustomAttributes       json.RawMessage `db:"custom_attributes" json:"custom_attributes"`
 	Teams                  tmodels.Teams   `db:"teams" json:"teams"`
 	ContactChannelID       int             `db:"contact_channel_id" json:"contact_channel_id,omitempty"`
@@ -62,8 +75,6 @@ type User struct {
 	APIKey           null.String `db:"api_key" json:"api_key"`
 	APIKeyLastUsedAt null.Time   `db:"api_key_last_used_at" json:"api_key_last_used_at"`
 	APISecret        null.String `db:"api_secret" json:"-"`
-
-	Total int `json:"total,omitempty"`
 }
 
 type Note struct {

@@ -18,7 +18,7 @@ const setFavicon = (url) => {
 }
 
 async function initApp () {
-  const settings = (await api.getSettings('general')).data.data
+  const settings = (await api.getConfig()).data.data
   const emitter = mitt()
   const lang = settings['app.lang'] || 'en'
   const langMessages = await api.getLanguage(lang)
@@ -42,9 +42,14 @@ async function initApp () {
   const pinia = createPinia()
   app.use(pinia)
 
-  // Store app settings in Pinia
+  // Fetch and store app settings in store
   const settingsStore = useAppSettingsStore()
-  settingsStore.setSettings(settings)
+  try {
+    const generalSettings = (await api.getSettings('general')).data.data
+    settingsStore.setSettings(generalSettings)
+  } catch (error) {
+    // Ignore errors - could be auth, network, whatever
+  }
 
   // Add emitter to global properties.
   app.config.globalProperties.emitter = emitter

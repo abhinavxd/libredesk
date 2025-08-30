@@ -42,7 +42,7 @@ func (u *Manager) GetContact(id int, email string) (models.User, error) {
 }
 
 // GetAllContacts returns a list of all contacts.
-func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filtersJSON string) ([]models.User, error) {
+func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filtersJSON string) ([]models.UserCompact, error) {
 	if pageSize > maxListPageSize {
 		return nil, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.pageTooLarge", "max", fmt.Sprintf("%d", maxListPageSize)), nil)
 	}

@@ -17,6 +17,12 @@ func handleGetInboxes(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	for i := range inboxes {
+		if err := inboxes[i].ClearPasswords(); err != nil {
+			app.lo.Error("error clearing inbox passwords from response", "error", err)
+			return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil)
+		}
+	}
 	return r.SendEnvelope(inboxes)
 }
 

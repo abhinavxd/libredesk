@@ -2,7 +2,7 @@
 SELECT id, created_at, updated_at, name, description, permissions FROM roles;
 
 -- name: get-role
-SELECT * FROM roles where id = $1;
+SELECT id, created_at, updated_at, name, description, permissions FROM roles where id = $1;
 
 -- name: delete-role
 DELETE FROM roles where id = $1;

@@ -153,7 +153,7 @@ func (u *Manager) filterValidPermissions(permissions []string) ([]string, error)
 		if amodels.PermissionExists(perm) {
 			validPermissions = append(validPermissions, perm)
 		} else {
-			u.lo.Warn("ignoring unknown permission", "permission", perm)
+			u.lo.Warn("skipping unknown permission for role", "permission", perm)
 		}
 	}
 	return validPermissions, nil

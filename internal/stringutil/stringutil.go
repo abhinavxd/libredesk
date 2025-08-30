@@ -144,13 +144,6 @@ func GenerateEmailMessageID(messageID string, fromAddress string) (string, error
 	), nil
 }
 
-// ReverseSlice reverses a slice of strings in place.
-func ReverseSlice(source []string) {
-	for i, j := 0, len(source)-1; i < j; i, j = i+1, j-1 {
-		source[i], source[j] = source[j], source[i]
-	}
-}
-
 // RemoveItemByValue removes all instances of a value from a slice of strings.
 func RemoveItemByValue(slice []string, value string) []string {
 	result := []string{}

@@ -82,18 +82,9 @@ func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int)
 	return activityLogs, nil
 }
 
-// Create adds a new activity log.
-func (m *Manager) Create(activityType, activityDescription string, actorID int, targetModelType string, targetModelID int, ip string) error {
-	if _, err := m.q.InsertActivity.Exec(activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {
-		m.lo.Error("error inserting activity", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.activityLog}"), nil)
-	}
-	return nil
-}
-
 // Login records a login event for the given user.
 func (al *Manager) Login(userID int, email, ip string) error {
-	return al.Create(
+	return al.create(
 		models.AgentLogin,
 		fmt.Sprintf("%s (#%d) logged in", email, userID),
 		userID,
@@ -105,7 +96,7 @@ func (al *Manager) Login(userID int, email, ip string) error {
 
 // Logout records a logout event for the given user.
 func (al *Manager) Logout(userID int, email, ip string) error {
-	return al.Create(
+	return al.create(
 		models.AgentLogout,
 		fmt.Sprintf("%s (#%d) logged out", email, userID),
 		userID,
@@ -123,7 +114,7 @@ func (al *Manager) Away(actorID int, actorEmail, ip string, targetID int, target
 	} else {
 		description = fmt.Sprintf("%s (#%d) is away", actorEmail, actorID)
 	}
-	return al.Create(
+	return al.create(
 		models.AgentAway, /* activity type*/
 		description,
 		actorID,           /*actor_id*/
@@ -141,7 +132,7 @@ func (al *Manager) AwayReassigned(actorID int, actorEmail, ip string, targetID i
 	} else {
 		description = fmt.Sprintf("%s (#%d) is away and reassigning", actorEmail, actorID)
 	}
-	return al.Create(
+	return al.create(
 		models.AgentAwayReassigned, /* activity type*/
 		description,
 		actorID,           /*actor_id*/
@@ -159,7 +150,7 @@ func (al *Manager) Online(actorID int, actorEmail, ip string, targetID int, targ
 	} else {
 		description = fmt.Sprintf("%s (#%d) is online", actorEmail, actorID)
 	}
-	return al.Create(
+	return al.create(
 		models.AgentOnline, /* activity type*/
 		description,
 		actorID,           /*actor_id*/
@@ -186,6 +177,16 @@ func (al *Manager) UserAvailability(actorID int, actorEmail, status, ip, targetE
 			al.lo.Error("error logging away and reassigning activity", "error", err)
 			return err
 		}
+	}
+	return nil
+}
+
+// create creates a new activity log in DB.
+func (m *Manager) create(activityType, activityDescription string, actorID int, targetModelType string, targetModelID int, ip string) error {
+	var activityLog models.ActivityLog
+	if err := m.q.InsertActivity.Get(&activityLog, activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {
+		m.lo.Error("error inserting activity log", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.activityLog}"), nil)
 	}
 	return nil
 }

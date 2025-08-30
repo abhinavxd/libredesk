@@ -99,6 +99,8 @@ SELECT
    c.closed_at,
    c.resolved_at,
    c.inbox_id,
+   c.assignee_last_seen_at,
+   inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
    COALESCE(inb.channel::TEXT, '') as inbox_channel,
    c.status_id,
@@ -140,7 +142,6 @@ SELECT
    ct.phone_number as "contact.phone_number",
    ct.phone_number_calling_code as "contact.phone_number_calling_code",
    ct.custom_attributes as "contact.custom_attributes",
-   ct.avatar_url as "contact.avatar_url",
    ct.enabled as "contact.enabled",
    ct.last_active_at as "contact.last_active_at",
    ct.last_login_at as "contact.last_login_at",
@@ -183,8 +184,11 @@ SELECT
 FROM conversations c
 WHERE c.created_at > $1;
 
--- name: get-contact-conversations
+-- name: get-contact-previous-conversations
 SELECT
+    c.id,
+    c.created_at,
+    c.updated_at,
     c.uuid,
     u.first_name AS "contact.first_name",
     u.last_name AS "contact.last_name",
@@ -195,7 +199,7 @@ FROM users u
 JOIN conversations c ON c.contact_id = u.id
 WHERE c.contact_id = $1
 ORDER BY c.created_at DESC
-LIMIT 10;
+LIMIT $2;
 
 -- name: get-conversation-uuid
 SELECT uuid from conversations where id = $1;
@@ -400,22 +404,27 @@ LIMIT $2;
 
 -- name: get-outgoing-pending-messages
 SELECT
-    m.created_at,
     m.id,
-    m.uuid,
-    m.sender_id,
-    m.type,
-    m.private,
+    m.created_at,
+    m.updated_at,
     m.status,
+    m.type,
     m.content,
+    m.text_content,
+    m.content_type,
     m.conversation_id,
+    m.uuid,
+    m.private,
+    m.sender_type,
+    m.sender_id,
+    m.meta,
+    c.uuid as conversation_uuid,
     m.content_type,
     m.source_id,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'cc')) AS cc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'bcc')) AS bcc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'to')) AS to,
     c.inbox_id,
-    c.uuid as conversation_uuid,
     c.subject
 FROM conversation_messages m
 INNER JOIN conversations c ON c.id = m.conversation_id
@@ -463,16 +472,21 @@ ORDER BY m.created_at;
 -- name: get-messages
 SELECT
    COUNT(*) OVER() AS total,
+   m.id,
    m.created_at,
    m.updated_at,
    m.status,
    m.type, 
    m.content,
+   m.text_content,
+   m.content_type,
+   m.conversation_id,
    m.uuid,
    m.private,
    m.sender_id,
    m.sender_type,
    m.meta,
+   $1::uuid AS conversation_uuid,
    COALESCE(
      (SELECT json_agg(
        json_build_object(
