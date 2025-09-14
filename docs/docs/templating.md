@@ -44,7 +44,7 @@ If you want to customize the look of outgoing emails, you can do so in the Admin
 
 ### Example outgoing email template
 
-```html
+```
 Dear {{ .Recipient.FirstName }},
 
 {{ template "content" . }}
@@ -55,6 +55,67 @@ Best regards,
 Reference: {{ .Conversation.ReferenceNumber }}
 ```
 
-Here, the `{{ template "content" . }}` serves as a placeholder for the body of the outgoing email. It will be replaced with the actual email content at the time of sending.
+#### Important: How templates work with your responses
 
-Similarly, the `{{ .Recipient.FirstName }}` expression will dynamically insert the recipient's first name when the email is sent.
+When this template is set as default, it automatically wraps around your ticket responses. The `{{ template "content" . }}` placeholder is where your response text will be inserted.
+
+#### Template expressions
+The template expressions like `{{ .Recipient.FirstName }}` and `{{ .Author.FullName }}` dynamically insert the appropriate information when the email is sent.
+
+#### What this means for you:
+- **DO NOT** include greetings (like "Hello" or "Dear Customer") in your response
+- **DO NOT** include sign-offs (like "Best regards" or your name) in your response  
+- **ONLY** write the main body of your message
+
+#### Example of CORRECT usage:
+When you write in the response field:
+```
+Thank you for contacting us. I've reviewed your account and can confirm that your refund has been processed.
+```
+
+The customer receives:
+```
+Dear John,
+
+Thank you for contacting us. I've reviewed your account and can confirm that your refund has been processed.
+
+Best regards,
+Sarah Smith
+---
+Reference: TKT-2024-001
+```
+
+#### Example of INCORRECT usage (creates duplication):
+When you write in the response field:
+```
+Hello John,
+
+Thank you for contacting us. I've reviewed your account and can confirm that your refund has been processed.
+
+Best regards,
+Sarah
+```
+
+The customer receives (with unwanted duplication):
+```
+Dear John,
+
+Hello John,
+
+Thank you for contacting us. I've reviewed your account and can confirm that your refund has been processed.
+
+Best regards,
+Sarah
+
+Best regards,
+Sarah Smith
+---
+Reference: TKT-2024-001
+```
+
+#### Working with different templates
+
+If your organization uses a different template structure, adjust your response accordingly. For example:
+- A template with no greeting would require you to include your own
+- A template with only `{{ template "content" . }}` and nothing else would require you to write complete emails
+- Always check your active template configuration to understand what's automatically included
