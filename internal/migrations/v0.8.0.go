@@ -149,5 +149,13 @@ func V0_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	// Add inbox linking support for conversation continuity between chat and email
+	_, err = db.Exec(`
+		ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS linked_email_inbox_id INT REFERENCES inboxes(id) ON DELETE SET NULL;
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

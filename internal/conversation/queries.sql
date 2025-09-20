@@ -666,3 +666,6 @@ AND m.status = ANY($3)
 AND m.private = NOT $4
 ORDER BY m.created_at DESC
 LIMIT 1;
+
+-- name: update-message-source-id
+UPDATE conversation_messages SET source_id = $1 WHERE id = $2;

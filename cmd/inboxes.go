@@ -181,6 +181,22 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 				return envelope.NewError(envelope.InputError, "`show_office_hours_after_assignment` cannot be enabled when `show_office_hours_in_chat` is disabled", nil)
 			}
 		}
+
+		// Validate linked email inbox if specified
+		if inbox.LinkedEmailInboxID.Valid {
+			linkedInbox, err := app.inbox.GetDBRecord(int(inbox.LinkedEmailInboxID.Int))
+			if err != nil {
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "linked_email_inbox_id"), nil)
+			}
+			// Ensure linked inbox is an email channel
+			if linkedInbox.Channel != "email" {
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "linked_email_inbox_id"), nil)
+			}
+			// Ensure linked inbox is enabled
+			if !linkedInbox.Enabled {
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "linked_email_inbox_id"), nil)
+			}
+		}
 	}
 
 	return nil

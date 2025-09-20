@@ -32,7 +32,6 @@
             <FormItem class="flex flex-row items-center justify-between box p-4">
               <div class="space-y-0.5">
                 <FormLabel class="text-base">{{ $t('globals.terms.enabled') }}</FormLabel>
-                <FormDescription>{{ $t('admin.inbox.enabled.description') }}</FormDescription>
               </div>
               <FormControl>
                 <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
@@ -57,7 +56,9 @@
 
           <FormField v-slot="{ componentField }" name="config.brand_name">
             <FormItem>
-              <FormLabel>{{ $t('globals.terms.brand') + ' ' + $t('globals.terms.name').toLowerCase() }}</FormLabel>
+              <FormLabel>{{
+                $t('globals.terms.brand') + ' ' + $t('globals.terms.name').toLowerCase()
+              }}</FormLabel>
               <FormControl>
                 <Input type="text" placeholder="" v-bind="componentField" />
               </FormControl>
@@ -79,9 +80,30 @@
                   </SelectContent>
                 </Select>
               </FormControl>
-              <FormDescription>{{
-                $t('admin.inbox.livechat.language.description')
-              }}</FormDescription>
+              <FormDescription> </FormDescription>
+            </FormItem>
+          </FormField>
+
+          <!-- Email Fallback Inbox -->
+          <FormField v-slot="{ componentField }" name="linked_email_inbox_id">
+            <FormItem>
+              <FormLabel>{{ $t('admin.inbox.livechat.emailFallbackInbox') }}</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="$t('admin.inbox.livechat.emailFallbackInbox.placeholder')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem :value="0">{{ $t('admin.inbox.livechat.emailFallbackInbox.none') }}</SelectItem>
+                    <SelectItem v-for="inbox in emailInboxes" :key="inbox.id" :value="inbox.id">
+                      {{ inbox.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormDescription>
+                {{ $t('admin.inbox.livechat.emailFallbackInbox.description') }}
+              </FormDescription>
             </FormItem>
           </FormField>
         </div>
@@ -472,7 +494,7 @@
             <FormItem>
               <FormLabel>{{ $t('admin.inbox.livechat.secretKey') }}</FormLabel>
               <FormControl>
-                <Input type="password" v-bind="componentField"/>
+                <Input type="password" v-bind="componentField" />
               </FormControl>
               <FormDescription>{{
                 $t('admin.inbox.livechat.secretKey.description')
@@ -582,7 +604,6 @@
                     </FormControl>
                   </FormItem>
                 </FormField>
-
               </div>
 
               <!-- Users Settings -->
@@ -653,10 +674,11 @@
 </template>
 
 <script setup>
-import { watch, computed, ref } from 'vue'
+import { watch, computed, ref, onMounted } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './livechatFormSchema.js'
+import { useInboxStore } from '@/stores/inbox'
 import {
   FormControl,
   FormField,
@@ -707,6 +729,11 @@ const selectedUserTab = ref('visitors')
 const externalLinks = ref([])
 const customAttributes = ref([])
 
+const inboxStore = useInboxStore()
+const emailInboxes = computed(() =>
+  inboxStore.inboxes.filter((inbox) => inbox.channel === 'email' && inbox.enabled)
+)
+
 const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t)),
   initialValues: {
@@ -714,6 +741,7 @@ const form = useForm({
     enabled: true,
     secret: '',
     csat_enabled: false,
+    linked_email_inbox_id: null,
     config: {
       brand_name: '',
       dark_mode: false,
@@ -811,7 +839,7 @@ const fetchCustomAttributes = async () => {
       api.getCustomAttributes('contact'),
       api.getCustomAttributes('conversation')
     ])
-    
+
     customAttributes.value = [
       ...(contactAttrs.data?.data || []),
       ...(conversationAttrs.data?.data || [])
@@ -821,6 +849,11 @@ const fetchCustomAttributes = async () => {
     customAttributes.value = []
   }
 }
+
+// Fetch inboxes on mount for the linked email inbox dropdown
+onMounted(() => {
+  inboxStore.fetchInboxes()
+})
 
 const onSubmit = form.handleSubmit(async (values) => {
   // Transform trusted_domains from textarea to array
@@ -838,6 +871,11 @@ const onSubmit = form.handleSubmit(async (values) => {
     values.config.external_links = values.config.external_links.filter(
       (link) => link.text && link.url
     )
+  }
+
+  // if linked email inbox id is 0, nullify the field
+  if (values.linked_email_inbox_id === 0) {
+    values.linked_email_inbox_id = null
   }
 
   await props.submitForm(values)

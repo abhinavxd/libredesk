@@ -5,6 +5,7 @@ export const createFormSchema = (t) => z.object({
   enabled: z.boolean(),
   csat_enabled: z.boolean(),
   secret: z.string(),
+  linked_email_inbox_id: z.number().nullable().optional(),
   config: z.object({
     brand_name: z.string().min(1, { message: t('globals.messages.required') }),
     dark_mode: z.boolean(),

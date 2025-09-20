@@ -15,7 +15,7 @@ SELECT * from inboxes where id = $1 and deleted_at is NULL;
 
 -- name: update
 UPDATE inboxes
-set channel = $2, config = $3, "name" = $4, "from" = $5, csat_enabled = $6, enabled = $7, secret = $8, updated_at = now()
+set channel = $2, config = $3, "name" = $4, "from" = $5, csat_enabled = $6, enabled = $7, secret = $8, linked_email_inbox_id = $9, updated_at = now()
 where id = $1 and deleted_at is NULL
 RETURNING *;
 

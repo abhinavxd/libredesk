@@ -181,9 +181,16 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 
 	// Send message
 	err = inb.Send(message)
-	if err != nil && err != livechat.ErrClientNotConnected {
-		handleError(err, "error sending message")
-		return
+	if err != nil {
+		if err == livechat.ErrClientNotConnected {
+			// Continue conversation over email.
+			if err := m.sendConversationContinuityEmail(message); err != nil {
+				m.lo.Error("error sending conversation continuity email", "message_id", message.ID, "error", err)
+			}
+		} else {
+			handleError(err, "error sending message")
+			return
+		}
 	}
 
 	// Update status as sent.
@@ -691,35 +698,70 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	var (
 		isNewConversation = false
 		conversationID    int
+		conversationFound bool
 		err               error
 	)
 
-	// Do channel specific processing.
-	switch in.Channel {
-	case inbox.ChannelEmail:
-		// Find or create contact and set sender ID in message.
-		if err := m.userStore.CreateContact(&in.Contact); err != nil {
-			m.lo.Error("error upserting contact", "error", err)
-			return models.Message{}, err
-		}
-		in.Message.SenderID = in.Contact.ID
-
-		// Conversations exists for this message?
-		conversationID, err = m.findConversationID([]string{in.Message.SourceID.String})
-		if err != nil && err != errConversationNotFound {
-			return models.Message{}, err
-		}
-		if conversationID > 0 {
-			return models.Message{}, nil
+	// If ConversationUUID is already set (from reply-to header), match it with existing conversation
+	if in.Message.ConversationUUID != "" && in.Channel == inbox.ChannelEmail {
+		var conversation models.Conversation
+		if err := m.q.GetConversation.Get(&conversation, 0, in.Message.ConversationUUID); err != nil {
+			m.lo.Error("error fetching conversation", "uuid", in.Message.ConversationUUID, "error", err)
+			return models.Message{}, fmt.Errorf("fetching conversation: %w", err)
 		}
 
-		// Find or create new conversation.
-		isNewConversation, err = m.findOrCreateConversation(&in.Message, in.InboxID, in.Contact.ID)
+		// Validate sender matches conversation contact for security
+		contact, err := m.userStore.Get(conversation.ContactID, "", "")
 		if err != nil {
-			return models.Message{}, err
+			m.lo.Error("error fetching conversation contact", "contact_id", conversation.ContactID, "error", err)
+			return models.Message{}, fmt.Errorf("fetching conversation contact: %w", err)
 		}
-	case inbox.ChannelLiveChat:
-		// For live chat, a conversation is created before the message is processed. So nothing to do here.
+
+		// Check if sender email matches contact email
+		if !strings.EqualFold(in.Contact.Email.String, contact.Email.String) {
+			m.lo.Warn("sender email mismatch for conversation, creating new conversation instead",
+				"sender_email", in.Contact.Email.String,
+				"expected_email", contact.Email.String,
+				"conversation_uuid", in.Message.ConversationUUID)
+			// Clear UUID to let normal flow create new conversation
+			in.Message.ConversationUUID = ""
+			conversationFound = false
+		} else {
+			// Valid sender - use existing conversation
+			in.Message.SenderID = conversation.ContactID
+			in.Message.ConversationID = conversation.ID
+			conversationFound = true
+		}
+	}
+
+	// Do channel specific processing.
+	if !conversationFound {
+		switch in.Channel {
+		case inbox.ChannelEmail:
+			// Find or create contact and set sender ID in message.
+			if err := m.userStore.CreateContact(&in.Contact); err != nil {
+				m.lo.Error("error upserting contact", "error", err)
+				return models.Message{}, err
+			}
+			in.Message.SenderID = in.Contact.ID
+
+			// Conversations exists for this message?
+			conversationID, err = m.findConversationID([]string{in.Message.SourceID.String})
+			if err != nil && err != errConversationNotFound {
+				return models.Message{}, err
+			}
+			if conversationID > 0 {
+				return models.Message{}, nil
+			}
+
+			// Find or create new conversation.
+			isNewConversation, err = m.findOrCreateConversation(&in.Message, in.InboxID, in.Contact.ID)
+			if err != nil {
+				return models.Message{}, err
+			}
+		case inbox.ChannelLiveChat:
+			// For live chat, a conversation is created before the message is processed. So nothing to do here.
+		}
 	}
 
 	// Upload message attachments.
@@ -1070,5 +1112,119 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 			m.BroadcastConversationUpdate(conversationUUID, "next_response_met_at", nil)
 		}
 	}
+	return nil
+}
+
+// updateMessageSourceID updates the source ID of a message.
+func (m *Manager) updateMessageSourceID(id int, sourceID string) error {
+	_, err := m.q.UpdateMessageSourceID.Exec(sourceID, id)
+	return err
+}
+
+// sendConversationContinuityEmail sends an email to continue the conversation over email when a live chat contact is offline.
+func (m *Manager) sendConversationContinuityEmail(message models.Message) error {
+	// Get contact and make sure it has a valid email
+	contact, err := m.userStore.Get(message.MessageReceiverID, "", "")
+	if err != nil {
+		return fmt.Errorf("error fetching contact for email: %w", err)
+	}
+
+	if contact.Email.String == "" {
+		m.lo.Info("contact has no email for conversation continuity", "contact_id", contact.ID, "conversation_uuid", message.ConversationUUID)
+		return nil
+	}
+
+	// Get the original livechat inbox to check for linked email inbox
+	originalInbox, err := m.inboxStore.GetDBRecord(message.InboxID)
+	if err != nil {
+		return fmt.Errorf("error fetching original inbox: %w", err)
+	}
+
+	// Check if livechat inbox has a linked email inbox
+	if !originalInbox.LinkedEmailInboxID.Valid {
+		m.lo.Info("no linked email inbox configured for livechat inbox", "inbox_id", message.InboxID)
+		return nil // No fallback configured.
+	}
+
+	// Get the linked email inbox
+	linkedEmailInbox, err := m.inboxStore.Get(originalInbox.LinkedEmailInboxID.Int)
+	if err != nil {
+		return fmt.Errorf("error fetching linked email inbox: %w", err)
+	}
+
+	linkedEmailInboxRecord, err := m.inboxStore.GetDBRecord(originalInbox.LinkedEmailInboxID.Int)
+	if err != nil {
+		return fmt.Errorf("error fetching linked email inbox record: %w", err)
+	}
+
+	if !linkedEmailInboxRecord.Enabled {
+		return fmt.Errorf("linked email inbox is disabled")
+	}
+
+	// Create a new message for the email inbox with proper threading headers
+	emailMessage := message
+	emailMessage.InboxID = originalInbox.LinkedEmailInboxID.Int
+	emailMessage.From = linkedEmailInbox.FromAddress()
+
+	// Generate Message-ID for threading using conversation UUID and random suffix
+	// Extract clean email address and domain from From address
+	emailAddress, err := stringutil.ExtractEmail(linkedEmailInbox.FromAddress())
+	if err != nil {
+		return fmt.Errorf("error extracting email from inbox address: %w", err)
+	}
+
+	// Embed UUID in Message-ID for threading (format: {uuid}.{timestamp}@domain)
+	emailUserPart := strings.Split(emailAddress, "@")
+	if len(emailUserPart) == 2 {
+		emailMessage.SourceID = null.StringFrom(fmt.Sprintf("%s.%d@%s", message.ConversationUUID, time.Now().UnixNano(), emailUserPart[1]))
+		m.updateMessageSourceID(message.ID, emailMessage.SourceID.String)
+	}
+
+	// Get all message source IDs for References header
+	references, err := m.GetMessageSourceIDs(message.ConversationID, 50)
+	if err != nil {
+		m.lo.Error("Error fetching conversation source IDs for email fallback", "error", err)
+		// Continue without references rather than fail
+		references = []string{}
+	}
+
+	// Filter out references that do not have `@` meaning they are live chat messages
+	var filteredReferences []string
+	for _, ref := range references {
+		if strings.Contains(ref, "@") {
+			filteredReferences = append(filteredReferences, ref)
+		}
+	}
+
+	// Build References and In-Reply-To headers
+	emailMessage.References = filteredReferences
+	if len(references) > 0 {
+		emailMessage.InReplyTo = references[len(references)-1]
+	}
+
+	// Render content of message in template
+	if err := m.RenderMessageInTemplate(linkedEmailInbox.Channel(), &emailMessage); err != nil {
+		return fmt.Errorf("error rendering email template: %w", err)
+	}
+
+	// Set email recipients
+	emailMessage.To = []string{contact.Email.String}
+
+	// Set Reply-To address with conversation UUID for routing replies
+	emailMessage.Headers = map[string][]string{
+		"Reply-To": {fmt.Sprintf("%s+%s@%s", strings.Split(emailAddress, "@")[0], message.ConversationUUID, strings.Split(emailAddress, "@")[1])},
+	}
+
+	// Send the email via the linked email inbox
+	if err := linkedEmailInbox.Send(emailMessage); err != nil {
+		return fmt.Errorf("error sending conversation continuity email: %w", err)
+	}
+
+	m.lo.Info("sent conversation continuity email",
+		"original_inbox_id", message.InboxID,
+		"linked_email_inbox_id", originalInbox.LinkedEmailInboxID.Int,
+		"contact_email", contact.Email.String,
+		"conversation_uuid", message.ConversationUUID)
+
 	return nil
 }

@@ -53,7 +53,11 @@
                       ? 'bg-destructive/60'
                       : 'bg-primary'
                 ]
-              : 'bg-background text-foreground rounded-bl-sm border border-border'
+              : 'bg-background text-foreground rounded-bl-sm border border-border',
+            {
+              'show-quoted-text': isQuotedTextVisible(message.uuid),
+              'hide-quoted-text': !isQuotedTextVisible(message.uuid)
+            }
           ]"
         >
           <!-- Message content rendered using vue-letter -->
@@ -62,6 +66,22 @@
             :allowedSchemas="['cid', 'https', 'http', 'mailto']"
             class="mb-1 native-html"
           />
+          <div
+            v-if="hasQuotedContent(message.content)"
+            @click="toggleQuote(message.uuid)"
+            :class="[
+              'text-xs cursor-pointer px-2 py-1 w-max rounded transition-all',
+              message.author.type === 'contact' || message.author.type === 'visitor'
+                ? 'text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-primary'
+            ]"
+          >
+            {{
+              isQuotedTextVisible(message.uuid)
+                ? t('conversation.hideQuotedText')
+                : t('conversation.showQuotedText')
+            }}
+          </div>
           <!-- Show attachments if available -->
           <MessageAttachment :attachments="message.attachments" />
         </div>
@@ -125,6 +145,7 @@ import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useWidgetStore } from '../store/widget.js'
 import { useChatStore } from '../store/chat.js'
 import { useRelativeTime } from '@widget/composables/useRelativeTime.js'
+import { useI18n } from 'vue-i18n'
 import { Letter } from 'vue-letter'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import ChatIntro from './ChatIntro.vue'
@@ -147,6 +168,8 @@ const messagesContainer = ref(null)
 const isAtBottom = ref(true)
 const unreadMessages = ref(0)
 const currentConversationUUID = ref('')
+const quotedTextState = ref({})
+const { t } = useI18n()
 
 const config = computed(() => widgetStore.config)
 const isTyping = computed(() => chatStore.isTyping)
@@ -154,6 +177,18 @@ const isLoadingConversation = computed(() => chatStore.isLoadingConversation)
 
 const getMessageTime = (timestamp) => {
   return useRelativeTime(new Date(timestamp)).value
+}
+
+const hasQuotedContent = (content) => {
+  return content && content.includes('<blockquote')
+}
+
+const isQuotedTextVisible = (messageUuid) => {
+  return quotedTextState.value[messageUuid] || false
+}
+
+const toggleQuote = (messageUuid) => {
+  quotedTextState.value[messageUuid] = !quotedTextState.value[messageUuid]
 }
 
 // handleCSATSubmitted updates the local message state when CSAT feedback is submitted.

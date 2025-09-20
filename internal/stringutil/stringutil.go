@@ -23,6 +23,7 @@ const (
 var (
 	regexpNonAlNum = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
 	regexpSpaces   = regexp.MustCompile(`[\s]+`)
+	uuidV4Regex    = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
 )
 
 // HTML2Text converts HTML to text.
@@ -255,4 +256,10 @@ func ComputeRecipients(
 	finalBCC = []string{}
 
 	return
+}
+
+// ExtractUUID finds and returns the first valid UUID v4 in the given text.
+// Returns empty string if no valid UUID is found.
+func ExtractUUID(text string) string {
+	return uuidV4Regex.FindString(text)
 }

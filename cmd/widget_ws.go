@@ -56,6 +56,7 @@ func handleWidgetWS(r *fastglue.Request) error {
 		// To store client and live chat references for cleanup.
 		var client *livechat.Client
 		var liveChat *livechat.LiveChat
+		var inboxID int
 
 		// Clean up client when connection closes.
 		defer func() {
@@ -80,15 +81,17 @@ func handleWidgetWS(r *fastglue.Request) error {
 			case WidgetMsgTypeJoin:
 				var joinedClient *livechat.Client
 				var joinedLiveChat *livechat.LiveChat
+				var joinedInboxID int
 				var err error
-				if joinedClient, joinedLiveChat, err = handleInboxJoin(app, conn, &msg); err != nil {
+				if joinedClient, joinedLiveChat, joinedInboxID, err = handleInboxJoin(app, conn, &msg); err != nil {
 					app.lo.Error("error handling widget join", "error", err)
 					sendWidgetError(conn, "Failed to join conversation")
 					continue
 				}
-				// Store the client and livechat reference for cleanup.
+				// Store the client, livechat, and inbox ID for cleanup and future use.
 				client = joinedClient
 				liveChat = joinedLiveChat
+				inboxID = joinedInboxID
 			// Typing.
 			case WidgetMsgTypeTyping:
 				if err := handleWidgetTyping(app, &msg); err != nil {
@@ -97,6 +100,19 @@ func handleWidgetWS(r *fastglue.Request) error {
 				}
 			// Ping.
 			case WidgetMsgTypePing:
+				// Update user's last active timestamp if JWT is provided and client has joined
+				if msg.JWT != "" && inboxID != 0 {
+					if claims, err := validateWidgetMessageJWT(app, msg.JWT, inboxID); err == nil {
+						if userID, err := resolveUserIDFromClaims(app, claims); err == nil {
+							if err := app.user.UpdateLastActive(userID); err != nil {
+								app.lo.Error("error updating user last active timestamp", "user_id", userID, "error", err)
+							} else {
+								app.lo.Debug("updated user last active timestamp", "user_id", userID)
+							}
+						}
+					}
+				}
+
 				if err := conn.WriteJSON(WidgetMessage{
 					Type: WidgetMsgTypePong,
 				}); err != nil {
@@ -111,48 +127,48 @@ func handleWidgetWS(r *fastglue.Request) error {
 }
 
 // handleInboxJoin handles a websocket join request for a live chat inbox.
-func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage) (*livechat.Client, *livechat.LiveChat, error) {
+func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage) (*livechat.Client, *livechat.LiveChat, int, error) {
 	joinDataBytes, err := json.Marshal(msg.Data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid join data: %w", err)
+		return nil, nil, 0, fmt.Errorf("invalid join data: %w", err)
 	}
 
 	var joinData WidgetInboxJoinRequest
 	if err := json.Unmarshal(joinDataBytes, &joinData); err != nil {
-		return nil, nil, fmt.Errorf("invalid join data format: %w", err)
+		return nil, nil, 0, fmt.Errorf("invalid join data format: %w", err)
 	}
 
 	// Validate JWT with inbox secret
 	claims, err := validateWidgetMessageJWT(app, msg.JWT, joinData.InboxID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("JWT validation failed: %w", err)
+		return nil, nil, 0, fmt.Errorf("JWT validation failed: %w", err)
 	}
 
 	// Resolve user ID.
 	userID, err := resolveUserIDFromClaims(app, claims)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to resolve user ID from claims: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to resolve user ID from claims: %w", err)
 	}
 
 	// Make sure inbox is active.
 	inbox, err := app.inbox.GetDBRecord(joinData.InboxID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("inbox not found: %w", err)
+		return nil, nil, 0, fmt.Errorf("inbox not found: %w", err)
 	}
 	if !inbox.Enabled {
-		return nil, nil, fmt.Errorf("inbox is not enabled")
+		return nil, nil, 0, fmt.Errorf("inbox is not enabled")
 	}
 
 	// Get live chat inbox
 	lcInbox, err := app.inbox.Get(inbox.ID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("live chat inbox not found: %w", err)
+		return nil, nil, 0, fmt.Errorf("live chat inbox not found: %w", err)
 	}
 
 	// Assert type.
 	liveChat, ok := lcInbox.(*livechat.LiveChat)
 	if !ok {
-		return nil, nil, fmt.Errorf("inbox is not a live chat inbox")
+		return nil, nil, 0, fmt.Errorf("inbox is not a live chat inbox")
 	}
 
 	// Add client to live chat session
@@ -160,7 +176,7 @@ func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage) (*livec
 	client, err := liveChat.AddClient(userIDStr)
 	if err != nil {
 		app.lo.Error("error adding client to live chat", "error", err, "user_id", userIDStr)
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 
 	// Start listening for messages from the live chat channel.
@@ -182,12 +198,12 @@ func handleInboxJoin(app *App, conn *websocket.Conn, msg *WidgetMessage) (*livec
 	}
 
 	if err := conn.WriteJSON(joinResp); err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 
 	app.lo.Debug("widget client joined live chat", "user_id", userIDStr, "inbox_id", joinData.InboxID)
 
-	return client, liveChat, nil
+	return client, liveChat, joinData.InboxID, nil
 }
 
 // handleWidgetTyping handles typing indicators
@@ -247,7 +263,7 @@ func validateWidgetMessageJWT(app *App, jwtToken string, inboxID int) (Claims, e
 		return Claims{}, fmt.Errorf("inbox not found: %w", err)
 	}
 
-	if !inbox.Secret.Valid || inbox.Secret.String == "" {
+	if !inbox.Secret.Valid {
 		return Claims{}, fmt.Errorf("inbox secret not configured for JWT verification")
 	}
 
