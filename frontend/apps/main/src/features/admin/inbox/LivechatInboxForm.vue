@@ -2,7 +2,7 @@
   <form @submit="onSubmit" class="space-y-6 w-full">
     <!-- Main Tabs -->
     <Tabs v-model="activeTab" class="w-full">
-      <TabsList class="grid w-full grid-cols-7">
+      <TabsList class="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 h-auto">
         <TabsTrigger value="general">{{ $t('admin.inbox.livechat.tabs.general') }}</TabsTrigger>
         <TabsTrigger value="appearance">{{
           $t('admin.inbox.livechat.tabs.appearance')
@@ -14,7 +14,7 @@
         <TabsTrigger value="users">{{ $t('admin.inbox.livechat.tabs.users') }}</TabsTrigger>
       </TabsList>
 
-      <div class="mt-6">
+      <div class="mt-8">
         <!-- General Tab -->
         <div v-show="activeTab === 'general'" class="space-y-6">
           <FormField v-slot="{ componentField }" name="name">
