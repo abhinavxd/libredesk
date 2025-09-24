@@ -1,18 +1,29 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col h-full relative">
     <!-- Header -->
     <WidgetHeader :title="$t('globals.terms.message', 2)" />
 
     <!-- Messages List -->
-    <div class="flex-1 overflow-y-auto">
+    <div class="flex-1 overflow-y-auto pb-20">
       <MessagesList />
     </div>
 
-    <!-- New conversation button -->
-    <div class="p-4 border-border mx-auto" v-if="canStartNewConversation">
-      <Button @click="startNewConversation">
-        {{ widgetStore.config?.users?.start_conversation_button_text || $t('globals.messages.startNewConversation') }}
-      </Button>
+    <!-- Floating button with gradient fade -->
+    <div v-if="canStartNewConversation" class="absolute bottom-0 inset-x-0">
+      <!-- Gradient fade overlay -->
+      <div
+        class="h-20 bg-gradient-to-t from-background via-background/80 to-transparent pointer-events-none"
+      ></div>
+
+      <!-- Floating button -->
+      <div class="absolute bottom-4 inset-x-0 mx-auto w-fit z-10">
+        <Button @click="startNewConversation">
+          {{
+            widgetStore.config?.users?.start_conversation_button_text ||
+            $t('globals.messages.startNewConversation')
+          }}
+        </Button>
+      </div>
     </div>
   </div>
 </template>

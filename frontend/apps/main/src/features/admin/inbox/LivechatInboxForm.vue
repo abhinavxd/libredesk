@@ -159,6 +159,19 @@
             </FormItem>
           </FormField>
 
+          <!-- Show Powered By -->
+          <FormField v-slot="{ componentField, handleChange }" name="config.show_powered_by">
+            <FormItem class="flex flex-row items-center justify-between box p-4">
+              <div class="space-y-0.5">
+                <FormLabel class="text-base">{{ $t('admin.inbox.livechat.showPoweredBy') }}</FormLabel>
+                <FormDescription>{{ $t('admin.inbox.livechat.showPoweredBy.description') }}</FormDescription>
+              </div>
+              <FormControl>
+                <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
+              </FormControl>
+            </FormItem>
+          </FormField>
+
           <!-- Launcher Configuration -->
           <div class="space-y-4">
             <h4 class="font-medium text-foreground">{{ $t('admin.inbox.livechat.launcher') }}</h4>
@@ -745,6 +758,7 @@ const form = useForm({
     config: {
       brand_name: '',
       dark_mode: false,
+      show_powered_by: true,
       language: 'en',
       logo_url: '',
       launcher: {

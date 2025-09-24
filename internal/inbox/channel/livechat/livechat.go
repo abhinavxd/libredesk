@@ -25,10 +25,11 @@ const (
 
 // Config holds the live chat inbox configuration.
 type Config struct {
-	BrandName string `json:"brand_name"`
-	DarkMode  bool   `json:"dark_mode"`
-	Language  string `json:"language"`
-	Users     struct {
+	BrandName     string `json:"brand_name"`
+	DarkMode      bool   `json:"dark_mode"`
+	ShowPoweredBy bool   `json:"show_powered_by"`
+	Language      string `json:"language"`
+	Users         struct {
 		AllowStartConversation       bool   `json:"allow_start_conversation"`
 		PreventMultipleConversations bool   `json:"prevent_multiple_conversations"`
 		StartConversationButtonText  string `json:"start_conversation_button_text"`
@@ -69,7 +70,7 @@ type Config struct {
 	ShowOfficeHoursInChat          bool     `json:"show_office_hours_in_chat"`
 	ShowOfficeHoursAfterAssignment bool     `json:"show_office_hours_after_assignment"`
 	ChatReplyExpectationMessage    string   `json:"chat_reply_expectation_message"`
-	PreChatForm struct {
+	PreChatForm                    struct {
 		Enabled bool   `json:"enabled"`
 		Title   string `json:"title"`
 		Fields  []struct {
@@ -90,7 +91,6 @@ type Config struct {
 type Client struct {
 	ID      string
 	Channel chan []byte
-	mutex   sync.RWMutex
 }
 
 // LiveChat represents the live chat inbox.
@@ -103,7 +103,6 @@ type LiveChat struct {
 	userStore    inbox.UserStore
 	clients      map[string][]*Client // Maps user IDs to slices of clients (to handle multiple devices)
 	clientsMutex sync.RWMutex
-	wg           sync.WaitGroup
 }
 
 // Opts holds the options required for the live chat inbox.

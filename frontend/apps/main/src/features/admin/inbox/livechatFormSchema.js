@@ -9,6 +9,7 @@ export const createFormSchema = (t) => z.object({
   config: z.object({
     brand_name: z.string().min(1, { message: t('globals.messages.required') }),
     dark_mode: z.boolean(),
+    show_powered_by: z.boolean(),
     language: z.string().min(1, { message: t('globals.messages.required') }),
     logo_url: z.string().url({
       message: t('globals.messages.invalid', {

@@ -20,7 +20,10 @@
           <span class="text-xs">{{ $t('globals.terms.message', 2) }}</span>
         </TabsTrigger>
       </TabsList>
-      <div class="text-center flex items-center justify-center py-1">
+      <div
+        v-if="widgetStore.config?.show_powered_by !== false"
+        class="text-center flex items-center justify-center"
+      >
         <span class="text-[10px] text-muted-foreground"
           >Powered by <a href="https://libredesk.io" target="_blank">Libredesk</a></span
         >
