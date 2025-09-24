@@ -476,7 +476,11 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.Message.SourceID.String,
 		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines))
 
-	// Multi-layer UUID extraction for conversation continuity
+	// Extract conversation UUID from the email using multiple fallback methods.
+	// 1. Try Reply-To/To address extraction (primary method)
+	// 2. Try In-Reply-To header
+	// 3. Try References header chain
+	// If none of these yield a UUID, the message will be treated as a new conversation.
 	conversationUUID := e.extractConversationUUID(envelope)
 	if conversationUUID != "" {
 		incomingMsg.Message.ConversationUUID = conversationUUID

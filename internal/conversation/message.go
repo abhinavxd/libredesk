@@ -702,35 +702,39 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 		err               error
 	)
 
-	// If ConversationUUID is already set (from reply-to header), match it with existing conversation
+	// If ConversationUUID is already set, match it with existing conversation
 	if in.Message.ConversationUUID != "" && in.Channel == inbox.ChannelEmail {
 		var conversation models.Conversation
-		if err := m.q.GetConversation.Get(&conversation, 0, in.Message.ConversationUUID); err != nil {
-			m.lo.Error("error fetching conversation", "uuid", in.Message.ConversationUUID, "error", err)
-			return models.Message{}, fmt.Errorf("fetching conversation: %w", err)
-		}
-
-		// Validate sender matches conversation contact for security
-		contact, err := m.userStore.Get(conversation.ContactID, "", "")
+		err := m.q.GetConversation.Get(&conversation, 0, in.Message.ConversationUUID)
 		if err != nil {
-			m.lo.Error("error fetching conversation contact", "contact_id", conversation.ContactID, "error", err)
-			return models.Message{}, fmt.Errorf("fetching conversation contact: %w", err)
-		}
-
-		// Check if sender email matches contact email
-		if !strings.EqualFold(in.Contact.Email.String, contact.Email.String) {
-			m.lo.Warn("sender email mismatch for conversation, creating new conversation instead",
-				"sender_email", in.Contact.Email.String,
-				"expected_email", contact.Email.String,
-				"conversation_uuid", in.Message.ConversationUUID)
-			// Clear UUID to let normal flow create new conversation
-			in.Message.ConversationUUID = ""
-			conversationFound = false
+			if err == sql.ErrNoRows {
+				// No conversation found - continue with normal flow to create new conversation
+				m.lo.Info("no conversation found with matching email conversation UUID, creating new conversation instead", "conversation_uuid", in.Message.ConversationUUID)
+			} else {
+				m.lo.Error("error fetching conversation", "uuid", in.Message.ConversationUUID, "error", err)
+				return models.Message{}, fmt.Errorf("fetching conversation: %w", err)
+			}
 		} else {
-			// Valid sender - use existing conversation
-			in.Message.SenderID = conversation.ContactID
-			in.Message.ConversationID = conversation.ID
-			conversationFound = true
+			// Conversation found validate sender email matches contact email
+			contact, err := m.userStore.Get(conversation.ContactID, "", "")
+			if err != nil {
+				m.lo.Error("error fetching conversation contact", "contact_id", conversation.ContactID, "error", err)
+				return models.Message{}, fmt.Errorf("fetching conversation contact: %w", err)
+			}
+
+			if strings.EqualFold(in.Contact.Email.String, contact.Email.String) {
+				// Valid sender - use existing conversation
+				in.Message.SenderID = conversation.ContactID
+				in.Message.ConversationID = conversation.ID
+				conversationFound = true
+			} else {
+				// Email mismatch - create new conversation instead
+				m.lo.Warn("sender email mismatch for conversation, creating new conversation instead",
+					"sender_email", in.Contact.Email.String,
+					"expected_email", contact.Email.String,
+					"conversation_uuid", in.Message.ConversationUUID)
+				in.Message.ConversationUUID = ""
+			}
 		}
 	}
 
@@ -1121,7 +1125,7 @@ func (m *Manager) updateMessageSourceID(id int, sourceID string) error {
 	return err
 }
 
-// sendConversationContinuityEmail sends an email to continue the conversation over email when a live chat contact is offline.
+// sendConversationContinuityEmail sends an email to the contact for conversation continuity, supposed to be called after contacts go offline in live chat.
 func (m *Manager) sendConversationContinuityEmail(message models.Message) error {
 	// Get contact and make sure it has a valid email
 	contact, err := m.userStore.Get(message.MessageReceiverID, "", "")
@@ -1131,7 +1135,7 @@ func (m *Manager) sendConversationContinuityEmail(message models.Message) error 
 
 	if contact.Email.String == "" {
 		m.lo.Info("contact has no email for conversation continuity", "contact_id", contact.ID, "conversation_uuid", message.ConversationUUID)
-		return nil
+		return fmt.Errorf("contact has no email for conversation continuity")
 	}
 
 	// Get the original livechat inbox to check for linked email inbox
@@ -1143,7 +1147,7 @@ func (m *Manager) sendConversationContinuityEmail(message models.Message) error 
 	// Check if livechat inbox has a linked email inbox
 	if !originalInbox.LinkedEmailInboxID.Valid {
 		m.lo.Info("no linked email inbox configured for livechat inbox", "inbox_id", message.InboxID)
-		return nil // No fallback configured.
+		return fmt.Errorf("no linked email inbox configured for livechat inbox")
 	}
 
 	// Get the linked email inbox
@@ -1177,7 +1181,10 @@ func (m *Manager) sendConversationContinuityEmail(message models.Message) error 
 	emailUserPart := strings.Split(emailAddress, "@")
 	if len(emailUserPart) == 2 {
 		emailMessage.SourceID = null.StringFrom(fmt.Sprintf("%s.%d@%s", message.ConversationUUID, time.Now().UnixNano(), emailUserPart[1]))
-		m.updateMessageSourceID(message.ID, emailMessage.SourceID.String)
+		if err := m.updateMessageSourceID(message.ID, emailMessage.SourceID.String); err != nil {
+			m.lo.Error("error updating message source ID", "error", err)
+			return fmt.Errorf("error updating message source ID: %w", err)
+		}
 	}
 
 	// Get all message source IDs for References header
