@@ -91,10 +91,14 @@
               <FormControl>
                 <Select v-bind="componentField">
                   <SelectTrigger>
-                    <SelectValue :placeholder="$t('admin.inbox.livechat.emailFallbackInbox.placeholder')" />
+                    <SelectValue
+                      :placeholder="$t('admin.inbox.livechat.emailFallbackInbox.placeholder')"
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem :value="0">{{ $t('admin.inbox.livechat.emailFallbackInbox.none') }}</SelectItem>
+                    <SelectItem :value="0">{{
+                      $t('admin.inbox.livechat.emailFallbackInbox.none')
+                    }}</SelectItem>
                     <SelectItem v-for="inbox in emailInboxes" :key="inbox.id" :value="inbox.id">
                       {{ inbox.name }}
                     </SelectItem>
@@ -163,8 +167,12 @@
           <FormField v-slot="{ componentField, handleChange }" name="config.show_powered_by">
             <FormItem class="flex flex-row items-center justify-between box p-4">
               <div class="space-y-0.5">
-                <FormLabel class="text-base">{{ $t('admin.inbox.livechat.showPoweredBy') }}</FormLabel>
-                <FormDescription>{{ $t('admin.inbox.livechat.showPoweredBy.description') }}</FormDescription>
+                <FormLabel class="text-base">{{
+                  $t('admin.inbox.livechat.showPoweredBy')
+                }}</FormLabel>
+                <FormDescription>{{
+                  $t('admin.inbox.livechat.showPoweredBy.description')
+                }}</FormDescription>
               </div>
               <FormControl>
                 <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
@@ -543,11 +551,7 @@
 
         <!-- Pre-Chat Form Tab -->
         <div v-show="activeTab === 'prechat'" class="space-y-6">
-          <PreChatFormConfig
-            :form="form"
-            :custom-attributes="customAttributes"
-            @fetch-custom-attributes="fetchCustomAttributes"
-          />
+          <PreChatFormConfig v-model="prechatConfig" />
         </div>
 
         <!-- Users Tab -->
@@ -715,7 +719,6 @@ import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { Plus, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import PreChatFormConfig from './PreChatFormConfig.vue'
-import api from '@/api'
 
 const props = defineProps({
   initialValues: {
@@ -740,7 +743,7 @@ const { t } = useI18n()
 const activeTab = ref('general')
 const selectedUserTab = ref('visitors')
 const externalLinks = ref([])
-const customAttributes = ref([])
+const prechatConfig = ref({})
 
 const inboxStore = useInboxStore()
 const emailInboxes = computed(() =>
@@ -846,24 +849,6 @@ const updateExternalLinks = () => {
   form.setFieldValue('config.external_links', externalLinks.value)
 }
 
-const fetchCustomAttributes = async () => {
-  try {
-    // Fetch both contact and conversation custom attributes
-    const [contactAttrs, conversationAttrs] = await Promise.all([
-      api.getCustomAttributes('contact'),
-      api.getCustomAttributes('conversation')
-    ])
-
-    customAttributes.value = [
-      ...(contactAttrs.data?.data || []),
-      ...(conversationAttrs.data?.data || [])
-    ]
-  } catch (error) {
-    console.error('Error fetching custom attributes:', error)
-    customAttributes.value = []
-  }
-}
-
 // Fetch inboxes on mount for the linked email inbox dropdown
 onMounted(() => {
   inboxStore.fetchInboxes()
@@ -895,6 +880,15 @@ const onSubmit = form.handleSubmit(async (values) => {
   await props.submitForm(values)
 })
 
+// Watch for prechat config changes and sync with form
+watch(
+  prechatConfig,
+  (newConfig) => {
+    form.setFieldValue('config.prechat_form', newConfig)
+  },
+  { deep: true }
+)
+
 watch(
   () => props.initialValues,
   (newValues) => {
@@ -911,6 +905,12 @@ watch(
     if (newValues.config?.external_links) {
       externalLinks.value = [...newValues.config.external_links]
     }
+
+    // Set prechat config
+    if (newValues.config?.prechat_form) {
+      prechatConfig.value = { ...newValues.config.prechat_form }
+    }
+
     form.setValues(newValues)
   },
   { deep: true, immediate: true }

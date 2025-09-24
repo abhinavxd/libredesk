@@ -26,13 +26,13 @@ export const createPreChatFormSchema = (t, fields = []) => {
           break
         
         case 'date':
-          fieldSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+          fieldSchema = z.string().regex(/^(\d{4}-\d{2}-\d{2}|)$/, {
             message: t('globals.messages.invalid', { name: field.label })
           })
           break
         
         case 'link':
-          fieldSchema = z.string().url({
+          fieldSchema = z.string().refine((val) => val === '' || z.string().url().safeParse(val).success, {
             message: t('globals.messages.invalid', { name: t('globals.terms.url').toLowerCase() })
           })
           break

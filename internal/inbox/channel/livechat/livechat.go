@@ -23,6 +23,18 @@ const (
 	MaxConnectionsPerUser = 10
 )
 
+type PreChatFormField struct {
+	Key               string `json:"key"`
+	Type              string `json:"type"`
+	Label             string `json:"label"`
+	Placeholder       string `json:"placeholder"`
+	Required          bool   `json:"required"`
+	Enabled           bool   `json:"enabled"`
+	Order             int    `json:"order"`
+	IsDefault         bool   `json:"is_default"`
+	CustomAttributeID int    `json:"custom_attribute_id"`
+}
+
 // Config holds the live chat inbox configuration.
 type Config struct {
 	BrandName     string `json:"brand_name"`
@@ -71,19 +83,9 @@ type Config struct {
 	ShowOfficeHoursAfterAssignment bool     `json:"show_office_hours_after_assignment"`
 	ChatReplyExpectationMessage    string   `json:"chat_reply_expectation_message"`
 	PreChatForm                    struct {
-		Enabled bool   `json:"enabled"`
-		Title   string `json:"title"`
-		Fields  []struct {
-			Key               string `json:"key"`
-			Type              string `json:"type"`
-			Label             string `json:"label"`
-			Placeholder       string `json:"placeholder"`
-			Required          bool   `json:"required"`
-			Enabled           bool   `json:"enabled"`
-			Order             int    `json:"order"`
-			IsDefault         bool   `json:"is_default"`
-			CustomAttributeID int    `json:"custom_attribute_id,omitempty"`
-		} `json:"fields"`
+		Enabled bool               `json:"enabled"`
+		Title   string             `json:"title"`
+		Fields  []PreChatFormField `json:"fields"`
 	} `json:"prechat_form"`
 }
 

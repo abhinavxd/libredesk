@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"math"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -162,29 +163,11 @@ func handleGetChatSettings(r *fastglue.Request) error {
 		}
 	}
 
-	// Collect custom attribute IDs from pre-chat form fields
+	// Filter out pre-chat form fields for which custom attributes don't exist anymore
 	if config.PreChatForm.Enabled && len(config.PreChatForm.Fields) > 0 {
-		customAttrIDs := make(map[int]bool)
-		for _, field := range config.PreChatForm.Fields {
-			if field.Enabled && field.CustomAttributeID > 0 {
-				customAttrIDs[field.CustomAttributeID] = true
-			}
-		}
-
-		// Fetch custom attributes if any are referenced
-		if len(customAttrIDs) > 0 {
-			customAttributes := make(map[int]customAttributeWidget)
-			for id := range customAttrIDs {
-				attr, err := app.customAttribute.Get(id)
-				if err != nil {
-					app.lo.Error("failed to fetch custom attribute for widget", "id", id, "error", err)
-					continue
-				}
-				customAttributes[id] = customAttributeWidget{
-					ID:     attr.ID,
-					Values: attr.Values,
-				}
-			}
+		filteredFields, customAttributes := filterPreChatFormFields(config.PreChatForm.Fields, app)
+		response.PreChatForm.Fields = filteredFields
+		if len(customAttributes) > 0 {
 			response.CustomAttributes = customAttributes
 		}
 	}
@@ -253,8 +236,8 @@ func handleChatInit(r *fastglue.Request) error {
 				lastName := claims.LastName
 				email := claims.Email
 
-				// Process form custom attributes
-				formCustomAttributes := processFormCustomAttributes(req.FormData, config, app)
+				// Validate custom attribute
+				formCustomAttributes := validateCustomAttributes(req.FormData, config, app)
 
 				// Merge JWT and form custom attributes (form takes precedence)
 				mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
@@ -284,14 +267,13 @@ func handleChatInit(r *fastglue.Request) error {
 				// User exists, update custom attributes from both JWT and form
 				// Don't override existing name and email.
 
-				// Process form custom attributes
-				formCustomAttributes := processFormCustomAttributes(req.FormData, config, app)
+				// Validate custom attribute
+				formCustomAttributes := validateCustomAttributes(req.FormData, config, app)
 
 				// Merge JWT and form custom attributes (form takes precedence)
 				mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
 
 				if len(mergedAttributes) > 0 {
-					fmt.Println("Updating custom attributes for user:", user.ID, "with attributes:", mergedAttributes)
 					if err := app.user.SaveCustomAttributes(user.ID, mergedAttributes, false); err != nil {
 						app.lo.Error("error updating contact custom attributes", "contact_id", user.ID, "error", err)
 						// Don't fail the request for custom attributes update failure
@@ -309,8 +291,8 @@ func handleChatInit(r *fastglue.Request) error {
 				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 			}
 
-			// Process form custom attributes
-			formCustomAttributes := processFormCustomAttributes(req.FormData, config, app)
+			// Validate custom attribute
+			formCustomAttributes := validateCustomAttributes(req.FormData, config, app)
 
 			// Merge JWT and form custom attributes (form takes precedence)
 			mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
@@ -334,7 +316,7 @@ func handleChatInit(r *fastglue.Request) error {
 		}
 
 		// Process custom attributes from form data
-		formCustomAttributes := processFormCustomAttributes(req.FormData, config, app)
+		formCustomAttributes := validateCustomAttributes(req.FormData, config, app)
 
 		// Marshal custom attributes for storage
 		var customAttribJSON []byte
@@ -378,7 +360,7 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 
 	if !allowStartConversation {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("globals.messages.notAllowed}"), nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.notAllowed", "name", ""), nil, envelope.PermissionError)
 	}
 
 	if preventMultipleConversations {
@@ -397,7 +379,7 @@ func handleChatInit(r *fastglue.Request) error {
 				userType = "user"
 			}
 			app.lo.Info(userType+" attempted to start new conversation but already has one", "contact_id", contactID, "conversations_count", len(conversations))
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("globals.messages.notAllowed}"), nil, envelope.PermissionError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.notAllowed", "name", ""), nil, envelope.PermissionError)
 		}
 	}
 
@@ -956,9 +938,8 @@ func mergeCustomAttributes(jwtAttributes, formAttributes map[string]interface{})
 	return merged
 }
 
-// processFormCustomAttributes processes form data and extracts custom attributes
-// based on the pre-chat form configuration, skipping default fields like name and email
-func processFormCustomAttributes(formData map[string]interface{}, config livechat.Config, app *App) map[string]interface{} {
+// validateCustomAttributes validates and processes custom attributes from form data
+func validateCustomAttributes(formData map[string]interface{}, config livechat.Config, app *App) map[string]interface{} {
 	customAttributes := make(map[string]interface{})
 
 	if !config.PreChatForm.Enabled || len(formData) == 0 {
@@ -973,17 +954,7 @@ func processFormCustomAttributes(formData map[string]interface{}, config livecha
 	}
 
 	// Create a map of valid field keys for quick lookup
-	validFields := make(map[string]struct {
-		Key               string `json:"key"`
-		Type              string `json:"type"`
-		Label             string `json:"label"`
-		Placeholder       string `json:"placeholder"`
-		Required          bool   `json:"required"`
-		Enabled           bool   `json:"enabled"`
-		Order             int    `json:"order"`
-		IsDefault         bool   `json:"is_default"`
-		CustomAttributeID int    `json:"custom_attribute_id,omitempty"`
-	})
+	validFields := make(map[string]livechat.PreChatFormField)
 	for _, field := range config.PreChatForm.Fields {
 		if field.Enabled {
 			validFields[field.Key] = field
@@ -1026,6 +997,24 @@ func processFormCustomAttributes(formData map[string]interface{}, config livecha
 			}
 			customAttributes[field.Key] = strValue
 		}
+
+		// Numbers
+		if numValue, ok := value.(float64); ok {
+			if math.IsNaN(numValue) || math.IsInf(numValue, 0) {
+				app.lo.Warn("form field contains invalid numeric value", "key", key, "value", numValue)
+				continue
+			}
+
+			if numValue > 1e12 || numValue < -1e12 {
+				app.lo.Warn("form field numeric value out of acceptable range", "key", key, "value", numValue)
+				continue
+			}
+
+			customAttributes[field.Key] = numValue
+		}
+
+		// Set rest as is
+		customAttributes[field.Key] = value
 	}
 
 	return customAttributes
@@ -1086,4 +1075,55 @@ func validateFormData(formData map[string]interface{}, config livechat.Config, e
 	}
 
 	return finalName, finalEmail, nil
+}
+
+// filterPreChatFormFields filters out pre-chat form fields that reference non-existent custom attributes while retaining the default fields
+func filterPreChatFormFields(fields []livechat.PreChatFormField, app *App) ([]livechat.PreChatFormField, map[int]customAttributeWidget) {
+	if len(fields) == 0 {
+		return fields, nil
+	}
+
+	// Collect custom attribute IDs and enabled fields
+	customAttrIDs := make(map[int]bool)
+	enabledFields := make([]livechat.PreChatFormField, 0, len(fields))
+
+	for _, field := range fields {
+		if field.Enabled {
+			enabledFields = append(enabledFields, field)
+			if field.CustomAttributeID > 0 {
+				customAttrIDs[field.CustomAttributeID] = true
+			}
+		}
+	}
+
+	// Fetch existing custom attributes
+	existingCustomAttrs := make(map[int]customAttributeWidget)
+	for id := range customAttrIDs {
+		attr, err := app.customAttribute.Get(id)
+		if err != nil {
+			app.lo.Warn("custom attribute referenced in pre-chat form no longer exists", "custom_attribute_id", id, "error", err)
+			continue
+		}
+		existingCustomAttrs[id] = customAttributeWidget{
+			ID:     attr.ID,
+			Values: attr.Values,
+		}
+	}
+
+	// Filter out fields with non-existent custom attributes
+	filteredFields := make([]livechat.PreChatFormField, 0, len(enabledFields))
+	for _, field := range enabledFields {
+		// Keep default fields
+		if field.IsDefault {
+			filteredFields = append(filteredFields, field)
+			continue
+		}
+
+		// Only keep custom fields if their custom attribute exists
+		if _, exists := existingCustomAttrs[field.CustomAttributeID]; exists {
+			filteredFields = append(filteredFields, field)
+		}
+	}
+
+	return filteredFields, existingCustomAttrs
 }

@@ -40,7 +40,7 @@ export const createFormSchema = (t) => z.object({
     colors: z.object({
       primary: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
         message: t('globals.messages.invalid', {
-          name: t('globals.terms.colors').toLowerCase()
+          name: t('admin.inbox.livechat.colors').toLowerCase()
         })
       }),
     }),
