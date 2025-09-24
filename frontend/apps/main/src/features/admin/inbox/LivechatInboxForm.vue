@@ -87,18 +87,20 @@
           <!-- Email Fallback Inbox -->
           <FormField v-slot="{ componentField }" name="linked_email_inbox_id">
             <FormItem>
-              <FormLabel>{{ $t('admin.inbox.livechat.emailFallbackInbox') }}</FormLabel>
+              <FormLabel>{{ $t('admin.inbox.livechat.conversationContinuity') }}</FormLabel>
               <FormControl>
                 <Select v-bind="componentField">
                   <SelectTrigger>
                     <SelectValue
-                      :placeholder="$t('admin.inbox.livechat.emailFallbackInbox.placeholder')"
+                      :placeholder="
+                        $t('globals.messages.select', {
+                          name: $t('globals.terms.inbox').toLowerCase()
+                        })
+                      "
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem :value="0">{{
-                      $t('admin.inbox.livechat.emailFallbackInbox.none')
-                    }}</SelectItem>
+                    <SelectItem :value="0"> None </SelectItem>
                     <SelectItem v-for="inbox in emailInboxes" :key="inbox.id" :value="inbox.id">
                       {{ inbox.name }}
                     </SelectItem>
@@ -106,7 +108,7 @@
                 </Select>
               </FormControl>
               <FormDescription>
-                {{ $t('admin.inbox.livechat.emailFallbackInbox.description') }}
+                {{ $t('admin.inbox.livechat.conversationContinuity.description') }}
               </FormDescription>
             </FormItem>
           </FormField>
@@ -114,6 +116,38 @@
 
         <!-- Appearance Tab -->
         <div v-show="activeTab === 'appearance'" class="space-y-6">
+          <!-- Dark mode -->
+          <FormField v-slot="{ componentField, handleChange }" name="config.dark_mode">
+            <FormItem class="flex flex-row items-center justify-between box p-4">
+              <div class="space-y-0.5">
+                <FormLabel class="text-base">{{ $t('admin.inbox.livechat.darkMode') }}</FormLabel>
+                <FormDescription>{{
+                  $t('admin.inbox.livechat.darkMode.description')
+                }}</FormDescription>
+              </div>
+              <FormControl>
+                <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
+              </FormControl>
+            </FormItem>
+          </FormField>
+
+          <!-- Show Powered By -->
+          <FormField v-slot="{ componentField, handleChange }" name="config.show_powered_by">
+            <FormItem class="flex flex-row items-center justify-between box p-4">
+              <div class="space-y-0.5">
+                <FormLabel class="text-base">{{
+                  $t('admin.inbox.livechat.showPoweredBy')
+                }}</FormLabel>
+                <FormDescription>{{
+                  $t('admin.inbox.livechat.showPoweredBy.description')
+                }}</FormDescription>
+              </div>
+              <FormControl>
+                <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
+              </FormControl>
+            </FormItem>
+          </FormField>
+
           <!-- Logo URL -->
           <FormField v-slot="{ componentField }" name="config.logo_url">
             <FormItem>
@@ -147,38 +181,6 @@
               </FormField>
             </div>
           </div>
-
-          <!-- Dark mode -->
-          <FormField v-slot="{ componentField, handleChange }" name="config.dark_mode">
-            <FormItem class="flex flex-row items-center justify-between box p-4">
-              <div class="space-y-0.5">
-                <FormLabel class="text-base">{{ $t('admin.inbox.livechat.darkMode') }}</FormLabel>
-                <FormDescription>{{
-                  $t('admin.inbox.livechat.darkMode.description')
-                }}</FormDescription>
-              </div>
-              <FormControl>
-                <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
-              </FormControl>
-            </FormItem>
-          </FormField>
-
-          <!-- Show Powered By -->
-          <FormField v-slot="{ componentField, handleChange }" name="config.show_powered_by">
-            <FormItem class="flex flex-row items-center justify-between box p-4">
-              <div class="space-y-0.5">
-                <FormLabel class="text-base">{{
-                  $t('admin.inbox.livechat.showPoweredBy')
-                }}</FormLabel>
-                <FormDescription>{{
-                  $t('admin.inbox.livechat.showPoweredBy.description')
-                }}</FormDescription>
-              </div>
-              <FormControl>
-                <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
-              </FormControl>
-            </FormItem>
-          </FormField>
 
           <!-- Launcher Configuration -->
           <div class="space-y-4">
@@ -363,9 +365,6 @@
                   <FormLabel class="text-base">{{
                     $t('admin.inbox.livechat.noticeBanner.enabled')
                   }}</FormLabel>
-                  <FormDescription>{{
-                    $t('admin.inbox.livechat.noticeBanner.enabled.description')
-                  }}</FormDescription>
                 </div>
                 <FormControl>
                   <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
@@ -387,9 +386,6 @@
                     rows="2"
                   />
                 </FormControl>
-                <FormDescription>{{
-                  $t('admin.inbox.livechat.noticeBanner.text.description')
-                }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
