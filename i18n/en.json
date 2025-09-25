@@ -211,6 +211,7 @@
   "globals.terms.tls": "TLS | TLSs",
   "globals.terms.credential": "Credential | Credentials",
   "globals.terms.unAuthorized": "Unauthorized",
+  "globals.messages.noInternetConnection": "No internet connection",
   "globals.messages.invalid": "Invalid {name}",
   "globals.messages.custom": "Custom {name}",
   "globals.messages.replying": "Replying",

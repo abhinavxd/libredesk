@@ -28,6 +28,9 @@
           >Powered by <a href="https://libredesk.io" target="_blank">Libredesk</a></span
         >
       </div>
+
+      <!-- Network Connection Banner -->
+      <ConnectionBanner />
     </Tabs>
   </div>
 </template>
@@ -38,6 +41,7 @@ import HomeView from '@widget/views/HomeView.vue'
 import { Home, MessageCircle } from 'lucide-vue-next'
 import ChatView from '@widget/views/ChatView.vue'
 import MessagesView from '@widget/views/MessagesView.vue'
+import ConnectionBanner from '@widget/components/ConnectionBanner.vue'
 import { useWidgetStore } from '@widget/store/widget.js'
 const widgetStore = useWidgetStore()
 </script>
