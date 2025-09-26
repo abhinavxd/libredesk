@@ -59,18 +59,28 @@
           </div>
 
           <div class="space-y-2">
-            <Label for="password" class="text-sm font-medium text-foreground">{{
-              t('globals.terms.password')
-            }}</Label>
-            <Input
-              id="password"
-              type="password"
-              autocomplete="current-password"
-              :placeholder="t('auth.enterPassword')"
-              v-model="loginForm.password"
-              :class="{ 'border-destructive': passwordHasError }"
-              class="w-full bg-card border-border text-foreground placeholder:text-muted-foreground rounded py-2 px-3 focus:ring-2 focus:ring-ring focus:border-ring transition-all duration-200 ease-in-out"
-            />
+            <Label for="password" class="text-sm font-medium text-foreground">
+              {{ t('globals.terms.password') }}
+            </Label>
+            <div class="relative">
+              <Input
+                id="password"
+                :type="showPassword ? 'text' : 'password'"
+                autocomplete="current-password"
+                :placeholder="t('auth.enterPassword')"
+                v-model="loginForm.password"
+                :class="{ 'border-destructive': passwordHasError }"
+                class="w-full bg-card border-border text-foreground placeholder:text-muted-foreground rounded py-2 px-3 pr-10 focus:ring-2 focus:ring-ring focus:border-ring transition-all duration-200 ease-in-out"
+              />
+              <button
+                type="button"
+                class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                @click="showPassword = !showPassword"
+              >
+                <Eye v-if="!showPassword" class="w-5 h-5" />
+                <EyeOff v-else class="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-between">
@@ -126,6 +136,7 @@ import { useI18n } from 'vue-i18n'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
+import { Eye, EyeOff } from 'lucide-vue-next'
 
 const emitter = useEmitter()
 const { t } = useI18n()
@@ -134,6 +145,7 @@ const isLoading = ref(false)
 const router = useRouter()
 const userStore = useUserStore()
 const shakeCard = ref(false)
+const showPassword = ref(false)
 const loginForm = ref({
   email: '',
   password: ''
