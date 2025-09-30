@@ -10,8 +10,6 @@ Modern, open source, self-hosted customer support desk. Single binary app.
 
 Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**Live demo**](https://demo.libredesk.io/).
 
-> **CAUTION:** This project is currently in **alpha**. Features and APIs may change and are not yet fully tested.
-
 ## Features
 
 - **Multi Shared Inbox**  
