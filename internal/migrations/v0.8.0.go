@@ -157,5 +157,22 @@ func V0_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	// Add column to track last continuity email sent
+	_, err = db.Exec(`
+		ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_continuity_email_sent_at TIMESTAMPTZ NULL;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Add index for continuity email tracking
+	_, err = db.Exec(`
+		CREATE INDEX IF NOT EXISTS index_conversations_on_last_continuity_email_sent_at
+		ON conversations (last_continuity_email_sent_at);
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -182,7 +182,6 @@ const sendMessage = async () => {
     emit('error', handleHTTPError(error).message)
   } finally {
     isSending.value = false
-    await chatStore.updateCurrentConversationLastSeen()
   }
 }
 

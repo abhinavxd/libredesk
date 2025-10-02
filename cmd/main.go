@@ -217,6 +217,7 @@ func main() {
 	go autoassigner.Run(ctx, autoAssignInterval)
 	go conversation.Run(ctx, messageIncomingQWorkers, messageOutgoingQWorkers, messageOutgoingScanInterval)
 	go conversation.RunUnsnoozer(ctx, unsnoozeInterval)
+	go conversation.RunContinuity(ctx)
 	go webhook.Run(ctx)
 	go notifier.Run(ctx)
 	go sla.Run(ctx, slaEvaluationInterval)

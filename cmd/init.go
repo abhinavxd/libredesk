@@ -226,11 +226,30 @@ func initConversations(
 	template *tmpl.Manager,
 	webhook *webhook.Manager,
 ) *conversation.Manager {
+	continuityConfig := &conversation.ContinuityConfig{}
+
+	if ko.Exists("conversation.continuity.batch_check_interval") {
+		continuityConfig.BatchCheckInterval = ko.MustDuration("conversation.continuity.batch_check_interval")
+	}
+
+	if ko.Exists("conversation.continuity.offline_threshold") {
+		continuityConfig.OfflineThreshold = ko.MustDuration("conversation.continuity.offline_threshold")
+	}
+
+	if ko.Exists("conversation.continuity.min_email_interval") {
+		continuityConfig.MinEmailInterval = ko.MustDuration("conversation.continuity.min_email_interval")
+	}
+
+	if ko.Exists("conversation.continuity.max_messages_per_email") {
+		continuityConfig.MaxMessagesPerEmail = ko.MustInt("conversation.continuity.max_messages_per_email")
+	}
+
 	c, err := conversation.New(hub, i18n, notif, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, conversation.Opts{
 		DB:                       db,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
 		IncomingMessageQueueSize: ko.MustInt("message.incoming_queue_size"),
+		ContinuityConfig:         continuityConfig,
 	})
 	if err != nil {
 		log.Fatalf("error initializing conversation manager: %v", err)

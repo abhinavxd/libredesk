@@ -23,8 +23,8 @@ export const useWidgetStore = defineStore('widget', () => {
         isInChatView.value = false
     }
 
-    const openWidget = () => {
-        isOpen.value = true
+    const setOpen = (open) => {
+        isOpen.value = open
     }
 
     const closeWidget = () => {
@@ -126,7 +126,7 @@ export const useWidgetStore = defineStore('widget', () => {
 
         // Actions
         toggleWidget,
-        openWidget,
+        setOpen,
         closeWidget,
         navigateToChat,
         navigateToMessages,

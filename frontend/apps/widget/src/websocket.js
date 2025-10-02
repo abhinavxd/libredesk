@@ -159,6 +159,8 @@ export class WidgetWebSocketClient {
         try {
           this.socket.send(JSON.stringify({
             type: 'ping',
+            jwt: this.jwt,
+            inbox_id: this.inboxId ? parseInt(this.inboxId, 10) : null
           }))
           if (Date.now() - this.lastPong > 60000) {
             console.warn('No pong received in 60 seconds, closing widget connection')

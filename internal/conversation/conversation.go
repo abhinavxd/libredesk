@@ -81,6 +81,7 @@ type Manager struct {
 	closed                     bool
 	closedMu                   sync.RWMutex
 	wg                         sync.WaitGroup
+	continuityConfig           ContinuityConfig
 }
 
 // WidgetConversationView represents the conversation data for widget clients
@@ -148,6 +149,7 @@ type inboxStore interface {
 type settingsStore interface {
 	GetAppRootURL() (string, error)
 	GetByPrefix(prefix string) (types.JSONText, error)
+	Get(key string) (types.JSONText, error)
 }
 
 type csatStore interface {
@@ -160,12 +162,21 @@ type webhookStore interface {
 	TriggerEvent(event wmodels.WebhookEvent, data any)
 }
 
+// ContinuityConfig holds configuration for conversation continuity emails
+type ContinuityConfig struct {
+	BatchCheckInterval  time.Duration
+	OfflineThreshold    time.Duration
+	MinEmailInterval    time.Duration
+	MaxMessagesPerEmail int
+}
+
 // Opts holds the options for creating a new Manager.
 type Opts struct {
 	DB                       *sqlx.DB
 	Lo                       *logf.Logger
 	OutgoingMessageQueueSize int
 	IncomingMessageQueueSize int
+	ContinuityConfig         *ContinuityConfig
 }
 
 // New initializes a new conversation Manager.
@@ -192,6 +203,30 @@ func New(
 		return nil, err
 	}
 
+	// Default continuity config
+	continuityConfig := ContinuityConfig{
+		BatchCheckInterval:  2 * time.Minute,
+		OfflineThreshold:    3 * time.Minute,
+		MinEmailInterval:    15 * time.Minute,
+		MaxMessagesPerEmail: 10,
+	}
+
+	// Override with provided config if available
+	if opts.ContinuityConfig != nil {
+		if opts.ContinuityConfig.BatchCheckInterval > 0 {
+			continuityConfig.BatchCheckInterval = opts.ContinuityConfig.BatchCheckInterval
+		}
+		if opts.ContinuityConfig.OfflineThreshold > 0 {
+			continuityConfig.OfflineThreshold = opts.ContinuityConfig.OfflineThreshold
+		}
+		if opts.ContinuityConfig.MinEmailInterval > 0 {
+			continuityConfig.MinEmailInterval = opts.ContinuityConfig.MinEmailInterval
+		}
+		if opts.ContinuityConfig.MaxMessagesPerEmail > 0 {
+			continuityConfig.MaxMessagesPerEmail = opts.ContinuityConfig.MaxMessagesPerEmail
+		}
+	}
+
 	c := &Manager{
 		q:                          q,
 		wsHub:                      wsHub,
@@ -214,6 +249,7 @@ func New(
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
 		outgoingProcessingMessages: sync.Map{},
+		continuityConfig:           continuityConfig,
 	}
 
 	return c, nil
@@ -262,11 +298,17 @@ type queries struct {
 	GetOutgoingPendingMessages         *sqlx.Stmt `query:"get-outgoing-pending-messages"`
 	GetMessageSourceIDs                *sqlx.Stmt `query:"get-message-source-ids"`
 	GetConversationUUIDFromMessageUUID *sqlx.Stmt `query:"get-conversation-uuid-from-message-uuid"`
+	MessageExistsBySourceID            *sqlx.Stmt `query:"message-exists-by-source-id"`
+	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
 	InsertMessage                      *sqlx.Stmt `query:"insert-message"`
 	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
 	UpdateMessageSourceID              *sqlx.Stmt `query:"update-message-source-id"`
-	MessageExistsBySourceID            *sqlx.Stmt `query:"message-exists-by-source-id"`
-	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
+	DeleteMessage                      *sqlx.Stmt `query:"delete-message"`
+
+	// Conversation continuity queries.
+	GetOfflineLiveChatConversations *sqlx.Stmt `query:"get-offline-livechat-conversations"`
+	GetUnreadMessages               *sqlx.Stmt `query:"get-unread-messages"`
+	UpdateContinuityEmailTracking   *sqlx.Stmt `query:"update-continuity-email-tracking"`
 }
 
 // CreateConversation creates a new conversation and returns its ID and UUID.

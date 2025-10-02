@@ -181,16 +181,9 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 
 	// Send message
 	err = inb.Send(message)
-	if err != nil {
-		if err == livechat.ErrClientNotConnected {
-			// Continue conversation over email.
-			if err := m.sendConversationContinuityEmail(message); err != nil {
-				m.lo.Error("error sending conversation continuity email", "message_id", message.ID, "error", err)
-			}
-		} else {
-			handleError(err, "error sending message")
-			return
-		}
+	if err != nil && err != livechat.ErrClientNotConnected {
+		handleError(err, "error sending message")
+		return
 	}
 
 	// Update status as sent.
@@ -430,12 +423,13 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID 
 			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
 		}
 	case inbox.ChannelLiveChat:
-		sourceID, err = stringutil.RandomAlphanumeric(35)
+		// TODO: Is source id needed for live chat messages?
+		sourceID, err = stringutil.RandomAlphanumeric(16)
 		if err != nil {
 			m.lo.Error("error generating random source id", "error", err)
 			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
 		}
-		sourceID = "livechat-" + sourceID
+		sourceID = "livechat-" + conversationUUID + "-" + sourceID
 	}
 
 	// Marshal meta.
@@ -980,24 +974,23 @@ func (m *Manager) findConversationID(messageSourceIDs []string) (int, error) {
 	return conversationID, nil
 }
 
-// attachAttachmentsToMessage attaches attachment blobs to message.
-func (m *Manager) attachAttachmentsToMessage(message *models.Message) error {
+// fetchMessageAttachments fetches attachments for a single message ID - extracted for reuse
+func (m *Manager) fetchMessageAttachments(messageID int) (attachment.Attachments, error) {
 	var attachments attachment.Attachments
 
-	// Get all media for this message.
-	medias, err := m.mediaStore.GetByModel(message.ID, mmodels.ModelMessages)
+	// Get all media for this message
+	medias, err := m.mediaStore.GetByModel(messageID, mmodels.ModelMessages)
 	if err != nil {
-		m.lo.Error("error fetching message attachments", "error", err)
-		return err
+		return attachments, fmt.Errorf("error fetching message attachments: %w", err)
 	}
 
-	// Fetch blobs.
+	// Fetch blobs for each media item
 	for _, media := range medias {
 		blob, err := m.mediaStore.GetBlob(media.UUID)
 		if err != nil {
-			m.lo.Error("error fetching media blob", "error", err)
-			return err
+			return attachments, fmt.Errorf("error fetching media blob: %w", err)
 		}
+
 		attachment := attachment.Attachment{
 			Name:        media.Filename,
 			UUID:        media.UUID,
@@ -1008,6 +1001,17 @@ func (m *Manager) attachAttachmentsToMessage(message *models.Message) error {
 			URL:         m.mediaStore.GetURL(media.UUID),
 		}
 		attachments = append(attachments, attachment)
+	}
+
+	return attachments, nil
+}
+
+// attachAttachmentsToMessage attaches attachment blobs to message.
+func (m *Manager) attachAttachmentsToMessage(message *models.Message) error {
+	attachments, err := m.fetchMessageAttachments(message.ID)
+	if err != nil {
+		m.lo.Error("error fetching message attachments", "error", err)
+		return err
 	}
 
 	// Attach attachments.
@@ -1116,122 +1120,5 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 			m.BroadcastConversationUpdate(conversationUUID, "next_response_met_at", nil)
 		}
 	}
-	return nil
-}
-
-// updateMessageSourceID updates the source ID of a message.
-func (m *Manager) updateMessageSourceID(id int, sourceID string) error {
-	_, err := m.q.UpdateMessageSourceID.Exec(sourceID, id)
-	return err
-}
-
-// sendConversationContinuityEmail sends an email to the contact for conversation continuity, supposed to be called after contacts go offline in live chat.
-func (m *Manager) sendConversationContinuityEmail(message models.Message) error {
-	// Get contact and make sure it has a valid email
-	contact, err := m.userStore.Get(message.MessageReceiverID, "", "")
-	if err != nil {
-		return fmt.Errorf("error fetching contact for email: %w", err)
-	}
-
-	if contact.Email.String == "" {
-		m.lo.Info("contact has no email for conversation continuity", "contact_id", contact.ID, "conversation_uuid", message.ConversationUUID)
-		return fmt.Errorf("contact has no email for conversation continuity")
-	}
-
-	// Get the original livechat inbox to check for linked email inbox
-	originalInbox, err := m.inboxStore.GetDBRecord(message.InboxID)
-	if err != nil {
-		return fmt.Errorf("error fetching original inbox: %w", err)
-	}
-
-	// Check if livechat inbox has a linked email inbox
-	if !originalInbox.LinkedEmailInboxID.Valid {
-		m.lo.Info("no linked email inbox configured for livechat inbox", "inbox_id", message.InboxID)
-		return fmt.Errorf("no linked email inbox configured for livechat inbox")
-	}
-
-	// Get the linked email inbox
-	linkedEmailInbox, err := m.inboxStore.Get(originalInbox.LinkedEmailInboxID.Int)
-	if err != nil {
-		return fmt.Errorf("error fetching linked email inbox: %w", err)
-	}
-
-	linkedEmailInboxRecord, err := m.inboxStore.GetDBRecord(originalInbox.LinkedEmailInboxID.Int)
-	if err != nil {
-		return fmt.Errorf("error fetching linked email inbox record: %w", err)
-	}
-
-	if !linkedEmailInboxRecord.Enabled {
-		return fmt.Errorf("linked email inbox is disabled")
-	}
-
-	// Create a new message for the email inbox with proper threading headers
-	emailMessage := message
-	emailMessage.InboxID = originalInbox.LinkedEmailInboxID.Int
-	emailMessage.From = linkedEmailInbox.FromAddress()
-
-	// Generate Message-ID for threading using conversation UUID and random suffix
-	// Extract clean email address and domain from From address
-	emailAddress, err := stringutil.ExtractEmail(linkedEmailInbox.FromAddress())
-	if err != nil {
-		return fmt.Errorf("error extracting email from inbox address: %w", err)
-	}
-
-	// Embed UUID in Message-ID for threading (format: {uuid}.{timestamp}@domain)
-	emailUserPart := strings.Split(emailAddress, "@")
-	if len(emailUserPart) == 2 {
-		emailMessage.SourceID = null.StringFrom(fmt.Sprintf("%s.%d@%s", message.ConversationUUID, time.Now().UnixNano(), emailUserPart[1]))
-		if err := m.updateMessageSourceID(message.ID, emailMessage.SourceID.String); err != nil {
-			m.lo.Error("error updating message source ID", "error", err)
-			return fmt.Errorf("error updating message source ID: %w", err)
-		}
-	}
-
-	// Get all message source IDs for References header
-	references, err := m.GetMessageSourceIDs(message.ConversationID, 50)
-	if err != nil {
-		m.lo.Error("Error fetching conversation source IDs for email fallback", "error", err)
-		// Continue without references rather than fail
-		references = []string{}
-	}
-
-	// Filter out references that do not have `@` meaning they are live chat messages
-	var filteredReferences []string
-	for _, ref := range references {
-		if strings.Contains(ref, "@") {
-			filteredReferences = append(filteredReferences, ref)
-		}
-	}
-
-	// Build References and In-Reply-To headers
-	emailMessage.References = filteredReferences
-	if len(references) > 0 {
-		emailMessage.InReplyTo = references[len(references)-1]
-	}
-
-	// Render content of message in template
-	if err := m.RenderMessageInTemplate(linkedEmailInbox.Channel(), &emailMessage); err != nil {
-		return fmt.Errorf("error rendering email template: %w", err)
-	}
-
-	// Set email recipients
-	emailMessage.To = []string{contact.Email.String}
-
-	// Set Reply-To address with conversation UUID for routing replies
-	emailMessage.Headers = map[string][]string{
-		"Reply-To": {fmt.Sprintf("%s+%s@%s", strings.Split(emailAddress, "@")[0], message.ConversationUUID, strings.Split(emailAddress, "@")[1])},
-	}
-
-	// Send the email via the linked email inbox
-	if err := linkedEmailInbox.Send(emailMessage); err != nil {
-		return fmt.Errorf("error sending conversation continuity email: %w", err)
-	}
-
-	m.lo.Info("sent conversation continuity email",
-		"original_inbox_id", message.InboxID,
-		"linked_email_inbox_id", originalInbox.LinkedEmailInboxID.Int,
-		"contact_email", contact.Email.String,
-		"conversation_uuid", message.ConversationUUID)
-
 	return nil
 }

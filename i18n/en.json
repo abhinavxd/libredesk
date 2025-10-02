@@ -586,6 +586,8 @@
   "admin.inbox.livechat.prechatForm.availableFields": "Available Custom Attributes",
   "admin.inbox.livechat.conversationContinuity": "Conversation continuity email inbox",
   "admin.inbox.livechat.conversationContinuity.description": "When contacts go offline, replies will be sent from this email inbox. The contacts can continue the same conversation by replying to the email or in the chat widget when they return to your site.",
+  "admin.inbox.livechat.continuityEmailFooter": "Reply directly to this email to continue the conversation.",
+  "admin.inbox.livechat.continuityEmailSubject": "New messages from {site_name}",
   "admin.agent.deleteConfirmation": "This will permanently delete the agent. Consider disabling the account instead.",
   "admin.agent.apiKey.description": "Generate API keys for this agent to access libredesk programmatically.",
   "admin.agent.apiKey.noKey": "No API key has been generated for this agent.",

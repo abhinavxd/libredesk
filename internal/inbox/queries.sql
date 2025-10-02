@@ -20,7 +20,7 @@ where id = $1 and deleted_at is NULL
 RETURNING *;
 
 -- name: soft-delete
-UPDATE inboxes set deleted_at = now(), config = '{}' where id = $1 and deleted_at is NULL;
+UPDATE inboxes set deleted_at = now(), config = '{}', enabled = false where id = $1 and deleted_at is NULL;
 
 -- name: toggle
 UPDATE inboxes 

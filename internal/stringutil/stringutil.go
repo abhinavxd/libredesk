@@ -3,7 +3,6 @@ package stringutil
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/mail"
 	"net/url"
@@ -101,11 +100,11 @@ func RemoveEmpty(s []string) []string {
 	return r
 }
 
-// GenerateEmailMessageID generates a RFC-compliant Message-ID for an email, does not include the angle brackets.
-// The client is expected to wrap the returned string in angle brackets.
-func GenerateEmailMessageID(messageID string, fromAddress string) (string, error) {
-	if messageID == "" {
-		return "", fmt.Errorf("messageID cannot be empty")
+// GenerateEmailMessageID generates an RFC-compliant Message-ID for an email without angle brackets.
+// The uuid parameter is a unique identifier, typically a conversation UUID v4.
+func GenerateEmailMessageID(uuid string, fromAddress string) (string, error) {
+	if uuid == "" {
+		return "", fmt.Errorf("uuid cannot be empty")
 	}
 
 	// Parse from address
@@ -121,26 +120,16 @@ func GenerateEmailMessageID(messageID string, fromAddress string) (string, error
 	}
 	domain := parts[1]
 
-	// Generate cryptographic random component
-	random := make([]byte, 8)
-	if _, err := rand.Read(random); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	// Random component
+	randomStr, err := RandomAlphanumeric(11)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random string: %w", err)
 	}
 
-	// Sanitize messageID for email Message-ID
-	cleaner := regexp.MustCompile(`[^\w.-]`) // Allow only alphanum, ., -, _
-	cleanmessageID := cleaner.ReplaceAllString(messageID, "_")
-
-	// Ensure cleaned messageID isn't empty
-	if cleanmessageID == "" {
-		return "", fmt.Errorf("messageID became empty after sanitization")
-	}
-
-	// Build RFC-compliant Message-ID
 	return fmt.Sprintf("%s-%d-%s@%s",
-		cleanmessageID,
-		time.Now().UnixNano(), // Nanosecond precision
-		strings.TrimRight(base64.URLEncoding.EncodeToString(random), "="), // URL-safe base64 without padding
+		uuid,
+		time.Now().UnixNano(),
+		randomStr,
 		domain,
 	), nil
 }

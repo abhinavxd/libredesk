@@ -267,8 +267,16 @@
         toggle () {
             if (this.isChatVisible) {
                 this.hideChat();
+                // Send WIDGET_CLOSED event to iframe
+                if (this.iframe && this.iframe.contentWindow) {
+                    this.iframe.contentWindow.postMessage({ type: 'WIDGET_CLOSED' }, '*');
+                }
             } else {
                 this.showChat();
+                // Send WIDGET_OPENED event to iframe
+                if (this.iframe && this.iframe.contentWindow) {
+                    this.iframe.contentWindow.postMessage({ type: 'WIDGET_OPENED' }, '*');
+                }
             }
         }
 

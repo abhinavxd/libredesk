@@ -503,6 +503,12 @@ WHERE m.id = $1;
 DELETE FROM conversations WHERE uuid = $1;
 
 -- MESSAGE queries.
+-- name: delete-message
+DELETE FROM conversation_messages WHERE CASE 
+    WHEN $1 > 0 THEN id = $1 
+    ELSE uuid = $2 
+END;
+
 -- name: get-message-source-ids
 SELECT 
     source_id
@@ -582,6 +588,7 @@ ORDER BY m.created_at;
 -- name: get-messages
 SELECT
    COUNT(*) OVER() AS total,
+   m.id,
    m.created_at,
    m.updated_at,
    m.status,
@@ -669,3 +676,67 @@ LIMIT 1;
 
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
+
+-- name: get-offline-livechat-conversations
+SELECT
+    c.id,
+    c.uuid,
+    c.contact_id,
+    c.inbox_id,
+    c.contact_last_seen_at,
+    c.last_continuity_email_sent_at,
+    i.linked_email_inbox_id,
+    u.email as contact_email,
+    u.first_name as contact_first_name,
+    u.last_name as contact_last_name
+FROM conversations c
+JOIN users u ON u.id = c.contact_id
+JOIN inboxes i ON i.id = c.inbox_id
+WHERE i.channel = 'livechat'
+  AND i.enabled = TRUE
+  AND i.linked_email_inbox_id IS NOT NULL
+  AND c.contact_last_seen_at IS NOT NULL
+  AND c.contact_last_seen_at > NOW() - INTERVAL '1 hour'
+  AND c.contact_last_seen_at < NOW() - MAKE_INTERVAL(mins => $1)
+  AND EXISTS (
+    SELECT 1 FROM conversation_messages cm
+    WHERE cm.conversation_id = c.id
+      AND cm.created_at > c.contact_last_seen_at
+      AND cm.type = 'outgoing'
+      AND cm.private = false
+  )
+  AND u.email > ''
+  AND (c.last_continuity_email_sent_at IS NULL
+       OR c.last_continuity_email_sent_at < NOW() - MAKE_INTERVAL(mins => $2));
+
+-- name: get-unread-messages
+SELECT
+    m.id,
+    m.created_at,
+    m.updated_at,
+    m.status,
+    m.type, 
+    m.content,
+    m.text_content,
+    m.uuid,
+    m.private,
+    m.sender_id,
+    m.sender_type,
+    m.meta,
+    u.first_name as "sender.first_name",
+    u.last_name as "sender.last_name",
+    u.type as "sender.type"
+FROM conversation_messages m
+LEFT JOIN users u ON u.id = m.sender_id
+WHERE m.conversation_id = $1
+  AND m.created_at > $2
+  AND m.type = 'outgoing'
+  AND m.private = false
+ORDER BY m.created_at ASC
+LIMIT $3;
+
+-- name: update-continuity-email-tracking
+UPDATE conversations
+SET contact_last_seen_at = NOW(),
+    last_continuity_email_sent_at = NOW()
+WHERE id = $1;

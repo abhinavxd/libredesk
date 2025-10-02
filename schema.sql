@@ -239,7 +239,8 @@ CREATE TABLE conversations (
 	last_interaction_at TIMESTAMPTZ NULL,
 
 	next_sla_deadline_at TIMESTAMPTZ NULL,
-	snoozed_until TIMESTAMPTZ NULL
+	snoozed_until TIMESTAMPTZ NULL,
+	last_continuity_email_sent_at TIMESTAMPTZ NULL
 );
 CREATE INDEX index_conversations_on_assigned_user_id ON conversations (assigned_user_id);
 CREATE INDEX index_conversations_on_assigned_team_id ON conversations (assigned_team_id);
@@ -253,6 +254,7 @@ CREATE INDEX index_conversations_on_last_message_at ON conversations (last_messa
 CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_interaction_at);
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
 CREATE INDEX index_conversations_on_waiting_since ON conversations (waiting_since);
+CREATE INDEX index_conversations_on_last_continuity_email_sent_at ON conversations (last_continuity_email_sent_at);
 
 DROP TABLE IF EXISTS conversation_messages CASCADE;
 CREATE TABLE conversation_messages (

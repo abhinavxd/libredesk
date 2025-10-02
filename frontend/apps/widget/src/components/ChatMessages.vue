@@ -87,7 +87,7 @@
         </div>
 
         <!-- Message metadata -->
-        <div class="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+        <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
           <!-- Agent name and time for agent messages -->
           <span v-if="message.author.type === 'agent'">
             {{ message.author.first_name }} {{ message.author.last_name }}
@@ -245,6 +245,9 @@ const scrollToBottom = () => {
 }
 
 onMounted(() => {
+  // Update last seen timestamp when conversation is opened
+  chatStore.updateCurrentConversationLastSeen()
+
   // Check initial scroll position
   checkIfAtBottom()
 
@@ -254,7 +257,8 @@ onMounted(() => {
   }, 200)
 })
 
-// Only auto-scroll for user's own messages or when at bottom
+// Auto-scroll for user's own messages or when already at bottom
+// On any new message addition, update last seen timestamp for this conversation
 watch(
   () => chatStore.getCurrentConversationMessages,
   (newMessages, oldMessages) => {
@@ -269,8 +273,13 @@ watch(
       return
     }
 
-    // Check if new messages were added
-    if (oldMessages && newMessages.length > oldMessages.length) {
+    // If widget is open, do:
+    // - Check if new messages were added and handle scrolling behavior
+    // - Also update the last seen timestamp if the widget is open
+    if (oldMessages && newMessages.length > oldMessages.length && widgetStore.isOpen) {
+      // Always on new message, update last seen timestamp if conversation is open
+      chatStore.updateCurrentConversationLastSeen()
+
       const newMessage = newMessages[newMessages.length - 1]
 
       // Auto-scroll if:

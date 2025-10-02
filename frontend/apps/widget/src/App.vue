@@ -1,5 +1,8 @@
 <template>
-  <div class="libredesk-widget-app text-foreground bg-background" :class="{ 'dark': widgetStore.config.dark_mode }">
+  <div
+    class="libredesk-widget-app text-foreground bg-background"
+    :class="{ dark: widgetStore.config.dark_mode }"
+  >
     <div class="widget-container">
       <MainLayout />
     </div>
@@ -28,25 +31,32 @@ onMounted(async () => {
   if (widgetConfig) {
     widgetStore.updateConfig(widgetConfig)
   }
-  
+
   initializeWebSocket()
-  
-  widgetStore.openWidget()
-  
+
+  widgetStore.setOpen(true)
+
   setupParentMessageListeners()
-  
+
   await chatStore.fetchConversations()
-  
+
   // Notify parent window that Vue app is ready
-  window.parent.postMessage({
-    type: 'VUE_APP_READY'
-  }, '*')
+  window.parent.postMessage(
+    {
+      type: 'VUE_APP_READY'
+    },
+    '*'
+  )
 })
 
 // Listen for messages from parent window (widget.js)
 const setupParentMessageListeners = () => {
   window.addEventListener('message', (event) => {
-    if (event.data.type === 'SET_MOBILE_STATE') {
+    if (event.data.type == 'WIDGET_CLOSED') {
+      widgetStore.setOpen(false)
+    } else if (event.data.type === 'WIDGET_OPENED') {
+      widgetStore.setOpen(true)
+    } else if (event.data.type === 'SET_MOBILE_STATE') {
       widgetStore.setMobileFullScreen(event.data.isMobile)
     } else if (event.data.type === 'WIDGET_EXPANDED') {
       widgetStore.setExpanded(event.data.isExpanded)

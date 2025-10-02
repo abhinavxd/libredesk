@@ -22,7 +22,9 @@ export const useChatStore = defineStore('chat', () => {
         messageCacheVersion.value // Force reactivity tracking
         const convId = currentConversation.value?.uuid
         if (!convId) return []
-        return messageCache.getAllPagesMessages(convId)
+        const messages = messageCache.getAllPagesMessages(convId)
+        // Filter out continuity email messages
+        return messages.filter(msg => !msg.meta?.continuity_email)
     })
     const hasConversations = computed(() => conversations.value?.length > 0)
     const getConversations = computed(() => {
@@ -139,7 +141,6 @@ export const useChatStore = defineStore('chat', () => {
             return false
         } finally {
             isLoadingConversation.value = false
-            await updateCurrentConversationLastSeen()
         }
         return true
     }

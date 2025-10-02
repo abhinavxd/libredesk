@@ -53,6 +53,26 @@ var (
 	ContentTypeHTML = "html"
 )
 
+type ContinuityConversation struct {
+	ID                        int         `db:"id"`
+	UUID                      string      `db:"uuid"`
+	ContactID                 int         `db:"contact_id"`
+	InboxID                   int         `db:"inbox_id"`
+	ContactLastSeenAt         time.Time   `db:"contact_last_seen_at"`
+	LastContinuityEmailSentAt null.Time   `db:"last_continuity_email_sent_at"`
+	ContactEmail              null.String `db:"contact_email"`
+	ContactFirstName          null.String `db:"contact_first_name"`
+	ContactLastName           null.String `db:"contact_last_name"`
+	LinkedEmailInboxID        null.Int    `db:"linked_email_inbox_id"`
+}
+
+type ContinuityUnreadMessage struct {
+	Message
+	SenderFirstName null.String `db:"sender.first_name"`
+	SenderLastName  null.String `db:"sender.last_name"`
+	SenderType      string      `db:"sender.type"`
+}
+
 type LastChatMessage struct {
 	Content   string           `db:"content" json:"content"`
 	CreatedAt time.Time        `db:"created_at" json:"created_at"`
