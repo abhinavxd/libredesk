@@ -1,17 +1,17 @@
-import { format, differenceInMinutes, differenceInHours, differenceInDays,differenceInMonths, differenceInYears } from 'date-fns'
+import { format, differenceInMinutes, differenceInHours, differenceInDays, differenceInMonths, differenceInYears } from 'date-fns'
 
 export function getRelativeTime (timestamp, now = new Date()) {
   try {
     const mins = differenceInMinutes(now, timestamp)
     const hours = differenceInHours(now, timestamp)
     const days = differenceInDays(now, timestamp)
-    const months=differenceInMonths(now, timestamp)
+    const months = differenceInMonths(now, timestamp)
     const years = differenceInYears(now, timestamp)
 
     if (mins === 0) return 'now'
     if (mins < 60) return `${mins}m`
     if (hours < 24) return `${hours}h`
-    if (days < 30) return `${days}d`
+    if (days < 31) return `${days}d`
     if (months < 12) return `${months}mo`
     return `${years}y`
   } catch (error) {
