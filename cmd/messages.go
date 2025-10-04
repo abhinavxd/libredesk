@@ -46,7 +46,7 @@ func handleGetMessages(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	messages, pageSize, err := app.conversation.GetConversationMessages(uuid, page, pageSize)
+	messages, pageSize, err := app.conversation.GetConversationMessages(uuid, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing, cmodels.MessageActivity}, nil, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -57,9 +57,10 @@ func handleGetMessages(r *fastglue.Request) error {
 		for j := range messages[i].Attachments {
 			messages[i].Attachments[j].URL = app.media.GetURL(messages[i].Attachments[j].UUID)
 		}
-		// Redact CSAT survey link
-		messages[i].CensorCSATContent()
 	}
+
+	// Process CSAT status for all messages (will only affect CSAT messages)
+	app.conversation.ProcessCSATStatus(messages)
 
 	return r.SendEnvelope(envelope.PageResults{
 		Total:      total,
@@ -94,8 +95,10 @@ func handleGetMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Redact CSAT survey link
-	message.CensorCSATContent()
+	// Process CSAT status for the message (will only affect CSAT messages)
+	messages := []cmodels.Message{message}
+	app.conversation.ProcessCSATStatus(messages)
+	message = messages[0]
 
 	for j := range message.Attachments {
 		message.Attachments[j].URL = app.media.GetURL(message.Attachments[j].UUID)
@@ -155,6 +158,16 @@ func handleSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
 	}
 
+	// Make sure the inbox is enabled.
+	inbox, err := app.inbox.GetDBRecord(conv.InboxID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if !inbox.Enabled {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+	}
+
+	// Prepare attachments.
 	if req.SenderType != umodels.UserTypeAgent && req.SenderType != umodels.UserTypeContact {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`sender_type`"), nil, envelope.InputError)
 	}
@@ -208,8 +221,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		return r.SendEnvelope(message)
 	}
 
-	// Queue reply.
-	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/)
+	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

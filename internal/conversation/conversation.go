@@ -35,6 +35,7 @@ import (
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/types"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
@@ -80,6 +81,24 @@ type Manager struct {
 	closed                     bool
 	closedMu                   sync.RWMutex
 	wg                         sync.WaitGroup
+	continuityConfig           ContinuityConfig
+}
+
+// WidgetConversationView represents the conversation data for widget clients
+type WidgetConversationView struct {
+	UUID                  string      `json:"uuid"`
+	Status                string      `json:"status"`
+	Assignee              interface{} `json:"assignee"`
+	BusinessHoursID       *int        `json:"business_hours_id,omitempty"`
+	WorkingHoursUTCOffset *int        `json:"working_hours_utc_offset,omitempty"`
+}
+
+// WidgetConversationResponse represents the full conversation response for widget with messages
+type WidgetConversationResponse struct {
+	Conversation          models.ChatConversation `json:"conversation"`
+	Messages              []models.ChatMessage    `json:"messages"`
+	BusinessHoursID       *int                    `json:"business_hours_id,omitempty"`
+	WorkingHoursUTCOffset *int                    `json:"working_hours_utc_offset,omitempty"`
 }
 
 type slaStore interface {
@@ -102,13 +121,18 @@ type teamStore interface {
 }
 
 type userStore interface {
+	Get(int, string, string) (umodels.User, error)
 	GetAgent(int, string) (umodels.User, error)
+	GetContact(int, string) (umodels.User, error)
+	GetVisitor(int) (umodels.User, error)
 	GetSystemUser() (umodels.User, error)
 	CreateContact(user *umodels.User) error
 }
 
 type mediaStore interface {
 	GetBlob(name string) ([]byte, error)
+	GetURL(name string) string
+	GetSignedURL(name string) string
 	Attach(id int, model string, modelID int) error
 	GetByModel(id int, model string) ([]mmodels.Media, error)
 	ContentIDExists(contentID string) (bool, string, error)
@@ -123,15 +147,26 @@ type inboxStore interface {
 
 type settingsStore interface {
 	GetAppRootURL() (string, error)
+	GetByPrefix(prefix string) (types.JSONText, error)
+	Get(key string) (types.JSONText, error)
 }
 
 type csatStore interface {
 	Create(conversationID int) (csatModels.CSATResponse, error)
+	Get(uuid string) (csatModels.CSATResponse, error)
 	MakePublicURL(appBaseURL, uuid string) string
 }
 
 type webhookStore interface {
 	TriggerEvent(event wmodels.WebhookEvent, data any)
+}
+
+// ContinuityConfig holds configuration for conversation continuity emails
+type ContinuityConfig struct {
+	BatchCheckInterval  time.Duration
+	OfflineThreshold    time.Duration
+	MinEmailInterval    time.Duration
+	MaxMessagesPerEmail int
 }
 
 // Opts holds the options for creating a new Manager.
@@ -140,6 +175,7 @@ type Opts struct {
 	Lo                       *logf.Logger
 	OutgoingMessageQueueSize int
 	IncomingMessageQueueSize int
+	ContinuityConfig         *ContinuityConfig
 }
 
 // New initializes a new conversation Manager.
@@ -166,6 +202,30 @@ func New(
 		return nil, err
 	}
 
+	// Default continuity config
+	continuityConfig := ContinuityConfig{
+		BatchCheckInterval:  2 * time.Minute,
+		OfflineThreshold:    3 * time.Minute,
+		MinEmailInterval:    15 * time.Minute,
+		MaxMessagesPerEmail: 10,
+	}
+
+	// Override with provided config if available
+	if opts.ContinuityConfig != nil {
+		if opts.ContinuityConfig.BatchCheckInterval > 0 {
+			continuityConfig.BatchCheckInterval = opts.ContinuityConfig.BatchCheckInterval
+		}
+		if opts.ContinuityConfig.OfflineThreshold > 0 {
+			continuityConfig.OfflineThreshold = opts.ContinuityConfig.OfflineThreshold
+		}
+		if opts.ContinuityConfig.MinEmailInterval > 0 {
+			continuityConfig.MinEmailInterval = opts.ContinuityConfig.MinEmailInterval
+		}
+		if opts.ContinuityConfig.MaxMessagesPerEmail > 0 {
+			continuityConfig.MaxMessagesPerEmail = opts.ContinuityConfig.MaxMessagesPerEmail
+		}
+	}
+
 	c := &Manager{
 		q:                          q,
 		wsHub:                      wsHub,
@@ -188,6 +248,7 @@ func New(
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
 		outgoingProcessingMessages: sync.Map{},
+		continuityConfig:           continuityConfig,
 	}
 
 	return c, nil
@@ -200,6 +261,8 @@ type queries struct {
 	GetConversationsCreatedAfter       *sqlx.Stmt `query:"get-conversations-created-after"`
 	GetUnassignedConversations         *sqlx.Stmt `query:"get-unassigned-conversations"`
 	GetConversations                   string     `query:"get-conversations"`
+	GetContactChatConversations        *sqlx.Stmt `query:"get-contact-chat-conversations"`
+	GetChatConversation                *sqlx.Stmt `query:"get-chat-conversation"`
 	GetContactPreviousConversations    *sqlx.Stmt `query:"get-contact-previous-conversations"`
 	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
 	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
@@ -207,12 +270,14 @@ type queries struct {
 	UpdateConversationLastReplyAt      *sqlx.Stmt `query:"update-conversation-last-reply-at"`
 	UpdateConversationWaitingSince     *sqlx.Stmt `query:"update-conversation-waiting-since"`
 	UpdateConversationAssigneeLastSeen *sqlx.Stmt `query:"update-conversation-assignee-last-seen"`
+	UpdateConversationContactLastSeen  *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
 	UpdateConversationAssignedUser     *sqlx.Stmt `query:"update-conversation-assigned-user"`
 	UpdateConversationAssignedTeam     *sqlx.Stmt `query:"update-conversation-assigned-team"`
 	UpdateConversationCustomAttributes *sqlx.Stmt `query:"update-conversation-custom-attributes"`
 	UpdateConversationPriority         *sqlx.Stmt `query:"update-conversation-priority"`
 	UpdateConversationStatus           *sqlx.Stmt `query:"update-conversation-status"`
 	UpdateConversationLastMessage      *sqlx.Stmt `query:"update-conversation-last-message"`
+	UpdateConversationMeta             *sqlx.Stmt `query:"update-conversation-meta"`
 	InsertConversationParticipant      *sqlx.Stmt `query:"insert-conversation-participant"`
 	InsertConversation                 *sqlx.Stmt `query:"insert-conversation"`
 	AddConversationTags                *sqlx.Stmt `query:"add-conversation-tags"`
@@ -232,20 +297,27 @@ type queries struct {
 	GetOutgoingPendingMessages         *sqlx.Stmt `query:"get-outgoing-pending-messages"`
 	GetMessageSourceIDs                *sqlx.Stmt `query:"get-message-source-ids"`
 	GetConversationUUIDFromMessageUUID *sqlx.Stmt `query:"get-conversation-uuid-from-message-uuid"`
-	InsertMessage                      *sqlx.Stmt `query:"insert-message"`
-	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
 	MessageExistsBySourceID            *sqlx.Stmt `query:"message-exists-by-source-id"`
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
+	InsertMessage                      *sqlx.Stmt `query:"insert-message"`
+	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
+	UpdateMessageSourceID              *sqlx.Stmt `query:"update-message-source-id"`
+	DeleteMessage                      *sqlx.Stmt `query:"delete-message"`
+
+	// Conversation continuity queries.
+	GetOfflineLiveChatConversations *sqlx.Stmt `query:"get-offline-livechat-conversations"`
+	GetUnreadMessages               *sqlx.Stmt `query:"get-unread-messages"`
+	UpdateContinuityEmailTracking   *sqlx.Stmt `query:"update-continuity-email-tracking"`
 }
 
 // CreateConversation creates a new conversation and returns its ID and UUID.
-func (c *Manager) CreateConversation(contactID, contactChannelID, inboxID int, lastMessage string, lastMessageAt time.Time, subject string, appendRefNumToSubject bool) (int, string, error) {
+func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string, lastMessageAt time.Time, subject string, appendRefNumToSubject bool) (int, string, error) {
 	var (
 		id     int
 		uuid   string
 		prefix string
 	)
-	if err := c.q.InsertConversation.QueryRow(contactID, contactChannelID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject).Scan(&id, &uuid); err != nil {
+	if err := c.q.InsertConversation.QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject).Scan(&id, &uuid); err != nil {
 		c.lo.Error("error inserting new conversation into the DB", "error", err)
 		return id, uuid, err
 	}
@@ -262,19 +334,19 @@ func (c *Manager) GetConversation(id int, uuid string) (models.Conversation, err
 
 	if err := c.q.GetConversation.Get(&conversation, id, uuidParam); err != nil {
 		if err == sql.ErrNoRows {
-			return conversation, envelope.NewError(envelope.InputError,
-				c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.conversation}"), nil)
+			return conversation, envelope.NewError(envelope.InputError, c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.conversation}"), nil)
 		}
 		c.lo.Error("error fetching conversation", "error", err)
-		return conversation, envelope.NewError(envelope.GeneralError,
-			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
+		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
 	}
 
 	// Strip name and extract plain email from "Name <email>"
-	var err error
-	conversation.InboxMail, err = stringutil.ExtractEmail(conversation.InboxMail)
-	if err != nil {
-		c.lo.Error("error extracting email from inbox mail", "inbox_mail", conversation.InboxMail, "error", err)
+	if conversation.InboxMail != "" {
+		var err error
+		conversation.InboxMail, err = stringutil.ExtractEmail(conversation.InboxMail)
+		if err != nil {
+			c.lo.Error("error extracting email from inbox mail", "inbox_mail", conversation.InboxMail, "error", err)
+		}
 	}
 
 	return conversation, nil
@@ -288,6 +360,29 @@ func (c *Manager) GetContactPreviousConversations(contactID int, limit int) ([]m
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
 	}
 	return conversations, nil
+}
+
+// GetContactChatConversations retrieves chat conversations for a contact in a specific inbox.
+func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.ChatConversation, error) {
+	var conversations = make([]models.ChatConversation, 0)
+	if err := c.q.GetContactChatConversations.Select(&conversations, contactID, inboxID); err != nil {
+		c.lo.Error("error fetching conversations", "error", err)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
+	}
+	return conversations, nil
+}
+
+// GetChatConversation retrieves a single chat conversation by UUID
+func (c *Manager) GetChatConversation(conversationUUID string) (models.ChatConversation, error) {
+	var conversation models.ChatConversation
+	if err := c.q.GetChatConversation.Get(&conversation, conversationUUID); err != nil {
+		c.lo.Error("error fetching chat conversation", "uuid", conversationUUID, "error", err)
+		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
+	}
+	if conversation.Assignee.ID == 0 {
+		conversation.Assignee = nil
+	}
+	return conversation, nil
 }
 
 // GetConversationsCreatedAfter retrieves conversations created after the specified time.
@@ -309,6 +404,18 @@ func (c *Manager) UpdateConversationAssigneeLastSeen(uuid string) error {
 
 	// Broadcast the property update to all subscribers.
 	c.BroadcastConversationUpdate(uuid, "assignee_last_seen_at", time.Now().Format(time.RFC3339))
+	return nil
+}
+
+// UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.
+func (c *Manager) UpdateConversationContactLastSeen(uuid string) error {
+	if _, err := c.q.UpdateConversationContactLastSeen.Exec(uuid); err != nil {
+		c.lo.Error("error updating contact last seen timestamp", "conversation_id", uuid, "error", err)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
+	}
+
+	// Broadcast the property update to all subscribers.
+	c.BroadcastConversationUpdate(uuid, "contact_last_seen_at", time.Now().Format(time.RFC3339))
 	return nil
 }
 
@@ -431,9 +538,18 @@ func (c *Manager) ActiveUserConversationsCount(userID int) (int, error) {
 }
 
 // UpdateConversationLastMessage updates the last message details for a conversation.
-func (c *Manager) UpdateConversationLastMessage(conversation int, conversationUUID, lastMessage, lastMessageSenderType string, lastMessageAt time.Time) error {
-	if _, err := c.q.UpdateConversationLastMessage.Exec(conversation, conversationUUID, lastMessage, lastMessageSenderType, lastMessageAt); err != nil {
+func (c *Manager) UpdateConversationLastMessage(conversation int, conversationUUID, lastMessage, lastMessageSenderType string, lastMessageAt time.Time, lastInteractionAt null.Time, conversationMeta []byte) error {
+	if _, err := c.q.UpdateConversationLastMessage.Exec(conversation, conversationUUID, lastMessage, lastMessageSenderType, lastMessageAt, lastInteractionAt, conversationMeta); err != nil {
 		c.lo.Error("error updating conversation last message", "error", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateConversationMeta updates meta data for a conversation.
+func (c *Manager) UpdateConversationMeta(uuid string, meta map[string]any) error {
+	if _, err := c.q.UpdateConversationMeta.Exec(uuid, meta); err != nil {
+		c.lo.Error("error updating conversation meta", "error", err)
 		return err
 	}
 	return nil
@@ -518,6 +634,9 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		return envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.conversation}"), nil)
 	}
 
+	// Broadcast conversation update to widget clients
+	c.BroadcastConversationToWidget(uuid)
+
 	return nil
 }
 
@@ -567,6 +686,10 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 		// Evaluate automation rules for conversation team assignment.
 		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationTeamAssigned)
 	}
+
+	// Broadcast conversation update to widget clients
+	c.BroadcastConversationToWidget(uuid)
+
 	return nil
 }
 
@@ -706,6 +829,10 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		}
 		c.BroadcastConversationUpdate(uuid, "resolved_at", resolvedAt.Format(time.RFC3339))
 	}
+
+	// Broadcast conversation update to widget clients
+	c.BroadcastConversationToWidget(uuid)
+
 	return nil
 }
 
@@ -938,6 +1065,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			[]mmodels.Media{},
 			conv.InboxID,
 			user.ID,
+			conv.ContactID,
 			conv.UUID,
 			action.Value[0],
 			to,
@@ -977,6 +1105,9 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 			"conversation_uuid": uuid,
 			"actor_id":          actor.ID,
 		})
+
+		// Broadcast conversation update to widget clients when user assignee is removed
+		m.BroadcastConversationToWidget(uuid)
 	}
 
 	// Broadcast ws update.
@@ -1013,8 +1144,8 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.csat}"), nil)
 	}
 
-	// Queue CSAT reply.
-	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.UUID, message, to, cc, bcc, meta)
+	// Send CSAT reply.
+	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, cc, bcc, meta)
 	if err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.csat}"), nil)
@@ -1211,4 +1342,205 @@ func (c *Manager) makeConversationsListQuery(userID int, teamIDs []int, listType
 		"conversations":         conversationsAllowedFields,
 		"conversation_statuses": conversationStatusAllowedFields,
 	})
+}
+
+// ProcessCSATStatus processes messages and adds CSAT submission status for CSAT messages.
+func (m *Manager) ProcessCSATStatus(messages []models.Message) {
+	for i := range messages {
+		msg := &messages[i]
+		if msg.HasCSAT() {
+			// Extract CSAT UUID from message content
+			csatUUID := msg.ExtractCSATUUID()
+			if csatUUID == "" {
+				// Fallback to basic censoring if UUID extraction fails
+				msg.CensorCSATContent()
+				continue
+			}
+
+			// Get CSAT submission status
+			csat, err := m.csatStore.Get(csatUUID)
+			isSubmitted := false
+			rating := 0
+			feedback := ""
+			if err == nil && csat.ResponseTimestamp.Valid {
+				isSubmitted = true
+				rating = csat.Rating
+				if csat.Feedback.Valid {
+					feedback = csat.Feedback.String
+				}
+			}
+
+			// Censor content and add submission status
+			msg.CensorCSATContentWithStatus(isSubmitted, csatUUID, rating, feedback)
+		}
+	}
+}
+
+// BuildWidgetConversationView builds the conversation view data for widget clients
+func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) (WidgetConversationView, error) {
+	view := WidgetConversationView{
+		UUID:     conversation.UUID,
+		Status:   conversation.Status.String,
+		Assignee: nil,
+	}
+
+	// Fetch assignee details if assigned
+	if conversation.AssignedUserID.Int > 0 {
+		assignee, err := m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
+		if err != nil {
+			m.lo.Error("error fetching conversation assignee for widget", "conversation_uuid", conversation.UUID, "error", err)
+		} else {
+			// Convert assignee avatar URL to signed URL if needed
+			if assignee.AvatarURL.Valid && assignee.AvatarURL.String != "" {
+				avatarPath := assignee.AvatarURL.String
+				if strings.HasPrefix(avatarPath, "/uploads/") {
+					avatarUUID := strings.TrimPrefix(avatarPath, "/uploads/")
+					assignee.AvatarURL = null.StringFrom(m.mediaStore.GetSignedURL(avatarUUID))
+				}
+			}
+
+			// Build assignee object
+			view.Assignee = map[string]interface{}{
+				"id":                  assignee.ID,
+				"first_name":          assignee.FirstName,
+				"last_name":           assignee.LastName,
+				"avatar_url":          assignee.AvatarURL,
+				"availability_status": assignee.AvailabilityStatus,
+				"type":                assignee.Type,
+				"active_at":           assignee.LastActiveAt,
+			}
+		}
+	}
+
+	// Calculate business hours info
+	businessHoursID, utcOffset := m.calculateBusinessHoursInfo(conversation)
+	if businessHoursID != nil {
+		view.BusinessHoursID = businessHoursID
+	}
+	if utcOffset != nil {
+		view.WorkingHoursUTCOffset = utcOffset
+	}
+
+	return view, nil
+}
+
+// BuildWidgetConversationResponse builds the full conversation response for widget including messages
+func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversation, includeMessages bool) (WidgetConversationResponse, error) {
+	var resp = WidgetConversationResponse{}
+
+	chatConversation, err := m.GetChatConversation(conversation.UUID)
+	if err != nil {
+		return resp, err
+	}
+	resp.Conversation = chatConversation
+
+	// Build messages if requested
+	if includeMessages {
+		private := false
+		messages, _, err := m.GetConversationMessages(conversation.UUID, []string{models.MessageIncoming, models.MessageOutgoing}, &private, 1, 1000)
+		if err != nil {
+			m.lo.Error("error fetching conversation messages", "conversation_uuid", conversation.UUID, "error", err)
+			return resp, envelope.NewError(envelope.GeneralError, "error fetching messages", nil)
+		}
+
+		m.ProcessCSATStatus(messages)
+
+		// Convert to chat message format
+		chatMessages := make([]models.ChatMessage, len(messages))
+		userCache := make(map[int]umodels.User)
+		for i, msg := range messages {
+			// Generate signed URLs for attachments
+			attachments := msg.Attachments
+			for j := range attachments {
+				attachments[j].URL = m.mediaStore.GetSignedURL(attachments[j].UUID)
+			}
+
+			// Fetch sender from cache or store
+			var user umodels.User
+			if cachedUser, ok := userCache[msg.SenderID]; ok {
+				user = cachedUser
+			} else {
+				user, err = m.userStore.Get(msg.SenderID, "", "")
+				if err != nil {
+					m.lo.Error("error fetching message sender user", "sender_id", msg.SenderID, "conversation_uuid", conversation.UUID, "error", err)
+				} else {
+					userCache[msg.SenderID] = user
+				}
+			}
+
+			chatMessages[i] = models.ChatMessage{
+				UUID:             msg.UUID,
+				Status:           msg.Status,
+				CreatedAt:        msg.CreatedAt,
+				Content:          msg.Content,
+				TextContent:      msg.TextContent,
+				ConversationUUID: msg.ConversationUUID,
+				Meta:             msg.Meta,
+				Author: umodels.ChatUser{
+					ID:                 user.ID,
+					FirstName:          user.FirstName,
+					LastName:           user.LastName,
+					AvatarURL:          user.AvatarURL,
+					AvailabilityStatus: user.AvailabilityStatus,
+					Type:               user.Type,
+				},
+				Attachments: attachments,
+			}
+		}
+		resp.Messages = chatMessages
+	}
+
+	// Calculate business hours info
+	businessHoursID, utcOffset := m.calculateBusinessHoursInfo(conversation)
+	resp.BusinessHoursID = businessHoursID
+	resp.WorkingHoursUTCOffset = utcOffset
+
+	return resp, nil
+}
+
+// calculateBusinessHoursInfo calculates business hours ID and UTC offset for a conversation
+func (m *Manager) calculateBusinessHoursInfo(conversation models.Conversation) (*int, *int) {
+	var (
+		businessHoursID *int
+		timezone        string
+		utcOffset       *int
+	)
+
+	// Check if conversation is assigned to a team with business hours
+	if conversation.AssignedTeamID.Valid {
+		team, err := m.teamStore.Get(conversation.AssignedTeamID.Int)
+		if err == nil && team.BusinessHoursID.Valid {
+			businessHoursID = &team.BusinessHoursID.Int
+			timezone = team.Timezone
+		}
+	}
+
+	// Fallback to general settings if no team business hours
+	if businessHoursID == nil {
+		out, err := m.settingsStore.GetByPrefix("app")
+		if err == nil {
+			var settings map[string]any
+			if err := json.Unmarshal([]byte(out), &settings); err == nil {
+				if bhIDStr, ok := settings["app.business_hours_id"].(string); ok && bhIDStr != "" {
+					if bhID, err := strconv.Atoi(bhIDStr); err == nil {
+						businessHoursID = &bhID
+					}
+				}
+				if tz, ok := settings["app.timezone"].(string); ok {
+					timezone = tz
+				}
+			}
+		}
+	}
+
+	// Calculate UTC offset for the timezone
+	if timezone != "" {
+		if loc, err := time.LoadLocation(timezone); err == nil {
+			_, offset := time.Now().In(loc).Zone()
+			offsetMinutes := offset / 60
+			utcOffset = &offsetMinutes
+		}
+	}
+
+	return businessHoursID, utcOffset
 }

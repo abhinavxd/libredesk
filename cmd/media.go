@@ -143,45 +143,51 @@ func handleMediaUpload(r *fastglue.Request) error {
 }
 
 // handleServeMedia serves uploaded media.
+// Supports both authenticated agent access and unauthenticated access via signed URLs.
 func handleServeMedia(r *fastglue.Request) error {
 	var (
-		app   = r.Context.(*App)
-		auser = r.RequestCtx.UserValue("user").(amodels.User)
-		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		app  = r.Context.(*App)
+		uuid = r.RequestCtx.UserValue("uuid").(string)
 	)
 
-	user, err := app.user.GetAgent(auser.ID, "")
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-
-	// Fetch media from DB.
-	media, err := app.media.Get(0, strings.TrimPrefix(uuid, thumbPrefix))
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-
-	// Check if the user has permission to access the linked model.
-	allowed, err := app.authz.EnforceMediaAccess(user, media.Model.String)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-
-	// For messages, check access to the conversation this message is part of.
-	if media.Model.String == "messages" {
-		conversation, err := app.conversation.GetConversationByMessageID(media.ModelID.Int)
+	// Check if user is authenticated (agent access)
+	auser := r.RequestCtx.UserValue("user")
+	if auser != nil {
+		// Authenticated.
+		user, err := app.user.GetAgent(auser.(amodels.User).ID, "")
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		allowed, err = app.authz.EnforceConversationAccess(user, conversation)
+
+		// Fetch media from DB.
+		media, err := app.media.Get(0, strings.TrimPrefix(uuid, thumbPrefix))
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-	}
 
-	if !allowed {
-		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.UnauthorizedError)
+		// Check if the user has permission to access the linked model.
+		allowed, err := app.authz.EnforceMediaAccess(user, media.Model.String)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+
+		// For messages, check access to the conversation this message is part of.
+		if media.Model.String == "messages" {
+			conversation, err := app.conversation.GetConversationByMessageID(media.ModelID.Int)
+			if err != nil {
+				return sendErrorEnvelope(r, err)
+			}
+			allowed, err = app.authz.EnforceConversationAccess(user, conversation)
+			if err != nil {
+				return sendErrorEnvelope(r, err)
+			}
+		}
+
+		if !allowed {
+			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.UnauthorizedError)
+		}
 	}
+	// If no authenticated user, the middleware has already verified the request signature serve the file.
 	consts := app.consts.Load().(*constants)
 	switch consts.UploadProvider {
 	case "fs":
