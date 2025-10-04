@@ -5,46 +5,6 @@ import (
 	"time"
 )
 
-func TestReverseSlice(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    []string
-		expected []string
-	}{
-		{
-			name:     "empty slice",
-			input:    []string{},
-			expected: []string{},
-		},
-		{
-			name:     "single element",
-			input:    []string{"a"},
-			expected: []string{"a"},
-		},
-		{
-			name:     "multiple elements",
-			input:    []string{"a", "b", "c"},
-			expected: []string{"c", "b", "a"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			input := make([]string, len(tt.input))
-			copy(input, tt.input)
-			ReverseSlice(input)
-			if len(input) != len(tt.expected) {
-				t.Errorf("got len %d, want %d", len(input), len(tt.expected))
-			}
-			for i := range input {
-				if input[i] != tt.expected[i] {
-					t.Errorf("at index %d got %s, want %s", i, input[i], tt.expected[i])
-				}
-			}
-		})
-	}
-}
-
 func TestRemoveItemByValue(t *testing.T) {
 	tests := []struct {
 		name     string

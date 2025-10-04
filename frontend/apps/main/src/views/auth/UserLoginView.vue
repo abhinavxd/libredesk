@@ -9,7 +9,7 @@
       <CardContent class="p-6 space-y-6">
         <div class="space-y-2 text-center">
           <CardTitle class="text-3xl font-bold text-foreground">
-            {{ appSettingsStore.settings?.['app.site_name'] || 'Libredesk' }}
+            {{ appSettingsStore.public_config?.['app.site_name'] || 'LIBREDESK' }}
           </CardTitle>
           <p class="text-muted-foreground">{{ t('auth.signIn') }}</p>
         </div>
@@ -25,9 +25,8 @@
           >
             <img
               :src="oidcProvider.logo_url"
+              :alt="oidcProvider.name"
               width="20"
-              class="mr-2"
-              alt=""
               v-if="oidcProvider.logo_url"
             />
             {{ oidcProvider.name }}
@@ -60,18 +59,28 @@
           </div>
 
           <div class="space-y-2">
-            <Label for="password" class="text-sm font-medium text-foreground">{{
-              t('globals.terms.password')
-            }}</Label>
-            <Input
-              id="password"
-              type="password"
-              autocomplete="current-password"
-              :placeholder="t('auth.enterPassword')"
-              v-model="loginForm.password"
-              :class="{ 'border-destructive': passwordHasError }"
-              class="w-full bg-card border-border text-foreground placeholder:text-muted-foreground rounded py-2 px-3 focus:ring-2 focus:ring-ring focus:border-ring transition-all duration-200 ease-in-out"
-            />
+            <Label for="password" class="text-sm font-medium text-foreground">
+              {{ t('globals.terms.password') }}
+            </Label>
+            <div class="relative">
+              <Input
+                id="password"
+                :type="showPassword ? 'text' : 'password'"
+                autocomplete="current-password"
+                :placeholder="t('auth.enterPassword')"
+                v-model="loginForm.password"
+                :class="{ 'border-destructive': passwordHasError }"
+                class="w-full bg-card border-border text-foreground placeholder:text-muted-foreground rounded py-2 px-3 pr-10 focus:ring-2 focus:ring-ring focus:border-ring transition-all duration-200 ease-in-out"
+              />
+              <button
+                type="button"
+                class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                @click="showPassword = !showPassword"
+              >
+                <Eye v-if="!showPassword" class="w-5 h-5" />
+                <EyeOff v-else class="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-between">
@@ -89,7 +98,9 @@
             type="submit"
           >
             <span v-if="isLoading" class="flex items-center justify-center">
-              <div class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"></div>
+              <div
+                class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"
+              ></div>
               {{ t('auth.loggingIn') }}
             </span>
             <span v-else>{{ t('auth.signInButton') }}</span>
@@ -125,6 +136,7 @@ import { useI18n } from 'vue-i18n'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { useAppSettingsStore } from '../../stores/appSettings'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
+import { Eye, EyeOff } from 'lucide-vue-next'
 
 const emitter = useEmitter()
 const { t } = useI18n()
@@ -133,6 +145,7 @@ const isLoading = ref(false)
 const router = useRouter()
 const userStore = useUserStore()
 const shakeCard = ref(false)
+const showPassword = ref(false)
 const loginForm = ref({
   email: '',
   password: ''
@@ -159,8 +172,10 @@ onMounted(async () => {
 
 const fetchOIDCProviders = async () => {
   try {
-    const resp = await api.getAllEnabledOIDC()
-    oidcProviders.value = resp.data.data
+    const config = appSettingsStore.public_config
+    if (config && config['app.sso_providers']) {
+      oidcProviders.value = config['app.sso_providers'] || []
+    }
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -204,6 +219,9 @@ const loginAction = () => {
       if (resp?.data?.data) {
         userStore.setCurrentUser(resp.data.data)
       }
+      // Also fetch general setting as user's logged in.
+      appSettingsStore.fetchSettings('general')
+      // Navigate to inboxes
       router.push({ name: 'inboxes' })
     })
     .catch((error) => {

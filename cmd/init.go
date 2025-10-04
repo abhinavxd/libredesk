@@ -272,11 +272,12 @@ func initTag(db *sqlx.DB, i18n *i18n.I18n) *tag.Manager {
 }
 
 // initViews inits view manager.
-func initView(db *sqlx.DB) *view.Manager {
+func initView(db *sqlx.DB, i18n *i18n.I18n) *view.Manager {
 	var lo = initLogger("view_manager")
 	m, err := view.New(view.Opts{
-		DB: db,
-		Lo: lo,
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing view manager: %v", err)
@@ -349,7 +350,7 @@ func initWS(user *user.Manager) *ws.Hub {
 func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *i18n.I18n) *tmpl.Manager {
 	var (
 		lo      = initLogger("template")
-		funcMap = getTmplFuncs(consts)
+		funcMap = getTmplFuncs(consts, i18n)
 	)
 	tpls, err := stuffbin.ParseTemplatesGlob(funcMap, fs, "/static/email-templates/*.html")
 	if err != nil {
@@ -367,7 +368,7 @@ func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *
 }
 
 // getTmplFuncs returns the template functions.
-func getTmplFuncs(consts *constants) template.FuncMap {
+func getTmplFuncs(consts *constants, i18n *i18n.I18n) template.FuncMap {
 	return template.FuncMap{
 		"RootURL": func() string {
 			return consts.AppBaseURL
@@ -387,6 +388,9 @@ func getTmplFuncs(consts *constants) template.FuncMap {
 		"SiteName": func() string {
 			return consts.SiteName
 		},
+		"L": func() interface{} {
+			return i18n
+		},
 	}
 }
 
@@ -403,7 +407,10 @@ func reloadSettings(app *App) error {
 		app.lo.Error("error unmarshalling settings from DB", "error", err)
 		return err
 	}
-	if err := ko.Load(confmap.Provider(out, "."), nil); err != nil {
+	app.Lock()
+	err = ko.Load(confmap.Provider(out, "."), nil)
+	app.Unlock()
+	if err != nil {
 		app.lo.Error("error loading settings into koanf", "error", err)
 		return err
 	}
@@ -415,7 +422,7 @@ func reloadSettings(app *App) error {
 // reloadTemplates reloads the templates from the filesystem.
 func reloadTemplates(app *App) error {
 	app.lo.Info("reloading templates")
-	funcMap := getTmplFuncs(app.consts.Load().(*constants))
+	funcMap := getTmplFuncs(app.consts.Load().(*constants), app.i18n)
 	tpls, err := stuffbin.ParseTemplatesGlob(funcMap, app.fs, "/static/email-templates/*.html")
 	if err != nil {
 		app.lo.Error("error parsing email templates", "error", err)

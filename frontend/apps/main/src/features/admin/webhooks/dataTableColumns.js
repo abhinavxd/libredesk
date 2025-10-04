@@ -10,7 +10,7 @@ export const createColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center font-medium' }, row.getValue('name'))
+      return h('div', { class: 'text-center' }, row.getValue('name'))
     }
   },
   {

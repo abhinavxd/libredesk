@@ -1,7 +1,8 @@
--- name: get-users
+-- name: get-users-compact
+-- TODO: Remove hardcoded `type` of user in some queries in this file.
 SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled
 FROM users
-WHERE users.email != 'System' AND users.deleted_at IS NULL AND type = $1
+WHERE users.email != 'System' AND users.deleted_at IS NULL AND type = ANY($1)
 
 -- name: soft-delete-agent
 WITH soft_delete AS (
@@ -23,12 +24,6 @@ delete_user_roles AS (
 )
 SELECT 1;
 
--- name: get-agents-compact
-SELECT u.id, u.type, u.first_name, u.last_name, u.enabled, u.avatar_url
-FROM users u
-WHERE u.email != 'System' AND u.deleted_at IS NULL AND u.type = 'agent'
-ORDER BY u.updated_at DESC;
-
 -- name: get-user
 SELECT
     u.id,
@@ -37,8 +32,6 @@ SELECT
     u.email,
     u.password,
     u.type,
-    u.created_at,
-    u.updated_at,
     u.enabled,
     u.avatar_url,
     u.first_name,
@@ -46,11 +39,12 @@ SELECT
     u.availability_status,
     u.last_active_at,
     u.last_login_at,
-    u.phone_number_calling_code,
+    u.phone_number_country_code,
     u.phone_number,
     u.api_key,
     u.api_key_last_used_at,
     u.external_user_id,
+    u.api_secret,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -145,7 +139,7 @@ WHERE id = $1 AND type = 'agent';
 -- name: set-password
 UPDATE users  
 SET password = $1, reset_password_token = NULL, reset_password_token_expiry = NULL
-WHERE reset_password_token = $2 AND reset_password_token_expiry > now() AND type = 'agent';
+WHERE reset_password_token = $2 AND reset_password_token_expiry > now();
 
 -- name: insert-agent
 WITH inserted_user AS (
@@ -196,7 +190,7 @@ SET first_name = COALESCE($2, first_name),
     email = COALESCE($4, email),
     avatar_url = $5,
     phone_number = $6,
-    phone_number_calling_code = $7,
+    phone_number_country_code = $7,
     updated_at = now()
 WHERE id = $1 and type = 'contact';
 
@@ -218,7 +212,8 @@ ORDER BY cn.created_at DESC;
 
 -- name: insert-note
 INSERT INTO contact_notes (contact_id, user_id, note)
-VALUES ($1, $2, $3);
+VALUES ($1, $2, $3)
+RETURNING *;
 
 -- name: delete-note
 DELETE FROM contact_notes
@@ -245,6 +240,7 @@ SELECT
     u.created_at,
     u.updated_at,
     u.email,
+    u.password,
     u.type,
     u.enabled,
     u.avatar_url,
@@ -253,8 +249,10 @@ SELECT
     u.availability_status,
     u.last_active_at,
     u.last_login_at,
-    u.phone_number_calling_code,
+    u.phone_number_country_code,
     u.phone_number,
+    u.api_key,
+    u.api_key_last_used_at,
     u.api_secret,
     u.external_user_id,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
@@ -273,7 +271,7 @@ LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
 WHERE u.api_key = $1 AND u.enabled = true AND u.deleted_at IS NULL
 GROUP BY u.id;
 
--- name: generate-api-key
+-- name: set-api-key
 UPDATE users 
 SET api_key = $2, api_secret = $3, api_key_last_used_at = NULL, updated_at = now()
 WHERE id = $1;

@@ -9,7 +9,7 @@ export const createColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.firstName'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center font-medium' }, row.getValue('first_name'))
+      return h('div', { class: 'text-center' }, row.getValue('first_name'))
     }
   },
   {
@@ -18,7 +18,7 @@ export const createColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.lastName'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center font-medium' }, row.getValue('last_name'))
+      return h('div', { class: 'text-center' }, row.getValue('last_name'))
     }
   },
   {
@@ -27,7 +27,7 @@ export const createColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.enabled'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center font-medium' }, row.getValue('enabled') ? t('globals.messages.yes') : t('globals.messages.no'))
+      return h('div', { class: 'text-center' }, row.getValue('enabled') ? t('globals.messages.yes') : t('globals.messages.no'))
     }
   },
   {
@@ -36,7 +36,7 @@ export const createColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.email'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center font-medium' }, row.getValue('email'))
+      return h('div', { class: 'text-center' }, row.getValue('email'))
     }
   },
   {
@@ -47,7 +47,7 @@ export const createColumns = (t) => [
     cell: function ({ row }) {
       return h(
         'div',
-        { class: 'text-center font-medium' },
+        { class: 'text-center' },
         format(row.getValue('created_at'), 'PPpp')
       )
     }
@@ -60,7 +60,7 @@ export const createColumns = (t) => [
     cell: function ({ row }) {
       return h(
         'div',
-        { class: 'text-center font-medium' },
+        { class: 'text-center' },
         format(row.getValue('updated_at'), 'PPpp')
       )
     }

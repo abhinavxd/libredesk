@@ -20,15 +20,17 @@ import { ref, onMounted } from 'vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import GeneralSettingForm from '@/features/admin/general/GeneralSettingForm.vue'
 import AdminPageWithHelp from '@/layouts/admin/AdminPageWithHelp.vue'
-import api from '../../../api'
+import { useAppSettingsStore } from '@/stores/appSettings'
+import api from '@/api'
 
 const initialValues = ref({})
 const isLoading = ref(false)
+const settingsStore = useAppSettingsStore()
 
 onMounted(async () => {
   isLoading.value = true
-  const response = await api.getSettings('general')
-  const data = response.data.data
+  await settingsStore.fetchSettings('general')
+  const data = settingsStore.settings
   isLoading.value = false
   initialValues.value = Object.keys(data).reduce((acc, key) => {
     // Remove 'app.' prefix

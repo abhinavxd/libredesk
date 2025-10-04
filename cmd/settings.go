@@ -31,6 +31,8 @@ func handleGetGeneralSettings(r *fastglue.Request) error {
 	settings["app.update"] = app.update
 	// Set app version.
 	settings["app.version"] = versionString
+	// Set restart required flag.
+	settings["app.restart_required"] = app.restartRequired
 	return r.SendEnvelope(settings)
 }
 
@@ -45,6 +47,11 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
 
+	// Get current language before update.
+	app.Lock()
+	oldLang := ko.String("app.lang")
+	app.Unlock()
+
 	// Remove any trailing slash `/` from the root url.
 	req.RootURL = strings.TrimRight(req.RootURL, "/")
 
@@ -55,6 +62,17 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	if err := reloadSettings(app); err != nil {
 		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.couldNotReload", "name", app.i18n.T("globals.terms.setting")), nil)
 	}
+
+	// Check if language changed and reload i18n if needed.
+	app.Lock()
+	newLang := ko.String("app.lang")
+	if oldLang != newLang {
+		app.lo.Info("language changed, reloading i18n", "old_lang", oldLang, "new_lang", newLang)
+		app.i18n = initI18n(app.fs)
+		app.lo.Info("reloaded i18n", "old_lang", oldLang, "new_lang", newLang)
+	}
+	app.Unlock()
+
 	if err := reloadTemplates(app); err != nil {
 		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.couldNotReload", "name", app.i18n.T("globals.terms.setting")), nil)
 	}
@@ -109,6 +127,7 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.invalidFromAddress"), nil, envelope.InputError)
 	}
 
+	// If empty then retain previous password.
 	if req.Password == "" {
 		req.Password = cur.Password
 	}
@@ -117,6 +136,10 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// No reload implemented, so user has to restart the app.
+	// Email notification settings require app restart to take effect.
+	app.Lock()
+	app.restartRequired = true
+	app.Unlock()
+
 	return r.SendEnvelope(true)
 }

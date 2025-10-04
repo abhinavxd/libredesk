@@ -1,11 +1,12 @@
 import { computed } from 'vue'
-import { useConversationStore } from '../stores/conversation'
-import { useInboxStore } from '../stores/inbox'
-import { useUsersStore } from '../stores/users'
-import { useTeamStore } from '../stores/team'
-import { useSlaStore } from '../stores/sla'
-import { useCustomAttributeStore } from '../stores/customAttributes'
-import { FIELD_TYPE, FIELD_OPERATORS } from '../constants/filterConfig'
+import { useConversationStore } from '@/stores/conversation'
+import { useInboxStore } from '@/stores/inbox'
+import { useUsersStore } from '@/stores/users'
+import { useTeamStore } from '@/stores/team'
+import { useSlaStore } from '@/stores/sla'
+import { useCustomAttributeStore } from '@/stores/customAttributes'
+import { useTagStore } from '@/stores/tag'
+import { FIELD_TYPE, FIELD_OPERATORS } from '@/constants/filterConfig'
 import { useI18n } from 'vue-i18n'
 
 export function useConversationFilters () {
@@ -15,6 +16,7 @@ export function useConversationFilters () {
     const tStore = useTeamStore()
     const slaStore = useSlaStore()
     const customAttributeStore = useCustomAttributeStore()
+    const tagStore = useTagStore()
     const { t } = useI18n()
 
     const customAttributeDataTypeToFieldType = {
@@ -69,6 +71,12 @@ export function useConversationFilters () {
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: iStore.options
+        },
+        tags: {
+            label: t('globals.terms.tag', 2),
+            type: FIELD_TYPE.MULTI_SELECT,
+            operators: FIELD_OPERATORS.MULTI_SELECT,
+            options: tagStore.tagOptions
         }
     }))
 

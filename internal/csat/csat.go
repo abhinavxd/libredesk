@@ -93,8 +93,7 @@ func (m *Manager) UpdateResponse(uuid string, score int, feedback string) error 
 		return err
 	}
 
-	// Check if CSAT has already been submitted (response timestamp exists)
-	if !csat.ResponseTimestamp.IsZero() {
+	if csat.Rating > 0 || !csat.ResponseTimestamp.IsZero() {
 		return envelope.NewError(envelope.InputError, m.i18n.T("csat.alreadySubmitted"), nil)
 	}
 

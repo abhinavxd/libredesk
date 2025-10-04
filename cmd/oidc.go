@@ -11,16 +11,6 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// handleGetAllEnabledOIDC returns all enabled OIDC records
-func handleGetAllEnabledOIDC(r *fastglue.Request) error {
-	app := r.Context.(*App)
-	out, err := app.oidc.GetAllEnabled()
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	return r.SendEnvelope(out)
-}
-
 // handleGetAllOIDC returns all OIDC records
 func handleGetAllOIDC(r *fastglue.Request) error {
 	app := r.Context.(*App)
@@ -74,10 +64,10 @@ func handleCreateOIDC(r *fastglue.Request) error {
 	if err := reloadAuth(app); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.couldNotReload", "name", "OIDC"), nil, envelope.GeneralError)
 	}
-	
+
 	// Clear client secret before returning
 	createdOIDC.ClientSecret = strings.Repeat(stringutil.PasswordDummy, 10)
-	
+
 	return r.SendEnvelope(createdOIDC)
 }
 
@@ -110,10 +100,10 @@ func handleUpdateOIDC(r *fastglue.Request) error {
 	if err := reloadAuth(app); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.couldNotReload", "name", "OIDC"), nil, envelope.GeneralError)
 	}
-	
+
 	// Clear client secret before returning
 	updatedOIDC.ClientSecret = strings.Repeat(stringutil.PasswordDummy, 10)
-	
+
 	return r.SendEnvelope(updatedOIDC)
 }
 

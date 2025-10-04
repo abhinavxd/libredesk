@@ -29,7 +29,7 @@ export const createFormSchema = (t) => z.object({
             })
         })
         .nullable(),
-    phone_number_calling_code: z.string().optional().nullable(),
+    phone_number_country_code: z.string().optional().nullable(),
     avatar_url: z.string().optional().nullable(),
     email: z
         .string({

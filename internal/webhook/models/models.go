@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/lib/pq"
@@ -37,10 +36,3 @@ const (
 	// Test event
 	EventWebhookTest WebhookEvent = "webhook.test"
 )
-
-// WebhookPayload represents the payload sent to a webhook
-type WebhookPayload struct {
-	Event     WebhookEvent    `json:"event"`
-	Timestamp time.Time       `json:"timestamp"`
-	Data      json.RawMessage `json:",inline"`
-}

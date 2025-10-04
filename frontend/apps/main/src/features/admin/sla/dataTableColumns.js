@@ -9,7 +9,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.name'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center font-medium' }, row.getValue('name'))
+            return h('div', { class: 'text-center' }, row.getValue('name'))
         }
     },
     {
@@ -18,7 +18,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center font-medium' }, format(row.getValue('created_at'), 'PPpp'))
+            return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
         }
     },
     {
@@ -27,7 +27,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center font-medium' }, format(row.getValue('updated_at'), 'PPpp'))
+            return h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
         }
     },
     {

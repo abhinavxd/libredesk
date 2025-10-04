@@ -10,7 +10,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/team/models"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
@@ -78,8 +77,8 @@ func (u *Manager) GetAll() ([]models.Team, error) {
 }
 
 // GetAllCompact retrieves all teams with limited fields.
-func (u *Manager) GetAllCompact() ([]models.Team, error) {
-	var teams = make([]models.Team, 0)
+func (u *Manager) GetAllCompact() ([]models.TeamCompact, error) {
+	var teams = make([]models.TeamCompact, 0)
 	if err := u.q.GetTeamsCompact.Select(&teams); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return teams, nil
@@ -169,14 +168,14 @@ func (u *Manager) UserBelongsToTeam(teamID, userID int) (bool, error) {
 }
 
 // GetMembers retrieves members of a team.
-func (u *Manager) GetMembers(id int) ([]umodels.User, error) {
-	var users []umodels.User
-	if err := u.q.GetTeamMembers.Select(&users, id); err != nil {
+func (u *Manager) GetMembers(id int) ([]models.TeamMember, error) {
+	var members = make([]models.TeamMember, 0)
+	if err := u.q.GetTeamMembers.Select(&members, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return users, nil
+			return members, nil
 		}
 		u.lo.Error("error fetching team members", "team_id", id, "error", err)
-		return users, fmt.Errorf("fetching team members: %w", err)
+		return members, fmt.Errorf("fetching team members: %w", err)
 	}
-	return users, nil
+	return members, nil
 }

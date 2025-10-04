@@ -26,12 +26,13 @@ func (u *Manager) GetNote(id int) (models.Note, error) {
 }
 
 // CreateNote creates a new note for a user.
-func (u *Manager) CreateNote(userID, authorID int, note string) error {
-	if _, err := u.q.InsertNote.Exec(userID, authorID, note); err != nil {
+func (u *Manager) CreateNote(userID, authorID int, note string) (models.Note, error) {
+	var createdNote models.Note
+	if err := u.q.InsertNote.Get(&createdNote, userID, authorID, note); err != nil {
 		u.lo.Error("error creating user note", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", u.i18n.P("globals.terms.note")), nil)
+		return createdNote, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", u.i18n.P("globals.terms.note")), nil)
 	}
-	return nil
+	return createdNote, nil
 }
 
 // DeleteNote deletes a note for a user.

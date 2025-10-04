@@ -1,7 +1,7 @@
 <template>
   <Button
     variant="ghost"
-    @click.prevent="onClose"
+    @click.stop="onClose"
     size="xs"
     class="text-gray-400 dark:text-gray-500 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 w-6 h-6 p-0"
   >

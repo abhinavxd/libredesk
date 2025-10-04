@@ -9,7 +9,7 @@ export const columns = [
       return h('div', { class: 'text-center' }, 'Name')
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center font-medium' }, row.getValue('name'))
+      return h('div', { class: 'text-center' }, row.getValue('name'))
     }
   },
   {
@@ -20,7 +20,7 @@ export const columns = [
     cell: function ({ row }) {
       return h(
         'div',
-        { class: 'text-center font-medium' },
+        { class: 'text-center' },
         format(row.getValue('created_at'), 'PPpp')
       )
     }
@@ -33,7 +33,7 @@ export const columns = [
     cell: function ({ row }) {
       return h(
         'div',
-        { class: 'text-center font-medium' },
+        { class: 'text-center' },
         format(row.getValue('updated_at'), 'PPpp')
       )
     }

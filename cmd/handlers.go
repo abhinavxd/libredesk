@@ -27,18 +27,20 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// i18n.
 	g.GET("/api/v1/lang/{lang}", handleGetI18nLang)
 
+	// Public config for app initialization.
+	g.GET("/api/v1/config", handleGetConfig)
+
 	// Media.
 	g.GET("/uploads/{uuid}", auth(handleServeMedia))
 	g.POST("/api/v1/media", auth(handleMediaUpload))
 
 	// Settings.
-	g.GET("/api/v1/settings/general", handleGetGeneralSettings)
+	g.GET("/api/v1/settings/general", auth(handleGetGeneralSettings))
 	g.PUT("/api/v1/settings/general", perm(handleUpdateGeneralSettings, "general_settings:manage"))
 	g.GET("/api/v1/settings/notifications/email", perm(handleGetEmailNotificationSettings, "notification_settings:manage"))
 	g.PUT("/api/v1/settings/notifications/email", perm(handleUpdateEmailNotificationSettings, "notification_settings:manage"))
 
 	// OpenID connect single sign-on.
-	g.GET("/api/v1/oidc/enabled", handleGetAllEnabledOIDC)
 	g.GET("/api/v1/oidc", perm(handleGetAllOIDC, "oidc:manage"))
 	g.POST("/api/v1/oidc", perm(handleCreateOIDC, "oidc:manage"))
 	g.GET("/api/v1/oidc/{id}", perm(handleGetOIDC, "oidc:manage"))
@@ -157,7 +159,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.DELETE("/api/v1/inboxes/{id}", perm(handleDeleteInbox, "inboxes:manage"))
 
 	// Roles.
-	g.GET("/api/v1/roles", perm(handleGetRoles, "roles:manage"))
+	g.GET("/api/v1/roles", auth(handleGetRoles))
 	g.GET("/api/v1/roles/{id}", perm(handleGetRole, "roles:manage"))
 	g.POST("/api/v1/roles", perm(handleCreateRole, "roles:manage"))
 	g.PUT("/api/v1/roles/{id}", perm(handleUpdateRole, "roles:manage"))

@@ -183,6 +183,7 @@ func (e *Enforcer) EnforceConversationAccess(user umodels.User, conversation cmo
 // EnforceMediaAccess checks for read access on linked model to media.
 func (e *Enforcer) EnforceMediaAccess(user umodels.User, model string) (bool, error) {
 	switch model {
+	// TODO: Pick this table / model name from the package/models/models.go
 	case "messages":
 		allowed, err := e.Enforce(user, model, "read")
 		if err != nil {

@@ -52,8 +52,15 @@
         <div class="flex-1">
           <div v-if="modelFilter.field && modelFilter.operator">
             <template v-if="modelFilter.operator !== 'set' && modelFilter.operator !== 'not set'">
+              <SelectTag
+                v-if="getFieldType(modelFilter) === FIELD_TYPE.MULTI_SELECT"
+                v-model="modelFilter.value"
+                :items="getFieldOptions(modelFilter)"
+                :placeholder="t('globals.messages.select', { name: t('globals.terms.tag', 2) })"
+              />
+
               <SelectComboBox
-                v-if="
+                v-else-if="
                   getFieldOptions(modelFilter).length > 0 &&
                   modelFilter.field === 'assigned_user_id'
                 "
@@ -94,8 +101,9 @@
       <CloseButton :onClose="() => removeFilter(index)" />
     </div>
 
+    <!-- Button Container -->
     <div class="flex items-center justify-between pt-3">
-      <Button variant="ghost" size="sm" @click="addFilter" class="text-slate-600">
+      <Button variant="ghost" size="sm" @click.stop="addFilter" class="text-slate-600">
         <Plus class="w-3 h-3 mr-1" />
         {{
           $t('globals.messages.add', {
@@ -104,15 +112,17 @@
         }}
       </Button>
       <div class="flex gap-2" v-if="showButtons">
-        <Button variant="ghost" @click="clearFilters">{{ $t('globals.messages.reset') }}</Button>
-        <Button @click="applyFilters">{{ $t('globals.messages.apply') }}</Button>
+        <Button variant="ghost" @click.stop="clearFilters">
+          {{ $t('globals.messages.reset') }}
+        </Button>
+        <Button @click.stop="applyFilters">{{ $t('globals.messages.apply') }}</Button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   Select,
   SelectContent,
@@ -125,8 +135,10 @@ import { Plus } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { useI18n } from 'vue-i18n'
-import CloseButton from '@main/components/button/CloseButton.vue'
-import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
+import { FIELD_TYPE } from '@/constants/filterConfig'
+import CloseButton from '@/components/button/CloseButton.vue'
+import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import SelectTag from '@/components/ui/select/SelectTag.vue'
 
 const props = defineProps({
   fields: {
@@ -150,18 +162,32 @@ onMounted(() => {
   }
 })
 
+onUnmounted(() => {
+  // On unmounted set valid filters
+  modelValue.value = validFilters.value
+})
+
 const getModel = (field) => {
   const fieldConfig = props.fields.find((f) => f.field === field)
   return fieldConfig?.model || ''
 }
 
-// Set model for each filter
+// Set model for each filter and the default value
 watch(
   () => modelValue.value,
   (filters) => {
     filters.forEach((filter) => {
       if (filter.field && !filter.model) {
         filter.model = getModel(filter.field)
+      }
+
+      // Multi select need arrays as their default value
+      if (
+        filter.field &&
+        getFieldType(filter) === FIELD_TYPE.MULTI_SELECT &&
+        !Array.isArray(filter.value)
+      ) {
+        filter.value = []
       }
     })
   },
@@ -170,15 +196,20 @@ watch(
 
 // Reset operator and value when field changes for a filter at a given index
 watch(
-  () => modelValue.value.map((f) => f.field),
-  (newFields, oldFields) => {
-    newFields.forEach((field, index) => {
-      if (field !== oldFields[index]) {
-        modelValue.value[index].operator = ''
-        modelValue.value[index].value = ''
+  modelValue,
+  (newFilters, oldFilters) => {
+    // Skip first run
+    if (!oldFilters) return
+
+    newFilters.forEach((filter, index) => {
+      const oldFilter = oldFilters[index]
+      if (oldFilter && filter.field !== oldFilter.field) {
+        filter.operator = ''
+        filter.value = ''
       }
     })
-  }
+  },
+  { deep: true }
 )
 
 const addFilter = () => {
@@ -197,7 +228,17 @@ const clearFilters = () => {
 }
 
 const validFilters = computed(() => {
-  return modelValue.value.filter((filter) => filter.field && filter.operator && filter.value)
+  return modelValue.value.filter((filter) => {
+    // For multi-select field type, allow empty array as a valid value
+    const field = props.fields.find((f) => f.field === filter.field)
+    const isMultiSelectField = field?.type === FIELD_TYPE.MULTI_SELECT
+
+    if (isMultiSelectField) {
+      return filter.field && filter.operator && filter.value !== undefined && filter.value !== null
+    }
+
+    return filter.field && filter.operator && filter.value
+  })
 })
 
 const getFieldOptions = (fieldValue) => {
@@ -208,5 +249,10 @@ const getFieldOptions = (fieldValue) => {
 const getFieldOperators = (modelFilter) => {
   const field = props.fields.find((f) => f.field === modelFilter.field)
   return field?.operators || []
+}
+
+const getFieldType = (modelFilter) => {
+  const field = props.fields.find((f) => f.field === modelFilter.field)
+  return field?.type || ''
 }
 </script>

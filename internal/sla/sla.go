@@ -885,7 +885,7 @@ func (m *Manager) evaluateSLA(appliedSLA models.AppliedSLA) error {
 
 	// If first response is not breached and not met, check the deadline and set them.
 	if !appliedSLA.FirstResponseBreachedAt.Valid && !appliedSLA.FirstResponseMetAt.Valid {
-		m.lo.Debug("checking deadline", "deadline", appliedSLA.FirstResponseDeadlineAt, "met_at", appliedSLA.ConversationFirstResponseAt.Time, "metric", MetricFirstResponse)
+		m.lo.Debug("checking deadline", "deadline", appliedSLA.FirstResponseDeadlineAt.Time, "met_at", appliedSLA.ConversationFirstResponseAt.Time, "metric", MetricFirstResponse)
 		if err := checkDeadline(appliedSLA.FirstResponseDeadlineAt.Time, appliedSLA.ConversationFirstResponseAt, MetricFirstResponse); err != nil {
 			return err
 		}
@@ -893,7 +893,7 @@ func (m *Manager) evaluateSLA(appliedSLA models.AppliedSLA) error {
 
 	// If resolution is not breached and not met, check the deadine and set them.
 	if !appliedSLA.ResolutionBreachedAt.Valid && !appliedSLA.ResolutionMetAt.Valid {
-		m.lo.Debug("checking deadline", "deadline", appliedSLA.ResolutionDeadlineAt, "met_at", appliedSLA.ConversationResolvedAt.Time, "metric", MetricResolution)
+		m.lo.Debug("checking deadline", "deadline", appliedSLA.ResolutionDeadlineAt.Time, "met_at", appliedSLA.ConversationResolvedAt.Time, "metric", MetricResolution)
 		if err := checkDeadline(appliedSLA.ResolutionDeadlineAt.Time, appliedSLA.ConversationResolvedAt, MetricResolution); err != nil {
 			return err
 		}

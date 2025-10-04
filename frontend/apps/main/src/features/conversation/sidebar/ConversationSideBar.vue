@@ -13,7 +13,9 @@
           <SelectComboBox
             v-model="conversationStore.current.assigned_user_id"
             :items="[{ value: 'none', label: 'None' }, ...usersStore.options]"
-            :placeholder="t('globals.messages.select', { name: t('globals.terms.agent').toLowerCase() })"
+            :placeholder="
+              t('globals.messages.select', { name: t('globals.terms.agent').toLowerCase() })
+            "
             @select="selectAgent"
             type="user"
           />
@@ -22,7 +24,9 @@
           <SelectComboBox
             v-model="conversationStore.current.assigned_team_id"
             :items="[{ value: 'none', label: 'None' }, ...teamsStore.options]"
-            :placeholder="t('globals.messages.select', { name: t('globals.terms.team').toLowerCase() })"
+            :placeholder="
+              t('globals.messages.select', { name: t('globals.terms.team').toLowerCase() })
+            "
             @select="selectTeam"
             type="team"
           />
@@ -31,7 +35,9 @@
           <SelectComboBox
             v-model="conversationStore.current.priority_id"
             :items="priorityOptions"
-            :placeholder="t('globals.messages.select', { name: t('globals.terms.priority').toLowerCase() })"
+            :placeholder="
+              t('globals.messages.select', { name: t('globals.terms.priority').toLowerCase() })
+            "
             @select="selectPriority"
             type="priority"
           />
@@ -41,7 +47,9 @@
             v-if="conversationStore.current"
             v-model="conversationStore.current.tags"
             :items="tags.map((tag) => ({ label: tag, value: tag }))"
-            :placeholder="t('globals.messages.select', { name: t('globals.terms.tag', 2).toLowerCase() })"
+            :placeholder="
+              t('globals.messages.select', { name: t('globals.terms.tag', 2).toLowerCase() })
+            "
           />
         </AccordionContent>
       </AccordionItem>
@@ -90,9 +98,10 @@
 
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
-import { useConversationStore } from '../../../stores/conversation'
-import { useUsersStore } from '../../../stores/users'
-import { useTeamStore } from '../../../stores/team'
+import { useConversationStore } from '@/stores/conversation'
+import { useUsersStore } from '@/stores/users'
+import { useTeamStore } from '@/stores/team'
+import { useTagStore } from '@/stores/tag'
 import {
   Accordion,
   AccordionContent,
@@ -118,6 +127,7 @@ const emitter = useEmitter()
 const conversationStore = useConversationStore()
 const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
+const tagStore = useTagStore()
 const tags = ref([])
 // Save the accordion state in local storage
 const accordionState = useStorage('conversation-sidebar-accordion', [])
@@ -171,15 +181,8 @@ watch(
 const priorityOptions = computed(() => conversationStore.priorityOptions)
 
 const fetchTags = async () => {
-  try {
-    const resp = await api.getTags()
-    tags.value = resp.data.data.map((item) => item.name)
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  }
+  await tagStore.fetchTags()
+  tags.value = tagStore.tags.map((item) => item.name)
 }
 
 const handleAssignedUserChange = (id) => {

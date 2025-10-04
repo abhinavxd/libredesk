@@ -18,14 +18,14 @@ const setFavicon = (url) => {
 }
 
 async function initApp () {
-  const settings = (await api.getSettings('general')).data.data
+  const config = (await api.getConfig()).data.data
   const emitter = mitt()
-  const lang = settings['app.lang'] || 'en'
+  const lang = config['app.lang'] || 'en'
   const langMessages = await api.getLanguage(lang)
 
   // Set favicon.
-  if (settings['app.favicon_url'])
-    setFavicon(settings['app.favicon_url'])
+  if (config['app.favicon_url'])
+    setFavicon(config['app.favicon_url'])
 
   // Initialize i18n.
   const i18nConfig = {
@@ -42,9 +42,17 @@ async function initApp () {
   const pinia = createPinia()
   app.use(pinia)
 
-  // Store app settings in Pinia
+  // Fetch and store app settings in store (after pinia is initialized)
   const settingsStore = useAppSettingsStore()
-  settingsStore.setSettings(settings)
+
+  // Store the public config in the store
+  settingsStore.setPublicConfig(config)
+
+  try {
+    await settingsStore.fetchSettings('general')
+  } catch (error) {
+    // Pass
+  }
 
   // Add emitter to global properties.
   app.config.globalProperties.emitter = emitter

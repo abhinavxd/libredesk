@@ -122,6 +122,7 @@ import { Input } from '@shared-ui/components/ui/input'
 import { useEmitter } from '../../composables/useEmitter'
 import { useFileUpload } from '../../composables/useFileUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
+import { UserTypeAgent } from '@/constants/user'
 import {
   Form,
   FormField,
@@ -252,6 +253,7 @@ const processSend = async () => {
     if (hasTextContent.value > 0 || mediaFiles.value.length > 0) {
       const message = htmlContent.value
       await api.sendMessage(conversationStore.current.uuid, {
+        sender_type: UserTypeAgent,
         private: messageType.value === 'private_note',
         message: message,
         attachments: mediaFiles.value.map((file) => file.id),

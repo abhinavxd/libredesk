@@ -31,12 +31,14 @@ import { useEmitter } from '../../../composables/useEmitter'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { format } from 'date-fns'
-import { Spinner } from '@shared-ui/components/ui/spinner'
-import api from '../../../api'
+import { Spinner } from '@/components/ui/spinner'
+import { useInboxStore } from '@/stores/inbox'
+import api from '@/api'
 
 const { t } = useI18n()
 const router = useRouter()
 const emitter = useEmitter()
+const inboxStore = useInboxStore()
 const isLoading = ref(false)
 const data = ref([])
 
@@ -47,8 +49,8 @@ onMounted(async () => {
 const getInboxes = async () => {
   try {
     isLoading.value = true
-    const response = await api.getInboxes()
-    data.value = response.data.data
+    await inboxStore.fetchInboxes(true)
+    data.value = inboxStore.inboxes
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -67,7 +69,7 @@ const columns = [
       return h('div', { class: 'text-center' }, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center font-medium' }, row.getValue('name'))
+      return h('div', { class: 'text-center' }, row.getValue('name'))
     }
   },
   {
@@ -76,7 +78,7 @@ const columns = [
       return h('div', { class: 'text-center' }, t('globals.terms.channel'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center font-medium' }, row.getValue('channel'))
+      return h('div', { class: 'text-center' }, row.getValue('channel'))
     }
   },
   {

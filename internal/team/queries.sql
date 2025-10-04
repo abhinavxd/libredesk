@@ -1,14 +1,14 @@
 -- name: get-teams
-SELECT id, emoji, created_at, updated_at, name, conversation_assignment_type, timezone, max_auto_assigned_conversations from teams order by updated_at desc;
+SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, business_hours_id, sla_policy_id, timezone from teams order by updated_at desc;
 
 -- name: get-teams-compact
 SELECT id, name, emoji from teams order by name;
 
 -- name: get-user-teams
-SELECT id, emoji, created_at, updated_at, name, conversation_assignment_type, timezone, max_auto_assigned_conversations from teams WHERE id IN (SELECT team_id FROM team_members WHERE user_id = $1) order by updated_at desc;
+SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, business_hours_id, sla_policy_id, timezone from teams WHERE id IN (SELECT team_id FROM team_members WHERE user_id = $1) order by updated_at desc;
 
 -- name: get-team
-SELECT id, emoji, name, conversation_assignment_type, timezone, business_hours_id, sla_policy_id, max_auto_assigned_conversations from teams where id = $1;
+SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, business_hours_id, sla_policy_id, timezone from teams where id = $1;
 
 -- name: get-team-members
 SELECT u.id, t.id as team_id, u.availability_status

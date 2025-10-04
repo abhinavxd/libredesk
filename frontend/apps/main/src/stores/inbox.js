@@ -12,14 +12,13 @@ export const useInboxStore = defineStore('inbox', () => {
     label: inb.name,
     value: String(inb.id)
   })))
-  const fetchInboxes = async () => {
-    if (inboxes.value.length) return
+  const fetchInboxes = async (force = false) => {
+    if (!force && inboxes.value.length) return
     try {
       const response = await api.getInboxes()
       inboxes.value = response?.data?.data || []
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        title: 'Error',
         variant: 'destructive',
         description: handleHTTPError(error).message
       })

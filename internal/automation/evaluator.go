@@ -232,12 +232,21 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 		for _, ruleValue := range ruleValues {
 			// Normalize rule value by collapsing multiple spaces
 			normalizedRuleValue := strings.Join(strings.Fields(ruleValue), " ")
-			if strings.Contains(
-				strings.ToLower(normalizedInputText),
-				strings.ToLower(normalizedRuleValue),
-			) {
-				conditionMet = true
-				break
+			
+			// Respect CaseSensitiveMatch flag
+			if rule.CaseSensitiveMatch {
+				if strings.Contains(normalizedInputText, normalizedRuleValue) {
+					conditionMet = true
+					break
+				}
+			} else {
+				if strings.Contains(
+					strings.ToLower(normalizedInputText),
+					strings.ToLower(normalizedRuleValue),
+				) {
+					conditionMet = true
+					break
+				}
 			}
 		}
 	case models.RuleOperatorNotContains:
@@ -249,12 +258,21 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 		for _, ruleValue := range ruleValues {
 			// Normalize rule value by collapsing multiple spaces
 			normalizedRuleValue := strings.Join(strings.Fields(ruleValue), " ")
-			if strings.Contains(
-				strings.ToLower(normalizedInputText),
-				strings.ToLower(normalizedRuleValue),
-			) {
-				conditionMet = false
-				break
+			
+			// Respect CaseSensitiveMatch flag
+			if rule.CaseSensitiveMatch {
+				if strings.Contains(normalizedInputText, normalizedRuleValue) {
+					conditionMet = false
+					break
+				}
+			} else {
+				if strings.Contains(
+					strings.ToLower(normalizedInputText),
+					strings.ToLower(normalizedRuleValue),
+				) {
+					conditionMet = false
+					break
+				}
 			}
 		}
 	case models.RuleOperatorSet:

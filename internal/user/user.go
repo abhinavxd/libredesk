@@ -22,6 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 	"golang.org/x/crypto/bcrypt"
@@ -61,11 +62,11 @@ type Opts struct {
 // queries contains prepared SQL queries.
 type queries struct {
 	GetUser                *sqlx.Stmt `query:"get-user"`
-	GetUsers               string     `query:"get-users"`
 	GetNotes               *sqlx.Stmt `query:"get-notes"`
 	GetNote                *sqlx.Stmt `query:"get-note"`
 	GetUserByExternalID    *sqlx.Stmt `query:"get-user-by-external-id"`
 	GetAgentsCompact       *sqlx.Stmt `query:"get-agents-compact"`
+	GetUsersCompact        string     `query:"get-users-compact"`
 	UpdateContact          *sqlx.Stmt `query:"update-contact"`
 	UpdateAgent            *sqlx.Stmt `query:"update-agent"`
 	UpdateCustomAttributes *sqlx.Stmt `query:"update-custom-attributes"`
@@ -88,7 +89,7 @@ type queries struct {
 	ToggleEnable           *sqlx.Stmt `query:"toggle-enable"`
 	// API key queries
 	GetUserByAPIKey      *sqlx.Stmt `query:"get-user-by-api-key"`
-	GenerateAPIKey       *sqlx.Stmt `query:"generate-api-key"`
+	SetAPIKey            *sqlx.Stmt `query:"set-api-key"`
 	RevokeAPIKey         *sqlx.Stmt `query:"revoke-api-key"`
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
 }
@@ -97,7 +98,7 @@ type queries struct {
 func New(i18n *i18n.I18n, opts Opts) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error scanning SQL file: %w", err)
 	}
 	return &Manager{
 		q:          q,
@@ -118,14 +119,14 @@ func (u *Manager) VerifyPassword(email string, password []byte) (models.User, er
 		u.lo.Error("error fetching user from db", "error", err)
 		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
 	}
-	if err := u.verifyPassword(password, user.Password.String); err != nil {
+	if err := u.verifyPassword(password, user.Password); err != nil {
 		return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 	}
 	return user, nil
 }
 
 // GetAllUsers returns a list of all users.
-func (u *Manager) GetAllUsers(page, pageSize int, userType, order, orderBy string, filtersJSON string) ([]models.User, error) {
+func (u *Manager) GetAllUsers(page, pageSize int, userType, order, orderBy string, filtersJSON string) ([]models.UserCompact, error) {
 	query, qArgs, err := u.makeUserListQuery(page, pageSize, userType, order, orderBy, filtersJSON)
 	if err != nil {
 		u.lo.Error("error creating user list query", "error", err)
@@ -143,7 +144,7 @@ func (u *Manager) GetAllUsers(page, pageSize int, userType, order, orderBy strin
 	defer tx.Rollback()
 
 	// Execute query
-	var users = make([]models.User, 0)
+	var users = make([]models.UserCompact, 0)
 	if err := tx.Select(&users, query, qArgs...); err != nil {
 		u.lo.Error("error fetching users", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
@@ -207,6 +208,7 @@ func (u *Manager) UpdateLastLoginAt(id int) error {
 
 // SetResetPasswordToken sets a reset password token for an user and returns the token.
 func (u *Manager) SetResetPasswordToken(id int) (string, error) {
+	// TODO: column `reset_password_token`, does not have a UNIQUE constraint. Add it in a future migration.
 	token, err := stringutil.RandomAlphanumeric(32)
 	if err != nil {
 		u.lo.Error("error generating reset password token", "error", err)
@@ -219,7 +221,7 @@ func (u *Manager) SetResetPasswordToken(id int) (string, error) {
 	return token, nil
 }
 
-// ResetPassword sets a new password for an user.
+// ResetPassword sets a password for a given user's reset password token.
 func (u *Manager) ResetPassword(token, password string) error {
 	if !IsStrongPassword(password) {
 		return envelope.NewError(envelope.InputError, "Password is not strong enough, "+PasswordHint, nil)
@@ -280,44 +282,6 @@ func (u *Manager) SaveCustomAttributes(id int, customAttributes map[string]any, 
 	return nil
 }
 
-// makeUserListQuery generates a query to fetch users based on the provided filters.
-func (u *Manager) makeUserListQuery(page, pageSize int, typ, order, orderBy, filtersJSON string) (string, []interface{}, error) {
-	var (
-		baseQuery = u.q.GetUsers
-		qArgs     []any
-	)
-	// Set the type of user to fetch.
-	qArgs = append(qArgs, typ)
-	return dbutil.BuildPaginatedQuery(baseQuery, qArgs, dbutil.PaginationOptions{
-		Order:    order,
-		OrderBy:  orderBy,
-		Page:     page,
-		PageSize: pageSize,
-	}, filtersJSON, dbutil.AllowedFields{
-		"users": {"email", "created_at", "updated_at"},
-	})
-}
-
-// verifyPassword compares the provided password with the stored password hash.
-func (u *Manager) verifyPassword(pwd []byte, pwdHash string) error {
-	if err := bcrypt.CompareHashAndPassword([]byte(pwdHash), pwd); err != nil {
-		u.lo.Error("error verifying password", "error", err)
-		return fmt.Errorf("error verifying password: %w", err)
-	}
-	return nil
-}
-
-// generatePassword generates a random password and returns its bcrypt hash.
-func (u *Manager) generatePassword() ([]byte, error) {
-	password, _ := stringutil.RandomAlphanumeric(70)
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		u.lo.Error("error generating bcrypt password", "error", err)
-		return nil, fmt.Errorf("generating bcrypt password: %w", err)
-	}
-	return bytes, nil
-}
-
 // ToggleEnabled toggles the enabled status of an user.
 func (u *Manager) ToggleEnabled(id int, typ string, enabled bool) error {
 	if _, err := u.q.ToggleEnable.Exec(id, typ, enabled); err != nil {
@@ -351,7 +315,7 @@ func (u *Manager) GenerateAPIKey(userID int) (string, string, error) {
 	}
 
 	// Update user with API key.
-	if _, err := u.q.GenerateAPIKey.Exec(userID, apiKey, string(secretHash)); err != nil {
+	if _, err := u.q.SetAPIKey.Exec(userID, apiKey, string(secretHash)); err != nil {
 		u.lo.Error("error saving API key", "error", err, "user_id", userID)
 		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.apiKey}"), nil)
 	}
@@ -493,4 +457,38 @@ func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) error {
 		return fmt.Errorf("failed to update system user password: %v", err)
 	}
 	return nil
+}
+
+// makeUserListQuery generates a query to fetch users based on the provided filters.
+func (u *Manager) makeUserListQuery(page, pageSize int, typ, order, orderBy, filtersJSON string) (string, []interface{}, error) {
+	var qArgs []any
+	qArgs = append(qArgs, pq.Array([]string{typ}))
+	return dbutil.BuildPaginatedQuery(u.q.GetUsersCompact, qArgs, dbutil.PaginationOptions{
+		Order:    order,
+		OrderBy:  orderBy,
+		Page:     page,
+		PageSize: pageSize,
+	}, filtersJSON, dbutil.AllowedFields{
+		"users": {"email", "created_at", "updated_at"},
+	})
+}
+
+// verifyPassword compares the provided password with the stored password hash.
+func (u *Manager) verifyPassword(pwd []byte, pwdHash string) error {
+	if err := bcrypt.CompareHashAndPassword([]byte(pwdHash), pwd); err != nil {
+		u.lo.Error("error verifying password", "error", err)
+		return fmt.Errorf("error verifying password: %w", err)
+	}
+	return nil
+}
+
+// generatePassword generates a random password and returns its bcrypt hash.
+func (u *Manager) generatePassword() ([]byte, error) {
+	password, _ := stringutil.RandomAlphanumeric(70)
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		u.lo.Error("error generating bcrypt password", "error", err)
+		return nil, fmt.Errorf("generating bcrypt password: %w", err)
+	}
+	return bytes, nil
 }

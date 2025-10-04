@@ -8,7 +8,7 @@
       <p>Configure webhooks to receive real-time notifications when events occur in your Libredesk workspace.</p>
       <p>Webhooks allow you to integrate Libredesk with external services by sending HTTP POST requests when specific events happen.</p>
       <a
-        href="https://libredesk.io/docs/webhooks/"
+        href="https://docs.libredesk.io/configuration/webhooks"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"

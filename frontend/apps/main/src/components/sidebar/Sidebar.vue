@@ -38,7 +38,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
-import { filterNavItems } from '../../utils/nav-permissions'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog'
+import { filterNavItems } from '@/utils/nav-permissions'
 import { useStorage } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -73,8 +83,17 @@ const editView = (view) => {
   emit('editView', view)
 }
 
-const deleteView = (view) => {
-  emit('deleteView', view)
+const openDeleteConfirmation = (view) => {
+  viewToDelete.value = view
+  isDeleteOpen.value = true
+}
+
+const handleDeleteView = () => {
+  if (viewToDelete.value) {
+    emit('deleteView', viewToDelete.value)
+    isDeleteOpen.value = false
+    viewToDelete.value = null
+  }
 }
 
 // Navigation methods with conversation retention
@@ -157,6 +176,13 @@ watch(
 const sidebarOpen = useStorage('mainSidebarOpen', true)
 const teamInboxOpen = useStorage('teamInboxOpen', true)
 const viewInboxOpen = useStorage('viewInboxOpen', true)
+
+// Track which view is being hovered for ellipsis menu visibility
+const hoveredViewId = ref(null)
+
+// Track delete confirmation dialog state
+const isDeleteOpen = ref(false)
+const viewToDelete = ref(null)
 </script>
 
 <template>
@@ -472,24 +498,35 @@ const viewInboxOpen = useStorage('viewInboxOpen', true)
 
                   <CollapsibleContent>
                     <SidebarMenuSub v-for="view in userViews" :key="view.id">
-                      <SidebarMenuSubItem>
+                      <SidebarMenuSubItem
+                        @mouseenter="hoveredViewId = view.id"
+                        @mouseleave="hoveredViewId = null"
+                      >
                         <SidebarMenuButton
                           size="sm"
                           :isActive="route.params.viewID == view.id"
                           asChild
                         >
                           <a href="#" @click.prevent="navigateToViewInbox(view.id)">
-                            <span class="break-words w-32 truncate">{{ view.name }}</span>
-                            <SidebarMenuAction :showOnHover="true" class="mr-3">
+                            <span class="break-words w-32 truncate" :title="view.name">{{ view.name }}</span>
+                            <SidebarMenuAction
+                              @click.stop
+                              :class="[
+                                'mr-3',
+                                'md:opacity-0',
+                                'data-[state=open]:opacity-100',
+                                { 'md:opacity-100': hoveredViewId === view.id }
+                              ]"
+                            >
                               <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
+                                <DropdownMenuTrigger asChild @click.prevent>
                                   <EllipsisVertical />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
                                   <DropdownMenuItem @click="() => editView(view)">
                                     <span>{{ t('globals.messages.edit') }}</span>
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem @click="() => deleteView(view)">
+                                  <DropdownMenuItem @click="() => openDeleteConfirmation(view)">
                                     <span>{{ t('globals.messages.delete') }}</span>
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -513,4 +550,22 @@ const viewInboxOpen = useStorage('viewInboxOpen', true)
       <slot></slot>
     </SidebarInset>
   </SidebarProvider>
+
+  <!-- View Delete Confirmation Dialog -->
+  <AlertDialog v-model:open="isDeleteOpen">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogDescription>
+          {{ t('globals.messages.deletionConfirmation', { name: t('globals.terms.view') }) }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click="handleDeleteView">
+          {{ t('globals.messages.delete') }}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>

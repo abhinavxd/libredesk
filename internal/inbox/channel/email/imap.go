@@ -140,6 +140,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 					headerAutoSubmitted,
 					headerAutoreply,
 					headerLibredeskLoopPrevention,
+					headerMessageID,
 				},
 			},
 		},
@@ -147,10 +148,11 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 
 	// Collect messages to process later.
 	type msgData struct {
-		env       *imap.Envelope
-		seqNum    uint32
-		autoReply bool
-		isLoop    bool
+		env                *imap.Envelope
+		seqNum             uint32
+		autoReply          bool
+		isLoop             bool
+		extractedMessageID string
 	}
 	var messages []msgData
 
@@ -182,9 +184,10 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		}
 
 		var (
-			env       *imap.Envelope
-			autoReply bool
-			isLoop    bool
+			env                *imap.Envelope
+			autoReply          bool
+			isLoop             bool
+			extractedMessageID string
 		)
 		// Process all fetch items for the current message.
 		for {
@@ -215,6 +218,9 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 				if isLoopMessage(envelope, inboxEmail) {
 					isLoop = true
 				}
+
+				// Extract Message-Id from raw headers as fallback for problematic Message IDs
+				extractedMessageID = extractMessageIDFromHeaders(envelope)
 			}
 
 			// Envelope.
@@ -223,12 +229,13 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			}
 		}
 
-		// Skip if we couldn't get headers or envelope.
+		// Skip if we couldn't get the envelope.
 		if env == nil {
+			e.lo.Warn("skipping message without envelope", "seq_num", msg.SeqNum, "inbox_id", e.Identifier())
 			continue
 		}
 
-		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, autoReply: autoReply, isLoop: isLoop})
+		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID})
 	}
 
 	// Now process each collected message.
@@ -253,7 +260,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		}
 
 		// Process the envelope.
-		if err := e.processEnvelope(ctx, client, msgData.env, msgData.seqNum, inboxID); err != nil && err != context.Canceled {
+		if err := e.processEnvelope(ctx, client, msgData.env, msgData.seqNum, inboxID, msgData.extractedMessageID); err != nil && err != context.Canceled {
 			e.lo.Error("error processing envelope", "error", err)
 		}
 	}
@@ -262,17 +269,32 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 }
 
 // processEnvelope processes a single email envelope.
-func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, env *imap.Envelope, seqNum uint32, inboxID int) error {
+func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, env *imap.Envelope, seqNum uint32, inboxID int, extractedMessageID string) error {
 	if len(env.From) == 0 {
 		e.lo.Warn("no sender received for email", "message_id", env.MessageID)
 		return nil
 	}
 	var fromAddress = strings.ToLower(env.From[0].Addr())
 
+	// Determine final Message ID - prefer IMAP-parsed, fallback to raw header extraction
+	messageID := env.MessageID
+	if messageID == "" {
+		messageID = extractedMessageID
+		if messageID != "" {
+			e.lo.Debug("using raw header Message-ID as fallback for malformed ID", "message_id", messageID, "subject", env.Subject, "from", fromAddress)
+		}
+	}
+
+	// Drop message if we still don't have a valid Message ID
+	if messageID == "" {
+		e.lo.Error("dropping message: no valid Message-ID found in IMAP parsing or raw headers", "subject", env.Subject, "from", fromAddress)
+		return nil
+	}
+
 	// Check if the message already exists in the database; if it does, ignore it.
-	exists, err := e.messageStore.MessageExists(env.MessageID)
+	exists, err := e.messageStore.MessageExists(messageID)
 	if err != nil {
-		e.lo.Error("error checking if message exists", "message_id", env.MessageID)
+		e.lo.Error("error checking if message exists", "message_id", messageID)
 		return fmt.Errorf("checking if message exists in DB: %w", err)
 	}
 	if exists {
@@ -291,7 +313,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return nil
 	}
 
-	e.lo.Debug("processing new incoming message", "message_id", env.MessageID, "subject", env.Subject, "from", fromAddress, "inbox_id", inboxID)
+	e.lo.Debug("processing new incoming message", "message_id", messageID, "subject", env.Subject, "from", fromAddress, "inbox_id", inboxID)
 
 	// Make contact.
 	firstName, lastName := getContactName(env.From[0])
@@ -348,7 +370,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 			InboxID:    inboxID,
 			Status:     models.MessageStatusReceived,
 			Subject:    env.Subject,
-			SourceID:   null.StringFrom(env.MessageID),
+			SourceID:   null.StringFrom(messageID),
 			Meta:       meta,
 		},
 		Contact: contact,
@@ -383,7 +405,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		}
 
 		if fullItem, ok := fullFetchItem.(imapclient.FetchItemDataBodySection); ok {
-			e.lo.Debug("fetching full message body", "message_id", env.MessageID)
+			e.lo.Debug("fetching full message body", "message_id", messageID)
 			return e.processFullMessage(fullItem, incomingMsg)
 		}
 	}
@@ -612,6 +634,15 @@ func (e *Email) extractConversationUUID(envelope *enmime.Envelope) string {
 			return uuid
 		}
 	}
+	return ""
+}
 
+// extractMessageIDFromHeaders extracts and cleans the Message-ID from email headers.
+// This function handles problematic Message IDs by extracting them from raw headers
+// and cleaning them of angle brackets and whitespace.
+func extractMessageIDFromHeaders(envelope *enmime.Envelope) string {
+	if rawMessageID := envelope.GetHeader(headerMessageID); rawMessageID != "" {
+		return strings.TrimSpace(strings.Trim(rawMessageID, "<>"))
+	}
 	return ""
 }

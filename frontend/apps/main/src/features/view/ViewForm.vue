@@ -83,7 +83,8 @@ import { handleHTTPError } from '../../utils/http'
 import { OPERATOR } from '../../constants/filterConfig.js'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'
-import api from '../../api'
+import { FIELD_TYPE } from '@/constants/filterConfig'
+import api from '@/api'
 
 const emitter = useEmitter()
 const { t } = useI18n()
@@ -106,68 +107,88 @@ const formSchema = toTypedSchema(
   z.object({
     id: z.number().optional(),
     name: z
-      .string()
+      .string({
+        required_error: t('globals.messages.required')
+      })
       .min(2, { message: t('view.form.name.length') })
       .max(30, { message: t('view.form.name.length') }),
     filters: z
       .array(
         z.object({
-          model: z.string({
-            required_error: t('globals.messages.required', {
-              name: t('globals.terms.filter').toLowerCase()
-            })
-          }),
-          field: z.string({
-            required_error: t('globals.messages.required', {
-              name: t('globals.terms.field').toLowerCase()
-            })
-          }),
-          operator: z.string({
-            required_error: t('globals.messages.required', {
-              name: t('globals.terms.operator').toLowerCase()
-            })
-          }),
-          value: z.union([z.string(), z.number(), z.boolean()]).optional()
+          model: z.string().optional(),
+          field: z.string().optional(),
+          operator: z.string().optional(),
+          value: z
+            .union([
+              z.string(),
+              z.number(),
+              z.boolean(),
+              z.array(z.union([z.string(), z.number()]))
+            ])
+            .optional()
         })
       )
       .default([])
-      .refine((filters) => filters.length > 0, { message: t('view.form.filter.selectAtLeastOne') })
-      .refine(
-        (filters) =>
-          filters.every(
-            (f) =>
-              f.model &&
-              f.field &&
-              f.operator &&
-              ([OPERATOR.SET, OPERATOR.NOT_SET].includes(f.operator) || f.value)
-          ),
-        {
-          message: t('view.form.filter.partiallyFilled')
-        }
-      )
   })
 )
 
 const form = useForm({
-  validationSchema: formSchema,
-  validateOnMount: false,
-  validateOnInput: false,
-  validateOnBlur: false
+  validationSchema: formSchema
 })
 
-const onSubmit = async () => {
-  const validationResult = await form.validate()
-  if (!validationResult.valid) return
-
+const onSubmit = form.handleSubmit(async (values) => {
   if (isSubmitting.value) return
+
+  // Make sure at least one filter is selected
+  if (!values.filters || values.filters.length === 0) {
+    form.setFieldError('filters', t('view.form.filter.selectAtLeastOne'))
+    return
+  }
+
+  // Check for partial filters
+  const hasPartialFilters = values.filters.some(
+    (f) =>
+      !f.field ||
+      !f.operator ||
+      (![OPERATOR.SET, OPERATOR.NOT_SET].includes(f.operator) && !f.value)
+  )
+  if (hasPartialFilters) {
+    form.setFieldError('filters', t('view.form.filter.partiallyFilled'))
+    return
+  }
+
   isSubmitting.value = true
 
   try {
-    const values = form.values
+    // Serialize array values to JSON strings for backend
+    if (values.filters) {
+      values.filters = values.filters.map((filter) => {
+        if (Array.isArray(filter.value)) {
+          // Convert string IDs to numbers for backend (tags use string IDs in frontend)
+          const numericValues = filter.value.map((v) => {
+            const num = Number(v)
+            return isNaN(num) ? v : num
+          })
+          return { ...filter, value: JSON.stringify(numericValues) }
+        }
+        return filter
+      })
+    }
+
     if (values.id) {
       await api.updateView(values.id, values)
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        description: t('globals.messages.updatedSuccessfully', {
+          name: t('globals.terms.view')
+        })
+      })
     } else {
       await api.createView(values)
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        description: t('globals.messages.createdSuccessfully', {
+          name: t('globals.terms.view')
+        })
+      })
     }
     emitter.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'view' })
     openDialog.value = false
@@ -180,14 +201,36 @@ const onSubmit = async () => {
   } finally {
     isSubmitting.value = false
   }
-}
+})
 
 // Set form values when view prop changes
 watch(
   () => view.value,
   (newVal) => {
     if (newVal && Object.keys(newVal).length) {
-      form.setValues(newVal)
+      // Deserialize multi-select filter values from JSON strings to arrays
+      const processedVal = { ...newVal }
+      if (processedVal.filters) {
+        processedVal.filters = processedVal.filters.map((filter) => {
+          // Multi-select fields need to be deserialized from JSON strings
+          const field = filterFields.value.find((f) => f.field === filter.field)
+          const isMultiSelectField = field?.type === FIELD_TYPE.MULTI_SELECT
+
+          if (isMultiSelectField && typeof filter.value === 'string') {
+            try {
+              const parsed = JSON.parse(filter.value)
+              // Convert numbers back to strings (frontend uses string IDs)
+              const stringValues = Array.isArray(parsed) ? parsed.map((v) => String(v)) : parsed
+              return { ...filter, value: stringValues }
+            } catch (e) {
+              // If parsing fails, return as-is
+              return filter
+            }
+          }
+          return filter
+        })
+      }
+      form.setValues(processedVal)
     }
   },
   { immediate: true }

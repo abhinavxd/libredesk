@@ -7,7 +7,7 @@
     <template #help>
       <p>Configure single sign-on with one or more OpenID Connect providers.</p>
       <a
-        href="https://libredesk.io/docs/sso/"
+        href="https://docs.libredesk.io/configuration/sso"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"

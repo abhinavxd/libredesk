@@ -2,23 +2,33 @@
 
 describe('Login Component', () => {
     beforeEach(() => {
-        // Visit the login page
-        cy.visit('/')
-
         // Mock the API response for OIDC providers
-        cy.intercept('GET', '**/api/v1/oidc/enabled', {
+        cy.intercept('GET', '**/api/v1/config', {
             statusCode: 200,
             body: {
-                data: [
-                    {
-                        id: 1,
-                        name: 'Google',
-                        logo_url: 'https://example.com/google-logo.png',
-                        disabled: false
-                    }
-                ]
+                data: {
+                    "app.favicon_url": "http://localhost:9000/favicon.ico",
+                    "app.lang": "en",
+                    "app.logo_url": "http://localhost:9000/logo.png",
+                    "app.site_name": "Libredesk",
+                    "app.sso_providers": [
+                        {
+                            "client_id": "xx",
+                            "enabled": true,
+                            "id": 1,
+                            "logo_url": "/images/google-logo.png",
+                            "name": "Google",
+                            "provider": "Google",
+                            "provider_url": "https://accounts.google.com",
+                            "redirect_uri": "http://localhost:9000/api/v1/oidc/1/finish"
+                        }
+                    ]
+                }
             }
         }).as('getOIDCProviders')
+
+        // Visit the login page
+        cy.visit('/')
     })
 
     it('should display login form', () => {

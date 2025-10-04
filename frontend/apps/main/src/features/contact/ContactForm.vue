@@ -41,8 +41,8 @@
 
       <div class="flex flex-col flex-1">
         <div class="flex items-end">
-          <FormField v-slot="{ componentField }" name="phone_number_calling_code">
-            <FormItem class="w-20">
+          <FormField v-slot="{ componentField }" name="phone_number_country_code">
+            <FormItem class="w-max">
               <FormLabel class="flex items-center whitespace-nowrap">
                 {{ t('globals.terms.phoneNumber') }}
               </FormLabel>
@@ -58,13 +58,18 @@
                       <div class="w-7 h-7 flex items-center justify-center">
                         <span v-if="item.emoji">{{ item.emoji }}</span>
                       </div>
-                      <span class="text-sm">{{ item.label }} ({{ item.value }})</span>
+                      <span class="text-sm">{{ item.label }} ({{ item.calling_code }})</span>
                     </div>
                   </template>
 
                   <template #selected="{ selected }">
-                    <div class="flex items-center mb-1">
-                      <span v-if="selected" class="text-xl leading-none">{{ selected.emoji }}</span>
+                    <div class="flex items-center gap-1">
+                      <span v-if="selected" class="text-lg">{{ selected.emoji }}</span>
+                      <span
+                        v-if="selected && selected.calling_code"
+                        class="text-xs text-muted-foreground"
+                        >({{ selected.calling_code }})</span
+                      >
                     </div>
                   </template>
                 </ComboBox>
@@ -116,7 +121,8 @@ const userStore = useUserStore()
 
 const allCountries = countries.map((country) => ({
   label: country.name,
-  value: country.calling_code,
-  emoji: country.emoji
+  value: country.iso_2,
+  emoji: country.emoji,
+  calling_code: country.calling_code
 }))
 </script>

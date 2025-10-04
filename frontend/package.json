@@ -1,6 +1,6 @@
 {
   "name": "libredesk",
-  "version": "0.6.0-alpha",
+  "version": "0.8.0-beta",
   "private": true,
   "type": "module",
   "scripts": {
@@ -42,7 +42,7 @@
     "@unovis/vue": "^1.4.4",
     "@vee-validate/zod": "^4.15.0",
     "@vueuse/core": "^12.4.0",
-    "axios": "^1.8.2",
+    "axios": "^1.12.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "codemirror": "^6.0.2",
@@ -81,7 +81,7 @@
     "start-server-and-test": "^2.0.3",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
-    "vite": "^5.4.19",
+    "vite": "^5.4.20",
     "vitest": "^3.2.2"
   },
   "packageManager": "pnpm@9.15.3+sha512.1f79bc245a66eb0b07c5d4d83131240774642caaa86ef7d0434ab47c0d16f66b04e21e0c086eb61e62c77efc4d7f7ec071afad3796af64892fae66509173893a"

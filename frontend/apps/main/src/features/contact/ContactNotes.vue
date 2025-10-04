@@ -33,13 +33,7 @@
             />
           </div>
           <div class="flex justify-end space-x-3 pt-2">
-            <Button
-              variant="outline"
-              @click="cancelAddNote"
-              class="transition-all hover:bg-gray-100"
-            >
-              Cancel
-            </Button>
+            <Button variant="outline" @click="cancelAddNote"> Cancel </Button>
             <Button type="submit" :disabled="!newNote.trim()">
               {{ $t('globals.messages.save') + ' ' + $t('globals.terms.note').toLowerCase() }}
             </Button>
@@ -53,13 +47,13 @@
       <Card
         v-for="note in notes"
         :key="note.id"
-        class="overflow-hidden border-gray-2 hover:border-gray-300 transition-all duration-200 box hover:shadow"
+        class="overflow-hidden border-gray-2 dark:hover:border-gray-700 hover:border-gray-300 transition-all duration-200 box hover:shadow"
       >
         <!-- Header -->
-        <CardHeader class="bg-gray-50/50 dark:bg-secondary border-b p-2">
+        <CardHeader class="bg-background border-b p-2">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
-              <Avatar class="border border-gray-200 shadow-sm">
+              <Avatar class="border shadow-sm">
                 <AvatarImage :src="note.avatar_url" />
                 <AvatarFallback>
                   {{ getInitials(note.first_name, note.last_name) }}

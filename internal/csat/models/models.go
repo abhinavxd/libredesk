@@ -10,11 +10,11 @@ import (
 // CSATResponse represents a customer satisfaction survey response.
 type CSATResponse struct {
 	ID                int         `db:"id"`
-	UUID              string      `db:"uuid"`
 	CreatedAt         time.Time   `db:"created_at"`
 	UpdatedAt         time.Time   `db:"updated_at"`
+	UUID              string      `db:"uuid"`
 	ConversationID    int         `db:"conversation_id"`
-	Score             int         `db:"rating"`
+	Rating            int         `db:"rating"`
 	Feedback          null.String `db:"feedback"`
 	ResponseTimestamp null.Time   `db:"response_timestamp"`
 }

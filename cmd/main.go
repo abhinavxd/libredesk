@@ -100,6 +100,8 @@ type App struct {
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
+	// Flag to indicate if app restart is required for settings to take effect.
+	restartRequired bool
 	sync.Mutex
 }
 
@@ -248,7 +250,7 @@ func main() {
 		activityLog:     initActivityLog(db, i18n),
 		customAttribute: initCustomAttribute(db, i18n),
 		authz:           initAuthz(i18n),
-		view:            initView(db),
+		view:            initView(db, i18n),
 		report:          initReport(db, i18n),
 		csat:            initCSAT(db, i18n),
 		search:          initSearch(db, i18n),

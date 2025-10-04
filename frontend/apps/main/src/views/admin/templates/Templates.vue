@@ -49,7 +49,7 @@
         <p>Design templates for customer communications and responses.</p>
         <p>Modify content for internal and external emails.</p>
         <a
-          href="https://libredesk.io/docs/templating/"
+          href="https://docs.libredesk.io/configuration/email-templates"
           target="_blank"
           rel="noopener noreferrer"
           class="link-style"

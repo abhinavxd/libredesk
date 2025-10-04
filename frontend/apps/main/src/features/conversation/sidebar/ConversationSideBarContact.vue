@@ -70,14 +70,15 @@
 <script setup>
 import { computed } from 'vue'
 import { ViewVerticalIcon } from '@radix-icons/vue'
-import { Button } from '@shared-ui/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
-import { Mail, Phone, ExternalLink, IdCard } from 'lucide-vue-next'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useConversationStore } from '../../../stores/conversation'
-import { Skeleton } from '@shared-ui/components/ui/skeleton'
-import { useUserStore } from '../../../stores/user'
+import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Mail, Phone, ExternalLink } from 'lucide-vue-next'
+import countries from '@/constants/countries.js'
+import { useEmitter } from '@/composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { useConversationStore } from '@/stores/conversation'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 
 const conversationStore = useConversationStore()
@@ -87,8 +88,13 @@ const { t } = useI18n()
 const userStore = useUserStore()
 
 const phoneNumber = computed(() => {
-  const callingCode = conversation.value?.contact?.phone_number_calling_code || ''
+  const countryCodeValue = conversation.value?.contact?.phone_number_country_code || ''
   const number = conversation.value?.contact?.phone_number || t('conversation.sidebar.notAvailable')
-  return callingCode ? `${callingCode} ${number}` : number
+  if (!countryCodeValue) return number
+
+  // Lookup calling code
+  const country = countries.find((c) => c.iso_2 === countryCodeValue)
+  const callingCode = country ? country.calling_code : countryCodeValue
+  return `${callingCode} ${number}`
 })
 </script>

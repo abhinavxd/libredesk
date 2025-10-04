@@ -88,8 +88,8 @@
         @create-conversation="() => (openCreateConversationDialog = true)"
       >
         <div class="flex flex-col h-screen">
-          <!-- Show app update only in admin routes -->
-          <AppUpdate v-if="route.path.startsWith('/admin')" />
+          <!-- Show admin banner only in admin routes -->
+          <AdminBanner v-if="route.path.startsWith('/admin')" />
 
           <!-- Common header for all pages -->
           <PageHeader />
@@ -128,8 +128,7 @@ import { useCustomAttributeStore } from './stores/customAttributes'
 import { useIdleDetection } from './composables/useIdleDetection'
 import PageHeader from './components/layout/PageHeader.vue'
 import ViewForm from '@/features/view/ViewForm.vue'
-import AppUpdate from '@main/components/update/AppUpdate.vue'
-import api from './api'
+import AdminBanner from '@/components/banner/AdminBanner.vue'
 import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
@@ -150,6 +149,7 @@ import {
 } from '@shared-ui/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import SidebarNavUser from '@main/components/sidebar/SidebarNavUser.vue'
+import api from '@/api'
 
 const route = useRoute()
 const emitter = useEmitter()

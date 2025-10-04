@@ -9,7 +9,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.name'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center font-medium' }, row.getValue('name'))
+            return h('div', { class: 'text-center' }, row.getValue('name'))
         }
     },
     {
@@ -18,7 +18,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.key'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center font-medium' }, row.getValue('key'))
+            return h('div', { class: 'text-center' }, row.getValue('key'))
         }
     },
     {
@@ -27,7 +27,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.type'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center font-medium' }, row.getValue('data_type'))
+            return h('div', { class: 'text-center' }, row.getValue('data_type'))
         }
     },
     {
@@ -36,7 +36,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.appliesTo'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center font-medium' }, row.getValue('applies_to'))
+            return h('div', { class: 'text-center' }, row.getValue('applies_to'))
         }
     },
     {
@@ -47,7 +47,7 @@ export const createColumns = (t) => [
         cell: function ({ row }) {
             return h(
                 'div',
-                { class: 'text-center font-medium' },
+                { class: 'text-center' },
                 format(row.getValue('created_at'), 'PPpp')
             )
         }
@@ -60,7 +60,7 @@ export const createColumns = (t) => [
         cell: function ({ row }) {
             return h(
                 'div',
-                { class: 'text-center font-medium' },
+                { class: 'text-center' },
                 format(row.getValue('updated_at'), 'PPpp')
             )
         }

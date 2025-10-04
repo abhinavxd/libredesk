@@ -88,8 +88,7 @@ type Manager struct {
 type WidgetConversationView struct {
 	UUID                  string      `json:"uuid"`
 	Status                string      `json:"status"`
-	UnreadMessageCount    int         `json:"unread_message_count"`
-	Assignee              interface{} `json:"assignee"` // Can be null or an object
+	Assignee              interface{} `json:"assignee"`
 	BusinessHoursID       *int        `json:"business_hours_id,omitempty"`
 	WorkingHoursUTCOffset *int        `json:"working_hours_utc_offset,omitempty"`
 }
@@ -265,6 +264,7 @@ type queries struct {
 	GetContactConversations            *sqlx.Stmt `query:"get-contact-conversations"`
 	GetContactChatConversations        *sqlx.Stmt `query:"get-contact-chat-conversations"`
 	GetChatConversation                *sqlx.Stmt `query:"get-chat-conversation"`
+	GetContactPreviousConversations    *sqlx.Stmt `query:"get-contact-previous-conversations"`
 	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
 	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
 	UpdateConversationFirstReplyAt     *sqlx.Stmt `query:"update-conversation-first-reply-at"`
@@ -353,11 +353,11 @@ func (c *Manager) GetConversation(id int, uuid string) (models.Conversation, err
 	return conversation, nil
 }
 
-// GetContactConversations retrieves conversations for a contact.
-func (c *Manager) GetContactConversations(contactID int) ([]models.Conversation, error) {
-	var conversations = make([]models.Conversation, 0)
-	if err := c.q.GetContactConversations.Select(&conversations, contactID); err != nil {
-		c.lo.Error("error fetching conversations", "error", err)
+// GetContactPreviousConversations retrieves previous conversations for a contact with a configurable limit.
+func (c *Manager) GetContactPreviousConversations(contactID int, limit int) ([]models.PreviousConversation, error) {
+	var conversations = make([]models.PreviousConversation, 0)
+	if err := c.q.GetContactPreviousConversations.Select(&conversations, contactID, limit); err != nil {
+		c.lo.Error("error fetching previous conversations", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
 	}
 	return conversations, nil
@@ -456,32 +456,32 @@ func (c *Manager) GetConversationUUID(id int) (string, error) {
 }
 
 // GetAllConversationsList retrieves all conversations with optional filtering, ordering, and pagination.
-func (c *Manager) GetAllConversationsList(order, orderBy, filters string, page, pageSize int) ([]models.Conversation, error) {
+func (c *Manager) GetAllConversationsList(order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
 	return c.GetConversations(0, []int{}, []string{models.AllConversations}, order, orderBy, filters, page, pageSize)
 }
 
 // GetAssignedConversationsList retrieves conversations assigned to a specific user with optional filtering, ordering, and pagination.
-func (c *Manager) GetAssignedConversationsList(userID int, order, orderBy, filters string, page, pageSize int) ([]models.Conversation, error) {
+func (c *Manager) GetAssignedConversationsList(userID int, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
 	return c.GetConversations(userID, []int{}, []string{models.AssignedConversations}, order, orderBy, filters, page, pageSize)
 }
 
 // GetUnassignedConversationsList retrieves conversations assigned to a team the user is part of with optional filtering, ordering, and pagination.
-func (c *Manager) GetUnassignedConversationsList(order, orderBy, filters string, page, pageSize int) ([]models.Conversation, error) {
+func (c *Manager) GetUnassignedConversationsList(order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
 	return c.GetConversations(0, []int{}, []string{models.UnassignedConversations}, order, orderBy, filters, page, pageSize)
 }
 
 // GetTeamUnassignedConversationsList retrieves conversations assigned to a team with optional filtering, ordering, and pagination.
-func (c *Manager) GetTeamUnassignedConversationsList(teamID int, order, orderBy, filters string, page, pageSize int) ([]models.Conversation, error) {
+func (c *Manager) GetTeamUnassignedConversationsList(teamID int, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
 	return c.GetConversations(0, []int{teamID}, []string{models.TeamUnassignedConversations}, order, orderBy, filters, page, pageSize)
 }
 
-func (c *Manager) GetViewConversationsList(userID int, teamIDs []int, listType []string, order, orderBy, filters string, page, pageSize int) ([]models.Conversation, error) {
+func (c *Manager) GetViewConversationsList(userID int, teamIDs []int, listType []string, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
 	return c.GetConversations(userID, teamIDs, listType, order, orderBy, filters, page, pageSize)
 }
 
 // GetConversations retrieves conversations list based on user ID, type, and optional filtering, ordering, and pagination.
-func (c *Manager) GetConversations(userID int, teamIDs []int, listTypes []string, order, orderBy, filters string, page, pageSize int) ([]models.Conversation, error) {
-	var conversations = make([]models.Conversation, 0)
+func (c *Manager) GetConversations(userID int, teamIDs []int, listTypes []string, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
+	var conversations = make([]models.ConversationListItem, 0)
 
 	// Make the query.
 	query, qArgs, err := c.makeConversationsListQuery(userID, teamIDs, listTypes, c.q.GetConversations, order, orderBy, page, pageSize, filters)
@@ -661,6 +661,10 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 
 	// Team changed?
 	if previousAssignedTeamID != teamID {
+		// Remove assigned user if team has changed.
+		c.RemoveConversationAssignee(uuid, models.AssigneeTypeUser, actor)
+
+		// Apply SLA policy if this new team has a SLA policy.
 		team, err := c.teamStore.Get(teamID)
 		if err != nil {
 			return nil
@@ -1058,7 +1062,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 		if err != nil {
 			return fmt.Errorf("making recipients for reply action: %w", err)
 		}
-		_, err = m.SendReply(
+		_, err = m.QueueReply(
 			[]mmodels.Media{},
 			conv.InboxID,
 			user.ID,
@@ -1089,7 +1093,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 	return nil
 }
 
-// RemoveConversationAssignee removes the assignee from the conversation.
+// RemoveConversationAssignee removes assigned user from a conversation.
 func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.User) error {
 	if _, err := m.q.RemoveConversationAssignee.Exec(uuid, typ); err != nil {
 		m.lo.Error("error removing conversation assignee", "error", err)
@@ -1105,6 +1109,14 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 
 		// Broadcast conversation update to widget clients when user assignee is removed
 		m.BroadcastConversationToWidget(uuid)
+	}
+
+	// Broadcast ws update.
+	switch typ {
+	case models.AssigneeTypeUser:
+		m.BroadcastConversationUpdate(uuid, "assigned_user_id", nil)
+	case models.AssigneeTypeTeam:
+		m.BroadcastConversationUpdate(uuid, "assigned_team_id", nil)
 	}
 
 	return nil
@@ -1134,7 +1146,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 	}
 
 	// Send CSAT reply.
-	_, err = m.SendReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, cc, bcc, meta)
+	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, cc, bcc, meta)
 	if err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.csat}"), nil)
@@ -1144,6 +1156,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 
 // DeleteConversation deletes a conversation.
 func (m *Manager) DeleteConversation(uuid string) error {
+	m.lo.Info("deleting conversation", "uuid", uuid)
 	if _, err := m.q.DeleteConversation.Exec(uuid); err != nil {
 		m.lo.Error("error deleting conversation", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", m.i18n.Ts("globals.terms.conversation")), nil)
@@ -1213,6 +1226,35 @@ func (c *Manager) makeConversationsListQuery(userID int, teamIDs []int, listType
 		return "", nil, fmt.Errorf("no conversation list types specified")
 	}
 
+	// Parse filters to extract tag filters
+	var (
+		filters          []dbutil.Filter
+		tagFilters       []dbutil.Filter
+		remainingFilters []dbutil.Filter
+	)
+	if filtersJSON != "" && filtersJSON != "[]" {
+		if err := json.Unmarshal([]byte(filtersJSON), &filters); err != nil {
+			return "", nil, fmt.Errorf("invalid filters JSON: %w", err)
+		}
+
+		// Separate tag filters from other filters
+		for _, f := range filters {
+			if f.Field == "tags" && (f.Operator == "contains" || f.Operator == "not contains" || f.Operator == "set" || f.Operator == "not set") {
+				tagFilters = append(tagFilters, f)
+			} else {
+				remainingFilters = append(remainingFilters, f)
+			}
+		}
+
+		// Update filtersJSON with remaining filters for the generic builder
+		if len(remainingFilters) > 0 {
+			b, _ := json.Marshal(remainingFilters)
+			filtersJSON = string(b)
+		} else {
+			filtersJSON = "[]"
+		}
+	}
+
 	// Prepare the conditions based on the list types.
 	conditions := []string{}
 	for _, lt := range listTypes {
@@ -1238,12 +1280,59 @@ func (c *Manager) makeConversationsListQuery(userID int, teamIDs []int, listType
 		}
 	}
 
+	// Build the base query with list type conditions
+	var whereClause string
 	if len(conditions) > 0 {
-		baseQuery = fmt.Sprintf(baseQuery, "AND ("+strings.Join(conditions, " OR ")+")")
-	} else {
-		// Replace the `%s` in the base query with an empty string.
-		baseQuery = fmt.Sprintf(baseQuery, "")
+		whereClause = "AND (" + strings.Join(conditions, " OR ") + ")"
 	}
+
+	// Add tag filter conditions
+	// TODO: Evaluate - https://github.com/Masterminds/squirrel when required.
+	for _, tf := range tagFilters {
+		switch tf.Operator {
+		case "contains", "not contains":
+			var tagIDs []int
+			if err := json.Unmarshal([]byte(tf.Value), &tagIDs); err != nil {
+				return "", nil, fmt.Errorf("invalid tag IDs in filter: %w", err)
+			}
+			if len(tagIDs) > 0 {
+				paramIdx := len(qArgs) + 1
+				switch tf.Operator {
+				case "contains":
+					// Has any of the tags
+					tagCondition := fmt.Sprintf(` AND conversations.id IN (
+						SELECT DISTINCT conversation_id 
+						FROM conversation_tags 
+						WHERE tag_id = ANY($%d::int[])
+					)`, paramIdx)
+					whereClause += tagCondition
+				case "not contains":
+					// Doesn't have any of the tags
+					tagCondition := fmt.Sprintf(` AND conversations.id NOT IN (
+						SELECT DISTINCT conversation_id 
+						FROM conversation_tags 
+						WHERE tag_id = ANY($%d::int[])
+					)`, paramIdx)
+					whereClause += tagCondition
+				}
+				qArgs = append(qArgs, pq.Array(tagIDs))
+			}
+		case "set":
+			// Has any tags at all
+			whereClause += ` AND EXISTS (
+				SELECT 1 FROM conversation_tags 
+				WHERE conversation_id = conversations.id
+			)`
+		case "not set":
+			// Has no tags at all
+			whereClause += ` AND NOT EXISTS (
+				SELECT 1 FROM conversation_tags 
+				WHERE conversation_id = conversations.id
+			)`
+		}
+	}
+
+	baseQuery = fmt.Sprintf(baseQuery, whereClause)
 
 	return dbutil.BuildPaginatedQuery(baseQuery, qArgs, dbutil.PaginationOptions{
 		Order:    order,
@@ -1276,7 +1365,7 @@ func (m *Manager) ProcessCSATStatus(messages []models.Message) {
 			feedback := ""
 			if err == nil && csat.ResponseTimestamp.Valid {
 				isSubmitted = true
-				rating = csat.Score
+				rating = csat.Rating
 				if csat.Feedback.Valid {
 					feedback = csat.Feedback.String
 				}
@@ -1291,10 +1380,9 @@ func (m *Manager) ProcessCSATStatus(messages []models.Message) {
 // BuildWidgetConversationView builds the conversation view data for widget clients
 func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) (WidgetConversationView, error) {
 	view := WidgetConversationView{
-		UUID:               conversation.UUID,
-		Status:             conversation.Status.String,
-		UnreadMessageCount: conversation.UnreadMessageCount,
-		Assignee:           nil, // Default to null
+		UUID:     conversation.UUID,
+		Status:   conversation.Status.String,
+		Assignee: nil,
 	}
 
 	// Fetch assignee details if assigned

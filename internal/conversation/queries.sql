@@ -107,6 +107,8 @@ SELECT
    c.closed_at,
    c.resolved_at,
    c.inbox_id,
+   c.assignee_last_seen_at,
+   inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
    COALESCE(inb.channel::TEXT, '') as inbox_channel,
    c.status_id,
@@ -155,9 +157,8 @@ SELECT
    ct.availability_status as "contact.availability_status",
    ct.avatar_url as "contact.avatar_url",
    ct.phone_number as "contact.phone_number",
-   ct.phone_number_calling_code as "contact.phone_number_calling_code",
+   ct.phone_number_country_code as "contact.phone_number_country_code",
    ct.custom_attributes as "contact.custom_attributes",
-   ct.avatar_url as "contact.avatar_url",
    ct.enabled as "contact.enabled",
    ct.last_active_at as "contact.last_active_at",
    ct.last_login_at as "contact.last_login_at",
@@ -201,8 +202,11 @@ SELECT
 FROM conversations c
 WHERE c.created_at > $1;
 
--- name: get-contact-conversations
+-- name: get-contact-previous-conversations
 SELECT
+    c.id,
+    c.created_at,
+    c.updated_at,
     c.uuid,
     u.first_name AS "contact.first_name",
     u.last_name AS "contact.last_name",
@@ -219,7 +223,7 @@ FROM users u
 JOIN conversations c ON c.contact_id = u.id
 WHERE c.contact_id = $1
 ORDER BY c.created_at DESC
-LIMIT 10;
+LIMIT $2;
 
 -- name: get-chat-conversation
 SELECT
@@ -464,6 +468,7 @@ WHERE uuid = $1;
 UPDATE conversations
 SET 
     assigned_user_id = CASE WHEN $2 = 'user' THEN NULL ELSE assigned_user_id END,
+    assignee_last_seen_at = CASE WHEN $2 = 'user' THEN NULL ELSE assignee_last_seen_at END,
     assigned_team_id = CASE WHEN $2 = 'team' THEN NULL ELSE assigned_team_id END,
     updated_at = NOW()
 WHERE uuid = $1;
@@ -521,17 +526,22 @@ LIMIT $2;
 
 -- name: get-outgoing-pending-messages
 SELECT
-    m.created_at,
     m.id,
-    m.uuid,
-    m.sender_id,
-    m.type,
-    m.private,
+    m.created_at,
+    m.updated_at,
     m.status,
+    m.type,
     m.content,
     m.text_content,
     m.sender_type,
+    m.content_type,
     m.conversation_id,
+    m.uuid,
+    m.private,
+    m.sender_type,
+    m.sender_id,
+    m.meta,
+    c.uuid as conversation_uuid,
     m.content_type,
     m.source_id,
     m.meta,
@@ -542,6 +552,7 @@ SELECT
     c.uuid as conversation_uuid,
     c.subject,
     c.contact_id as message_receiver_id
+    c.subject
 FROM conversation_messages m
 INNER JOIN conversations c ON c.id = m.conversation_id
 WHERE m.status = 'pending' AND m.type = 'outgoing' AND m.private = false
@@ -595,11 +606,14 @@ SELECT
    m.type, 
    m.content,
    m.text_content,
+   m.content_type,
+   m.conversation_id,
    m.uuid,
    m.private,
    m.sender_id,
    m.sender_type,
    m.meta,
+   $1::uuid AS conversation_uuid,
    COALESCE(
      (SELECT json_agg(
        json_build_object(

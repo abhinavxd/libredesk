@@ -1,6 +1,7 @@
 export const FIELD_TYPE = {
     SELECT: 'select',
     TAG: 'tag',
+    MULTI_SELECT: 'multi-select',
     TEXT: 'text',
     NUMBER: 'number',
     RICHTEXT: 'richtext',
@@ -39,4 +40,5 @@ export const FIELD_OPERATORS = {
         OPERATOR.LESS_THAN
     ],
     NUMBER: [OPERATOR.EQUALS, OPERATOR.NOT_EQUALS, OPERATOR.GREATER_THAN, OPERATOR.LESS_THAN],
+    MULTI_SELECT: [OPERATOR.CONTAINS, OPERATOR.NOT_CONTAINS, OPERATOR.SET, OPERATOR.NOT_SET]
 }

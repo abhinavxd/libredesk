@@ -1,4 +1,5 @@
 <template>
+  <!-- idk why I named this select tag, should be named multi-select -->
   <TagsInput v-model="tags" class="px-0 gap-0" :displayValue="getLabel">
     <!-- Tags visible to the user -->
     <div class="flex gap-2 flex-wrap items-center px-3">
@@ -24,6 +25,7 @@
             @keydown.enter.prevent
             @blur="handleBlur"
             @click="open = true"
+            @input.stop
           />
         </ComboboxInput>
       </ComboboxAnchor>

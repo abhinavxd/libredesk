@@ -169,7 +169,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		}
 
 		// References is sorted in DESC i.e newest message first, so reverse it to keep the references in order.
-		stringutil.ReverseSlice(message.References)
+		slices.Reverse(message.References)
 
 		// Remove the current message ID from the references.
 		message.References = stringutil.RemoveItemByValue(message.References, message.SourceID.String)
@@ -360,9 +360,10 @@ func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
 	return nil
 }
 
-// MarkMessageAsPending updates message status to `Pending`, so if it's a outgoing message it can be picked up again by a worker.
+// MarkMessageAsPending updates message status to `Pending`, enqueuing it for sending.
 func (m *Manager) MarkMessageAsPending(uuid string) error {
 	if err := m.UpdateMessageStatus(uuid, models.MessageStatusPending); err != nil {
+		m.lo.Error("error marking message as pending", "uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil)
 	}
 	return nil
@@ -387,18 +388,43 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 	return message, nil
 }
 
-// SendReply inserts a reply message for a conversation.
-func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]any) (models.Message, error) {
-	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
-	if err != nil {
+// CreateContactMessage creates a contact message in a conversation.
+func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, conversationUUID, content, contentType string) (models.Message, error) {
+	message := models.Message{
+		ConversationUUID: conversationUUID,
+		SenderID:         contactID,
+		Type:             models.MessageIncoming,
+		SenderType:       models.SenderTypeContact,
+		Status:           models.MessageStatusReceived,
+		Content:          content,
+		ContentType:      contentType,
+		Private:          false,
+		Media:            media,
+	}
+	if err := m.InsertMessage(&message); err != nil {
 		return models.Message{}, err
 	}
+	return message, nil
+}
 
+// QueueReply queues a reply message in a conversation.
+func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, meta map[string]interface{}) (models.Message, error) {
+	var (
+		message = models.Message{}
+		metaMap = map[string]interface{}{}
+	)
+
+	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
 	if !inboxRecord.Enabled {
 		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil)
 	}
 
-	var sourceID = ""
+	sourceID, err := stringutil.GenerateEmailMessageID(conversationUUID, inboxRecord.From)
+	if err != nil {
+		m.lo.Error("error generating source message id", "error", err)
+		return message, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
+	}
+
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
@@ -440,7 +466,7 @@ func (m *Manager) SendReply(media []mmodels.Media, inboxID, senderID, contactID 
 	}
 
 	// Insert the message into the database
-	message := models.Message{
+	message = models.Message{
 		ConversationUUID:  conversationUUID,
 		SenderID:          senderID,
 		Type:              models.MessageOutgoing,
@@ -469,7 +495,12 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.Meta = json.RawMessage(`{}`)
 	}
 
-	// Save message as text.
+	// Handle empty content type enum, default to text.
+	if message.ContentType == "" {
+		message.ContentType = models.ContentTypeText
+	}
+
+	// Convert HTML content to text for search.
 	message.TextContent = stringutil.HTML2Text(message.Content)
 
 	// Insert Message.
@@ -762,10 +793,16 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 		}
 	}
 
-	// Upload message attachments.
-	if err := m.uploadMessageAttachments(&in.Message); err != nil {
-		// Log error but continue processing.
-		m.lo.Error("error uploading message attachments", "message_source_id", in.Message.SourceID, "error", err)
+	// Upload message attachments, on failure delete the conversation if it was just created for this message.
+	if upErr := m.uploadMessageAttachments(&in.Message); upErr != nil {
+		m.lo.Error("error uploading message attachments", "message_source_id", in.Message.SourceID, "error", upErr)
+		if isNewConversation && in.Message.ConversationUUID != "" {
+			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", in.Message.ConversationUUID, "message_source_id", in.Message.SourceID)
+			if err := m.DeleteConversation(in.Message.ConversationUUID); err != nil {
+				return models.Message{}, fmt.Errorf("error deleting conversation after message attachment upload failure: %w", err)
+			}
+		}
+		return models.Message{}, fmt.Errorf("error uploading message attachments: %w", upErr)
 	}
 
 	// Insert message.
@@ -848,12 +885,11 @@ func (c *Manager) generateMessagesQuery(baseQuery string, qArgs []interface{}, p
 }
 
 // uploadMessageAttachments uploads all attachments for a message.
-func (m *Manager) uploadMessageAttachments(message *models.Message) []error {
+func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 	if len(message.Attachments) == 0 {
 		return nil
 	}
 
-	var uploadErr []error
 	for _, attachment := range message.Attachments {
 		// Check if this attachment already exists by the content ID, as inline images can be repeated across conversations.
 		contentID := attachment.ContentID
@@ -900,21 +936,20 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) []error {
 			[]byte("{}"), /** meta **/
 		)
 		if err != nil {
-			uploadErr = append(uploadErr, err)
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "error", err)
+			return fmt.Errorf("failed to upload media %s: %w", attachment.Name, err)
 		}
 
-		// If the attachment is an image, generate and upload thumbnail.
+		// If the attachment is an image, generate and upload a thumbnail. Log any errors and continue, as thumbnail generation failure should not block message processing.
 		attachmentExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(attachment.Name)), ".")
 		if slices.Contains(image.Exts, attachmentExt) {
 			if err := m.uploadThumbnailForMedia(media, attachment.Content); err != nil {
-				uploadErr = append(uploadErr, err)
 				m.lo.Error("error uploading thumbnail", "error", err)
 			}
 		}
 		message.Media = append(message.Media, media)
 	}
-	return uploadErr
+	return nil
 }
 
 // findOrCreateConversation finds or creates a conversation for the given message.

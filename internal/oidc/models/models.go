@@ -4,6 +4,12 @@ import (
 	"time"
 )
 
+// providerLogos holds known provider logos.
+var providerLogos = map[string]string{
+	"Google": "/images/google-logo.png",
+	"Custom": "",
+}
+
 // OIDC represents an OpenID Connect configuration.
 type OIDC struct {
 	ID              int       `db:"id" json:"id"`
@@ -17,12 +23,6 @@ type OIDC struct {
 	ProviderURL     string    `db:"provider_url" json:"provider_url"`
 	RedirectURI     string    `db:"-" json:"redirect_uri"`
 	ProviderLogoURL string    `db:"-" json:"logo_url"`
-}
-
-// providerLogos holds known provider logos.
-var providerLogos = map[string]string{
-	"Google": "/images/google-logo.png",
-	"Custom": "",
 }
 
 // SetProviderLogo provider logo to the OIDC model.

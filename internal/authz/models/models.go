@@ -15,6 +15,7 @@ const (
 	PermConversationWrite               = "conversations:write"
 	PermMessagesRead                    = "messages:read"
 	PermMessagesWrite                   = "messages:write"
+	PermMessagesWriteAsContact          = "messages:write_as_contact"
 
 	// View
 	PermViewManage = "view:manage"
@@ -102,6 +103,7 @@ var validPermissions = map[string]struct{}{
 	PermConversationWrite:               {},
 	PermMessagesRead:                    {},
 	PermMessagesWrite:                   {},
+	PermMessagesWriteAsContact:          {},
 	PermViewManage:                      {},
 	PermStatusManage:                    {},
 	PermTagsManage:                      {},

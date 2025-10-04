@@ -2,11 +2,14 @@ package main
 
 import (
 	"strconv"
+	"strings"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
+	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	medModels "github.com/abhinavxd/libredesk/internal/media/models"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -18,6 +21,7 @@ type messageReq struct {
 	To          []string `json:"to"`
 	CC          []string `json:"cc"`
 	BCC         []string `json:"bcc"`
+	SenderType  string   `json:"sender_type"`
 }
 
 // handleGetMessages returns messages for a conversation.
@@ -103,7 +107,7 @@ func handleGetMessage(r *fastglue.Request) error {
 	return r.SendEnvelope(message)
 }
 
-// handleRetryMessage changes message status so it can be retried for sending.
+// handleRetryMessage changes message status to `pending`, so it's enqueued for sending.
 func handleRetryMessage(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -164,6 +168,31 @@ func handleSendMessage(r *fastglue.Request) error {
 	}
 
 	// Prepare attachments.
+	if req.SenderType != umodels.UserTypeAgent && req.SenderType != umodels.UserTypeContact {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`sender_type`"), nil, envelope.InputError)
+	}
+
+	// Contacts cannot send private messages
+	if req.SenderType == umodels.UserTypeContact && req.Private {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+
+	// Check if user has permission to send messages as contact
+	if req.SenderType == umodels.UserTypeContact {
+		parts := strings.Split(authzModels.PermMessagesWriteAsContact, ":")
+		if len(parts) != 2 {
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorChecking", "name", "{globals.terms.permission}"), nil))
+		}
+		ok, err := app.authz.Enforce(user, parts[0], parts[1])
+		if err != nil {
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorChecking", "name", "{globals.terms.permission}"), nil))
+		}
+		if !ok {
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
+		}
+	}
+
+	// Get media for all attachments.
 	var media = make([]medModels.Media, 0, len(req.Attachments))
 	for _, id := range req.Attachments {
 		m, err := app.media.Get(id, "")
@@ -174,6 +203,16 @@ func handleSendMessage(r *fastglue.Request) error {
 		media = append(media, m)
 	}
 
+	// Create contact message.
+	if req.SenderType == umodels.UserTypeContact {
+		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		return r.SendEnvelope(message)
+	}
+
+	// Send private note.
 	if req.Private {
 		message, err := app.conversation.SendPrivateNote(media, user.ID, cuuid, req.Message)
 		if err != nil {
@@ -182,7 +221,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		return r.SendEnvelope(message)
 	}
 
-	message, err := app.conversation.SendReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/)
+	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, map[string]any{} /**meta**/)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

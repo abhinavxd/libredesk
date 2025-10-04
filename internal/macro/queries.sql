@@ -1,15 +1,15 @@
 -- name: get
 SELECT
     id,
-    name,
-    message_content,
     created_at,
     updated_at,
+    name,
+    actions,
     visibility,
+    visible_when,
+    message_content,
     user_id,
     team_id,
-    actions,
-    visible_when,
     usage_count
 FROM
     macros
@@ -19,15 +19,15 @@ WHERE
 -- name: get-all
 SELECT
     id,
-    name,
-    message_content,
     created_at,
     updated_at,
+    name,
+    actions,
     visibility,
+    visible_when,
+    message_content,
     user_id,
     team_id,
-    actions,
-    visible_when,
     usage_count
 FROM
     macros
@@ -67,7 +67,6 @@ WHERE
 UPDATE
     macros
 SET
-    usage_count = usage_count + 1,
-    updated_at = NOW()
+    usage_count = usage_count + 1
 WHERE
     id = $1;
