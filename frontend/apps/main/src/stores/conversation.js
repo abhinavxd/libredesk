@@ -690,9 +690,10 @@ export const useConversationStore = defineStore('conversation', () => {
     conversation.isTyping = is_typing
   }
 
-  function sendTyping (isTyping) {
+  function sendTyping (isTyping, otherAttributes = {}) {
+    // Send typing websocket message only if a conversation is open
     if (conversation.data?.uuid) {
-      sendTypingIndicator(conversation.data.uuid, isTyping)
+      sendTypingIndicator(conversation.data.uuid, isTyping, otherAttributes.isPrivateMessage)
     }
   }
 

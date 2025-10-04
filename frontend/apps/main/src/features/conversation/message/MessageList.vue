@@ -43,11 +43,11 @@
             </div>
           </div>
         </TransitionGroup>
+      </div>
 
-        <!-- Typing indicator -->
-        <div v-if="conversationStore.conversation.isTyping">
-          <TypingIndicator />
-        </div>
+      <!-- Typing indicator -->
+      <div v-if="conversationStore.conversation.isTyping" class="px-4 pb-4">
+        <TypingIndicator />
       </div>
     </div>
 

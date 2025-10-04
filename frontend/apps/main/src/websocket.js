@@ -227,14 +227,15 @@ export class WebSocketClient {
     this.send(subscribeMessage)
   }
 
-  sendTypingIndicator (conversationUUID, isTyping) {
+  sendTypingIndicator (conversationUUID, isTyping, isPrivateMessage) {
     if (!conversationUUID) return
 
     const typingMessage = {
       type: WS_EVENT.TYPING,
       data: {
         conversation_uuid: conversationUUID,
-        is_typing: isTyping
+        is_typing: isTyping,
+        is_private_message: isPrivateMessage,
       }
     }
 
@@ -262,5 +263,5 @@ export function initWS () {
 
 export const sendMessage = message => wsClient?.send(message)
 export const subscribeToConversation = conversationUUID => wsClient?.subscribeToConversation(conversationUUID)
-export const sendTypingIndicator = (conversationUUID, isTyping) => wsClient?.sendTypingIndicator(conversationUUID, isTyping)
+export const sendTypingIndicator = (conversationUUID, isTyping, isPrivateMessage) => wsClient?.sendTypingIndicator(conversationUUID, isTyping, isPrivateMessage)
 export const closeWebSocket = () => wsClient?.close()

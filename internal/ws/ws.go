@@ -19,7 +19,7 @@ type Hub struct {
 	conversationClients      map[string][]*Client
 	conversationClientsMutex sync.RWMutex
 
-	userStore           userStore
+	userStore         userStore
 	conversationStore conversationStore
 }
 
@@ -181,7 +181,7 @@ func (h *Hub) BroadcastTypingToConversation(conversationUUID string, typingMsg m
 	}
 
 	// Also broadcast to widget clients since this is an agent typing.
-	if h.conversationStore != nil {
+	if h.conversationStore != nil && !typingMsg.IsPrivateMessage {
 		h.conversationStore.BroadcastTypingToWidgetClientsOnly(conversationUUID, typingMsg.IsTyping)
 	}
 }

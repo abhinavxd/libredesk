@@ -129,6 +129,7 @@ const linkUrl = ref('')
 const props = defineProps({
   placeholder: String,
   insertContent: String,
+  messageType: String,
   autoFocus: {
     type: Boolean,
     default: true
@@ -136,7 +137,7 @@ const props = defineProps({
   aiPrompts: {
     type: Array,
     default: () => []
-  }
+  },
 })
 
 const emit = defineEmits(['send', 'aiPromptSelected'])
@@ -145,7 +146,9 @@ const emitPrompt = (key) => emit('aiPromptSelected', key)
 
 // Set up typing indicator
 const conversationStore = useConversationStore()
-const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyping)
+const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyping, {
+  get isPrivateMessage() { return props.messageType === 'private_note' }
+}) 
 
 // To preseve the table styling in emails, need to set the table style inline.
 // Created these custom extensions to set the table style inline.

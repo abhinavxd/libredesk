@@ -88,6 +88,7 @@
       <Editor
         v-model:htmlContent="htmlContent"
         v-model:textContent="textContent"
+        :message-type="messageType"
         :placeholder="t('editor.newLine') + t('editor.send') + t('editor.ctrlK')"
         :aiPrompts="aiPrompts"
         :insertContent="insertContent"

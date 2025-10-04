@@ -1,13 +1,13 @@
 import { ref, onUnmounted } from 'vue'
 
-export function useTypingIndicator(sendTypingCallback) {
+export function useTypingIndicator (sendTypingCallback, otherAttributes = {}) {
   const typingTimer = ref(null)
   const isCurrentlyTyping = ref(false)
 
   const startTyping = () => {
     if (!isCurrentlyTyping.value) {
       isCurrentlyTyping.value = true
-      sendTypingCallback?.(true)
+      sendTypingCallback?.(true, otherAttributes)
     }
 
     // Clear existing timer
@@ -22,10 +22,12 @@ export function useTypingIndicator(sendTypingCallback) {
   }
 
   const stopTyping = () => {
-    if (isCurrentlyTyping.value) {
-      isCurrentlyTyping.value = false
-      sendTypingCallback?.(false)
-    }
+    setTimeout(() => {
+      if (isCurrentlyTyping.value) {
+        isCurrentlyTyping.value = false
+        sendTypingCallback?.(false, otherAttributes)
+      }
+    }, 500)
 
     if (typingTimer.value) {
       clearTimeout(typingTimer.value)
