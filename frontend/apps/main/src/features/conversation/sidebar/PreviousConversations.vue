@@ -62,7 +62,7 @@
 
 <script setup>
 import { useConversationStore } from '@/stores/conversation'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { formatFullTimestamp, getRelativeTime } from '@/utils/datetime'
 
 const conversationStore = useConversationStore()

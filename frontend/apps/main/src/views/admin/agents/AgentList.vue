@@ -19,10 +19,10 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 import { createColumns } from '@/features/admin/agents/dataTableColumns.js'
-import { Button } from '@/components/ui/button'
+import { Button } from '@shared-ui/components/ui/button'
 import DataTable from '@/components/datatable/DataTable.vue'
 import { handleHTTPError } from '@/utils/http'
-import { Spinner } from '@/components/ui/spinner'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUsersStore } from '@/stores/users'

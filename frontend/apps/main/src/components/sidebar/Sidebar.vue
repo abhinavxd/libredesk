@@ -47,7 +47,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@/components/ui/alert-dialog'
+} from '@shared-ui/components/ui/alert-dialog'
 import { filterNavItems } from '@/utils/nav-permissions'
 import { useStorage } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'

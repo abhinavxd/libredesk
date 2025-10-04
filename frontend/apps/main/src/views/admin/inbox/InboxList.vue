@@ -31,7 +31,7 @@ import { useEmitter } from '../../../composables/useEmitter'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { format } from 'date-fns'
-import { Spinner } from '@/components/ui/spinner'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useInboxStore } from '@/stores/inbox'
 import api from '@/api'
 

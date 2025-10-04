@@ -70,14 +70,14 @@
 <script setup>
 import { computed } from 'vue'
 import { ViewVerticalIcon } from '@radix-icons/vue'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@shared-ui/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Mail, Phone, ExternalLink } from 'lucide-vue-next'
 import countries from '@/constants/countries.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 

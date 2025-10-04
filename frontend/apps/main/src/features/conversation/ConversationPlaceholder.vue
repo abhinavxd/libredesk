@@ -56,8 +56,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { CheckCircle, Circle } from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
+import { Button } from '@shared-ui/components/ui/button'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useInboxStore } from '@/stores/inbox'
 import { useUsersStore } from '@/stores/users'
 

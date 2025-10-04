@@ -138,7 +138,7 @@ import { useI18n } from 'vue-i18n'
 import { FIELD_TYPE } from '@/constants/filterConfig'
 import CloseButton from '@/components/button/CloseButton.vue'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
-import SelectTag from '@/components/ui/select/SelectTag.vue'
+import SelectTag from '@shared-ui/components/ui/select/SelectTag.vue'
 
 const props = defineProps({
   fields: {
