@@ -415,6 +415,11 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	)
 
 	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
+	if err != nil {
+		m.lo.Error("error fetching inbox record", "inbox_id", inboxID, "error", err)
+		return models.Message{}, err
+	}
+
 	if !inboxRecord.Enabled {
 		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil)
 	}
