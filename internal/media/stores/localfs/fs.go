@@ -21,6 +21,8 @@ type Opts struct {
 	UploadPath string
 	UploadURI  string
 	RootURL    string
+	Expiry     time.Duration
+	Secret     string
 }
 
 // Client implements `media.Store`
@@ -82,53 +84,52 @@ func (c *Client) Name() string {
 
 // GetSignedURL generates a signed URL for the file with expiration.
 // This implements the SignedURLStore interface for secure public access.
-func (c *Client) GetSignedURL(name string, expiresAt time.Time, secret []byte) string {
+func (c *Client) GetSignedURL(name string) string {
 	// Generate base URL
 	baseURL := c.GetURL(name)
-	
+
 	// Create the signature payload: name + expires timestamp
-	expires := expiresAt.Unix()
+	expires := time.Now().Add(c.opts.Expiry).Unix()
 	payload := name + strconv.FormatInt(expires, 10)
-	
+
 	// Generate HMAC-SHA256 signature
-	h := hmac.New(sha256.New, secret)
+	h := hmac.New(sha256.New, []byte(c.opts.Secret))
 	h.Write([]byte(payload))
 	signature := base64.URLEncoding.EncodeToString(h.Sum(nil))
-	
+
 	// Parse base URL and add query parameters
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		// Fallback to base URL if parsing fails
 		return baseURL
 	}
-	
+
 	// Add signature and expires parameters
 	query := u.Query()
 	query.Set("signature", signature)
 	query.Set("expires", strconv.FormatInt(expires, 10))
 	u.RawQuery = query.Encode()
-	
+
 	return u.String()
 }
 
 // VerifySignature verifies that a signature is valid for the given parameters.
 // This implements the SignedURLStore interface for secure public access.
-func (c *Client) VerifySignature(name, signature string, expiresAt time.Time, secret []byte) bool {
+func (c *Client) VerifySignature(name, signature string, expiresAt time.Time) bool {
 	// Check if URL has expired
 	if time.Now().After(expiresAt) {
 		return false
 	}
-	
+
 	// Recreate the signature payload: name + expires timestamp
 	expires := expiresAt.Unix()
 	payload := name + strconv.FormatInt(expires, 10)
-	
+
 	// Generate expected HMAC-SHA256 signature
-	h := hmac.New(sha256.New, secret)
+	h := hmac.New(sha256.New, []byte(c.opts.Secret))
 	h.Write([]byte(payload))
 	expectedSignature := base64.URLEncoding.EncodeToString(h.Sum(nil))
-	
-	// Use constant-time comparison to prevent timing attacks
+
 	return subtle.ConstantTimeCompare([]byte(signature), []byte(expectedSignature)) == 1
 }
 

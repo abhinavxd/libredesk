@@ -41,8 +41,8 @@ type Store interface {
 // This is optional and only implemented by stores that need signed URL functionality (like fs).
 type SignedURLStore interface {
 	Store
-	GetSignedURL(name string, expiresAt time.Time, secret []byte) string
-	VerifySignature(name, signature string, expiresAt time.Time, secret []byte) bool
+	GetSignedURL(name string) string
+	VerifySignature(name, signature string, expiresAt time.Time) bool
 }
 
 type Manager struct {
@@ -50,16 +50,14 @@ type Manager struct {
 	lo      *logf.Logger
 	i18n    *i18n.I18n
 	queries queries
-	secret  string
 }
 
 // Opts provides options for configuring the Manager.
 type Opts struct {
-	Store  Store
-	Lo     *logf.Logger
-	DB     *sqlx.DB
-	I18n   *i18n.I18n
-	Secret string
+	Store Store
+	Lo    *logf.Logger
+	DB    *sqlx.DB
+	I18n  *i18n.I18n
 }
 
 // New initializes and returns a new Manager instance for handling media operations.
@@ -73,7 +71,6 @@ func New(opt Opts) (*Manager, error) {
 		lo:      opt.Lo,
 		i18n:    opt.I18n,
 		queries: q,
-		secret:  opt.Secret,
 	}, nil
 }
 
@@ -233,10 +230,10 @@ func (m *Manager) deleteUnlinkedMessageMedia() error {
 
 // GetSignedURL returns a signed URL for accessing a media file with expiration.
 // This delegates to the store if it supports signed URLs (like fs), otherwise returns the normal URL.
-func (m *Manager) GetSignedURL(name string, expiresAt time.Time) string {
+func (m *Manager) GetSignedURL(name string) string {
 	// Check if the store supports signed URLs
 	if signedStore, ok := m.store.(SignedURLStore); ok {
-		return signedStore.GetSignedURL(name, expiresAt, []byte(m.secret))
+		return signedStore.GetSignedURL(name)
 	}
 	// Fallback to regular URL for stores that handle signing internally (like S3)
 	return m.store.GetURL(name)
@@ -249,32 +246,32 @@ func (m *Manager) VerifySignature(r *fastglue.Request) error {
 	if uuid == nil {
 		return fmt.Errorf("missing uuid parameter")
 	}
-	
+
 	signature := string(r.RequestCtx.QueryArgs().Peek("signature"))
 	expiresStr := string(r.RequestCtx.QueryArgs().Peek("expires"))
-	
+
 	if signature == "" || expiresStr == "" {
 		return fmt.Errorf("missing signature or expires parameter")
 	}
-	
+
 	// Parse expiration time
 	var expires int64
 	if _, err := fmt.Sscanf(expiresStr, "%d", &expires); err != nil {
 		return fmt.Errorf("invalid expires parameter: %v", err)
 	}
-	
+
 	expiresAt := time.Unix(expires, 0)
-	
+
 	// Check if store supports signature verification
 	if signedStore, ok := m.store.(SignedURLStore); ok {
 		// Strip thumb_ prefix for signature verification to match the base UUID
 		verificationName := strings.TrimPrefix(uuid.(string), "thumb_")
-		if !signedStore.VerifySignature(verificationName, signature, expiresAt, []byte(m.secret)) {
+		if !signedStore.VerifySignature(verificationName, signature, expiresAt) {
 			return fmt.Errorf("signature verification failed")
 		}
 		return nil
 	}
-	
+
 	// For stores that don't support signing (like S3), always allow
 	return nil
 }

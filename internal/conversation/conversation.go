@@ -133,7 +133,7 @@ type userStore interface {
 type mediaStore interface {
 	GetBlob(name string) ([]byte, error)
 	GetURL(name string) string
-	GetSignedURL(name string, expiresAt time.Time) string
+	GetSignedURL(name string) string
 	Attach(id int, model string, modelID int) error
 	GetByModel(id int, model string) ([]mmodels.Media, error)
 	ContentIDExists(contentID string) (bool, string, error)
@@ -1308,8 +1308,7 @@ func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) 
 				avatarPath := assignee.AvatarURL.String
 				if strings.HasPrefix(avatarPath, "/uploads/") {
 					avatarUUID := strings.TrimPrefix(avatarPath, "/uploads/")
-					expiresAt := time.Now().Add(1 * time.Hour)
-					assignee.AvatarURL = null.StringFrom(m.mediaStore.GetSignedURL(avatarUUID, expiresAt))
+					assignee.AvatarURL = null.StringFrom(m.mediaStore.GetSignedURL(avatarUUID))
 				}
 			}
 
@@ -1366,8 +1365,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 			// Generate signed URLs for attachments
 			attachments := msg.Attachments
 			for j := range attachments {
-				expiresAt := time.Now().Add(8 * time.Hour)
-				attachments[j].URL = m.mediaStore.GetSignedURL(attachments[j].UUID, expiresAt)
+				attachments[j].URL = m.mediaStore.GetSignedURL(attachments[j].UUID)
 			}
 
 			// Fetch sender from cache or store

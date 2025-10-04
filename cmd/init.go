@@ -473,6 +473,8 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n) *media.Manager {
 			UploadURI:  "/uploads",
 			UploadPath: filepath.Clean(ko.String("upload.fs.upload_path")),
 			RootURL:    appRootURL,
+			Expiry:     ko.Duration("upload.fs.expiry"),
+			Secret:     ko.String("upload.fs.secret"),
 		})
 		if err != nil {
 			log.Fatalf("error initializing fs media store: %v", err)
@@ -482,11 +484,10 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n) *media.Manager {
 	}
 
 	media, err := media.New(media.Opts{
-		Store:  store,
-		Lo:     lo,
-		DB:     db,
-		I18n:   i18n,
-		Secret: ko.String("upload.secret"),
+		Store: store,
+		Lo:    lo,
+		DB:    db,
+		I18n:  i18n,
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)

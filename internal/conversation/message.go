@@ -998,7 +998,7 @@ func (m *Manager) fetchMessageAttachments(messageID int) (attachment.Attachments
 			Content:     blob,
 			Size:        media.Size,
 			Header:      attachment.MakeHeader(media.ContentType, media.UUID, media.Filename, "base64", media.Disposition.String),
-			URL:         m.mediaStore.GetSignedURL(media.UUID, time.Now().Add(4*time.Hour)),
+			URL:         m.mediaStore.GetSignedURL(media.UUID),
 		}
 		attachments = append(attachments, attachment)
 	}
