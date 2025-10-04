@@ -65,7 +65,6 @@ type queries struct {
 	GetNotes               *sqlx.Stmt `query:"get-notes"`
 	GetNote                *sqlx.Stmt `query:"get-note"`
 	GetUserByExternalID    *sqlx.Stmt `query:"get-user-by-external-id"`
-	GetAgentsCompact       *sqlx.Stmt `query:"get-agents-compact"`
 	GetUsersCompact        string     `query:"get-users-compact"`
 	UpdateContact          *sqlx.Stmt `query:"update-contact"`
 	UpdateAgent            *sqlx.Stmt `query:"update-agent"`
