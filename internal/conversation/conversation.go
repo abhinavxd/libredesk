@@ -261,7 +261,6 @@ type queries struct {
 	GetConversationsCreatedAfter       *sqlx.Stmt `query:"get-conversations-created-after"`
 	GetUnassignedConversations         *sqlx.Stmt `query:"get-unassigned-conversations"`
 	GetConversations                   string     `query:"get-conversations"`
-	GetContactConversations            *sqlx.Stmt `query:"get-contact-conversations"`
 	GetContactChatConversations        *sqlx.Stmt `query:"get-contact-chat-conversations"`
 	GetChatConversation                *sqlx.Stmt `query:"get-chat-conversation"`
 	GetContactPreviousConversations    *sqlx.Stmt `query:"get-contact-previous-conversations"`
