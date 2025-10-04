@@ -551,7 +551,7 @@ SELECT
     c.inbox_id,
     c.uuid as conversation_uuid,
     c.subject,
-    c.contact_id as message_receiver_id
+    c.contact_id as message_receiver_id,
     c.subject
 FROM conversation_messages m
 INNER JOIN conversations c ON c.id = m.conversation_id
