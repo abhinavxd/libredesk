@@ -1,5 +1,6 @@
 <template>
-  <div class="flex flex-col items-end text-left">
+  <!-- Do not show live chat continuity emails -->
+  <div class="flex flex-col items-end text-left" v-if="!message.meta.continuity_email">
     <!-- Sender Name -->
     <div class="pr-[47px] mb-1">
       <p class="text-muted-foreground text-sm font-medium">
