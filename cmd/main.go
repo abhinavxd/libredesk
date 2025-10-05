@@ -35,6 +35,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/tag"
@@ -54,7 +55,8 @@ var (
 	ko          = koanf.New(".")
 	ctx         = context.Background()
 	appName     = "libredesk"
-	frontendDir = "frontend/dist"
+	frontendDir = "frontend/dist/main"
+	widgetDir   = "frontend/dist/widget"
 
 	// Injected at build time.
 	buildString   string
@@ -94,6 +96,7 @@ type App struct {
 	customAttribute *customAttribute.Manager
 	report          *report.Manager
 	webhook         *webhook.Manager
+	rateLimit       *ratelimit.Limiter
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -203,14 +206,20 @@ func main() {
 		sla                         = initSLA(db, team, settings, businessHours, notifier, template, user, i18n)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template, webhook)
 		autoassigner                = initAutoAssigner(team, user, conversation)
+		rateLimiter                 = initRateLimit(rdb)
 	)
+
+	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
 
+	// Start inboxes.
 	startInboxes(ctx, inbox, conversation, user)
+
 	go automation.Run(ctx, automationWorkers)
 	go autoassigner.Run(ctx, autoAssignInterval)
 	go conversation.Run(ctx, messageIncomingQWorkers, messageOutgoingQWorkers, messageOutgoingScanInterval)
 	go conversation.RunUnsnoozer(ctx, unsnoozeInterval)
+	go conversation.RunContinuity(ctx)
 	go webhook.Run(ctx)
 	go notifier.Run(ctx)
 	go sla.Run(ctx, slaEvaluationInterval)
@@ -250,6 +259,7 @@ func main() {
 		macro:           initMacro(db, i18n),
 		ai:              initAI(db, i18n),
 		webhook:         webhook,
+		rateLimit:       rateLimiter,
 	}
 	app.consts.Store(constants)
 

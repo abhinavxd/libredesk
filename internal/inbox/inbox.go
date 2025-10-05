@@ -8,12 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
@@ -21,7 +23,8 @@ import (
 )
 
 const (
-	ChannelEmail = "email"
+	ChannelEmail    = "email"
+	ChannelLiveChat = "livechat"
 )
 
 var (
@@ -69,6 +72,7 @@ type MessageStore interface {
 // UserStore defines methods for fetching user information.
 type UserStore interface {
 	GetContact(id int, email string) (umodels.User, error)
+	GetAgent(id int, email string) (umodels.User, error)
 }
 
 // Opts contains the options for initializing the inbox manager.
@@ -171,7 +175,7 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 // Create creates an inbox in the DB.
 func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 	var createdInbox imodels.Inbox
-	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, inbox.Config, inbox.Name, inbox.From, inbox.CSATEnabled); err != nil {
+	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, inbox.Config, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Secret); err != nil {
 		m.lo.Error("error creating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.inbox}"), nil)
 	}
@@ -312,11 +316,16 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			return imodels.Inbox{}, err
 		}
 		inbox.Config = updatedConfig
+	case "livechat":
+		// Preserve existing secret if update contains password dummy
+		if inbox.Secret.Valid && strings.Contains(inbox.Secret.String, stringutil.PasswordDummy) {
+			inbox.Secret = current.Secret
+		}
 	}
 
 	// Update the inbox in the DB.
 	var updatedInbox imodels.Inbox
-	if err := m.queries.Update.Get(&updatedInbox, id, inbox.Channel, inbox.Config, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Enabled); err != nil {
+	if err := m.queries.Update.Get(&updatedInbox, id, inbox.Channel, inbox.Config, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Enabled, inbox.Secret, inbox.LinkedEmailInboxID); err != nil {
 		m.lo.Error("error updating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.inbox}"), nil)
 	}

@@ -26,10 +26,6 @@ const (
 	maxAvatarSizeMB = 2
 )
 
-type updateAvailabilityRequest struct {
-	Status string `json:"status"`
-}
-
 type resetPasswordRequest struct {
 	Email string `json:"email"`
 }

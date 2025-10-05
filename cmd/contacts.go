@@ -276,11 +276,16 @@ func handleBlockContact(r *fastglue.Request) error {
 
 	app.lo.Info("setting contact block status", "contact_id", contactID, "enabled", req.Enabled, "actor_id", auser.ID)
 
-	if err := app.user.ToggleEnabled(contactID, models.UserTypeContact, req.Enabled); err != nil {
+	contact, err := app.user.GetContact(contactID, "")
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	contact, err := app.user.GetContact(contactID, "")
+	if err := app.user.ToggleEnabled(contactID, contact.Type, req.Enabled); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	contact, err = app.user.GetContact(contactID, "")
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

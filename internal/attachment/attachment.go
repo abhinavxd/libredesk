@@ -38,6 +38,13 @@ func (a *Attachments) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, a)
 }
 
+func (a Attachments) MarshalJSON() ([]byte, error) {
+	if a == nil {
+		a = make(Attachments, 0)
+	}
+	return json.Marshal([]Attachment(a))
+}
+
 // MakeHeader creates a MIME header for email attachments or inline content.
 func MakeHeader(contentType, contentID, fileName, encoding, disposition string) textproto.MIMEHeader {
 	if encoding == "" {
