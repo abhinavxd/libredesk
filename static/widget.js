@@ -413,7 +413,7 @@
         window.LibredeskWidget = new LibredeskWidget(window.LibredeskConfig);
     }
 
-    window.initLibreDeskWidget = function (config = {}) {
+    window.initLibredeskWidget = function (config = {}) {
         if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
             console.warn('Libredesk Widget is already initialized');
             return window.LibredeskWidget;
@@ -426,7 +426,7 @@
         if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
             window.LibredeskWidget.showChat();
         } else {
-            console.warn('Libredesk Widget is not initialized. Call initLibreDeskWidget() first.');
+            console.warn('Libredesk Widget is not initialized. Call initLibredeskWidget() first.');
         }
     };
 
@@ -434,7 +434,7 @@
         if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
             window.LibredeskWidget.hideChat();
         } else {
-            console.warn('Libredesk Widget is not initialized. Call initLibreDeskWidget() first.');
+            console.warn('Libredesk Widget is not initialized. Call initLibredeskWidget() first.');
         }
     };
 
@@ -442,7 +442,7 @@
         if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
             window.LibredeskWidget.toggle();
         } else {
-            console.warn('Libredesk Widget is not initialized. Call initLibreDeskWidget() first.');
+            console.warn('Libredesk Widget is not initialized. Call initLibredeskWidget() first.');
         }
     };
 
@@ -450,7 +450,7 @@
         if (window.LibredeskWidget && window.LibredeskWidget instanceof LibredeskWidget) {
             return window.LibredeskWidget.isChatVisible;
         } else {
-            console.warn('Libredesk Widget is not initialized. Call initLibreDeskWidget() first.');
+            console.warn('Libredesk Widget is not initialized. Call initLibredeskWidget() first.');
             return false;
         }
     };

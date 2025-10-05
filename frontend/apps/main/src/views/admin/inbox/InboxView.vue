@@ -6,7 +6,7 @@
 
     <template #help>
       <div class="flex flex-col justify-evenly h-full gap-4">
-        <p class="font-semibold text-2xl">{{ $t('admin.inbox.help.title') }}</p>
+        <p class="font-medium text-2xl">{{ $t('admin.inbox.help.title') }}</p>
         <p>{{ $t('admin.inbox.help.description') }}</p>
         <ul class="list-disc list-inside space-y-2">
           <li>{{ $t('admin.inbox.help.email') }}</li>

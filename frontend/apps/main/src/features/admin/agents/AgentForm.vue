@@ -132,28 +132,24 @@
             <Label class="text-sm font-medium">{{ $t('globals.terms.apiKey') }}</Label>
             <div class="flex items-center gap-2 mt-1">
               <Input v-model="newAPIKeyData.api_key" readonly class="font-mono text-sm" />
-              <Button
-                type="button"
+              <CopyButton
+                :text-to-copy="newAPIKeyData.api_key"
                 variant="outline"
                 size="sm"
-                @click="copyToClipboard(newAPIKeyData.api_key)"
-              >
-                <Copy class="w-4 h-4" />
-              </Button>
+                :show-text="false"
+              />
             </div>
           </div>
           <div>
             <Label class="text-sm font-medium">{{ $t('globals.terms.secret') }}</Label>
             <div class="flex items-center gap-2 mt-1">
               <Input v-model="newAPIKeyData.api_secret" readonly class="font-mono text-sm" />
-              <Button
-                type="button"
+              <CopyButton
+                :text-to-copy="newAPIKeyData.api_secret"
                 variant="outline"
                 size="sm"
-                @click="copyToClipboard(newAPIKeyData.api_secret)"
-              >
-                <Copy class="w-4 h-4" />
-              </Button>
+                :show-text="false"
+              />
             </div>
           </div>
           <Alert>
@@ -312,8 +308,15 @@ import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import { Label } from '@shared-ui/components/ui/label/index.js'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
-import { Clock, LogIn, Key, RotateCcw, Trash2, Plus, Copy, AlertTriangle } from 'lucide-vue-next'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@shared-ui/components/ui/form/index.js'
+import { Clock, LogIn, Key, RotateCcw, Trash2, Plus, AlertTriangle } from 'lucide-vue-next'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@shared-ui/components/ui/form/index.js'
+import CopyButton from '@/components/button/CopyButton.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar/index.js'
 import {
   Select,
@@ -490,17 +493,6 @@ const revokeAPIKey = async () => {
     })
   } finally {
     isAPIKeyLoading.value = false
-  }
-}
-
-const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.copied')
-    })
-  } catch (error) {
-    console.error('Error copying to clipboard:', error)
   }
 }
 

@@ -2,16 +2,15 @@
   <form @submit="onSubmit" class="space-y-6 w-full">
     <!-- Main Tabs -->
     <Tabs v-model="activeTab" class="w-full">
-      <TabsList class="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 h-auto">
+      <TabsList class="flex flex-wrap gap-1 h-auto p-1 w-fit">
         <TabsTrigger value="general">{{ $t('admin.inbox.livechat.tabs.general') }}</TabsTrigger>
-        <TabsTrigger value="appearance">{{
-          $t('admin.inbox.livechat.tabs.appearance')
-        }}</TabsTrigger>
+        <TabsTrigger value="appearance">{{ $t('admin.inbox.livechat.tabs.appearance') }}</TabsTrigger>
         <TabsTrigger value="messages">{{ $t('admin.inbox.livechat.tabs.messages') }}</TabsTrigger>
         <TabsTrigger value="features">{{ $t('admin.inbox.livechat.tabs.features') }}</TabsTrigger>
         <TabsTrigger value="security">{{ $t('admin.inbox.livechat.tabs.security') }}</TabsTrigger>
         <TabsTrigger value="prechat">{{ $t('admin.inbox.livechat.tabs.prechat') }}</TabsTrigger>
         <TabsTrigger value="users">{{ $t('admin.inbox.livechat.tabs.users') }}</TabsTrigger>
+        <TabsTrigger value="installation">{{ $t('admin.inbox.livechat.tabs.installation') }}</TabsTrigger>
       </TabsList>
 
       <div class="mt-8">
@@ -677,6 +676,30 @@
             </div>
           </Tabs>
         </div>
+
+        <!-- Installation Tab -->
+        <div v-show="activeTab === 'installation'" class="space-y-6">
+          <div class="space-y-4">
+            <div class="relative">
+              <div class="box p-4 bg-slate-900 border border-slate-700">
+                <pre
+                  class="text-sm overflow-x-auto text-slate-100 font-mono"
+                ><code>{{ integrationSnippet }}</code></pre>
+              </div>
+              <CopyButton :text-to-copy="integrationSnippet" class="absolute top-3 right-3" />
+            </div>
+
+            <div class="box p-4 bg-info/10 border-info/20">
+              <h5 class="font-medium text-sm mb-2">
+                {{ $t('admin.inbox.livechat.installation.instructions.title') }}
+              </h5>
+              <ol class="text-sm space-y-2 list-decimal list-inside">
+                <li>{{ $t('admin.inbox.livechat.installation.instructions.step1') }}</li>
+                <li>{{ $t('admin.inbox.livechat.installation.instructions.step2') }}</li>
+              </ol>
+            </div>
+          </div>
+        </div>
       </div>
     </Tabs>
 
@@ -715,6 +738,8 @@ import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { Plus, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import PreChatFormConfig from './PreChatFormConfig.vue'
+import { useAppSettingsStore } from '@/stores/appSettings'
+import CopyButton from '@/components/button/CopyButton.vue'
 
 const props = defineProps({
   initialValues: {
@@ -742,9 +767,29 @@ const externalLinks = ref([])
 const prechatConfig = ref({})
 
 const inboxStore = useInboxStore()
+const appSettingsStore = useAppSettingsStore()
+
 const emailInboxes = computed(() =>
   inboxStore.inboxes.filter((inbox) => inbox.channel === 'email' && inbox.enabled)
 )
+
+// Get base URL from app settings
+const baseUrl = computed(() => {
+  return appSettingsStore.settings?.['app.root_url'] || window.location.origin
+})
+
+// Generate integration snippet
+const integrationSnippet = computed(() => {
+  const inboxId = props.initialValues?.id || '<INBOX_ID>'
+  return `<script src="${baseUrl.value}/widget.js"><\/script>
+<script>
+  // Initialize the Libredesk widget
+  const widget = initLibredeskWidget({
+    baseUrl: '${baseUrl.value}',
+    inboxID: ${inboxId}
+  });
+<\/script>`
+})
 
 const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t)),
@@ -845,9 +890,10 @@ const updateExternalLinks = () => {
   form.setFieldValue('config.external_links', externalLinks.value)
 }
 
-// Fetch inboxes on mount for the linked email inbox dropdown
+// Fetch inboxes and app settings on mount
 onMounted(() => {
   inboxStore.fetchInboxes()
+  appSettingsStore.fetchPublicConfig()
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
