@@ -153,7 +153,7 @@ import { useI18n } from 'vue-i18n'
 import { useEmitter } from '../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { handleHTTPError } from '../../utils/http'
-import { getInitials } from '../../utils/strings'
+import { getInitials } from '@shared-ui/utils/string'
 import { useUserStore } from '../../stores/user'
 import api from '../../api'
 

@@ -28,5 +28,5 @@ func (u *Manager) CreateVisitor(user *models.User) error {
 
 // GetVisitor retrieves a visitor user by ID
 func (u *Manager) GetVisitor(id int) (models.User, error) {
-	return u.Get(id, "", models.UserTypeVisitor)
+	return u.Get(id, "", []string{models.UserTypeVisitor})
 }

@@ -424,12 +424,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil)
 	}
 
-	sourceID, err := stringutil.GenerateEmailMessageID(conversationUUID, inboxRecord.From)
-	if err != nil {
-		m.lo.Error("error generating source message id", "error", err)
-		return message, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
-	}
-
+	var sourceID string
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
@@ -746,7 +741,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			}
 		} else {
 			// Conversation found validate sender email matches contact email
-			contact, err := m.userStore.Get(conversation.ContactID, "", "")
+			contact, err := m.userStore.Get(conversation.ContactID, "", []string{})
 			if err != nil {
 				m.lo.Error("error fetching conversation contact", "contact_id", conversation.ContactID, "error", err)
 				return models.Message{}, fmt.Errorf("fetching conversation contact: %w", err)

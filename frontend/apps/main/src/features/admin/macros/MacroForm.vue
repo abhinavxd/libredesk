@@ -158,7 +158,7 @@ import ActionBuilder from '@/features/admin/macros/ActionBuilder.vue'
 import { useConversationFilters } from '../../../composables/useConversationFilters.js'
 import { useUsersStore } from '../../../stores/users.js'
 import { useTeamStore } from '../../../stores/team.js'
-import { getTextFromHTML } from '../../../utils/strings.js'
+import { getTextFromHTML } from '@shared-ui/utils/string'
 import { createFormSchema } from './formSchema.js'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import {

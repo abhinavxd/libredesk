@@ -121,7 +121,7 @@ type teamStore interface {
 }
 
 type userStore interface {
-	Get(int, string, string) (umodels.User, error)
+	Get(int, string, []string) (umodels.User, error)
 	GetAgent(int, string) (umodels.User, error)
 	GetContact(int, string) (umodels.User, error)
 	GetVisitor(int) (umodels.User, error)
@@ -1460,7 +1460,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 			if cachedUser, ok := userCache[msg.SenderID]; ok {
 				user = cachedUser
 			} else {
-				user, err = m.userStore.Get(msg.SenderID, "", "")
+				user, err = m.userStore.Get(msg.SenderID, "", []string{})
 				if err != nil {
 					m.lo.Error("error fetching message sender user", "sender_id", msg.SenderID, "conversation_uuid", conversation.UUID, "error", err)
 				} else {

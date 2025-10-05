@@ -61,7 +61,7 @@ LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
 WHERE u.deleted_at IS NULL 
     AND ($1 = 0 OR u.id = $1) 
     AND ($2 = '' OR u.email = $2)
-    AND ($3 = '' OR u.type::text = $3)
+    AND (cardinality($3::text[]) = 0 OR u.type::text = ANY($3::text[]))
 GROUP BY u.id;
 
 -- name: set-user-password
@@ -192,7 +192,7 @@ SET first_name = COALESCE($2, first_name),
     phone_number = $6,
     phone_number_country_code = $7,
     updated_at = now()
-WHERE id = $1 and type = 'contact';
+WHERE id = $1 and type in ('contact', 'visitor');
 
 -- name: get-notes
 SELECT 
@@ -301,7 +301,7 @@ SELECT
     u.availability_status,
     u.last_active_at,
     u.last_login_at,
-    u.phone_number_calling_code,
+    u.phone_number_country_code,
     u.phone_number,
     u.external_user_id,
     u.custom_attributes,

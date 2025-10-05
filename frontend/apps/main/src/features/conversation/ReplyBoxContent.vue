@@ -142,7 +142,7 @@ import AttachmentsPreview from '@/features/conversation/message/attachment/Attac
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { useI18n } from 'vue-i18n'
-import { validateEmail } from '../../utils/strings'
+import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '../../stores/macro'
 
 const messageType = defineModel('messageType', { default: 'reply' })

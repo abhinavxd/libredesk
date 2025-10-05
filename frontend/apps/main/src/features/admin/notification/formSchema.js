@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { isGoDuration } from '../../../utils/strings';
+import { isGoDuration } from '@shared-ui/utils/string';
 
 export const createFormSchema = (t) => z.object({
     enabled: z.boolean().default(false),

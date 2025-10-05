@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -613,7 +614,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	}
 
 	// Fetch sender.
-	sender, err := app.user.Get(senderID, "", "")
+	sender, err := app.user.Get(senderID, "", []string{})
 	if err != nil {
 		app.lo.Error("error fetching sender user", "sender_id", senderID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
@@ -777,7 +778,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Get sender user for ProcessIncomingMessage
-	sender, err := app.user.Get(senderID, "", "")
+	sender, err := app.user.Get(senderID, "", []string{})
 	if err != nil {
 		app.lo.Error("error fetching sender user", "sender_id", senderID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
@@ -847,22 +848,30 @@ func buildConversationResponseWithBusinessHours(app *App, conversation cmodels.C
 // resolveUserIDFromClaims resolves the actual user ID from JWT claims,
 // handling both regular user_id and external_user_id cases
 func resolveUserIDFromClaims(app *App, claims Claims) (int, error) {
-	// If UserID is already set and valid, use it directly
 	if claims.UserID > 0 {
-		return claims.UserID, nil
-	}
-
-	// If UserID is not set but ExternalUserID is available, resolve it
-	if claims.ExternalUserID != "" {
+		user, err := app.user.Get(claims.UserID, "", []string{})
+		if err != nil {
+			app.lo.Error("error fetching user by user ID", "user_id", claims.UserID, "error", err)
+			return 0, errors.New("error fetching user")
+		}
+		if !user.Enabled {
+			return 0, errors.New("user is disabled")
+		}
+		return user.ID, nil
+	} else if claims.ExternalUserID != "" {
 		user, err := app.user.GetByExternalID(claims.ExternalUserID)
 		if err != nil {
 			app.lo.Error("error fetching user by external ID", "external_user_id", claims.ExternalUserID, "error", err)
-			return 0, fmt.Errorf("user not found for external_user_id %s: %w", claims.ExternalUserID, err)
+			return 0, errors.New("error fetching user")
 		}
+		if !user.Enabled {
+			return 0, errors.New("user is disabled")
+		}
+
 		return user.ID, nil
 	}
 
-	return 0, fmt.Errorf("no valid user ID found in JWT claims")
+	return 0, errors.New("error fetching user")
 }
 
 // verifyJWT verifies and validates a JWT token with proper signature verification

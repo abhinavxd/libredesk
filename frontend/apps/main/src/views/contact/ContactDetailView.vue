@@ -20,10 +20,13 @@
               :label="t('globals.messages.upload')"
             />
 
-            <div>
+            <div class="flex items-center gap-3">
               <h2 class="text-2xl font-bold text-gray-900 dark:text-foreground">
                 {{ contact.first_name }} {{ contact.last_name }}
               </h2>
+              <Badge v-if="contact.type" variant="secondary">
+                {{ contact.type.titleCase() }}
+              </Badge>
             </div>
 
             <div class="text-xs text-gray-500">
@@ -93,6 +96,7 @@ import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { AvatarUpload } from '@shared-ui/components/ui/avatar'
 import { Button } from '@shared-ui/components/ui/button'
+import { Badge } from '@shared-ui/components/ui/badge'
 import {
   Dialog,
   DialogContent,

@@ -29,7 +29,7 @@ func (u *Manager) MonitorAgentAvailability(ctx context.Context) {
 
 // GetAgent retrieves an agent by ID and also caches it for future requests.
 func (u *Manager) GetAgent(id int, email string) (models.User, error) {
-	agent, err := u.Get(id, email, models.UserTypeAgent)
+	agent, err := u.Get(id, email, []string{models.UserTypeAgent})
 	if err != nil {
 		return models.User{}, err
 	}
@@ -95,7 +95,7 @@ func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string)
 		u.lo.Error("error creating user", "error", err)
 		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil)
 	}
-	return u.Get(id, "", models.UserTypeAgent)
+	return u.Get(id, "", []string{models.UserTypeAgent})
 }
 
 // UpdateAgent updates an agent with individual field parameters
@@ -162,5 +162,5 @@ func (u *Manager) markInactiveAgentsOffline() {
 // GetAllAgents returns a list of all agents.
 func (u *Manager) GetAgents() ([]models.UserCompact, error) {
 	// Some dirty hack.
-	return u.GetAllUsers(1, 999999999, models.UserTypeAgent, "desc", "users.updated_at", "")
+	return u.GetAllUsers(1, 999999999, []string{models.UserTypeAgent}, "desc", "users.updated_at", "")
 }

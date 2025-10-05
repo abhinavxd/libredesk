@@ -111,22 +111,22 @@ func New(i18n *i18n.I18n, opts Opts) (*Manager, error) {
 // VerifyPassword authenticates an user by email and password, returning the user if successful.
 func (u *Manager) VerifyPassword(email string, password []byte) (models.User, error) {
 	var user models.User
-	if err := u.q.GetUser.Get(&user, 0, email, models.UserTypeAgent); err != nil {
+	if err := u.q.GetUser.Get(&user, 0, email, pq.Array([]string{models.UserTypeAgent})); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 		}
 		u.lo.Error("error fetching user from db", "error", err)
 		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
 	}
-	if err := u.verifyPassword(password, user.Password); err != nil {
+	if err := u.verifyPassword(password, user.Password.String); err != nil {
 		return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 	}
 	return user, nil
 }
 
 // GetAllUsers returns a list of all users.
-func (u *Manager) GetAllUsers(page, pageSize int, userType, order, orderBy string, filtersJSON string) ([]models.UserCompact, error) {
-	query, qArgs, err := u.makeUserListQuery(page, pageSize, userType, order, orderBy, filtersJSON)
+func (u *Manager) GetAllUsers(page, pageSize int, userTypes []string, order, orderBy string, filtersJSON string) ([]models.UserCompact, error) {
+	query, qArgs, err := u.makeUserListQuery(page, pageSize, userTypes, order, orderBy, filtersJSON)
 	if err != nil {
 		u.lo.Error("error creating user list query", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
@@ -152,14 +152,14 @@ func (u *Manager) GetAllUsers(page, pageSize int, userType, order, orderBy strin
 	return users, nil
 }
 
-// Get retrieves an user by ID or email.
-func (u *Manager) Get(id int, email, type_ string) (models.User, error) {
+// Get retrieves an user by ID or email or type. At least one of ID or email must be provided.
+func (u *Manager) Get(id int, email string, userType []string) (models.User, error) {
 	if id == 0 && email == "" {
 		return models.User{}, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.user}"), nil)
 	}
 
 	var user models.User
-	if err := u.q.GetUser.Get(&user, id, email, type_); err != nil {
+	if err := u.q.GetUser.Get(&user, id, email, pq.Array(userType)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return user, envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.user}"), nil)
 		}
@@ -171,7 +171,7 @@ func (u *Manager) Get(id int, email, type_ string) (models.User, error) {
 
 // GetSystemUser retrieves the system user.
 func (u *Manager) GetSystemUser() (models.User, error) {
-	return u.Get(0, models.SystemUserEmail, models.UserTypeAgent)
+	return u.Get(0, models.SystemUserEmail, []string{models.UserTypeAgent})
 }
 
 // GetByExternalID retrieves a user by external user ID.
@@ -459,9 +459,9 @@ func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) error {
 }
 
 // makeUserListQuery generates a query to fetch users based on the provided filters.
-func (u *Manager) makeUserListQuery(page, pageSize int, typ, order, orderBy, filtersJSON string) (string, []interface{}, error) {
+func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, order, orderBy, filtersJSON string) (string, []interface{}, error) {
 	var qArgs []any
-	qArgs = append(qArgs, pq.Array([]string{typ}))
+	qArgs = append(qArgs, pq.Array(userTypes))
 	return dbutil.BuildPaginatedQuery(u.q.GetUsersCompact, qArgs, dbutil.PaginationOptions{
 		Order:    order,
 		OrderBy:  orderBy,

@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { getTextFromHTML } from '../../../utils/strings.js'
+import { getTextFromHTML } from '@shared-ui/utils/string'
 
 const actionSchema = () => z.array(
   z.object({

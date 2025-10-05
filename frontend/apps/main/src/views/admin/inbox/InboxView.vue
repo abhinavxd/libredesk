@@ -5,8 +5,14 @@
     </template>
 
     <template #help>
-      <p>Add email inboxes by configuring IMAP and SMTP settings.</p>
-      <p>Each added inbox creates a new email channel for receiving customer emails.</p>
+      <div class="flex flex-col justify-evenly h-full gap-4">
+        <p class="font-semibold text-2xl">{{ $t('admin.inbox.help.title') }}</p>
+        <p>{{ $t('admin.inbox.help.description') }}</p>
+        <ul class="list-disc list-inside space-y-2">
+          <li>{{ $t('admin.inbox.help.email') }}</li>
+          <li>{{ $t('admin.inbox.help.livechat') }}</li>
+        </ul>
+      </div>
     </template>
   </AdminPageWithHelp>
 </template>

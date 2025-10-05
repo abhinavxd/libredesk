@@ -100,7 +100,7 @@ import {
 } from '@shared-ui/components/ui/select'
 import { SelectTag } from '@shared-ui/components/ui/select'
 import { useConversationFilters } from '../../../composables/useConversationFilters'
-import { getTextFromHTML } from '../../../utils/strings.js'
+import { getTextFromHTML } from '@shared-ui/utils/string'
 import { useI18n } from 'vue-i18n'
 import Editor from '@main/components/editor/TextEditor.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'

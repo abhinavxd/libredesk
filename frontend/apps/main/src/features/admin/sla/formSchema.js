@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { isGoHourMinuteDuration } from '../../../utils/strings'
+import { isGoHourMinuteDuration } from '@shared-ui/utils/string'
 
 export const createFormSchema = (t) =>
     z

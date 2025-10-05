@@ -73,10 +73,15 @@
               </AvatarFallback>
             </Avatar>
 
-            <div class="space-y-1 overflow-hidden">
-              <h4 class="text-sm font-semibold truncate">
-                {{ contact.first_name }} {{ contact.last_name }}
-              </h4>
+            <div class="space-y-1 overflow-hidden flex-1">
+              <div class="flex items-center gap-2">
+                <h4 class="text-sm font-semibold truncate">
+                  {{ contact.first_name }} {{ contact.last_name }}
+                </h4>
+                <Badge v-if="contact.type" variant="secondary" class="text-xs px-1.5 py-0">
+                  {{ contact.type.titleCase() }}
+                </Badge>
+              </div>
               <p class="text-xs text-muted-foreground truncate">
                 {{ contact.email }}
               </p>
@@ -163,6 +168,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Card } from '@shared-ui/components/ui/card'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { Avatar, AvatarImage, AvatarFallback } from '@shared-ui/components/ui/avatar'
+import { Badge } from '@shared-ui/components/ui/badge'
 import {
   Pagination,
   PaginationEllipsis,

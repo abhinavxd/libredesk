@@ -88,7 +88,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/u
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { useConversationStore } from '@/stores/conversation'
-import { revertCIDToImageSrc } from '@/utils/strings'
+import { revertCIDToImageSrc } from '@shared-ui/utils/string'
 import { formatMessageTimestamp, formatFullTimestamp } from '@/utils/datetime'
 import MessageAttachmentPreview from '@/features/conversation/message/attachment/MessageAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'
