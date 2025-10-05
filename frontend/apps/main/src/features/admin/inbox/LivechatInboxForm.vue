@@ -7,9 +7,9 @@
         <TabsTrigger value="appearance">{{ $t('admin.inbox.livechat.tabs.appearance') }}</TabsTrigger>
         <TabsTrigger value="messages">{{ $t('admin.inbox.livechat.tabs.messages') }}</TabsTrigger>
         <TabsTrigger value="features">{{ $t('admin.inbox.livechat.tabs.features') }}</TabsTrigger>
-        <TabsTrigger value="security">{{ $t('admin.inbox.livechat.tabs.security') }}</TabsTrigger>
         <TabsTrigger value="prechat">{{ $t('admin.inbox.livechat.tabs.prechat') }}</TabsTrigger>
         <TabsTrigger value="users">{{ $t('admin.inbox.livechat.tabs.users') }}</TabsTrigger>
+        <TabsTrigger value="security">{{ $t('admin.inbox.livechat.tabs.security') }}</TabsTrigger>
         <TabsTrigger value="installation">{{ $t('admin.inbox.livechat.tabs.installation') }}</TabsTrigger>
       </TabsList>
 
@@ -680,24 +680,48 @@
         <!-- Installation Tab -->
         <div v-show="activeTab === 'installation'" class="space-y-6">
           <div class="space-y-4">
+            <h4 class="font-medium text-foreground">
+              {{ $t('admin.inbox.livechat.installation.instructions.title') }}
+            </h4>
+            <ol class="text-sm space-y-2 list-decimal list-inside text-muted-foreground">
+              <li>{{ $t('admin.inbox.livechat.installation.instructions.step1') }}</li>
+              <li>{{ $t('admin.inbox.livechat.installation.instructions.step2') }}</li>
+            </ol>
+          </div>
+
+          <!-- Basic Installation -->
+          <div class="relative">
+            <CodeEditor :modelValue="integrationSnippet" language="html" :readOnly="true" />
+            <CopyButton :text-to-copy="integrationSnippet" class="absolute top-3 right-3" />
+          </div>
+
+          <!-- Authenticated Users Section -->
+          <div class="space-y-4 pt-4">
+            <h4 class="font-medium text-foreground">
+              {{ $t('admin.inbox.livechat.installation.authenticated.title') }}
+            </h4>
+
+            <p class="text-sm text-muted-foreground">
+              {{ $t('admin.inbox.livechat.installation.authenticated.jwt.description') }}
+            </p>
+
             <div class="relative">
-              <div class="box p-4 bg-slate-900 border border-slate-700">
-                <pre
-                  class="text-sm overflow-x-auto text-slate-100 font-mono"
-                ><code>{{ integrationSnippet }}</code></pre>
-              </div>
-              <CopyButton :text-to-copy="integrationSnippet" class="absolute top-3 right-3" />
+              <CodeEditor :modelValue="jwtPayloadExample" language="javascript" :readOnly="true" />
+              <CopyButton :text-to-copy="jwtPayloadExample" class="absolute top-3 right-3" />
             </div>
 
-            <div class="box p-4 bg-info/10 border-info/20">
-              <h5 class="font-medium text-sm mb-2">
-                {{ $t('admin.inbox.livechat.installation.instructions.title') }}
-              </h5>
-              <ol class="text-sm space-y-2 list-decimal list-inside">
-                <li>{{ $t('admin.inbox.livechat.installation.instructions.step1') }}</li>
-                <li>{{ $t('admin.inbox.livechat.installation.instructions.step2') }}</li>
-              </ol>
+            <p class="text-sm text-muted-foreground">
+              {{ $t('admin.inbox.livechat.installation.authenticated.implementation.description') }}
+            </p>
+
+            <div class="relative">
+              <CodeEditor :modelValue="authenticatedIntegrationSnippet" language="html" :readOnly="true" />
+              <CopyButton :text-to-copy="authenticatedIntegrationSnippet" class="absolute top-3 right-3" />
             </div>
+
+            <p class="text-sm text-warning">
+              {{ $t('admin.inbox.livechat.installation.authenticated.secret.note') }}
+            </p>
           </div>
         </div>
       </div>
@@ -740,6 +764,7 @@ import { useI18n } from 'vue-i18n'
 import PreChatFormConfig from './PreChatFormConfig.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import CopyButton from '@/components/button/CopyButton.vue'
+import CodeEditor from '@/components/editor/CodeEditor.vue'
 
 const props = defineProps({
   initialValues: {
@@ -787,6 +812,38 @@ const integrationSnippet = computed(() => {
   const widget = initLibredeskWidget({
     baseUrl: '${baseUrl.value}',
     inboxID: ${inboxId}
+  });
+<\/script>`
+})
+
+// JWT payload example
+const jwtPayloadExample = computed(() => {
+  return `{
+  "external_user_id": "your_app_user_123",  // Required: Your application's unique user ID
+  "email": "user@example.com",              // Optional: User's email
+  "first_name": "John",                     // Optional: User's first name
+  "last_name": "Doe",                       // Optional: User's last name
+  "custom_attributes": {                    // Optional: Custom attributes
+    "plan": "premium",
+    "company": "Acme Inc"
+  }
+}`
+})
+
+// Authenticated integration snippet
+const authenticatedIntegrationSnippet = computed(() => {
+  const inboxId = props.initialValues?.id || '<INBOX_ID>'
+  return `<script src="${baseUrl.value}/widget.js"><\/script>
+<script>
+  // Your server should generate this JWT token
+  // Sign it with the secret key from the Security tab
+  const userJWT = 'YOUR_SIGNED_JWT_TOKEN_HERE';
+
+  // Initialize the Libredesk widget with authentication
+  const widget = initLibredeskWidget({
+    baseUrl: '${baseUrl.value}',
+    inboxID: ${inboxId},
+    libredesk_user_jwt: userJWT  // Pass the signed JWT token
   });
 <\/script>`
 })
