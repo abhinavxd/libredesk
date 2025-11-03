@@ -102,8 +102,12 @@ const settingsStore = useAppSettingsStore()
 const showQuotedText = ref(false)
 const { t } = useI18n()
 
+const participant = computed(() => {
+  return convStore.conversation?.participants?.[props.message.sender_id] ?? {}
+})
+
 const getAvatar = computed(() => {
-  return convStore.current?.contact?.avatar_url || ''
+  return participant.value?.avatar_url || ''
 })
 const sanitizedMessageContent = computed(() => {
   let content = props.message.content || ''
@@ -132,13 +136,14 @@ const nonInlineAttachments = computed(() =>
 )
 
 const getFullName = computed(() => {
-  const contact = convStore.current?.contact || {}
-  return `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
+  const firstName = participant.value?.first_name ?? 'User'
+  const lastName = participant.value?.last_name ?? ''
+  return `${firstName} ${lastName}`
 })
 
 const avatarFallback = computed(() => {
-  const contact = convStore.current?.contact || {}
-  return (contact.first_name || '').toUpperCase().substring(0, 2)
+  const firstName = participant.value?.first_name ?? 'U'
+  return firstName.toUpperCase().substring(0, 2)
 })
 
 const showEnvelope = computed(() => {
