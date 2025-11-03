@@ -31,7 +31,15 @@
           <hr class="mb-2" v-if="showEnvelope" />
 
           <!-- Message Text -->
+          <div
+            v-if="message.content_type === 'text'"
+            class="mb-1 native-html break-all whitespace-pre-wrap"
+            :class="{ 'mb-3': message.attachments.length > 0 }"
+          >
+            {{ sanitizedMessageContent }}
+          </div>
           <Letter
+            v-else
             :html="sanitizedMessageContent"
             :allowedSchemas="['cid', 'https', 'http', 'mailto']"
             class="mb-1 native-html break-all"
