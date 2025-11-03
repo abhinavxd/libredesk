@@ -195,8 +195,9 @@ func loadSettings(m *setting.Manager) {
 // initSettings inits setting manager.
 func initSettings(db *sqlx.DB) *setting.Manager {
 	s, err := setting.New(setting.Opts{
-		DB: db,
-		Lo: initLogger("settings"),
+		DB:            db,
+		Lo:            initLogger("settings"),
+		EncryptionKey: ko.MustString("app.encryption_key"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing setting manager: %v", err)
@@ -499,7 +500,7 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 // initInbox initializes the inbox manager without registering inboxes.
 func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 	var lo = initLogger("inbox-manager")
-	mgr, err := inbox.New(lo, db, i18n)
+	mgr, err := inbox.New(lo, db, i18n, ko.MustString("app.encryption_key"))
 	if err != nil {
 		log.Fatalf("error initializing inbox manager: %v", err)
 	}
@@ -535,12 +536,12 @@ func initAutoAssigner(teamManager *team.Manager, userManager *user.Manager, conv
 
 // initNotifier initializes the notifier service with available providers.
 func initNotifier() *notifier.Service {
-	smtpCfg := email.SMTPConfig{}
+	smtpCfg := imodels.SMTPConfig{}
 	if err := ko.UnmarshalWithConf("notification.email", &smtpCfg, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		log.Fatalf("error unmarshalling email notification provider config: %v", err)
 	}
 
-	emailNotifier, err := emailnotifier.New([]email.SMTPConfig{smtpCfg}, emailnotifier.Opts{
+	emailNotifier, err := emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
 		Lo:        initLogger("email-notifier"),
 		FromEmail: ko.String("notification.email.email_address"),
 	})
@@ -556,8 +557,8 @@ func initNotifier() *notifier.Service {
 }
 
 // initEmailInbox initializes the email inbox.
-func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
-	var config email.Config
+func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager) (inbox.Inbox, error) {
+	var config imodels.Config
 
 	// Load JSON data into Koanf.
 	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
@@ -566,6 +567,38 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 
 	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
+	}
+
+	configUpdated := false
+	if config.AuthType == imodels.AuthTypeOAuth2 {
+		if isTokenExpired(config.OAuth.ExpiresAt) {
+			log.Printf("refreshing expired OAuth token for SMTP config of inbox: %s", inboxRecord.Name)
+			newTokens, err := email.RefreshOAuthConfig(config.OAuth)
+			if err != nil {
+				log.Printf("ERROR: Failed to refresh OAuth token for SMTP: %v", err)
+				return nil, fmt.Errorf("refreshing SMTP OAuth token: %w", err)
+			}
+			config.OAuth = newTokens
+			configUpdated = true
+		}
+	}
+
+	// Save refreshed tokens to DB if they were updated
+	if configUpdated {
+		log.Printf("INFO: OAuth tokens refreshed for inbox: %s", inboxRecord.Name)
+
+		// Marshal updated config to JSON
+		updatedConfigJSON, err := json.Marshal(config)
+		if err != nil {
+			log.Printf("ERROR: Failed to marshal updated config for inbox %s: %v", inboxRecord.Name, err)
+		} else {
+			// Persist updated config to DB
+			if err := mgr.UpdateConfig(inboxRecord.ID, updatedConfigJSON); err != nil {
+				log.Printf("ERROR: Failed to persist refreshed tokens for inbox %s: %v", inboxRecord.Name, err)
+			} else {
+				log.Printf("INFO: Successfully persisted refreshed tokens for inbox: %s", inboxRecord.Name)
+			}
+		}
 	}
 
 	if len(config.SMTP) == 0 {
@@ -582,10 +615,30 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		log.Printf("WARNING: No `from` email address set for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
 	}
 
+	// Callback to persist refreshed tokens in DB.
+	tokenRefreshCallback := func(inboxID int, updatedConfig imodels.Config) error {
+		// Marshal updated config to JSON
+		updatedConfigJSON, err := json.Marshal(updatedConfig)
+		if err != nil {
+			log.Printf("ERROR: Failed to marshal updated config during token refresh for inbox %d: %v", inboxID, err)
+			return err
+		}
+
+		// Persist updated config to DB
+		if err := mgr.UpdateConfig(inboxID, updatedConfigJSON); err != nil {
+			log.Printf("ERROR: Failed to persist refreshed tokens during operation for inbox %d: %v", inboxID, err)
+			return err
+		}
+
+		log.Printf("INFO: Successfully persisted refreshed tokens during operation for inbox: %d", inboxID)
+		return nil
+	}
+
 	inbox, err := email.New(msgStore, usrStore, email.Opts{
-		ID:     inboxRecord.ID,
-		Config: config,
-		Lo:     initLogger("email_inbox"),
+		ID:                   inboxRecord.ID,
+		Config:               config,
+		Lo:                   initLogger("email_inbox"),
+		TokenRefreshCallback: tokenRefreshCallback,
 	})
 
 	if err != nil {
@@ -597,20 +650,22 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 	return inbox, nil
 }
 
-// initializeInboxes handles inbox initialization.
-func initializeInboxes(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
-	switch inboxR.Channel {
-	case "email":
-		return initEmailInbox(inboxR, msgStore, usrStore)
-	default:
-		return nil, fmt.Errorf("unknown inbox channel: %s", inboxR.Channel)
+// makeInboxInitializer creates an inbox initializer function.
+func makeInboxInitializer(mgr *inbox.Manager) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
+	return func(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
+		switch inboxR.Channel {
+		case "email":
+			return initEmailInbox(inboxR, msgStore, usrStore, mgr)
+		default:
+			return nil, fmt.Errorf("unknown inbox channel: %s", inboxR.Channel)
+		}
 	}
 }
 
 // reloadInboxes reloads all inboxes.
 func reloadInboxes(app *App) error {
 	app.lo.Info("reloading inboxes")
-	return app.inbox.Reload(ctx, initializeInboxes)
+	return app.inbox.Reload(ctx, makeInboxInitializer(app.inbox))
 }
 
 // startInboxes registers the active inboxes and starts receiver for each.
@@ -618,7 +673,7 @@ func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.Messag
 	mgr.SetMessageStore(msgStore)
 	mgr.SetUserStore(usrStore)
 
-	if err := mgr.InitInboxes(initializeInboxes); err != nil {
+	if err := mgr.InitInboxes(makeInboxInitializer(mgr)); err != nil {
 		log.Fatalf("error initializing inboxes: %v", err)
 	}
 
@@ -696,9 +751,10 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Manager {
 	lo := initLogger("oidc")
 	o, err := oidc.New(oidc.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:            db,
+		Lo:            lo,
+		I18n:          i18n,
+		EncryptionKey: ko.MustString("app.encryption_key"),
 	}, settings)
 	if err != nil {
 		log.Fatalf("error initializing oidc: %v", err)
@@ -870,12 +926,13 @@ func initReport(db *sqlx.DB, i18n *i18n.I18n) *report.Manager {
 func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 	var lo = initLogger("webhook")
 	m, err := webhook.New(webhook.Opts{
-		DB:        db,
-		Lo:        lo,
-		I18n:      i18n,
-		Workers:   ko.MustInt("webhook.workers"),
-		QueueSize: ko.MustInt("webhook.queue_size"),
-		Timeout:   ko.MustDuration("webhook.timeout"),
+		DB:            db,
+		Lo:            lo,
+		I18n:          i18n,
+		Workers:       ko.MustInt("webhook.workers"),
+		QueueSize:     ko.MustInt("webhook.queue_size"),
+		Timeout:       ko.MustDuration("webhook.timeout"),
+		EncryptionKey: ko.MustString("app.encryption_key"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)
@@ -919,4 +976,10 @@ func getLogLevel(lvl string) logf.Level {
 	default:
 		return logf.InfoLevel
 	}
+}
+
+// isTokenExpired checks if an OAuth token has expired or is about to expire.
+// Returns true if the token will expire in the next 5 minutes.
+func isTokenExpired(expiresAt time.Time) bool {
+	return time.Now().Add(5 * time.Minute).After(expiresAt)
 }

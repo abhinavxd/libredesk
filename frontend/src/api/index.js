@@ -431,6 +431,13 @@ const generateAPIKey = (id) =>
 
 const revokeAPIKey = (id) => http.delete(`/api/v1/agents/${id}/api-key`)
 
+const initiateOAuthFlow = (provider, data) =>
+  http.post(`/api/v1/inboxes/oauth/${provider}/authorize`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+
 export default {
   login,
   deleteUser,
@@ -567,5 +574,6 @@ export default {
   toggleWebhook,
   testWebhook,
   generateAPIKey,
-  revokeAPIKey
+  revokeAPIKey,
+  initiateOAuthFlow
 }

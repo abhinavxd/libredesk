@@ -6,8 +6,10 @@ import (
 	"math/rand"
 	"net/smtp"
 	"net/textproto"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/knadh/smtppool"
 )
@@ -25,24 +27,34 @@ const (
 )
 
 // NewSmtpPool returns a smtppool
-func NewSmtpPool(configs []SMTPConfig) ([]*smtppool.Pool, error) {
+func NewSmtpPool(configs []imodels.SMTPConfig, oauth *imodels.OAuthConfig) ([]*smtppool.Pool, error) {
 	pools := make([]*smtppool.Pool, 0, len(configs))
 
 	for _, cfg := range configs {
 		var auth smtp.Auth
-		switch cfg.AuthProtocol {
-		case "cram":
-			auth = smtp.CRAMMD5Auth(cfg.Username, cfg.Password)
-		case "plain":
-			auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
-		case "login":
-			auth = &smtppool.LoginAuth{Username: cfg.Username, Password: cfg.Password}
-		case "", "none":
-			// No authentication
-		default:
-			return nil, fmt.Errorf("unknown SMTP auth type '%s'", cfg.AuthProtocol)
+
+		// Check if OAuth authentication should be used
+		if oauth != nil {
+			auth = &XOAuth2SMTPAuth{
+				Username: cfg.Username,
+				Token:    oauth.AccessToken,
+			}
+		} else {
+			// Use traditional authentication methods
+			switch cfg.AuthProtocol {
+			case "cram":
+				auth = smtp.CRAMMD5Auth(cfg.Username, cfg.Password)
+			case "plain":
+				auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
+			case "login":
+				auth = &smtppool.LoginAuth{Username: cfg.Username, Password: cfg.Password}
+			case "", "none":
+				// No authentication
+			default:
+				return nil, fmt.Errorf("unknown SMTP auth type '%s'", cfg.AuthProtocol)
+			}
 		}
-		cfg.Opt.Auth = auth
+		cfg.Auth = auth
 
 		// TLS config
 		if cfg.TLSType != "none" {
@@ -55,11 +67,32 @@ func NewSmtpPool(configs []SMTPConfig) ([]*smtppool.Pool, error) {
 
 			// SSL/TLS, not STARTTLS
 			if cfg.TLSType == "tls" {
-				cfg.Opt.SSL = true
+				cfg.SSL = true
 			}
 		}
 
-		pool, err := smtppool.New(cfg.Opt)
+		// Parse timeouts.
+		idleTimeout, err := time.ParseDuration(cfg.IdleTimeout)
+		if err != nil {
+			idleTimeout = 30 * time.Second
+		}
+		poolWaitTimeout, err := time.ParseDuration(cfg.PoolWaitTimeout)
+		if err != nil {
+			poolWaitTimeout = 40 * time.Second
+		}
+
+		pool, err := smtppool.New(smtppool.Opt{
+			Host:              cfg.Host,
+			Port:              cfg.Port,
+			HelloHostname:     cfg.HelloHostname,
+			MaxConns:          cfg.MaxConns,
+			MaxMessageRetries: cfg.MaxMessageRetries,
+			IdleTimeout:       idleTimeout,
+			PoolWaitTimeout:   poolWaitTimeout,
+			SSL:               cfg.SSL,
+			Auth:              cfg.Auth,
+			TLSConfig:         cfg.TLSConfig,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -71,6 +104,28 @@ func NewSmtpPool(configs []SMTPConfig) ([]*smtppool.Pool, error) {
 
 // Send sends an email using one of the configured SMTP servers.
 func (e *Email) Send(m models.Message) error {
+	// Refresh OAuth token if needed
+	oauthConfig, tokensRefreshed, err := e.refreshOAuthIfNeeded()
+	if err != nil {
+		return err
+	}
+
+	// If tokens were refreshed, recreate SMTP pools
+	if tokensRefreshed {
+		// Close existing pools
+		for _, p := range e.smtpPools {
+			p.Close()
+		}
+
+		// Create new pools with refreshed tokens
+		newPools, err := NewSmtpPool(e.smtpCfg, oauthConfig)
+		if err != nil {
+			e.lo.Error("Failed to recreate SMTP pools after token refresh", "inbox_id", e.Identifier(), "error", err)
+			return fmt.Errorf("failed to recreate SMTP pools: %w", err)
+		}
+		e.smtpPools = newPools
+	}
+
 	// Select a random SMTP server if there are multiple
 	var (
 		serverCount = len(e.smtpPools)
