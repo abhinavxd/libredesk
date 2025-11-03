@@ -23,7 +23,12 @@ RETURNING *;
 UPDATE inboxes set deleted_at = now(), updated_at = now(), config = '{}' where id = $1 and deleted_at is NULL;
 
 -- name: toggle
-UPDATE inboxes 
-SET enabled = NOT enabled, updated_at = NOW() 
+UPDATE inboxes
+SET enabled = NOT enabled, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
+
+-- name: update-config
+UPDATE inboxes
+SET config = $2, updated_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL;

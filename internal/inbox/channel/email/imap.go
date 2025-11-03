@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/emersion/go-imap/v2"
@@ -25,7 +26,7 @@ const (
 )
 
 // ReadIncomingMessages reads and processes incoming messages from an IMAP server based on the provided configuration.
-func (e *Email) ReadIncomingMessages(ctx context.Context, cfg IMAPConfig) error {
+func (e *Email) ReadIncomingMessages(ctx context.Context, cfg imodels.IMAPConfig) error {
 	readInterval, err := time.ParseDuration(cfg.ReadInterval)
 	if err != nil {
 		e.lo.Warn("could not parse IMAP read interval, using the default read interval of 5 minutes", "interval", cfg.ReadInterval, "inbox_id", e.Identifier(), "error", err)
@@ -61,7 +62,7 @@ func (e *Email) ReadIncomingMessages(ctx context.Context, cfg IMAPConfig) error 
 }
 
 // processMailbox processes emails in the specified mailbox.
-func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration, cfg IMAPConfig) error {
+func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration, cfg imodels.IMAPConfig) error {
 	var (
 		client *imapclient.Client
 		err    error
@@ -88,8 +89,27 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 	}
 
 	defer client.Logout()
-	if err := client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
-		return fmt.Errorf("error logging in to the IMAP server: %w", err)
+
+	// Authenticate based on auth type
+	if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
+		// Refresh OAuth token if needed
+		oauthConfig, _, err := e.refreshOAuthIfNeeded()
+		if err != nil {
+			return err
+		}
+
+		// Use XOAUTH2 authentication
+		saslClient := &xoauth2IMAPClient{
+			username: cfg.Username,
+			token:    oauthConfig.AccessToken,
+		}
+		if err := client.Authenticate(saslClient); err != nil {
+			return fmt.Errorf("error authenticating with OAuth to IMAP server: %w", err)
+		}
+	} else {
+		if err := client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
+			return fmt.Errorf("error logging in to the IMAP server: %w", err)
+		}
 	}
 
 	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: true}).Wait(); err != nil {

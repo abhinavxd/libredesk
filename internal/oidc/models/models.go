@@ -1,7 +1,10 @@
 package models
 
 import (
+	"strings"
 	"time"
+
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 )
 
 // providerLogos holds known provider logos.
@@ -31,5 +34,12 @@ func (oidc *OIDC) SetProviderLogo() {
 		if oidc.Provider == provider {
 			oidc.ProviderLogoURL = logo
 		}
+	}
+}
+
+// ClearSecrets masks sensitive fields with dummy values for API responses.
+func (oidc *OIDC) ClearSecrets() {
+	if oidc.ClientSecret != "" {
+		oidc.ClientSecret = strings.Repeat(stringutil.PasswordDummy, 10)
 	}
 }
