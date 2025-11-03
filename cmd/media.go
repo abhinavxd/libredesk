@@ -185,6 +185,18 @@ func handleServeMedia(r *fastglue.Request) error {
 	consts := app.consts.Load().(*constants)
 	switch consts.UploadProvider {
 	case "fs":
+		disposition := "attachment"
+
+		// Keep certain content types inline.
+		if strings.HasPrefix(media.ContentType, "image/") ||
+			strings.HasPrefix(media.ContentType, "video/") ||
+			media.ContentType == "application/pdf" {
+			disposition = "inline"
+		}
+
+		r.RequestCtx.Response.Header.Set("Content-Type", media.ContentType)
+		r.RequestCtx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`%s; filename="%s"`, disposition, media.Filename))
+
 		fasthttp.ServeFile(r.RequestCtx, filepath.Join(ko.String("upload.fs.upload_path"), uuid))
 	case "s3":
 		r.RequestCtx.Redirect(app.media.GetURL(uuid), http.StatusFound)
