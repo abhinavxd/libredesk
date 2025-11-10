@@ -35,6 +35,7 @@ import (
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/organization"
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
@@ -245,6 +246,20 @@ func initTag(db *sqlx.DB, i18n *i18n.I18n) *tag.Manager {
 	})
 	if err != nil {
 		log.Fatalf("error initializing tags: %v", err)
+	}
+	return mgr
+}
+
+// initOrganization inits organization manager.
+func initOrganization(db *sqlx.DB, i18n *i18n.I18n) *organization.Manager {
+	var lo = initLogger("organization_manager")
+	mgr, err := organization.New(organization.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing organizations: %v", err)
 	}
 	return mgr
 }
