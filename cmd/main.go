@@ -36,6 +36,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/role"
+	"github.com/abhinavxd/libredesk/internal/organization"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
@@ -78,6 +79,7 @@ type App struct {
 	status          *status.Manager
 	priority        *priority.Manager
 	tag             *tag.Manager
+	organization    *organization.Manager
 	inbox           *inbox.Manager
 	tmpl            *template.Manager
 	macro           *macro.Manager
@@ -247,6 +249,7 @@ func main() {
 		search:          initSearch(db, i18n),
 		role:            initRole(db, i18n),
 		tag:             initTag(db, i18n),
+		organization:    initOrganization(db, i18n),
 		macro:           initMacro(db, i18n),
 		ai:              initAI(db, i18n),
 		webhook:         webhook,
