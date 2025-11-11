@@ -350,6 +350,38 @@ const routes = [
             ]
           },
           {
+            path: 'organizations',
+            component: () => import('@/views/admin/organizations/Organizations.vue'),
+            meta: { title: 'Organizations' },
+            children: [
+              {
+                path: '',
+                name: 'organization-list',
+                component: () => import('@/views/admin/organizations/OrganizationList.vue')
+              },
+              {
+                path: 'new',
+                name: 'new-organization',
+                component: () => import('@/views/admin/organizations/CreateOrganization.vue'),
+                meta: { title: 'Create Organization' }
+              },
+              {
+                path: ':id',
+                props: true,
+                name: 'organization-detail',
+                component: () => import('@/views/admin/organizations/OrganizationDetail.vue'),
+                meta: { title: 'Organization Details' }
+              },
+              {
+                path: ':id/edit',
+                props: true,
+                name: 'edit-organization',
+                component: () => import('@/views/admin/organizations/EditOrganization.vue'),
+                meta: { title: 'Edit Organization' }
+              }
+            ]
+          },
+          {
             path: 'automations',
             component: () => import('@/views/admin/automations/Automation.vue'),
             name: 'automations',

@@ -83,6 +83,17 @@ export const adminNavItems = [
     ]
   },
   {
+    titleKey: 'globals.terms.organization',
+    isTitleKeyPlural: true,
+    children: [
+      {
+        titleKey: 'globals.terms.organization',
+        href: '/admin/organizations',
+        permission: 'organizations:manage'
+      }
+    ]
+  },
+  {
     titleKey: 'globals.terms.automation',
     children: [
       {

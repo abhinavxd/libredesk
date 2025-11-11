@@ -422,7 +422,7 @@ const deleteWebhook = (id) => http.delete(`/api/v1/webhooks/${id}`)
 const toggleWebhook = (id) => http.put(`/api/v1/webhooks/${id}/toggle`)
 const testWebhook = (id) => http.post(`/api/v1/webhooks/${id}/test`)
 
-const generateAPIKey = (id) => 
+const generateAPIKey = (id) =>
   http.post(`/api/v1/agents/${id}/api-key`, {}, {
     headers: {
       'Content-Type': 'application/json'
@@ -430,6 +430,23 @@ const generateAPIKey = (id) =>
   })
 
 const revokeAPIKey = (id) => http.delete(`/api/v1/agents/${id}/api-key`)
+
+// Organizations
+const getOrganizations = (params) => http.get('/api/v1/organizations', { params })
+const getOrganization = (id) => http.get(`/api/v1/organizations/${id}`)
+const createOrganization = (data) =>
+  http.post('/api/v1/organizations', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const updateOrganization = (id, data) =>
+  http.put(`/api/v1/organizations/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const deleteOrganization = (id) => http.delete(`/api/v1/organizations/${id}`)
 
 export default {
   login,
@@ -567,5 +584,10 @@ export default {
   toggleWebhook,
   testWebhook,
   generateAPIKey,
-  revokeAPIKey
+  revokeAPIKey,
+  getOrganizations,
+  getOrganization,
+  createOrganization,
+  updateOrganization,
+  deleteOrganization
 }

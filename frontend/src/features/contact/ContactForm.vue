@@ -97,6 +97,34 @@
       </div>
     </div>
 
+    <FormField v-slot="{ componentField }" name="organization_id">
+      <FormItem class="flex flex-col">
+        <FormLabel class="flex items-center">
+          {{ t('globals.terms.organization', 1) }}
+          <span class="text-xs text-muted-foreground ml-2">({{ t('globals.messages.optional') }})</span>
+        </FormLabel>
+        <FormControl>
+          <ComboBox
+            v-bind="componentField"
+            :items="organizationOptions"
+            :placeholder="t('globals.messages.select', { name: t('globals.terms.organization', 1) })"
+            :searchPlaceholder="t('globals.messages.search')"
+            :emptyText="t('globals.messages.noOrganizationsFound')"
+            :modelValue="componentField.modelValue"
+            @update:modelValue="componentField['onUpdate:modelValue']"
+          >
+            <template #item="{ item }">
+              <div class="flex flex-col">
+                <span class="font-medium">{{ item.label }}</span>
+                <span v-if="item.domain" class="text-xs text-muted-foreground">{{ item.domain }}</span>
+              </div>
+            </template>
+          </ComboBox>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <div v-if="userStore.can('contacts:write')">
       <Button type="submit" :isLoading="formLoading" :disabled="formLoading">
         {{ t('globals.messages.update', { name: t('globals.terms.contact').toLowerCase() }) }}
@@ -106,6 +134,7 @@
 </template>
 
 <script setup>
+import { ref, onMounted, computed } from 'vue'
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -113,11 +142,13 @@ import ComboBox from '@/components/ui/combobox/ComboBox.vue'
 import countries from '@/constants/countries.js'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
+import api from '@/api'
 
 defineProps(['formLoading', 'onSubmit'])
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const organizations = ref([])
 
 const allCountries = countries.map((country) => ({
   label: country.name,
@@ -125,4 +156,21 @@ const allCountries = countries.map((country) => ({
   emoji: country.emoji,
   calling_code: country.calling_code
 }))
+
+const organizationOptions = computed(() =>
+  organizations.value.map((org) => ({
+    label: org.name,
+    value: org.id,
+    domain: org.email_domain
+  }))
+)
+
+onMounted(async () => {
+  try {
+    const response = await api.getOrganizations({})
+    organizations.value = response.data.data || []
+  } catch (error) {
+    console.error('Error fetching organizations:', error)
+  }
+})
 </script>

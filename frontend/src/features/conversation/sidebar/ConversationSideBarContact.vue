@@ -49,6 +49,22 @@
         {{ phoneNumber }}
       </span>
     </div>
+    <div
+      v-if="conversation?.contact?.organization"
+      class="text-sm text-muted-foreground flex gap-2 items-center"
+    >
+      <Building2 size="16" class="flex-shrink-0" />
+      <span v-if="conversationStore.conversation.loading">
+        <Skeleton class="w-32 h-4" />
+      </span>
+      <router-link
+        v-else
+        :to="{ name: 'organization-detail', params: { id: conversation.contact.organization.id } }"
+        class="text-blue-600 hover:text-blue-800 hover:underline break-all"
+      >
+        {{ conversation.contact.organization.name }}
+      </router-link>
+    </div>
   </div>
 </template>
 
@@ -57,7 +73,7 @@ import { computed } from 'vue'
 import { ViewVerticalIcon } from '@radix-icons/vue'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Mail, Phone, ExternalLink } from 'lucide-vue-next'
+import { Mail, Phone, ExternalLink, Building2 } from 'lucide-vue-next'
 import countries from '@/constants/countries.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'

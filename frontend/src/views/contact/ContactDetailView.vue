@@ -26,6 +26,16 @@
               </h2>
             </div>
 
+            <div v-if="contact.organization" class="flex items-center gap-2 text-sm">
+              <Building2 class="w-4 h-4 text-muted-foreground" />
+              <router-link
+                :to="{ name: 'organization-detail', params: { id: contact.organization.id } }"
+                class="text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                {{ contact.organization.name }}
+              </router-link>
+            </div>
+
             <div class="text-xs text-gray-500">
               {{ $t('globals.terms.createdOn') }}
               {{ contact.created_at ? format(new Date(contact.created_at), 'PPP') : 'N/A' }}
@@ -101,7 +111,7 @@ import {
   DialogDescription
 } from '@/components/ui/dialog'
 import { useUserStore } from '@/stores/user'
-import { ShieldOffIcon, ShieldCheckIcon } from 'lucide-vue-next'
+import { ShieldOffIcon, ShieldCheckIcon, Building2 } from 'lucide-vue-next'
 import ContactDetail from '@/layouts/contact/ContactDetail.vue'
 import api from '@/api'
 import ContactForm from '@/features/contact/ContactForm.vue'

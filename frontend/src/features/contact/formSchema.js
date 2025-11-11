@@ -38,4 +38,5 @@ export const createFormSchema = (t) => z.object({
         .email({
             message: t('globals.messages.invalidEmailAddress'),
         }),
+    organization_id: z.number().optional().nullable(),
 })
