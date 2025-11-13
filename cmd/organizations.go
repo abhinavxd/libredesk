@@ -21,6 +21,14 @@ func handleGetOrganizations(r *fastglue.Request) error {
 		total       = 0
 	)
 
+	// Set default values if not provided
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 50 // Default page size
+	}
+
 	organizations, err := app.organization.GetAll(page, pageSize, order, orderBy, filters)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
