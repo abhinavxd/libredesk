@@ -151,6 +151,60 @@ const { uploadingFiles, handleFileUpload, handleFileDelete, mediaFiles, clearMed
     linkedModel: 'messages'
   })
 
+// Store drafts per conversation UUID
+const conversationDrafts = ref({})
+
+// Load drafts from localStorage on mount
+const loadDraftsFromStorage = () => {
+  try {
+    const saved = localStorage.getItem('libredesk-conversation-drafts')
+    if (saved) {
+      conversationDrafts.value = JSON.parse(saved)
+    }
+  } catch (error) {
+    console.error('Failed to load conversation drafts:', error)
+    conversationDrafts.value = {}
+  }
+}
+
+// Save drafts to localStorage
+const saveDraftsToStorage = () => {
+  try {
+    localStorage.setItem('libredesk-conversation-drafts', JSON.stringify(conversationDrafts.value))
+  } catch (error) {
+    console.error('Failed to save conversation drafts:', error)
+  }
+}
+
+// Get draft for current conversation
+const getCurrentDraft = () => {
+  const uuid = conversationStore.current?.uuid
+  if (!uuid) return { htmlContent: '', textContent: '' }
+  
+  return conversationDrafts.value[uuid] || { htmlContent: '', textContent: '' }
+}
+
+// Save draft for current conversation
+const saveCurrentDraft = () => {
+  const uuid = conversationStore.current?.uuid
+  if (!uuid) return
+  
+  conversationDrafts.value[uuid] = {
+    htmlContent: htmlContent.value,
+    textContent: textContent.value
+  }
+  saveDraftsToStorage()
+}
+
+// Clear draft for current conversation
+const clearCurrentDraft = () => {
+  const uuid = conversationStore.current?.uuid
+  if (!uuid) return
+  
+  delete conversationDrafts.value[uuid]
+  saveDraftsToStorage()
+}
+
 // Rest of existing state
 const openAIKeyPrompt = ref(false)
 const isOpenAIKeyUpdating = ref(false)
@@ -163,12 +217,53 @@ const bcc = ref('')
 const showBcc = ref(false)
 const emailErrors = ref([])
 const aiPrompts = ref([])
-const htmlContent = ref('')
-const textContent = ref('')
+
+const htmlContent = computed({
+  get: () => getCurrentDraft().htmlContent,
+  set: (value) => {
+    const uuid = conversationStore.current?.uuid
+    if (!uuid) return
+    
+    if (!conversationDrafts.value[uuid]) {
+      conversationDrafts.value[uuid] = { htmlContent: '', textContent: '' }
+    }
+    conversationDrafts.value[uuid].htmlContent = value
+    saveDraftsToStorage()
+  }
+})
+
+const textContent = computed({
+  get: () => getCurrentDraft().textContent,
+  set: (value) => {
+    const uuid = conversationStore.current?.uuid
+    if (!uuid) return
+    
+    if (!conversationDrafts.value[uuid]) {
+      conversationDrafts.value[uuid] = { htmlContent: '', textContent: '' }
+    }
+    conversationDrafts.value[uuid].textContent = value
+    saveDraftsToStorage()
+  }
+})
 
 onMounted(async () => {
+  // Load drafts from localStorage
+  loadDraftsFromStorage()
+  
   await fetchAiPrompts()
 })
+
+// Watch for conversation changes and load appropriate draft
+watch(
+  () => conversationStore.current?.uuid,
+  (newUuid, oldUuid) => {
+    if (newUuid !== oldUuid) {
+      // The computed properties will automatically load the correct draft
+      // console.log(`Switched conversation: ${oldUuid} -> ${newUuid}`)
+    }
+  },
+  { immediate: true }
+)
 
 /**
  * Fetches AI prompts from the server.
@@ -299,6 +394,9 @@ const processSend = async () => {
   } finally {
     // If API has NOT errored clear state.
     if (hasMessageSendingErrored === false) {
+      // CHANGED: Clear the draft for this conversation
+      clearCurrentDraft()
+      
       // Clear macro.
       conversationStore.resetMacro('reply')
 
