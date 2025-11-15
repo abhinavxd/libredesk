@@ -199,6 +199,10 @@ const editor = useEditor({
   editorProps: {
     attributes: { class: 'outline-none' },
     handleKeyDown: (view, event) => {
+  if (event.ctrlKey && event.key.toLowerCase() === 'b') {
+      event.stopPropagation();
+      return false; 
+    }
       if (event.ctrlKey && event.key === 'Enter') {
         emit('send')
         return true
