@@ -106,6 +106,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { handleHTTPError } from '@/utils/http'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUserStore } from '@/stores/user'
+import { useDraftStore } from '@/stores/draftStore'
 import api from '@/api'
 import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@/stores/conversation'
@@ -142,6 +143,7 @@ const formSchema = toTypedSchema(
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
+const draftStore = useDraftStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
 
@@ -163,11 +165,32 @@ const bcc = ref('')
 const showBcc = ref(false)
 const emailErrors = ref([])
 const aiPrompts = ref([])
-const htmlContent = ref('')
-const textContent = ref('')
 
-onMounted(async () => {
-  await fetchAiPrompts()
+// Draft store integration with computed properties
+const htmlContent = computed({
+  get: () => draftStore.getDraft(conversationStore.current?.uuid).htmlContent,
+  set: (value) => {
+    draftStore.setDraft(
+      conversationStore.current?.uuid,
+      value,
+      textContent.value
+    )
+  }
+})
+
+const textContent = computed({
+  get: () => draftStore.getDraft(conversationStore.current?.uuid).textContent,
+  set: (value) => {
+    draftStore.setDraft(
+      conversationStore.current?.uuid,
+      htmlContent.value,
+      value
+    )
+  }
+})
+
+onMounted( () => {
+  draftStore.loadDrafts()
 })
 
 /**
@@ -299,6 +322,9 @@ const processSend = async () => {
   } finally {
     // If API has NOT errored clear state.
     if (hasMessageSendingErrored === false) {
+      // Clear draft from store
+      draftStore.clearDraft(conversationStore.current?.uuid)
+      
       // Clear macro.
       conversationStore.resetMacro('reply')
 
@@ -311,7 +337,6 @@ const processSend = async () => {
     isSending.value = false
   }
 }
-
 /**
  * Watches for changes in the conversation's macro id and update message content.
  */
