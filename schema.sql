@@ -106,6 +106,23 @@ CREATE TABLE teams (
 	CONSTRAINT constraint_teams_on_name_unique UNIQUE ("name")
 );
 
+DROP TABLE IF EXISTS organizations CASCADE;
+CREATE TABLE organizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    "name" TEXT NOT NULL,
+    website TEXT NULL,
+    email_domain TEXT NULL,
+    phone TEXT NULL,
+    CONSTRAINT constraint_organizations_on_name CHECK (length("name") <= 255),
+    CONSTRAINT constraint_organizations_on_website CHECK (length(website) <= 255),
+    CONSTRAINT constraint_organizations_on_email_domain CHECK (length(email_domain) <= 255),
+    CONSTRAINT constraint_organizations_on_phone CHECK (length(phone) <= 50)
+);
+CREATE INDEX index_organizations_on_name ON organizations USING btree ("name");
+CREATE INDEX index_organizations_on_email_domain ON organizations USING btree (email_domain);
+
 DROP TABLE IF EXISTS roles CASCADE;
 CREATE TABLE roles (
     id SERIAL PRIMARY KEY,
@@ -144,6 +161,8 @@ CREATE TABLE users (
 	api_key TEXT NULL,
 	api_secret TEXT NULL,
 	api_key_last_used_at TIMESTAMPTZ NULL,
+	-- Organization relationship (for contacts)
+	organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL ON UPDATE CASCADE NULL,
     CONSTRAINT constraint_users_on_country CHECK (LENGTH(country) <= 140),
     CONSTRAINT constraint_users_on_phone_number CHECK (LENGTH(phone_number) <= 20),
 	CONSTRAINT constraint_users_on_phone_number_country_code CHECK (LENGTH(phone_number_country_code) <= 10),
@@ -155,6 +174,7 @@ CREATE UNIQUE INDEX index_unique_users_on_email_and_type_when_deleted_at_is_null
 WHERE deleted_at IS NULL;
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
+CREATE INDEX index_users_on_organization_id ON users(organization_id);
 
 DROP TABLE IF EXISTS user_roles CASCADE;
 CREATE TABLE user_roles (
@@ -669,7 +689,7 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
+		'{webhooks:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage,organizations:manage}'
 	);
 
 
