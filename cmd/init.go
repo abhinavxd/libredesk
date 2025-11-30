@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"html/template"
@@ -52,6 +53,7 @@ import (
 	kjson "github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/confmap"
+	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/posflag"
 	"github.com/knadh/koanf/providers/rawbytes"
@@ -74,17 +76,27 @@ type constants struct {
 	MaxFileUploadSizeMB         int
 }
 
-// Config loads config files into koanf.
+// Config loads config from files and environment variables into koanf.
 func initConfig(ko *koanf.Koanf) {
 	for _, f := range ko.Strings("config") {
 		log.Println("reading config file:", f)
 		if err := ko.Load(file.Provider(f), toml.Parser()); err != nil {
 			if os.IsNotExist(err) {
-				log.Fatal("error config file not found.")
+				log.Printf("WARNING: Config file not found. Continuing with defaults and environment variables.")
+				continue
 			}
 			log.Fatalf("error loading config from file: %v.", err)
 		}
 	}
+	// Load environment variables with `LIBREDESK_` prefix.
+	ko.Load(env.Provider(".", env.Opt{
+		Prefix: "LIBREDESK_",
+		TransformFunc: func(key, val string) (string, any) {
+			// Transform the key.
+			key = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(key, "LIBREDESK_")), "_", ".")
+			return key, val
+		},
+	}), nil)
 }
 
 // initFlags initializes the commandline flags.
