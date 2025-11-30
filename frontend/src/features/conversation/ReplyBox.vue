@@ -53,8 +53,8 @@
           :isSending="isSending"
           :uploadingFiles="uploadingFiles"
           :uploadedFiles="mediaFiles"
-          v-model:htmlContent="htmlContent"
-          v-model:textContent="textContent"
+          v-model:htmlContent="localHtmlContent"
+          v-model:textContent="localTextContent"
           v-model:to="to"
           v-model:cc="cc"
           v-model:bcc="bcc"
@@ -83,8 +83,8 @@
         :isSending="isSending"
         :uploadingFiles="uploadingFiles"
         :uploadedFiles="mediaFiles"
-        v-model:htmlContent="htmlContent"
-        v-model:textContent="textContent"
+        v-model:htmlContent="localHtmlContent"
+        v-model:textContent="localTextContent"
         v-model:to="to"
         v-model:cc="cc"
         v-model:bcc="bcc"
@@ -102,10 +102,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { handleHTTPError } from '@/utils/http'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUserStore } from '@/stores/user'
+import { useDraftManager } from '@/composables/useDraftManager'
 import api from '@/api'
 import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@/stores/conversation'
@@ -151,6 +152,15 @@ const { uploadingFiles, handleFileUpload, handleFileDelete, mediaFiles, clearMed
     linkedModel: 'messages'
   })
 
+// Setup draft management composable
+const currentDraftKey = computed(() => conversationStore.current?.uuid || null)
+const {
+  htmlContent: localHtmlContent,
+  textContent: localTextContent,
+  isLoadingDraft,
+  clearDraft
+} = useDraftManager(currentDraftKey)
+
 // Rest of existing state
 const openAIKeyPrompt = ref(false)
 const isOpenAIKeyUpdating = ref(false)
@@ -163,12 +173,6 @@ const bcc = ref('')
 const showBcc = ref(false)
 const emailErrors = ref([])
 const aiPrompts = ref([])
-const htmlContent = ref('')
-const textContent = ref('')
-
-onMounted(async () => {
-  await fetchAiPrompts()
-})
 
 /**
  * Fetches AI prompts from the server.
@@ -185,6 +189,9 @@ const fetchAiPrompts = async () => {
   }
 }
 
+// Call fetchAiPrompts immediately when component is set up
+fetchAiPrompts()
+
 /**
  * Handles the AI prompt selection event.
  * Sends the selected prompt key and the current text content to the server for completion.
@@ -195,9 +202,9 @@ const handleAiPromptSelected = async (key) => {
   try {
     const resp = await api.aiCompletion({
       prompt_key: key,
-      content: textContent.value
+      content: localTextContent.value
     })
-    htmlContent.value = resp.data.data.replace(/\n/g, '<br>')
+    localHtmlContent.value = resp.data.data.replace(/\n/g, '<br>')
   } catch (error) {
     // Check if user needs to enter OpenAI API key and has permission to do so.
     if (error.response?.status === 400 && userStore.can('ai:manage')) {
@@ -238,7 +245,7 @@ const updateProvider = async (values) => {
  * Returns true if the editor has text content.
  */
 const hasTextContent = computed(() => {
-  return textContent.value.trim().length > 0
+  return localTextContent.value.trim().length > 0
 })
 
 /**
@@ -251,7 +258,7 @@ const processSend = async () => {
     isSending.value = true
     // Send message if there is text content in the editor or media files are attached.
     if (hasTextContent.value > 0 || mediaFiles.value.length > 0) {
-      const message = htmlContent.value
+      const message = localHtmlContent.value
       await api.sendMessage(conversationStore.current.uuid, {
         sender_type: UserTypeAgent,
         private: messageType.value === 'private_note',
@@ -299,6 +306,9 @@ const processSend = async () => {
   } finally {
     // If API has NOT errored clear state.
     if (hasMessageSendingErrored === false) {
+      // Clear draft using composable
+      clearDraft(currentDraftKey.value)
+      
       // Clear macro.
       conversationStore.resetMacro('reply')
 
@@ -311,14 +321,16 @@ const processSend = async () => {
     isSending.value = false
   }
 }
-
 /**
  * Watches for changes in the conversation's macro id and update message content.
  */
 watch(
   () => conversationStore.getMacro('reply').id,
-  () => {
-    htmlContent.value = conversationStore.getMacro('reply').message_content
+  (newId, oldId) => {
+    // Only update if macro ID actually changed and is not undefined/0
+    if (newId && newId !== oldId && conversationStore.getMacro('reply').message_content) {
+      localHtmlContent.value = conversationStore.getMacro('reply').message_content
+    }
   },
   { deep: true }
 )
