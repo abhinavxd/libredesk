@@ -154,6 +154,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/inboxes/{id}", perm(handleUpdateInbox, "inboxes:manage"))
 	g.DELETE("/api/v1/inboxes/{id}", perm(handleDeleteInbox, "inboxes:manage"))
 
+	// OAuth endpoints for email inboxes.
+	g.POST("/api/v1/inboxes/oauth/{provider}/authorize", perm(handleOAuthAuthorize, "inboxes:manage"))
+	g.GET("/api/v1/inboxes/oauth/{provider}/callback", perm(handleOAuthCallback, "inboxes:manage"))
+
 	// Roles.
 	g.GET("/api/v1/roles", auth(handleGetRoles))
 	g.GET("/api/v1/roles/{id}", perm(handleGetRole, "roles:manage"))

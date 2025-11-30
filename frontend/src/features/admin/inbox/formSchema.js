@@ -1,11 +1,21 @@
 import * as z from 'zod'
 import { isGoDuration } from '@/utils/strings'
+import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
 
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, t('globals.messages.required')),
   from: z.string().min(1, t('globals.messages.required')),
   enabled: z.boolean().optional(),
   csat_enabled: z.boolean().optional(),
+  auth_type: z.enum([AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2]),
+  oauth: z.object({
+    access_token: z.string().optional(),
+    client_id: z.string().optional(),
+    client_secret: z.string().optional(),
+    expires_at: z.string().optional(),
+    provider: z.string().optional(),
+    refresh_token: z.string().optional()
+  }).optional(),
   imap: z.object({
     host: z.string().min(1, t('globals.messages.required')),
     port: z.number().min(1).max(65535),
@@ -21,7 +31,6 @@ export const createFormSchema = (t) => z.object({
       message: t('globals.messages.goDuration')
     })
   }),
-
   smtp: z.object({
     host: z.string().min(1, t('globals.messages.required')),
     port: z.number().min(1).max(65535),
