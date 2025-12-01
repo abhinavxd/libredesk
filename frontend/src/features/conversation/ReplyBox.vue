@@ -102,10 +102,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { handleHTTPError } from '@/utils/http'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUserStore } from '@/stores/user'
+import { useDraftManager } from '@/composables/useDraftManager'
 import api from '@/api'
 import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@/stores/conversation'
@@ -151,6 +152,15 @@ const { uploadingFiles, handleFileUpload, handleFileDelete, mediaFiles, clearMed
     linkedModel: 'messages'
   })
 
+// Setup draft management composable
+const currentDraftKey = computed(() => conversationStore.current?.uuid || null)
+const {
+  htmlContent,
+  textContent,
+  isLoadingDraft,
+  clearDraft
+} = useDraftManager(currentDraftKey)
+
 // Rest of existing state
 const openAIKeyPrompt = ref(false)
 const isOpenAIKeyUpdating = ref(false)
@@ -163,12 +173,6 @@ const bcc = ref('')
 const showBcc = ref(false)
 const emailErrors = ref([])
 const aiPrompts = ref([])
-const htmlContent = ref('')
-const textContent = ref('')
-
-onMounted(async () => {
-  await fetchAiPrompts()
-})
 
 /**
  * Fetches AI prompts from the server.
@@ -184,6 +188,9 @@ const fetchAiPrompts = async () => {
     })
   }
 }
+
+// Call fetchAiPrompts immediately when component is set up
+fetchAiPrompts()
 
 /**
  * Handles the AI prompt selection event.
@@ -299,6 +306,9 @@ const processSend = async () => {
   } finally {
     // If API has NOT errored clear state.
     if (hasMessageSendingErrored === false) {
+      // Clear draft using composable
+      clearDraft(currentDraftKey.value)
+      
       // Clear macro.
       conversationStore.resetMacro('reply')
 
@@ -311,14 +321,16 @@ const processSend = async () => {
     isSending.value = false
   }
 }
-
 /**
  * Watches for changes in the conversation's macro id and update message content.
  */
 watch(
   () => conversationStore.getMacro('reply').id,
-  () => {
-    htmlContent.value = conversationStore.getMacro('reply').message_content
+  (newId, oldId) => {
+    // Only update if macro ID actually changed and is not undefined/0
+    if (newId && newId !== oldId && conversationStore.getMacro('reply').message_content) {
+      htmlContent.value = conversationStore.getMacro('reply').message_content
+    }
   },
   { deep: true }
 )
