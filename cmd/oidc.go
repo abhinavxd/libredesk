@@ -2,11 +2,9 @@ package main
 
 import (
 	"strconv"
-	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/oidc/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -20,7 +18,7 @@ func handleGetAllOIDC(r *fastglue.Request) error {
 	}
 	// Replace secrets with dummy values.
 	for i := range out {
-		out[i].ClientSecret = strings.Repeat(stringutil.PasswordDummy, 10)
+		out[i].ClearSecrets()
 	}
 	return r.SendEnvelope(out)
 }
@@ -30,13 +28,13 @@ func handleGetOIDC(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.invalid", "name", "OIDC `id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
-	o, err := app.oidc.Get(id, false)
+	o, err := app.oidc.Get(id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	o.ClearSecrets()
 	return r.SendEnvelope(o)
 }
 
@@ -66,7 +64,7 @@ func handleCreateOIDC(r *fastglue.Request) error {
 	}
 
 	// Clear client secret before returning
-	createdOIDC.ClientSecret = strings.Repeat(stringutil.PasswordDummy, 10)
+	createdOIDC.ClearSecrets()
 
 	return r.SendEnvelope(createdOIDC)
 }
@@ -79,7 +77,7 @@ func handleUpdateOIDC(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "OIDC `id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&req, "json"); err != nil {
@@ -102,7 +100,7 @@ func handleUpdateOIDC(r *fastglue.Request) error {
 	}
 
 	// Clear client secret before returning
-	updatedOIDC.ClientSecret = strings.Repeat(stringutil.PasswordDummy, 10)
+	updatedOIDC.ClearSecrets()
 
 	return r.SendEnvelope(updatedOIDC)
 }
@@ -112,7 +110,7 @@ func handleDeleteOIDC(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "OIDC `id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
 	}
 	if err = app.oidc.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)

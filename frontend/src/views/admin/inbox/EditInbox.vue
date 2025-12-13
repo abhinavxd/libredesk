@@ -13,6 +13,7 @@ import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import { CustomBreadcrumb } from '@/components/ui/breadcrumb/index.js'
 import { Spinner } from '@/components/ui/spinner'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@/utils/http'
 import { useI18n } from 'vue-i18n'
@@ -28,21 +29,41 @@ const breadcrumbLinks = [
 ]
 
 const submitForm = (values) => {
+  // Prepare request payload from form values
+  const config = {
+    auth_type: values.auth_type,
+    imap: [{ ...values.imap }],
+    smtp: [{ ...values.smtp }]
+  }
+
+  // Only add oauth if auth_type is oauth2
+  if (values.auth_type === AUTH_TYPE_OAUTH2) {
+    config.oauth = values.oauth
+  }
+
   const payload = {
     ...values,
     channel: inbox.value.channel,
-    config: {
-      imap: [{ ...values.imap }],
-      smtp: [{ ...values.smtp }]
-    }
+    config
   }
 
-  // Set dummy IMAP password to empty string
+  // Set dummy passwords to empty string
   if (payload.config.imap[0].password?.includes('•')) {
     payload.config.imap[0].password = ''
   }
 
-  // Set dummy SMTP passwords to empty strings
+  if (payload.config.auth_type === AUTH_TYPE_OAUTH2) {
+    if (payload.config.oauth.access_token?.includes('•')) {
+      payload.config.oauth.access_token = ''
+    }
+    if (payload.config.oauth.client_secret?.includes('•')) {
+      payload.config.oauth.client_secret = ''
+    }
+    if (payload.config.oauth.refresh_token?.includes('•')) {
+      payload.config.oauth.refresh_token = ''
+    }
+  }
+
   payload.config.smtp.forEach((smtp) => {
     if (smtp.password?.includes('•')) {
       smtp.password = ''
@@ -83,6 +104,8 @@ onMounted(async () => {
     if (inboxData?.config?.smtp) {
       inboxData.smtp = inboxData?.config?.smtp[0]
     }
+    inboxData.auth_type = inboxData?.config?.auth_type || AUTH_TYPE_PASSWORD
+    inboxData.oauth = inboxData?.config?.oauth || {}
     inbox.value = inboxData
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

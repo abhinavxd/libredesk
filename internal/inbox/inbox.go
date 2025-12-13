@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
@@ -78,41 +79,44 @@ type Opts struct {
 }
 
 type Manager struct {
-	mu        sync.RWMutex
-	queries   queries
-	inboxes   map[int]Inbox
-	lo        *logf.Logger
-	i18n      *i18n.I18n
-	receivers map[int]context.CancelFunc
-	msgStore  MessageStore
-	usrStore  UserStore
-	wg        sync.WaitGroup
+	mu            sync.RWMutex
+	queries       queries
+	inboxes       map[int]Inbox
+	lo            *logf.Logger
+	i18n          *i18n.I18n
+	receivers     map[int]context.CancelFunc
+	msgStore      MessageStore
+	usrStore      UserStore
+	wg            sync.WaitGroup
+	encryptionKey string
 }
 
 // Prepared queries.
 type queries struct {
-	GetInbox    *sqlx.Stmt `query:"get-inbox"`
-	GetActive   *sqlx.Stmt `query:"get-active-inboxes"`
-	GetAll      *sqlx.Stmt `query:"get-all-inboxes"`
-	Update      *sqlx.Stmt `query:"update"`
-	Toggle      *sqlx.Stmt `query:"toggle"`
-	SoftDelete  *sqlx.Stmt `query:"soft-delete"`
-	InsertInbox *sqlx.Stmt `query:"insert-inbox"`
+	GetInbox     *sqlx.Stmt `query:"get-inbox"`
+	GetActive    *sqlx.Stmt `query:"get-active-inboxes"`
+	GetAll       *sqlx.Stmt `query:"get-all-inboxes"`
+	Update       *sqlx.Stmt `query:"update"`
+	Toggle       *sqlx.Stmt `query:"toggle"`
+	SoftDelete   *sqlx.Stmt `query:"soft-delete"`
+	InsertInbox  *sqlx.Stmt `query:"insert-inbox"`
+	UpdateConfig *sqlx.Stmt `query:"update-config"`
 }
 
 // New returns a new inbox manager.
-func New(lo *logf.Logger, db *sqlx.DB, i18n *i18n.I18n) (*Manager, error) {
+func New(lo *logf.Logger, db *sqlx.DB, i18n *i18n.I18n, encryptionKey string) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
 		return nil, err
 	}
 
 	m := &Manager{
-		lo:        lo,
-		inboxes:   make(map[int]Inbox),
-		receivers: make(map[int]context.CancelFunc),
-		queries:   q,
-		i18n:      i18n,
+		lo:            lo,
+		inboxes:       make(map[int]Inbox),
+		receivers:     make(map[int]context.CancelFunc),
+		queries:       q,
+		i18n:          i18n,
+		encryptionKey: encryptionKey,
 	}
 	return m, nil
 }
@@ -155,6 +159,15 @@ func (m *Manager) GetDBRecord(id int) (imodels.Inbox, error) {
 		m.lo.Error("error fetching inbox", "error", err)
 		return inbox, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil)
 	}
+
+	// Decrypt sensitive fields in config
+	decryptedConfig, err := m.decryptInboxConfig(inbox.Config)
+	if err != nil {
+		m.lo.Error("error decrypting inbox config", "id", id, "error", err)
+		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil)
+	}
+	inbox.Config = decryptedConfig
+
 	return inbox, nil
 }
 
@@ -165,16 +178,43 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 		m.lo.Error("error fetching inboxes", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.terms.inbox")), nil)
 	}
+
+	// Decrypt sensitive fields in each inbox config
+	for i := range inboxes {
+		decryptedConfig, err := m.decryptInboxConfig(inboxes[i].Config)
+		if err != nil {
+			m.lo.Error("error decrypting inbox config", "id", inboxes[i].ID, "error", err)
+			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.terms.inbox")), nil)
+		}
+		inboxes[i].Config = decryptedConfig
+	}
+
 	return inboxes, nil
 }
 
 // Create creates an inbox in the DB.
 func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
+	// Encrypt sensitive fields before saving
+	encryptedConfig, err := m.encryptInboxConfig(inbox.Config)
+	if err != nil {
+		m.lo.Error("error encrypting inbox config", "error", err)
+		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.inbox}"), nil)
+	}
+
 	var createdInbox imodels.Inbox
-	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, inbox.Config, inbox.Name, inbox.From, inbox.CSATEnabled); err != nil {
+	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled); err != nil {
 		m.lo.Error("error creating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.inbox}"), nil)
 	}
+
+	// Decrypt before returning
+	decryptedConfig, err := m.decryptInboxConfig(createdInbox.Config)
+	if err != nil {
+		m.lo.Error("error decrypting inbox config after creation", "error", err)
+	} else {
+		createdInbox.Config = decryptedConfig
+	}
+
 	return createdInbox, nil
 }
 
@@ -265,12 +305,16 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	switch current.Channel {
 	case "email":
 		var currentCfg struct {
-			IMAP []map[string]interface{} `json:"imap"`
-			SMTP []map[string]interface{} `json:"smtp"`
+			AuthType string                   `json:"auth_type"`
+			OAuth    map[string]string        `json:"oauth"`
+			IMAP     []map[string]interface{} `json:"imap"`
+			SMTP     []map[string]interface{} `json:"smtp"`
 		}
 		var updateCfg struct {
-			IMAP []map[string]interface{} `json:"imap"`
-			SMTP []map[string]interface{} `json:"smtp"`
+			AuthType string                   `json:"auth_type"`
+			OAuth    map[string]string        `json:"oauth"`
+			IMAP     []map[string]interface{} `json:"imap"`
+			SMTP     []map[string]interface{} `json:"smtp"`
 		}
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
@@ -306,6 +350,14 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 				updateCfg.SMTP[i]["password"] = currentCfg.SMTP[i]["password"]
 			}
 		}
+
+		// Preserve existing OAuth fields if update has empty fields
+		for k, v := range currentCfg.OAuth {
+			if updateCfg.OAuth[k] == "" { 
+				updateCfg.OAuth[k] = v
+			}
+		}
+
 		updatedConfig, err := json.Marshal(updateCfg)
 		if err != nil {
 			m.lo.Error("error marshalling updated config", "id", id, "error", err)
@@ -314,11 +366,26 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 		inbox.Config = updatedConfig
 	}
 
+	// Encrypt sensitive fields before updating
+	encryptedConfig, err := m.encryptInboxConfig(inbox.Config)
+	if err != nil {
+		m.lo.Error("error encrypting inbox config", "error", err)
+		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.inbox}"), nil)
+	}
+
 	// Update the inbox in the DB.
 	var updatedInbox imodels.Inbox
-	if err := m.queries.Update.Get(&updatedInbox, id, inbox.Channel, inbox.Config, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Enabled); err != nil {
+	if err := m.queries.Update.Get(&updatedInbox, id, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Enabled); err != nil {
 		m.lo.Error("error updating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.inbox}"), nil)
+	}
+
+	// Decrypt before returning
+	decryptedConfig, err := m.decryptInboxConfig(updatedInbox.Config)
+	if err != nil {
+		m.lo.Error("error decrypting inbox config after update", "error", err)
+	} else {
+		updatedInbox.Config = decryptedConfig
 	}
 
 	return updatedInbox, nil
@@ -339,6 +406,22 @@ func (m *Manager) SoftDelete(id int) error {
 	if _, err := m.queries.SoftDelete.Exec(id); err != nil {
 		m.lo.Error("error deleting inbox", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.inbox}"), nil)
+	}
+	return nil
+}
+
+// UpdateConfig updates only the config field of an inbox in the DB.
+func (m *Manager) UpdateConfig(id int, config json.RawMessage) error {
+	// Encrypt fields before updating
+	encryptedConfig, err := m.encryptInboxConfig(config)
+	if err != nil {
+		m.lo.Error("error encrypting inbox config", "id", id, "error", err)
+		return fmt.Errorf("encrypting inbox config: %w", err)
+	}
+
+	if _, err := m.queries.UpdateConfig.Exec(id, encryptedConfig); err != nil {
+		m.lo.Error("error updating inbox config", "id", id, "error", err)
+		return fmt.Errorf("updating inbox config: %w", err)
 	}
 	return nil
 }
@@ -388,5 +471,142 @@ func (m *Manager) getActive() ([]imodels.Inbox, error) {
 		m.lo.Error("fetching active inboxes", "error", err)
 		return nil, err
 	}
+
+	// Decrypt sensitive fields in each inbox config
+	for i := range inboxes {
+		decryptedConfig, err := m.decryptInboxConfig(inboxes[i].Config)
+		if err != nil {
+			m.lo.Error("error decrypting inbox config", "id", inboxes[i].ID, "error", err)
+			return nil, fmt.Errorf("decrypting inbox config for ID %d: %w", inboxes[i].ID, err)
+		}
+		inboxes[i].Config = decryptedConfig
+	}
+
 	return inboxes, nil
+}
+
+// encryptInboxConfig encrypts sensitive fields in the inbox config JSON.
+func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, error) {
+	if len(config) == 0 {
+		return config, nil
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(config, &cfg); err != nil {
+		return nil, fmt.Errorf("unmarshalling config: %w", err)
+	}
+
+	// Encrypt SMTP passwords
+	if smtpSlice, ok := cfg["smtp"].([]interface{}); ok {
+		for i, smtpItem := range smtpSlice {
+			if smtpMap, ok := smtpItem.(map[string]interface{}); ok {
+				if password, ok := smtpMap["password"].(string); ok && password != "" {
+					encrypted, err := crypto.Encrypt(password, m.encryptionKey)
+					if err != nil {
+						return nil, fmt.Errorf("encrypting SMTP password at index %d: %w", i, err)
+					}
+					smtpMap["password"] = encrypted
+				}
+			}
+		}
+	}
+
+	// Encrypt IMAP passwords
+	if imapSlice, ok := cfg["imap"].([]interface{}); ok {
+		for i, imapItem := range imapSlice {
+			if imapMap, ok := imapItem.(map[string]interface{}); ok {
+				if password, ok := imapMap["password"].(string); ok && password != "" {
+					encrypted, err := crypto.Encrypt(password, m.encryptionKey)
+					if err != nil {
+						return nil, fmt.Errorf("encrypting IMAP password at index %d: %w", i, err)
+					}
+					imapMap["password"] = encrypted
+				}
+			}
+		}
+	}
+
+	// Encrypt OAuth fields if present
+	if oauthMap, ok := cfg["oauth"].(map[string]interface{}); ok {
+		fields := []string{"client_id", "client_secret", "access_token", "refresh_token"}
+		for _, fieldName := range fields {
+			if fieldValue, ok := oauthMap[fieldName].(string); ok && fieldValue != "" {
+				encrypted, err := crypto.Encrypt(fieldValue, m.encryptionKey)
+				if err != nil {
+					return nil, fmt.Errorf("encrypting OAuth %s: %w", fieldName, err)
+				}
+				oauthMap[fieldName] = encrypted
+			}
+		}
+	}
+
+	encrypted, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling encrypted config: %w", err)
+	}
+
+	return encrypted, nil
+}
+
+// decryptInboxConfig decrypts sensitive fields in the inbox config JSON.
+func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, error) {
+	if len(config) == 0 {
+		return config, nil
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(config, &cfg); err != nil {
+		return nil, fmt.Errorf("unmarshalling config: %w", err)
+	}
+
+	// Decrypt SMTP passwords
+	if smtpSlice, ok := cfg["smtp"].([]interface{}); ok {
+		for i, smtpItem := range smtpSlice {
+			if smtpMap, ok := smtpItem.(map[string]interface{}); ok {
+				if password, ok := smtpMap["password"].(string); ok && password != "" {
+					decrypted, err := crypto.Decrypt(password, m.encryptionKey)
+					if err != nil {
+						return nil, fmt.Errorf("decrypting SMTP password at index %d: %w", i, err)
+					}
+					smtpMap["password"] = decrypted
+				}
+			}
+		}
+	}
+
+	// Decrypt IMAP passwords
+	if imapSlice, ok := cfg["imap"].([]interface{}); ok {
+		for i, imapItem := range imapSlice {
+			if imapMap, ok := imapItem.(map[string]interface{}); ok {
+				if password, ok := imapMap["password"].(string); ok && password != "" {
+					decrypted, err := crypto.Decrypt(password, m.encryptionKey)
+					if err != nil {
+						return nil, fmt.Errorf("decrypting IMAP password at index %d: %w", i, err)
+					}
+					imapMap["password"] = decrypted
+				}
+			}
+		}
+	}
+
+	// Decrypt OAuth fields if present
+	if oauthMap, ok := cfg["oauth"].(map[string]interface{}); ok {
+		fields := []string{"client_id", "client_secret", "access_token", "refresh_token"}
+		for _, fieldName := range fields {
+			if fieldValue, ok := oauthMap[fieldName].(string); ok && fieldValue != "" {
+				decrypted, err := crypto.Decrypt(fieldValue, m.encryptionKey)
+				if err != nil {
+					return nil, fmt.Errorf("decrypting OAuth %s: %w", fieldName, err)
+				}
+				oauthMap[fieldName] = decrypted
+			}
+		}
+	}
+
+	decrypted, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling decrypted config: %w", err)
+	}
+
+	return decrypted, nil
 }
