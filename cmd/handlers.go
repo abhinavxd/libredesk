@@ -199,7 +199,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// AI completions.
 	g.GET("/api/v1/ai/prompts", auth(handleGetAIPrompts))
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
+	g.GET("/api/v1/ai/providers", perm(handleGetAIProviders, "ai:manage"))
+	g.GET("/api/v1/ai/providers/supported", perm(handleGetSupportedProviders, "ai:manage"))
+	g.GET("/api/v1/ai/models", perm(handleGetAvailableModels, "ai:manage"))
 	g.PUT("/api/v1/ai/provider", perm(handleUpdateAIProvider, "ai:manage"))
+	g.PUT("/api/v1/ai/provider/default", perm(handleSetDefaultAIProvider, "ai:manage"))
+	g.POST("/api/v1/ai/provider/test", perm(handleTestAIProvider, "ai:manage"))
 
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))

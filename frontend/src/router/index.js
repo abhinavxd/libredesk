@@ -182,6 +182,12 @@ const routes = [
             meta: { title: 'General' }
           },
           {
+            path: 'ai',
+            name: 'ai-settings',
+            component: () => import('@/views/admin/ai/AISettings.vue'),
+            meta: { title: 'AI Settings' }
+          },
+          {
             path: 'business-hours',
             component: () => import('@/views/admin/business-hours/BusinessHours.vue'),
             meta: { title: 'Business Hours' },

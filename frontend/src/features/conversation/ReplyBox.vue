@@ -201,7 +201,13 @@ const handleAiPromptSelected = async (key) => {
   } catch (error) {
     // Check if user needs to enter OpenAI API key and has permission to do so.
     if (error.response?.status === 400 && userStore.can('ai:manage')) {
-      openAIKeyPrompt.value = true
+      // Direct user to AI Settings page
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'default',
+        description: 'Please configure an AI provider in Settings > AI Settings'
+      })
+      return
+      // Removed - now using toast instead
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
