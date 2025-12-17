@@ -173,7 +173,8 @@ func handleServeMedia(r *fastglue.Request) error {
 	}
 
 	// For messages, check access to the conversation this message is part of.
-	if media.Model.String == "messages" {
+	// Skip this check if ModelID is not valid (e.g., inline images uploaded before message is sent).
+	if media.Model.String == "messages" && media.ModelID.Valid {
 		conversation, err := app.conversation.GetConversationByMessageID(media.ModelID.Int)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
