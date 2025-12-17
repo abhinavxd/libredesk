@@ -61,6 +61,8 @@ const searchContacts = (params) => http.get('/api/v1/contacts/search', { params 
 const getEmailNotificationSettings = () => http.get('/api/v1/settings/notifications/email')
 const updateEmailNotificationSettings = (data) =>
   http.put('/api/v1/settings/notifications/email', data)
+const testEmailNotificationSettings = (data) =>
+  http.post("/api/v1/settings/notifications/email/test", data)
 const getPriorities = () => http.get('/api/v1/priorities')
 const getStatuses = () => http.get('/api/v1/statuses')
 const createStatus = (data) => http.post('/api/v1/statuses', data)
@@ -536,6 +538,7 @@ export default {
   getUsersCompact,
   getEmailNotificationSettings,
   updateEmailNotificationSettings,
+  testEmailNotificationSettings,
   getCurrentUserViews,
   createView,
   updateView,

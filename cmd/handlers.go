@@ -35,6 +35,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/settings/general", perm(handleUpdateGeneralSettings, "general_settings:manage"))
 	g.GET("/api/v1/settings/notifications/email", perm(handleGetEmailNotificationSettings, "notification_settings:manage"))
 	g.PUT("/api/v1/settings/notifications/email", perm(handleUpdateEmailNotificationSettings, "notification_settings:manage"))
+	g.POST("/api/v1/settings/notifications/email/test", perm(handleTestEmailNotificationSettings, "notification_settings:manage"))
 
 	// OpenID connect single sign-on.
 	g.GET("/api/v1/oidc", perm(handleGetAllOIDC, "oidc:manage"))
