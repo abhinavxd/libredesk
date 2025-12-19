@@ -71,6 +71,7 @@ type ConversationListItem struct {
 	LastMessage        null.String             `db:"last_message" json:"last_message"`
 	LastMessageAt      null.Time               `db:"last_message_at" json:"last_message_at"`
 	LastMessageSender  null.String             `db:"last_message_sender" json:"last_message_sender"`
+	MergedIntoID       null.Int                `db:"merged_into_id" json:"merged_into_id"`
 	NextSLADeadlineAt  null.Time               `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	PriorityID         null.Int                `db:"priority_id" json:"priority_id"`
 	UnreadMessageCount int                     `db:"unread_message_count" json:"unread_message_count"`
@@ -121,6 +122,8 @@ type Conversation struct {
 	LastMessageAt         null.Time              `db:"last_message_at" json:"last_message_at"`
 	LastMessage           null.String            `db:"last_message" json:"last_message"`
 	LastMessageSender     null.String            `db:"last_message_sender" json:"last_message_sender"`
+	MergedIntoID          null.Int               `db:"merged_into_id" json:"merged_into_id"`
+	MergedAt              null.Time              `db:"merged_at" json:"merged_at"`
 	Contact               ConversationContact    `db:"contact" json:"contact"`
 	SLAPolicyID           null.Int               `db:"sla_policy_id" json:"sla_policy_id"`
 	SlaPolicyName         null.String            `db:"sla_policy_name" json:"sla_policy_name"`

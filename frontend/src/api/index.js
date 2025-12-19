@@ -312,6 +312,12 @@ const retryMessage = (cuuid, uuid) =>
 const getConversationMessages = (uuid, params) =>
   http.get(`/api/v1/conversations/${uuid}/messages`, { params })
 const sendMessage = (uuid, data) =>
+
+const searchConversationsForMerge = (uuid, query) =>
+  http.get(`/api/v1/conversations/${uuid}/merge/search`, { params: { query } })
+
+const mergeConversation = (uuid, targetUUID) =>
+  http.post(`/api/v1/conversations/${uuid}/merge`, { target_uuid: targetUUID })
   http.post(`/api/v1/conversations/${uuid}/messages`, data, {
     headers: {
       'Content-Type': 'application/json'
@@ -502,6 +508,8 @@ export default {
   getConversationParticipants,
   getConversationMessage,
   getConversationMessages,
+  searchConversationsForMerge,
+  mergeConversation,
   getCurrentUser,
   getCurrentUserTeams,
   getAllMacros,

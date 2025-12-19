@@ -799,3 +799,53 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 
 	return nil
 }
+
+// handleMergeConversations merges secondary conversations into the primary.
+func handleMergeConversations(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+
+	var req struct {
+		SecondaryUUIDs []string `json:"secondary_conversation_uuids"`
+	}
+
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+
+	if len(req.SecondaryUUIDs) == 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "At least one conversation to merge is required", nil, envelope.InputError)
+	}
+
+	if err := app.conversation.MergeConversations(uuid, req.SecondaryUUIDs, auser.ID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(map[string]interface{}{
+		"merged_count":              len(req.SecondaryUUIDs),
+		"primary_conversation_uuid": uuid,
+	})
+}
+
+// handleSearchConversationsForMerge searches for conversations to merge.
+func handleSearchConversationsForMerge(r *fastglue.Request) error {
+	var (
+		app         = r.Context.(*App)
+		excludeUUID = r.RequestCtx.UserValue("uuid").(string)
+		query       = string(r.RequestCtx.QueryArgs().Peek("q"))
+	)
+
+	if query == "" {
+		return r.SendEnvelope([]interface{}{})
+	}
+
+	results, err := app.conversation.SearchConversationsForMerge(excludeUUID, query)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(results)
+}

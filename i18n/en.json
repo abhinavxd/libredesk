@@ -495,6 +495,7 @@
   "admin.role.conversations.readAll": "View all conversations",
   "admin.role.conversations.readUnassigned": "View all unassigned conversations",
   "admin.role.conversations.readTeamInbox": "View conversations in team inbox",
+  "admin.role.conversations.merge": "Merge Conversations",
   "admin.role.conversations.updateUserAssignee": "Assign conversations to users",
   "admin.role.conversations.updateTeamAssignee": "Assign conversations to teams",
   "admin.role.conversations.updatePriority": "Change conversation priority",

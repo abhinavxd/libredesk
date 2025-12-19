@@ -51,6 +51,18 @@
               t('globals.messages.select', { name: t('globals.terms.tag', 2).toLowerCase() })
             "
           />
+
+          <!-- Merge Conversations -->
+          <Button
+            v-if="userStore.can('conversations:merge')"
+            variant="outline"
+            size="sm"
+            class="w-full"
+            @click="showMergeModal = true"
+          >
+            <GitMergeIcon class="h-4 w-4 mr-2" />
+            Merge Conversations
+          </Button>
         </AccordionContent>
       </AccordionItem>
 
@@ -94,6 +106,13 @@
       </AccordionItem>
     </Accordion>
   </div>
+
+    <!-- Merge Modal -->
+    <MergeConversationModal
+      v-model:open="showMergeModal"
+      :conversation-uuid="conversationStore.current?.uuid"
+      @merged="refreshConversation"
+    />
 </template>
 
 <script setup>
@@ -102,6 +121,10 @@ import { useConversationStore } from '@/stores/conversation'
 import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
 import { useTagStore } from '@/stores/tag'
+import { useUserStore } from "@/stores/user"
+import { GitMergeIcon } from "lucide-vue-next"
+import { Button } from "@/components/ui/button"
+import MergeConversationModal from "@/components/conversation/MergeConversationModal.vue"
 import {
   Accordion,
   AccordionContent,
@@ -129,6 +152,15 @@ const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
 const tagStore = useTagStore()
 const tags = ref([])
+const userStore = useUserStore()
+const showMergeModal = ref(false)
+
+const refreshConversation = () => {
+  if (conversationStore.current?.uuid) {
+    conversationStore.fetchConversation(conversationStore.current.uuid)
+    conversationStore.fetchMessages(conversationStore.current.uuid)
+  }
+}
 // Save the accordion state in local storage
 const accordionState = useStorage('conversation-sidebar-accordion', [])
 const { t } = useI18n()

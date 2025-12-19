@@ -36,6 +36,7 @@ SELECT
     conversations.created_at,
     conversations.updated_at,
     conversations.uuid,
+    conversations.reference_number,
     conversations.waiting_since,
     users.created_at as "contact.created_at",
     users.updated_at as "contact.updated_at",
@@ -557,3 +558,71 @@ AND m.status = ANY($3)
 AND m.private = NOT $4
 ORDER BY m.created_at DESC
 LIMIT 1;
+-- name: get-conversation-by-uuid-for-merge
+SELECT id, uuid, contact_id, status_id, merged_into_id, reference_number
+FROM conversations
+WHERE uuid = $1;
+
+-- name: copy-messages-to-conversation
+INSERT INTO conversation_messages (
+    conversation_id, type, status, content, text_content, content_type,
+    private, sender_id, sender_type, meta, created_at, updated_at
+)
+SELECT 
+    $1, type, status, content, text_content, content_type,
+    private, sender_id, sender_type, 
+    CASE 
+        WHEN meta IS NULL THEN jsonb_build_object('merged_from_conversation_id', conversation_id)
+        ELSE meta::jsonb || jsonb_build_object('merged_from_conversation_id', conversation_id)
+    END,
+    created_at, NOW()
+FROM conversation_messages
+WHERE conversation_id = $2
+ORDER BY created_at;
+
+-- name: mark-conversation-as-merged
+UPDATE conversations
+SET merged_into_id = $1,
+    merged_at = NOW(),
+    status_id = (SELECT id FROM conversation_statuses WHERE name = 'Closed'),
+    updated_at = NOW()
+WHERE id = $2
+RETURNING id;
+
+-- name: get-conversation-reference-number
+SELECT reference_number FROM conversations WHERE id = $1;
+
+-- name: search-conversations-for-merge
+SELECT 
+    c.id,
+    c.uuid,
+    c.reference_number,
+    c.subject,
+    c.last_message,
+    c.last_message_at,
+    c.merged_into_id,
+    cs.name as status,
+    u.first_name as "contact.first_name",
+    u.last_name as "contact.last_name"
+FROM conversations c
+JOIN users u ON c.contact_id = u.id
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE c.merged_into_id IS NULL
+  AND c.uuid != $1
+  AND (
+    c.reference_number ILIKE '%' || $2 || '%'
+    OR c.subject ILIKE '%' || $2 || '%'
+    OR u.first_name ILIKE '%' || $2 || '%'
+    OR u.last_name ILIKE '%' || $2 || '%'
+    OR u.email ILIKE '%' || $2 || '%'
+  )
+ORDER BY c.last_message_at DESC
+LIMIT 20;
+
+-- name: insert-activity-message
+INSERT INTO conversation_messages (
+    conversation_id, type, status, content, text_content, content_type,
+    sender_id, sender_type, created_at, updated_at
+)
+VALUES ($1, 'activity', 'sent', $2, $2, 'text', $3, 'agent', NOW(), NOW())
+RETURNING id;

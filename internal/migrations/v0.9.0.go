@@ -6,7 +6,7 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-// V0_9_0 adds AI settings and RAG tables with pgvector support.
+// V0_9_0 adds AI settings, RAG tables with pgvector support, and conversation merge feature.
 func V0_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	// Add AI Settings (these work regardless of pgvector)
 	_, err := db.Exec(`
@@ -21,6 +21,26 @@ func V0_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			('ai.similarity_threshold', '0.7'::jsonb),
 			('ai.system_prompt', '"You are a helpful customer support assistant."'::jsonb)
 		ON CONFLICT ("key") DO NOTHING;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Add conversation merge columns
+	_, err = db.Exec(`
+		ALTER TABLE conversations ADD COLUMN IF NOT EXISTS merged_into_id BIGINT REFERENCES conversations(id);
+		ALTER TABLE conversations ADD COLUMN IF NOT EXISTS merged_at TIMESTAMPTZ;
+		CREATE INDEX IF NOT EXISTS idx_conversations_merged_into ON conversations(merged_into_id) WHERE merged_into_id IS NOT NULL;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Add conversations:merge permission to Admin role
+	_, err = db.Exec(`
+		UPDATE roles 
+		SET permissions = array_append(permissions, 'conversations:merge') 
+		WHERE name = 'Admin' AND NOT ('conversations:merge' = ANY(permissions));
 	`)
 	if err != nil {
 		return err

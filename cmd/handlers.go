@@ -82,6 +82,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Search.
 	g.GET("/api/v1/conversations/search", perm(handleSearchConversations, "conversations:read"))
+	g.GET("/api/v1/conversations/{uuid}/merge/search", perm(handleSearchConversationsForMerge, "conversations:merge"))
+	g.POST("/api/v1/conversations/{uuid}/merge", perm(handleMergeConversation, "conversations:merge"))
 	g.GET("/api/v1/messages/search", perm(handleSearchMessages, "messages:read"))
 	g.GET("/api/v1/contacts/search", perm(handleSearchContacts, "contacts:read"))
 

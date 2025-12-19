@@ -224,6 +224,11 @@ type queries struct {
 	UnsnoozeAll                        *sqlx.Stmt `query:"unsnooze-all"`
 	DeleteConversation                 *sqlx.Stmt `query:"delete-conversation"`
 	RemoveConversationAssignee         *sqlx.Stmt `query:"remove-conversation-assignee"`
+	GetConversationByUUIDForMerge    *sqlx.Stmt `query:"get-conversation-by-uuid-for-merge"`
+	CopyMessagesToConversation       *sqlx.Stmt `query:"copy-messages-to-conversation"`
+	MarkConversationAsMerged         *sqlx.Stmt `query:"mark-conversation-as-merged"`
+	SearchConversationsForMerge      *sqlx.Stmt `query:"search-conversations-for-merge"`
+	InsertActivityMessage            *sqlx.Stmt `query:"insert-activity-message"`
 	GetLatestMessage                   *sqlx.Stmt `query:"get-latest-message"`
 
 	// Message queries.
@@ -1210,4 +1215,124 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		"conversations":         conversationsAllowedFields,
 		"conversation_statuses": conversationStatusAllowedFields,
 	})
+}
+
+// MergeSearchResult represents a conversation in merge search results
+type MergeSearchResult struct {
+	ID              int         `db:"id" json:"id"`
+	UUID            string      `db:"uuid" json:"uuid"`
+	ReferenceNumber string      `db:"reference_number" json:"reference_number"`
+	Subject         null.String `db:"subject" json:"subject"`
+	LastMessage     null.String `db:"last_message" json:"last_message"`
+	LastMessageAt   null.Time   `db:"last_message_at" json:"last_message_at"`
+	MergedIntoID    null.Int    `db:"merged_into_id" json:"merged_into_id"`
+	Status          null.String `db:"status" json:"status"`
+	Contact         struct {
+		FirstName string `db:"first_name" json:"first_name"`
+		LastName  string `db:"last_name" json:"last_name"`
+	} `db:"contact" json:"contact"`
+}
+
+// SearchConversationsForMerge searches for conversations that can be merged
+func (m *Manager) SearchConversationsForMerge(excludeUUID, query string) ([]MergeSearchResult, error) {
+	var results []MergeSearchResult
+	if err := m.q.SearchConversationsForMerge.Select(&results, excludeUUID, query); err != nil {
+		m.lo.Error("error searching conversations for merge", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, "Error searching conversations", nil)
+	}
+	return results, nil
+}
+
+// MergeConversations merges secondary conversations into the primary conversation
+func (m *Manager) MergeConversations(primaryUUID string, secondaryUUIDs []string, actorID int) error {
+	tx, err := m.db.BeginTxx(context.Background(), nil)
+	if err != nil {
+		return envelope.NewError(envelope.GeneralError, "Failed to start transaction", nil)
+	}
+	defer tx.Rollback()
+
+	// Get primary conversation
+	var primary struct {
+		ID              int      `db:"id"`
+		UUID            string   `db:"uuid"`
+		ContactID       int      `db:"contact_id"`
+		StatusID        null.Int `db:"status_id"`
+		MergedIntoID    null.Int `db:"merged_into_id"`
+		ReferenceNumber string   `db:"reference_number"`
+	}
+	if err := tx.Get(&primary, `SELECT id, uuid, contact_id, status_id, merged_into_id, reference_number FROM conversations WHERE uuid = $1`, primaryUUID); err != nil {
+		m.lo.Error("error getting primary conversation", "uuid", primaryUUID, "error", err)
+		return envelope.NewError(envelope.NotFoundError, "Primary conversation not found", nil)
+	}
+
+	if primary.MergedIntoID.Valid {
+		return envelope.NewError(envelope.InputError, "Primary conversation is already merged", nil)
+	}
+
+	var mergedRefs []string
+
+	for _, secUUID := range secondaryUUIDs {
+		if secUUID == primaryUUID {
+			continue
+		}
+
+		// Get secondary conversation
+		var secondary struct {
+			ID              int      `db:"id"`
+			UUID            string   `db:"uuid"`
+			ContactID       int      `db:"contact_id"`
+			StatusID        null.Int `db:"status_id"`
+			MergedIntoID    null.Int `db:"merged_into_id"`
+			ReferenceNumber string   `db:"reference_number"`
+		}
+		if err := tx.Get(&secondary, `SELECT id, uuid, contact_id, status_id, merged_into_id, reference_number FROM conversations WHERE uuid = $1`, secUUID); err != nil {
+			m.lo.Error("error getting secondary conversation", "uuid", secUUID, "error", err)
+			return envelope.NewError(envelope.NotFoundError, "Secondary conversation not found: "+secUUID, nil)
+		}
+
+		if secondary.MergedIntoID.Valid {
+			return envelope.NewError(envelope.InputError, "Conversation "+secondary.ReferenceNumber+" is already merged", nil)
+		}
+
+		// Copy messages from secondary to primary
+		if _, err := tx.Exec(`INSERT INTO conversation_messages (conversation_id, type, status, content, text_content, content_type, private, sender_id, sender_type, meta, created_at, updated_at) SELECT $1, type, status, content, text_content, content_type, private, sender_id, sender_type, CASE WHEN meta IS NULL THEN jsonb_build_object('merged_from_conversation_id', conversation_id) ELSE meta::jsonb || jsonb_build_object('merged_from_conversation_id', conversation_id) END, created_at, NOW() FROM conversation_messages WHERE conversation_id = $2 ORDER BY created_at`, primary.ID, secondary.ID); err != nil {
+			m.lo.Error("error copying messages", "from", secondary.ID, "to", primary.ID, "error", err)
+			return envelope.NewError(envelope.GeneralError, "Failed to copy messages", nil)
+		}
+
+		// Mark secondary as merged
+		if _, err := tx.Exec(`UPDATE conversations SET merged_into_id = $1, merged_at = NOW(), status_id = (SELECT id FROM conversation_statuses WHERE name = 'Closed'), updated_at = NOW() WHERE id = $2 RETURNING id`, primary.ID, secondary.ID); err != nil {
+			m.lo.Error("error marking conversation as merged", "id", secondary.ID, "error", err)
+			return envelope.NewError(envelope.GeneralError, "Failed to mark conversation as merged", nil)
+		}
+
+		mergedRefs = append(mergedRefs, "#"+secondary.ReferenceNumber)
+
+		// Add activity message to secondary
+		activityContent := fmt.Sprintf("This conversation was merged into #%s", primary.ReferenceNumber)
+		m.InsertActivityMessage(secondary.ID, activityContent, actorID)
+	}
+
+	// Add activity message to primary
+	if len(mergedRefs) > 0 {
+		activityContent := fmt.Sprintf("Merged conversations: %s", strings.Join(mergedRefs, ", "))
+		m.InsertActivityMessage(primary.ID, activityContent, actorID)
+	}
+
+	if err := tx.Commit(); err != nil {
+		m.lo.Error("error committing merge transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, "Failed to complete merge", nil)
+	}
+
+	m.lo.Info("conversations merged", "primary", primaryUUID, "merged_count", len(secondaryUUIDs))
+	return nil
+}
+
+// InsertActivityMessage inserts an activity message into a conversation
+func (m *Manager) InsertActivityMessage(conversationID int, content string, actorID int) error {
+	if _, err := m.q.InsertActivityMessage.Exec(conversationID, content, actorID); err != nil {
+		m.lo.Error("error inserting activity message", "conversation_id", conversationID, "error", err)
+		return err
+	}
+	return nil
 }
