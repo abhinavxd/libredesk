@@ -36,6 +36,7 @@ SELECT
     conversations.created_at,
     conversations.updated_at,
     conversations.uuid,
+    conversations.reference_number,
     conversations.waiting_since,
     users.created_at as "contact.created_at",
     users.updated_at as "contact.updated_at",
