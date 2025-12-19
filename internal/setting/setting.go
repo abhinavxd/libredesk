@@ -146,3 +146,27 @@ func (m *Manager) GetAppRootURL() (string, error) {
 	}
 	return strings.Trim(string(rootURL), "\""), nil
 }
+
+// GetAISettings retrieves AI settings.
+func (m *Manager) GetAISettings() (models.AISettings, error) {
+	var (
+		b   types.JSONText
+		out models.AISettings
+	)
+
+	b, err := m.GetByPrefix("ai.")
+	if err != nil {
+		return out, err
+	}
+
+	if err := json.Unmarshal([]byte(b), &out); err != nil {
+		m.lo.Error("error unmarshalling AI settings", "error", err)
+		return out, envelope.NewError(
+			envelope.GeneralError,
+			"Error parsing AI settings",
+			nil,
+		)
+	}
+
+	return out, nil
+}

@@ -1,7 +1,9 @@
 services:
   # Libredesk app
   app:
-    image: libredesk/libredesk:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.custom
     container_name: libredesk_app
     restart: unless-stopped
     ports:
@@ -18,18 +20,21 @@ services:
     volumes:
       - ./uploads:/libredesk/uploads:rw 
       - ./config.toml:/libredesk/config.toml
+      - ./frontend/dist:/libredesk/frontend/dist:ro
+      - ./i18n:/libredesk/i18n:ro
+      - ./static:/libredesk/static:ro
     command: [sh, -c, "./libredesk --install --idempotent-install --yes --config /libredesk/config.toml && ./libredesk --upgrade --yes --config /libredesk/config.toml && ./libredesk --config /libredesk/config.toml"]
 
   # PostgreSQL database
   db:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     container_name: libredesk_db
     restart: unless-stopped
     networks:
       - libredesk
     ports:
       # Only bind on the local interface. To connect to Postgres externally, change this to 0.0.0.0
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     environment:
       # Set these environment variables to configure the database, defaults to libredesk.
       POSTGRES_USER: ${POSTGRES_USER:-libredesk}
@@ -50,7 +55,7 @@ services:
     restart: unless-stopped
     ports:
       # Only bind on the local interface.
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6380:6379"
     networks:
       - libredesk
     volumes:

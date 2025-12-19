@@ -15,6 +15,8 @@ import (
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
 	"github.com/abhinavxd/libredesk/internal/ai"
+	"github.com/abhinavxd/libredesk/internal/rag"
+	ragsync "github.com/abhinavxd/libredesk/internal/rag/sync"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	"github.com/abhinavxd/libredesk/internal/autoassigner"
@@ -929,4 +931,30 @@ func getLogLevel(lvl string) logf.Level {
 	default:
 		return logf.InfoLevel
 	}
+}
+
+// initRAG inits RAG manager.
+func initRAG(db *sqlx.DB, i18n *i18n.I18n, aiMgr *ai.Manager) *rag.Manager {
+	lo := initLogger("rag")
+	m, err := rag.New(rag.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+		EmbeddingFunc: aiMgr.GenerateEmbedding,
+	})
+	if err != nil {
+		log.Fatalf("error initializing RAG manager: %v", err)
+	}
+	return m
+}
+
+// initRAGSync inits RAG sync coordinator.
+func initRAGSync(ragMgr *rag.Manager, macroMgr *macro.Manager) *ragsync.Coordinator {
+	lo := initLogger("rag-sync")
+	return ragsync.NewCoordinator(ragsync.CoordinatorOpts{
+		RAG:          ragMgr,
+		Macro:        macroMgr,
+		Lo:           lo,
+		SyncInterval: 1 * time.Hour,
+	})
 }

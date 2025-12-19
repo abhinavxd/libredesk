@@ -33,3 +33,16 @@ type Settings struct {
 	EmailNotification
 	General
 }
+
+// AISettings holds AI/RAG configuration.
+type AISettings struct {
+	Enabled             bool    `json:"ai.enabled" db:"ai.enabled"`
+	Provider            string  `json:"ai.provider" db:"ai.provider"`
+	OpenAIAPIKey        string  `json:"ai.openai_api_key" db:"ai.openai_api_key"`
+	OpenRouterAPIKey    string  `json:"ai.openrouter_api_key" db:"ai.openrouter_api_key"`
+	OpenRouterModel     string  `json:"ai.openrouter_model" db:"ai.openrouter_model"`
+	EmbeddingModel      string  `json:"ai.embedding_model" db:"ai.embedding_model"`
+	SystemPrompt        string  `json:"ai.system_prompt" db:"ai.system_prompt"`
+	MaxContextChunks    int     `json:"ai.max_context_chunks" db:"ai.max_context_chunks"`
+	SimilarityThreshold float64 `json:"ai.similarity_threshold" db:"ai.similarity_threshold"`
+}

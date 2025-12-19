@@ -16,6 +16,16 @@ export const adminNavItems = [
         permission: 'general_settings:manage'
       },
       {
+        titleKey: 'AI Settings',
+        href: '/admin/ai',
+        permission: 'ai:manage'
+      },
+      {
+        titleKey: 'Knowledge Sources',
+        href: '/admin/knowledge-sources',
+        permission: 'ai:manage'
+      },
+      {
         titleKey: 'globals.terms.businessHour',
         href: '/admin/business-hours',
         permission: 'business_hours:manage'

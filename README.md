@@ -30,8 +30,10 @@ Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**Live 
   Set and track response time targets. Get notified when conversations are at risk of breaching SLA commitments.
 - **Custom attributes**  
   Create custom attributes for contacts or conversations such as the subscription plan or the date of their first purchase. 
-- **AI-Assist**  
+- **AI-Assist**
   Instantly rewrite responses with AI to make them more friendly, professional, or polished.
+- **AI-Powered Responses (RAG)**
+  Generate context-aware responses using your knowledge base. Indexes FAQ pages and macros for intelligent retrieval.
 - **Activity logs**  
   Track all actions performed by agents and admins—updates and key events across the system—for auditing and accountability.
 - **Webhooks**  
@@ -77,6 +79,20 @@ __________________
 - Run `./libredesk` and visit `http://localhost:9000` and login with username `System` and the password you set using the --set-system-user-password command.
 
 See [installation docs](https://docs.libredesk.io/getting-started/installation)
+__________________
+
+### AI-Powered Responses (RAG)
+
+The AI assistant uses PostgreSQL with pgvector for semantic search.
+
+**Docker:** Already included - uses `pgvector/pgvector:pg17` image.
+
+**Binary/Manual Install:** Install the pgvector extension:
+- Ubuntu/Debian: `apt install postgresql-17-pgvector`
+- Or compile from [pgvector/pgvector](https://github.com/pgvector/pgvector)
+
+The extension is automatically enabled during database migration.
+
 __________________
 
 

@@ -15,6 +15,8 @@ import (
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
 	"github.com/abhinavxd/libredesk/internal/ai"
+	"github.com/abhinavxd/libredesk/internal/rag"
+	ragsync "github.com/abhinavxd/libredesk/internal/rag/sync"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
@@ -88,6 +90,8 @@ type App struct {
 	csat            *csat.Manager
 	view            *view.Manager
 	ai              *ai.Manager
+	rag             *rag.Manager
+	ragSync         *ragsync.Coordinator
 	search          *search.Manager
 	activityLog     *activitylog.Manager
 	notifier        *notifier.Service
@@ -203,6 +207,10 @@ func main() {
 		sla                         = initSLA(db, team, settings, businessHours, notifier, template, user, i18n)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template, webhook)
 		autoassigner                = initAutoAssigner(team, user, conversation)
+		macroMgr                    = initMacro(db, i18n)
+		aiMgr                       = initAI(db, i18n)
+		ragMgr                      = initRAG(db, i18n, aiMgr)
+		ragSyncMgr                  = initRAGSync(ragMgr, macroMgr)
 	)
 	automation.SetConversationStore(conversation)
 
@@ -217,6 +225,9 @@ func main() {
 	go sla.SendNotifications(ctx)
 	go media.DeleteUnlinkedMedia(ctx)
 	go user.MonitorAgentAvailability(ctx)
+
+	// Start RAG sync coordinator
+	ragSyncMgr.Start()
 
 	var app = &App{
 		lo:              lo,
@@ -247,8 +258,10 @@ func main() {
 		search:          initSearch(db, i18n),
 		role:            initRole(db, i18n),
 		tag:             initTag(db, i18n),
-		macro:           initMacro(db, i18n),
-		ai:              initAI(db, i18n),
+		macro:           macroMgr,
+		ai:              aiMgr,
+		rag:             ragMgr,
+		ragSync:         ragSyncMgr,
 		webhook:         webhook,
 	}
 	app.consts.Store(constants)
@@ -285,6 +298,8 @@ func main() {
 	<-ctx.Done()
 	colorlog.Red("Shutting down HTTP server...")
 	s.Shutdown()
+	colorlog.Red("Shutting down RAG sync...")
+	ragSyncMgr.Stop()
 	colorlog.Red("Shutting down inboxes...")
 	inbox.Close()
 	colorlog.Red("Shutting down automation...")

@@ -74,6 +74,7 @@ type queries struct {
 	UpdateInactiveOffline  *sqlx.Stmt `query:"update-inactive-offline"`
 	UpdateLastLoginAt      *sqlx.Stmt `query:"update-last-login-at"`
 	SoftDeleteAgent        *sqlx.Stmt `query:"soft-delete-agent"`
+	SoftDeleteContact      *sqlx.Stmt `query:"soft-delete-contact"`
 	SetUserPassword        *sqlx.Stmt `query:"set-user-password"`
 	SetResetPasswordToken  *sqlx.Stmt `query:"set-reset-password-token"`
 	SetPassword            *sqlx.Stmt `query:"set-password"`
@@ -114,7 +115,7 @@ func (u *Manager) VerifyPassword(email string, password []byte) (models.User, er
 		u.lo.Error("error fetching user from db", "error", err)
 		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
 	}
-	if err := u.verifyPassword(password, user.Password); err != nil {
+	if err := u.verifyPassword(password, user.Password.String); err != nil {
 		return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 	}
 	return user, nil
