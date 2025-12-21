@@ -197,7 +197,58 @@
       </FormItem>
     </FormField>
 
-    <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
+    <div class="flex gap-2">
+      <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
+    </div>
+
+    <!-- Test Connection Section -->
+    <div class="border-t pt-6 mt-6">
+      <h3 class="text-lg font-medium mb-4">Test Connection</h3>
+      <div class="space-y-4">
+        <div class="space-y-2">
+          <Label for="test-email">Send test email to</Label>
+          <div class="flex gap-2">
+            <Input
+              id="test-email"
+              v-model="testEmail"
+              type="email"
+              placeholder="your@email.com"
+              class="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              @click="runTest"
+              :disabled="isTesting || !testEmail"
+            >
+              <Loader2 v-if="isTesting" class="w-4 h-4 mr-2 animate-spin" />
+              {{ isTesting ? 'Testing...' : 'Test' }}
+            </Button>
+          </div>
+        </div>
+
+        <!-- Debug Log -->
+        <div v-if="testLogs.length > 0" class="space-y-2">
+          <Label>Debug Log</Label>
+          <div
+            class="bg-muted p-3 rounded-md font-mono text-xs max-h-48 overflow-y-auto"
+            :class="testSuccess === true ? 'border-green-500 border' : testSuccess === false ? 'border-red-500 border' : ''"
+          >
+            <div v-for="(log, index) in testLogs" :key="index" class="py-0.5">
+              {{ log }}
+            </div>
+          </div>
+          <div v-if="testSuccess === true" class="text-green-600 text-sm flex items-center gap-1">
+            <CheckCircle class="w-4 h-4" />
+            Test successful! Check your inbox.
+          </div>
+          <div v-else-if="testSuccess === false" class="text-red-600 text-sm flex items-center gap-1">
+            <XCircle class="w-4 h-4" />
+            Test failed. Check the log above for details.
+          </div>
+        </div>
+      </div>
+    </div>
   </form>
 </template>
 
@@ -228,8 +279,14 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { useI18n } from 'vue-i18n'
+import { Loader2, CheckCircle, XCircle } from 'lucide-vue-next'
+import api from '@/api'
 
 const isLoading = ref(false)
+const isTesting = ref(false)
+const testEmail = ref('')
+const testLogs = ref([])
+const testSuccess = ref(null)
 const { t } = useI18n()
 const props = defineProps({
   initialValues: {
@@ -275,4 +332,34 @@ watch(
   },
   { deep: true, immediate: true }
 )
+
+// Run SMTP test
+const runTest = async () => {
+  isTesting.value = true
+  testLogs.value = []
+  testSuccess.value = null
+
+  try {
+    const values = smtpForm.values
+    const response = await api.testEmailNotificationSettings({
+      'notification.email.host': values.host,
+      'notification.email.port': values.port,
+      'notification.email.username': values.username,
+      'notification.email.password': values.password,
+      'notification.email.auth_protocol': values.auth_protocol,
+      'notification.email.tls_type': values.tls_type,
+      'notification.email.tls_skip_verify': values.tls_skip_verify,
+      'notification.email.email_address': values.email_address,
+      'notification.email.hello_hostname': values.hello_hostname,
+      test_email: testEmail.value
+    })
+    testLogs.value = response.data.data.logs || []
+    testSuccess.value = response.data.data.success
+  } catch (error) {
+    testLogs.value = [`Error: ${error.response?.data?.message || error.message}`]
+    testSuccess.value = false
+  } finally {
+    isTesting.value = false
+  }
+}
 </script>
