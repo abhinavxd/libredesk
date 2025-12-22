@@ -51,7 +51,6 @@
         >
           <List size="14" />
         </Button>
-
         <Button
           size="sm"
           variant="ghost"
@@ -68,9 +67,33 @@
         >
           <LinkIcon size="14" />
         </Button>
+        <!-- Image upload button -->
+        <Button
+          size="sm"
+          variant="ghost"
+          @click.prevent="triggerImageUpload"
+          :disabled="isUploadingImage"
+        >
+          <ImageIcon size="14" />
+        </Button>
       </div>
     </BubbleMenu>
     <EditorContent :editor="editor" class="native-html" />
+
+    <!-- Hidden file input for image upload -->
+    <input
+      ref="imageInput"
+      type="file"
+      accept="image/*"
+      class="hidden"
+      @change="handleImageSelect"
+    />
+
+    <!-- Upload indicator -->
+    <div v-if="isUploadingImage" class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+      <Loader2 size="12" class="animate-spin" />
+      Uploading image...
+    </div>
 
     <Dialog v-model:open="showLinkDialog">
       <DialogContent class="sm:max-w-[425px]">
@@ -117,6 +140,8 @@ import {
   List,
   ListOrdered,
   Link as LinkIcon,
+  Image as ImageIcon,
+  Loader2,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
@@ -142,11 +167,18 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
+import { useEmitter } from '@/composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { handleHTTPError } from '@/utils/http'
+import api from '@/api'
 
 const textContent = defineModel('textContent', { default: '' })
 const htmlContent = defineModel('htmlContent', { default: '' })
 const showLinkDialog = ref(false)
 const linkUrl = ref('')
+const imageInput = ref(null)
+const isUploadingImage = ref(false)
+const emitter = useEmitter()
 
 const props = defineProps({
   placeholder: String,
@@ -165,8 +197,104 @@ const emit = defineEmits(['send', 'aiPromptSelected'])
 
 const emitPrompt = (key) => emit('aiPromptSelected', key)
 
-// To preseve the table styling in emails, need to set the table style inline.
-// Created these custom extensions to set the table style inline.
+/**
+ * Upload an image file to the server and return the URL
+ */
+const uploadImage = async (file) => {
+  isUploadingImage.value = true
+  try {
+    const response = await api.uploadMedia({
+      files: file,
+      inline: true,
+      linked_model: 'messages'
+    })
+    return response.data.data.url
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message || 'Failed to upload image'
+    })
+    return null
+  } finally {
+    isUploadingImage.value = false
+  }
+}
+
+/**
+ * Insert an image into the editor at the current cursor position
+ */
+const insertImage = (url) => {
+  if (url && editor.value) {
+    editor.value.chain().focus().setImage({ src: url }).run()
+  }
+}
+
+/**
+ * Handle paste events to capture images from clipboard
+ */
+const handlePaste = async (view, event) => {
+  const items = event.clipboardData?.items
+  if (!items) return false
+
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      event.preventDefault()
+      const file = item.getAsFile()
+      if (file) {
+        const url = await uploadImage(file)
+        if (url) {
+          insertImage(url)
+        }
+      }
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Handle drop events for drag & drop images
+ */
+const handleDrop = async (view, event) => {
+  const files = event.dataTransfer?.files
+  if (!files || files.length === 0) return false
+
+  for (const file of files) {
+    if (file.type.startsWith('image/')) {
+      event.preventDefault()
+      const url = await uploadImage(file)
+      if (url) {
+        insertImage(url)
+      }
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Trigger the hidden file input for image selection
+ */
+const triggerImageUpload = () => {
+  imageInput.value?.click()
+}
+
+/**
+ * Handle image selection from file input
+ */
+const handleImageSelect = async (event) => {
+  const file = event.target.files?.[0]
+  if (file && file.type.startsWith('image/')) {
+    const url = await uploadImage(file)
+    if (url) {
+      insertImage(url)
+    }
+  }
+  // Reset the input so the same file can be selected again
+  event.target.value = ''
+}
+
+// Custom table extensions with inline styles for email compatibility
 const CustomTable = Table.extend({
   addAttributes() {
     return {
@@ -206,12 +334,40 @@ const CustomTableHeader = TableHeader.extend({
   }
 })
 
+// Custom Image extension with resizing support
+const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: element => element.getAttribute('width'),
+        renderHTML: attributes => {
+          if (!attributes.width) return {}
+          return { width: attributes.width }
+        }
+      },
+      height: {
+        default: null,
+        parseHTML: element => element.getAttribute('height'),
+        renderHTML: attributes => {
+          if (!attributes.height) return {}
+          return { height: attributes.height }
+        }
+      }
+    }
+  }
+})
+
 const isInternalUpdate = ref(false)
 
 const editor = useEditor({
   extensions: [
     StarterKit.configure(),
-    Image.configure({ HTMLAttributes: { class: 'inline-image' } }),
+    ResizableImage.configure({
+      HTMLAttributes: { class: 'inline-image', style: 'max-width: 100%; height: auto;' },
+      allowBase64: false,
+    }),
     Placeholder.configure({ placeholder: () => props.placeholder }),
     Link,
     CustomTable.configure({ resizable: false }),
@@ -223,6 +379,8 @@ const editor = useEditor({
   content: htmlContent.value,
   editorProps: {
     attributes: { class: 'outline-none' },
+    handlePaste,
+    handleDrop,
     handleKeyDown: (view, event) => {
       if (event.ctrlKey && event.key.toLowerCase() === 'b') {
         event.stopPropagation()
@@ -234,7 +392,6 @@ const editor = useEditor({
       }
     }
   },
-  // To update state when user types.
   onUpdate: ({ editor }) => {
     isInternalUpdate.value = true
     htmlContent.value = editor.getHTML()
@@ -255,7 +412,6 @@ watch(
   { immediate: true }
 )
 
-// Insert content at cursor position when insertContent prop changes.
 watch(
   () => props.insertContent,
   (val) => {
@@ -290,7 +446,6 @@ const unsetLink = () => {
 </script>
 
 <style lang="scss">
-// Moving placeholder to the top.
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
@@ -299,14 +454,12 @@ const unsetLink = () => {
   height: 0;
 }
 
-// Ensure the parent div has a proper height
 .editor-wrapper div[aria-expanded='false'] {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-// Ensure the editor content has a proper height and breaks words
 .tiptap.ProseMirror {
   flex: 1;
   min-height: 70px;
@@ -319,13 +472,11 @@ const unsetLink = () => {
 }
 
 .tiptap {
-  // Table styling
   .tableWrapper {
     margin: 1.5rem 0;
     overflow-x: auto;
   }
 
-  // Anchor tag styling
   a {
     color: #0066cc;
     cursor: pointer;
@@ -333,6 +484,24 @@ const unsetLink = () => {
     &:hover {
       color: #003d7a;
     }
+  }
+
+  // Inline image styling
+  .inline-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin: 8px 0;
+    cursor: pointer;
+
+    &:hover {
+      outline: 2px solid #0066cc;
+    }
+  }
+
+  // Image selected state
+  .ProseMirror-selectednode .inline-image {
+    outline: 2px solid #0066cc;
   }
 }
 </style>
