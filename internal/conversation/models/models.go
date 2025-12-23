@@ -60,7 +60,6 @@ type ConversationListItem struct {
 	UpdatedAt          time.Time               `db:"updated_at" json:"updated_at"`
 	UUID               string                  `db:"uuid" json:"uuid"`
 	WaitingSince       null.Time               `db:"waiting_since" json:"waiting_since"`
-	AssigneeLastSeenAt null.Time               `db:"assignee_last_seen_at" json:"assignee_last_seen_at"`
 	Contact            ConversationListContact `db:"contact" json:"contact"`
 	InboxChannel       string                  `db:"inbox_channel" json:"inbox_channel"`
 	InboxName          string                  `db:"inbox_name" json:"inbox_name"`
@@ -111,7 +110,6 @@ type Conversation struct {
 	LastReplyAt           null.Time              `db:"last_reply_at" json:"last_reply_at"`
 	AssignedUserID        null.Int               `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID        null.Int               `db:"assigned_team_id" json:"assigned_team_id"`
-	AssigneeLastSeenAt    null.Time              `db:"assignee_last_seen_at" json:"assignee_last_seen_at"`
 	WaitingSince          null.Time              `db:"waiting_since" json:"waiting_since"`
 	Subject               null.String            `db:"subject" json:"subject"`
 	InboxMail             string                 `db:"inbox_mail" json:"inbox_mail"`

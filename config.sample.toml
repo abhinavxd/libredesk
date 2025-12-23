@@ -76,8 +76,11 @@ max_lifetime = "300s"
 
 # Redis.
 [redis]
+# url parameter overrides other redis config options
+# url = "redis://user:password@host:port/db"
 # If running locally, use `localhost:6379`.
 address = "redis:6379"
+user = ""
 password = ""
 db = 0
 

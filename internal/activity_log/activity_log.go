@@ -183,8 +183,7 @@ func (al *Manager) UserAvailability(actorID int, actorEmail, status, ip, targetE
 
 // create creates a new activity log in DB.
 func (m *Manager) create(activityType, activityDescription string, actorID int, targetModelType string, targetModelID int, ip string) error {
-	var activityLog models.ActivityLog
-	if err := m.q.InsertActivity.Get(&activityLog, activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {
+	if _, err := m.q.InsertActivity.Exec(activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {
 		m.lo.Error("error inserting activity log", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.activityLog}"), nil)
 	}

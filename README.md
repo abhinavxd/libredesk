@@ -79,9 +79,14 @@ __________________
 See [installation docs](https://docs.libredesk.io/getting-started/installation)
 __________________
 
-
 ## Developers
-If you are interested in contributing, refer to the [developer setup](https://docs.libredesk.io/contributing/developer-setup). The backend is written in Go and the frontend is Vue js 3 with Shadcn for UI components.
+
+- If you are interested in contributing, please read [CONTRIBUTING.md](./CONTRIBUTING.md) first.
+- For local development and setup, refer to the [developer setup](https://docs.libredesk.io/contributing/developer-setup).
+- For planned features and project direction, see [ROADMAP.md](./ROADMAP.md).
+
+The backend is written in Go and the frontend is Vue.js 3 with Shadcn UI.
+
 
 
 ## Translators

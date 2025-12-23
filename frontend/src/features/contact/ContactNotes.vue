@@ -99,7 +99,11 @@
 
         <!-- Note content -->
         <CardContent class="pt-4 pb-5">
-          <p class="whitespace-pre-wrap text-sm native-html" v-dompurify-html="note.note"></p>
+          <Letter
+            :html="note.note"
+            :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+            class="whitespace-pre-wrap text-sm native-html"
+          />
         </CardContent>
       </Card>
     </div>
@@ -155,6 +159,7 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@/utils/http'
 import { getInitials } from '@/utils/strings'
 import { useUserStore } from '@/stores/user'
+import { Letter } from 'vue-letter'
 import api from '@/api'
 
 const props = defineProps({ contactId: Number })

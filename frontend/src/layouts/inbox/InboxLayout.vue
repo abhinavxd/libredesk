@@ -1,9 +1,9 @@
 <template>
   <div class="flex h-screen w-full" v-if="!isSearchRoute">
-    <div class="w-[450px] border-r shrink-0 overflow-y-auto">
+    <div class="w-80 2xl:w-[450px] shrink-0 border-r overflow-y-auto">
       <ConversationList />
     </div>
-    <div class="grow">
+    <div class="flex-1 min-w-0">
       <router-view v-slot="{ Component }">
         <component :is="Component" />
       </router-view>

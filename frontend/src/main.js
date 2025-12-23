@@ -7,7 +7,6 @@ import mitt from 'mitt'
 import api from './api'
 import './assets/styles/main.scss'
 import './utils/strings.js'
-import VueDOMPurifyHTML from 'vue-dompurify-html'
 import Root from './Root.vue'
 
 const setFavicon = (url) => {
@@ -59,7 +58,6 @@ async function initApp () {
 
   app.use(router)
   app.use(i18n)
-  app.use(VueDOMPurifyHTML)
   app.mount('#app')
 }
 

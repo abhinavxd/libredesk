@@ -56,6 +56,7 @@ type createConversationRequest struct {
 func handleGetAllConversations(r *fastglue.Request) error {
 	var (
 		app         = r.Context.(*App)
+		user        = r.RequestCtx.UserValue("user").(amodels.User)
 		order       = string(r.RequestCtx.QueryArgs().Peek("order"))
 		orderBy     = string(r.RequestCtx.QueryArgs().Peek("order_by"))
 		page, _     = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page")))
@@ -64,7 +65,7 @@ func handleGetAllConversations(r *fastglue.Request) error {
 		total       = 0
 	)
 
-	conversations, err := app.conversation.GetAllConversationsList(order, orderBy, filters, page, pageSize)
+	conversations, err := app.conversation.GetAllConversationsList(user.ID, order, orderBy, filters, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -94,7 +95,7 @@ func handleGetAssignedConversations(r *fastglue.Request) error {
 		pageSize, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page_size")))
 		total       = 0
 	)
-	conversations, err := app.conversation.GetAssignedConversationsList(user.ID, order, orderBy, filters, page, pageSize)
+	conversations, err := app.conversation.GetAssignedConversationsList(user.ID, user.ID, order, orderBy, filters, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -115,6 +116,7 @@ func handleGetAssignedConversations(r *fastglue.Request) error {
 func handleGetUnassignedConversations(r *fastglue.Request) error {
 	var (
 		app         = r.Context.(*App)
+		user        = r.RequestCtx.UserValue("user").(amodels.User)
 		order       = string(r.RequestCtx.QueryArgs().Peek("order"))
 		orderBy     = string(r.RequestCtx.QueryArgs().Peek("order_by"))
 		filters     = string(r.RequestCtx.QueryArgs().Peek("filters"))
@@ -123,7 +125,7 @@ func handleGetUnassignedConversations(r *fastglue.Request) error {
 		total       = 0
 	)
 
-	conversations, err := app.conversation.GetUnassignedConversationsList(order, orderBy, filters, page, pageSize)
+	conversations, err := app.conversation.GetUnassignedConversationsList(user.ID, order, orderBy, filters, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -194,7 +196,7 @@ func handleGetViewConversations(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
 	}
 
-	conversations, err := app.conversation.GetViewConversationsList(user.ID, user.Teams.IDs(), lists, order, orderBy, string(view.Filters), page, pageSize)
+	conversations, err := app.conversation.GetViewConversationsList(user.ID, user.ID, user.Teams.IDs(), lists, order, orderBy, string(view.Filters), page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -239,7 +241,7 @@ func handleGetTeamUnassignedConversations(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("conversation.notMemberOfTeam"), nil))
 	}
 
-	conversations, err := app.conversation.GetTeamUnassignedConversationsList(teamID, order, orderBy, filters, page, pageSize)
+	conversations, err := app.conversation.GetTeamUnassignedConversationsList(auser.ID, teamID, order, orderBy, filters, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -279,7 +281,7 @@ func handleGetConversation(r *fastglue.Request) error {
 	return r.SendEnvelope(conv)
 }
 
-// handleUpdateConversationAssigneeLastSeen updates the assignee's last seen timestamp for a conversation.
+// handleUpdateConversationAssigneeLastSeen updates the current user's last seen timestamp for a conversation.
 func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -294,7 +296,8 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if err = app.conversation.UpdateConversationAssigneeLastSeen(uuid); err != nil {
+
+	if err = app.conversation.UpdateUserLastSeen(uuid, auser.ID); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)
@@ -747,12 +750,12 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`initiator`"), nil, envelope.InputError)
 	}
 
-	// Assign the conversation to the agent or team.
-	if req.AssignedAgentID > 0 {
-		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
-	}
+	// Assign the conversation to team/agent if provided, always assign team first as it clears assigned agent.
 	if req.AssignedTeamID > 0 {
 		app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
+	}
+	if req.AssignedAgentID > 0 {
+		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
 	}
 
 	// Trigger webhook event for conversation created.

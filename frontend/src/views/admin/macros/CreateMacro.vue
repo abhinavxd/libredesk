@@ -14,11 +14,13 @@ import { useRouter } from 'vue-router'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'
+import { useMacroStore } from '@/stores/macro'
 import api from '@/api'
 
 const router = useRouter()
 const emit = useEmitter()
 const { t } = useI18n()
+const macroStore = useMacroStore()
 const formLoading = ref(false)
 const breadcrumbLinks = [
   { path: 'macro-list', label: t('globals.terms.macro', 2) },
@@ -38,6 +40,9 @@ const createMacro = async (values) => {
   try {
     formLoading.value = true
     await api.createMacro(values)
+    
+    await macroStore.loadMacros(true)
+    
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.createdSuccessfully', {
         name: t('globals.terms.macro')

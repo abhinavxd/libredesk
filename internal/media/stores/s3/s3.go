@@ -88,14 +88,15 @@ func (c *Client) Put(name string, cType string, file io.ReadSeeker) (string, err
 
 // GetURL generates a URL to access the file stored in S3.
 // It returns a pre-signed URL for private buckets or a public URL for public buckets.
-func (c *Client) GetURL(name string) string {
+func (c *Client) GetURL(name string, disposition, fileName string) string {
 	if c.opts.BucketType == "private" && c.opts.PublicURL == "" {
 		u := c.s3.GeneratePresignedURL(simples3.PresignedInput{
-			Bucket:        c.opts.Bucket,
-			ObjectKey:     c.makeBucketPath(name),
-			Method:        "GET",
-			Timestamp:     time.Now(),
-			ExpirySeconds: int(c.opts.Expiry.Seconds()),
+			Bucket:                     c.opts.Bucket,
+			ObjectKey:                  c.makeBucketPath(name),
+			Method:                     "GET",
+			Timestamp:                  time.Now(),
+			ExpirySeconds:              int(c.opts.Expiry.Seconds()),
+			ResponseContentDisposition: fmt.Sprintf("%s; filename=\"%s\"", disposition, fileName),
 		})
 		return u
 	}

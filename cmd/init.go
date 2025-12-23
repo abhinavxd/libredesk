@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"html/template"
@@ -52,6 +53,7 @@ import (
 	kjson "github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/confmap"
+	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/posflag"
 	"github.com/knadh/koanf/providers/rawbytes"
@@ -74,17 +76,27 @@ type constants struct {
 	MaxFileUploadSizeMB         int
 }
 
-// Config loads config files into koanf.
+// Config loads config from files and environment variables into koanf.
 func initConfig(ko *koanf.Koanf) {
 	for _, f := range ko.Strings("config") {
 		log.Println("reading config file:", f)
 		if err := ko.Load(file.Provider(f), toml.Parser()); err != nil {
 			if os.IsNotExist(err) {
-				log.Fatal("error config file not found.")
+				log.Printf("WARNING: Config file not found. Continuing with defaults and environment variables.")
+				continue
 			}
 			log.Fatalf("error loading config from file: %v.", err)
 		}
 	}
+	// Load environment variables with `LIBREDESK_` prefix.
+	ko.Load(env.Provider(".", env.Opt{
+		Prefix: "LIBREDESK_",
+		TransformFunc: func(key, val string) (string, any) {
+			// Transform the key.
+			key = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(key, "LIBREDESK_")), "__", ".")
+			return key, val
+		},
+	}), nil)
 }
 
 // initFlags initializes the commandline flags.
@@ -711,8 +723,19 @@ func initI18n(fs stuffbin.FileSystem) *i18n.I18n {
 
 // initRedis inits redis DB.
 func initRedis() *redis.Client {
+	// Load options from redis URL if set.
+	redisURL := ko.String("redis.url")
+	if redisURL != "" {
+		options, err := redis.ParseURL(redisURL)
+		if err != nil {
+			log.Fatalf("error parsing redis url: %v", err)
+		}
+		return redis.NewClient(options)
+	}
+	// Load from individual config options.
 	return redis.NewClient(&redis.Options{
 		Addr:     ko.MustString("redis.address"),
+		Username: ko.String("redis.user"),
 		Password: ko.String("redis.password"),
 		DB:       ko.Int("redis.db"),
 	})

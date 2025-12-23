@@ -1,5 +1,4 @@
-# Use the latest version of Alpine Linux as the base image
-FROM alpine:latest
+FROM alpine:3.18
 
 # Install necessary packages
 RUN apk --no-cache add ca-certificates tzdata

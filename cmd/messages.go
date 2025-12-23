@@ -55,7 +55,8 @@ func handleGetMessages(r *fastglue.Request) error {
 		total = messages[i].Total
 		// Populate attachment URLs
 		for j := range messages[i].Attachments {
-			messages[i].Attachments[j].URL = app.media.GetURL(messages[i].Attachments[j].UUID)
+			att := messages[i].Attachments[j]
+			messages[i].Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
 		}
 		// Redact CSAT survey link
 		messages[i].CensorCSATContent()
@@ -98,7 +99,8 @@ func handleGetMessage(r *fastglue.Request) error {
 	message.CensorCSATContent()
 
 	for j := range message.Attachments {
-		message.Attachments[j].URL = app.media.GetURL(message.Attachments[j].UUID)
+		att := message.Attachments[j]
+		message.Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
 	}
 
 	return r.SendEnvelope(message)

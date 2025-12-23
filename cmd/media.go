@@ -20,10 +20,6 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-const (
-	thumbPrefix = "thumb_"
-)
-
 // handleMediaUpload handles media uploads.
 func handleMediaUpload(r *fastglue.Request) error {
 	var (
@@ -70,6 +66,12 @@ func handleMediaUpload(r *fastglue.Request) error {
 	srcFileSize := fileHeader.Size
 	srcExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(srcFileName)), ".")
 
+	// Check if file is empty
+	if srcFileSize == 0 {
+		app.lo.Error("error: uploaded file is empty (0 bytes)")
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileEmpty"), nil, envelope.InputError)
+	}
+
 	// Check file size
 	consts := app.consts.Load().(*constants)
 	if bytesToMegabytes(srcFileSize) > float64(consts.MaxFileUploadSizeMB) {
@@ -88,7 +90,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 
 	// Delete files on any error.
 	var uuid = uuid.New()
-	thumbName := thumbPrefix + uuid.String()
+	thumbName := image.ThumbPrefix + uuid.String()
 	defer func() {
 		if cleanUp {
 			app.media.Delete(uuid.String())
@@ -105,7 +107,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 			app.lo.Error("error creating thumb image", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.thumbnail}"), nil, envelope.GeneralError)
 		}
-		thumbName, err = app.media.Upload(thumbName, srcContentType, thumbFile)
+		thumbName, _, err = app.media.Upload(thumbName, srcContentType, thumbFile)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -124,8 +126,11 @@ func handleMediaUpload(r *fastglue.Request) error {
 		})
 	}
 
+	// Reset ptr.
 	file.Seek(0, 0)
-	_, err = app.media.Upload(uuid.String(), srcContentType, file)
+
+	// Override content type after upload (in case it was detected incorrectly).
+	_, srcContentType, err = app.media.Upload(uuid.String(), srcContentType, file)
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error uploading file", "error", err)
@@ -156,7 +161,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	}
 
 	// Fetch media from DB.
-	media, err := app.media.Get(0, strings.TrimPrefix(uuid, thumbPrefix))
+	media, err := app.media.Get(0, strings.TrimPrefix(uuid, image.ThumbPrefix))
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -199,7 +204,7 @@ func handleServeMedia(r *fastglue.Request) error {
 
 		fasthttp.ServeFile(r.RequestCtx, filepath.Join(ko.String("upload.fs.upload_path"), uuid))
 	case "s3":
-		r.RequestCtx.Redirect(app.media.GetURL(uuid), http.StatusFound)
+		r.RequestCtx.Redirect(app.media.GetURL(uuid, media.ContentType, media.Filename), http.StatusFound)
 	}
 	return nil
 }

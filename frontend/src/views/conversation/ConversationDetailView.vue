@@ -1,13 +1,13 @@
 <template>
   <div class="flex">
-    <div class="grow min-w-[300px]">
-      <Conversation v-if="conversationStore.current || conversationStore.conversation.loading" />
-    </div>
-    <div>
-      <ConversationSideBarWrapper
-        v-if="conversationStore.current || conversationStore.conversation.loading"
-      />
-    </div>
+    <Conversation
+      class="flex-auto min-w-[300px]"
+      v-if="conversationStore.current || conversationStore.conversation.loading"
+    />
+    <ConversationSideBarWrapper
+      class="flex-none"
+      v-if="conversationStore.current || conversationStore.conversation.loading"
+    />
   </div>
 </template>
 

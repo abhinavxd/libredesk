@@ -31,12 +31,11 @@
               'pt-4': index === 0
             }"
           >
-            <div v-if="!message.private">
-              <ContactMessageBubble :message="message" v-if="message.type === 'incoming'" />
-              <AgentMessageBubble :message="message" v-if="message.type === 'outgoing'" />
+            <div v-if="!message.private && message.type !== 'activity'">
+              <MessageBubble :message="message" :direction="message.type" />
             </div>
             <div v-else-if="isPrivateNote(message)">
-              <AgentMessageBubble :message="message" v-if="message.type === 'outgoing'" />
+              <MessageBubble :message="message" direction="outgoing" />
             </div>
             <div v-else-if="message.type === 'activity'">
               <ActivityMessageBubble :message="message" />
@@ -75,9 +74,8 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import ContactMessageBubble from './ContactMessageBubble.vue'
+import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
-import AgentMessageBubble from './AgentMessageBubble.vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useUserStore } from '@/stores/user'
 import { Button } from '@/components/ui/button'

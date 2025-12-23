@@ -71,9 +71,10 @@
                     <p class="text-xs font-semibold text-foreground">
                       {{ $t('command.replyPreview') }}
                     </p>
-                    <div
+                    <Letter
+                      :html="replyContent"
+                      :allowedSchemas="['cid', 'https', 'http', 'mailto']"
                       class="w-full min-h-200 p-2 bg-muted/50 rounded overflow-auto shadow native-html"
-                      v-dompurify-html="replyContent"
                     />
                   </div>
 
@@ -237,6 +238,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useI18n } from 'vue-i18n'
+import { Letter } from 'vue-letter'
 
 const conversationStore = useConversationStore()
 const macroStore = useMacroStore()

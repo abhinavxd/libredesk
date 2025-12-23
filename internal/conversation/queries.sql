@@ -29,6 +29,7 @@ VALUES(
 RETURNING id, uuid;
 
 -- name: get-conversations
+-- $1 = viewing user ID for per-agent unread count
 SELECT
     COUNT(*) OVER() as total,
     conversations.id,
@@ -36,12 +37,11 @@ SELECT
     conversations.updated_at,
     conversations.uuid,
     conversations.waiting_since,
-    conversations.assignee_last_seen_at,
     users.created_at as "contact.created_at",
     users.updated_at as "contact.updated_at",
     users.first_name as "contact.first_name",
     users.last_name as "contact.last_name",
-    users.avatar_url as "contact.avatar_url", 
+    users.avatar_url as "contact.avatar_url",
     inboxes.channel as inbox_channel,
     inboxes.name as inbox_name,
     conversations.sla_policy_id,
@@ -57,9 +57,13 @@ SELECT
     (
     SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
     FROM (
-        SELECT 1 FROM conversation_messages 
-        WHERE conversation_id = conversations.id 
-        AND created_at > conversations.assignee_last_seen_at
+        SELECT 1 FROM conversation_messages
+        WHERE conversation_id = conversations.id
+        AND created_at > COALESCE(
+            (SELECT last_seen_at FROM conversation_last_seen
+             WHERE conversation_id = conversations.id AND user_id = $1),
+            '1970-01-01'::TIMESTAMPTZ
+        )
         LIMIT 10
     ) t
     ) as unread_message_count,
@@ -99,7 +103,6 @@ SELECT
    c.closed_at,
    c.resolved_at,
    c.inbox_id,
-   c.assignee_last_seen_at,
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
    COALESCE(inb.channel::TEXT, '') as inbox_channel,
@@ -207,8 +210,6 @@ SELECT uuid from conversations where id = $1;
 -- name: update-conversation-assigned-user
 UPDATE conversations
 SET assigned_user_id = $2,
--- Reset assignee_last_seen_at when assigned to a new user.
-assignee_last_seen_at = NULL,
 updated_at = NOW()
 WHERE uuid = $1;
 
@@ -236,11 +237,11 @@ SET priority_id = (SELECT id FROM conversation_priorities WHERE name = $2),
     updated_at = NOW()
 WHERE uuid = $1;
 
--- name: update-conversation-assignee-last-seen
-UPDATE conversations 
-SET assignee_last_seen_at = NOW(),
-    updated_at = NOW()
-WHERE uuid = $1;
+-- name: upsert-user-last-seen
+INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
+VALUES ($1, (SELECT id FROM conversations WHERE uuid = $2), NOW())
+ON CONFLICT (conversation_id, user_id)
+DO UPDATE SET last_seen_at = NOW(), updated_at = NOW();
 
 -- name: update-conversation-last-message
 UPDATE conversations SET last_message = $3, last_message_sender = $4, last_message_at = $5, updated_at = NOW() WHERE CASE 
@@ -351,9 +352,8 @@ WHERE uuid = $1;
 
 -- name: remove-conversation-assignee
 UPDATE conversations
-SET 
+SET
     assigned_user_id = CASE WHEN $2 = 'user' THEN NULL ELSE assigned_user_id END,
-    assignee_last_seen_at = CASE WHEN $2 = 'user' THEN NULL ELSE assignee_last_seen_at END,
     assigned_team_id = CASE WHEN $2 = 'team' THEN NULL ELSE assigned_team_id END,
     updated_at = NOW()
 WHERE uuid = $1;

@@ -111,24 +111,46 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 }
 
 // searchMessages searches for messages in the specified time range.
+// Uses ESEARCH if supported by the server, otherwise falls back to standard SEARCH.
 func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*imap.SearchData, error) {
-	searchCMD := client.Search(&imap.SearchCriteria{
+	criteria := &imap.SearchCriteria{
 		Since: since,
-	},
-		&imap.SearchOptions{
+	}
+
+	// Attempt ESEARCH if server supports it
+	if client.Caps().Has(imap.CapESearch) {
+		opts := &imap.SearchOptions{
 			ReturnMin:   true,
 			ReturnMax:   true,
 			ReturnAll:   true,
 			ReturnCount: true,
-		},
-	)
-	return searchCMD.Wait()
+		}
+
+		result, err := client.Search(criteria, opts).Wait()
+		if err == nil {
+			return result, nil
+		}
+
+		e.lo.Warn("ESEARCH failed, falling back to standard SEARCH", "error", err, "inbox_id", e.Identifier())
+	}
+
+	return client.Search(criteria, nil).Wait()
 }
 
 // fetchAndProcessMessages fetches and processes messages based on the search results.
 func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.Client, searchResults *imap.SearchData, inboxID int) error {
 	seqSet := imap.SeqSet{}
-	seqSet.AddRange(searchResults.Min, searchResults.Max)
+	if searchResults.Min > 0 && searchResults.Max > 0 {
+		e.lo.Debug("using ESEARCH range", "min", searchResults.Min, "max", searchResults.Max, "inbox_id", inboxID)
+		seqSet.AddRange(searchResults.Min, searchResults.Max)
+	} else if seqNums := searchResults.AllSeqNums(); len(seqNums) > 0 {
+		e.lo.Debug("using SEARCH fallback (no ESEARCH support)", "count", len(seqNums), "inbox_id", inboxID)
+		seqSet.AddNum(seqNums...)
+	} else {
+		// No results found
+		e.lo.Debug("no messages found in search results", "inbox_id", inboxID)
+		return nil
+	}
 
 	// Fetch envelope and headers needed for auto-reply detection.
 	fetchOptions := &imap.FetchOptions{

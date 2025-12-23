@@ -48,7 +48,7 @@ func (c *Client) Put(filename string, cType string, src io.ReadSeeker) (string, 
 }
 
 // GetURL accepts a filename and retrieves the full URL for file.
-func (c *Client) GetURL(name string) string {
+func (c *Client) GetURL(name, _, _ string) string {
 	return fmt.Sprintf("%s%s/%s", c.opts.RootURL(), c.opts.UploadURI, name)
 }
 

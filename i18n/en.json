@@ -332,6 +332,7 @@
   "user.errorGeneratingPasswordToken": "Error generating password token",
   "media.fileSizeTooLarge": "File size too large, please upload a file less than {size} ",
   "media.fileTypeNotAllowed": "File type not allowed",
+  "media.fileEmpty": "This file is 0 bytes, so it will not be attached.",
   "inbox.emptyIMAP": "Empty IMAP config",
   "inbox.emptySMTP": "Empty SMTP config",
   "template.defaultTemplateAlreadyExists": "Default template already exists",

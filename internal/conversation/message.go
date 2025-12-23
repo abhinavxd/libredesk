@@ -973,7 +973,7 @@ func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) e
 	thumbName := fmt.Sprintf("thumb_%s", media.UUID)
 
 	// Upload the thumbnail
-	if _, err := m.mediaStore.Upload(thumbName, media.ContentType, thumbFile); err != nil {
+	if _, _, err := m.mediaStore.Upload(thumbName, media.ContentType, thumbFile); err != nil {
 		m.lo.Error("error uploading thumbnail", "error", err)
 		return fmt.Errorf("error uploading thumbnail: %w", err)
 	}
