@@ -21,11 +21,16 @@
 
       <!-- Content container -->
       <div class="flex-1 min-w-0 space-y-2">
-        <!-- Contact name and last message time -->
+        <!-- Contact name, reference number, and last message time -->
         <div class="flex items-center justify-between gap-2">
-          <h3 class="text-sm font-semibold truncate">
-            {{ contactFullName }}
-          </h3>
+          <div class="flex items-center gap-2 min-w-0">
+            <h3 class="text-sm font-semibold truncate">
+              {{ contactFullName }}
+            </h3>
+            <span v-if="conversation.reference_number" class="text-xs font-mono text-muted-foreground whitespace-nowrap">
+              #{{ conversation.reference_number }}
+            </span>
+          </div>
           <span class="text-xs text-gray-400 whitespace-nowrap" v-if="conversation.last_message_at">
             {{ relativeLastMessageTime }}
           </span>

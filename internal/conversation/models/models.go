@@ -59,6 +59,7 @@ type ConversationListItem struct {
 	CreatedAt          time.Time               `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time               `db:"updated_at" json:"updated_at"`
 	UUID               string                  `db:"uuid" json:"uuid"`
+	ReferenceNumber    string                  `db:"reference_number" json:"reference_number"`
 	WaitingSince       null.Time               `db:"waiting_since" json:"waiting_since"`
 	Contact            ConversationListContact `db:"contact" json:"contact"`
 	InboxChannel       string                  `db:"inbox_channel" json:"inbox_channel"`
