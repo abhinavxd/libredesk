@@ -31,7 +31,7 @@
               {{ contact.created_at ? format(new Date(contact.created_at), 'PPP') : 'N/A' }}
             </div>
 
-            <div class="w-30 pt-3">
+            <div class="flex gap-2 pt-3">
               <Button
                 :variant="contact.enabled ? 'destructive' : 'outline'"
                 @click="showBlockConfirmation = true"
@@ -40,6 +40,15 @@
                 <ShieldOffIcon v-if="contact.enabled" size="18" class="mr-2" />
                 <ShieldCheckIcon v-else size="18" class="mr-2" />
                 {{ t(contact.enabled ? 'globals.messages.block' : 'globals.messages.unblock') }}
+              </Button>
+              <Button
+                v-if="userStore.can('contacts:delete')"
+                variant="destructive"
+                @click="showDeleteConfirmation = true"
+                size="sm"
+              >
+                <Trash2Icon size="18" class="mr-2" />
+                {{ t('globals.messages.delete') }}
               </Button>
             </div>
           </div>
@@ -80,13 +89,34 @@
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog :open="showDeleteConfirmation" @update:open="showDeleteConfirmation = $event">
+        <DialogContent class="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {{ t('globals.messages.delete', { name: t('globals.terms.contact') }) }}
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this contact? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div class="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" @click="showDeleteConfirmation = false">
+              {{ t('globals.messages.cancel') }}
+            </Button>
+            <Button variant="destructive" @click="confirmDelete">
+              {{ t('globals.messages.delete') }}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   </ContactDetail>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
@@ -101,7 +131,7 @@ import {
   DialogDescription
 } from '@/components/ui/dialog'
 import { useUserStore } from '@/stores/user'
-import { ShieldOffIcon, ShieldCheckIcon } from 'lucide-vue-next'
+import { ShieldOffIcon, ShieldCheckIcon, Trash2Icon } from 'lucide-vue-next'
 import ContactDetail from '@/layouts/contact/ContactDetail.vue'
 import api from '@/api'
 import ContactForm from '@/features/contact/ContactForm.vue'
@@ -116,9 +146,11 @@ import { Spinner } from '@/components/ui/spinner'
 const { t } = useI18n()
 const emitter = useEmitter()
 const route = useRoute()
+const router = useRouter()
 const formLoading = ref(false)
 const contact = ref(null)
 const showBlockConfirmation = ref(false)
+const showDeleteConfirmation = ref(false)
 const userStore = useUserStore()
 
 const form = useForm({
@@ -168,6 +200,20 @@ async function toggleBlock() {
     emitToast(t(messageKey, { name: t('globals.terms.contact') }))
   } catch (err) {
     showError(err)
+  }
+}
+
+async function confirmDelete() {
+  showDeleteConfirmation.value = false
+  try {
+    formLoading.value = true
+    await api.deleteContact(contact.value.id)
+    emitToast(t('globals.messages.deletedSuccessfully', { name: t('globals.terms.contact') }))
+    router.push('/contacts')
+  } catch (err) {
+    showError(err)
+  } finally {
+    formLoading.value = false
   }
 }
 
