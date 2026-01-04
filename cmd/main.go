@@ -34,6 +34,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/priority"
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/oidc"
@@ -101,6 +102,7 @@ type App struct {
 	customAttribute *customAttribute.Manager
 	report          *report.Manager
 	webhook         *webhook.Manager
+	importer        *importer.Importer
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -251,6 +253,7 @@ func main() {
 		conversation:    conversation,
 		automation:      automation,
 		businessHours:   businessHours,
+		importer:        importer.NewImporter(),
 		activityLog:     initActivityLog(db, i18n),
 		customAttribute: initCustomAttribute(db, i18n),
 		authz:           initAuthz(i18n),

@@ -1,7 +1,8 @@
 <template>
   <Spinner v-if="isLoading" />
   <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
-    <div class="flex justify-end mb-5">
+    <div class="flex justify-end mb-5 gap-2">
+      <Importer @import-complete="getData" />
       <router-link :to="{ name: 'new-agent' }">
         <Button>{{
           $t('globals.messages.new', {
@@ -27,6 +28,7 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUsersStore } from '@/stores/users'
 import { useI18n } from 'vue-i18n'
+import Importer from '@/components/ui/importer/Importer.vue'
 
 const isLoading = ref(false)
 const usersStore = useUsersStore()
