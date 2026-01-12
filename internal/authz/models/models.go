@@ -78,6 +78,7 @@ const (
 	PermContactsRead    = "contacts:read"
 	PermContactsWrite   = "contacts:write"
 	PermContactsBlock   = "contacts:block"
+	PermContactsDelete  = "contacts:delete"
 
 	// Contact Notes
 	PermContactNotesRead   = "contact_notes:read"
@@ -130,6 +131,7 @@ var validPermissions = map[string]struct{}{
 	PermContactsRead:                    {},
 	PermContactsWrite:                   {},
 	PermContactsBlock:                   {},
+	PermContactsDelete:                 {},
 	PermContactNotesRead:                {},
 	PermContactNotesWrite:               {},
 	PermContactNotesDelete:              {},
