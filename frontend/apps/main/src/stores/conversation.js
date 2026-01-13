@@ -18,6 +18,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const currentBCC = ref([])
   const currentCC = ref([])
   const macros = ref({})
+  const drafts = ref(new Map())
 
   // Options for select fields
   const priorityOptions = computed(() => {
@@ -215,6 +216,18 @@ export const useConversationStore = defineStore('conversation', () => {
           conversations.data[index].unread_message_count = 0
         }
       }, 3000)
+    }
+  }
+
+  async function markAsUnread (uuid) {
+    try {
+      await api.markConversationAsUnread(uuid)
+      const index = conversations.data.findIndex(conv => conv.uuid === uuid)
+      if (index !== -1) {
+        conversations.data[index].unread_message_count = 1
+      }
+    } catch (err) {
+      handleHTTPError(err)
     }
   }
 
@@ -451,7 +464,8 @@ export const useConversationStore = defineStore('conversation', () => {
           page: page,
           page_size: CONV_LIST_PAGE_SIZE,
           order_by: sortFieldMap[conversations.sortField].model + "." + sortFieldMap[conversations.sortField].field,
-          order: sortFieldMap[conversations.sortField].order
+          order: sortFieldMap[conversations.sortField].order,
+          filters
         })
       case CONVERSATION_LIST_TYPE.VIEW:
         return await api.getViewConversations(viewID, {
@@ -459,6 +473,14 @@ export const useConversationStore = defineStore('conversation', () => {
           page_size: CONV_LIST_PAGE_SIZE,
           order_by: sortFieldMap[conversations.sortField].model + "." + sortFieldMap[conversations.sortField].field,
           order: sortFieldMap[conversations.sortField].order
+        })
+      case CONVERSATION_LIST_TYPE.MENTIONED:
+        return await api.getMentionedConversations({
+          page: page,
+          page_size: CONV_LIST_PAGE_SIZE,
+          order_by: sortFieldMap[conversations.sortField].model + "." + sortFieldMap[conversations.sortField].field,
+          order: sortFieldMap[conversations.sortField].order,
+          filters
         })
       default:
         throw new Error('Invalid conversation list type: ' + listType)
@@ -573,6 +595,12 @@ export const useConversationStore = defineStore('conversation', () => {
       listConversation.last_message = message.content
       listConversation.last_message_at = message.created_at
       listConversation.last_message_sender = message.sender_type
+      // Update last interaction only for non-private, non-activity messages
+      if (message.type !== 'activity' && !message.private) {
+        listConversation.last_interaction = message.content
+        listConversation.last_interaction_at = message.created_at
+        listConversation.last_interaction_sender = message.sender_type
+      }
       if (listConversation.uuid !== conversation?.data?.uuid) {
         listConversation.unread_message_count += 1
       }
@@ -663,8 +691,15 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   /** Macros set for new conversation or an open conversation **/
-  async function setMacro (macro, context) {
+  function setMacro (macro, context) {
     macros.value[context] = macro
+  }
+
+  function setMacroActions (actions, context) {
+    if (!macros.value[context]) {
+      macros.value[context] = {}
+    }
+    macros.value[context].actions = actions
   }
 
   function getMacro (context) {
@@ -697,7 +732,51 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  // Fetch all drafts for the current user
+  async function fetchAllDrafts () {
+    try {
+      const resp = await api.getAllDrafts()
+      const newDrafts = new Map()
+      if (resp.data?.data) {
+        for (const draft of resp.data.data) {
+          newDrafts.set(draft.conversation_uuid, draft)
+        }
+      }
+      drafts.value = newDrafts
+    } catch (e) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: handleHTTPError(e).message
+      })
+    }
+  }
+
+  // Get draft for a specific conversation
+  function getDraft (uuid) {
+    return drafts.value.get(uuid)
+  }
+
+  // Set draft for a specific conversation
+  function setDraft (uuid, draft) {
+    drafts.value.set(uuid, draft)
+    // Trigger reactivity
+    drafts.value = new Map(drafts.value)
+  }
+
+  // Remove draft for a specific conversation
+  function removeDraft (uuid) {
+    drafts.value.delete(uuid)
+    // Trigger reactivity
+    drafts.value = new Map(drafts.value)
+  }
+
+  // Check if a conversation has a draft
+  function hasDraft (uuid) {
+    return drafts.value.has(uuid)
+  }
+
   return {
+    macros,
     conversations,
     conversation,
     messages,
@@ -719,6 +798,7 @@ export const useConversationStore = defineStore('conversation', () => {
     fetchNextConversations,
     updateMessageProp,
     updateAssigneeLastSeen,
+    markAsUnread,
     updateConversationMessage,
     snoozeConversation,
     fetchConversation,
@@ -738,6 +818,7 @@ export const useConversationStore = defineStore('conversation', () => {
     getMacro,
     setMacro,
     resetMacro,
+    setMacroActions,
     removeAssignee,
     getListSortField,
     getListStatus,
@@ -747,6 +828,12 @@ export const useConversationStore = defineStore('conversation', () => {
     statusOptionsNoSnooze,
     statusOptions,
     updateTypingStatus,
-    sendTyping
+    sendTyping,
+    drafts,
+    fetchAllDrafts,
+    getDraft,
+    setDraft,
+    removeDraft,
+    hasDraft
   }
 })

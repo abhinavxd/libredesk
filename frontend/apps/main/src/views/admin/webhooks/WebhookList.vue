@@ -14,7 +14,7 @@
       </div>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="webhooks" />
+      <DataTable :columns="createColumns(t)" :data="webhooks" :loading="isLoading" />
     </div>
   </div>
 </template>

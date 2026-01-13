@@ -7,18 +7,20 @@
 
 <script setup>
 import { ref } from 'vue'
-import MacroForm from '@/features/admin/macros/MacroForm.vue'
+import MacroForm from '@main/features/admin/macros/MacroForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@main/utils/http'
 import { useRouter } from 'vue-router'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'
-import api from '../../../api'
+import { useMacroStore } from '@main/stores/macro'
+import api from '@main/api'
 
 const router = useRouter()
 const emit = useEmitter()
 const { t } = useI18n()
+const macroStore = useMacroStore()
 const formLoading = ref(false)
 const breadcrumbLinks = [
   { path: 'macro-list', label: t('globals.terms.macro', 2) },
@@ -38,6 +40,9 @@ const createMacro = async (values) => {
   try {
     formLoading.value = true
     await api.createMacro(values)
+    
+    await macroStore.loadMacros(true)
+    
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.createdSuccessfully', {
         name: t('globals.terms.macro')

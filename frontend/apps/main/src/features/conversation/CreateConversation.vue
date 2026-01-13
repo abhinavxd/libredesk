@@ -185,10 +185,10 @@
 
                     <!-- Macro preview -->
                     <MacroActionsPreview
-                      v-if="conversationStore.getMacro('new-conversation').actions?.length > 0"
-                      :actions="conversationStore.getMacro('new-conversation')?.actions || []"
+                      v-if="conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).actions?.length > 0"
+                      :actions="conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)?.actions || []"
                       :onRemove="
-                        (action) => conversationStore.removeMacroAction(action, 'new-conversation')
+                        (action) => conversationStore.removeMacroAction(action, MACRO_CONTEXT.NEW_CONVERSATION)
                       "
                       class="mt-2 flex-shrink-0"
                     />
@@ -244,12 +244,13 @@ import AttachmentsPreview from '@/features/conversation/message/attachment/Attac
 import { useConversationStore } from '../../stores/conversation'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useEmitter } from '../../composables/useEmitter'
-import { handleHTTPError } from '../../utils/http'
-import { useInboxStore } from '../../stores/inbox'
-import { useUsersStore } from '../../stores/users'
-import { useTeamStore } from '../../stores/team'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { MACRO_CONTEXT } from '@main/constants/conversation'
+import { useEmitter } from '@main/composables/useEmitter'
+import { handleHTTPError } from '@main/utils/http'
+import { useInboxStore } from '@main/stores/inbox'
+import { useUsersStore } from '@main/stores/users'
+import { useTeamStore } from '@main/stores/team'
 import {
   Select,
   SelectContent,
@@ -328,7 +329,7 @@ const formSchema = z.object({
 onUnmounted(() => {
   clearTimeout(timeoutId)
   clearMediaFiles()
-  conversationStore.resetMacro('new-conversation')
+  conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
   emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
     command: null,
     open: false
@@ -406,7 +407,7 @@ const createConversation = form.handleSubmit(async (values) => {
     const conversationUUID = conversation.data.data.uuid
 
     // Get macro from context, and set if any actions are available.
-    const macro = conversationStore.getMacro('new-conversation')
+    const macro = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)
     if (conversationUUID !== '' && macro?.id && macro?.actions?.length > 0) {
       try {
         await api.applyMacro(conversationUUID, macro.id, macro.actions)
@@ -433,9 +434,9 @@ const createConversation = form.handleSubmit(async (values) => {
  * Watches for changes in the macro id and update message content.
  */
 watch(
-  () => conversationStore.getMacro('new-conversation').id,
+  () => conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).id,
   () => {
-    form.setFieldValue('content', conversationStore.getMacro('new-conversation').message_content)
+    form.setFieldValue('content', conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content)
   },
   { deep: true }
 )

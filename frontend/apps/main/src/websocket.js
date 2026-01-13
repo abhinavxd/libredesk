@@ -1,4 +1,5 @@
 import { useConversationStore } from './stores/conversation'
+import { useNotificationStore } from './stores/notification'
 import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
 
 export class WebSocketClient {
@@ -13,6 +14,7 @@ export class WebSocketClient {
     this.pingInterval = null
     this.lastPong = Date.now()
     this.convStore = useConversationStore()
+    this.notificationStore = useNotificationStore()
     this.messageQueue = []
     this.maxQueueSize = 50
     // 30 sec.
@@ -73,7 +75,8 @@ export class WebSocketClient {
         },
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)
-        }
+        },
+        [WS_EVENT.NEW_NOTIFICATION]: () => this.notificationStore.addNotification(data.data)
       }
 
       const handler = handlers[data.type]

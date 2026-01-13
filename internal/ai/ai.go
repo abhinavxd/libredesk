@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
+	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
@@ -24,16 +25,18 @@ var (
 )
 
 type Manager struct {
-	q    queries
-	lo   *logf.Logger
-	i18n *i18n.I18n
+	q             queries
+	lo            *logf.Logger
+	i18n          *i18n.I18n
+	encryptionKey string
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB   *sqlx.DB
-	I18n *i18n.I18n
-	Lo   *logf.Logger
+	DB            *sqlx.DB
+	I18n          *i18n.I18n
+	Lo            *logf.Logger
+	EncryptionKey string
 }
 
 // queries contains prepared SQL queries.
@@ -51,9 +54,10 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		q:    q,
-		lo:   opts.Lo,
-		i18n: opts.I18n,
+		q:             q,
+		lo:            opts.Lo,
+		i18n:          opts.I18n,
+		encryptionKey: opts.EncryptionKey,
 	}, nil
 }
 
@@ -115,7 +119,14 @@ func (m *Manager) UpdateProvider(provider, apiKey string) error {
 
 // setOpenAIAPIKey sets the OpenAI API key in the database.
 func (m *Manager) setOpenAIAPIKey(apiKey string) error {
-	if _, err := m.q.SetOpenAIKey.Exec(apiKey); err != nil {
+	// Encrypt API key before storing.
+	encryptedKey, err := crypto.Encrypt(apiKey, m.encryptionKey)
+	if err != nil {
+		m.lo.Error("error encrypting API key", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "OpenAI API Key"), nil)
+	}
+
+	if _, err := m.q.SetOpenAIKey.Exec(encryptedKey); err != nil {
 		m.lo.Error("error setting OpenAI API key", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "OpenAI API Key"), nil)
 	}
@@ -154,7 +165,13 @@ func (m *Manager) getDefaultProviderClient() (ProviderClient, error) {
 			m.lo.Error("error parsing provider config", "error", err)
 			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorParsing", "name", m.i18n.Ts("globals.terms.provider")), nil)
 		}
-		return NewOpenAIClient(config.APIKey, m.lo), nil
+		// Decrypt API key.
+		decryptedKey, err := crypto.Decrypt(config.APIKey, m.encryptionKey)
+		if err != nil {
+			m.lo.Error("error decrypting API key", "error", err)
+			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.Ts("globals.terms.provider")), nil)
+		}
+		return NewOpenAIClient(decryptedKey, m.lo), nil
 	default:
 		m.lo.Error("unsupported provider type", "provider", p.Provider)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.invalid", "name", m.i18n.Ts("globals.terms.provider")), nil)

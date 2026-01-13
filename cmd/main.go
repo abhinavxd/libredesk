@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log"
@@ -27,11 +28,13 @@ import (
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/view"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/abhinavxd/libredesk/internal/automation"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/priority"
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/oidc"
@@ -63,40 +66,47 @@ var (
 	versionString string
 )
 
+const (
+	sampleEncKey = "your-32-char-random-string-here!"
+)
+
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
-	fs              stuffbin.FileSystem
-	consts          atomic.Value
-	auth            *auth_.Auth
-	authz           *authz.Enforcer
-	i18n            *i18n.I18n
-	lo              *logf.Logger
-	oidc            *oidc.Manager
-	media           *media.Manager
-	setting         *setting.Manager
-	role            *role.Manager
-	user            *user.Manager
-	team            *team.Manager
-	status          *status.Manager
-	priority        *priority.Manager
-	tag             *tag.Manager
-	inbox           *inbox.Manager
-	tmpl            *template.Manager
-	macro           *macro.Manager
-	conversation    *conversation.Manager
-	automation      *automation.Engine
-	businessHours   *businesshours.Manager
-	sla             *sla.Manager
-	csat            *csat.Manager
-	view            *view.Manager
-	ai              *ai.Manager
-	search          *search.Manager
-	activityLog     *activitylog.Manager
-	notifier        *notifier.Service
-	customAttribute *customAttribute.Manager
-	report          *report.Manager
-	webhook         *webhook.Manager
-	rateLimit       *ratelimit.Limiter
+	fs               stuffbin.FileSystem
+	consts           atomic.Value
+	auth             *auth_.Auth
+	authz            *authz.Enforcer
+	i18n             *i18n.I18n
+	lo               *logf.Logger
+	oidc             *oidc.Manager
+	media            *media.Manager
+	setting          *setting.Manager
+	role             *role.Manager
+	user             *user.Manager
+	team             *team.Manager
+	status           *status.Manager
+	priority         *priority.Manager
+	tag              *tag.Manager
+	inbox            *inbox.Manager
+	tmpl             *template.Manager
+	macro            *macro.Manager
+	conversation     *conversation.Manager
+	automation       *automation.Engine
+	businessHours    *businesshours.Manager
+	sla              *sla.Manager
+	csat             *csat.Manager
+	view             *view.Manager
+	ai               *ai.Manager
+	search           *search.Manager
+	activityLog      *activitylog.Manager
+	notifier         *notifier.Service
+	userNotification *notifier.UserNotificationManager
+	customAttribute  *customAttribute.Manager
+	report           *report.Manager
+	webhook          *webhook.Manager
+	rateLimit        *ratelimit.Limiter
+	redis            *redis.Client
+	importer         *importer.Importer
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -166,6 +176,9 @@ func main() {
 	settings := initSettings(db)
 	loadSettings(settings)
 
+	// Validate config.
+	validateConfig(ko)
+
 	// Fallback for config typo. Logs a warning but continues to work with the incorrect key.
 	// Uses 'message.message_outgoing_scan_interval' (correct key) as default key, falls back to the common typo.
 	msgOutgoingScanIntervalKey := "message.message_outgoing_scan_interval"
@@ -179,6 +192,7 @@ func main() {
 	var (
 		autoAssignInterval          = ko.MustDuration("autoassigner.autoassign_interval")
 		unsnoozeInterval            = ko.MustDuration("conversation.unsnooze_interval")
+		draftRetentionDuration      = cmp.Or(ko.Duration("conversation.draft_retention_duration"), 360*time.Hour)
 		automationWorkers           = ko.MustInt("automation.worker_count")
 		messageOutgoingQWorkers     = ko.MustDuration("message.outgoing_queue_workers")
 		messageIncomingQWorkers     = ko.MustDuration("message.incoming_queue_workers")
@@ -194,7 +208,7 @@ func main() {
 		priority                    = initPriority(db, i18n)
 		auth                        = initAuth(oidc, rdb, i18n)
 		template                    = initTemplate(db, fs, constants, i18n)
-		media                       = initMedia(db, i18n)
+		media                       = initMedia(db, i18n, settings)
 		inbox                       = initInbox(db, i18n)
 		team                        = initTeam(db, i18n)
 		businessHours               = initBusinessHours(db, i18n)
@@ -202,9 +216,11 @@ func main() {
 		user                        = initUser(i18n, db)
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
+		userNotification            = initUserNotification(db, i18n)
+		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub)
 		automation                  = initAutomationEngine(db, i18n)
-		sla                         = initSLA(db, team, settings, businessHours, notifier, template, user, i18n)
-		conversation                = initConversations(i18n, sla, status, priority, wsHub, notifier, db, inbox, user, team, media, settings, csat, automation, template, webhook)
+		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
+		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
 	)
@@ -226,40 +242,45 @@ func main() {
 	go sla.SendNotifications(ctx)
 	go media.DeleteUnlinkedMedia(ctx)
 	go user.MonitorAgentAvailability(ctx)
+	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
+	go userNotification.RunNotificationCleaner(ctx)
 
 	var app = &App{
-		lo:              lo,
-		fs:              fs,
-		sla:             sla,
-		oidc:            oidc,
-		i18n:            i18n,
-		auth:            auth,
-		media:           media,
-		setting:         settings,
-		inbox:           inbox,
-		user:            user,
-		team:            team,
-		status:          status,
-		priority:        priority,
-		tmpl:            template,
-		notifier:        notifier,
-		consts:          atomic.Value{},
-		conversation:    conversation,
-		automation:      automation,
-		businessHours:   businessHours,
-		activityLog:     initActivityLog(db, i18n),
-		customAttribute: initCustomAttribute(db, i18n),
-		authz:           initAuthz(i18n),
-		view:            initView(db, i18n),
-		report:          initReport(db, i18n),
-		csat:            initCSAT(db, i18n),
-		search:          initSearch(db, i18n),
-		role:            initRole(db, i18n),
-		tag:             initTag(db, i18n),
-		macro:           initMacro(db, i18n),
-		ai:              initAI(db, i18n),
-		webhook:         webhook,
-		rateLimit:       rateLimiter,
+		lo:               lo,
+		fs:               fs,
+		sla:              sla,
+		oidc:             oidc,
+		i18n:             i18n,
+		auth:             auth,
+		media:            media,
+		setting:          settings,
+		inbox:            inbox,
+		user:             user,
+		team:             team,
+		status:           status,
+		priority:         priority,
+		tmpl:             template,
+		notifier:         notifier,
+		consts:           atomic.Value{},
+		conversation:     conversation,
+		automation:       automation,
+		businessHours:    businessHours,
+		activityLog:      initActivityLog(db, i18n),
+		customAttribute:  initCustomAttribute(db, i18n),
+		authz:            initAuthz(i18n),
+		view:             initView(db, i18n),
+		report:           initReport(db, i18n),
+		csat:             initCSAT(db, i18n),
+		search:           initSearch(db, i18n),
+		role:             initRole(db, i18n),
+		tag:              initTag(db, i18n),
+		macro:            initMacro(db, i18n),
+		ai:               initAI(db, i18n),
+		importer:         initImporter(i18n),
+		webhook:          webhook,
+		rateLimit:        rateLimiter,
+		redis:            rdb,
+		userNotification: userNotification,
 	}
 	app.consts.Store(constants)
 
@@ -309,6 +330,8 @@ func main() {
 	conversation.Close()
 	colorlog.Red("Shutting down SLA...")
 	sla.Close()
+	colorlog.Red("Shutting down importer...")
+	app.importer.Close()
 	colorlog.Red("Shutting down database...")
 	db.Close()
 	colorlog.Red("Shutting down redis...")

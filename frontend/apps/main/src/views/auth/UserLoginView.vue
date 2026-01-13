@@ -185,7 +185,12 @@ const fetchOIDCProviders = async () => {
 }
 
 const redirectToOIDC = (provider) => {
-  window.location.href = `/api/v1/oidc/${provider.id}/login`
+  // Pass the 'next' parameter to OIDC login if it exists
+  const nextParam = router.currentRoute.value.query.next
+  const url = nextParam
+    ? `/api/v1/oidc/${provider.id}/login?next=${encodeURIComponent(nextParam)}`
+    : `/api/v1/oidc/${provider.id}/login`
+  window.location.href = url
 }
 
 const validateForm = () => {
@@ -221,8 +226,14 @@ const loginAction = () => {
       }
       // Also fetch general setting as user's logged in.
       appSettingsStore.fetchSettings('general')
-      // Navigate to inboxes
-      router.push({ name: 'inboxes' })
+
+      // Redirect to the 'next' parameter if it exists
+      const nextParam = router.currentRoute.value.query.next
+      if (nextParam) {
+        router.push(nextParam)
+      } else {
+        router.push({ name: 'inboxes' })
+      }
     })
     .catch((error) => {
       errorMessage.value = handleHTTPError(error).message

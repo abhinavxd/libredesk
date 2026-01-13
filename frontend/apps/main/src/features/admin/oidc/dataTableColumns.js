@@ -30,6 +30,15 @@ export const createColumns = (t) => [
     }
   },
   {
+    accessorKey: 'created_at',
+    header: function () {
+      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+    },
+    cell: function ({ row }) {
+      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+    }
+  },
+  {
     accessorKey: 'updated_at',
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
@@ -41,6 +50,7 @@ export const createColumns = (t) => [
   {
     id: 'actions',
     enableHiding: false,
+    enableSorting: false,
     cell: ({ row }) => {
       const role = row.original
       return h(

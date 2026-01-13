@@ -21,18 +21,25 @@
       }"
       class="block p-2 rounded hover:bg-muted"
     >
-      <div class="flex items-center justify-between">
-        <div class="flex flex-col">
-          <span class="font-medium text-sm">
-            {{ conversation.contact.first_name }} {{ conversation.contact.last_name }}
-          </span>
-          <span class="text-xs text-muted-foreground truncate max-w-[200px]">
+      <div class="flex flex-wrap items-start justify-between gap-1">
+        <div class="flex flex-col flex-1 min-w-[120px]">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span class="font-medium text-sm truncate max-w-[300px]">
+                {{ conversation.subject }}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {{ conversation.subject }}
+            </TooltipContent>
+          </Tooltip>
+          <span class="text-xs text-muted-foreground truncate max-w-[400px]">
             {{ conversation.last_message }}
           </span>
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div class="flex gap-1 items-center text-xs text-muted-foreground">
+            <div class="flex gap-1 items-center text-xs text-muted-foreground flex-shrink-0">
               <span v-if="conversation.created_at">
                 {{ getRelativeTime(new Date(conversation.created_at)) }}
               </span>

@@ -43,7 +43,7 @@
             </div>
           </div>
           <div>
-            <DataTable :columns="createColumns(t)" :data="statuses" />
+            <DataTable :columns="createColumns(t)" :data="statuses" :loading="isLoading" />
           </div>
         </div>
       </template>

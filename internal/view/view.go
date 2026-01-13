@@ -10,6 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/view/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/lib/pq"
 	"github.com/zerodha/logf"
 )
 
@@ -33,11 +34,13 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	GetView      *sqlx.Stmt `query:"get-view"`
-	GetUserViews *sqlx.Stmt `query:"get-user-views"`
-	InsertView   *sqlx.Stmt `query:"insert-view"`
-	DeleteView   *sqlx.Stmt `query:"delete-view"`
-	UpdateView   *sqlx.Stmt `query:"update-view"`
+	GetView               *sqlx.Stmt `query:"get-view"`
+	GetUserViews          *sqlx.Stmt `query:"get-user-views"`
+	GetSharedViewsForUser *sqlx.Stmt `query:"get-shared-views-for-user"`
+	GetAllSharedViews     *sqlx.Stmt `query:"get-all-shared-views"`
+	InsertView            *sqlx.Stmt `query:"insert-view"`
+	DeleteView            *sqlx.Stmt `query:"delete-view"`
+	UpdateView            *sqlx.Stmt `query:"update-view"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -66,7 +69,7 @@ func (v *Manager) Get(id int) (models.View, error) {
 	return view, nil
 }
 
-// GetUsersViews returns all views for a user.
+// GetUsersViews returns all personal views (visibility='user') for a user.
 func (v *Manager) GetUsersViews(userID int) ([]models.View, error) {
 	views := make([]models.View, 0)
 	if err := v.q.GetUserViews.Select(&views, userID); err != nil {
@@ -76,21 +79,61 @@ func (v *Manager) GetUsersViews(userID int) ([]models.View, error) {
 	return views, nil
 }
 
-// Create creates a new view.
+// GetSharedViewsForUser returns shared views accessible to a user based on their team memberships.
+func (v *Manager) GetSharedViewsForUser(teamIDs []int) ([]models.View, error) {
+	views := make([]models.View, 0)
+	if err := v.q.GetSharedViewsForUser.Select(&views, pq.Array(teamIDs)); err != nil {
+		v.lo.Error("error fetching shared views", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.view}"), nil)
+	}
+	return views, nil
+}
+
+// GetAllSharedViews returns all shared views (for admin management).
+func (v *Manager) GetAllSharedViews() ([]models.View, error) {
+	views := make([]models.View, 0)
+	if err := v.q.GetAllSharedViews.Select(&views); err != nil {
+		v.lo.Error("error fetching all shared views", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.view}"), nil)
+	}
+	return views, nil
+}
+
+// Create creates a new view (personal view with visibility='user').
 func (v *Manager) Create(name string, filter []byte, userID int) (models.View, error) {
 	var createdView models.View
-	if err := v.q.InsertView.Get(&createdView, name, filter, userID); err != nil {
+	if err := v.q.InsertView.Get(&createdView, name, filter, models.VisibilityUser, userID, nil); err != nil {
 		v.lo.Error("error inserting view", "error", err)
 		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.view}"), nil)
 	}
 	return createdView, nil
 }
 
-// Update updates a view by id.
-func (v *Manager) Update(id int, name string, filter []byte) (models.View, error) {
+// CreateSharedView creates a new shared view (admin only).
+func (v *Manager) CreateSharedView(name string, filter []byte, visibility string, teamID *int) (models.View, error) {
+	var createdView models.View
+	if err := v.q.InsertView.Get(&createdView, name, filter, visibility, nil, teamID); err != nil {
+		v.lo.Error("error inserting shared view", "error", err)
+		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.view}"), nil)
+	}
+	return createdView, nil
+}
+
+// Update updates a personal view by id.
+func (v *Manager) Update(id int, name string, filter []byte, userID int) (models.View, error) {
 	var updatedView models.View
-	if err := v.q.UpdateView.Get(&updatedView, id, name, filter); err != nil {
+	if err := v.q.UpdateView.Get(&updatedView, id, name, filter, models.VisibilityUser, userID, nil); err != nil {
 		v.lo.Error("error updating view", "error", err)
+		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.view}"), nil)
+	}
+	return updatedView, nil
+}
+
+// UpdateSharedView updates a shared view.
+func (v *Manager) UpdateSharedView(id int, name string, filter []byte, visibility string, teamID *int) (models.View, error) {
+	var updatedView models.View
+	if err := v.q.UpdateView.Get(&updatedView, id, name, filter, visibility, nil, teamID); err != nil {
+		v.lo.Error("error updating shared view", "error", err)
 		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.view}"), nil)
 	}
 	return updatedView, nil

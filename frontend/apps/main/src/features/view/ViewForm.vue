@@ -150,7 +150,8 @@ const onSubmit = form.handleSubmit(async (values) => {
     (f) =>
       !f.field ||
       !f.operator ||
-      (![OPERATOR.SET, OPERATOR.NOT_SET].includes(f.operator) && !f.value)
+      (![OPERATOR.SET, OPERATOR.NOT_SET].includes(f.operator) &&
+        (!f.value || (Array.isArray(f.value) && f.value.length === 0)))
   )
   if (hasPartialFilters) {
     form.setFieldError('filters', t('view.form.filter.partiallyFilled'))

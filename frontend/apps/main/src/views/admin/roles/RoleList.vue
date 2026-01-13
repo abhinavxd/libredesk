@@ -13,7 +13,7 @@
       </router-link>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="roles" />
+      <DataTable :columns="createColumns(t)" :data="roles" :loading="isLoading" />
     </div>
   </div>
 </template>

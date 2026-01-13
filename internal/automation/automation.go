@@ -26,7 +26,7 @@ var (
 	//go:embed queries.sql
 	efs embed.FS
 	// MaxQueueSize is the maximum size of the task queue.
-	MaxQueueSize = 5000
+	MaxQueueSize = 10000
 )
 
 // TaskType represents the type of conversation task.
@@ -66,7 +66,7 @@ type Opts struct {
 
 type conversationStore interface {
 	ApplyAction(action models.RuleAction, conversation cmodels.Conversation, user umodels.User) error
-	GetConversation(teamID int, uuid string) (cmodels.Conversation, error)
+	GetConversation(teamID int, uuid, refNum string) (cmodels.Conversation, error)
 	GetConversationsCreatedAfter(time.Time) ([]cmodels.Conversation, error)
 }
 
@@ -318,7 +318,7 @@ func (e *Engine) EvaluateConversationUpdateRules(conversation cmodels.Conversati
 // EvaluateConversationUpdateRulesByID fetches conversation by ID and enqueues for rule evaluation,
 // This function is useful when callers want to fresh fetch the conversation from the database instead of passing it directly as they might have a stale copy.
 func (e *Engine) EvaluateConversationUpdateRulesByID(conversationID int, conversationUUID, eventType string) {
-	conversation, err := e.conversationStore.GetConversation(conversationID, conversationUUID)
+	conversation, err := e.conversationStore.GetConversation(conversationID, conversationUUID, "")
 	if err != nil {
 		e.lo.Error("error fetching conversation", "conversation_id", conversationID, "error", err)
 		return
@@ -365,7 +365,7 @@ func (e *Engine) handleTimeTrigger() {
 	e.lo.Info("fetched conversations for evaluating time triggers", "conversations_count", len(conversations), "rules_count", len(rules))
 	for _, c := range conversations {
 		// Fetch entire conversation.
-		conversation, err := e.conversationStore.GetConversation(0, c.UUID)
+		conversation, err := e.conversationStore.GetConversation(0, c.UUID, "")
 		if err != nil {
 			e.lo.Error("error fetching conversation for time trigger", "uuid", c.UUID, "error", err)
 			continue

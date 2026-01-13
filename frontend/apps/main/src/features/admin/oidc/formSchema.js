@@ -13,6 +13,7 @@ export const createFormSchema = (t) => z.object({
     .url({
       message: t('form.error.validUrl'),
     }),
+  logo_url: z.string().url({ message: t('form.error.validUrl') }).optional().or(z.literal('')),
   client_id: z.string({
     required_error: t('globals.messages.required'),
   }),

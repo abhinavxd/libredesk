@@ -12,6 +12,7 @@ DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent
 DROP TYPE IF EXISTS "ai_provider" CASCADE; CREATE TYPE "ai_provider" AS ENUM ('openai');
 DROP TYPE IF EXISTS "automation_execution_mode" CASCADE; CREATE TYPE "automation_execution_mode" AS ENUM ('all', 'first_match');
 DROP TYPE IF EXISTS "macro_visibility" CASCADE; CREATE TYPE "macro_visibility" AS ENUM ('all', 'team', 'user');
+DROP TYPE IF EXISTS "view_visibility" CASCADE; CREATE TYPE "view_visibility" AS ENUM ('all', 'team', 'user');
 DROP TYPE IF EXISTS "media_disposition" CASCADE; CREATE TYPE "media_disposition" AS ENUM ('inline', 'attachment');
 DROP TYPE IF EXISTS "media_store" CASCADE; CREATE TYPE "media_store" AS ENUM ('s3', 'fs');
 DROP TYPE IF EXISTS "user_availability_status" CASCADE; CREATE TYPE "user_availability_status" AS ENUM ('online', 'away', 'away_manual', 'offline', 'away_and_reassigning');
@@ -19,8 +20,9 @@ DROP TYPE IF EXISTS "applied_sla_status" CASCADE; CREATE TYPE "applied_sla_statu
 DROP TYPE IF EXISTS "sla_event_status" CASCADE; CREATE TYPE "sla_event_status" AS ENUM ('pending', 'breached', 'met');
 DROP TYPE IF EXISTS "sla_metric" CASCADE; CREATE TYPE "sla_metric" AS ENUM ('first_response', 'resolution', 'next_response');
 DROP TYPE IF EXISTS "sla_notification_type" CASCADE; CREATE TYPE "sla_notification_type" AS ENUM ('warning', 'breach');
-DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online');
+DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online', 'agent_password_set', 'agent_role_permissions_changed');
 DROP TYPE IF EXISTS "macro_visible_when" CASCADE; CREATE TYPE "macro_visible_when" AS ENUM ('replying', 'starting_conversation', 'adding_private_note');
+DROP TYPE IF EXISTS "user_notification_type" CASCADE; CREATE TYPE "user_notification_type" AS ENUM ('mention', 'assignment', 'sla_warning', 'sla_breach');
 DROP TYPE IF EXISTS "webhook_event" CASCADE; CREATE TYPE webhook_event AS ENUM (
 	'conversation.created',
 	'conversation.status_changed',
@@ -233,12 +235,12 @@ CREATE TABLE conversations (
 
 	"subject" TEXT NULL,
 	waiting_since TIMESTAMPTZ NULL,
-	-- Fields to track last message details.
 	last_message_at TIMESTAMPTZ NULL,
 	last_message TEXT NULL,
 	last_message_sender message_sender_type NULL,
+	last_interaction TEXT NULL,
+	last_interaction_sender message_sender_type NULL,
 	last_interaction_at TIMESTAMPTZ NULL,
-
 	next_sla_deadline_at TIMESTAMPTZ NULL,
 	snoozed_until TIMESTAMPTZ NULL,
 	last_continuity_email_sent_at TIMESTAMPTZ NULL
@@ -301,6 +303,18 @@ CREATE TABLE automation_rules (
 CREATE INDEX index_automation_rules_on_enabled_and_weight ON automation_rules(enabled, weight);
 CREATE INDEX index_automation_rules_on_type_and_weight ON automation_rules(type, weight);
 
+DROP TABLE IF EXISTS conversation_drafts CASCADE;
+CREATE TABLE conversation_drafts (
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+	meta JSONB DEFAULT '{}'::jsonb NOT NULL
+);
+CREATE UNIQUE INDEX index_uniq_conversation_drafts_on_conversation_id_and_user_id ON conversation_drafts (conversation_id, user_id);
+
 DROP TABLE IF EXISTS macros CASCADE;
 CREATE TABLE macros (
    id SERIAL PRIMARY KEY,
@@ -329,6 +343,35 @@ CREATE TABLE conversation_participants (
 	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL
 );
 CREATE UNIQUE INDEX index_unique_conversation_participants_on_conversation_id_and_user_id ON conversation_participants (conversation_id, user_id);
+
+DROP TABLE IF EXISTS conversation_mentions CASCADE;
+CREATE TABLE conversation_mentions (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	message_id BIGINT REFERENCES conversation_messages(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	mentioned_user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	mentioned_team_id INT REFERENCES teams(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	mentioned_by_user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	CONSTRAINT constraint_mention_target CHECK (
+		(mentioned_user_id IS NOT NULL AND mentioned_team_id IS NULL) OR
+		(mentioned_user_id IS NULL AND mentioned_team_id IS NOT NULL)
+	)
+);
+CREATE INDEX index_conversation_mentions_on_mentioned_user_id ON conversation_mentions(mentioned_user_id);
+CREATE INDEX index_conversation_mentions_on_mentioned_team_id ON conversation_mentions(mentioned_team_id);
+CREATE INDEX index_conversation_mentions_on_conversation_id ON conversation_mentions(conversation_id);
+
+DROP TABLE IF EXISTS conversation_last_seen CASCADE;
+CREATE TABLE conversation_last_seen (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	last_seen_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+CREATE UNIQUE INDEX index_unique_conversation_last_seen ON conversation_last_seen (conversation_id, user_id);
 
 DROP TABLE IF EXISTS media CASCADE;
 CREATE TABLE media (
@@ -362,6 +405,7 @@ CREATE TABLE oidc (
 	client_secret TEXT NOT NULL,
 	enabled bool DEFAULT TRUE NOT NULL,
 	provider VARCHAR NULL,
+	logo_url TEXT NOT NULL DEFAULT '',
 	CONSTRAINT constraint_oidc_on_name CHECK (length("name") <= 140)
 );
 
@@ -450,11 +494,17 @@ CREATE TABLE views (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     name TEXT NOT NULL,
     filters JSONB NOT NULL,
-	-- Delete user views when user is deleted.
-    user_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
-	CONSTRAINT constraint_views_on_name CHECK (length(name) <= 140)
+    visibility view_visibility NOT NULL DEFAULT 'user',
+    -- Delete user views when user / team is deleted.
+    user_id BIGINT REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT constraint_views_on_name CHECK (length(name) <= 140),
+    CONSTRAINT constraint_views_visibility_user CHECK (visibility != 'user' OR user_id IS NOT NULL),
+    CONSTRAINT constraint_views_visibility_team CHECK (visibility != 'team' OR team_id IS NOT NULL)
 );
 CREATE INDEX index_views_on_user_id ON views(user_id);
+CREATE INDEX index_views_on_visibility ON views(visibility);
+CREATE INDEX index_views_on_team_id ON views(team_id);
 
 DROP TABLE IF EXISTS applied_slas CASCADE;
 CREATE TABLE applied_slas (
@@ -603,6 +653,28 @@ CREATE TABLE webhooks (
 	CONSTRAINT constraint_webhooks_on_events_not_empty CHECK (array_length(events, 1) > 0)
 );
 
+DROP TABLE IF EXISTS user_notifications CASCADE;
+CREATE TABLE user_notifications (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	notification_type user_notification_type NOT NULL,
+	title TEXT NOT NULL,
+	body TEXT NULL,
+	is_read BOOLEAN DEFAULT FALSE NOT NULL,
+	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	message_id BIGINT REFERENCES conversation_messages(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	actor_id BIGINT REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
+	meta JSONB DEFAULT '{}'::jsonb NOT NULL,
+	CONSTRAINT constraint_user_notifications_on_title CHECK (length(title) <= 500),
+	CONSTRAINT constraint_user_notifications_on_body CHECK (length(body) <= 2000)
+);
+CREATE INDEX index_user_notifications_on_user_id ON user_notifications(user_id);
+CREATE INDEX index_user_notifications_on_user_id_is_read ON user_notifications(user_id, is_read);
+CREATE INDEX index_user_notifications_on_created_at ON user_notifications(created_at);
+CREATE INDEX index_user_notifications_on_conversation_id ON user_notifications(conversation_id);
+
 INSERT INTO ai_providers
 ("name", provider, config, is_default)
 VALUES('openai', 'openai', '{"api_key": ""}'::jsonb, true);
@@ -663,7 +735,7 @@ VALUES
 	(
 		'Agent',
 		'Role for all agents with limited access to conversations.',
-		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage}'
+		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage}'
 	);
 
 INSERT INTO
@@ -672,7 +744,7 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
+		'{webhooks:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
 	);
 
 
@@ -758,5 +830,31 @@ VALUES (
   false,
   'SLA breached',
   'Urgent: SLA Breach for Conversation {{ .Conversation.ReferenceNumber }} for {{ .SLA.Metric }}',
+  true
+);
+
+INSERT INTO templates
+("type", body, is_default, "name", subject, is_builtin)
+VALUES (
+  'email_notification'::template_type,
+  '
+<p>{{ .MentionedBy.FullName }} mentioned you in a private note on conversation #{{ .Conversation.ReferenceNumber }}.</p>
+
+<blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">
+{{ .Message.Content }}
+</blockquote>
+
+<p>
+<a href="{{ RootURL }}/inboxes/mentioned/conversation/{{ .Conversation.UUID }}?scrollTo={{ .Message.UUID }}">View Conversation</a>
+</p>
+
+<p>
+Best regards,<br>
+Libredesk
+</p>
+',
+  false,
+  'Mentioned in conversation',
+  '{{ .MentionedBy.FullName }} mentioned you in conversation #{{ .Conversation.ReferenceNumber }}',
   true
 );

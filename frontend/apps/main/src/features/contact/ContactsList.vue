@@ -190,12 +190,12 @@ import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import { ArrowDownWideNarrow } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
-import { debounce } from '../../utils/debounce'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useEmitter } from '../../composables/useEmitter'
-import { handleHTTPError } from '../../utils/http'
-import { getVisiblePages } from '../../utils/pagination'
-import api from '../../api'
+import { useDebounceFn } from '@vueuse/core'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { handleHTTPError } from '@main/utils/http'
+import { getVisiblePages } from '@main/utils/pagination'
+import api from '@main/api'
 
 const contacts = ref([])
 const loading = ref(false)
@@ -211,7 +211,7 @@ const emitter = useEmitter()
 // Google-style pagination
 const visiblePages = computed(() => getVisiblePages(page.value, totalPages.value))
 
-const fetchContactsDebounced = debounce(() => {
+const fetchContactsDebounced = useDebounceFn(() => {
   fetchContacts()
 }, 300)
 

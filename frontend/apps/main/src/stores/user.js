@@ -34,6 +34,7 @@ export const useUserStore = defineStore('user', () => {
   const getFullName = computed(() => {
     const first = user.value.first_name ?? ''
     const last = user.value.last_name ?? ''
+    if (!last) return first
     return `${first} ${last}`.trim()
   })
 

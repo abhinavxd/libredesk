@@ -67,6 +67,13 @@ func (u *Manager) InvalidateAgentCache(id int) {
 	delete(u.agentCache, id)
 }
 
+// InvalidateAllAgentCache clears the entire agent cache.
+func (u *Manager) InvalidateAllAgentCache() {
+	u.agentCacheMu.Lock()
+	defer u.agentCacheMu.Unlock()
+	u.agentCache = make(map[int]models.User)
+}
+
 // GetAgentsCompact returns a compact list of agents with limited fields.
 func (u *Manager) GetAgentsCompact() ([]models.UserCompact, error) {
 	var users = make([]models.UserCompact, 0)

@@ -70,24 +70,24 @@
     }
   }
   :root {
-    --sidebar-background: 0 0% 100%;
+    --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.9% 10%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 240 5.9% 30%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
+    --sidebar-border: 240 5% 88%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
   .dark {
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 240 5% 7%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 235 86% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-border: 240 5% 14%;
+    --sidebar-ring: 235 86% 65%;
   }
 
   :root {
@@ -131,43 +131,59 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
+    --private: 35 90% 94%;
+    --canvas: 240 5% 90%;
   }
 
   .dark {
-    --background: 240 5.9% 10%;
-    --foreground: 0 0% 98%;
+    --background: 240 7% 11%;
+    --foreground: 240 4% 94%;
 
-    --card: 240 5.9% 10%;
-    --card-foreground: 0 0% 98%;
+    --card: 240 5% 13%;
+    --card-foreground: 240 4% 94%;
 
-    --popover: 240 5.9% 10%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 240 5% 15%;
+    --popover-foreground: 240 4% 94%;
 
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
+    --primary: 240 4% 94%;
+    --primary-foreground: 240 7% 11%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 240 5% 16%;
+    --secondary-foreground: 240 4% 94%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 4% 60%;
 
     --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 1 100% 69%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
+    --border: 240 5% 18%;
+    --input: 240 5% 16%;
     --ring: 240 4.9% 83.9%;
+    --private: 30 35% 18%;
+    --canvas: 240 7% 15%;
   }
 }
 
 .message-bubble {
   @apply flex flex-col px-4 pt-2 pb-3 w-fit min-w-[30%] max-w-full border overflow-x-auto rounded shadow-sm;
+  overflow-wrap: break-all;
+
+  * {
+    max-width: 100%;
+  }
+
+  // Force pre blocks to wrap
+  pre,
+  code {
+    white-space: pre-wrap;
+  }
+
   table {
-    width: 100% !important;
+    max-width: 100% !important;
     table-layout: fixed !important;
   }
 }
@@ -185,31 +201,55 @@
 }
 
 .loading-fade {
-  @apply opacity-50 transition-opacity duration-300
+  @apply opacity-50 transition-opacity duration-300;
 }
 
 // Scrollbar start
-::-webkit-scrollbar {
-  width: 8px; /* Adjust width */
-  height: 8px; /* Adjust height */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: theme('colors.gray.300') transparent;
 }
 
-::-webkit-scrollbar-thumb {
-  background-color: #888;
-  border-radius: 3px;
-  border: 2px solid transparent;
-  background-clip: content-box;
+.dark * {
+  scrollbar-color: theme('colors.gray.600') transparent;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background-color: #555; /* Hover effect */
-}
+@supports selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: initial;
+    scrollbar-color: initial;
+  }
 
-::-webkit-scrollbar-track {
-  background: #f0f0f0;
-  border-radius: 3px;
+  .dark * {
+    scrollbar-color: initial;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+
+  .dark *::-webkit-scrollbar-thumb {
+    @apply bg-gray-600;
+  }
+
+  .dark *::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
 }
-// End Scrollbar
+// Scrollbar end
 
 .show-quoted-text {
   blockquote {
@@ -232,4 +272,13 @@
   .link-style {
     @apply text-blue-500 hover:underline;
   }
+}
+
+/* Fix collapsed sidebar visibility in padding gap.
+ * The sidebar is position:fixed and slides to left:-14rem when collapsed,
+ * but ml-[3.2rem] offset causes part to remain visible in the app's padding gap.
+ * Push it further left to fully hide it.
+ */
+[data-state="collapsed"][data-collapsible="offcanvas"] .sidebar-secondary {
+  left: calc((var(--sidebar-width) + 3.5rem) * -1.4) !important;
 }

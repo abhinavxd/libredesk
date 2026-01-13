@@ -27,6 +27,14 @@ FROM
 WHERE
     id = $1;
 
+-- name: get-webhook-secret
+SELECT
+    secret
+FROM
+    webhooks
+WHERE
+    id = $1;
+
 -- name: get-active-webhooks
 SELECT
     id,

@@ -20,9 +20,11 @@ const (
 )
 
 var (
-	regexpNonAlNum = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
-	regexpSpaces   = regexp.MustCompile(`[\s]+`)
-	uuidV4Regex    = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
+	regexpNonAlNum  = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
+	regexpSpaces    = regexp.MustCompile(`[\s]+`)
+	uuidV4Regex     = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
+	regexpRefNumber = regexp.MustCompile(`#(\d+)`)
+	regexpConvUUID  = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
 )
 
 // HTML2Text converts HTML to text.
@@ -201,6 +203,43 @@ func DedupAndExcludeString(list []string, exclude string) []string {
 	return cleaned
 }
 
+// StripConvUUID removes +conv-{uuid-v4} from an email address if present.
+// Only matches strict UUID v4 format (36 chars).
+// e.g., support+conv-13216cf7-6626-4b0d-a938-46ce65a20701@domain.com -> support@domain.com
+func StripConvUUID(email string) string {
+	return regexpConvUUID.ReplaceAllString(email, "@")
+}
+
+// ExtractConvUUID extracts the conversation UUID from a plus-addressed email.
+// e.g., support+conv-abc12345-1234-4123-1234-123456789abc@domain.com -> abc12345-1234-4123-1234-123456789abc
+// Returns empty string if no valid UUIDv4 found.
+func ExtractConvUUID(email string) string {
+	match := regexpConvUUID.FindString(email)
+	if match == "" {
+		return ""
+	}
+	// match is "+conv-{uuid}@", extract just the UUID (skip "+conv-" prefix and "@" suffix)
+	return match[6 : len(match)-1]
+}
+
+// DedupAndExcludePlusVariants deduplicates and excludes inbox email and its plus-addressed variants.
+func DedupAndExcludePlusVariants(list []string, inboxEmail string) []string {
+	seen := make(map[string]struct{}, len(list))
+	cleaned := make([]string, 0, len(list))
+	inboxNorm := strings.ToLower(inboxEmail)
+	for _, s := range list {
+		// Skip if empty or matches inbox email (after stripping +conv-UUID)
+		if s == "" || strings.EqualFold(StripConvUUID(s), inboxNorm) {
+			continue
+		}
+		if _, ok := seen[s]; !ok {
+			seen[s] = struct{}{}
+			cleaned = append(cleaned, s)
+		}
+	}
+	return cleaned
+}
+
 // ComputeRecipients computes new recipients using last message's recipients and direction.
 func ComputeRecipients(
 	from, to, cc, bcc []string,
@@ -232,8 +271,8 @@ func ComputeRecipients(
 		}
 	}
 
-	finalTo = DedupAndExcludeString(finalTo, inboxEmail)
-	finalCC = DedupAndExcludeString(finalCC, inboxEmail)
+	finalTo = DedupAndExcludePlusVariants(finalTo, inboxEmail)
+	finalCC = DedupAndExcludePlusVariants(finalCC, inboxEmail)
 	// BCC is one-time only, user is supposed to add it manually.
 	finalBCC = []string{}
 
@@ -244,4 +283,19 @@ func ComputeRecipients(
 // Returns empty string if no valid UUID is found.
 func ExtractUUID(text string) string {
 	return uuidV4Regex.FindString(text)
+}
+
+// ExtractReferenceNumber extracts the last reference number from a subject line.
+// For example, "RE: Test - #392" returns "392".
+// If multiple numbers exist (e.g., "Order #123 - #392"), returns the last one ("392").
+func ExtractReferenceNumber(subject string) string {
+	matches := regexpRefNumber.FindAllStringSubmatch(subject, -1)
+	if len(matches) > 0 {
+		// Return the last match's captured group.
+		lastMatch := matches[len(matches)-1]
+		if len(lastMatch) >= 2 {
+			return lastMatch[1]
+		}
+	}
+	return ""
 }

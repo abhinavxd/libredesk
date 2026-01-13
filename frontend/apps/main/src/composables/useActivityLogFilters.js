@@ -20,20 +20,26 @@ export function useActivityLogFilters () {
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: [{
-                label: 'Agent login',
+                label: t('activityLog.type.agentLogin'),
                 value: 'agent_login'
             }, {
-                label: 'Agent logout',
+                label: t('activityLog.type.agentLogout'),
                 value: 'agent_logout'
             }, {
-                label: 'Agent away',
+                label: t('activityLog.type.agentAway'),
                 value: 'agent_away'
             }, {
-                label: 'Agent away reassigned',
+                label: t('activityLog.type.agentAwayReassigned'),
                 value: 'agent_away_reassigned'
             }, {
-                label: 'Agent online',
+                label: t('activityLog.type.agentOnline'),
                 value: 'agent_online'
+            }, {
+                label: t('activityLog.type.agentPasswordSet'),
+                value: 'agent_password_set'
+            }, {
+                label: t('activityLog.type.agentRolePermissionsChanged'),
+                value: 'agent_role_permissions_changed'
             }]
         },
     }))

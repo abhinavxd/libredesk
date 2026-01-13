@@ -33,6 +33,7 @@ export const createColumns = (t) => [
   {
     id: 'actions',
     enableHiding: false,
+    enableSorting: false,
     cell: ({ row }) => {
       const tag = row.original
       return h(

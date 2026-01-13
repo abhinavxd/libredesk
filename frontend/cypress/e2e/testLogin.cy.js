@@ -16,7 +16,7 @@ describe('Login Component', () => {
                             "client_id": "xx",
                             "enabled": true,
                             "id": 1,
-                            "logo_url": "/images/google-logo.png",
+                            "logo_url": "/images/google-logo.svg",
                             "name": "Google",
                             "provider": "Google",
                             "provider_url": "https://accounts.google.com",

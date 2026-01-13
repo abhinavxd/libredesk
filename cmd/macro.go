@@ -146,7 +146,7 @@ func handleApplyMacro(r *fastglue.Request) error {
 	}
 
 	// Enforce conversation access.
-	conversation, err := app.conversation.GetConversation(0, conversationUUID)
+	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

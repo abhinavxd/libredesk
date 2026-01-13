@@ -26,17 +26,17 @@
           <div
             v-for="(message, index) in conversationStore.conversationMessages"
             :key="message.uuid"
+            :data-message-uuid="message.uuid"
             :class="{
               'my-2': message.type === 'activity',
               'pt-4': index === 0
             }"
           >
-            <div v-if="!message.private">
-              <ContactMessageBubble :message="message" v-if="message.type === 'incoming'" />
-              <AgentMessageBubble :message="message" v-if="message.type === 'outgoing'" />
+            <div v-if="!message.private && message.type !== 'activity'">
+              <MessageBubble :message="message" :direction="message.type" />
             </div>
             <div v-else-if="isPrivateNote(message)">
-              <AgentMessageBubble :message="message" v-if="message.type === 'outgoing'" />
+              <MessageBubble :message="message" direction="outgoing" />
             </div>
             <div v-else-if="message.type === 'activity'">
               <ActivityMessageBubble :message="message" />
@@ -62,18 +62,20 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import ContactMessageBubble from './ContactMessageBubble.vue'
+import { useRoute } from 'vue-router'
+import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
-import AgentMessageBubble from './AgentMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
-import { RefreshCw } from 'lucide-vue-next'
+import { RefreshCw, ChevronDown } from 'lucide-vue-next'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import MessagesSkeleton from './MessagesSkeleton.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
+
+const route = useRoute()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
@@ -110,6 +112,34 @@ const scrollToBottom = () => {
   }, 50)
 }
 
+const scrollToMessage = (messageUUID) => {
+  if (!messageUUID) {
+    scrollToBottom()
+    return
+  }
+
+  setTimeout(() => {
+    const thread = threadEl.value
+    const messageEl = thread?.querySelector(`[data-message-uuid="${messageUUID}"]`)
+    if (messageEl && thread) {
+      // Manual scroll calculation for reliability with variable-height messages
+      const messageTop = messageEl.offsetTop
+      const threadHeight = thread.clientHeight
+      const messageHeight = messageEl.offsetHeight
+      // Position message at ~1/3 from top of viewport for better visibility
+      const targetScroll = messageTop - threadHeight / 3 + messageHeight / 2
+      thread.scrollTop = Math.max(0, targetScroll)
+
+      // Highlight the message briefly
+      messageEl.classList.add('highlight-mention')
+      setTimeout(() => messageEl.classList.remove('highlight-mention'), 2500)
+    } else {
+      // Message not found, scroll to bottom instead
+      scrollToBottom()
+    }
+  }, 150)
+}
+
 onMounted(() => {
   checkIfAtBottom()
   handleNewMessage()
@@ -118,13 +148,16 @@ onMounted(() => {
 const handleNewMessage = () => {
   emitter.on(EMITTER_EVENTS.NEW_MESSAGE, (data) => {
     if (data.conversation_uuid === conversationStore.current.uuid) {
+      // Agent's own message - always scroll to bottom
       if (data.message?.sender_id === userStore.userID) {
         scrollToBottom()
-      } else if (isAtBottom.value) {
-        // If user is at bottom, scroll to show new message
+      }
+      // Customer message - only scroll if already at bottom
+      else if (isAtBottom.value) {
         scrollToBottom()
-      } else {
-        // If user is not at bottom, increment unread counter but do not scroll
+      }
+      // Customer message but not at bottom - don't scroll, increment unread
+      else {
         unReadMessages.value++
       }
     }
@@ -143,7 +176,16 @@ watch(
     ) {
       currentConversationUUID.value = conversationStore.current.uuid
       unReadMessages.value = 0
-      scrollToBottom()
+
+      // Check if this is a mentioned conversation
+      const scrollToUUID = route.query.scrollTo
+      if (scrollToUUID) {
+        // Mentioned conversation - only scroll to message, NOT to bottom
+        scrollToMessage(scrollToUUID)
+      } else {
+        // Normal conversation - scroll to bottom
+        scrollToBottom()
+      }
     }
   }
 )
@@ -172,3 +214,34 @@ const isPrivateNote = (message) => {
   return message.type === 'outgoing' && message.private
 }
 </script>
+
+<style scoped>
+.highlight-mention {
+  animation: highlightPulse 2.5s ease-out;
+}
+
+@keyframes highlightPulse {
+  0% {
+    background-color: rgb(251 191 36 / 0.35);
+    border-radius: 0.5rem;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Dark mode highlight - softer yellow */
+:global(.dark) .highlight-mention {
+  animation: highlightPulseDark 2.5s ease-out;
+}
+
+@keyframes highlightPulseDark {
+  0% {
+    background-color: rgb(250 204 21 / 0.2);
+    border-radius: 0.5rem;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+</style>

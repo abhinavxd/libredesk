@@ -28,8 +28,8 @@ func (m *mockConversationStore) ApplyAction(action models.RuleAction, conversati
 	return args.Error(0)
 }
 
-func (m *mockConversationStore) GetConversation(teamID int, uuid string) (cmodels.Conversation, error) {
-	args := m.Called(teamID, uuid)
+func (m *mockConversationStore) GetConversation(teamID int, uuid, refNum string) (cmodels.Conversation, error) {
+	args := m.Called(teamID, uuid, refNum)
 	return args.Get(0).(cmodels.Conversation), args.Error(1)
 }
 

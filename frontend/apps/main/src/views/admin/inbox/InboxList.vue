@@ -14,7 +14,7 @@
       </router-link>
     </div>
     <div>
-      <DataTable :columns="columns" :data="data" />
+      <DataTable :columns="columns" :data="data" :loading="isLoading" />
     </div>
   </div>
 </template>
@@ -22,27 +22,62 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { h } from 'vue'
-import InboxDataTableDropDown from '@/features/admin/inbox/InboxDataTableDropDown.vue'
-import { handleHTTPError } from '../../../utils/http'
+import { RouterLink } from 'vue-router'
+import InboxDataTableDropDown from '@main/features/admin/inbox/InboxDataTableDropDown.vue'
+import { handleHTTPError } from '@main/utils/http'
 import { Button } from '@shared-ui/components/ui/button'
 import DataTable from '@main/components/datatable/DataTable.vue'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
-import { useRouter } from 'vue-router'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { format } from 'date-fns'
 import { Spinner } from '@shared-ui/components/ui/spinner'
-import { useInboxStore } from '@/stores/inbox'
-import api from '@/api'
+import { useInboxStore } from '@main/stores/inbox'
+import api from '@main/api'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const emitter = useEmitter()
 const inboxStore = useInboxStore()
 const isLoading = ref(false)
 const data = ref([])
 
 onMounted(async () => {
+  // Handle OAuth callback messages
+  const errorCode = route.query.error
+  const successCode = route.query.success
+
+  if (errorCode) {
+    let msg
+    if (errorCode === 'oauth_denied') {
+      msg = t('globals.messages.denied', { name: t('globals.terms.authorization') })
+    } else if (errorCode === 'inbox_already_exists') {
+      msg = t('inbox.oauthAlreadyExists')
+    } else if (errorCode === 'inbox_not_found') {
+      msg = t('inbox.oauthNotFound')
+    } else if (errorCode === 'email_mismatch') {
+      msg = t('inbox.oauthEmailMismatch')
+    } else {
+      msg = t('globals.messages.errorConnecting', { name: t('globals.terms.inbox') })
+    }
+    setTimeout(() => {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: msg
+      })
+    }, 500)
+  } else if (successCode) {
+    const msg =
+      successCode === 'oauth_reconnected'
+        ? t('globals.messages.reconnectedSuccessfully', { name: t('globals.terms.inbox') })
+        : t('globals.messages.connectedSuccessfully', { name: t('globals.terms.inbox') })
+    setTimeout(() => {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: msg })
+    }, 500)
+  }
+
   await getInboxes()
 })
 
@@ -69,7 +104,15 @@ const columns = [
       return h('div', { class: 'text-center' }, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('name'))
+      return h('div', { class: 'text-center' },
+        h(RouterLink,
+          {
+            to: { name: 'edit-inbox', params: { id: row.original.id } },
+            class: 'text-primary hover:underline'
+          },
+          () => row.getValue('name')
+        )
+      )
     }
   },
   {
@@ -110,6 +153,7 @@ const columns = [
   {
     id: 'actions',
     enableHiding: false,
+    enableSorting: false,
     cell: ({ row }) => {
       const inbox = row.original
       return h(

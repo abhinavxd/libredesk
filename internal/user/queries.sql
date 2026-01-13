@@ -137,7 +137,7 @@ SET reset_password_token = $2, reset_password_token_expiry = now() + interval '1
 WHERE id = $1 AND type = 'agent';
 
 -- name: set-password
-UPDATE users  
+UPDATE users
 SET password = $1, reset_password_token = NULL, reset_password_token_expiry = NULL
 WHERE reset_password_token = $2 AND reset_password_token_expiry > now();
 

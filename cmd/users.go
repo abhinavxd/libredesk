@@ -282,6 +282,13 @@ func handleUpdateAgent(r *fastglue.Request) error {
 		}
 	}
 
+	// Log activity if password was changed.
+	if req.NewPassword != "" {
+		if err := app.activityLog.PasswordSet(auser.ID, auser.Email, ip, id, req.Email); err != nil {
+			app.lo.Error("error creating activity log", "error", err)
+		}
+	}
+
 	// Upsert agent teams.
 	if err := app.team.UpsertUserTeams(id, req.Teams); err != nil {
 		return sendErrorEnvelope(r, err)

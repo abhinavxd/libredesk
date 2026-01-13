@@ -14,7 +14,7 @@
       </div>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="oidc" />
+      <DataTable :columns="createColumns(t)" :data="oidc" :loading="isLoading" />
     </div>
   </div>
 </template>

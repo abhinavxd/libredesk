@@ -43,3 +43,42 @@ func handleOverviewSLA(r *fastglue.Request) error {
 	}
 	return r.SendEnvelope(sla)
 }
+
+// handleOverviewCSAT retrieves CSAT metrics for the dashboard.
+func handleOverviewCSAT(r *fastglue.Request) error {
+	var (
+		app     = r.Context.(*App)
+		days, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
+	)
+	csat, err := app.report.GetOverviewCSAT(days)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(csat)
+}
+
+// handleOverviewMessageVolume retrieves message volume metrics for the dashboard.
+func handleOverviewMessageVolume(r *fastglue.Request) error {
+	var (
+		app     = r.Context.(*App)
+		days, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
+	)
+	volume, err := app.report.GetOverviewMessageVolume(days)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(volume)
+}
+
+// handleOverviewTagDistribution retrieves tag distribution metrics for the dashboard.
+func handleOverviewTagDistribution(r *fastglue.Request) error {
+	var (
+		app     = r.Context.(*App)
+		days, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
+	)
+	tags, err := app.report.GetOverviewTagDistribution(days)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(tags)
+}

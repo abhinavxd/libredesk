@@ -14,6 +14,7 @@ const (
 	TmplConversationAssigned = "Conversation assigned"
 	TmplSLABreachWarning     = "SLA breach warning"
 	TmplSLABreached          = "SLA breached"
+	TmplMentioned            = "Mentioned in conversation"
 
 	// Built-in templates fetched from memory stored in `static` directory.
 	TmplResetPassword = "reset-password"

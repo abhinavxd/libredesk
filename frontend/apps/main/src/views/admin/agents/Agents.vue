@@ -5,7 +5,7 @@
     </template>
 
     <template #help>
-      <p>Manage your support agents, their roles and permissions and teams.</p>
+      <p>Manage support agents, roles, permissions and teams.</p>
     </template>
   </AdminPageWithHelp>
 </template>

@@ -17,6 +17,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/sla/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
@@ -48,23 +49,23 @@ const (
 )
 
 var metricLabels = map[string]string{
-	MetricFirstResponse: "First Response",
+	MetricFirstResponse: "First response",
 	MetricResolution:    "Resolution",
-	MetricNextResponse:  "Next Response",
+	MetricNextResponse:  "Next response",
 }
 
 type Manager struct {
-	q                queries
-	lo               *logf.Logger
-	i18n             *i18n.I18n
-	teamStore        teamStore
-	userStore        userStore
-	appSettingsStore appSettingsStore
-	businessHrsStore businessHrsStore
-	notifier         *notifier.Service
-	template         *template.Manager
-	wg               sync.WaitGroup
-	opts             Opts
+	q                     queries
+	lo                    *logf.Logger
+	i18n                  *i18n.I18n
+	teamStore             teamStore
+	userStore             userStore
+	appSettingsStore      appSettingsStore
+	businessHrsStore      businessHrsStore
+	template              *template.Manager
+	dispatcher            *notifier.Dispatcher
+	wg                    sync.WaitGroup
+	opts                  Opts
 }
 
 // Opts defines the options for creating SLA manager.
@@ -135,9 +136,9 @@ func New(
 	teamStore teamStore,
 	appSettingsStore appSettingsStore,
 	businessHrsStore businessHrsStore,
-	notifier *notifier.Service,
 	template *template.Manager,
 	userStore userStore,
+	dispatcher *notifier.Dispatcher,
 ) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile(
@@ -149,16 +150,16 @@ func New(
 		return nil, err
 	}
 	return &Manager{
-		q:                q,
-		lo:               opts.Lo,
-		i18n:             opts.I18n,
-		teamStore:        teamStore,
-		appSettingsStore: appSettingsStore,
-		businessHrsStore: businessHrsStore,
-		notifier:         notifier,
-		template:         template,
-		userStore:        userStore,
-		opts:             opts,
+		q:                     q,
+		lo:                    opts.Lo,
+		i18n:                  opts.I18n,
+		teamStore:             teamStore,
+		appSettingsStore:      appSettingsStore,
+		businessHrsStore:      businessHrsStore,
+		template:              template,
+		userStore:             userStore,
+		dispatcher:            dispatcher,
+		opts:                  opts,
 	}, nil
 }
 
@@ -695,17 +696,38 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			continue
 		}
 
-		// Enqueue email notification.
-		if err := m.notifier.Send(notifier.Message{
-			RecipientEmails: []string{
-				agent.Email.String,
-			},
-			Subject:  subject,
-			Content:  content,
-			Provider: notifier.ProviderEmail,
-		}); err != nil {
-			m.lo.Error("error sending email notification", "error", err)
+		// Determine notification type for in-app notification.
+		var notifType nmodels.NotificationType
+		if scheduledNotification.NotificationType == NotificationTypeBreach {
+			notifType = nmodels.NotificationTypeSLABreach
+		} else {
+			notifType = nmodels.NotificationTypeSLAWarning
 		}
+
+		notificationTitle := fmt.Sprintf("SLA %s: %s for #%s",
+			scheduledNotification.NotificationType, metricLabel, appliedSLA.ConversationReferenceNumber)
+
+		var notificationBody string
+		if scheduledNotification.NotificationType == NotificationTypeBreach {
+			notificationBody = fmt.Sprintf("Overdue by %s", overdueBy)
+		} else {
+			notificationBody = fmt.Sprintf("Due in %s", dueIn)
+		}
+
+		// Send notification via dispatcher (handles in-app, WebSocket, and email).
+		m.dispatcher.Send(notifier.Notification{
+			Type:             notifType,
+			RecipientIDs:     []int{recipientID},
+			Title:            notificationTitle,
+			Body:             null.StringFrom(notificationBody),
+			ConversationID:   null.IntFrom(appliedSLA.ConversationID),
+			ConversationUUID: appliedSLA.ConversationUUID,
+			Email: &notifier.EmailNotification{
+				Recipients: []string{agent.Email.String},
+				Subject:    subject,
+				Content:    content,
+			},
+		})
 
 		// Mark the notification as processed.
 		if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {

@@ -2,7 +2,7 @@
   <div v-if="dueAt" class="flex justify-start items-center space-x-2">
     <!-- Overdue-->
     <span v-if="sla?.status === 'overdue'" key="overdue" class="sla-badge sla-overdue">
-      <AlertCircle size="14" class="shrink-0 text-red-600 dark:text-red-300" stroke-width="2" />
+      <AlertCircle size="12" class="shrink-0 text-red-600 dark:text-red-300" stroke-width="2" />
       <span class="sla-text">
         <span v-if="!showExtra">{{ label }} {{ $t('globals.terms.overdue') }}</span>
         <span v-else>{{ label }} {{ $t('sla.overdueBy') }} {{ sla.value }} </span>
@@ -11,13 +11,13 @@
 
     <!-- SLA Hit -->
     <span v-else-if="sla?.status === 'hit' && showExtra" key="sla-hit" class="sla-badge sla-hit">
-      <CheckCircle size="14" class="shrink-0 text-green-600 dark:text-green-300" stroke-width="2" />
+      <CheckCircle size="12" class="shrink-0 text-green-600 dark:text-green-300" stroke-width="2" />
       <span class="sla-text">{{ label }} {{ $t('sla.met') }}</span>
     </span>
 
     <!-- Remaining -->
     <span v-else-if="sla?.status === 'remaining'" key="remaining" class="sla-badge sla-remaining">
-      <Clock size="14" class="shrink-0 text-amber-600 dark:text-amber-300" stroke-width="2" />
+      <Clock size="12" class="shrink-0 text-amber-600 dark:text-amber-300" stroke-width="2" />
       <span class="sla-text">{{ label }} {{ sla.value }}</span>
     </span>
   </div>
@@ -52,9 +52,8 @@ watch(
 
 <style scoped>
 .sla-badge {
-  @apply inline-flex items-center px-2 py-1 rounded-md border transition-all
-         text-xs font-medium tracking-tight space-x-1.5
-         hover:scale-[98%] hover:shadow-sm;
+  @apply inline-flex items-center px-1.5 py-0.5 rounded border transition-all
+         text-xs font-medium tracking-tight space-x-1 hover:shadow-sm;
 }
 
 .sla-overdue {

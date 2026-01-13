@@ -1,4 +1,5 @@
 import { h } from 'vue'
+import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
 
 export const createColumns = (t) => [
@@ -8,7 +9,15 @@ export const createColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('name'))
+      return h('div', { class: 'text-center' },
+        h(RouterLink,
+          {
+            to: { name: 'edit-role', params: { id: row.original.id } },
+            class: 'text-primary hover:underline'
+          },
+          () => row.getValue('name')
+        )
+      )
     }
   },
   {
@@ -23,6 +32,7 @@ export const createColumns = (t) => [
   {
     id: 'actions',
     enableHiding: false,
+    enableSorting: false,
     cell: ({ row }) => {
       const role = row.original
       return h(

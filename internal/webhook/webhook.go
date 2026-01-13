@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/version"
@@ -44,16 +45,18 @@ type Manager struct {
 	closed        bool
 	closedMu      sync.RWMutex
 	wg            sync.WaitGroup
+	encryptionKey string
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB        *sqlx.DB
-	Lo        *logf.Logger
-	I18n      *i18n.I18n
-	Workers   int
-	QueueSize int
-	Timeout   time.Duration
+	DB            *sqlx.DB
+	Lo            *logf.Logger
+	I18n          *i18n.I18n
+	Workers       int
+	QueueSize     int
+	Timeout       time.Duration
+	EncryptionKey string
 }
 
 // DeliveryTask represents a webhook delivery task
@@ -66,6 +69,7 @@ type DeliveryTask struct {
 type queries struct {
 	GetAllWebhooks     *sqlx.Stmt `query:"get-all-webhooks"`
 	GetWebhook         *sqlx.Stmt `query:"get-webhook"`
+	GetWebhookSecret   *sqlx.Stmt `query:"get-webhook-secret"`
 	GetActiveWebhooks  *sqlx.Stmt `query:"get-active-webhooks"`
 	GetWebhooksByEvent *sqlx.Stmt `query:"get-webhooks-by-event"`
 	InsertWebhook      *sqlx.Stmt `query:"insert-webhook"`
@@ -99,7 +103,8 @@ func New(opts Opts) (*Manager, error) {
 				ResponseHeaderTimeout: 3 * time.Second,
 			},
 		},
-		workers: opts.Workers,
+		workers:       opts.Workers,
+		encryptionKey: opts.EncryptionKey,
 	}, nil
 }
 
@@ -110,6 +115,10 @@ func (m *Manager) GetAll() ([]models.Webhook, error) {
 		m.lo.Error("error fetching webhooks", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "webhooks"), nil)
 	}
+
+	// Decrypt secrets
+	m.decryptWebhooks(webhooks)
+
 	return webhooks, nil
 }
 
@@ -123,29 +132,73 @@ func (m *Manager) Get(id int) (models.Webhook, error) {
 		m.lo.Error("error fetching webhook", "error", err)
 		return webhook, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "webhook"), nil)
 	}
+
+	// Decrypt secret
+	if err := m.decryptWebhook(&webhook); err != nil {
+		return webhook, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "webhook"), nil)
+	}
+
 	return webhook, nil
 }
 
 // Create creates a new webhook.
 func (m *Manager) Create(webhook models.Webhook) (models.Webhook, error) {
 	var result models.Webhook
-	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), webhook.Secret, webhook.IsActive); err != nil {
+
+	// Encrypt secret before storing
+	encryptedSecret, err := m.encryptSecret(webhook.Secret)
+	if err != nil {
+		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "webhook"), nil)
+	}
+
+	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return models.Webhook{}, envelope.NewError(envelope.ConflictError, m.i18n.Ts("globals.messages.errorAlreadyExists", "name", "webhook"), nil)
 		}
 		m.lo.Error("error inserting webhook", "error", err)
 		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "webhook"), nil)
 	}
+
+	// Decrypt secret before returning (ignore errors as non-critical)
+	if err := m.decryptWebhook(&result); err != nil {
+		m.lo.Error("error decrypting webhook secret after creation", "webhook_id", result.ID, "error", err)
+	}
+
 	return result, nil
 }
 
 // Update updates a webhook by ID.
 func (m *Manager) Update(id int, webhook models.Webhook) (models.Webhook, error) {
 	var result models.Webhook
-	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), webhook.Secret, webhook.IsActive); err != nil {
+
+	// Preserve the existing encrypted secret.
+	encryptedSecret := webhook.Secret
+	if webhook.Secret == "" {
+		var existingSecret string
+		if err := m.q.GetWebhookSecret.Get(&existingSecret, id); err != nil {
+			m.lo.Error("error fetching existing webhook secret", "id", id, "error", err)
+			return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "webhook"), nil)
+		}
+		encryptedSecret = existingSecret
+	} else if !crypto.IsEncrypted(webhook.Secret) {
+		// Encrypt new secret before storing
+		var err error
+		encryptedSecret, err = m.encryptSecret(webhook.Secret)
+		if err != nil {
+			return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "webhook"), nil)
+		}
+	}
+
+	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive); err != nil {
 		m.lo.Error("error updating webhook", "error", err)
 		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "webhook"), nil)
 	}
+
+	// Decrypt secret before returning (ignore errors as non-critical)
+	if err := m.decryptWebhook(&result); err != nil {
+		m.lo.Error("error decrypting webhook secret after update", "webhook_id", result.ID, "error", err)
+	}
+
 	return result, nil
 }
 
@@ -345,5 +398,9 @@ func (m *Manager) getWebhooksByEvent(event string) ([]models.Webhook, error) {
 	if err := m.q.GetWebhooksByEvent.Select(&webhooks, event); err != nil {
 		return nil, err
 	}
+
+	// Decrypt secrets
+	m.decryptWebhooks(webhooks)
+
 	return webhooks, nil
 }

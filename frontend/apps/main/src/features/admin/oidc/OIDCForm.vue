@@ -6,11 +6,14 @@
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger>
-              <SelectValue :placeholder="t('globals.messages.select', { name: t('globals.terms.provider') })" />
+              <SelectValue
+                :placeholder="t('globals.messages.select', { name: t('globals.terms.provider') })"
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectItem value="Google"> Google </SelectItem>
+                <SelectItem value="Microsoft"> Microsoft </SelectItem>
                 <SelectItem value="Custom"> Custom </SelectItem>
               </SelectGroup>
             </SelectContent>
@@ -36,6 +39,17 @@
         <FormControl>
           <Input type="text" placeholder="https://accounts.google.com" v-bind="componentField" />
         </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ componentField }" name="logo_url" v-if="form.values.provider === 'Custom'">
+      <FormItem v-auto-animate>
+        <FormLabel>{{ $t('admin.general.logoURL') }}</FormLabel>
+        <FormControl>
+          <Input type="text" placeholder="https://example.com/logo.svg" v-bind="componentField" />
+        </FormControl>
+        <FormDescription>{{ $t('admin.sso.logoURLDescription') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -153,8 +167,21 @@ const onSubmit = form.handleSubmit((values) => {
 watch(
   () => props.initialValues,
   (newValues) => {
+    if (newValues && newValues.provider !== 'Custom') {
+      newValues.logo_url = ''
+    }
     form.setValues(newValues)
   },
   { deep: true, immediate: true }
+)
+
+// Clear logo_url when switching to Custom if current value is a built-in logo.
+watch(
+  () => form.values.provider,
+  () => {
+    if (form.values.provider === 'Custom' && form.values.logo_url?.startsWith('/images/')) {
+      form.setFieldValue('logo_url', '', false)
+    }
+  }
 )
 </script>

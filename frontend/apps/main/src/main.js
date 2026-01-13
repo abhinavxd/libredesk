@@ -5,9 +5,8 @@ import { useAppSettingsStore } from './stores/appSettings'
 import router from './router'
 import mitt from 'mitt'
 import api from './api'
-import '@shared-ui/assets/styles/main.scss'
-import '@shared-ui/utils/string'
-import VueDOMPurifyHTML from 'vue-dompurify-html'
+import './assets/styles/main.scss'
+import './utils/strings.js'
 import Root from './Root.vue'
 
 const setFavicon = (url) => {
@@ -59,7 +58,6 @@ async function initApp () {
 
   app.use(router)
   app.use(i18n)
-  app.use(VueDOMPurifyHTML)
   app.mount('#app')
 }
 

@@ -1,8 +1,8 @@
 <template>
-  <div class="flex w-full h-screen text-foreground">
+  <div class="flex w-full h-screen text-foreground bg-canvas p-1.5">
     <!-- Icon sidebar always visible -->
     <SidebarProvider style="--sidebar-width: 3rem" class="w-auto z-50">
-      <ShadcnSidebar collapsible="none" class="border-r">
+      <ShadcnSidebar collapsible="none" class="border rounded-lg overflow-hidden">
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
@@ -72,7 +72,21 @@
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <SidebarNavUser />
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <NotificationBell />
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>{{ t('globals.terms.notification', 2) }}</p>
+                </TooltipContent>
+              </Tooltip>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarNavUser />
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
       </ShadcnSidebar>
     </SidebarProvider>
@@ -82,12 +96,13 @@
       <Sidebar
         :userTeams="userStore.teams"
         :userViews="userViews"
+        :sharedViews="sharedViewStore.sharedViewList"
         @create-view="openCreateViewForm = true"
         @edit-view="editView"
         @delete-view="deleteView"
         @create-conversation="() => (openCreateConversationDialog = true)"
       >
-        <div class="flex flex-col h-screen">
+        <div class="flex flex-col h-full rounded-lg overflow-hidden bg-background">
           <!-- Show admin banner only in admin routes -->
           <AdminBanner v-if="route.path.startsWith('/admin')" />
 
@@ -123,6 +138,7 @@ import { useUsersStore } from './stores/users'
 import { useTeamStore } from './stores/team'
 import { useSlaStore } from './stores/sla'
 import { useMacroStore } from './stores/macro'
+import { useSharedViewStore } from './stores/sharedView'
 import { useTagStore } from './stores/tag'
 import { useCustomAttributeStore } from './stores/customAttributes'
 import { useIdleDetection } from './composables/useIdleDetection'
@@ -149,7 +165,8 @@ import {
 } from '@shared-ui/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import SidebarNavUser from '@main/components/sidebar/SidebarNavUser.vue'
-import api from '@/api'
+import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
+import api from '@main/api'
 
 const route = useRoute()
 const emitter = useEmitter()
@@ -160,6 +177,7 @@ const teamStore = useTeamStore()
 const inboxStore = useInboxStore()
 const slaStore = useSlaStore()
 const macroStore = useMacroStore()
+const sharedViewStore = useSharedViewStore()
 const tagStore = useTagStore()
 const customAttributeStore = useCustomAttributeStore()
 const userViews = ref([])
@@ -184,8 +202,10 @@ const initStores = async () => {
   }
   await Promise.allSettled([
     getUserViews(),
+    sharedViewStore.loadSharedViews(),
     conversationStore.fetchStatuses(),
     conversationStore.fetchPriorities(),
+    conversationStore.fetchAllDrafts(),
     usersStore.fetchUsers(),
     teamStore.fetchTeams(),
     inboxStore.fetchInboxes(),
@@ -252,3 +272,10 @@ const refreshViews = (data) => {
   }
 }
 </script>
+
+<style scoped>
+:deep(.group\/sidebar-wrapper) {
+  min-height: auto !important;
+  height: 100%;
+}
+</style>

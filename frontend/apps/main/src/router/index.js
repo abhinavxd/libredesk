@@ -115,7 +115,7 @@ const routes = [
         meta: { title: 'Search', hidePageHeader: true }
       },
       {
-        path: '/inboxes/:type(assigned|unassigned|all)?',
+        path: '/inboxes/:type(assigned|unassigned|all|mentioned)?',
         name: 'inboxes',
         redirect: '/inboxes/assigned',
         component: InboxLayout,
@@ -128,7 +128,11 @@ const routes = [
             component: () => import('@main/views/inbox/InboxView.vue'),
             meta: {
               title: 'Inbox',
-              type: (route) => (route.params.type === 'assigned' ? 'My inbox' : route.params.type)
+              type: (route) => {
+                if (route.params.type === 'assigned') return 'My inbox'
+                if (route.params.type === 'mentioned') return 'Mentions'
+                return route.params.type
+              }
             },
             children: [
               {
@@ -138,8 +142,11 @@ const routes = [
                 props: true,
                 meta: {
                   title: 'Inbox',
-                  type: (route) =>
-                    route.params.type === 'assigned' ? 'My inbox' : route.params.type,
+                  type: (route) => {
+                    if (route.params.type === 'assigned') return 'My inbox'
+                    if (route.params.type === 'mentioned') return 'Mentions'
+                    return route.params.type
+                  },
                   hidePageHeader: true
                 }
               }
@@ -286,6 +293,7 @@ const routes = [
                   {
                     path: ':id/edit',
                     props: true,
+                    name: 'edit-agent',
                     component: () => import('@main/views/admin/agents/EditAgent.vue'),
                     meta: { title: 'Edit agent' }
                   }
@@ -481,6 +489,31 @@ const routes = [
                     name: 'edit-macro',
                     component: () => import('@main/views/admin/macros/EditMacro.vue'),
                     meta: { title: 'Edit Macro' }
+                  }
+                ]
+              },
+              {
+                path: 'shared-views',
+                component: () => import('@/views/admin/shared-views/SharedViews.vue'),
+                meta: { title: 'Shared views' },
+                children: [
+                  {
+                    path: '',
+                    name: 'shared-view-list',
+                    component: () => import('@/views/admin/shared-views/SharedViewList.vue')
+                  },
+                  {
+                    path: 'new',
+                    name: 'new-shared-view',
+                    component: () => import('@/views/admin/shared-views/CreateSharedView.vue'),
+                    meta: { title: 'Create shared view' }
+                  },
+                  {
+                    path: ':id/edit',
+                    props: true,
+                    name: 'edit-shared-view',
+                    component: () => import('@/views/admin/shared-views/EditSharedView.vue'),
+                    meta: { title: 'Edit shared view' }
                   }
                 ]
               }

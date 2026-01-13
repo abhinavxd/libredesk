@@ -13,7 +13,7 @@
       </router-link>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="macros" />
+      <DataTable :columns="createColumns(t)" :data="macros" :loading="formLoading" />
     </div>
   </div>
 </template>

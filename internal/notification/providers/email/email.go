@@ -1,4 +1,3 @@
-// Package email sends out emails.
 package email
 
 import (
@@ -7,6 +6,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
+	"github.com/abhinavxd/libredesk/internal/inbox/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/knadh/smtppool"
 	"github.com/zerodha/logf"
@@ -26,8 +26,8 @@ type Opts struct {
 }
 
 // New initializes a new Email sender.
-func New(smtpConfig []email.SMTPConfig, opts Opts) (*Email, error) {
-	pools, err := email.NewSmtpPool(smtpConfig)
+func New(smtpConfig []models.SMTPConfig, opts Opts) (*Email, error) {
+	pools, err := email.NewSmtpPool(smtpConfig, nil)
 	if err != nil {
 		return nil, err
 	}

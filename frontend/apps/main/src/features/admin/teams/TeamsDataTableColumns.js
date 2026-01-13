@@ -1,4 +1,5 @@
 import { h } from 'vue'
+import { RouterLink } from 'vue-router'
 import TeamDataTableDropdown from '@/features/admin/teams/TeamDataTableDropdown.vue'
 import { format } from 'date-fns'
 
@@ -9,7 +10,15 @@ export const columns = [
       return h('div', { class: 'text-center' }, 'Name')
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('name'))
+      return h('div', { class: 'text-center' },
+        h(RouterLink,
+          {
+            to: { name: 'edit-team', params: { id: row.original.id } },
+            class: 'text-primary hover:underline'
+          },
+          () => row.getValue('name')
+        )
+      )
     }
   },
   {
@@ -41,6 +50,7 @@ export const columns = [
   {
     id: 'actions',
     enableHiding: false,
+    enableSorting: false,
     cell: ({ row }) => {
       const team = row.original
       return h(

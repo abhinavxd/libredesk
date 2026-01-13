@@ -6,30 +6,30 @@
       :class="{ 'overflow-hidden': nestedCommand === 'apply-macro' }"
     >
       <CommandEmpty>
-        <p class="text-muted-foreground">{{ $t('command.noCommandAvailable') }}</p>
+        <p class="text-base text-muted-foreground">{{ $t('command.noCommandAvailable') }}</p>
       </CommandEmpty>
 
       <!-- Snooze Options -->
       <CommandGroup v-if="nestedCommand === 'snooze'" heading="Snooze for">
-        <CommandItem value="1 hour" @select="handleSnooze(60)">
+        <CommandItem value="1 hour" @select="handleSnooze(60)" class="text-base py-3">
           1 {{ $t('globals.terms.hour') }}
         </CommandItem>
-        <CommandItem value="3 hours" @select="handleSnooze(180)"
-          >3 {{ $t('globals.terms.hour', 2) }}</CommandItem
-        >
-        <CommandItem value="6 hours" @select="handleSnooze(360)">
+        <CommandItem value="3 hours" @select="handleSnooze(180)" class="text-base py-3">
+          3 {{ $t('globals.terms.hour', 2) }}
+        </CommandItem>
+        <CommandItem value="6 hours" @select="handleSnooze(360)" class="text-base py-3">
           6 {{ $t('globals.terms.hour', 2) }}
         </CommandItem>
-        <CommandItem value="12 hours" @select="handleSnooze(720)">
+        <CommandItem value="12 hours" @select="handleSnooze(720)" class="text-base py-3">
           12 {{ $t('globals.terms.hour', 2) }}
         </CommandItem>
-        <CommandItem value="1 day" @select="handleSnooze(1440)">
+        <CommandItem value="1 day" @select="handleSnooze(1440)" class="text-base py-3">
           1 {{ $t('globals.terms.day') }}
         </CommandItem>
-        <CommandItem value="2 days" @select="handleSnooze(2880)">
+        <CommandItem value="2 days" @select="handleSnooze(2880)" class="text-base py-3">
           2 {{ $t('globals.terms.day', 2) }}
         </CommandItem>
-        <CommandItem value="pick date & time" @select="showCustomDialog">
+        <CommandItem value="pick date & time" @select="showCustomDialog" class="text-base py-3">
           {{ $t('globals.messages.pickDateAndTime') }}
         </CommandItem>
       </CommandGroup>
@@ -52,11 +52,12 @@
                   :value="macro.label + '|' + index"
                   :data-index="index"
                   @select="handleApplyMacro(macro)"
-                  class="px-3 py-2 rounded cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:"
+                  @pointerenter="highlightedMacro = macro"
+                  class="px-3 py-3 rounded cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:"
                 >
-                  <div class="flex items-center gap-2">
-                    <Zap size="14" class="shrink-0" />
-                    <span class="text-sm truncate w-full break-words whitespace-normal">{{
+                  <div class="flex items-center gap-3">
+                    <Zap size="18" class="shrink-0" />
+                    <span class="text-base truncate w-full break-words whitespace-normal">{{
                       macro.label
                     }}</span>
                   </div>
@@ -65,61 +66,63 @@
 
               <!-- Right Column: Macro Details (70%) -->
               <div class="col-span-8 px-4 overflow-y-auto h-full pb-12">
-                <div class="space-y-3 text-xs">
+                <div class="space-y-4 text-base">
                   <!-- Reply Preview -->
                   <div v-if="replyContent" class="space-y-2">
-                    <p class="text-xs font-semibold text-foreground">
+                    <p class="text-base font-semibold text-foreground">
                       {{ $t('command.replyPreview') }}
                     </p>
-                    <div
+                    <Letter
+                      :key="highlightedMacro?.value"
+                      :html="replyContent"
+                      :allowedSchemas="['cid', 'https', 'http', 'mailto']"
                       class="w-full min-h-200 p-2 bg-muted/50 rounded overflow-auto shadow native-html"
-                      v-dompurify-html="replyContent"
                     />
                   </div>
 
                   <!-- Actions -->
                   <div v-if="otherActions.length > 0" class="space-y-2">
-                    <p class="text-xs font-semibold">
+                    <p class="text-base font-semibold">
                       {{ $t('globals.terms.action', 2) }}
                     </p>
                     <div class="space-y-1.5 max-w-sm">
                       <div
                         v-for="action in otherActions"
                         :key="action.type"
-                        class="flex items-center gap-2 px-2 py-1.5 rounded text-xs bg-muted/50 hover:bg-accent hover:text-accent-foreground transition duration-200 group"
+                        class="flex items-center gap-3 px-3 py-2.5 rounded text-base bg-muted/50 hover:bg-accent hover:text-accent-foreground transition duration-200 group"
                       >
                         <div
-                          class="p-1 rounded-full group-hover:bg-muted/20 transition duration-200"
+                          class="p-1.5 rounded-full group-hover:bg-muted/20 transition duration-200"
                         >
-                          <User v-if="action.type === 'assign_user'" :size="10" class="shrink-0" />
+                          <User v-if="action.type === 'assign_user'" :size="14" class="shrink-0" />
                           <Users
                             v-else-if="action.type === 'assign_team'"
-                            :size="10"
+                            :size="14"
                             class="shrink-0"
                           />
                           <Pin
                             v-else-if="action.type === 'set_status'"
-                            :size="10"
+                            :size="14"
                             class="shrink-0"
                           />
                           <Rocket
                             v-else-if="action.type === 'set_priority'"
-                            :size="10"
+                            :size="14"
                             class="shrink-0"
                           />
                           <Tags
                             v-else-if="action.type === 'add_tags'"
-                            :size="10"
+                            :size="14"
                             class="shrink-0"
                           />
                           <Tags
                             v-else-if="action.type === 'set_tags'"
-                            :size="10"
+                            :size="14"
                             class="shrink-0"
                           />
                           <Tags
                             v-else-if="action.type === 'remove_tags'"
-                            :size="10"
+                            :size="14"
                             class="shrink-0"
                           />
                         </div>
@@ -133,7 +136,7 @@
                     v-if="!replyContent && otherActions.length === 0"
                     class="flex items-center justify-center h-20"
                   >
-                    <p class="text-xs text-muted-foreground italic">
+                    <p class="text-base text-muted-foreground italic">
                       {{ $t('command.selectAMacro') }}
                     </p>
                   </div>
@@ -153,20 +156,21 @@
         <CommandItem
           value="apply-macro"
           @select="setNestedCommand('apply-macro-to-existing-conversation')"
+          class="text-base py-3"
         >
           {{ $t('globals.messages.apply', { name: t('globals.terms.macro').toLowerCase() }) }}
         </CommandItem>
-        <CommandItem value="conv-snooze" @select="setNestedCommand('snooze')">
+        <CommandItem value="conv-snooze" @select="setNestedCommand('snooze')" class="text-base py-3">
           {{ $t('globals.terms.snooze') }}
         </CommandItem>
-        <CommandItem value="conv-resolve" @select="resolveConversation">
+        <CommandItem value="conv-resolve" @select="resolveConversation" class="text-base py-3">
           {{ $t('globals.terms.resolve') }}
         </CommandItem>
       </CommandGroup>
     </CommandList>
 
     <!-- Navigation -->
-    <div class="mt-2 px-4 py-2 text-xs text-gray-500 flex space-x-4">
+    <div class="mt-2 px-4 py-2 text-sm text-gray-500 flex space-x-4">
       <span> {{ $t('command.enterToSelect') }}</span>
       <span> {{ $t('command.navigateWithArrows') }}</span>
       <span> {{ $t('command.closeWithEsc') }}</span>
@@ -209,9 +213,9 @@
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useMagicKeys } from '@vueuse/core'
 import { CalendarIcon } from 'lucide-vue-next'
-import { useConversationStore } from '../../stores/conversation'
-import { useMacroStore } from '../../stores/macro'
-import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
+import { useConversationStore } from '@main/stores/conversation'
+import { useMacroStore } from '@main/stores/macro'
+import { CONVERSATION_DEFAULT_STATUSES, MACRO_CONTEXT } from '@main/constants/conversation'
 import { Users, User, Pin, Rocket, Tags, Zap } from 'lucide-vue-next'
 import {
   CommandDialog,
@@ -230,13 +234,14 @@ import {
   DialogDescription
 } from '@shared-ui/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useEmitter } from '../../composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
 import { Button } from '@shared-ui/components/ui/button'
 import { Calendar } from '@shared-ui/components/ui/calendar'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
 import { useI18n } from 'vue-i18n'
+import { Letter } from 'vue-letter'
 
 const conversationStore = useConversationStore()
 const macroStore = useMacroStore()
@@ -267,9 +272,9 @@ function handleApplyMacro(macro) {
   // Create a deep copy.
   const plainMacro = JSON.parse(JSON.stringify(macro))
   if (nestedCommand.value === 'apply-macro-to-new-conversation') {
-    conversationStore.setMacro(plainMacro, 'new-conversation')
+    conversationStore.setMacro(plainMacro, MACRO_CONTEXT.NEW_CONVERSATION)
   } else {
-    conversationStore.setMacro(plainMacro, 'reply')
+    conversationStore.setMacro(plainMacro, MACRO_CONTEXT.REPLY)
   }
   toggleOpen()
 }

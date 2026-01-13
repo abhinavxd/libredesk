@@ -110,6 +110,13 @@ func (e *Enforcer) InvalidateUserCache(userID int) {
 	e.permsCacheMu.Unlock()
 }
 
+// InvalidateAllCache clears the entire permissions cache.
+func (e *Enforcer) InvalidateAllCache() {
+	e.permsCacheMu.Lock()
+	defer e.permsCacheMu.Unlock()
+	e.permsCache = make(map[int][]string)
+}
+
 // Enforce checks if a user has permission to perform an action on an object.
 func (e *Enforcer) Enforce(user umodels.User, obj, act string) (bool, error) {
 	// Load permissions before enforcing as user perjissions might have changed.
@@ -164,7 +171,14 @@ func (e *Enforcer) EnforceConversationAccess(user umodels.User, conversation cmo
 		}
 	}
 
-	// Check `read_team_inbox` permission for team-assigned conversations
+	// Check `read_team_all` permission for all team conversations (superset - includes assigned to teammates)
+	if conversation.AssignedTeamID.Int > 0 && slices.Contains(user.Teams.IDs(), conversation.AssignedTeamID.Int) {
+		if allowed, err := checkPermission("read_team_all"); err != nil || allowed {
+			return allowed, err
+		}
+	}
+
+	// Check `read_team_inbox` permission for team-assigned conversations (no user assigned)
 	if conversation.AssignedTeamID.Int > 0 && slices.Contains(user.Teams.IDs(), conversation.AssignedTeamID.Int) && conversation.AssignedUserID.Int == 0 {
 		if allowed, err := checkPermission("read_team_inbox"); err != nil || allowed {
 			return allowed, err

@@ -86,6 +86,7 @@
     <!-- Main tiptap editor -->
     <div class="flex-grow flex flex-col overflow-hidden">
       <Editor
+        ref="editorRef"
         v-model:htmlContent="htmlContent"
         v-model:textContent="textContent"
         :message-type="messageType"
@@ -93,16 +94,20 @@
         :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
+        :disabled="isDraftLoading"
+        :enableMentions="messageType === 'private_note'"
+        :getSuggestions="getSuggestions"
         @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
+        @mentionsChanged="handleMentionsChanged"
       />
     </div>
 
     <!-- Macro preview -->
     <MacroActionsPreview
-      v-if="conversationStore.getMacro('reply')?.actions?.length > 0"
-      :actions="conversationStore.getMacro('reply').actions"
-      :onRemove="(action) => conversationStore.removeMacroAction(action, 'reply')"
+      v-if="conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions?.length > 0"
+      :actions="conversationStore.getMacro(MACRO_CONTEXT.REPLY).actions"
+      :onRemove="(action) => conversationStore.removeMacroAction(action, MACRO_CONTEXT.REPLY)"
       class="mt-2"
     />
 
@@ -130,20 +135,23 @@
 
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { Maximize2, Minimize2 } from 'lucide-vue-next'
 import Editor from '@main/components/editor/TextEditor.vue'
-import { useConversationStore } from '../../stores/conversation'
+import { useConversationStore } from '@main/stores/conversation'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
-import { useEmitter } from '../../composables/useEmitter'
+import { useEmitter } from '@main/composables/useEmitter'
 import AttachmentsPreview from '@/features/conversation/message/attachment/AttachmentsPreview.vue'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
-import { useMacroStore } from '../../stores/macro'
+import { useMacroStore } from '@main/stores/macro'
+import { useUsersStore } from '@main/stores/users'
+import { useTeamStore } from '@main/stores/team'
 
 const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
@@ -153,7 +161,48 @@ const showBcc = defineModel('showBcc', { default: false })
 const emailErrors = defineModel('emailErrors', { default: () => [] })
 const htmlContent = defineModel('htmlContent', { default: '' })
 const textContent = defineModel('textContent', { default: '' })
+const mentions = defineModel('mentions', { default: () => [] })
 const macroStore = useMacroStore()
+const usersStore = useUsersStore()
+const teamStore = useTeamStore()
+
+// Get suggestions for the mention dropdown
+const getSuggestions = async (query) => {
+  // Only show suggestions in private note mode
+  if (messageType.value !== 'private_note') {
+    return []
+  }
+
+  await Promise.all([usersStore.fetchUsers(), teamStore.fetchTeams()])
+
+  const q = query.toLowerCase()
+
+  const users = usersStore.users
+    .filter((u) => u.enabled)
+    .filter((u) => `${u.first_name} ${u.last_name}`.toLowerCase().includes(q))
+    .map((u) => ({
+      id: u.id,
+      type: 'agent',
+      label: `${u.first_name} ${u.last_name}`.trim(),
+      avatar_url: u.avatar_url
+    }))
+
+  const teams = teamStore.teams
+    .filter((t) => t.name.toLowerCase().includes(q))
+    .map((t) => ({
+      id: t.id,
+      type: 'team',
+      label: t.name,
+      emoji: t.emoji
+    }))
+
+  return [...users, ...teams].slice(0, 25)
+}
+
+// Handle mentions changed from editor
+const handleMentionsChanged = (newMentions) => {
+  mentions.value = newMentions
+}
 
 const props = defineProps({
   isFullscreen: {
@@ -176,6 +225,11 @@ const props = defineProps({
     type: Array,
     required: false,
     default: () => []
+  },
+  isDraftLoading: {
+    type: Boolean,
+    required: false,
+    default: false
   }
 })
 
@@ -192,6 +246,7 @@ const conversationStore = useConversationStore()
 const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)
+const editorRef = ref(null)
 
 const toggleBcc = async () => {
   showBcc.value = !showBcc.value
@@ -214,7 +269,7 @@ const enableSend = computed(() => {
       conversationStore.getMacro('reply')?.actions?.length > 0 ||
       props.uploadedFiles.length > 0) &&
     emailErrors.value.length === 0 &&
-    !props.uploadingFiles.length
+    !props.uploadingFiles.length && !props.isDraftLoading
   )
 })
 
@@ -276,13 +331,23 @@ const handleAiPromptSelected = (key) => {
 // Watch and update macro view based on message type this filters our macros.
 watch(
   messageType,
-  (newType) => {
+  (newType, oldType) => {
     if (newType === 'reply') {
       macroStore.setCurrentView('replying')
     } else if (newType === 'private_note') {
       macroStore.setCurrentView('adding_private_note')
     }
+    // Focus editor on tab change
+    setTimeout(() => {
+      editorRef.value?.focus()
+    }, 50)
   },
   { immediate: true }
 )
+
+// Expose focus method for parent components
+const focus = () => {
+  editorRef.value?.focus()
+}
+defineExpose({ focus })
 </script>

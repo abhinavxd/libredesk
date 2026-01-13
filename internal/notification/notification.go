@@ -82,26 +82,32 @@ func (s *Service) Send(message Message) error {
 // Run starts the worker pool to process messages.
 func (s *Service) Run(ctx context.Context) {
 	for range s.concurrency {
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			s.worker()
-		}()
+		s.wg.Go(func() {
+			s.worker(ctx)
+		})
 	}
 	<-ctx.Done()
+	s.Close()
 }
 
 // worker processes messages from the message channel and sends them using the set provider.
-func (s *Service) worker() {
-	for message := range s.messageChannel {
-		provider, exists := s.providers[message.Provider]
-		if !exists {
-			s.lo.Error("unsupported provider", "provider", message.Provider)
-			continue
-		}
-
-		if err := provider.Send(message); err != nil {
-			s.lo.Error("error sending message", "error", err)
+func (s *Service) worker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case message, ok := <-s.messageChannel:
+			if !ok {
+				return
+			}
+			provider, exists := s.providers[message.Provider]
+			if !exists {
+				s.lo.Error("unsupported provider", "provider", message.Provider)
+				continue
+			}
+			if err := provider.Send(message); err != nil {
+				s.lo.Error("error sending message", "error", err)
+			}
 		}
 	}
 }

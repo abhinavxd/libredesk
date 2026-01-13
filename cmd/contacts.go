@@ -25,14 +25,13 @@ type blockContactReq struct {
 // handleGetContacts returns a list of contacts from the database.
 func handleGetContacts(r *fastglue.Request) error {
 	var (
-		app         = r.Context.(*App)
-		order       = string(r.RequestCtx.QueryArgs().Peek("order"))
-		orderBy     = string(r.RequestCtx.QueryArgs().Peek("order_by"))
-		filters     = string(r.RequestCtx.QueryArgs().Peek("filters"))
-		page, _     = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page")))
-		pageSize, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page_size")))
-		total       = 0
+		app     = r.Context.(*App)
+		order   = string(r.RequestCtx.QueryArgs().Peek("order"))
+		orderBy = string(r.RequestCtx.QueryArgs().Peek("order_by"))
+		filters = string(r.RequestCtx.QueryArgs().Peek("filters"))
+		total   = 0
 	)
+	page, pageSize := getPagination(r)
 	contacts, err := app.user.GetContacts(page, pageSize, order, orderBy, filters)
 	if err != nil {
 		return sendErrorEnvelope(r, err)

@@ -55,10 +55,12 @@ import { Button } from '@shared-ui/components/ui/button'
 import { useEmitter } from '../../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useRouter } from 'vue-router'
-import api from '../../../api/index.js'
+import { useMacroStore } from '@main/stores/macro'
+import api from '@main/api/index.js'
 
 const router = useRouter()
 const emit = useEmitter()
+const macroStore = useMacroStore()
 const isDeleteOpen = ref(false)
 
 const props = defineProps({
@@ -70,6 +72,9 @@ const props = defineProps({
 
 const handleDelete = async () => {
   await api.deleteMacro(props.macro.id)
+  
+  await macroStore.loadMacros(true)
+  
   isDeleteOpen.value = false
   emit.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'macros' })
 }

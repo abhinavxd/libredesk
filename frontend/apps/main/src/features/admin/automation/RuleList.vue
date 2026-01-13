@@ -3,9 +3,12 @@
     <div class="flex justify-between space-y-1">
       <div>
         <span class="sub-title space-x-3 flex justify-center items-center">
-          <div class="text-base">
+          <router-link
+            :to="{ name: 'edit-automation', params: { id: rule.id } }"
+            class="text-base text-primary hover:underline"
+          >
             {{ rule.name }}
-          </div>
+          </router-link>
           <div class="mb-1">
             <Badge v-if="rule.enabled" class="text-[9px]">{{ $t('globals.terms.enabled') }}</Badge>
             <Badge v-else variant="secondary">{{ $t('globals.terms.disabled') }}</Badge>
@@ -95,7 +98,7 @@ const props = defineProps({
 })
 
 const navigateToEditRule = (id) => {
-  router.push({ path: `/admin/automations/${id}/edit` })
+  router.push({ name: 'edit-automation', params: { id } })
 }
 
 const handleDelete = () => {

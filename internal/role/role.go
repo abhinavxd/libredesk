@@ -158,3 +158,26 @@ func (u *Manager) filterValidPermissions(permissions []string) ([]string, error)
 	}
 	return validPermissions, nil
 }
+
+// ComparePermissions returns added and removed permissions between old and new permission sets.
+func ComparePermissions(old, new []string) (added, removed []string) {
+	oldSet := make(map[string]bool)
+	newSet := make(map[string]bool)
+	for _, p := range old {
+		oldSet[p] = true
+	}
+	for _, p := range new {
+		newSet[p] = true
+	}
+	for _, p := range new {
+		if !oldSet[p] {
+			added = append(added, p)
+		}
+	}
+	for _, p := range old {
+		if !newSet[p] {
+			removed = append(removed, p)
+		}
+	}
+	return
+}

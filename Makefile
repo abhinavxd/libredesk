@@ -105,5 +105,7 @@ demo-build:
 # Run tests.
 .PHONY: test
 test:
-	@echo "→ Running tests..."
+	@echo "→ Running Go tests..."
 	go test -count=1 ./...
+	@echo "→ Running frontend tests..."
+	cd ${FRONTEND_DIR} && npx pnpm install --frozen-lockfile && npx pnpm test:run

@@ -1,7 +1,13 @@
 <template>
   <Spinner v-if="isLoading" />
   <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
-    <div class="flex justify-end mb-5">
+    <div class="flex justify-end mb-5 gap-2">
+      <Importer
+        entity-key="globals.terms.agent"
+        :upload-fn="api.importAgents"
+        :get-status-fn="api.getAgentImportStatus"
+        @import-complete="getData"
+      />
       <router-link :to="{ name: 'new-agent' }">
         <Button>{{
           $t('globals.messages.new', {
@@ -11,7 +17,7 @@
       </router-link>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="data" />
+      <DataTable :columns="createColumns(t)" :data="data" :loading="isLoading" />
     </div>
   </div>
 </template>
@@ -27,6 +33,8 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUsersStore } from '@/stores/users'
 import { useI18n } from 'vue-i18n'
+import Importer from '@/components/importer/Importer.vue'
+import api from '@/api'
 
 const isLoading = ref(false)
 const usersStore = useUsersStore()

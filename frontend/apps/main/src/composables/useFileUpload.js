@@ -127,6 +127,19 @@ export function useFileUpload (options = {}) {
         }
     }
 
+    /**
+     * Replace all media files with new files
+     * @param {Array} files - Array of file objects to set
+     */
+    const setMediaFiles = (files) => {
+        if (Array.isArray(mediaFiles.value)) {
+            mediaFiles.value = files
+        } else {
+            mediaFiles.length = 0
+            mediaFiles.push(...files)
+        }
+    }
+
     return {
         // State
         uploadingFiles: readonly(uploadingFiles),
@@ -137,6 +150,7 @@ export function useFileUpload (options = {}) {
         handleFileUpload,
         handleFileDelete,
         uploadFiles,
-        clearMediaFiles
+        clearMediaFiles,
+        setMediaFiles
     }
 }

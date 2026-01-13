@@ -5,7 +5,7 @@
 
 Modern, open source, self-hosted customer support desk. Single binary app. 
 
-![image](https://libredesk.io/hero.png)
+![image](https://libredesk.io/hero.png?v=1)
 
 
 Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**Live demo**](https://demo.libredesk.io/).
@@ -79,9 +79,14 @@ __________________
 See [installation docs](https://docs.libredesk.io/getting-started/installation)
 __________________
 
-
 ## Developers
-If you are interested in contributing, refer to the [developer setup](https://docs.libredesk.io/contributing/developer-setup). The backend is written in Go and the frontend is Vue js 3 with Shadcn for UI components.
+
+- If you are interested in contributing, please read [CONTRIBUTING.md](./CONTRIBUTING.md) first.
+- For local development and setup, refer to the [developer setup](https://docs.libredesk.io/contributing/developer-setup).
+- For planned features and project direction, see [ROADMAP.md](./ROADMAP.md).
+
+The backend is written in Go and the frontend is Vue.js 3 with Shadcn UI.
+
 
 
 ## Translators

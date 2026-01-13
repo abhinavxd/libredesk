@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"html/template"
@@ -25,6 +26,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
@@ -54,6 +56,7 @@ import (
 	kjson "github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/confmap"
+	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/posflag"
 	"github.com/knadh/koanf/providers/rawbytes"
@@ -76,16 +79,40 @@ type constants struct {
 	MaxFileUploadSizeMB         int
 }
 
-// Config loads config files into koanf.
+// Config loads config from files and environment variables into koanf.
 func initConfig(ko *koanf.Koanf) {
 	for _, f := range ko.Strings("config") {
 		log.Println("reading config file:", f)
 		if err := ko.Load(file.Provider(f), toml.Parser()); err != nil {
 			if os.IsNotExist(err) {
-				log.Fatal("error config file not found.")
+				log.Printf("WARNING: Config file not found. Continuing with defaults and environment variables.")
+				continue
 			}
 			log.Fatalf("error loading config from file: %v.", err)
 		}
+	}
+	// Load environment variables with `LIBREDESK_` prefix.
+	ko.Load(env.Provider(".", env.Opt{
+		Prefix: "LIBREDESK_",
+		TransformFunc: func(key, val string) (string, any) {
+			// Transform the key.
+			key = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(key, "LIBREDESK_")), "__", ".")
+			return key, val
+		},
+	}), nil)
+}
+
+// validateConfig logs warnings/fatals for invalid config values.
+func validateConfig(ko *koanf.Koanf) {
+	encKey := ko.MustString("app.encryption_key")
+
+	if len(encKey) != 32 {
+		log.Fatalf("encryption_key must be exactly 32 characters, got %d", len(encKey))
+	}
+
+	// Warn if using sample config value.
+	if encKey == sampleEncKey {
+		colorlog.Red("WARNING: You are using the sample encryption_key from config.sample.toml. Change it immediately. Generate a secure key with `openssl rand -hex 16`")
 	}
 }
 
@@ -186,8 +213,9 @@ func loadSettings(m *setting.Manager) {
 // initSettings inits setting manager.
 func initSettings(db *sqlx.DB) *setting.Manager {
 	s, err := setting.New(setting.Opts{
-		DB: db,
-		Lo: initLogger("settings"),
+		DB:            db,
+		Lo:            initLogger("settings"),
+		EncryptionKey: ko.MustString("app.encryption_key"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing setting manager: %v", err)
@@ -214,7 +242,6 @@ func initConversations(
 	status *status.Manager,
 	priority *priority.Manager,
 	hub *ws.Hub,
-	notif *notifier.Service,
 	db *sqlx.DB,
 	inboxStore *inbox.Manager,
 	userStore *user.Manager,
@@ -225,6 +252,7 @@ func initConversations(
 	automationEngine *automation.Engine,
 	template *tmpl.Manager,
 	webhook *webhook.Manager,
+	dispatcher *notifier.Dispatcher,
 ) *conversation.Manager {
 	continuityConfig := &conversation.ContinuityConfig{}
 
@@ -243,8 +271,7 @@ func initConversations(
 	if ko.Exists("conversation.continuity.max_messages_per_email") {
 		continuityConfig.MaxMessagesPerEmail = ko.MustInt("conversation.continuity.max_messages_per_email")
 	}
-
-	c, err := conversation.New(hub, i18n, notif, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, conversation.Opts{
+	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, dispatcher, conversation.Opts{
 		DB:                       db,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
@@ -314,13 +341,13 @@ func initBusinessHours(db *sqlx.DB, i18n *i18n.I18n) *businesshours.Manager {
 }
 
 // initSLA inits SLA manager.
-func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, businessHours *businesshours.Manager, notifier *notifier.Service, template *tmpl.Manager, userManager *user.Manager, i18n *i18n.I18n) *sla.Manager {
+func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, businessHours *businesshours.Manager, template *tmpl.Manager, userManager *user.Manager, i18n *i18n.I18n, dispatcher *notifier.Dispatcher) *sla.Manager {
 	var lo = initLogger("sla")
 	m, err := sla.New(sla.Opts{
 		DB:   db,
 		Lo:   lo,
 		I18n: i18n,
-	}, teamManager, settings, businessHours, notifier, template, userManager)
+	}, teamManager, settings, businessHours, template, userManager, dispatcher)
 	if err != nil {
 		log.Fatalf("error initializing SLA manager: %v", err)
 	}
@@ -451,12 +478,11 @@ func initTeam(db *sqlx.DB, i18n *i18n.I18n) *team.Manager {
 }
 
 // initMedia inits media manager.
-func initMedia(db *sqlx.DB, i18n *i18n.I18n) *media.Manager {
+func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.Manager {
 	var (
-		store      media.Store
-		err        error
-		appRootURL = ko.String("app.root_url")
-		lo         = initLogger("media")
+		store media.Store
+		err   error
+		lo    = initLogger("media")
 	)
 	switch s := ko.MustString("upload.provider"); s {
 	case "s3":
@@ -476,12 +502,24 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n) *media.Manager {
 			log.Fatalf("error initializing s3 media store: %v", err)
 		}
 	case "fs":
+		// Default expiry to 1h if not set.
+		fsExpiry := ko.Duration("upload.fs.expiry")
+		if fsExpiry == 0 {
+			fsExpiry = 1 * time.Hour
+		}
 		store, err = fs.New(fs.Opts{
 			UploadURI:  "/uploads",
 			UploadPath: filepath.Clean(ko.String("upload.fs.upload_path")),
-			RootURL:    appRootURL,
-			Expiry:     ko.Duration("upload.fs.expiry"),
-			Secret:     ko.String("upload.fs.secret"),
+			RootURL: func() string {
+				rootURL, err := settings.GetAppRootURL()
+				if err != nil {
+					// Fallback to config if settings fetch fails
+					return ko.String("app.root_url")
+				}
+				return rootURL
+			},
+			SigningKey: ko.MustString("app.encryption_key"),
+			Expiry:     fsExpiry,
 		})
 		if err != nil {
 			log.Fatalf("error initializing fs media store: %v", err)
@@ -505,7 +543,7 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n) *media.Manager {
 // initInbox initializes the inbox manager without registering inboxes.
 func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 	var lo = initLogger("inbox-manager")
-	mgr, err := inbox.New(lo, db, i18n)
+	mgr, err := inbox.New(lo, db, i18n, ko.MustString("app.encryption_key"))
 	if err != nil {
 		log.Fatalf("error initializing inbox manager: %v", err)
 	}
@@ -541,12 +579,12 @@ func initAutoAssigner(teamManager *team.Manager, userManager *user.Manager, conv
 
 // initNotifier initializes the notifier service with available providers.
 func initNotifier() *notifier.Service {
-	smtpCfg := email.SMTPConfig{}
+	smtpCfg := imodels.SMTPConfig{}
 	if err := ko.UnmarshalWithConf("notification.email", &smtpCfg, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		log.Fatalf("error unmarshalling email notification provider config: %v", err)
 	}
 
-	emailNotifier, err := emailnotifier.New([]email.SMTPConfig{smtpCfg}, emailnotifier.Opts{
+	emailNotifier, err := emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
 		Lo:        initLogger("email-notifier"),
 		FromEmail: ko.String("notification.email.email_address"),
 	})
@@ -561,9 +599,9 @@ func initNotifier() *notifier.Service {
 	return notifier.NewService(notifierProviders, ko.MustInt("notification.concurrency"), ko.MustInt("notification.queue_size"), initLogger("notifier"))
 }
 
-// initEmailInbox initializes the email inbox.
-func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
-	var config email.Config
+// initEmailInbox loads inbox config from DB and initializes the email inbox.
+func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager) (inbox.Inbox, error) {
+	var config imodels.Config
 
 	// Load JSON data into Koanf.
 	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
@@ -588,10 +626,30 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		log.Printf("WARNING: No `from` email address set for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
 	}
 
+	// Callback to persist refreshed tokens in DB.
+	tokenRefreshCallback := func(inboxID int, updatedConfig imodels.Config) error {
+		// Marshal updated config to JSON
+		updatedConfigJSON, err := json.Marshal(updatedConfig)
+		if err != nil {
+			log.Printf("ERROR: Failed to marshal updated config during token refresh for inbox %d: %v", inboxID, err)
+			return err
+		}
+
+		// Persist updated config to DB
+		if err := mgr.UpdateConfig(inboxID, updatedConfigJSON); err != nil {
+			log.Printf("ERROR: Failed to persist refreshed tokens during operation for inbox %d: %v", inboxID, err)
+			return err
+		}
+
+		log.Printf("INFO: Successfully persisted refreshed tokens during operation for inbox: %d", inboxID)
+		return nil
+	}
+
 	inbox, err := email.New(msgStore, usrStore, email.Opts{
-		ID:     inboxRecord.ID,
-		Config: config,
-		Lo:     initLogger("email_inbox"),
+		ID:                   inboxRecord.ID,
+		Config:               config,
+		Lo:                   initLogger("email_inbox"),
+		TokenRefreshCallback: tokenRefreshCallback,
 	})
 
 	if err != nil {
@@ -643,10 +701,22 @@ func initializeInboxes(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrSto
 	}
 }
 
+// makeInboxInitializer creates an inbox initializer function.
+func makeInboxInitializer(mgr *inbox.Manager) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
+	return func(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
+		switch inboxR.Channel {
+		case inbox.ChannelEmail:
+			return initEmailInbox(inboxR, msgStore, usrStore, mgr)
+		default:
+			return nil, fmt.Errorf("unknown inbox channel: %s", inboxR.Channel)
+		}
+	}
+}
+
 // reloadInboxes reloads all inboxes.
 func reloadInboxes(app *App) error {
 	app.lo.Info("reloading inboxes")
-	return app.inbox.Reload(ctx, initializeInboxes)
+	return app.inbox.Reload(ctx, makeInboxInitializer(app.inbox))
 }
 
 // startInboxes registers the active inboxes and starts receiver for each.
@@ -654,7 +724,7 @@ func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.Messag
 	mgr.SetMessageStore(msgStore)
 	mgr.SetUserStore(usrStore)
 
-	if err := mgr.InitInboxes(initializeInboxes); err != nil {
+	if err := mgr.InitInboxes(makeInboxInitializer(mgr)); err != nil {
 		log.Fatalf("error initializing inboxes: %v", err)
 	}
 
@@ -732,9 +802,10 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Manager {
 	lo := initLogger("oidc")
 	o, err := oidc.New(oidc.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:            db,
+		Lo:            lo,
+		I18n:          i18n,
+		EncryptionKey: ko.MustString("app.encryption_key"),
 	}, settings)
 	if err != nil {
 		log.Fatalf("error initializing oidc: %v", err)
@@ -759,8 +830,19 @@ func initI18n(fs stuffbin.FileSystem) *i18n.I18n {
 
 // initRedis inits redis DB.
 func initRedis() *redis.Client {
+	// Load options from redis URL if set.
+	redisURL := ko.String("redis.url")
+	if redisURL != "" {
+		options, err := redis.ParseURL(redisURL)
+		if err != nil {
+			log.Fatalf("error parsing redis url: %v", err)
+		}
+		return redis.NewClient(options)
+	}
+	// Load from individual config options.
 	return redis.NewClient(&redis.Options{
 		Addr:     ko.MustString("redis.address"),
+		Username: ko.String("redis.user"),
 		Password: ko.String("redis.password"),
 		DB:       ko.Int("redis.db"),
 	})
@@ -835,9 +917,10 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 func initAI(db *sqlx.DB, i18n *i18n.I18n) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:            db,
+		Lo:            lo,
+		I18n:          i18n,
+		EncryptionKey: ko.MustString("app.encryption_key"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)
@@ -905,17 +988,50 @@ func initReport(db *sqlx.DB, i18n *i18n.I18n) *report.Manager {
 func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 	var lo = initLogger("webhook")
 	m, err := webhook.New(webhook.Opts{
-		DB:        db,
-		Lo:        lo,
-		I18n:      i18n,
-		Workers:   ko.MustInt("webhook.workers"),
-		QueueSize: ko.MustInt("webhook.queue_size"),
-		Timeout:   ko.MustDuration("webhook.timeout"),
+		DB:            db,
+		Lo:            lo,
+		I18n:          i18n,
+		Workers:       ko.MustInt("webhook.workers"),
+		QueueSize:     ko.MustInt("webhook.queue_size"),
+		Timeout:       ko.MustDuration("webhook.timeout"),
+		EncryptionKey: ko.MustString("app.encryption_key"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)
 	}
 	return m
+}
+
+// initUserNotification inits user notification manager.
+func initUserNotification(db *sqlx.DB, i18n *i18n.I18n) *notifier.UserNotificationManager {
+	var lo = initLogger("user-notification")
+	m, err := notifier.NewUserNotificationManager(notifier.UserNotificationOpts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing user notification manager: %v", err)
+	}
+	return m
+}
+
+// initImporter inits the importer manager.
+func initImporter(i18n *i18n.I18n) *importer.Importer {
+	return importer.New(importer.Opts{
+		Lo:   initLogger("importer"),
+		I18n: i18n,
+	})
+}
+
+// initNotifDispatcher initializes the notification dispatcher.
+func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub) *notifier.Dispatcher {
+	return notifier.NewDispatcher(notifier.DispatcherOpts{
+		InApp:    userNotification,
+		Outbound: outbound,
+		WSHub:    wsHub,
+		Lo:       initLogger("notification-dispatcher"),
+	})
 }
 
 // initLogger initializes a logf logger.

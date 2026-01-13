@@ -19,19 +19,21 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '../../../api'
-import AdminPageWithHelp from '@/layouts/admin/AdminPageWithHelp.vue'
+import api from '@main/api'
+import AdminPageWithHelp from '@main/layouts/admin/AdminPageWithHelp.vue'
 import { useI18n } from 'vue-i18n'
 import NotificationsForm from './NotificationSettingForm.vue'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '../../../utils/http'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { handleHTTPError } from '@main/utils/http'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import { useAppSettingsStore } from '@main/stores/appSettings'
 
 const initialValues = ref({})
 const { t } = useI18n()
 const isLoading = ref(false)
 const emitter = useEmitter()
+const appSettingsStore = useAppSettingsStore()
 
 onMounted(() => {
   getNotificationSettings()
@@ -72,6 +74,7 @@ const submitForm = async (values) => {
       description: t('admin.notification.restartApp')
     })
     await getNotificationSettings()
+    appSettingsStore.fetchSettings()
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

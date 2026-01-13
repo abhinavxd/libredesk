@@ -37,9 +37,12 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	GetOverviewCharts string `query:"get-overview-charts"`
-	GetOverviewCounts string `query:"get-overview-counts"`
-	GetOverviewSLA    string `query:"get-overview-sla-counts"`
+	GetOverviewCharts          string `query:"get-overview-charts"`
+	GetOverviewCounts          string `query:"get-overview-counts"`
+	GetOverviewSLA             string `query:"get-overview-sla-counts"`
+	GetOverviewCSAT            string `query:"get-overview-csat"`
+	GetOverviewMessageVolume   string `query:"get-overview-message-volume"`
+	GetOverviewTagDistribution string `query:"get-overview-tag-distribution"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -130,6 +133,66 @@ func (m *Manager) GetOverviewChart(days int) (json.RawMessage, error) {
 	if err := tx.Get(&stats, query); err != nil {
 		m.lo.Error("error fetching overview charts", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingChart", "name", "{globals.terms.overview}"), nil)
+	}
+	return stats, nil
+}
+
+// GetOverviewCSAT returns CSAT metrics for the overview dashboard
+func (m *Manager) GetOverviewCSAT(days int) (json.RawMessage, error) {
+	var stats = json.RawMessage{}
+	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
+		ReadOnly: true,
+	})
+	if err != nil {
+		m.lo.Error("error starting db txn", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.csat}"), nil)
+	}
+	defer tx.Rollback()
+
+	query := fmt.Sprintf(m.q.GetOverviewCSAT, days, days)
+	if err := tx.Get(&stats, query); err != nil {
+		m.lo.Error("error fetching overview CSAT", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.csat}"), nil)
+	}
+	return stats, nil
+}
+
+// GetOverviewMessageVolume returns message volume metrics for the overview dashboard
+func (m *Manager) GetOverviewMessageVolume(days int) (json.RawMessage, error) {
+	var stats = json.RawMessage{}
+	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
+		ReadOnly: true,
+	})
+	if err != nil {
+		m.lo.Error("error starting db txn", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
+	}
+	defer tx.Rollback()
+
+	query := fmt.Sprintf(m.q.GetOverviewMessageVolume, days, days)
+	if err := tx.Get(&stats, query); err != nil {
+		m.lo.Error("error fetching overview message volume", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
+	}
+	return stats, nil
+}
+
+// GetOverviewTagDistribution returns tag distribution metrics for the overview dashboard
+func (m *Manager) GetOverviewTagDistribution(days int) (json.RawMessage, error) {
+	var stats = json.RawMessage{}
+	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
+		ReadOnly: true,
+	})
+	if err != nil {
+		m.lo.Error("error starting db txn", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.tag}"), nil)
+	}
+	defer tx.Rollback()
+
+	query := fmt.Sprintf(m.q.GetOverviewTagDistribution, days, days, days, days)
+	if err := tx.Get(&stats, query); err != nil {
+		m.lo.Error("error fetching overview tag distribution", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.tag}"), nil)
 	}
 	return stats, nil
 }

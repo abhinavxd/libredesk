@@ -159,26 +159,6 @@ input[disabled] {
   margin-bottom: 1.5rem;
 }
 
-.form .nonce {
-  display: none;
-}
-
-.form .captcha {
-  margin-top: 2rem;
-}
-
-.archive {
-  list-style-type: none;
-  margin: 1.5rem 0 0 0;
-  padding: 0;
-}
-
-.archive .date {
-  display: block;
-  color: #6b7280;
-  font-size: 0.875rem;
-}
-
 footer.container {
   margin-top: 2rem;
   text-align: center;

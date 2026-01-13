@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/activity_log/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -179,6 +180,44 @@ func (al *Manager) UserAvailability(actorID int, actorEmail, status, ip, targetE
 		}
 	}
 	return nil
+}
+
+// PasswordSet records a password set event.
+func (al *Manager) PasswordSet(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
+	description := fmt.Sprintf("%s (#%d) set password for %s (#%d)", actorEmail, actorID, targetEmail, targetID)
+	return al.create(
+		models.AgentPasswordSet,
+		description,
+		actorID,
+		umodels.UserModel,
+		targetID,
+		ip,
+	)
+}
+
+// RolePermissionsChanged records a role permissions change event.
+func (al *Manager) RolePermissionsChanged(actorID int, actorEmail, ip string, roleID int, roleName string, added, removed []string) error {
+	var description string
+	if len(removed) > 0 && len(added) > 0 {
+		description = fmt.Sprintf("%s (#%d) removed permission(s) %s and added permission(s) %s to role %s (#%d)",
+			actorEmail, actorID, strings.Join(removed, ", "), strings.Join(added, ", "), roleName, roleID)
+	} else if len(removed) > 0 {
+		description = fmt.Sprintf("%s (#%d) removed permission(s) %s from role %s (#%d)",
+			actorEmail, actorID, strings.Join(removed, ", "), roleName, roleID)
+	} else if len(added) > 0 {
+		description = fmt.Sprintf("%s (#%d) added permission(s) %s to role %s (#%d)",
+			actorEmail, actorID, strings.Join(added, ", "), roleName, roleID)
+	} else {
+		return nil // No changes
+	}
+	return al.create(
+		models.AgentRolePermissionsChanged,
+		description,
+		actorID,
+		"role",
+		roleID,
+		ip,
+	)
 }
 
 // create creates a new activity log in DB.

@@ -13,6 +13,7 @@ import (
 
 var (
 	oidcStateSessKey = "oidc_state"
+	oidcNextSessKey  = "oidc_next"
 )
 
 // handleOIDCLogin redirects to the OIDC provider for login.
@@ -33,9 +34,13 @@ func handleOIDCLogin(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorGenerating", "name", "state"), nil, envelope.GeneralError)
 	}
 
-	if err = app.auth.SetSessionValues(r, map[string]interface{}{
+	sessionValues := map[string]any{
 		oidcStateSessKey: state,
-	}); err != nil {
+		// For redirecting after login
+		oidcNextSessKey: string(r.RequestCtx.QueryArgs().Peek("next")),
+	}
+
+	if err = app.auth.SetSessionValues(r, sessionValues); err != nil {
 		app.lo.Error("error saving state in session", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSaving", "name", "{globals.terms.session}"), nil, envelope.GeneralError)
 	}
@@ -104,5 +109,12 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		app.lo.Error("error creating login activity log", "error", err)
 	}
 
-	return r.Redirect("/", fasthttp.StatusFound, nil, "")
+	// Read the 'next' parameter from session to redirect after login.
+	nextParam, _ := app.auth.GetSessionValue(r, oidcNextSessKey)
+	redirectURL := "/"
+	if nextStr, ok := nextParam.(string); ok && nextStr != "" {
+		redirectURL = nextStr
+	}
+
+	return r.RedirectURI(redirectURL, fasthttp.StatusFound, nil, "")
 }

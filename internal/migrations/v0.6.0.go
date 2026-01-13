@@ -222,6 +222,9 @@ func V0_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		END
 		$$;
 	`)
+	if err != nil {
+		return err
+	}
 
 	// Create sla_event_status enum type if it doesn't exist
 	_, err = db.Exec(`
@@ -324,5 +327,8 @@ func V0_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		FOREIGN KEY (conversation_id) REFERENCES conversations(id) 
 			ON DELETE CASCADE ON UPDATE CASCADE;
 	`)
+	if err != nil {
+		return err
+	}
 	return nil
 }

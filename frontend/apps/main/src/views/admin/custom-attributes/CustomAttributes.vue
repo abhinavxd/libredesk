@@ -58,10 +58,10 @@
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="contact">
-                <DataTable :columns="createColumns(t)" :data="customAttributes" />
+                <DataTable :columns="createColumns(t)" :data="customAttributes" :loading="isLoading" />
               </TabsContent>
               <TabsContent value="conversation">
-                <DataTable :columns="createColumns(t)" :data="customAttributes" />
+                <DataTable :columns="createColumns(t)" :data="customAttributes" :loading="isLoading" />
               </TabsContent>
             </Tabs>
           </div>

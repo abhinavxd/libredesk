@@ -1,6 +1,5 @@
 {
   "name": "libredesk",
-  "version": "0.8.0-beta",
   "private": true,
   "type": "module",
   "scripts": {
@@ -31,7 +30,9 @@
     "@tanstack/vue-table": "^8.19.2",
     "@tiptap/extension-image": "^2.5.9",
     "@tiptap/extension-link": "^2.11.2",
+    "@tiptap/extension-mention": "^2.11.2",
     "@tiptap/extension-placeholder": "^2.4.0",
+    "@tiptap/suggestion": "^2.11.2",
     "@tiptap/extension-table": "^2.11.5",
     "@tiptap/extension-table-cell": "^2.11.5",
     "@tiptap/extension-table-header": "^2.11.5",
@@ -51,13 +52,12 @@
     "lucide-vue-next": "^0.525.0",
     "mitt": "^3.0.1",
     "pinia": "^2.1.7",
-    "qs": "^6.12.1",
+    "qs": "^6.14.1",
     "radix-vue": "^1.9.17",
     "reka-ui": "^2.2.0",
     "tailwind-merge": "^2.3.0",
     "vee-validate": "^4.15.0",
     "vue": "^3.4.37",
-    "vue-dompurify-html": "^5.2.0",
     "vue-i18n": "9",
     "vue-letter": "^0.2.0",
     "vue-picture-cropper": "^0.7.0",
@@ -82,7 +82,7 @@
     "start-server-and-test": "^2.0.3",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
-    "vite": "^5.4.20",
+    "vite": "^5.4.21",
     "vitest": "^3.2.2"
   },
   "packageManager": "pnpm@9.15.3+sha512.1f79bc245a66eb0b07c5d4d83131240774642caaa86ef7d0434ab47c0d16f66b04e21e0c086eb61e62c77efc4d7f7ec071afad3796af64892fae66509173893a"

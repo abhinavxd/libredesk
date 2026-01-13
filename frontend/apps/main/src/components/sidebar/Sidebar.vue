@@ -19,10 +19,9 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubItem,
-  SidebarProvider,
-  SidebarRail
+  SidebarProvider
 } from '@shared-ui/components/ui/sidebar'
-import { useAppSettingsStore } from '../../stores/appSettings'
+import { useAppSettingsStore } from '@main/stores/appSettings'
 import {
   ChevronRight,
   EllipsisVertical,
@@ -30,7 +29,8 @@ import {
   Search,
   Plus,
   CircleDashed,
-  List
+  List,
+  AtSign
 } from 'lucide-vue-next'
 import {
   DropdownMenu,
@@ -48,16 +48,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { filterNavItems } from '@/utils/nav-permissions'
+import { filterNavItems } from '@main/utils/nav-permissions'
+import { permissions } from '@main/constants/permissions'
 import { useStorage } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useUserStore } from '../../stores/user'
-import { useConversationStore } from '../../stores/conversation'
+import { useUserStore } from '@main/stores/user'
+import { useConversationStore } from '@main/stores/conversation'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
-  userViews: { type: Array, default: () => [] }
+  userViews: { type: Array, default: () => [] },
+  sharedViews: { type: Array, default: () => [] }
 })
 const userStore = useUserStore()
 const conversationStore = useConversationStore()
@@ -176,6 +178,7 @@ watch(
 const sidebarOpen = useStorage('mainSidebarOpen', true)
 const teamInboxOpen = useStorage('teamInboxOpen', true)
 const viewInboxOpen = useStorage('viewInboxOpen', true)
+const sharedViewInboxOpen = useStorage('sharedViewInboxOpen', true)
 
 // Track which view is being hovered for ellipsis menu visibility
 const hoveredViewId = ref(null)
@@ -195,7 +198,7 @@ const viewToDelete = ref(null)
     <template
       v-if="route.matched.some((record) => record.name && record.name.startsWith('contact'))"
     >
-      <Sidebar collapsible="offcanvas" class="border-r ml-12">
+      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -224,7 +227,6 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarRail />
       </Sidebar>
     </template>
 
@@ -235,7 +237,7 @@ const viewToDelete = ref(null)
         route.matched.some((record) => record.name && record.name.startsWith('reports'))
       "
     >
-      <Sidebar collapsible="offcanvas" class="border-r ml-12">
+      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -260,13 +262,12 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarRail />
       </Sidebar>
     </template>
 
     <!-- Admin Sidebar -->
     <template v-if="route.matched.some((record) => record.name && record.name.startsWith('admin'))">
-      <Sidebar collapsible="offcanvas" class="border-r ml-12">
+      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -315,7 +316,7 @@ const viewToDelete = ref(null)
                       <SidebarMenuSubItem v-for="child in item.children" :key="child.titleKey">
                         <SidebarMenuButton size="sm" :isActive="isActiveParent(child.href)" asChild>
                           <router-link :to="child.href">
-                            <span>{{ t(child.titleKey) }}</span>
+                            <span>{{ t(child.titleKey, child.isTitleKeyPlural === true ? 2 : 1) }}</span>
                           </router-link>
                         </SidebarMenuButton>
                       </SidebarMenuSubItem>
@@ -326,13 +327,12 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarRail />
       </Sidebar>
     </template>
 
     <!-- Account sidebar -->
     <template v-if="isActiveParent('/account')">
-      <Sidebar collapsible="offcanvas" class="border-r ml-12">
+      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -360,13 +360,12 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarRail />
       </Sidebar>
     </template>
 
     <!-- Inbox sidebar -->
     <template v-if="route.path && isInboxRoute(route.path)">
-      <Sidebar collapsible="offcanvas" class="border-r ml-12">
+      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -403,32 +402,43 @@ const viewToDelete = ref(null)
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild :isActive="isActiveParent('/inboxes/assigned')">
-                  <a href="#" @click.prevent="navigateToInbox('assigned')">
+                  <router-link :to="{ name: 'inbox', params: { type: 'assigned' } }">
                     <User />
                     <span>{{ t('globals.terms.myInbox') }}</span>
+                  </router-link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild :isActive="isActiveParent('/inboxes/mentioned')">
+                  <a href="#" @click.prevent="navigateToInbox('mentioned')">
+                    <AtSign />
+                    <span>
+                      {{ t('globals.terms.mention', 2) }}
+                    </span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton asChild :isActive="isActiveParent('/inboxes/unassigned')">
-                  <a href="#" @click.prevent="navigateToInbox('unassigned')">
+                  <router-link :to="{ name: 'inbox', params: { type: 'unassigned' } }">
                     <CircleDashed />
                     <span>
                       {{ t('globals.terms.unassigned') }}
                     </span>
-                  </a>
+                  </router-link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton asChild :isActive="isActiveParent('/inboxes/all')">
-                  <a href="#" @click.prevent="navigateToInbox('all')">
+                  <router-link :to="{ name: 'inbox', params: { type: 'all' } }">
                     <List />
                     <span>
                       {{ t('globals.messages.all') }}
                     </span>
-                  </a>
+                  </router-link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -461,9 +471,9 @@ const viewToDelete = ref(null)
                           :is-active="route.params.teamID == team.id"
                           asChild
                         >
-                          <a href="#" @click.prevent="navigateToTeamInbox(team.id)">
+                          <router-link :to="{ name: 'team-inbox', params: { teamID: team.id } }">
                             {{ team.emoji }}<span>{{ team.name }}</span>
-                          </a>
+                          </router-link>
                         </SidebarMenuButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
@@ -472,7 +482,7 @@ const viewToDelete = ref(null)
               </Collapsible>
 
               <!-- Views -->
-              <Collapsible class="group/collapsible" defaultOpen v-model:open="viewInboxOpen">
+              <Collapsible class="group/collapsible" defaultOpen v-model:open="viewInboxOpen" v-if="userStore.can(permissions.VIEW_MANAGE)">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton asChild>
@@ -507,7 +517,7 @@ const viewToDelete = ref(null)
                           :isActive="route.params.viewID == view.id"
                           asChild
                         >
-                          <a href="#" @click.prevent="navigateToViewInbox(view.id)">
+                          <router-link :to="{ name: 'view-inbox', params: { viewID: view.id } }">
                             <span class="break-words w-32 truncate" :title="view.name">{{ view.name }}</span>
                             <SidebarMenuAction
                               @click.stop
@@ -532,7 +542,48 @@ const viewToDelete = ref(null)
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </SidebarMenuAction>
-                          </a>
+                          </router-link>
+                        </SidebarMenuButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              <!-- Shared Views -->
+              <Collapsible
+                class="group/collapsible"
+                defaultOpen
+                v-model:open="sharedViewInboxOpen"
+                v-if="sharedViews.length"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton asChild>
+                      <router-link to="#" class="group/item !p-2">
+                        <span>
+                          {{ t('globals.terms.sharedView', 2) }}
+                        </span>
+                        <ChevronRight
+                          class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+                        />
+                      </router-link>
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    <SidebarMenuSub v-for="view in sharedViews" :key="view.id">
+                      <SidebarMenuSubItem>
+                        <SidebarMenuButton
+                          size="sm"
+                          :isActive="route.params.viewID == view.id"
+                          asChild
+                        >
+                          <router-link :to="{ name: 'view-inbox', params: { viewID: view.id } }">
+                            <span class="break-words w-32 truncate" :title="view.name">{{
+                              view.name
+                            }}</span>
+                          </router-link>
                         </SidebarMenuButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
@@ -546,7 +597,7 @@ const viewToDelete = ref(null)
     </template>
 
     <!-- Main Content Area -->
-    <SidebarInset>
+    <SidebarInset class="bg-canvas !min-h-0 !h-full">
       <slot></slot>
     </SidebarInset>
   </SidebarProvider>
@@ -569,3 +620,19 @@ const viewToDelete = ref(null)
     </AlertDialogContent>
   </AlertDialog>
 </template>
+
+<style scoped>
+:deep(.sidebar-secondary) {
+  @apply border ml-[3.2rem] rounded-lg overflow-hidden;
+  top: 0.40rem !important;
+  bottom: 0.35rem !important;
+  height: auto !important;
+}
+
+/* Override SidebarProvider height */
+:deep(.group\/sidebar-wrapper) {
+  min-height: auto !important;
+  height: 100%;
+}
+
+</style>

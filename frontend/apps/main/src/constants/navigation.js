@@ -18,87 +18,110 @@ export const adminNavItems = [
       {
         titleKey: 'globals.terms.businessHour',
         href: '/admin/business-hours',
-        permission: 'business_hours:manage'
+        permission: 'business_hours:manage',
+        isTitleKeyPlural: true
       },
       {
         titleKey: 'globals.terms.slaPolicy',
         href: '/admin/sla',
-        permission: 'sla:manage'
+        permission: 'sla:manage',
+        isTitleKeyPlural: true
       }
     ]
   },
   {
     titleKey: 'globals.terms.conversation',
+    isTitleKeyPlural: true,
     children: [
       {
         titleKey: 'globals.terms.tag',
         href: '/admin/conversations/tags',
-        permission: 'tags:manage'
+        permission: 'tags:manage',
+        isTitleKeyPlural: true
       },
       {
         titleKey: 'globals.terms.macro',
         href: '/admin/conversations/macros',
-        permission: 'macros:manage'
+        permission: 'macros:manage',
+        isTitleKeyPlural: true
+      },
+      {
+        titleKey: 'globals.terms.sharedView',
+        href: '/admin/conversations/shared-views',
+        permission: 'shared_views:manage',
+        isTitleKeyPlural: true
       },
       {
         titleKey: 'globals.terms.status',
         href: '/admin/conversations/statuses',
-        permission: 'status:manage'
+        permission: 'status:manage',
+        isTitleKeyPlural: true
       }
     ]
   },
   {
     titleKey: 'globals.terms.inbox',
+    isTitleKeyPlural: true,
     children: [
       {
         titleKey: 'globals.terms.inbox',
         href: '/admin/inboxes',
-        permission: 'inboxes:manage'
+        permission: 'inboxes:manage',
+        isTitleKeyPlural: true
       }
     ]
   },
   {
     titleKey: 'globals.terms.teammate',
+    isTitleKeyPlural: true,
     children: [
       {
         titleKey: 'globals.terms.agent',
         href: '/admin/teams/agents',
-        permission: 'users:manage'
+        permission: 'users:manage',
+        isTitleKeyPlural: true
       },
       {
         titleKey: 'globals.terms.team',
         href: '/admin/teams/teams',
-        permission: 'teams:manage'
+        permission: 'teams:manage',
+        isTitleKeyPlural: true
       },
       {
         titleKey: 'globals.terms.role',
         href: '/admin/teams/roles',
-        permission: 'roles:manage'
+        permission: 'roles:manage',
+        isTitleKeyPlural: true
       },
       {
         titleKey: 'globals.terms.activityLog',
         href: '/admin/teams/activity-log',
-        permission: 'activity_logs:manage'
+        permission: 'activity_logs:manage',
+        isTitleKeyPlural: true
       }
     ]
   },
   {
     titleKey: 'globals.terms.automation',
+    isTitleKeyPlural: true,
     children: [
       {
         titleKey: 'globals.terms.automation',
         href: '/admin/automations',
-        permission: 'automations:manage'
+        permission: 'automations:manage',
+        isTitleKeyPlural: true
       }
     ]
   },
   {
     titleKey: 'globals.terms.customAttribute',
+    isTitleKeyPlural: true,
     children: [
       {
         titleKey: 'globals.terms.customAttribute',
         href: '/admin/custom-attributes',
-        permission: 'custom_attributes:manage'
+        permission: 'custom_attributes:manage',
+        isTitleKeyPlural: true
       }
     ]
   },
@@ -114,11 +137,13 @@ export const adminNavItems = [
   },
   {
     titleKey: 'globals.terms.template',
+    isTitleKeyPlural: true,
     children: [
       {
         titleKey: 'globals.terms.template',
         href: '/admin/templates',
-        permission: 'templates:manage'
+        permission: 'templates:manage',
+        isTitleKeyPlural: true
       }
     ]
   },
@@ -139,7 +164,8 @@ export const adminNavItems = [
       {
         titleKey: 'globals.terms.webhook',
         href: '/admin/webhooks',
-        permission: 'webhooks:manage'
+        permission: 'webhooks:manage',
+        isTitleKeyPlural: true
       }
     ]
   }
@@ -155,6 +181,7 @@ export const accountNavItems = [
 export const contactNavItems = [
   {
     titleKey: 'globals.terms.contact',
-    href: '/contacts'
+    href: '/contacts',
+    isTitleKeyPlural: true
   }
 ]

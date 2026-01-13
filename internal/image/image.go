@@ -12,6 +12,7 @@ import (
 var (
 	Exts         = []string{"gif", "png", "jpg", "jpeg"}
 	DefThumbSize = 150
+	ThumbPrefix  = "thumb_"
 )
 
 // GetDimensions returns the width and height of the image in the provided file.

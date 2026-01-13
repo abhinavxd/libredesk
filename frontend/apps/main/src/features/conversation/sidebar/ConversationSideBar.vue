@@ -2,13 +2,13 @@
   <div>
     <ConversationSideBarContact class="p-4" />
     <Accordion type="multiple" collapsible v-model="accordionState">
-      <AccordionItem value="actions" class="border-0 mb-2">
-        <AccordionTrigger class="bg-muted px-4 py-3 text-sm font-medium rounded mx-2">
+      <AccordionItem value="actions" class="accordion-item">
+        <AccordionTrigger class="accordion-trigger">
           {{ $t('globals.terms.action', 2) }}
         </AccordionTrigger>
 
         <!-- `Agent, team, and priority assignment -->
-        <AccordionContent class="space-y-4 p-4">
+        <AccordionContent class="accordion-content--actions">
           <!-- Agent assignment -->
           <SelectComboBox
             v-model="conversationStore.current.assigned_user_id"
@@ -55,11 +55,11 @@
       </AccordionItem>
 
       <!-- Information -->
-      <AccordionItem value="information" class="border-0 mb-2">
-        <AccordionTrigger class="bg-muted px-4 py-3 text-sm font-medium rounded mx-2">
+      <AccordionItem value="information" class="accordion-item">
+        <AccordionTrigger class="accordion-trigger">
           {{ $t('conversation.sidebar.information') }}
         </AccordionTrigger>
-        <AccordionContent class="p-4">
+        <AccordionContent class="accordion-content">
           <ConversationInfo />
         </AccordionContent>
       </AccordionItem>
@@ -67,13 +67,13 @@
       <!-- Contact attributes -->
       <AccordionItem
         value="contact_attributes"
-        class="border-0 mb-2"
+        class="accordion-item"
         v-if="customAttributeStore.contactAttributeOptions.length > 0"
       >
-        <AccordionTrigger class="bg-muted px-4 py-3 text-sm font-medium rounded mx-2">
+        <AccordionTrigger class="accordion-trigger">
           {{ $t('conversation.sidebar.contactAttributes') }}
         </AccordionTrigger>
-        <AccordionContent class="p-4">
+        <AccordionContent class="accordion-content">
           <CustomAttributes
             :loading="conversationStore.current.loading"
             :attributes="customAttributeStore.contactAttributeOptions"
@@ -84,11 +84,11 @@
       </AccordionItem>
 
       <!-- Previous conversations -->
-      <AccordionItem value="previous_conversations" class="border-0 mb-2">
-        <AccordionTrigger class="bg-muted px-4 py-3 text-sm font-medium rounded mx-2">
+      <AccordionItem value="previous_conversations" class="accordion-item">
+        <AccordionTrigger class="accordion-trigger">
           {{ $t('conversation.sidebar.previousConvo') }}
         </AccordionTrigger>
-        <AccordionContent class="p-4">
+        <AccordionContent class="accordion-content">
           <PreviousConversations />
         </AccordionContent>
       </AccordionItem>
@@ -247,3 +247,21 @@ const updateContactCustomAttributes = async (attributes) => {
   }
 }
 </script>
+
+<style scoped>
+:deep(.accordion-item) {
+  @apply border-0 mb-2;
+}
+
+:deep(.accordion-trigger) {
+  @apply bg-muted p-2 text-sm font-medium rounded mx-2;
+}
+
+:deep(.accordion-content) {
+  @apply p-4;
+}
+
+:deep(.accordion-content--actions) {
+  @apply space-y-4 p-4;
+}
+</style>

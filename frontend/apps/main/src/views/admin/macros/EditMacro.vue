@@ -8,20 +8,22 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import api from '../../../api'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '../../../utils/http'
-import MacroForm from '@/features/admin/macros/MacroForm.vue'
+import api from '@main/api'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { handleHTTPError } from '@main/utils/http'
+import MacroForm from '@main/features/admin/macros/MacroForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useI18n } from 'vue-i18n'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import { useMacroStore } from '@main/stores/macro'
 
 const macro = ref({})
 const { t } = useI18n()
 const isLoading = ref(false)
 const formLoading = ref(false)
 const emitter = useEmitter()
+const macroStore = useMacroStore()
 
 const breadcrumbLinks = [
   { path: 'macro-list', label: t('globals.terms.macro', 2) },
@@ -36,6 +38,10 @@ const updateMacro = async (payload) => {
   try {
     formLoading.value = true
     await api.updateMacro(macro.value.id, payload)
+    
+    // Reload macros from server
+    await macroStore.loadMacros(true)
+    
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.updatedSuccessfully', {
         name: t('globals.terms.macro')

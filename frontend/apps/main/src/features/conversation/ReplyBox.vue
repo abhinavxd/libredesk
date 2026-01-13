@@ -42,7 +42,7 @@
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
         class="max-w-[60%] max-h-[75%] h-[70%] bg-card text-card-foreground p-4 flex flex-col"
-        :class="{ '!bg-[#FEF1E1] dark:!bg-[#4C3A24]': messageType === 'private_note' }"
+        :class="{ '!bg-private': messageType === 'private_note' }"
         @escapeKeyDown="isEditorFullscreen = false"
         :hide-close-button="true"
       >
@@ -51,6 +51,7 @@
           :isFullscreen="true"
           :aiPrompts="aiPrompts"
           :isSending="isSending"
+          :isDraftLoading="isDraftLoading"
           :uploadingFiles="uploadingFiles"
           :uploadedFiles="mediaFiles"
           v-model:htmlContent="htmlContent"
@@ -61,6 +62,7 @@
           v-model:emailErrors="emailErrors"
           v-model:messageType="messageType"
           v-model:showBcc="showBcc"
+          v-model:mentions="mentions"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
           @send="processSend"
           @fileUpload="handleFileUpload"
@@ -74,13 +76,15 @@
     <!-- Main Editor non-fullscreen -->
     <div
       class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col"
-      :class="{ '!bg-[#FEF1E1] dark:!bg-[#4C3A24]': messageType === 'private_note' }"
+      :class="{ '!bg-private': messageType === 'private_note' }"
       v-if="!isEditorFullscreen"
     >
       <ReplyBoxContent
+        ref="replyBoxContentRef"
         :isFullscreen="false"
         :aiPrompts="aiPrompts"
         :isSending="isSending"
+        :isDraftLoading="isDraftLoading"
         :uploadingFiles="uploadingFiles"
         :uploadedFiles="mediaFiles"
         v-model:htmlContent="htmlContent"
@@ -91,6 +95,7 @@
         v-model:emailErrors="emailErrors"
         v-model:messageType="messageType"
         v-model:showBcc="showBcc"
+        v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
         @send="processSend"
         @fileUpload="handleFileUpload"
@@ -102,13 +107,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
-import { handleHTTPError } from '../../utils/http'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useUserStore } from '../../stores/user'
-import api from '../../api'
+import { ref, onMounted, watch, computed, toRaw } from 'vue'
+import { useStorage } from '@vueuse/core'
+import { handleHTTPError } from '@main/utils/http'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { MACRO_CONTEXT } from '@main/constants/conversation'
+import { useUserStore } from '@main/stores/user'
+import { useDraftManager } from '@main/composables/useDraftManager'
+import api from '@main/api'
 import { useI18n } from 'vue-i18n'
-import { useConversationStore } from '../../stores/conversation'
+import { useConversationStore } from '@main/stores/conversation'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   Dialog,
@@ -119,8 +127,8 @@ import {
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
 import { Input } from '@shared-ui/components/ui/input'
-import { useEmitter } from '../../composables/useEmitter'
-import { useFileUpload } from '../../composables/useFileUpload'
+import { useEmitter } from '@main/composables/useEmitter'
+import { useFileUpload } from '@main/composables/useFileUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
 import {
@@ -146,29 +154,42 @@ const emitter = useEmitter()
 const userStore = useUserStore()
 
 // Setup file upload composable
-const { uploadingFiles, handleFileUpload, handleFileDelete, mediaFiles, clearMediaFiles } =
-  useFileUpload({
-    linkedModel: 'messages'
-  })
+const {
+  uploadingFiles,
+  handleFileUpload,
+  handleFileDelete,
+  mediaFiles,
+  clearMediaFiles,
+  setMediaFiles
+} = useFileUpload({
+  linkedModel: 'messages'
+})
+
+// Setup draft management composable
+const currentDraftKey = computed(() => conversationStore.current?.uuid || null)
+const {
+  htmlContent,
+  textContent,
+  isLoading: isDraftLoading,
+  clearDraft,
+  loadedAttachments,
+  loadedMacroActions
+} = useDraftManager(currentDraftKey, mediaFiles)
 
 // Rest of existing state
 const openAIKeyPrompt = ref(false)
 const isOpenAIKeyUpdating = ref(false)
 const isEditorFullscreen = ref(false)
 const isSending = ref(false)
-const messageType = ref('reply')
+const messageType = useStorage('replyBoxMessageType', 'reply')
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
 const showBcc = ref(false)
 const emailErrors = ref([])
 const aiPrompts = ref([])
-const htmlContent = ref('')
-const textContent = ref('')
-
-onMounted(async () => {
-  await fetchAiPrompts()
-})
+const replyBoxContentRef = ref(null)
+const mentions = ref([])
 
 /**
  * Fetches AI prompts from the server.
@@ -184,6 +205,8 @@ const fetchAiPrompts = async () => {
     })
   }
 }
+
+fetchAiPrompts()
 
 /**
  * Handles the AI prompt selection event.
@@ -257,6 +280,8 @@ const processSend = async () => {
         private: messageType.value === 'private_note',
         message: message,
         attachments: mediaFiles.value.map((file) => file.id),
+        // Include mentions only for private notes
+        mentions: messageType.value === 'private_note' ? mentions.value : [],
         // Convert email addresses to array and remove empty strings.
         cc: cc.value
           .split(',')
@@ -278,8 +303,8 @@ const processSend = async () => {
     }
 
     // Apply macro actions if any, for macro errors just show toast and clear the editor.
-    const macroID = conversationStore.getMacro('reply')?.id
-    const macroActions = conversationStore.getMacro('reply')?.actions || []
+    const macroID = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.id
+    const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
     if (macroID > 0 && macroActions.length > 0) {
       try {
         await api.applyMacro(conversationStore.current.uuid, macroID, macroActions)
@@ -299,14 +324,20 @@ const processSend = async () => {
   } finally {
     // If API has NOT errored clear state.
     if (hasMessageSendingErrored === false) {
-      // Clear macro.
-      conversationStore.resetMacro('reply')
+      // Clear draft from backend.
+      clearDraft(currentDraftKey.value)
+
+      // Clear macro for this conversation reply.
+      conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
 
       // Clear media files.
       clearMediaFiles()
 
       // Clear any email errors.
       emailErrors.value = []
+
+      // Clear mentions.
+      mentions.value = []
     }
     isSending.value = false
   }
@@ -317,8 +348,40 @@ const processSend = async () => {
  */
 watch(
   () => conversationStore.getMacro('reply').id,
-  () => {
-    htmlContent.value = conversationStore.getMacro('reply').message_content
+  (newId) => {
+    // No macro set.
+    if (!newId) return
+
+    // If macro has message content, set it in the editor.
+    if (conversationStore.getMacro('reply').message_content) {
+      htmlContent.value = conversationStore.getMacro('reply').message_content
+    }
+  },
+  { deep: true }
+)
+
+/**
+ * Watch loaded macro actions from draft and update conversation store.
+ */
+watch(
+  loadedMacroActions,
+  (actions) => {
+    if (actions.length > 0) {
+      conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
+    }
+  },
+  { deep: true }
+)
+
+/**
+ * Watch for loaded attachments from draft and restore them to mediaFiles.
+ */
+watch(
+  loadedAttachments,
+  (attachments) => {
+    if (attachments.length > 0) {
+      setMediaFiles([...attachments])
+    }
   },
   { deep: true }
 )
@@ -351,5 +414,18 @@ watch(
     }
   },
   { deep: true, immediate: true }
+)
+
+// Clear media files and reset macro when conversation changes.
+watch(
+  () => conversationStore.current?.uuid,
+  () => {
+    clearMediaFiles()
+    conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
+    // Focus editor on conversation change
+    setTimeout(() => {
+      replyBoxContentRef.value?.focus()
+    }, 100)
+  }
 )
 </script>

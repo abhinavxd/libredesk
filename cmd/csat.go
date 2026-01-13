@@ -41,7 +41,7 @@ func handleShowCSAT(r *fastglue.Request) error {
 		})
 	}
 
-	conversation, err := app.conversation.GetConversation(csat.ConversationID, "")
+	conversation, err := app.conversation.GetConversation(csat.ConversationID, "", "")
 	if err != nil {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{

@@ -6,6 +6,7 @@ const (
 	PermConversationsReadUnassigned     = "conversations:read_unassigned"
 	PermConversationsReadAssigned       = "conversations:read_assigned"
 	PermConversationsReadTeamInbox      = "conversations:read_team_inbox"
+	PermConversationsReadTeamAll        = "conversations:read_team_all"
 	PermConversationsRead               = "conversations:read"
 	PermConversationsUpdateUserAssignee = "conversations:update_user_assignee"
 	PermConversationsUpdateTeamAssignee = "conversations:update_team_assignee"
@@ -18,7 +19,8 @@ const (
 	PermMessagesWriteAsContact          = "messages:write_as_contact"
 
 	// View
-	PermViewManage = "view:manage"
+	PermViewManage        = "view:manage"
+	PermSharedViewsManage = "shared_views:manage"
 
 	// Status
 	PermStatusManage = "status:manage"
@@ -94,6 +96,7 @@ var validPermissions = map[string]struct{}{
 	PermConversationsReadUnassigned:     {},
 	PermConversationsReadAssigned:       {},
 	PermConversationsReadTeamInbox:      {},
+	PermConversationsReadTeamAll:        {},
 	PermConversationsRead:               {},
 	PermConversationsUpdateUserAssignee: {},
 	PermConversationsUpdateTeamAssignee: {},
@@ -105,6 +108,7 @@ var validPermissions = map[string]struct{}{
 	PermMessagesWrite:                   {},
 	PermMessagesWriteAsContact:          {},
 	PermViewManage:                      {},
+	PermSharedViewsManage:               {},
 	PermStatusManage:                    {},
 	PermTagsManage:                      {},
 	PermMacrosManage:                    {},

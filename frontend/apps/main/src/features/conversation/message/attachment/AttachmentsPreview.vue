@@ -73,6 +73,7 @@ const allAttachments = computed(() => [
 ])
 
 const getAttachmentName = (name) => {
+  if (!name) return ''
   return name.length > 20 ? name.substring(0, 17) + '...' : name
 }
 </script>

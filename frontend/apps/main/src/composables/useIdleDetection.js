@@ -1,7 +1,6 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useUserStore } from '../stores/user'
-import { debounce } from '../utils/debounce'
-import { useStorage } from '@vueuse/core'
+import { useUserStore } from '@main/stores/user'
+import { useStorage, useDebounceFn } from '@vueuse/core'
 
 export function useIdleDetection () {
     const userStore = useUserStore()
@@ -11,16 +10,15 @@ export function useIdleDetection () {
     const lastActivity = useStorage('last_active', Date.now())
     const timer = ref(null)
 
-    // Debounce the goOnline to prevent it from being called too frequently
-    const goOnline = debounce(() => {
+    const goOnline = useDebounceFn(() => {
         if (userStore.user.availability_status === 'away' || userStore.user.availability_status === 'offline') {
             userStore.updateUserAvailability('online', false)
         }
     }, 200)
 
-    function resetTimer () {
+    const resetTimer = useDebounceFn(() => {
         lastActivity.value = Date.now()
-    }
+    }, 100)
 
     function checkIdle () {
         if (

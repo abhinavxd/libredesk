@@ -99,7 +99,11 @@
 
         <!-- Note content -->
         <CardContent class="pt-4 pb-5">
-          <p class="whitespace-pre-wrap text-sm leading-relaxed" v-dompurify-html="note.note"></p>
+          <Letter
+            :html="note.note"
+            :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+            class="whitespace-pre-wrap text-sm native-html"
+          />
         </CardContent>
       </Card>
     </div>
@@ -150,12 +154,13 @@ import {
 } from 'lucide-vue-next'
 import Editor from '@main/components/editor/TextEditor.vue'
 import { useI18n } from 'vue-i18n'
-import { useEmitter } from '../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { handleHTTPError } from '../../utils/http'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { handleHTTPError } from '@main/utils/http'
 import { getInitials } from '@shared-ui/utils/string'
-import { useUserStore } from '../../stores/user'
-import api from '../../api'
+import { useUserStore } from '@main/stores/user'
+import { Letter } from 'vue-letter'
+import api from '@main/api'
 
 const props = defineProps({ contactId: Number })
 const { t } = useI18n()

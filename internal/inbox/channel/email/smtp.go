@@ -6,8 +6,11 @@ import (
 	"math/rand"
 	"net/smtp"
 	"net/textproto"
+	"strings"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/knadh/smtppool"
 )
@@ -18,6 +21,7 @@ const (
 	headerReferences              = "References"
 	headerInReplyTo               = "In-Reply-To"
 	headerLibredeskLoopPrevention = "X-Libredesk-Loop-Prevention"
+	headerLibredeskConversationID = "X-Libredesk-Conversation-UUID"
 	headerAutoreply               = "X-Autoreply"
 	headerAutoSubmitted           = "Auto-Submitted"
 
@@ -25,24 +29,34 @@ const (
 )
 
 // NewSmtpPool returns a smtppool
-func NewSmtpPool(configs []SMTPConfig) ([]*smtppool.Pool, error) {
+func NewSmtpPool(configs []imodels.SMTPConfig, oauth *imodels.OAuthConfig) ([]*smtppool.Pool, error) {
 	pools := make([]*smtppool.Pool, 0, len(configs))
 
 	for _, cfg := range configs {
 		var auth smtp.Auth
-		switch cfg.AuthProtocol {
-		case "cram":
-			auth = smtp.CRAMMD5Auth(cfg.Username, cfg.Password)
-		case "plain":
-			auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
-		case "login":
-			auth = &smtppool.LoginAuth{Username: cfg.Username, Password: cfg.Password}
-		case "", "none":
-			// No authentication
-		default:
-			return nil, fmt.Errorf("unknown SMTP auth type '%s'", cfg.AuthProtocol)
+
+		// Check if OAuth authentication should be used
+		if oauth != nil && oauth.AccessToken != "" {
+			auth = &XOAuth2SMTPAuth{
+				Username: cfg.Username,
+				Token:    oauth.AccessToken,
+			}
+		} else {
+			// Use traditional authentication methods
+			switch cfg.AuthProtocol {
+			case "cram":
+				auth = smtp.CRAMMD5Auth(cfg.Username, cfg.Password)
+			case "plain":
+				auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
+			case "login":
+				auth = &smtppool.LoginAuth{Username: cfg.Username, Password: cfg.Password}
+			case "", "none":
+				// No authentication
+			default:
+				return nil, fmt.Errorf("unknown SMTP auth type '%s'", cfg.AuthProtocol)
+			}
 		}
-		cfg.Opt.Auth = auth
+		cfg.Auth = auth
 
 		// TLS config
 		if cfg.TLSType != "none" {
@@ -55,11 +69,32 @@ func NewSmtpPool(configs []SMTPConfig) ([]*smtppool.Pool, error) {
 
 			// SSL/TLS, not STARTTLS
 			if cfg.TLSType == "tls" {
-				cfg.Opt.SSL = true
+				cfg.SSL = true
 			}
 		}
 
-		pool, err := smtppool.New(cfg.Opt)
+		// Parse timeouts.
+		idleTimeout, err := time.ParseDuration(cfg.IdleTimeout)
+		if err != nil {
+			idleTimeout = 30 * time.Second
+		}
+		poolWaitTimeout, err := time.ParseDuration(cfg.PoolWaitTimeout)
+		if err != nil {
+			poolWaitTimeout = 40 * time.Second
+		}
+
+		pool, err := smtppool.New(smtppool.Opt{
+			Host:              cfg.Host,
+			Port:              cfg.Port,
+			HelloHostname:     cfg.HelloHostname,
+			MaxConns:          cfg.MaxConns,
+			MaxMessageRetries: cfg.MaxMessageRetries,
+			IdleTimeout:       idleTimeout,
+			PoolWaitTimeout:   poolWaitTimeout,
+			SSL:               cfg.SSL,
+			Auth:              cfg.Auth,
+			TLSConfig:         cfg.TLSConfig,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +106,36 @@ func NewSmtpPool(configs []SMTPConfig) ([]*smtppool.Pool, error) {
 
 // Send sends an email using one of the configured SMTP servers.
 func (e *Email) Send(m models.Message) error {
+	// Refresh OAuth token if needed
+	oauthConfig, _, err := e.refreshOAuthIfNeeded()
+	if err != nil {
+		return err
+	}
+
+	// Recreate SMTP pools if token changed (handles both: we refreshed or IMAP refreshed)
+	if e.authType == imodels.AuthTypeOAuth2 && oauthConfig != nil {
+		e.smtpPoolsMu.Lock()
+		if e.smtpPoolsToken != oauthConfig.AccessToken {
+			// Close existing pools
+			for _, p := range e.smtpPools {
+				p.Close()
+			}
+
+			// Create new pools with current token
+			newPools, err := NewSmtpPool(e.smtpCfg, oauthConfig)
+			if err != nil {
+				e.smtpPoolsMu.Unlock()
+				e.lo.Error("Failed to recreate SMTP pools after token refresh", "inbox_id", e.Identifier(), "error", err)
+				return fmt.Errorf("failed to recreate SMTP pools: %w", err)
+			}
+			e.smtpPools = newPools
+			e.smtpPoolsToken = oauthConfig.AccessToken
+		}
+		e.smtpPoolsMu.Unlock()
+	}
+
 	// Select a random SMTP server if there are multiple
+	e.smtpPoolsMu.RLock()
 	var (
 		serverCount = len(e.smtpPools)
 		server      *smtppool.Pool
@@ -81,6 +145,7 @@ func (e *Email) Send(m models.Message) error {
 	} else {
 		server = e.smtpPools[0]
 	}
+	e.smtpPoolsMu.RUnlock()
 
 	// Prepare attachments if there are any
 	var attachments []smtppool.Attachment
@@ -115,6 +180,14 @@ func (e *Email) Send(m models.Message) error {
 	}
 	email.Headers.Set(headerLibredeskLoopPrevention, emailAddress)
 
+	// Set Reply-To with plus-addressing for conversation matching
+	// e.g., support@company.com → support+conv-{uuid}@company.com
+	if m.ConversationUUID != "" {
+		replyToAddr := buildPlusAddress(emailAddress, m.ConversationUUID)
+		email.Headers.Set("Reply-To", replyToAddr)
+		e.lo.Debug("Reply-To header set with plus-addressing", "reply_to", replyToAddr)
+	}
+
 	// Attach SMTP level headers
 	for key, value := range e.headers {
 		email.Headers.Set(key, value)
@@ -142,8 +215,15 @@ func (e *Email) Send(m models.Message) error {
 	for _, ref := range m.References {
 		references += "<" + ref + "> "
 	}
-	e.lo.Debug("References header set", "references", references)
 	email.Headers.Set(headerReferences, references)
+
+	e.lo.Debug("References header set", "references", references)
+
+	// Set conversation uuid header
+	if m.ConversationUUID != "" {
+		email.Headers.Set(headerLibredeskConversationID, m.ConversationUUID)
+		e.lo.Debug("Conversation UUID header set", "conversation_uuid", m.ConversationUUID)
+	}
 
 	// Set email content
 	switch m.ContentType {
@@ -156,4 +236,14 @@ func (e *Email) Send(m models.Message) error {
 		}
 	}
 	return server.Send(email)
+}
+
+// buildPlusAddress creates a plus-addressed email for conversation matching.
+// e.g., support@company.com + uuid → support+conv-{uuid}@company.com
+func buildPlusAddress(email, conversationUUID string) string {
+	parts := strings.SplitN(email, "@", 2)
+	if len(parts) != 2 {
+		return email // fallback to original if invalid format
+	}
+	return fmt.Sprintf("%s+conv-%s@%s", parts[0], conversationUUID, parts[1])
 }

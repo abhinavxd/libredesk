@@ -48,7 +48,7 @@ func handleGetConfig(r *fastglue.Request) error {
 				"provider":     provider.Provider,
 				"provider_url": provider.ProviderURL,
 				"client_id":    provider.ClientID,
-				"logo_url":     provider.ProviderLogoURL,
+				"logo_url":     provider.LogoURL,
 				"enabled":      provider.Enabled,
 				"redirect_uri": provider.RedirectURI,
 			}

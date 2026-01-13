@@ -2,7 +2,7 @@
 SELECT id, name, description, first_response_time, resolution_time, next_response_time, notifications, created_at, updated_at FROM sla_policies WHERE id = $1;
 
 -- name: get-all-sla-policies
-SELECT id, name, created_at, updated_at FROM sla_policies ORDER BY updated_at DESC;
+SELECT id, name, description, first_response_time, resolution_time, next_response_time, notifications, created_at, updated_at FROM sla_policies ORDER BY updated_at DESC;
 
 -- name: insert-sla-policy
 INSERT INTO sla_policies (

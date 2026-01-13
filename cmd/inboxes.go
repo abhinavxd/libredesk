@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/valyala/fasthttp"
@@ -71,7 +72,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 	// Clear passwords before returning.
 	if err := createdInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.inbox}"), nil)
 	}
 
 	return r.SendEnvelope(createdInbox)
@@ -109,7 +110,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 	// Clear passwords before returning.
 	if err := updatedInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.inbox}"), nil)
 	}
 
 	return r.SendEnvelope(updatedInbox)
@@ -168,13 +169,13 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalidFromAddress"), nil)
 		}
 	}
-	if len(inbox.Config) == 0 {
+	if len(inb.Config) == 0 {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "config"), nil)
 	}
-	if inbox.Name == "" {
+	if inb.Name == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "name"), nil)
 	}
-	if inbox.Channel == "" {
+	if inb.Channel == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "channel"), nil)
 	}
 
@@ -201,7 +202,77 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			// Ensure linked inbox is enabled
 			if !linkedInbox.Enabled {
 				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "linked_email_inbox_id"), nil)
+
 			}
+		}
+	}
+
+	// Validate email channel config.
+	if inb.Channel == inbox.ChannelEmail {
+		if err := validateEmailConfig(app, inb.Config); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateEmailConfig validates the email inbox configuration.
+func validateEmailConfig(app *App, configJSON json.RawMessage) error {
+	var cfg imodels.Config
+	if err := json.Unmarshal(configJSON, &cfg); err != nil {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "config"), nil)
+	}
+
+	// Validate auth_type.
+	if cfg.AuthType != "" && cfg.AuthType != imodels.AuthTypePassword && cfg.AuthType != imodels.AuthTypeOAuth2 {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "auth_type"), nil)
+	}
+
+	// Validate OAuth config if auth_type is oauth2.
+	if cfg.AuthType == imodels.AuthTypeOAuth2 {
+		if cfg.OAuth == nil {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth"), nil)
+		}
+		if cfg.OAuth.Provider != string(oauth.ProviderGoogle) && cfg.OAuth.Provider != string(oauth.ProviderMicrosoft) {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "oauth.provider"), nil)
+		}
+		if cfg.OAuth.ClientID == "" {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth.client_id"), nil)
+		}
+	}
+
+	// Validate SMTP configs.
+	for i, smtp := range cfg.SMTP {
+		if smtp.Host == "" {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "smtp.host"), nil)
+		}
+		if smtp.Port <= 0 {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "smtp.port"), nil)
+		}
+		// Validate auth_protocol for password auth.
+		if cfg.AuthType != imodels.AuthTypeOAuth2 {
+			validAuthProtocols := map[string]bool{"": true, "none": true, "plain": true, "login": true, "cram": true}
+			if !validAuthProtocols[cfg.SMTP[i].AuthProtocol] {
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "smtp.auth_protocol"), nil)
+			}
+		}
+	}
+
+	// Validate IMAP configs.
+	for _, imap := range cfg.IMAP {
+		if imap.Host == "" {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "imap.host"), nil)
+		}
+		if imap.Port <= 0 {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "imap.port"), nil)
+		}
+		if imap.Mailbox == "" {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "imap.mailbox"), nil)
+		}
+		// Validate tls_type.
+		validTLSTypes := map[string]bool{"none": true, "starttls": true, "tls": true}
+		if !validTLSTypes[imap.TLSType] {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "imap.tls_type"), nil)
 		}
 	}
 

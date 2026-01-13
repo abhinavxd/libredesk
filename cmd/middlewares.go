@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
@@ -234,6 +235,64 @@ func notAuthPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandle
 			}
 			return r.RedirectURI(nextURI, fasthttp.StatusFound, nil, "")
 		}
+		return handler(r)
+	}
+}
+
+// authOrSignedURL allows access if user is authenticated OR if URL has valid signature.
+// Used for media endpoints that support both access methods.
+func authOrSignedURL(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		app := r.Context.(*App)
+
+		// First, try to authenticate normally.
+		user, err := authenticateUser(r, app)
+		if err == nil && user.ID > 0 {
+			// User is authenticated, set user context and proceed.
+			r.RequestCtx.SetUserValue("user", amodels.User{
+				ID:        user.ID,
+				Email:     user.Email.String,
+				FirstName: user.FirstName,
+				LastName:  user.LastName,
+			})
+			r.RequestCtx.SetUserValue("auth_method", "session")
+			return handler(r)
+		}
+
+		// Authentication failed, check for signed URL.
+		validator := app.media.SignedURLValidator()
+		if validator == nil {
+			// Store doesn't support signed URLs, require auth.
+			return r.SendErrorEnvelope(http.StatusUnauthorized,
+				app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.GeneralError)
+		}
+
+		// Parse signature and expiry from query params.
+		sig := string(r.RequestCtx.QueryArgs().Peek("sig"))
+		expStr := string(r.RequestCtx.QueryArgs().Peek("exp"))
+
+		if sig == "" || expStr == "" {
+			return r.SendErrorEnvelope(http.StatusUnauthorized,
+				app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.GeneralError)
+		}
+
+		exp, err := strconv.ParseInt(expStr, 10, 64)
+		if err != nil {
+			return r.SendErrorEnvelope(http.StatusBadRequest,
+				app.i18n.Ts("globals.messages.invalid", "name", "expiry"), nil, envelope.InputError)
+		}
+
+		// Get the UUID from the route.
+		uuid := r.RequestCtx.UserValue("uuid").(string)
+
+		// Validate signature.
+		if !validator(uuid, sig, exp) {
+			return r.SendErrorEnvelope(http.StatusForbidden,
+				app.i18n.T("media.invalidOrExpiredURL"), nil, envelope.PermissionError)
+		}
+
+		// Mark as signed URL access (no user context).
+		r.RequestCtx.SetUserValue("auth_method", "signed_url")
 		return handler(r)
 	}
 }

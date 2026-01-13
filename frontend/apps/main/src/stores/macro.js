@@ -61,8 +61,8 @@ export const useMacroStore = defineStore('macroStore', () => {
         }))
     })
 
-    const loadMacros = async () => {
-        if (macroList.value.length) return
+    const loadMacros = async (force = false) => {
+        if (!force && macroList.value.length) return
         try {
             const response = await api.getAllMacros()
             macroList.value = response?.data?.data || []

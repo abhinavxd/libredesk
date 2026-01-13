@@ -16,7 +16,7 @@
     </div>
     <div>
       <Spinner v-if="isLoading" />
-      <DataTable :columns="createColumns(t)" :data="businessHours" />
+      <DataTable :columns="createColumns(t)" :data="businessHours" :loading="isLoading" />
     </div>
   </div>
 </template>

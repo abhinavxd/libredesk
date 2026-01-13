@@ -166,7 +166,22 @@ SELECT
     nr.avg_next_response_time_sec,
     fas.resolution_met_count,
     fas.resolution_breached_count,
-    fas.avg_resolution_time_sec
+    fas.avg_resolution_time_sec,
+    CASE
+        WHEN (fas.first_response_met_count + fas.first_response_breached_count) > 0
+        THEN ROUND((fas.first_response_met_count::numeric / (fas.first_response_met_count + fas.first_response_breached_count)::numeric) * 100, 1)
+        ELSE 0
+    END AS first_response_compliance_percent,
+    CASE
+        WHEN (nr.next_response_met_count + nr.next_response_breached_count) > 0
+        THEN ROUND((nr.next_response_met_count::numeric / (nr.next_response_met_count + nr.next_response_breached_count)::numeric) * 100, 1)
+        ELSE 0
+    END AS next_response_compliance_percent,
+    CASE
+        WHEN (fas.resolution_met_count + fas.resolution_breached_count) > 0
+        THEN ROUND((fas.resolution_met_count::numeric / (fas.resolution_met_count + fas.resolution_breached_count)::numeric) * 100, 1)
+        ELSE 0
+    END AS resolution_compliance_percent
 FROM
     first_and_resolution fas,
     next_response nr;
@@ -232,3 +247,117 @@ SELECT
                 resolved_conversations
         )
     ) AS result;
+
+-- name: get-overview-csat
+SELECT
+    json_build_object(
+        'average_rating',
+        COALESCE(AVG(rating) FILTER (WHERE rating > 0), 0),
+        'total_responses',
+        COUNT(*) FILTER (WHERE rating > 0),
+        'total_sent',
+        COUNT(*),
+        'response_rate',
+        CASE
+            WHEN COUNT(*) > 0
+            THEN ROUND((COUNT(*) FILTER (WHERE rating > 0)::numeric / COUNT(*)::numeric) * 100, 1)
+            ELSE 0
+        END
+    ) AS result
+FROM
+    csat_responses
+WHERE
+    created_at >= CASE
+        WHEN %d = 0 THEN CURRENT_DATE
+        ELSE NOW() - INTERVAL '%d days'
+    END;
+
+-- name: get-overview-message-volume
+WITH stats AS (
+    SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE type = 'incoming') AS incoming,
+        COUNT(*) FILTER (WHERE type = 'outgoing') AS outgoing,
+        COUNT(DISTINCT conversation_id) AS convos
+    FROM
+        conversation_messages
+    WHERE
+        type IN ('incoming', 'outgoing')
+        AND created_at >= CASE
+            WHEN %d = 0 THEN CURRENT_DATE
+            ELSE NOW() - INTERVAL '%d days'
+        END
+)
+SELECT
+    json_build_object(
+        'total_messages', total,
+        'incoming_messages', incoming,
+        'outgoing_messages', outgoing,
+        'messages_per_conversation',
+        CASE
+            WHEN convos > 0 THEN ROUND(total::numeric / convos::numeric, 1)
+            ELSE 0
+        END
+    ) AS result
+FROM
+    stats;
+
+-- name: get-overview-tag-distribution
+WITH tag_counts AS (
+    SELECT
+        t.id AS tag_id,
+        t.name AS tag_name,
+        COUNT(ct.conversation_id) AS count
+    FROM
+        tags t
+        LEFT JOIN conversation_tags ct ON t.id = ct.tag_id
+        LEFT JOIN conversations c ON ct.conversation_id = c.id
+    WHERE
+        c.created_at >= CASE
+            WHEN %d = 0 THEN CURRENT_DATE
+            ELSE NOW() - INTERVAL '%d days'
+        END
+        OR c.id IS NULL
+    GROUP BY
+        t.id, t.name
+    ORDER BY
+        count DESC
+    LIMIT 10
+),
+tagging AS (
+    SELECT
+        COUNT(DISTINCT c.id) FILTER (
+            WHERE EXISTS (
+                SELECT 1 FROM conversation_tags ct
+                WHERE ct.conversation_id = c.id
+            )
+        ) AS tagged,
+        COUNT(DISTINCT c.id) FILTER (
+            WHERE NOT EXISTS (
+                SELECT 1 FROM conversation_tags ct
+                WHERE ct.conversation_id = c.id
+            )
+        ) AS untagged
+    FROM
+        conversations c
+    WHERE
+        c.created_at >= CASE
+            WHEN %d = 0 THEN CURRENT_DATE
+            ELSE NOW() - INTERVAL '%d days'
+        END
+)
+SELECT
+    json_build_object(
+        'top_tags',
+        COALESCE((SELECT json_agg(row_to_json(tc)) FROM tag_counts tc), '[]'::json),
+        'tagged_conversations', tagged,
+        'untagged_conversations', untagged,
+        'tagged_percentage',
+        CASE
+            WHEN (tagged + untagged) > 0
+            THEN ROUND((tagged::numeric / (tagged + untagged)::numeric) * 100, 1)
+            ELSE 0
+        END
+    ) AS result
+FROM
+    tagging;
