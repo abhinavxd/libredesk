@@ -188,34 +188,14 @@ func handleServeMedia(r *fastglue.Request) error {
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-
-		// Fetch media from DB.
-		media, err := app.media.Get(0, strings.TrimPrefix(uuid, thumbPrefix))
+		allowed, err = app.authz.EnforceConversationAccess(user, conversation)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
+	}
 
-		// Check if the user has permission to access the linked model.
-		allowed, err := app.authz.EnforceMediaAccess(user, media.Model.String)
-		if err != nil {
-			return sendErrorEnvelope(r, err)
-		}
-
-		// For messages, check access to the conversation this message is part of.
-		if media.Model.String == "messages" {
-			conversation, err := app.conversation.GetConversationByMessageID(media.ModelID.Int)
-			if err != nil {
-				return sendErrorEnvelope(r, err)
-			}
-			allowed, err = app.authz.EnforceConversationAccess(user, conversation)
-			if err != nil {
-				return sendErrorEnvelope(r, err)
-			}
-		}
-
-		if !allowed {
-			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.UnauthorizedError)
-		}
+	if !allowed {
+		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.UnauthorizedError)
 	}
 
 	return serveMediaFile(r, app, uuid, &media)

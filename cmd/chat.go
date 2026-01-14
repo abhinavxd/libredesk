@@ -426,7 +426,7 @@ func handleChatInit(r *fastglue.Request) error {
 		app.lo.Error("error processing incoming message hooks for initial message", "conversation_uuid", conversationUUID, "error", err)
 	}
 
-	conversation, err := app.conversation.GetConversation(0, conversationUUID)
+	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching created conversation", "conversation_uuid", conversationUUID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
@@ -472,7 +472,7 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 	}
 
-	conversation, err := app.conversation.GetConversation(0, conversationUUID)
+	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
@@ -523,7 +523,7 @@ func handleChatGetConversation(r *fastglue.Request) error {
 	}
 
 	// Fetch conversation
-	conversation, err := app.conversation.GetConversation(0, conversationUUID)
+	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
@@ -607,7 +607,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	}
 
 	// Fetch conversation to ensure it exists
-	conversation, err := app.conversation.GetConversation(0, conversationUUID)
+	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
@@ -711,7 +711,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	conversationUUID := conversationValues[0]
 
 	// Make sure the conversation belongs to the sender
-	conversation, err := app.conversation.GetConversation(0, conversationUUID)
+	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
 		return sendErrorEnvelope(r, err)
