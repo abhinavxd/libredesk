@@ -99,7 +99,7 @@ func (m *Manager) broadcastToUsers(userIDs []int, message wsmodels.Message) {
 // broadcastTypingToWidgetClients broadcasts typing status to widget clients (customers) for a conversation.
 func (m *Manager) broadcastTypingToWidgetClients(conversationUUID string, isTyping bool) {
 	// Get the conversation to find its inbox ID
-	conversation, err := m.GetConversation(0, conversationUUID)
+	conversation, err := m.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		m.lo.Error("error getting conversation for widget typing broadcast", "error", err, "conversation_uuid", conversationUUID)
 		return
@@ -121,7 +121,7 @@ func (m *Manager) broadcastTypingToWidgetClients(conversationUUID string, isTypi
 // BroadcastConversationToWidget broadcasts full conversation data to widget clients when conversation properties change.
 func (m *Manager) BroadcastConversationToWidget(conversationUUID string) {
 	// Get the conversation with assignee details
-	conversation, err := m.GetConversation(0, conversationUUID)
+	conversation, err := m.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		m.lo.Error("error getting conversation for widget broadcast", "error", err, "conversation_uuid", conversationUUID)
 		return

@@ -169,13 +169,13 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalidFromAddress"), nil)
 		}
 	}
-	if len(inb.Config) == 0 {
+	if len(inbox.Config) == 0 {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "config"), nil)
 	}
-	if inb.Name == "" {
+	if inbox.Name == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "name"), nil)
 	}
-	if inb.Channel == "" {
+	if inbox.Channel == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "channel"), nil)
 	}
 
@@ -208,8 +208,8 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 	}
 
 	// Validate email channel config.
-	if inb.Channel == inbox.ChannelEmail {
-		if err := validateEmailConfig(app, inb.Config); err != nil {
+	if inbox.Channel == "email" {
+		if err := validateEmailConfig(app, inbox.Config); err != nil {
 			return err
 		}
 	}

@@ -689,18 +689,6 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 	return inbox, nil
 }
 
-// initializeInboxes handles inbox initialization.
-func initializeInboxes(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
-	switch inboxR.Channel {
-	case "email":
-		return initEmailInbox(inboxR, msgStore, usrStore)
-	case "livechat":
-		return initLiveChatInbox(inboxR, msgStore, usrStore)
-	default:
-		return nil, fmt.Errorf("unknown inbox channel: %s", inboxR.Channel)
-	}
-}
-
 // makeInboxInitializer creates an inbox initializer function.
 func makeInboxInitializer(mgr *inbox.Manager) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
 	return func(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {

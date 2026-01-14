@@ -125,14 +125,14 @@ func (c *Client) Name() string {
 // This implements the SignedURLStore interface for secure public access.
 func (c *Client) GetSignedURL(name string) string {
 	// Generate base URL
-	baseURL := c.GetURL(name)
+	baseURL := c.GetURL(name, "", "")
 
 	// Create the signature payload: name + expires timestamp
 	expires := time.Now().Add(c.opts.Expiry).Unix()
 	payload := name + strconv.FormatInt(expires, 10)
 
 	// Generate HMAC-SHA256 signature
-	h := hmac.New(sha256.New, []byte(c.opts.Secret))
+	h := hmac.New(sha256.New, []byte(c.opts.SigningKey))
 	h.Write([]byte(payload))
 	signature := base64.URLEncoding.EncodeToString(h.Sum(nil))
 
@@ -165,7 +165,7 @@ func (c *Client) VerifySignature(name, signature string, expiresAt time.Time) bo
 	payload := name + strconv.FormatInt(expires, 10)
 
 	// Generate expected HMAC-SHA256 signature
-	h := hmac.New(sha256.New, []byte(c.opts.Secret))
+	h := hmac.New(sha256.New, []byte(c.opts.SigningKey))
 	h.Write([]byte(payload))
 	expectedSignature := base64.URLEncoding.EncodeToString(h.Sum(nil))
 

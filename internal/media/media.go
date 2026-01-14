@@ -186,6 +186,16 @@ func (m *Manager) GetURL(uuid, contentType, fileName string) string {
 	return m.store.GetURL(uuid, disposition, fileName)
 }
 
+// GetSignedURL generates a signed URL for secure media access if the store supports it.
+// Returns a regular URL if the store doesn't support signed URLs.
+func (m *Manager) GetSignedURL(name string) string {
+	if signedStore, ok := m.store.(SignedURLStore); ok {
+		return signedStore.GetSignedURL(name)
+	}
+	// Fallback to regular URL if signed URLs not supported
+	return m.GetURL(name, "", "")
+}
+
 // SignedURLValidator returns the store's signature validator if available.
 // Returns nil if the store doesn't support signed URL validation.
 func (m *Manager) SignedURLValidator() func(name, sig string, exp int64) bool {

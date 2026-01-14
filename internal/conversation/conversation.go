@@ -134,7 +134,7 @@ type userStore interface {
 
 type mediaStore interface {
 	GetBlob(name string) ([]byte, error)
-	GetURL(name string) string
+	GetURL(uuid, contentType, fileName string) string
 	GetSignedURL(name string) string
 	Attach(id int, model string, modelID int) error
 	GetByModel(id int, model string) ([]mmodels.Media, error)
@@ -1650,7 +1650,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 	// Build messages if requested
 	if includeMessages {
 		private := false
-		messages, _, err := m.GetConversationMessages(conversation.UUID, []string{models.MessageIncoming, models.MessageOutgoing}, &private, 1, 1000)
+		messages, _, err := m.GetConversationMessages(conversation.UUID, 1, 1000, &private, []string{models.MessageIncoming, models.MessageOutgoing})
 		if err != nil {
 			m.lo.Error("error fetching conversation messages", "conversation_uuid", conversation.UUID, "error", err)
 			return resp, envelope.NewError(envelope.GeneralError, "error fetching messages", nil)

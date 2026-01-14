@@ -225,7 +225,7 @@ func handleWidgetTyping(app *App, msg *WidgetMessage) error {
 		return fmt.Errorf("conversation UUID is required for typing messages")
 	}
 
-	conversation, err := app.conversation.GetConversation(0, typingData.ConversationUUID)
+	conversation, err := app.conversation.GetConversation(0, typingData.ConversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching conversation for typing", "conversation_uuid", typingData.ConversationUUID, "error", err)
 		return fmt.Errorf("conversation not found: %w", err)
