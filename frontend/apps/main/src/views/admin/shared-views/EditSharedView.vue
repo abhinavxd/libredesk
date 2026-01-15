@@ -18,9 +18,9 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@/utils/http'
 import SharedViewForm from '@/features/admin/shared-views/SharedViewForm.vue'
-import { CustomBreadcrumb } from '@/components/ui/breadcrumb'
+import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useI18n } from 'vue-i18n'
-import { Spinner } from '@/components/ui/spinner'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useSharedViewStore } from '@/stores/sharedView'
 
 const sharedView = ref({})

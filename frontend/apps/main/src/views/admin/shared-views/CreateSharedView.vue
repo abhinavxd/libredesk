@@ -8,7 +8,7 @@
 <script setup>
 import { ref } from 'vue'
 import SharedViewForm from '@/features/admin/shared-views/SharedViewForm.vue'
-import { CustomBreadcrumb } from '@/components/ui/breadcrumb'
+import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { handleHTTPError } from '@/utils/http'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '@/composables/useEmitter'

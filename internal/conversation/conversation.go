@@ -269,11 +269,10 @@ type queries struct {
 	GetContactPreviousConversations    *sqlx.Stmt `query:"get-contact-previous-conversations"`
 	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
 	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
-	UpdateConversationFirstReplyAt     *sqlx.Stmt `query:"update-conversation-first-reply-at"`
-	UpdateConversationLastReplyAt      *sqlx.Stmt `query:"update-conversation-last-reply-at"`
-	UpdateConversationWaitingSince     *sqlx.Stmt `query:"update-conversation-waiting-since"`
-	UpdateConversationAssigneeLastSeen *sqlx.Stmt `query:"update-conversation-assignee-last-seen"`
-	UpdateConversationContactLastSeen  *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
+	UpdateConversationFirstReplyAt    *sqlx.Stmt `query:"update-conversation-first-reply-at"`
+	UpdateConversationLastReplyAt     *sqlx.Stmt `query:"update-conversation-last-reply-at"`
+	UpdateConversationWaitingSince    *sqlx.Stmt `query:"update-conversation-waiting-since"`
+	UpdateConversationContactLastSeen *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
 	UpsertUserLastSeen                 *sqlx.Stmt `query:"upsert-user-last-seen"`
 	MarkConversationUnread             *sqlx.Stmt `query:"mark-conversation-unread"`
 	UpdateConversationAssignedUser     *sqlx.Stmt `query:"update-conversation-assigned-user"`

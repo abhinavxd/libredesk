@@ -78,9 +78,9 @@
 import { ref, watch, computed } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
-import { Input } from '@/components/ui/input'
+import { Button } from '@shared-ui/components/ui/button'
+import { Spinner } from '@shared-ui/components/ui/spinner'
+import { Input } from '@shared-ui/components/ui/input'
 import {
   FormControl,
   FormDescription,
@@ -88,7 +88,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage
-} from '@/components/ui/form'
+} from '@shared-ui/components/ui/form'
 import FilterBuilder from '@/components/filter/FilterBuilder.vue'
 import { useConversationFilters } from '@/composables/useConversationFilters'
 import { useTeamStore } from '@/stores/team'
@@ -101,7 +101,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@/components/ui/select'
+} from '@shared-ui/components/ui/select'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'
 

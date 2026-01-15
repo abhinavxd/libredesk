@@ -104,18 +104,18 @@
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@shared-ui/components/ui/button'
+import { Card } from '@shared-ui/components/ui/card'
+import { Alert, AlertTitle, AlertDescription } from '@shared-ui/components/ui/alert'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter
-} from '@/components/ui/dialog'
+} from '@shared-ui/components/ui/dialog'
 import { Upload } from 'lucide-vue-next'
-import { Spinner } from '@/components/ui/spinner'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 import CopyButton from '@/components/button/CopyButton.vue'
 import { handleHTTPError } from '@/utils/http'
 import { useEmitter } from '@/composables/useEmitter'

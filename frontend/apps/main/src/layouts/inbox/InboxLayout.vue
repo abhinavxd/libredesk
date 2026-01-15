@@ -35,7 +35,7 @@ import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle
-} from '@/components/ui/resizable'
+} from '@shared-ui/components/ui/resizable'
 
 const route = useRoute()
 const isSearchRoute = computed(() => route.name === 'search')

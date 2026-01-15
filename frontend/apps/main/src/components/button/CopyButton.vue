@@ -12,7 +12,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { Button } from '@/components/ui/button'
+import { Button } from '@shared-ui/components/ui/button'
 import { Copy, Check } from 'lucide-vue-next'
 
 const props = defineProps({

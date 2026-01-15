@@ -40,7 +40,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+} from '@shared-ui/components/ui/dropdown-menu'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,8 +50,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+} from '@shared-ui/components/ui/alert-dialog'
+import { Button } from '@shared-ui/components/ui/button'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useRouter } from 'vue-router'
