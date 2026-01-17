@@ -76,6 +76,7 @@ type Config struct {
 		Text string `json:"text"`
 	} `json:"external_links"`
 	TrustedDomains                 []string `json:"trusted_domains"`
+	DirectToConversation           bool     `json:"direct_to_conversation"`
 	GreetingMessage                string   `json:"greeting_message"`
 	ChatIntroduction               string   `json:"chat_introduction"`
 	IntroductionMessage            string   `json:"introduction_message"`

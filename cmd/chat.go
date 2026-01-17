@@ -17,6 +17,7 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/golang-jwt/jwt/v5"
@@ -66,37 +67,56 @@ type conversationResponseWithBusinessHours struct {
 	WorkingHoursUTCOffset *int `json:"working_hours_utc_offset,omitempty"`
 }
 
-//	TODO: live chat widget can have a different language setting than the main app, handle this.
-//
-// handleGetChatLauncherSettings returns the live chat launcher settings for the widget
-func handleGetChatLauncherSettings(r *fastglue.Request) error {
-	var (
-		app     = r.Context.(*App)
-		inboxID = r.RequestCtx.QueryArgs().GetUintOrZero("inbox_id")
-	)
+// validateLiveChatInbox validates inbox_id from query params and returns the inbox and parsed config.
+// Used by public widget endpoints that don't require JWT authentication.
+func validateLiveChatInbox(r *fastglue.Request) (imodels.Inbox, livechat.Config, error) {
+	app := r.Context.(*App)
+	inboxID := r.RequestCtx.QueryArgs().GetUintOrZero("inbox_id")
 
 	if inboxID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
+			fasthttp.StatusBadRequest,
+			app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"),
+			nil, envelope.InputError)
 	}
 
 	inbox, err := app.inbox.GetDBRecord(inboxID)
 	if err != nil {
 		app.lo.Error("error fetching inbox", "inbox_id", inboxID, "error", err)
-		return sendErrorEnvelope(r, err)
+		return imodels.Inbox{}, livechat.Config{}, sendErrorEnvelope(r, err)
 	}
 
 	if inbox.Channel != livechat.ChannelLiveChat {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
+			fasthttp.StatusBadRequest,
+			app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"),
+			nil, envelope.InputError)
 	}
 
 	if !inbox.Enabled {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
+			fasthttp.StatusBadRequest,
+			app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"),
+			nil, envelope.InputError)
 	}
 
 	var config livechat.Config
 	if err := json.Unmarshal(inbox.Config, &config); err != nil {
 		app.lo.Error("error parsing live chat config", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
+			fasthttp.StatusInternalServerError,
+			app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"),
+			nil, envelope.GeneralError)
+	}
+
+	return inbox, config, nil
+}
+
+// handleGetChatLauncherSettings returns the live chat launcher settings for the widget
+func handleGetChatLauncherSettings(r *fastglue.Request) error {
+	_, config, err := validateLiveChatInbox(r)
+	if err != nil {
+		return err
 	}
 
 	return r.SendEnvelope(map[string]any{
@@ -107,33 +127,11 @@ func handleGetChatLauncherSettings(r *fastglue.Request) error {
 
 // handleGetChatSettings returns the live chat settings for the widget
 func handleGetChatSettings(r *fastglue.Request) error {
-	var (
-		app     = r.Context.(*App)
-		inboxID = r.RequestCtx.QueryArgs().GetUintOrZero("inbox_id")
-	)
+	app := r.Context.(*App)
 
-	if inboxID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
-	}
-
-	inbox, err := app.inbox.GetDBRecord(inboxID)
+	_, config, err := validateLiveChatInbox(r)
 	if err != nil {
-		app.lo.Error("error fetching inbox", "inbox_id", inboxID, "error", err)
-		return sendErrorEnvelope(r, err)
-	}
-
-	if inbox.Channel != livechat.ChannelLiveChat {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
-	}
-
-	if !inbox.Enabled {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
-	}
-
-	var config livechat.Config
-	if err := json.Unmarshal(inbox.Config, &config); err != nil {
-		app.lo.Error("error parsing live chat config", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return err
 	}
 
 	// Get business hours data if office hours feature is enabled.
@@ -142,7 +140,6 @@ func handleGetChatSettings(r *fastglue.Request) error {
 	}
 
 	if config.ShowOfficeHoursInChat {
-		// Get all business hours.
 		businessHours, err := app.businessHours.GetAll()
 		if err != nil {
 			app.lo.Error("error fetching business hours", "error", err)
@@ -164,7 +161,7 @@ func handleGetChatSettings(r *fastglue.Request) error {
 		}
 	}
 
-	// Filter out pre-chat form fields for which custom attributes don't exist anymore
+	// Filter out pre-chat form fields for which custom attributes don't exist anymore.
 	if config.PreChatForm.Enabled && len(config.PreChatForm.Fields) > 0 {
 		filteredFields, customAttributes := filterPreChatFormFields(config.PreChatForm.Fields, app)
 		response.PreChatForm.Fields = filteredFields

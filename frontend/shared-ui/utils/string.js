@@ -65,3 +65,20 @@ export function getInitials (firstName = '', lastName = '') {
   const lastInitial = lastName.charAt(0).toUpperCase() || ''
   return `${firstInitial}${lastInitial}`
 }
+
+/**
+ * Parses template variables in text and replaces them with user data.
+ * Mimics Go's text/template whitespace handling - flexible with spaces/tabs inside delimiters.
+ * Supports {{.FirstName}} and {{.LastName}} variables.
+ *
+ * @param {string} text - The text containing template variables
+ * @param {Object} userData - Object containing firstName and lastName
+ * @returns {string} - Text with variables replaced
+ */
+export function parseTemplateVariables(text, userData) {
+  if (!text) return text
+
+  return text
+    .replace(/\{\{\s*\.\s*FirstName\s*\}\}/gi, userData?.firstName || '')
+    .replace(/\{\{\s*\.\s*LastName\s*\}\}/gi, userData?.lastName || '')
+}

@@ -9,19 +9,38 @@
     />
     <!-- Greeting and introduction -->
     <div class="mt-24 font-medium text-4xl">
-      <h2>{{ config.greeting_message }}</h2>
+      <h2>{{ parsedGreeting }}</h2>
       <p class="text-muted-foreground mt-2">
-        {{ config.introduction_message }}
+        {{ parsedIntroduction }}
       </p>
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { useUserStore } from '@widget/store/user.js'
+import { parseTemplateVariables } from '@shared-ui/utils/string.js'
+
+const props = defineProps({
   config: {
     type: Object,
     required: true
   }
 })
+
+const userStore = useUserStore()
+
+const userData = computed(() => ({
+  firstName: userStore.firstName,
+  lastName: userStore.lastName
+}))
+
+const parsedGreeting = computed(() =>
+  parseTemplateVariables(props.config.greeting_message, userData.value)
+)
+
+const parsedIntroduction = computed(() =>
+  parseTemplateVariables(props.config.introduction_message, userData.value)
+)
 </script>

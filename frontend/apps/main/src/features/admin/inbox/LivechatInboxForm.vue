@@ -4,29 +4,22 @@
     <Tabs v-model="activeTab" class="w-full">
       <TabsList class="flex flex-wrap gap-1 h-auto p-1 w-fit">
         <TabsTrigger value="general">{{ $t('admin.inbox.livechat.tabs.general') }}</TabsTrigger>
-        <TabsTrigger value="appearance">{{ $t('admin.inbox.livechat.tabs.appearance') }}</TabsTrigger>
+        <TabsTrigger value="appearance">{{
+          $t('admin.inbox.livechat.tabs.appearance')
+        }}</TabsTrigger>
         <TabsTrigger value="messages">{{ $t('admin.inbox.livechat.tabs.messages') }}</TabsTrigger>
         <TabsTrigger value="features">{{ $t('admin.inbox.livechat.tabs.features') }}</TabsTrigger>
         <TabsTrigger value="prechat">{{ $t('admin.inbox.livechat.tabs.prechat') }}</TabsTrigger>
         <TabsTrigger value="users">{{ $t('admin.inbox.livechat.tabs.users') }}</TabsTrigger>
         <TabsTrigger value="security">{{ $t('admin.inbox.livechat.tabs.security') }}</TabsTrigger>
-        <TabsTrigger value="installation">{{ $t('admin.inbox.livechat.tabs.installation') }}</TabsTrigger>
+        <TabsTrigger value="installation">{{
+          $t('admin.inbox.livechat.tabs.installation')
+        }}</TabsTrigger>
       </TabsList>
 
       <div class="mt-8">
         <!-- General Tab -->
         <div v-show="activeTab === 'general'" class="space-y-6">
-          <FormField v-slot="{ componentField }" name="name">
-            <FormItem>
-              <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-              <FormControl>
-                <Input type="text" placeholder="" v-bind="componentField" />
-              </FormControl>
-              <FormDescription>{{ $t('admin.inbox.name.description') }}</FormDescription>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
           <FormField v-slot="{ componentField, handleChange }" name="enabled">
             <FormItem class="flex flex-row items-center justify-between box p-4">
               <div class="space-y-0.5">
@@ -43,13 +36,26 @@
               <div class="space-y-0.5">
                 <FormLabel class="text-base">{{ $t('admin.inbox.csatSurveys') }}</FormLabel>
                 <FormDescription>
-                  {{ $t('admin.inbox.csatSurveys.description_1') }}<br />
-                  {{ $t('admin.inbox.csatSurveys.description_2') }}
+                  {{ $t('admin.inbox.csatSurveys.description_1') }}
                 </FormDescription>
               </div>
               <FormControl>
                 <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
               </FormControl>
+            </FormItem>
+            <p class="!mt-2 text-muted-foreground text-sm">
+              {{ $t('admin.inbox.csatSurveys.description_2') }}
+            </p>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="name">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+              <FormControl>
+                <Input type="text" placeholder="" v-bind="componentField" />
+              </FormControl>
+              <FormDescription>{{ $t('admin.inbox.name.description') }}</FormDescription>
+              <FormMessage />
             </FormItem>
           </FormField>
 
@@ -269,6 +275,9 @@
                   rows="2"
                 />
               </FormControl>
+              <FormDescription>{{
+                $t('admin.inbox.livechat.greetingMessage.variables')
+              }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
@@ -279,6 +288,9 @@
               <FormControl>
                 <Textarea v-bind="componentField" placeholder="We're here to help!" rows="2" />
               </FormControl>
+              <FormDescription>{{
+                $t('admin.inbox.livechat.greetingMessage.variables')
+              }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
@@ -491,6 +503,25 @@
                     }}</FormLabel>
                     <FormDescription>{{
                       $t('admin.inbox.livechat.features.emoji.description')
+                    }}</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
+                  </FormControl>
+                </FormItem>
+              </FormField>
+
+              <FormField
+                v-slot="{ componentField, handleChange }"
+                name="config.direct_to_conversation"
+              >
+                <FormItem class="flex flex-row items-center justify-between box p-4">
+                  <div class="space-y-0.5">
+                    <FormLabel class="text-base">{{
+                      $t('admin.inbox.livechat.directToConversation')
+                    }}</FormLabel>
+                    <FormDescription>{{
+                      $t('admin.inbox.livechat.directToConversation.description')
                     }}</FormDescription>
                   </div>
                   <FormControl>
@@ -715,8 +746,15 @@
             </p>
 
             <div class="relative">
-              <CodeEditor :modelValue="authenticatedIntegrationSnippet" language="html" :readOnly="true" />
-              <CopyButton :text-to-copy="authenticatedIntegrationSnippet" class="absolute top-3 right-3" />
+              <CodeEditor
+                :modelValue="authenticatedIntegrationSnippet"
+                language="html"
+                :readOnly="true"
+              />
+              <CopyButton
+                :text-to-copy="authenticatedIntegrationSnippet"
+                class="absolute top-3 right-3"
+              />
             </div>
 
             <p class="text-sm text-warning">
@@ -887,6 +925,7 @@ const form = useForm({
         file_upload: true,
         emoji: true
       },
+      direct_to_conversation: false,
       trusted_domains: '',
       external_links: [],
       visitors: {

@@ -21,6 +21,20 @@ export const useUserStore = defineStore('user', () => {
         return jwt.user_id || null
     })
 
+    const firstName = computed(() => {
+        const token = userSessionToken.value
+        if (!token) return ''
+        const jwt = parseJWT(token)
+        return jwt.first_name || ''
+    })
+
+    const lastName = computed(() => {
+        const token = userSessionToken.value
+        if (!token) return ''
+        const jwt = parseJWT(token)
+        return jwt.last_name || ''
+    })
+
     const clearSessionToken = () => {
         userSessionToken.value = ""
     }
@@ -36,6 +50,8 @@ export const useUserStore = defineStore('user', () => {
         userSessionToken,
         isVisitor,
         userID,
+        firstName,
+        lastName,
         clearSessionToken,
         setSessionToken
     }

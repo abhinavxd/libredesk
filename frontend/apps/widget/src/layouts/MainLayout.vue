@@ -36,6 +36,7 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/ui/tabs'
 import HomeView from '@widget/views/HomeView.vue'
 import { Home, MessageCircle } from 'lucide-vue-next'
@@ -43,5 +44,20 @@ import ChatView from '@widget/views/ChatView.vue'
 import MessagesView from '@widget/views/MessagesView.vue'
 import ConnectionBanner from '@widget/components/ConnectionBanner.vue'
 import { useWidgetStore } from '@widget/store/widget.js'
+import { useChatStore } from '@widget/store/chat.js'
+
 const widgetStore = useWidgetStore()
+const chatStore = useChatStore()
+
+onMounted(async () => {
+  if (widgetStore.config?.direct_to_conversation) {
+    await chatStore.fetchConversations()
+    if (chatStore.hasConversations) {
+      const latest = chatStore.getConversations[0]
+      await chatStore.loadConversation(latest.uuid)
+    }
+    // Always navigate to chat - shows latest convo OR new convo screen
+    widgetStore.navigateToChat()
+  }
+})
 </script>

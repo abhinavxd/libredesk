@@ -48,6 +48,7 @@ export const createFormSchema = (t) => z.object({
       file_upload: z.boolean(),
       emoji: z.boolean(),
     }),
+    direct_to_conversation: z.boolean().default(false),
     trusted_domains: z.string().optional(),
     external_links: z.array(z.object({
       text: z.string().min(1),
