@@ -6,21 +6,21 @@ SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_en
 
 -- name: insert-inbox
 INSERT INTO inboxes
-(channel, config, "name", "from", csat_enabled)
-VALUES($1, $2, $3, $4, $5)
+(channel, config, "name", "from", csat_enabled, secret)
+VALUES($1, $2, $3, $4, $5, $6)
 RETURNING *
 
 -- name: get-inbox
-SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from" FROM inboxes where id = $1 and deleted_at is NULL;
+SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from", secret FROM inboxes where id = $1 and deleted_at is NULL;
 
 -- name: update
 UPDATE inboxes
-set channel = $2, config = $3, "name" = $4, "from" = $5, csat_enabled = $6, enabled = $7, updated_at = now()
+set channel = $2, config = $3, "name" = $4, "from" = $5, csat_enabled = $6, enabled = $7, secret = $8, linked_email_inbox_id = $9, updated_at = now()
 where id = $1 and deleted_at is NULL
 RETURNING *;
 
 -- name: soft-delete
-UPDATE inboxes set deleted_at = now(), updated_at = now(), config = '{}' where id = $1 and deleted_at is NULL;
+UPDATE inboxes set deleted_at = now(), updated_at = now(), config = '{}', enabled = false where id = $1 and deleted_at is NULL;
 
 -- name: toggle
 UPDATE inboxes

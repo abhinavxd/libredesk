@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -162,24 +162,54 @@ func handleDeleteInbox(r *fastglue.Request) error {
 }
 
 // validateInbox validates the inbox
-func validateInbox(app *App, inb imodels.Inbox) error {
-	// Validate from address.
-	if _, err := mail.ParseAddress(inb.From); err != nil {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalidFromAddress"), nil)
+func validateInbox(app *App, inbox imodels.Inbox) error {
+	// Validate from address only for email channels.
+	if inbox.Channel == "email" {
+		if _, err := mail.ParseAddress(inbox.From); err != nil {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalidFromAddress"), nil)
+		}
 	}
-	if len(inb.Config) == 0 {
+	if len(inbox.Config) == 0 {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "config"), nil)
 	}
-	if inb.Name == "" {
+	if inbox.Name == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "name"), nil)
 	}
-	if inb.Channel == "" {
+	if inbox.Channel == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "channel"), nil)
 	}
 
+	// Validate livechat-specific configuration
+	if inbox.Channel == livechat.ChannelLiveChat {
+		var config livechat.Config
+		if err := json.Unmarshal(inbox.Config, &config); err == nil {
+			// ShowOfficeHoursAfterAssignment cannot be enabled if ShowOfficeHoursInChat is disabled
+			if config.ShowOfficeHoursAfterAssignment && !config.ShowOfficeHoursInChat {
+				return envelope.NewError(envelope.InputError, "`show_office_hours_after_assignment` cannot be enabled when `show_office_hours_in_chat` is disabled", nil)
+			}
+		}
+
+		// Validate linked email inbox if specified
+		if inbox.LinkedEmailInboxID.Valid {
+			linkedInbox, err := app.inbox.GetDBRecord(int(inbox.LinkedEmailInboxID.Int))
+			if err != nil {
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "linked_email_inbox_id"), nil)
+			}
+			// Ensure linked inbox is an email channel
+			if linkedInbox.Channel != "email" {
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "linked_email_inbox_id"), nil)
+			}
+			// Ensure linked inbox is enabled
+			if !linkedInbox.Enabled {
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "linked_email_inbox_id"), nil)
+
+			}
+		}
+	}
+
 	// Validate email channel config.
-	if inb.Channel == inbox.ChannelEmail {
-		if err := validateEmailConfig(app, inb.Config); err != nil {
+	if inbox.Channel == "email" {
+		if err := validateEmailConfig(app, inbox.Config); err != nil {
 			return err
 		}
 	}

@@ -360,13 +360,10 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 	// Make contact.
 	firstName, lastName := getContactName(env.From[0])
 	var contact = umodels.User{
-		InboxID:         inboxID,
-		FirstName:       firstName,
-		LastName:        lastName,
-		SourceChannel:   null.NewString(e.Channel(), true),
-		SourceChannelID: null.NewString(fromAddress, true),
-		Email:           null.NewString(fromAddress, true),
-		Type:            umodels.UserTypeContact,
+		FirstName: firstName,
+		LastName:  lastName,
+		Email:     null.StringFrom(fromAddress),
+		Type:      umodels.UserTypeContact,
 	}
 
 	// Lowercase and set the `to`, `cc`, `from` and `bcc` addresses in message meta.
@@ -407,6 +404,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return fmt.Errorf("marshalling meta: %w", err)
 	}
 	incomingMsg := models.IncomingMessage{
+		Channel: ChannelEmail,
 		Message: models.Message{
 			Channel:    e.Channel(),
 			SenderType: models.SenderTypeContact,
@@ -550,6 +548,16 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.Message.SourceID.String,
 		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines))
 
+	// Extract conversation UUID from the email using multiple fallback methods.
+	// 1. Try Reply-To/To address extraction (primary method)
+	// 2. Try In-Reply-To header
+	// 3. Try References header chain
+	// If none of these yield a UUID, the message will be treated as a new conversation.
+	conversationUUID := e.extractConversationUUID(envelope)
+	if conversationUUID != "" {
+		incomingMsg.Message.ConversationUUID = conversationUUID
+	}
+
 	if err := e.messageStore.EnqueueIncoming(incomingMsg); err != nil {
 		return err
 	}
@@ -605,6 +613,78 @@ func extractAllHTMLParts(part *enmime.Part) []string {
 	}
 
 	return htmlParts
+}
+
+// extractUUIDFromReplyAddress extracts a UUID from the reply address if present.
+// The UUID is expected to be in the format "username+<UUID>@domain" within the email address.
+// Returns an empty string if the UUID is not found or invalid.
+func (e *Email) extractUUIDFromReplyAddress(address string) string {
+	// Remove angle brackets if present
+	address = strings.Trim(address, "<>")
+
+	// Check if it contains +
+	if !strings.Contains(address, "+") {
+		return ""
+	}
+
+	// Extract the part between + and @
+	parts := strings.Split(address, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+
+	// Get the UUID
+	uuid := strings.SplitN(parts[0], "+", 2)[1]
+	if uuid == "" {
+		return ""
+	}
+
+	// Validate UUID format (36 chars with hyphens at specific positions)
+	if len(uuid) == 36 &&
+		uuid[8] == '-' &&
+		uuid[13] == '-' &&
+		uuid[18] == '-' &&
+		uuid[23] == '-' {
+		return uuid
+	}
+
+	return ""
+}
+
+// extractConversationUUID attempts to extract conversation UUID using multiple fallback methods.
+func (e *Email) extractConversationUUID(envelope *enmime.Envelope) string {
+	// 1. Try Reply-To/To address extraction (primary method)
+	toAddresses := envelope.GetHeaderValues("To")
+	inboxEmail, err := stringutil.ExtractEmail(e.FromAddress())
+	if err == nil {
+		emailUsername := strings.Split(inboxEmail, "@")[0]
+		for _, addr := range toAddresses {
+			if strings.HasPrefix(addr, emailUsername+"+") {
+				if uuid := e.extractUUIDFromReplyAddress(addr); uuid != "" {
+					e.lo.Debug("found UUID in reply-to address", "uuid", uuid)
+					return uuid
+				}
+			}
+		}
+	}
+
+	// 2. Try In-Reply-To header
+	inReplyTo := strings.Trim(envelope.GetHeader("In-Reply-To"), "<>")
+	if uuid := stringutil.ExtractUUID(inReplyTo); uuid != "" {
+		e.lo.Debug("found UUID in In-Reply-To header", "uuid", uuid)
+		return uuid
+	}
+
+	// 3. Try References header chain
+	references := strings.Fields(envelope.GetHeader("References"))
+	for _, ref := range references {
+		ref = strings.Trim(ref, "<>")
+		if uuid := stringutil.ExtractUUID(ref); uuid != "" {
+			e.lo.Debug("found UUID in References header", "uuid", uuid)
+			return uuid
+		}
+	}
+	return ""
 }
 
 // extractMessageIDFromHeaders extracts and cleans the Message-ID from email headers.
