@@ -218,14 +218,8 @@ SELECT
     u.first_name AS "contact.first_name",
     u.last_name AS "contact.last_name",
     u.avatar_url AS "contact.avatar_url",
-    COALESCE(
-        c.meta->'last_message'->>'text_content',
-        c.last_message
-    ) as last_message,
-    COALESCE(
-        (c.meta->'last_message'->>'created_at')::timestamptz,
-        c.last_message_at
-    ) as last_message_at
+    c.last_message as last_message,
+    c.last_message_at as last_message_at
 FROM users u
 JOIN conversations c ON c.contact_id = u.id
 WHERE c.contact_id = $1
@@ -237,19 +231,19 @@ SELECT
     c.created_at,
     c.uuid,
     cs.name as status,
-    COALESCE(c.meta->'last_chat_message'->>'text_content', '') as "last_message.content",
-    COALESCE((c.meta->'last_chat_message'->>'created_at')::timestamptz, NULL) as "last_message.created_at",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'id', '') AS "last_message.author.id",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'first_name', '') AS "last_message.author.first_name",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'last_name', '') AS "last_message.author.last_name",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'avatar_url', '') AS "last_message.author.avatar_url",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'type', '') AS "last_message.author.type",
+    COALESCE(c.last_interaction, '') as "last_message.content",
+    c.last_interaction_at as "last_message.created_at",
+    COALESCE(lis.id::TEXT, '') AS "last_message.author.id",
+    COALESCE(lis.first_name, '') AS "last_message.author.first_name",
+    COALESCE(lis.last_name, '') AS "last_message.author.last_name",
+    COALESCE(lis.avatar_url, '') AS "last_message.author.avatar_url",
+    COALESCE(c.last_interaction_sender::TEXT, '') AS "last_message.author.type",
     (SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
      FROM (
          SELECT 1 FROM conversation_messages unread
          WHERE unread.conversation_id = c.id
            AND unread.created_at > c.contact_last_seen_at
-           AND unread.type IN ('incoming', 'outgoing') 
+           AND unread.type IN ('incoming', 'outgoing')
            AND unread.private = false
          LIMIT 10
      ) t) AS unread_message_count,
@@ -263,6 +257,7 @@ FROM conversations c
 INNER JOIN inboxes inb on c.inbox_id = inb.id
 LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 LEFT JOIN users au ON c.assigned_user_id = au.id
+LEFT JOIN users lis ON c.last_interaction_sender_id = lis.id
 WHERE c.uuid = $1
   AND inb.deleted_at IS NULL;
 
@@ -271,19 +266,19 @@ SELECT
     c.created_at,
     c.uuid,
     cs.name as status,
-    COALESCE(c.meta->'last_chat_message'->>'text_content', '') as "last_message.content",
-    COALESCE((c.meta->'last_chat_message'->>'created_at')::timestamptz, NULL) as "last_message.created_at",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'id', '') AS "last_message.author.id",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'first_name', '') AS "last_message.author.first_name",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'last_name', '') AS "last_message.author.last_name",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'avatar_url', '') AS "last_message.author.avatar_url",
-    COALESCE(c.meta->'last_chat_message'->'sender'->>'type', '') AS "last_message.author.type",
+    COALESCE(c.last_interaction, '') as "last_message.content",
+    c.last_interaction_at as "last_message.created_at",
+    COALESCE(lis.id::TEXT, '') AS "last_message.author.id",
+    COALESCE(lis.first_name, '') AS "last_message.author.first_name",
+    COALESCE(lis.last_name, '') AS "last_message.author.last_name",
+    COALESCE(lis.avatar_url, '') AS "last_message.author.avatar_url",
+    COALESCE(c.last_interaction_sender::TEXT, '') AS "last_message.author.type",
     (SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
      FROM (
          SELECT 1 FROM conversation_messages unread
          WHERE unread.conversation_id = c.id
            AND unread.created_at > c.contact_last_seen_at
-           AND unread.type IN ('incoming', 'outgoing') 
+           AND unread.type IN ('incoming', 'outgoing')
            AND unread.private = false
          LIMIT 10
      ) t) AS unread_message_count,
@@ -298,6 +293,7 @@ INNER JOIN inboxes inb ON c.inbox_id = inb.id
 INNER JOIN users con ON c.contact_id = con.id
 LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 LEFT JOIN users au ON c.assigned_user_id = au.id
+LEFT JOIN users lis ON c.last_interaction_sender_id = lis.id
 WHERE c.contact_id = $1 AND c.inbox_id = $2
   AND inb.deleted_at IS NULL
   AND con.deleted_at IS NULL
@@ -356,13 +352,15 @@ ON CONFLICT (conversation_id, user_id)
 DO UPDATE SET last_seen_at = NOW(), updated_at = NOW();
 
 -- name: update-conversation-last-message
--- $1=id, $2=uuid, $3=content, $4=sender_type, $5=timestamp, $6=message_type, $7=private
+-- $1=id, $2=uuid, $3=content, $4=sender_type, $5=timestamp, $6=message_type, $7=private, $8=sender_id
 UPDATE conversations SET
     last_message = $3,
     last_message_sender = $4,
+    last_message_sender_id = $8,
     last_message_at = $5,
     last_interaction = CASE WHEN $6 != 'activity' AND $7 = false THEN $3 ELSE last_interaction END,
     last_interaction_sender = CASE WHEN $6 != 'activity' AND $7 = false THEN $4 ELSE last_interaction_sender END,
+    last_interaction_sender_id = CASE WHEN $6 != 'activity' AND $7 = false THEN $8 ELSE last_interaction_sender_id END,
     last_interaction_at = CASE WHEN $6 != 'activity' AND $7 = false THEN $5 ELSE last_interaction_at END,
     updated_at = NOW()
 WHERE CASE

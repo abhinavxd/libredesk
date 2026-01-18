@@ -631,6 +631,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	// Insert incoming message and run post processing hooks.
 	message := cmodels.Message{
 		ConversationUUID: conversationUUID,
+		ConversationID:   conversation.ID,
 		SenderID:         senderID,
 		Type:             cmodels.MessageIncoming,
 		SenderType:       senderType,
@@ -784,6 +785,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	// Create message with attachment using existing infrastructure
 	message := cmodels.Message{
 		ConversationUUID: conversationUUID,
+		ConversationID:   conversation.ID,
 		SenderID:         senderID,
 		Type:             cmodels.MessageIncoming,
 		SenderType:       cmodels.SenderTypeContact,

@@ -99,8 +99,8 @@
             // Create icon element or arrow based on state
             this.iconContainer = document.createElement('div');
             this.iconContainer.style.cssText = `
-                width: 60%;
-                height: 60%;
+                width: 100%;
+                height: 100%;
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -113,6 +113,8 @@
                 this.defaultIcon.style.cssText = `
                     width: 100%;
                     height: 100%;
+                    border-radius: 50%;
+                    object-fit: cover;
                 `;
                 this.iconContainer.appendChild(this.defaultIcon);
             }

@@ -174,5 +174,21 @@ func V0_12_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	// Add last_message_sender_id column to track who sent the last message
+	_, err = db.Exec(`
+		ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_message_sender_id BIGINT REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Add last_interaction_sender_id column to track who sent the last interaction (for widget display)
+	_, err = db.Exec(`
+		ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_interaction_sender_id BIGINT REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE;
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

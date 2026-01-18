@@ -695,6 +695,8 @@ func makeInboxInitializer(mgr *inbox.Manager) func(imodels.Inbox, inbox.MessageS
 		switch inboxR.Channel {
 		case inbox.ChannelEmail:
 			return initEmailInbox(inboxR, msgStore, usrStore, mgr)
+		case inbox.ChannelLiveChat:
+			return initLiveChatInbox(inboxR, msgStore, usrStore)
 		default:
 			return nil, fmt.Errorf("unknown inbox channel: %s", inboxR.Channel)
 		}

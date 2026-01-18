@@ -534,7 +534,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	}
 
 	// Update conversation last message details (also conditionally updates last_interaction if not activity/private).
-	m.UpdateConversationLastMessage(message.ConversationID, message.ConversationUUID, lastMessage, message.SenderType, message.Type, message.Private, message.CreatedAt)
+	m.UpdateConversationLastMessage(message.ConversationID, message.ConversationUUID, lastMessage, message.SenderType, message.Type, message.Private, message.CreatedAt, message.SenderID)
 
 	// Broadcast new message.
 	m.BroadcastNewMessage(message)
@@ -674,6 +674,14 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 		conversationID    int
 		err               error
 	)
+
+	// Find or create contact and set sender ID in message.
+	if in.Contact.ID == 0 && in.Contact.Email.Valid {
+		if err := m.userStore.CreateContact(&in.Contact); err != nil {
+			return models.Message{}, fmt.Errorf("creating contact: %w", err)
+		}
+	}
+	in.Message.SenderID = in.Contact.ID
 
 	// Message exists by source ID?
 	conversationID, err = m.messageExistsBySourceID([]string{in.Message.SourceID.String})

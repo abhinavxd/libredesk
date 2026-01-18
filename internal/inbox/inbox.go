@@ -20,6 +20,7 @@ import (
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -172,6 +173,9 @@ func (m *Manager) GetDBRecord(id int) (imodels.Inbox, error) {
 	}
 	inbox.Config = decryptedConfig
 
+	// Decrypt secret field
+	m.decryptInboxSecret(&inbox)
+
 	return inbox, nil
 }
 
@@ -191,6 +195,9 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.terms.inbox")), nil)
 		}
 		inboxes[i].Config = decryptedConfig
+
+		// Decrypt secret field
+		m.decryptInboxSecret(&inboxes[i])
 	}
 
 	return inboxes, nil
@@ -198,6 +205,19 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 
 // Create creates an inbox in the DB.
 func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
+	// Generate and encrypt secret for livechat inboxes if not provided
+	if inbox.Channel == ChannelLiveChat && !inbox.Secret.Valid {
+		secret, err := stringutil.RandomAlphanumeric(32)
+		if err != nil {
+			return imodels.Inbox{}, fmt.Errorf("generating inbox secret: %w", err)
+		}
+		encryptedSecret, err := crypto.Encrypt(secret, m.encryptionKey)
+		if err != nil {
+			return imodels.Inbox{}, fmt.Errorf("encrypting inbox secret: %w", err)
+		}
+		inbox.Secret = null.StringFrom(encryptedSecret)
+	}
+
 	// Encrypt sensitive fields before saving
 	encryptedConfig, err := m.encryptInboxConfig(inbox.Config)
 	if err != nil {
@@ -218,6 +238,9 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 	} else {
 		createdInbox.Config = decryptedConfig
 	}
+
+	// Decrypt secret field
+	m.decryptInboxSecret(&createdInbox)
 
 	return createdInbox, nil
 }
@@ -377,6 +400,13 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 		// Preserve existing secret if update contains password dummy
 		if inbox.Secret.Valid && strings.Contains(inbox.Secret.String, stringutil.PasswordDummy) {
 			inbox.Secret = current.Secret
+		} else if inbox.Secret.Valid && inbox.Secret.String != "" {
+			// Encrypt new secret
+			encryptedSecret, err := crypto.Encrypt(inbox.Secret.String, m.encryptionKey)
+			if err != nil {
+				return imodels.Inbox{}, fmt.Errorf("encrypting inbox secret: %w", err)
+			}
+			inbox.Secret = null.StringFrom(encryptedSecret)
 		}
 	}
 
@@ -401,6 +431,9 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	} else {
 		updatedInbox.Config = decryptedConfig
 	}
+
+	// Decrypt secret field
+	m.decryptInboxSecret(&updatedInbox)
 
 	return updatedInbox, nil
 }
@@ -494,6 +527,9 @@ func (m *Manager) getActive() ([]imodels.Inbox, error) {
 			return nil, fmt.Errorf("decrypting inbox config for ID %d: %w", inboxes[i].ID, err)
 		}
 		inboxes[i].Config = decryptedConfig
+
+		// Decrypt secret field
+		m.decryptInboxSecret(&inboxes[i])
 	}
 
 	return inboxes, nil
@@ -623,4 +659,16 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	}
 
 	return decrypted, nil
+}
+
+// decryptInboxSecret decrypts the inbox secret field if present.
+func (m *Manager) decryptInboxSecret(inbox *imodels.Inbox) {
+	if inbox.Secret.Valid && inbox.Secret.String != "" {
+		decrypted, err := crypto.Decrypt(inbox.Secret.String, m.encryptionKey)
+		if err != nil {
+			m.lo.Error("error decrypting inbox secret", "inbox_id", inbox.ID, "error", err)
+			return
+		}
+		inbox.Secret = null.StringFrom(decrypted)
+	}
 }
