@@ -624,7 +624,7 @@
   "admin.inbox.livechat.features.allowCloseConversation.description": "Allow users to close their own conversations",
   "admin.inbox.livechat.directToConversation": "Launch directly into conversation",
   "admin.inbox.livechat.directToConversation.description": "Skip the home screen and open directly into the user's latest conversation, or a new conversation if none exists",
-  "admin.inbox.livechat.greetingMessage.variables": "Available variables: {{.FirstName}}, {{.LastName}}",
+  "admin.inbox.livechat.greetingMessage.variables": "Available variables: {'{{.FirstName}}'}, {'{{.LastName}}'}",
   "admin.inbox.livechat.externalLinks": "External links",
   "admin.inbox.livechat.externalLinks.add": "Add external link",
   "admin.inbox.livechat.externalLinks.description": "Add helpful links that will be displayed in the chat widget",

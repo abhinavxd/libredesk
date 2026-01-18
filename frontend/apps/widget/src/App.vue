@@ -16,6 +16,7 @@ import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from './store/user.js'
 import { initWidgetWS, closeWidgetWebSocket } from './websocket.js'
 import { useUnreadCount } from './composables/useUnreadCount.js'
+import { applyCSSColor } from '@shared-ui/utils/color.js'
 import MainLayout from '@widget/layouts/MainLayout.vue'
 
 const widgetStore = useWidgetStore()
@@ -30,6 +31,8 @@ onMounted(async () => {
   const widgetConfig = getCurrentInstance().appContext.config.globalProperties.$widgetConfig
   if (widgetConfig) {
     widgetStore.updateConfig(widgetConfig)
+    // Apply custom primary color from config
+    applyCSSColor('--primary', widgetConfig.colors?.primary)
   }
 
   initializeWebSocket()

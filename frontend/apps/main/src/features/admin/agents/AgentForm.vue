@@ -133,7 +133,7 @@
             <div class="flex items-center gap-2 mt-1">
               <Input v-model="newAPIKeyData.api_key" readonly class="font-mono text-sm" />
               <CopyButton
-                :text-to-copy="newAPIKeyData.api_key"
+                :text="newAPIKeyData.api_key"
                 variant="outline"
                 size="sm"
                 :show-text="false"
@@ -145,7 +145,7 @@
             <div class="flex items-center gap-2 mt-1">
               <Input v-model="newAPIKeyData.api_secret" readonly class="font-mono text-sm" />
               <CopyButton
-                :text-to-copy="newAPIKeyData.api_secret"
+                :text="newAPIKeyData.api_secret"
                 variant="outline"
                 size="sm"
                 :show-text="false"

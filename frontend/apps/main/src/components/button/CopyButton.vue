@@ -1,5 +1,6 @@
 <template>
   <Button
+    type="button"
     variant="ghost"
     size="icon"
     class="h-7 w-7 text-zinc-400 hover:text-white hover:bg-zinc-700"

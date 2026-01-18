@@ -723,7 +723,7 @@
           <!-- Basic Installation -->
           <div class="relative">
             <CodeEditor :modelValue="integrationSnippet" language="html" :readOnly="true" />
-            <CopyButton :text-to-copy="integrationSnippet" class="absolute top-3 right-3" />
+            <CopyButton :text="integrationSnippet" class="absolute top-3 right-3" />
           </div>
 
           <!-- Authenticated Users Section -->
@@ -738,7 +738,7 @@
 
             <div class="relative">
               <CodeEditor :modelValue="jwtPayloadExample" language="javascript" :readOnly="true" />
-              <CopyButton :text-to-copy="jwtPayloadExample" class="absolute top-3 right-3" />
+              <CopyButton :text="jwtPayloadExample" class="absolute top-3 right-3" />
             </div>
 
             <p class="text-sm text-muted-foreground">
@@ -752,7 +752,7 @@
                 :readOnly="true"
               />
               <CopyButton
-                :text-to-copy="authenticatedIntegrationSnippet"
+                :text="authenticatedIntegrationSnippet"
                 class="absolute top-3 right-3"
               />
             </div>
@@ -908,8 +908,8 @@ const form = useForm({
           bottom: 20
         }
       },
-      greeting_message: '',
-      introduction_message: '',
+      greeting_message: 'Hello {{.FirstName}}',
+      introduction_message: 'How can we help?',
       chat_introduction: 'Ask us anything, or share your feedback.',
       show_office_hours_in_chat: false,
       show_office_hours_after_assignment: false,
