@@ -518,7 +518,7 @@ const viewToDelete = ref(null)
                           asChild
                         >
                           <router-link :to="{ name: 'view-inbox', params: { viewID: view.id } }">
-                            <span class="break-words w-32 truncate" :title="view.name">{{ view.name }}</span>
+                            <span class="flex-1 truncate" :title="view.name">{{ view.name }}</span>
                             <SidebarMenuAction
                               @click.stop
                               :class="[
@@ -580,7 +580,7 @@ const viewToDelete = ref(null)
                           asChild
                         >
                           <router-link :to="{ name: 'view-inbox', params: { viewID: view.id } }">
-                            <span class="break-words w-32 truncate" :title="view.name">{{
+                            <span class="flex-1 truncate" :title="view.name">{{
                               view.name
                             }}</span>
                           </router-link>
