@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -124,32 +123,10 @@ func (c *Client) Name() string {
 // GetSignedURL generates a signed URL for the file with expiration.
 // This implements the SignedURLStore interface for secure public access.
 func (c *Client) GetSignedURL(name string) string {
-	// Generate base URL
-	baseURL := c.GetURL(name, "", "")
-
-	// Create the signature payload: name + expires timestamp
-	expires := time.Now().Add(c.opts.Expiry).Unix()
-	payload := name + strconv.FormatInt(expires, 10)
-
-	// Generate HMAC-SHA256 signature
-	h := hmac.New(sha256.New, []byte(c.opts.SigningKey))
-	h.Write([]byte(payload))
-	signature := base64.URLEncoding.EncodeToString(h.Sum(nil))
-
-	// Parse base URL and add query parameters
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		// Fallback to base URL if parsing fails
-		return baseURL
+	if c.opts.SigningKey == "" {
+		return fmt.Sprintf("%s%s/%s", c.opts.RootURL(), c.opts.UploadURI, name)
 	}
-
-	// Add signature and expires parameters
-	query := u.Query()
-	query.Set("signature", signature)
-	query.Set("expires", strconv.FormatInt(expires, 10))
-	u.RawQuery = query.Encode()
-
-	return u.String()
+	return c.signURL(name)
 }
 
 // VerifySignature verifies that a signature is valid for the given parameters.

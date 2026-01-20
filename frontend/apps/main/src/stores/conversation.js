@@ -205,7 +205,9 @@ export const useConversationStore = defineStore('conversation', () => {
   })
 
   const conversationMessages = computed(() => {
-    return messages.data.getAllPagesMessages(conversation.data?.uuid)
+    const allMessages = messages.data.getAllPagesMessages(conversation.data?.uuid)
+    // Filter out continuity emails.
+    return allMessages.filter(msg => !msg.meta?.continuity_email)
   })
 
   function markConversationAsRead (uuid) {

@@ -141,7 +141,7 @@ func (lc *LiveChat) Receive(ctx context.Context) error {
 }
 
 // Send sends the passed message to the message receiver if they are connected to the live chat.
-func (lc *LiveChat) Send(message models.Message) error {
+func (lc *LiveChat) Send(message models.OutboundMessage) error {
 	if message.MessageReceiverID > 0 {
 		msgReceiverStr := strconv.Itoa(message.MessageReceiverID)
 		lc.clientsMutex.RLock()

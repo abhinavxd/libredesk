@@ -640,12 +640,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 		ContentType:      cmodels.ContentTypeText,
 		Private:          false,
 	}
-	if message, err = app.conversation.ProcessIncomingMessage(cmodels.IncomingMessage{
-		Channel: livechat.ChannelLiveChat,
-		Message: message,
-		Contact: sender,
-		InboxID: inbox.ID,
-	}); err != nil {
+	if message, err = app.conversation.ProcessIncomingLiveChatMessage(message); err != nil {
 		app.lo.Error("error processing incoming message", "conversation_uuid", conversationUUID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
 	}
@@ -775,14 +770,6 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.terms.file}"), nil, envelope.GeneralError)
 	}
 
-	// Get sender user for ProcessIncomingMessage
-	sender, err := app.user.Get(senderID, "", []string{})
-	if err != nil {
-		app.lo.Error("error fetching sender user", "sender_id", senderID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
-	}
-
-	// Create message with attachment using existing infrastructure
 	message := cmodels.Message{
 		ConversationUUID: conversationUUID,
 		ConversationID:   conversation.ID,
@@ -805,12 +792,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Process the incoming message with attachment.
-	if message, err = app.conversation.ProcessIncomingMessage(cmodels.IncomingMessage{
-		Channel: livechat.ChannelLiveChat,
-		Message: message,
-		Contact: sender,
-		InboxID: inbox.ID,
-	}); err != nil {
+	if message, err = app.conversation.ProcessIncomingLiveChatMessage(message); err != nil {
 		app.lo.Error("error processing incoming message with attachment", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
 	}

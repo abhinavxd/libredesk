@@ -1,17 +1,17 @@
 -- name: get-active-inboxes
-SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from" FROM inboxes where enabled is TRUE and deleted_at is NULL;
+SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from", linked_email_inbox_id FROM inboxes where enabled is TRUE and deleted_at is NULL;
 
 -- name: get-all-inboxes
-SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from" FROM inboxes where deleted_at is NULL;
+SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from", linked_email_inbox_id FROM inboxes where deleted_at is NULL;
 
 -- name: insert-inbox
 INSERT INTO inboxes
-(channel, config, "name", "from", csat_enabled, secret)
-VALUES($1, $2, $3, $4, $5, $6)
+(channel, config, "name", "from", csat_enabled, secret, linked_email_inbox_id)
+VALUES($1, $2, $3, $4, $5, $6, $7)
 RETURNING *
 
 -- name: get-inbox
-SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from", secret FROM inboxes where id = $1 and deleted_at is NULL;
+SELECT id, created_at, updated_at, "name", deleted_at, channel, enabled, csat_enabled, config, "from", secret, linked_email_inbox_id FROM inboxes where id = $1 and deleted_at is NULL;
 
 -- name: update
 UPDATE inboxes

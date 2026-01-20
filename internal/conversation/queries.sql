@@ -652,16 +652,16 @@ ORDER BY m.created_at DESC %s
 
 -- name: insert-message
 WITH conversation_id AS (
-   SELECT id 
-   FROM conversations 
-   WHERE CASE 
-       WHEN $3 > 0 THEN id = $3 
-       ELSE uuid = $4 
+   SELECT id
+   FROM conversations
+   WHERE CASE
+       WHEN $3 > 0 THEN id = $3
+       ELSE uuid = $4
    END
 ),
 inserted_msg AS (
    INSERT INTO conversation_messages (
-       "type", status, conversation_id, "content", 
+       "type", status, conversation_id, "content",
        text_content, sender_id, sender_type, private,
        content_type, source_id, meta
    )
@@ -723,7 +723,6 @@ WHERE i.channel = 'livechat'
   AND i.enabled = TRUE
   AND i.linked_email_inbox_id IS NOT NULL
   AND c.contact_last_seen_at IS NOT NULL
-  AND c.contact_last_seen_at > NOW() - INTERVAL '1 hour'
   AND c.contact_last_seen_at < NOW() - MAKE_INTERVAL(mins => $1)
   AND EXISTS (
     SELECT 1 FROM conversation_messages cm
@@ -759,6 +758,7 @@ WHERE m.conversation_id = $1
   AND m.created_at > $2
   AND m.type = 'outgoing'
   AND m.private = false
+  AND (m.meta IS NULL OR NOT COALESCE((m.meta->>'continuity_email')::boolean, false))
 ORDER BY m.created_at ASC
 LIMIT $3;
 

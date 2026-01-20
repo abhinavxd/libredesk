@@ -17,8 +17,6 @@ import (
 
 // RunContinuity starts a goroutine that sends continuity emails containing unread outgoing messages to contacts who have been offline for a configured duration.
 func (m *Manager) RunContinuity(ctx context.Context) {
-	m.lo.Info("starting conversation continuity processor", "check_interval", m.continuityConfig.BatchCheckInterval)
-
 	ticker := time.NewTicker(m.continuityConfig.BatchCheckInterval)
 	defer ticker.Stop()
 
@@ -145,7 +143,6 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 		return fmt.Errorf("error marshalling continuity email meta: %w", err)
 	}
 
-	// Create message for sending
 	message = models.Message{
 		InboxID:           conv.LinkedEmailInboxID.Int,
 		ConversationID:    conv.ID,
@@ -166,17 +163,6 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 		Attachments:       attachments,
 	}
 
-	// Set Reply-To header for conversation continuity
-	emailAddress, err := stringutil.ExtractEmail(linkedEmailInbox.FromAddress())
-	if err == nil {
-		emailUserPart := strings.Split(emailAddress, "@")
-		if len(emailUserPart) == 2 {
-			message.Headers = map[string][]string{
-				"Reply-To": {fmt.Sprintf("%s+%s@%s", emailUserPart[0], conv.UUID, emailUserPart[1])},
-			}
-		}
-	}
-
 	// Insert message into database
 	if err := m.InsertMessage(&message); err != nil {
 		return fmt.Errorf("error inserting continuity message: %w", err)
@@ -192,22 +178,10 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 	// References is sorted in DESC i.e newest message first, so reverse it to keep the references in order.
 	slices.Reverse(references)
 
-	// Filter out livechat references (ones without @) and keep only the last 20
-	var filteredReferences []string
-	for _, ref := range references {
-		if strings.Contains(ref, "@") {
-			filteredReferences = append(filteredReferences, ref)
-			// Keep only the last 20 references, remove the first one if exceeding
-			if len(filteredReferences) > 20 {
-				filteredReferences = filteredReferences[1:]
-			}
-		}
-	}
-	message.References = filteredReferences
-
-	// Set In-Reply-To if we have references
-	if len(filteredReferences) > 0 {
-		message.InReplyTo = filteredReferences[len(filteredReferences)-1]
+	// Determine In-Reply-To from references
+	var inReplyTo string
+	if len(references) > 0 {
+		inReplyTo = references[len(references)-1]
 	}
 
 	// Render message template
@@ -218,8 +192,39 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 		return fmt.Errorf("error rendering email template: %w", err)
 	}
 
+	// Build Reply-To with plus-addressing for conversation tracking
+	var replyTo string
+	emailAddress, err := stringutil.ExtractEmail(linkedEmailInbox.FromAddress())
+	if err == nil {
+		emailUserPart := strings.Split(emailAddress, "@")
+		if len(emailUserPart) == 2 {
+			replyTo = fmt.Sprintf("%s+conv-%s@%s", emailUserPart[0], conv.UUID, emailUserPart[1])
+		}
+	}
+
+	// Create OutboundMessage with all transport fields for sending
+	outbound := models.OutboundMessage{
+		UUID:              message.UUID,
+		ConversationUUID:  conv.UUID,
+		SenderID:          message.SenderID,
+		MessageReceiverID: conv.ContactID,
+		Content:           message.Content,
+		TextContent:       message.TextContent,
+		ContentType:       message.ContentType,
+		From:              linkedEmailInbox.FromAddress(),
+		To:                []string{conv.ContactEmail.String},
+		Subject:           emailSubject,
+		SourceID:          sourceID,
+		References:        references,
+		InReplyTo:         inReplyTo,
+		ReplyTo:           replyTo,
+		Attachments:       message.Attachments,
+		Meta:              message.Meta,
+		CreatedAt:         message.CreatedAt,
+	}
+
 	// Send the email
-	if err := linkedEmailInbox.Send(message); err != nil {
+	if err := linkedEmailInbox.Send(outbound); err != nil {
 		// Clean up the inserted message on failure
 		cleanUp = true
 		m.lo.Error("error sending continuity email", "error", err, "message_id", message.ID, "message_uuid", message.UUID, "conversation_uuid", conv.UUID)

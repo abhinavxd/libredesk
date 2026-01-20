@@ -157,30 +157,33 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		return
 	}
 
+	// Convert to OutboundMessage for transport
+	outbound := message.ToOutbound()
+
 	if inb.Channel() == inbox.ChannelEmail {
 		// Set from address of the inbox
-		message.From = inb.FromAddress()
+		outbound.From = inb.FromAddress()
 
 		// Set "In-Reply-To" and "References" headers, logging any errors but continuing to send the message.
 		// Include only the last 20 messages as references to avoid exceeding header size limits.
-		message.References, err = m.GetMessageSourceIDs(message.ConversationID, 20)
+		outbound.References, err = m.GetMessageSourceIDs(message.ConversationID, 20)
 		if err != nil {
 			m.lo.Error("Error fetching conversation source IDs", "error", err)
 		}
 
 		// References is sorted in DESC i.e newest message first, so reverse it to keep the references in order.
-		slices.Reverse(message.References)
+		slices.Reverse(outbound.References)
 
 		// Remove the current message ID from the references.
-		message.References = stringutil.RemoveItemByValue(message.References, message.SourceID.String)
+		outbound.References = stringutil.RemoveItemByValue(outbound.References, outbound.SourceID)
 
-		if len(message.References) > 0 {
-			message.InReplyTo = message.References[len(message.References)-1]
+		if len(outbound.References) > 0 {
+			outbound.InReplyTo = outbound.References[len(outbound.References)-1]
 		}
 	}
 
 	// Send message
-	err = inb.Send(message)
+	err = inb.Send(outbound)
 	if err != nil && err != livechat.ErrClientNotConnected {
 		handleError(err, "error sending message")
 		return
@@ -681,10 +684,10 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			return models.Message{}, fmt.Errorf("creating contact: %w", err)
 		}
 	}
-	in.Message.SenderID = in.Contact.ID
+	in.SenderID = in.Contact.ID
 
 	// Message exists by source ID?
-	conversationID, err = m.messageExistsBySourceID([]string{in.Message.SourceID.String})
+	conversationID, err = m.messageExistsBySourceID([]string{in.SourceID.String})
 	if err != nil && err != errConversationNotFound {
 		return models.Message{}, err
 	}
@@ -704,8 +707,8 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 		// Verify sender email matches conversation contact
 		if strings.EqualFold(conversation.Contact.Email.String, in.Contact.Email.String) {
-			in.Message.ConversationID = conversation.ID
-			in.Message.ConversationUUID = conversation.UUID
+			in.ConversationID = conversation.ID
+			in.ConversationUUID = conversation.UUID
 			m.lo.Debug("matched conversation by plus-addressed Reply-To",
 				"conversation_uuid", conversation.UUID,
 				"contact_email", in.Contact.Email.String)
@@ -719,8 +722,8 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Try to match conversation by reference number in subject (e.g., "RE: Test - #392").
 	// Skip if already matched by plus-addressing above.
-	if in.Message.ConversationID == 0 {
-		if refNum := stringutil.ExtractReferenceNumber(in.Message.Subject); refNum != "" {
+	if in.ConversationID == 0 {
+		if refNum := stringutil.ExtractReferenceNumber(in.Subject); refNum != "" {
 			conversation, err := m.GetConversation(0, "", refNum)
 			if err != nil {
 				envErr, ok := err.(envelope.Error)
@@ -730,8 +733,8 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			}
 			if conversation.Contact.Email.String != "" && strings.EqualFold(conversation.Contact.Email.String, in.Contact.Email.String) {
 				// Conversation found and contact email matches, use this conversation.
-				in.Message.ConversationID = conversation.ID
-				in.Message.ConversationUUID = conversation.UUID
+				in.ConversationID = conversation.ID
+				in.ConversationUUID = conversation.UUID
 				m.lo.Debug("matched conversation by reference number in subject", "reference_number", refNum, "contact_email", in.Contact.Email.String)
 			} else {
 				m.lo.Debug("reference number found in subject but contact email did not match, skipping conversation match", "reference_number", refNum, "conversation_contact_email", conversation.Contact.Email.String, "message_contact_email", in.Contact.Email.String)
@@ -740,19 +743,22 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	}
 
 	// If conversation not matched via reference number, find conversation using references and in-reply-to headers else create a new one.
-	if in.Message.ConversationID == 0 {
-		isNewConversation, err = m.findOrCreateConversation(&in.Message, in.InboxID, in.Contact.ID)
+	if in.ConversationID == 0 {
+		isNewConversation, err = m.findOrCreateConversation(&in)
 		if err != nil {
 			return models.Message{}, err
 		}
 	}
 
+	// Convert to Message for attachment upload and insertion.
+	msg := in.ToMessage()
+
 	// Upload message attachments, on failure delete the conversation if it was just created for this message.
-	if upErr := m.uploadMessageAttachments(&in.Message); upErr != nil {
-		m.lo.Error("error uploading message attachments", "message_source_id", in.Message.SourceID, "error", upErr)
-		if isNewConversation && in.Message.ConversationUUID != "" {
-			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", in.Message.ConversationUUID, "message_source_id", in.Message.SourceID)
-			if err := m.DeleteConversation(in.Message.ConversationUUID); err != nil {
+	if upErr := m.uploadMessageAttachments(&msg); upErr != nil {
+		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID, "error", upErr)
+		if isNewConversation && in.ConversationUUID != "" {
+			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", in.ConversationUUID, "message_source_id", in.SourceID)
+			if err := m.DeleteConversation(in.ConversationUUID); err != nil {
 				return models.Message{}, fmt.Errorf("error deleting conversation after message attachment upload failure: %w", err)
 			}
 		}
@@ -760,16 +766,37 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	}
 
 	// Insert message.
-	if err = m.InsertMessage(&in.Message); err != nil {
+	if err = m.InsertMessage(&msg); err != nil {
 		return models.Message{}, err
 	}
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
-	if err := m.ProcessIncomingMessageHooks(in.Message.ConversationUUID, isNewConversation); err != nil {
-		m.lo.Error("error processing incoming message hooks", "conversation_uuid", in.Message.ConversationUUID, "error", err)
+	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation); err != nil {
+		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 		return models.Message{}, fmt.Errorf("processing incoming message hooks: %w", err)
 	}
-	return in.Message, nil
+	return msg, nil
+}
+
+// ProcessIncomingLiveChatMessage handles incoming live chat messages.
+func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Message, error) {
+	// Upload message attachments.
+	if err := m.uploadMessageAttachments(&msg); err != nil {
+		return models.Message{}, fmt.Errorf("uploading message attachments: %w", err)
+	}
+
+	// Insert message.
+	if err := m.InsertMessage(&msg); err != nil {
+		return models.Message{}, err
+	}
+
+	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
+	// isNewConversation = false since conversation always exists for live chat.
+	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, false); err != nil {
+		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
+	}
+
+	return msg, nil
 }
 
 // MessageExists checks if a message with the given messageID exists.
@@ -900,8 +927,8 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 	return nil
 }
 
-// findOrCreateConversation finds or creates a conversation for the given message.
-func (m *Manager) findOrCreateConversation(in *models.Message, inboxID, contactID int) (bool, error) {
+// findOrCreateConversation finds or creates a conversation for the given incoming message.
+func (m *Manager) findOrCreateConversation(in *models.IncomingMessage) (bool, error) {
 	var (
 		new              bool
 		err              error
@@ -923,7 +950,7 @@ func (m *Manager) findOrCreateConversation(in *models.Message, inboxID, contactI
 		new = true
 		lastMessage := stringutil.HTML2Text(in.Content)
 		lastMessageAt := time.Now()
-		conversationID, conversationUUID, err = m.CreateConversation(contactID, inboxID, lastMessage, lastMessageAt, in.Subject, false /**append reference number to subject**/)
+		conversationID, conversationUUID, err = m.CreateConversation(in.Contact.ID, in.InboxID, lastMessage, lastMessageAt, in.Subject, false /**append reference number to subject**/)
 		if err != nil || conversationID == 0 {
 			return new, err
 		}

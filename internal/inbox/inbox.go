@@ -53,7 +53,7 @@ type Identifier interface {
 // MessageHandler defines methods for handling message operations.
 type MessageHandler interface {
 	Receive(context.Context) error
-	Send(models.Message) error
+	Send(models.OutboundMessage) error
 }
 
 // Inbox combines the operations of an inbox including its lifecycle, identification, and message handling.
@@ -226,7 +226,7 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 	}
 
 	var createdInbox imodels.Inbox
-	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Secret); err != nil {
+	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Secret, inbox.LinkedEmailInboxID); err != nil {
 		m.lo.Error("error creating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.inbox}"), nil)
 	}

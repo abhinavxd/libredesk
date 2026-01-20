@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"net/textproto"
 	"strings"
 	"time"
 
@@ -288,12 +287,7 @@ type Message struct {
 	CC                pq.StringArray         `db:"cc" json:"-"`
 	BCC               pq.StringArray         `db:"bcc" json:"-"`
 	MessageReceiverID int                    `db:"message_receiver_id" json:"-"`
-	References        []string               `json:"-"`
-	InReplyTo         string                 `json:"-"`
-	Headers           textproto.MIMEHeader   `json:"-"`
-	AltContent        string                 `json:"-"`
 	Media             []mmodels.Media        `json:"-"`
-	IsCSAT            bool                   `json:"-"`
 	Author            MessageAuthor          `db:"author" json:"author"`
 }
 
@@ -379,13 +373,112 @@ func (m *Message) ExtractCSATUUID() string {
 	return ""
 }
 
-// IncomingMessage links a message with the contact information and inbox id.
+// OutboundMessage contains fields needed for sending messages via inboxes.
+type OutboundMessage struct {
+	// Core message identifiers
+	UUID             string
+	ConversationUUID string
+
+	// Sender info
+	SenderID          int
+	MessageReceiverID int
+
+	// Content
+	Content     string
+	TextContent string
+	ContentType string
+	AltContent  string // Plain text alternative for HTML emails
+
+	// Email-specific fields
+	From     string
+	To       []string
+	CC       []string
+	BCC      []string
+	Subject  string
+	SourceID string
+
+	// Threading (email)
+	References []string
+	InReplyTo  string
+	ReplyTo    string
+
+	// Attachments
+	Attachments attachment.Attachments
+
+	// Metadata
+	Meta      json.RawMessage
+	CreatedAt time.Time
+}
+
+// ToOutbound converts a Message to an OutboundMessage for transport.
+// Transport-only fields (References, InReplyTo, Headers, AltContent) must be set by caller.
+func (m *Message) ToOutbound() OutboundMessage {
+	return OutboundMessage{
+		UUID:              m.UUID,
+		ConversationUUID:  m.ConversationUUID,
+		SenderID:          m.SenderID,
+		MessageReceiverID: m.MessageReceiverID,
+		Content:           m.Content,
+		TextContent:       m.TextContent,
+		ContentType:       m.ContentType,
+		From:              m.From,
+		To:                m.To,
+		CC:                m.CC,
+		BCC:               m.BCC,
+		Subject:           m.Subject,
+		SourceID:          m.SourceID.String,
+		Attachments:       m.Attachments,
+		Meta:              m.Meta,
+		CreatedAt:         m.CreatedAt,
+	}
+}
+
+// IncomingMessage contains data needed to process an incoming message.
 type IncomingMessage struct {
-	Channel                     string
-	ConversationUUIDFromReplyTo string // UUID extracted from plus-addressed recipient (e.g., inbox+conv-{uuid}@domain)
-	Message                     Message
-	Contact                     umodels.User
-	InboxID                     int
+	// Channel context
+	Channel string
+	InboxID int
+
+	// Contact
+	Contact umodels.User
+
+	// Message fields
+	Subject string
+	SourceID    null.String
+	Content     string
+	ContentType string
+	Meta        json.RawMessage
+	Attachments attachment.Attachments
+
+	// Set during processing
+	SenderID         int
+	ConversationID   int
+	ConversationUUID string
+
+	// Email threading
+	ConversationUUIDFromReplyTo string // UUID extracted from plus-addressed recipient (inbox+conv-{uuid}@domain)
+	InReplyTo                   string
+	References                  []string
+}
+
+// ToMessage converts IncomingMessage to a Message for DB insertion.
+func (in *IncomingMessage) ToMessage() Message {
+	return Message{
+		Channel:          in.Channel,
+		SenderType:       SenderTypeContact,
+		Type:             MessageIncoming,
+		Status:           MessageStatusReceived,
+		InboxID:          in.InboxID,
+		Subject:          in.Subject,
+		SourceID:         in.SourceID,
+		Content:          in.Content,
+		ContentType:      in.ContentType,
+		Meta:             in.Meta,
+		Attachments:      in.Attachments,
+		SenderID:         in.SenderID,
+		ConversationID:   in.ConversationID,
+		ConversationUUID: in.ConversationUUID,
+	}
 }
 
 type Status struct {
