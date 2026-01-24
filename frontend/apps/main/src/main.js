@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createI18n } from 'vue-i18n'
+import { initI18n } from './i18n'
 import { useAppSettingsStore } from './stores/appSettings'
 import router from './router'
 import mitt from 'mitt'
@@ -36,7 +36,7 @@ async function initApp () {
     }
   }
 
-  const i18n = createI18n(i18nConfig)
+  const i18n = initI18n(i18nConfig)
   const app = createApp(Root)
   const pinia = createPinia()
   app.use(pinia)

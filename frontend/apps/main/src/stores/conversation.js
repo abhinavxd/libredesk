@@ -7,6 +7,7 @@ import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
 import { subscribeToConversation, sendTypingIndicator } from '@main/websocket'
 import MessageCache from '../utils/conversation-message-cache'
+import { getI18n } from '../i18n'
 import api from '../api'
 
 export const useConversationStore = defineStore('conversation', () => {
@@ -594,12 +595,19 @@ export const useConversationStore = defineStore('conversation', () => {
   function updateConversationList (message) {
     const listConversation = conversations.data.find(c => c.uuid === message.conversation_uuid)
     if (listConversation) {
-      listConversation.last_message = message.content
+      let lastMessage = (message.content || '').trim()
+      if (lastMessage === '' && message.attachments?.length > 0) {
+        lastMessage = getMediaPreview(message.attachments)
+      } else {
+        lastMessage = message.content
+      }
+
+      listConversation.last_message = lastMessage
       listConversation.last_message_at = message.created_at
       listConversation.last_message_sender = message.sender_type
       // Update last interaction only for non-private, non-activity messages
       if (message.type !== 'activity' && !message.private) {
-        listConversation.last_interaction = message.content
+        listConversation.last_interaction = lastMessage
         listConversation.last_interaction_at = message.created_at
         listConversation.last_interaction_sender = message.sender_type
       }
@@ -775,6 +783,19 @@ export const useConversationStore = defineStore('conversation', () => {
   // Check if a conversation has a draft
   function hasDraft (uuid) {
     return drafts.value.has(uuid)
+  }
+
+
+  function getMediaPreview (attachments) {
+    if (!attachments?.length) return ''
+    const contentType = attachments[0].content_type || ''
+    const i18n = getI18n()
+    const t = i18n?.global?.t || ((key) => key.split('.').pop())
+
+    if (contentType.startsWith('image/')) return t('globals.terms.image')
+    if (contentType.startsWith('video/')) return t('globals.terms.video')
+    if (contentType.startsWith('audio/')) return t('globals.terms.audio')
+    return t('globals.terms.file')
   }
 
   return {

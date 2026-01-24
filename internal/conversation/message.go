@@ -460,14 +460,6 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			m.lo.Error("error generating source message id", "error", err)
 			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
 		}
-	case inbox.ChannelLiveChat:
-		// TODO: Is source id needed for live chat messages?
-		sourceID, err = stringutil.RandomAlphanumeric(16)
-		if err != nil {
-			m.lo.Error("error generating random source id", "error", err)
-			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
-		}
-		sourceID = "livechat-" + conversationUUID + "-" + sourceID
 	}
 
 	// Marshal meta.
@@ -530,17 +522,25 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	// Add this user as a participant if not already present.
 	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
-	// Hide CSAT message content as it contains a public link to the survey.
-	lastMessage := message.TextContent
-	if message.HasCSAT() {
-		lastMessage = "Please rate your experience with us"
+	// Skip updating last_message and broadcasting for continuity emails.
+	if !message.IsContinuityMessage() {
+		// Hide CSAT message content as it contains a public link to the survey.
+		lastMessage := message.TextContent
+		if message.HasCSAT() {
+			lastMessage = "Please rate your experience with us"
+		}
+
+		// If no text content but has media, set last message preview based on media type.
+		if strings.TrimSpace(lastMessage) == "" && len(message.Media) > 0 {
+			lastMessage = m.getMediaPreview(message.Media[0])
+		}
+
+		// Update conversation last message details (also conditionally updates last_interaction if not activity/private).
+		m.UpdateConversationLastMessage(message.ConversationID, message.ConversationUUID, lastMessage, message.SenderType, message.Type, message.Private, message.CreatedAt, message.SenderID)
+
+		// Broadcast new message with computed preview.
+		m.BroadcastNewMessage(message, lastMessage)
 	}
-
-	// Update conversation last message details (also conditionally updates last_interaction if not activity/private).
-	m.UpdateConversationLastMessage(message.ConversationID, message.ConversationUUID, lastMessage, message.SenderType, message.Type, message.Private, message.CreatedAt, message.SenderID)
-
-	// Broadcast new message.
-	m.BroadcastNewMessage(message)
 
 	// Refetch the message to get all fields populated (e.g., author, media URLs).
 	refetchedMessage, err := m.GetMessage(message.UUID)
@@ -673,20 +673,27 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 // inserts the message, uploads any attachments, and queues the conversation evaluation of automation rules.
 func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Message, error) {
 	var (
-		isNewConversation = false
+		isNewConversation bool
 		conversationID    int
+		conversationUUID  string
+		senderID          int
 		err               error
 	)
 
-	// Find or create contact and set sender ID in message.
-	if in.Contact.ID == 0 && in.Contact.Email.Valid {
-		if err := m.userStore.CreateContact(&in.Contact); err != nil {
-			return models.Message{}, fmt.Errorf("creating contact: %w", err)
-		}
+	// Find or create contact.
+	user := umodels.User{
+		FirstName: in.Contact.FirstName,
+		LastName:  in.Contact.LastName,
+		Email:     in.Contact.Email,
+		Type:      umodels.UserTypeContact,
 	}
-	in.SenderID = in.Contact.ID
+	if err := m.userStore.CreateContact(&user); err != nil {
+		return models.Message{}, fmt.Errorf("creating contact: %w", err)
+	}
+	in.Contact.ID = user.ID
+	senderID = user.ID
 
-	// Message exists by source ID?
+	// Message already exists by source ID?
 	conversationID, err = m.messageExistsBySourceID([]string{in.SourceID.String})
 	if err != nil && err != errConversationNotFound {
 		return models.Message{}, err
@@ -694,6 +701,9 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	if conversationID > 0 {
 		return models.Message{}, nil
 	}
+
+	// Reset conversationID.
+	conversationID = 0
 
 	// Try to match by plus-addressed Reply-To (e.g., inbox+conv-{uuid}@domain)
 	if in.ConversationUUIDFromReplyTo != "" {
@@ -707,8 +717,8 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 		// Verify sender email matches conversation contact
 		if strings.EqualFold(conversation.Contact.Email.String, in.Contact.Email.String) {
-			in.ConversationID = conversation.ID
-			in.ConversationUUID = conversation.UUID
+			conversationID = conversation.ID
+			conversationUUID = conversation.UUID
 			m.lo.Debug("matched conversation by plus-addressed Reply-To",
 				"conversation_uuid", conversation.UUID,
 				"contact_email", in.Contact.Email.String)
@@ -722,7 +732,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Try to match conversation by reference number in subject (e.g., "RE: Test - #392").
 	// Skip if already matched by plus-addressing above.
-	if in.ConversationID == 0 {
+	if conversationID == 0 {
 		if refNum := stringutil.ExtractReferenceNumber(in.Subject); refNum != "" {
 			conversation, err := m.GetConversation(0, "", refNum)
 			if err != nil {
@@ -733,8 +743,8 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			}
 			if conversation.Contact.Email.String != "" && strings.EqualFold(conversation.Contact.Email.String, in.Contact.Email.String) {
 				// Conversation found and contact email matches, use this conversation.
-				in.ConversationID = conversation.ID
-				in.ConversationUUID = conversation.UUID
+				conversationID = conversation.ID
+				conversationUUID = conversation.UUID
 				m.lo.Debug("matched conversation by reference number in subject", "reference_number", refNum, "contact_email", in.Contact.Email.String)
 			} else {
 				m.lo.Debug("reference number found in subject but contact email did not match, skipping conversation match", "reference_number", refNum, "conversation_contact_email", conversation.Contact.Email.String, "message_contact_email", in.Contact.Email.String)
@@ -743,22 +753,22 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	}
 
 	// If conversation not matched via reference number, find conversation using references and in-reply-to headers else create a new one.
-	if in.ConversationID == 0 {
-		isNewConversation, err = m.findOrCreateConversation(&in)
+	if conversationID == 0 {
+		conversationID, conversationUUID, isNewConversation, err = m.findOrCreateConversation(in)
 		if err != nil {
 			return models.Message{}, err
 		}
 	}
 
 	// Convert to Message for attachment upload and insertion.
-	msg := in.ToMessage()
+	msg := in.ToMessage(senderID, conversationID, conversationUUID)
 
 	// Upload message attachments, on failure delete the conversation if it was just created for this message.
 	if upErr := m.uploadMessageAttachments(&msg); upErr != nil {
 		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID, "error", upErr)
-		if isNewConversation && in.ConversationUUID != "" {
-			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", in.ConversationUUID, "message_source_id", in.SourceID)
-			if err := m.DeleteConversation(in.ConversationUUID); err != nil {
+		if isNewConversation && conversationUUID != "" {
+			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID)
+			if err := m.DeleteConversation(conversationUUID); err != nil {
 				return models.Message{}, fmt.Errorf("error deleting conversation after message attachment upload failure: %w", err)
 			}
 		}
@@ -928,12 +938,11 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 }
 
 // findOrCreateConversation finds or creates a conversation for the given incoming message.
-func (m *Manager) findOrCreateConversation(in *models.IncomingMessage) (bool, error) {
+func (m *Manager) findOrCreateConversation(in models.IncomingMessage) (int, string, bool, error) {
 	var (
-		new              bool
-		err              error
 		conversationID   int
 		conversationUUID string
+		err              error
 	)
 
 	// Search for existing conversation using the in-reply-to and references.
@@ -942,36 +951,31 @@ func (m *Manager) findOrCreateConversation(in *models.IncomingMessage) (bool, er
 	sourceIDs := append([]string{in.InReplyTo}, in.References...)
 	conversationID, err = m.messageExistsBySourceID(sourceIDs)
 	if err != nil && err != errConversationNotFound {
-		return new, err
+		return 0, "", false, err
 	}
 
 	// Conversation not found, create one.
 	if conversationID == 0 {
-		new = true
 		lastMessage := stringutil.HTML2Text(in.Content)
 		lastMessageAt := time.Now()
 		conversationID, conversationUUID, err = m.CreateConversation(in.Contact.ID, in.InboxID, lastMessage, lastMessageAt, in.Subject, false /**append reference number to subject**/)
 		if err != nil || conversationID == 0 {
-			return new, err
+			return 0, "", false, err
 		}
-		in.ConversationID = conversationID
-		in.ConversationUUID = conversationUUID
-		return new, nil
+		return conversationID, conversationUUID, true, nil
 	}
-	// Get UUID.
-	if conversationUUID == "" {
-		conversationUUID, err = m.GetConversationUUID(conversationID)
-		if err != nil {
-			return new, err
-		}
+
+	// Get UUID for existing conversation.
+	conversationUUID, err = m.GetConversationUUID(conversationID)
+	if err != nil {
+		return 0, "", false, err
 	}
-	in.ConversationID = conversationID
-	in.ConversationUUID = conversationUUID
-	return new, nil
+	return conversationID, conversationUUID, false, nil
 }
 
 // messageExistsBySourceID returns conversation ID if a message with any of the given source IDs exists.
 func (m *Manager) messageExistsBySourceID(messageSourceIDs []string) (int, error) {
+	messageSourceIDs = stringutil.RemoveEmpty(messageSourceIDs)
 	if len(messageSourceIDs) == 0 {
 		return 0, errConversationNotFound
 	}
@@ -1133,4 +1137,19 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		}
 	}
 	return nil
+}
+
+// getMediaPreview returns a localized preview string based on attachment type.
+func (m *Manager) getMediaPreview(media mmodels.Media) string {
+	contentType := media.ContentType
+	switch {
+	case strings.HasPrefix(contentType, "image/"):
+		return m.i18n.T("globals.terms.image")
+	case strings.HasPrefix(contentType, "video/"):
+		return m.i18n.T("globals.terms.video")
+	case strings.HasPrefix(contentType, "audio/"):
+		return m.i18n.T("globals.terms.audio")
+	default:
+		return m.i18n.T("globals.terms.file")
+	}
 }

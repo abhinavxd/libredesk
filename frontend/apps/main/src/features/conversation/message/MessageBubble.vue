@@ -74,7 +74,7 @@
           <MessageAttachmentPreview :attachments="nonInlineAttachments" />
 
           <!-- Spinner for Pending Messages (outgoing only) -->
-          <Spinner v-if="isOutgoing && message.status === 'pending'" size="w-4 h-4" />
+          <Spinner v-if="isOutgoing && message.status === 'pending'" size="sm" />
 
           <!-- Status Icons (outgoing only) -->
           <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">

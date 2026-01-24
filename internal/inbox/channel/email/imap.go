@@ -13,7 +13,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/jhillyerd/enmime"
@@ -359,11 +358,10 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 	// Make contact.
 	firstName, lastName := getContactName(env.From[0])
-	var contact = umodels.User{
+	contact := models.IncomingContact{
 		FirstName: firstName,
 		LastName:  lastName,
 		Email:     null.StringFrom(fromAddress),
-		Type:      umodels.UserTypeContact,
 	}
 
 	// Lowercase and set the `to`, `cc`, `from` and `bcc` addresses in message meta.
@@ -541,16 +539,6 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.SourceID.String,
 		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines))
 
-	// Extract conversation UUID from the email using multiple fallback methods.
-	// 1. Try Reply-To/To address extraction (primary method)
-	// 2. Try In-Reply-To header
-	// 3. Try References header chain
-	// If none of these yield a UUID, the message will be treated as a new conversation.
-	conversationUUID := e.extractConversationUUID(envelope)
-	if conversationUUID != "" {
-		incomingMsg.ConversationUUID = conversationUUID
-	}
-
 	if err := e.messageStore.EnqueueIncoming(incomingMsg); err != nil {
 		return err
 	}
@@ -641,42 +629,6 @@ func (e *Email) extractUUIDFromReplyAddress(address string) string {
 		return uuid
 	}
 
-	return ""
-}
-
-// extractConversationUUID attempts to extract conversation UUID using multiple fallback methods.
-func (e *Email) extractConversationUUID(envelope *enmime.Envelope) string {
-	// 1. Try Reply-To/To address extraction (primary method)
-	toAddresses := envelope.GetHeaderValues("To")
-	inboxEmail, err := stringutil.ExtractEmail(e.FromAddress())
-	if err == nil {
-		emailUsername := strings.Split(inboxEmail, "@")[0]
-		for _, addr := range toAddresses {
-			if strings.HasPrefix(addr, emailUsername+"+") {
-				if uuid := e.extractUUIDFromReplyAddress(addr); uuid != "" {
-					e.lo.Debug("found UUID in reply-to address", "uuid", uuid)
-					return uuid
-				}
-			}
-		}
-	}
-
-	// 2. Try In-Reply-To header
-	inReplyTo := strings.Trim(envelope.GetHeader("In-Reply-To"), "<>")
-	if uuid := stringutil.ExtractUUID(inReplyTo); uuid != "" {
-		e.lo.Debug("found UUID in In-Reply-To header", "uuid", uuid)
-		return uuid
-	}
-
-	// 3. Try References header chain
-	references := strings.Fields(envelope.GetHeader("References"))
-	for _, ref := range references {
-		ref = strings.Trim(ref, "<>")
-		if uuid := stringutil.ExtractUUID(ref); uuid != "" {
-			e.lo.Debug("found UUID in References header", "uuid", uuid)
-			return uuid
-		}
-	}
 	return ""
 }
 

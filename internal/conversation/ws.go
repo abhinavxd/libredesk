@@ -10,12 +10,13 @@ import (
 )
 
 // BroadcastNewMessage broadcasts a new message to all users.
-func (m *Manager) BroadcastNewMessage(message *cmodels.Message) {
+// lastMessage is the computed preview text (e.g., "Image" for media-only messages).
+func (m *Manager) BroadcastNewMessage(message *cmodels.Message, lastMessage string) {
 	m.broadcastToUsers([]int{}, wsmodels.Message{
 		Type: wsmodels.MessageTypeNewMessage,
 		Data: map[string]interface{}{
 			"conversation_uuid": message.ConversationUUID,
-			"content":           message.TextContent,
+			"content":           lastMessage,
 			"created_at":        message.CreatedAt.Format(time.RFC3339),
 			"uuid":              message.UUID,
 			"private":           message.Private,

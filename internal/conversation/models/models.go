@@ -291,9 +291,19 @@ type Message struct {
 	Author            MessageAuthor          `db:"author" json:"author"`
 }
 
+// IsContinuityMessage returns true if the message is a continuity email.
+func (m *Message) IsContinuityMessage() bool {
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(m.Meta), &meta); err != nil {
+		return false
+	}
+	isContinuity, _ := meta["continuity_email"].(bool)
+	return isContinuity
+}
+
 // CensorCSATContent redacts the content of a CSAT message to prevent leaking the CSAT survey public link.
 func (m *Message) CensorCSATContent() {
-	var meta map[string]interface{}
+	var meta map[string]any
 	if err := json.Unmarshal([]byte(m.Meta), &meta); err != nil {
 		return
 	}
@@ -433,27 +443,28 @@ func (m *Message) ToOutbound() OutboundMessage {
 	}
 }
 
-// IncomingMessage contains data needed to process an incoming message.
+type IncomingContact struct {
+	ID        int
+	FirstName string
+	LastName  string
+	Email     null.String
+}
+
 type IncomingMessage struct {
 	// Channel context
 	Channel string
 	InboxID int
 
 	// Contact
-	Contact umodels.User
+	Contact IncomingContact
 
 	// Message fields
-	Subject string
+	Subject     string
 	SourceID    null.String
 	Content     string
 	ContentType string
 	Meta        json.RawMessage
 	Attachments attachment.Attachments
-
-	// Set during processing
-	SenderID         int
-	ConversationID   int
-	ConversationUUID string
 
 	// Email threading
 	ConversationUUIDFromReplyTo string // UUID extracted from plus-addressed recipient (inbox+conv-{uuid}@domain)
@@ -462,7 +473,7 @@ type IncomingMessage struct {
 }
 
 // ToMessage converts IncomingMessage to a Message for DB insertion.
-func (in *IncomingMessage) ToMessage() Message {
+func (in *IncomingMessage) ToMessage(senderID, conversationID int, conversationUUID string) Message {
 	return Message{
 		Channel:          in.Channel,
 		SenderType:       SenderTypeContact,
@@ -475,9 +486,9 @@ func (in *IncomingMessage) ToMessage() Message {
 		ContentType:      in.ContentType,
 		Meta:             in.Meta,
 		Attachments:      in.Attachments,
-		SenderID:         in.SenderID,
-		ConversationID:   in.ConversationID,
-		ConversationUUID: in.ConversationUUID,
+		SenderID:         senderID,
+		ConversationID:   conversationID,
+		ConversationUUID: conversationUUID,
 	}
 }
 
