@@ -6,7 +6,7 @@
           <HomeView />
         </TabsContent>
         <TabsContent value="messages" class="h-full mt-0">
-          <MessagesView v-if="!widgetStore.isChatView" />
+          <ConversationsView v-if="!widgetStore.isChatView" />
           <ChatView v-else />
         </TabsContent>
       </div>
@@ -41,7 +41,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/
 import HomeView from '@widget/views/HomeView.vue'
 import { Home, MessageCircle } from 'lucide-vue-next'
 import ChatView from '@widget/views/ChatView.vue'
-import MessagesView from '@widget/views/MessagesView.vue'
+import ConversationsView from '@widget/views/ConversationsView.vue'
 import ConnectionBanner from '@widget/components/ConnectionBanner.vue'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'

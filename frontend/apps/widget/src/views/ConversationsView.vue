@@ -5,7 +5,7 @@
 
     <!-- Messages List -->
     <div class="flex-1 overflow-y-auto pb-20">
-      <MessagesList />
+      <ConversationsList />
     </div>
 
     <!-- Floating button with gradient fade -->
@@ -34,7 +34,7 @@ import { Button } from '@shared-ui/components/ui/button'
 import { useChatStore } from '../store/chat.js'
 import { useWidgetStore } from '../store/widget.js'
 import { useUserStore } from '@widget/store/user.js'
-import MessagesList from '../components/MessagesList.vue'
+import ConversationsList from '../components/ConversationsList.vue'
 import WidgetHeader from '../layouts/WidgetHeader.vue'
 
 const chatStore = useChatStore()
