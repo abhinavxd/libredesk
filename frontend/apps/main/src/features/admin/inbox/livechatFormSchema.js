@@ -33,6 +33,7 @@ export const createFormSchema = (t) => z.object({
     chat_introduction: z.string(),
     show_office_hours_in_chat: z.boolean(),
     show_office_hours_after_assignment: z.boolean(),
+    chat_reply_expectation_message: z.string().optional(),
     notice_banner: z.object({
       enabled: z.boolean(),
       text: z.string().optional()

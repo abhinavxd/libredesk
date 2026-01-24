@@ -1,5 +1,8 @@
 // Widget WebSocket message types (matching backend constants)
 import { useChatStore } from './store/chat.js'
+import { useWidgetStore } from './store/widget.js'
+import { useUserStore } from './store/user.js'
+import { playNotificationSound } from './composables/useNotificationSound.js'
 
 export const WS_EVENT = {
   JOIN: 'join',
@@ -83,8 +86,21 @@ export class WidgetWebSocketClient {
           this.lastPong = Date.now()
         },
         [WS_EVENT.NEW_MESSAGE]: () => {
-          if (data.data) {
-            chatStore.addMessageToConversation(data.data.conversation_uuid, data.data)
+          if (!data.data) return
+
+          const message = data.data
+          chatStore.addMessageToConversation(message.conversation_uuid, message)
+
+          // Play notification sound if message is from agent and widget is not focused on this conversation
+          const widgetStore = useWidgetStore()
+          const userStore = useUserStore()
+          const isFromAgent = message.author?.id !== userStore.userID
+          const isViewingConversation = widgetStore.isOpen &&
+            widgetStore.isInChatView &&
+            chatStore.currentConversation?.uuid === message.conversation_uuid
+
+          if (isFromAgent && !isViewingConversation) {
+            playNotificationSound()
           }
         },
         [WS_EVENT.ERROR]: () => {

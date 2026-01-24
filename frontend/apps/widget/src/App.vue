@@ -2,6 +2,8 @@
   <div
     class="libredesk-widget-app text-foreground bg-background"
     :class="{ dark: widgetStore.config.dark_mode }"
+    @click.once="initAudioContext"
+    @touchstart.once="initAudioContext"
   >
     <div class="widget-container">
       <MainLayout />
@@ -16,6 +18,7 @@ import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from './store/user.js'
 import { initWidgetWS, closeWidgetWebSocket } from './websocket.js'
 import { useUnreadCount } from './composables/useUnreadCount.js'
+import { initAudioContext } from './composables/useNotificationSound.js'
 import { applyCSSColor } from '@shared-ui/utils/color.js'
 import MainLayout from '@widget/layouts/MainLayout.vue'
 
