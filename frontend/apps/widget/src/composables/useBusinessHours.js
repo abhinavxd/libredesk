@@ -7,12 +7,6 @@ import { useI18n } from 'vue-i18n'
 export function useBusinessHours() {
   const { t } = useI18n()
 
-  /**
-   * Get the business hours by ID from a list
-   * @param {number} businessHoursId - Business hours ID
-   * @param {Array} businessHoursList - List of business hours objects
-   * @returns {Object|null} Business hours object or null
-   */
   function getBusinessHoursById(businessHoursId, businessHoursList) {
     if (!businessHoursId || !businessHoursList) {
       return null
@@ -21,16 +15,6 @@ export function useBusinessHours() {
     return businessHoursList.find(bh => bh.id === businessHoursId)
   }
 
-  /**
-   * Determine which business hours to use based on configuration
-   * @param {Object} options - Configuration options
-   * @param {boolean} options.showOfficeHours - Whether to show office hours
-   * @param {boolean} options.showAfterAssignment - Whether to show team hours after assignment
-   * @param {number|null} options.assignedBusinessHoursId - Business hours ID from assignment
-   * @param {number|null} options.defaultBusinessHoursId - Default business hours ID
-   * @param {Array} options.businessHoursList - List of available business hours
-   * @returns {Object|null} Business hours object or null
-   */
   function resolveBusinessHours(options) {
     const {
       showOfficeHours,
@@ -57,13 +41,6 @@ export function useBusinessHours() {
     return getBusinessHoursById(businessHoursId, businessHoursList)
   }
 
-  /**
-   * Check if a given time is within business hours
-   * @param {Object} businessHours - Business hours object
-   * @param {Date} date - Date to check
-   * @param {number} utcOffset - UTC offset in minutes
-   * @returns {boolean} True if within business hours
-   */
   function isWithinBusinessHours(businessHours, date, utcOffset = 0) {
     if (!businessHours || businessHours.is_always_open) {
       return true
@@ -93,12 +70,6 @@ export function useBusinessHours() {
     return currentTime >= schedule.open && currentTime <= schedule.close
   }
 
-  /**
-   * Check if a date is a holiday
-   * @param {Object} businessHours - Business hours object
-   * @param {Date} date - Date to check
-   * @returns {boolean} True if it's a holiday
-   */
   function isHoliday(businessHours, date) {
     if (!businessHours.holidays || businessHours.holidays.length === 0) {
       return false
@@ -107,13 +78,6 @@ export function useBusinessHours() {
     return businessHours.holidays.some(holiday => holiday.date === dateStr)
   }
 
-  /**
-   * Get the next working time
-   * @param {Object} businessHours - Business hours object
-   * @param {Date} fromDate - Date to start from
-   * @param {number} utcOffset - UTC offset in minutes
-   * @returns {Date|null} Next working time or null
-   */
   function getNextWorkingTime(businessHours, fromDate, utcOffset = 0) {
     if (!businessHours || businessHours.is_always_open) {
       return fromDate
@@ -140,14 +104,18 @@ export function useBusinessHours() {
       const [openHour, openMinute] = schedule.open.split(':').map(Number)
       let nextWorking = setMinutes(setHours(localDate, openHour), openMinute)
 
-      // If it's the same day and current time is before opening time
+      // Handle same-day logic
       if (i === 0) {
         const currentTime = format(localDate, 'HH:mm')
+        // Currently within business hours
+        if (currentTime >= schedule.open && currentTime < schedule.close) {
+          return new Date(localDate.getTime() - (utcOffset * 60000))
+        }
+        // Before opening time today
         if (currentTime < schedule.open) {
-          // Convert back from business timezone to user timezone
           return new Date(nextWorking.getTime() - (utcOffset * 60000))
         }
-        // If it's the same day but past opening time, continue to next day
+        // Past closing time, check next day
         continue
       }
 
@@ -159,29 +127,11 @@ export function useBusinessHours() {
     return null
   }
 
-  /**
-   * Get day name from day number
-   * @param {number} dayNum - Day number (0 = Sunday, 1 = Monday, etc.)
-   * @returns {string} Day name
-   */
+  // Returns English day name to match backend hours keys
   function getDayName(dayNum) {
-    const days = [
-      t('globals.days.sunday'),
-      t('globals.days.monday'), 
-      t('globals.days.tuesday'),
-      t('globals.days.wednesday'),
-      t('globals.days.thursday'),
-      t('globals.days.friday'),
-      t('globals.days.saturday')
-    ]
-    return days[dayNum]
+    return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayNum]
   }
 
-  /**
-   * Format the next working time for display
-   * @param {Date} nextWorkingTime - Next working time
-   * @returns {string} Formatted string
-   */
   function formatNextWorkingTime(nextWorkingTime) {
     if (!nextWorkingTime) {
       return ''
@@ -198,13 +148,6 @@ export function useBusinessHours() {
       })
     }
   }
-  /**
-   * Get business hours status message and whether it's within business hours
-   * @param {Object} businessHours - Business hours object
-   * @param {number} utcOffset - UTC offset in minutes
-   * @param {string} withinHoursMessage - Message to show when within hours
-   * @returns {Object|null} { status: string|null, isWithin: boolean } or null
-   */
   function getBusinessHoursStatus(businessHours, utcOffset = 0, withinHoursMessage = '') {
     if (!businessHours) {
       return null

@@ -60,9 +60,7 @@ const authorDisplayName = computed(() => {
 })
 
 const continueConversation = async () => {
-  // Load the conversation details and messages
-  await chatStore.loadConversation(props.conversation.uuid)
-  // Navigate to chat view
   widgetStore.navigateToChat()
+  await chatStore.loadConversation(props.conversation.uuid)
 }
 </script>

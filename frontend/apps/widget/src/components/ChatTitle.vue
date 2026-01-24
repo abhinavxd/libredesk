@@ -46,10 +46,12 @@ import { computed } from 'vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { useBusinessHours } from '@widget/composables/useBusinessHours.js'
+import { useI18n } from 'vue-i18n'
 
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()
 const { resolveBusinessHours, getBusinessHoursStatus } = useBusinessHours()
+const { t } = useI18n()
 
 const businessHoursStatus = computed(() => {
   const config = widgetStore.config
@@ -84,6 +86,17 @@ const businessHoursStatus = computed(() => {
 })
 
 const chatTitle = computed(() => {
+  // Show loading state while conversation is being fetched
+  if (chatStore.isLoadingConversation) {
+    return {
+      name: t('globals.terms.loading'),
+      avatarUrl: '',
+      avatarFallback: '',
+      availability_status: null,
+      hasAssignee: false
+    }
+  }
+
   const config = widgetStore.config
   const assignee = chatStore.currentConversation?.assignee
   if (assignee?.id && assignee?.id > 0) {

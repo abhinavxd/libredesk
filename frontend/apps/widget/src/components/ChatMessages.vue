@@ -245,8 +245,10 @@ const scrollToBottom = () => {
 }
 
 onMounted(() => {
-  // Update last seen timestamp when conversation is opened
-  chatStore.updateCurrentConversationLastSeen()
+  // Update last seen timestamp only when widget is actually visible.
+  if (widgetStore.isOpen) {
+    chatStore.updateCurrentConversationLastSeen()
+  }
 
   // Check initial scroll position
   checkIfAtBottom()
@@ -306,6 +308,20 @@ watch(
   (isTyping) => {
     if (isTyping && isAtBottom.value) {
       scrollToBottom()
+    }
+  }
+)
+
+// Watch for widget becoming visible - scroll to bottom and update last seen
+// This handles the direct_to_conversation case where messages load while widget is hidden
+watch(
+  () => widgetStore.isOpen,
+  (isOpen) => {
+    if (isOpen && chatStore.currentConversation?.uuid) {
+      chatStore.updateCurrentConversationLastSeen()
+      setTimeout(() => {
+        scrollToBottom()
+      }, 50)
     }
   }
 )

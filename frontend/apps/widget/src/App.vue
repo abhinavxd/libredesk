@@ -26,22 +26,21 @@ const userStore = useUserStore()
 // Initialize unread count tracking and sending to parent window.
 useUnreadCount()
 
+const widgetConfig = getCurrentInstance().appContext.config.globalProperties.$widgetConfig
+if (widgetConfig) {
+  widgetStore.updateConfig(widgetConfig)
+  applyCSSColor('--primary', widgetConfig.colors?.primary)
+}
+
 onMounted(async () => {
-  // Use pre-fetched widget config from main.js
-  const widgetConfig = getCurrentInstance().appContext.config.globalProperties.$widgetConfig
-  if (widgetConfig) {
-    widgetStore.updateConfig(widgetConfig)
-    // Apply custom primary color from config
-    applyCSSColor('--primary', widgetConfig.colors?.primary)
-  }
-
   initializeWebSocket()
-
-  widgetStore.setOpen(true)
 
   setupParentMessageListeners()
 
-  await chatStore.fetchConversations()
+  // Only fetch conversations if not directly navigating to a conversation
+  if (!widgetStore.config?.direct_to_conversation) {
+    await chatStore.fetchConversations()
+  }
 
   // Notify parent window that Vue app is ready
   window.parent.postMessage(
