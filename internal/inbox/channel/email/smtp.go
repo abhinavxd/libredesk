@@ -105,7 +105,7 @@ func NewSmtpPool(configs []imodels.SMTPConfig, oauth *imodels.OAuthConfig) ([]*s
 }
 
 // Send sends an email using one of the configured SMTP servers.
-func (e *Email) Send(m models.Message) error {
+func (e *Email) Send(m models.OutboundMessage) error {
 	// Refresh OAuth token if needed
 	oauthConfig, _, err := e.refreshOAuthIfNeeded()
 	if err != nil {
@@ -193,9 +193,9 @@ func (e *Email) Send(m models.Message) error {
 		email.Headers.Set(key, value)
 	}
 
-	// Attach email level headers
-	for key, value := range m.Headers {
-		email.Headers.Set(key, value[0])
+	// Set Reply-To header if specified
+	if m.ReplyTo != "" {
+		email.Headers.Set("Reply-To", m.ReplyTo)
 	}
 
 	// Set In-Reply-To header
@@ -205,9 +205,9 @@ func (e *Email) Send(m models.Message) error {
 	}
 
 	// Set message id header
-	if m.SourceID.String != "" {
-		email.Headers.Set(headerMessageID, fmt.Sprintf("<%s>", m.SourceID.String))
-		e.lo.Debug("Message-ID header set", "message_id", m.SourceID.String)
+	if m.SourceID != "" {
+		email.Headers.Set(headerMessageID, fmt.Sprintf("<%s>", m.SourceID))
+		e.lo.Debug("Message-ID header set", "message_id", m.SourceID)
 	}
 
 	// Set references header

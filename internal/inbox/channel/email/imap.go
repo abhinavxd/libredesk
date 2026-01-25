@@ -13,7 +13,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/jhillyerd/enmime"
@@ -359,14 +358,10 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 	// Make contact.
 	firstName, lastName := getContactName(env.From[0])
-	var contact = umodels.User{
-		InboxID:         inboxID,
-		FirstName:       firstName,
-		LastName:        lastName,
-		SourceChannel:   null.NewString(e.Channel(), true),
-		SourceChannelID: null.NewString(fromAddress, true),
-		Email:           null.NewString(fromAddress, true),
-		Type:            umodels.UserTypeContact,
+	contact := models.IncomingContact{
+		FirstName: firstName,
+		LastName:  lastName,
+		Email:     null.StringFrom(fromAddress),
 	}
 
 	// Lowercase and set the `to`, `cc`, `from` and `bcc` addresses in message meta.
@@ -407,18 +402,12 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return fmt.Errorf("marshalling meta: %w", err)
 	}
 	incomingMsg := models.IncomingMessage{
-		Message: models.Message{
-			Channel:    e.Channel(),
-			SenderType: models.SenderTypeContact,
-			Type:       models.MessageIncoming,
-			InboxID:    inboxID,
-			Status:     models.MessageStatusReceived,
-			Subject:    env.Subject,
-			SourceID:   null.StringFrom(messageID),
-			Meta:       meta,
-		},
-		Contact: contact,
-		InboxID: inboxID,
+		Channel:  ChannelEmail,
+		InboxID:  inboxID,
+		Contact:  contact,
+		Subject:  env.Subject,
+		SourceID: null.StringFrom(messageID),
+		Meta:     meta,
 	}
 
 	// Fetch full message body.
@@ -459,16 +448,16 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, incomingMsg models.IncomingMessage) error {
 	envelope, err := enmime.ReadEnvelope(item.Literal)
 	if err != nil {
-		e.lo.Error("error parsing email envelope", "error", err, "message_id", incomingMsg.Message.SourceID.String)
+		e.lo.Error("error parsing email envelope", "error", err, "message_id", incomingMsg.SourceID.String)
 		for _, err := range envelope.Errors {
-			e.lo.Error("error parsing email envelope. envelope_error: ", "error", err.Error(), "message_id", incomingMsg.Message.SourceID.String)
+			e.lo.Error("error parsing email envelope. envelope_error: ", "error", err.Error(), "message_id", incomingMsg.SourceID.String)
 		}
 		return fmt.Errorf("parsing email envelope: %w", err)
 	}
 
 	// Log any envelope errors.
 	for _, err := range envelope.Errors {
-		e.lo.Error("error parsing email envelope", "error", err.Error(), "message_id", incomingMsg.Message.SourceID.String)
+		e.lo.Error("error parsing email envelope", "error", err.Error(), "message_id", incomingMsg.SourceID.String)
 	}
 
 	// Extract all HTML content by traversing the tree
@@ -486,19 +475,19 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 
 	// Set message content - prioritize combined HTML
 	if allHTML.Len() > 0 {
-		incomingMsg.Message.Content = allHTML.String()
-		incomingMsg.Message.ContentType = models.ContentTypeHTML
-		e.lo.Debug("extracted HTML content from parts", "message_id", incomingMsg.Message.SourceID.String, "content", incomingMsg.Message.Content)
+		incomingMsg.Content = allHTML.String()
+		incomingMsg.ContentType = models.ContentTypeHTML
+		e.lo.Debug("extracted HTML content from parts", "message_id", incomingMsg.SourceID.String, "content", incomingMsg.Content)
 	} else if len(envelope.HTML) > 0 {
-		incomingMsg.Message.Content = envelope.HTML
-		incomingMsg.Message.ContentType = models.ContentTypeHTML
+		incomingMsg.Content = envelope.HTML
+		incomingMsg.ContentType = models.ContentTypeHTML
 	} else if len(envelope.Text) > 0 {
-		incomingMsg.Message.Content = envelope.Text
-		incomingMsg.Message.ContentType = models.ContentTypeText
+		incomingMsg.Content = envelope.Text
+		incomingMsg.ContentType = models.ContentTypeText
 	}
 
-	e.lo.Debug("envelope HTML content", "message_id", incomingMsg.Message.SourceID.String, "content", incomingMsg.Message.Content)
-	e.lo.Debug("envelope text content", "message_id", incomingMsg.Message.SourceID.String, "content", envelope.Text)
+	e.lo.Debug("envelope HTML content", "message_id", incomingMsg.SourceID.String, "content", incomingMsg.Content)
+	e.lo.Debug("envelope text content", "message_id", incomingMsg.SourceID.String, "content", envelope.Text)
 
 	// Clean headers
 	inReplyTo := strings.ReplaceAll(strings.ReplaceAll(envelope.GetHeader("In-Reply-To"), "<", ""), ">", "")
@@ -507,20 +496,20 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		references[i] = strings.Trim(strings.TrimSpace(ref), " <>")
 	}
 
-	incomingMsg.Message.InReplyTo = inReplyTo
-	incomingMsg.Message.References = references
+	incomingMsg.InReplyTo = inReplyTo
+	incomingMsg.References = references
 
 	// Extract conversation UUID from plus-addressed recipient (e.g., inbox+conv-{uuid}@domain)
 	incomingMsg.ConversationUUIDFromReplyTo = extractConversationUUIDFromRecipient(envelope)
 	if incomingMsg.ConversationUUIDFromReplyTo != "" {
 		e.lo.Debug("extracted conversation UUID from plus-addressed recipient",
 			"conversation_uuid", incomingMsg.ConversationUUIDFromReplyTo,
-			"message_id", incomingMsg.Message.SourceID.String)
+			"message_id", incomingMsg.SourceID.String)
 	}
 
 	// Process attachments
 	for _, att := range envelope.Attachments {
-		incomingMsg.Message.Attachments = append(incomingMsg.Message.Attachments, attachment.Attachment{
+		incomingMsg.Attachments = append(incomingMsg.Attachments, attachment.Attachment{
 			Name:        att.FileName,
 			Content:     att.Content,
 			ContentType: att.ContentType,
@@ -537,7 +526,7 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 			disposition = attachment.DispositionAttachment
 		}
 
-		incomingMsg.Message.Attachments = append(incomingMsg.Message.Attachments, attachment.Attachment{
+		incomingMsg.Attachments = append(incomingMsg.Attachments, attachment.Attachment{
 			Name:        inline.FileName,
 			Content:     inline.Content,
 			ContentType: inline.ContentType,
@@ -547,7 +536,7 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		})
 	}
 
-	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.Message.SourceID.String,
+	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.SourceID.String,
 		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines))
 
 	if err := e.messageStore.EnqueueIncoming(incomingMsg); err != nil {
@@ -605,6 +594,42 @@ func extractAllHTMLParts(part *enmime.Part) []string {
 	}
 
 	return htmlParts
+}
+
+// extractUUIDFromReplyAddress extracts a UUID from the reply address if present.
+// The UUID is expected to be in the format "username+<UUID>@domain" within the email address.
+// Returns an empty string if the UUID is not found or invalid.
+func (e *Email) extractUUIDFromReplyAddress(address string) string {
+	// Remove angle brackets if present
+	address = strings.Trim(address, "<>")
+
+	// Check if it contains +
+	if !strings.Contains(address, "+") {
+		return ""
+	}
+
+	// Extract the part between + and @
+	parts := strings.Split(address, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+
+	// Get the UUID
+	uuid := strings.SplitN(parts[0], "+", 2)[1]
+	if uuid == "" {
+		return ""
+	}
+
+	// Validate UUID format (36 chars with hyphens at specific positions)
+	if len(uuid) == 36 &&
+		uuid[8] == '-' &&
+		uuid[13] == '-' &&
+		uuid[18] == '-' &&
+		uuid[23] == '-' {
+		return uuid
+	}
+
+	return ""
 }
 
 // extractMessageIDFromHeaders extracts and cleans the Message-ID from email headers.
