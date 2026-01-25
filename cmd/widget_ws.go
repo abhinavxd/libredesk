@@ -247,33 +247,18 @@ func handleWidgetTyping(app *App, msg *WidgetMessage) error {
 	return nil
 }
 
-// validateWidgetMessageJWT validates the incoming widget message JWT using inbox secret
+// validateWidgetMessageJWT validates the incoming widget message JWT using inbox secret.
 func validateWidgetMessageJWT(app *App, jwtToken string, inboxID int) (Claims, error) {
-	if jwtToken == "" {
-		return Claims{}, fmt.Errorf("JWT token is empty")
-	}
-
 	if inboxID <= 0 {
 		return Claims{}, fmt.Errorf("inbox ID is required for JWT validation")
 	}
 
-	// Get inbox to retrieve secret for JWT verification
 	inbox, err := app.inbox.GetDBRecord(inboxID)
 	if err != nil {
 		return Claims{}, fmt.Errorf("inbox not found: %w", err)
 	}
 
-	if !inbox.Secret.Valid {
-		return Claims{}, fmt.Errorf("inbox secret not configured for JWT verification")
-	}
-
-	// Use the existing verifyStandardJWT function which properly validates with inbox secret
-	claims, err := verifyStandardJWT(jwtToken, inbox.Secret.String)
-	if err != nil {
-		return Claims{}, fmt.Errorf("JWT validation failed: %w", err)
-	}
-
-	return claims, nil
+	return verifyStandardJWT(jwtToken, inbox.Secret.String)
 }
 
 // sendWidgetError sends an error message to the widget client

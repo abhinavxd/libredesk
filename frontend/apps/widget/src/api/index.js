@@ -1,9 +1,41 @@
 import axios from 'axios'
+import { parseJWT } from '@shared-ui/utils/string'
+
+const VISITOR_JWT_KEY = 'libredesk_visitor_jwt'
 
 function getInboxIDFromQuery () {
     const params = new URLSearchParams(window.location.search)
     const inboxId = params.get('inbox_id')
     return inboxId ? parseInt(inboxId, 10) : null
+}
+
+export function setVisitorJWT (jwt) {
+    localStorage.setItem(VISITOR_JWT_KEY, jwt)
+}
+
+export function clearVisitorJWT () {
+    localStorage.removeItem(VISITOR_JWT_KEY)
+}
+
+export function getVisitorJWT () {
+    return localStorage.getItem(VISITOR_JWT_KEY)
+}
+
+// Returns visitor JWT if current user is authenticated (for merge).
+function getVisitorJWTForMerge (sessionToken) {
+    const visitorJWT = getVisitorJWT()
+    if (!visitorJWT || !sessionToken) {
+        return null
+    }
+    try {
+        const claims = parseJWT(sessionToken)
+        if (claims && !claims.is_visitor && claims.external_user_id) {
+            return visitorJWT
+        }
+    } catch {
+        // Ignore JWT parse errors
+    }
+    return null
 }
 
 const http = axios.create({
@@ -21,19 +53,31 @@ http.interceptors.request.use((request) => {
     if (request.url && request.url.includes('/api/v1/widget/')) {
         const libredeskSession = localStorage.getItem('libredesk_session')
         const inboxId = getInboxIDFromQuery()
-        
+
         // Add JWT to Authorization header
         if (libredeskSession) {
             request.headers['Authorization'] = `Bearer ${libredeskSession}`
         }
-        
+
         // Add inbox ID to custom header
         if (inboxId) {
             request.headers['X-Libredesk-Inbox-ID'] = inboxId.toString()
         }
+
+        const visitorJWTForMerge = getVisitorJWTForMerge(libredeskSession)
+        if (visitorJWTForMerge) {
+            request.headers['X-Libredesk-Visitor-JWT'] = visitorJWTForMerge
+        }
     }
 
     return request
+})
+
+http.interceptors.response.use((response) => {
+    if (response.headers['x-libredesk-clear-visitor']) {
+        clearVisitorJWT()
+    }
+    return response
 })
 
 const getWidgetSettings = (inboxID) => http.get('/api/v1/widget/chat/settings', {
@@ -47,7 +91,7 @@ const sendChatMessage = (uuid, data) => http.post(`/api/v1/widget/chat/conversat
 const closeChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/close`)
 const uploadMedia = (conversationUUID, files) => {
     const formData = new FormData()
-    
+
     // Only add conversation UUID to form data now
     formData.append('conversation_uuid', conversationUUID)
 
@@ -72,9 +116,19 @@ const uploadMedia = (conversationUUID, files) => {
         headers['X-Libredesk-Inbox-ID'] = inboxId.toString()
     }
 
+    const visitorJWTForMerge = getVisitorJWTForMerge(libredeskSession)
+    if (visitorJWTForMerge) {
+        headers['X-Libredesk-Visitor-JWT'] = visitorJWTForMerge
+    }
+
     return axios.post('/api/v1/widget/media/upload', formData, {
         headers,
         timeout: 30000
+    }).then((response) => {
+        if (response.headers['x-libredesk-clear-visitor']) {
+            clearVisitorJWT()
+        }
+        return response
     })
 }
 const updateConversationLastSeen = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/update-last-seen`)

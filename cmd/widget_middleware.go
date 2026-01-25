@@ -19,8 +19,9 @@ const (
 	ctxWidgetContactID = "widget_contact_id"
 	ctxWidgetInbox     = "widget_inbox"
 
-	// Header sent in every widget request to identify the inbox
-	hdrWidgetInboxID = "X-Libredesk-Inbox-ID"
+	hdrWidgetInboxID    = "X-Libredesk-Inbox-ID"
+	hdrWidgetVisitorJWT = "X-Libredesk-Visitor-JWT"
+	hdrClearVisitorJWT  = "X-Libredesk-Clear-Visitor"
 )
 
 // widgetAuth middleware authenticates widget requests using JWT and inbox validation.
@@ -28,9 +29,7 @@ const (
 // For /conversations/init without JWT, it allows visitor creation while still validating inbox.
 func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) error {
 	return func(r *fastglue.Request) error {
-		var (
-			app = r.Context.(*App)
-		)
+		app := r.Context.(*App)
 
 		// Always extract and validate inbox_id from custom header
 		inboxIDHeader := string(r.RequestCtx.Request.Header.Peek(hdrWidgetInboxID))
@@ -97,6 +96,23 @@ func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) erro
 		// Store authenticated data in request context for downstream handlers
 		r.RequestCtx.SetUserValue(ctxWidgetClaims, claims)
 		r.RequestCtx.SetUserValue(ctxWidgetContactID, contactID)
+
+		// Merge visitor to contact if visitor JWT is provided.
+		visitorJWT := string(r.RequestCtx.Request.Header.Peek(hdrWidgetVisitorJWT))
+		if visitorJWT != "" && claims.ExternalUserID != "" && contactID > 0 {
+			visitorClaims, err := verifyStandardJWT(visitorJWT, inbox.Secret.String)
+			if err == nil && visitorClaims.IsVisitor && visitorClaims.UserID > 0 {
+				visitorID := visitorClaims.UserID
+				if visitorID != contactID {
+					if err := app.user.MergeVisitorToContact(visitorID, contactID); err != nil {
+						app.lo.Error("error merging visitor to contact", "visitor_id", visitorID, "contact_id", contactID, "error", err)
+					} else {
+						app.lo.Info("merged visitor to contact", "visitor_id", visitorID, "contact_id", contactID)
+						r.RequestCtx.Response.Header.Set(hdrClearVisitorJWT, "true")
+					}
+				}
+			}
+		}
 
 		return next(r)
 	}

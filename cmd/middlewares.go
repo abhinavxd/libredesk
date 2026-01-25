@@ -7,6 +7,7 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -268,8 +269,11 @@ func authOrSignedURL(handler fastglue.FastRequestHandler) fastglue.FastRequestHa
 		// Get the UUID from the route.
 		uuid := r.RequestCtx.UserValue("uuid").(string)
 
+		// Strip thumb prefix for signature validation (thumbnails use the same signature as the original).
+		signatureUUID := strings.TrimPrefix(uuid, image.ThumbPrefix)
+
 		// Validate signature.
-		if !validator(uuid, sig, exp) {
+		if !validator(signatureUUID, sig, exp) {
 			return r.SendErrorEnvelope(http.StatusForbidden,
 				app.i18n.T("media.invalidOrExpiredURL"), nil, envelope.PermissionError)
 		}

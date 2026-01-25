@@ -67,50 +67,9 @@ type conversationResponseWithBusinessHours struct {
 	WorkingHoursUTCOffset *int `json:"working_hours_utc_offset,omitempty"`
 }
 
-// validateLiveChatInbox validates inbox_id from query params and returns the inbox and parsed config.
-// Used by public widget endpoints that don't require JWT authentication.
-func validateLiveChatInbox(r *fastglue.Request) (imodels.Inbox, livechat.Config, error) {
-	app := r.Context.(*App)
-	inboxID := r.RequestCtx.QueryArgs().GetUintOrZero("inbox_id")
-
-	if inboxID <= 0 {
-		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
-			fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"),
-			nil, envelope.InputError)
-	}
-
-	inbox, err := app.inbox.GetDBRecord(inboxID)
-	if err != nil {
-		app.lo.Error("error fetching inbox", "inbox_id", inboxID, "error", err)
-		return imodels.Inbox{}, livechat.Config{}, sendErrorEnvelope(r, err)
-	}
-
-	if inbox.Channel != livechat.ChannelLiveChat {
-		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
-			fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"),
-			nil, envelope.InputError)
-	}
-
-	if !inbox.Enabled {
-		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
-			fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"),
-			nil, envelope.InputError)
-	}
-
-	var config livechat.Config
-	if err := json.Unmarshal(inbox.Config, &config); err != nil {
-		app.lo.Error("error parsing live chat config", "error", err)
-		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
-			fasthttp.StatusInternalServerError,
-			app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"),
-			nil, envelope.GeneralError)
-	}
-
-	return inbox, config, nil
-}
+// -----------------------------------------------------------------------------
+// Handlers
+// -----------------------------------------------------------------------------
 
 // handleGetChatLauncherSettings returns the live chat launcher settings for the widget
 func handleGetChatLauncherSettings(r *fastglue.Request) error {
@@ -206,12 +165,12 @@ func handleChatInit(r *fastglue.Request) error {
 		contactID        int
 		conversationUUID string
 		isVisitor        bool
-		config           livechat.Config
 		newJWT           string
 	)
 
 	// Parse inbox config
-	if err := json.Unmarshal(inbox.Config, &config); err != nil {
+	config, err := parseLiveChatConfig(inbox)
+	if err != nil {
 		app.lo.Error("error parsing live chat config", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
@@ -230,53 +189,13 @@ func handleChatInit(r *fastglue.Request) error {
 				}
 
 				// User doesn't exist, create new contact
-				firstName := claims.FirstName
-				lastName := claims.LastName
-				email := claims.Email
-
-				// Validate custom attribute
-				formCustomAttributes := validateCustomAttributes(req.FormData, config, app)
-
-				// Merge JWT and form custom attributes (form takes precedence)
-				mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
-
-				// Marshal custom attributes
-				customAttribJSON, err := json.Marshal(mergedAttributes)
+				contactID, err = createExternalUser(app, *claims, req.FormData, config)
 				if err != nil {
-					app.lo.Error("error marshalling custom attributes", "error", err)
-					customAttribJSON = []byte("{}")
-				}
-
-				// Create new contact with external user ID.
-				var user = umodels.User{
-					FirstName:        firstName,
-					LastName:         lastName,
-					Email:            null.NewString(email, email != ""),
-					ExternalUserID:   null.NewString(claims.ExternalUserID, claims.ExternalUserID != ""),
-					CustomAttributes: customAttribJSON,
-				}
-				err = app.user.CreateContact(&user)
-				if err != nil {
-					app.lo.Error("error creating contact with external ID", "external_user_id", claims.ExternalUserID, "error", err)
 					return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 				}
-				contactID = user.ID
 			} else {
 				// User exists, update custom attributes from both JWT and form
-				// Don't override existing name and email.
-
-				// Validate custom attribute
-				formCustomAttributes := validateCustomAttributes(req.FormData, config, app)
-
-				// Merge JWT and form custom attributes (form takes precedence)
-				mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
-
-				if len(mergedAttributes) > 0 {
-					if err := app.user.SaveCustomAttributes(user.ID, mergedAttributes, false); err != nil {
-						app.lo.Error("error updating contact custom attributes", "contact_id", user.ID, "error", err)
-						// Don't fail the request for custom attributes update failure
-					}
-				}
+				processCustomAttributesForUser(app, user.ID, claims, req.FormData, config)
 				contactID = user.ID
 			}
 			isVisitor = false
@@ -289,96 +208,30 @@ func handleChatInit(r *fastglue.Request) error {
 				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
 			}
 
-			// Validate custom attribute
-			formCustomAttributes := validateCustomAttributes(req.FormData, config, app)
-
-			// Merge JWT and form custom attributes (form takes precedence)
-			mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
-
 			// Update custom attributes from both JWT and form
-			if len(mergedAttributes) > 0 {
-				if err := app.user.SaveCustomAttributes(contactID, mergedAttributes, false); err != nil {
-					app.lo.Error("error updating contact custom attributes", "contact_id", contactID, "error", err)
-					// Don't fail the request for custom attributes update failure
-				}
-			}
+			processCustomAttributesForUser(app, contactID, claims, req.FormData, config)
 		}
 	} else {
 		// Visitor user not authenticated, create a new visitor contact.
 		isVisitor = true
 
-		// Validate form data and get final name/email for new visitor
-		finalName, finalEmail, err := validateFormData(req.FormData, config, nil)
-		if err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, err.Error(), nil, envelope.InputError)
-		}
-
-		// Process custom attributes from form data
-		formCustomAttributes := validateCustomAttributes(req.FormData, config, app)
-
-		// Marshal custom attributes for storage
-		var customAttribJSON []byte
-		if len(formCustomAttributes) > 0 {
-			customAttribJSON, err = json.Marshal(formCustomAttributes)
-			if err != nil {
-				app.lo.Error("error marshalling form custom attributes", "error", err)
-				customAttribJSON = []byte("{}")
+		var visitorErr error
+		contactID, newJWT, visitorErr = createVisitorContact(app, req.FormData, config, inbox)
+		if visitorErr != nil {
+			// Check if it's a validation error (from validateFormData)
+			if strings.Contains(visitorErr.Error(), "required") || strings.Contains(visitorErr.Error(), "invalid") {
+				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, visitorErr.Error(), nil, envelope.InputError)
 			}
-		} else {
-			customAttribJSON = []byte("{}")
-		}
-
-		visitor := umodels.User{
-			Email:            null.NewString(finalEmail, finalEmail != ""),
-			FirstName:        finalName,
-			CustomAttributes: customAttribJSON,
-		}
-
-		if err := app.user.CreateVisitor(&visitor); err != nil {
-			app.lo.Error("error creating visitor contact", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
-		}
-		contactID = visitor.ID
-		secretToUse := []byte(inbox.Secret.String)
-		newJWT, err = generateUserJWTWithSecret(contactID, isVisitor, time.Now().Add(87600*time.Hour), secretToUse) // 10 years
-		if err != nil {
-			app.lo.Error("error generating visitor JWT", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.session}"), nil, envelope.GeneralError)
 		}
 	}
 
 	// Check conversation permissions based on user type.
-	var allowStartConversation, preventMultipleConversations bool
-	if isVisitor {
-		allowStartConversation = config.Visitors.AllowStartConversation
-		preventMultipleConversations = config.Visitors.PreventMultipleConversations
-	} else {
-		allowStartConversation = config.Users.AllowStartConversation
-		preventMultipleConversations = config.Users.PreventMultipleConversations
-	}
-
-	if !allowStartConversation {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.notAllowed", "name", ""), nil, envelope.PermissionError)
-	}
-
-	if preventMultipleConversations {
-		conversations, err := app.conversation.GetContactChatConversations(contactID, inboxID)
-		if err != nil {
-			userType := "visitor"
-			if !isVisitor {
-				userType = "user"
-			}
-			app.lo.Error("error fetching "+userType+" conversations", "contact_id", contactID, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
-		}
-		if len(conversations) > 0 {
-			userType := "visitor"
-			if !isVisitor {
-				userType = "user"
-			}
-			app.lo.Info(userType+" attempted to start new conversation but already has one", "contact_id", contactID, "conversations_count", len(conversations))
+	if err := checkConversationPermissions(app, config, isVisitor, contactID, inboxID); err != nil {
+		if strings.Contains(err.Error(), "not allowed") || strings.Contains(err.Error(), "multiple conversations") {
 			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.notAllowed", "name", ""), nil, envelope.PermissionError)
 		}
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
 	}
 
 	app.lo.Info("creating new live chat conversation for user", "user_id", contactID, "inbox_id", inboxID, "is_visitor", isVisitor)
@@ -716,8 +569,8 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Make sure file upload is enabled for the inbox.
-	var config livechat.Config
-	if err := json.Unmarshal(inbox.Config, &config); err != nil {
+	config, err := parseLiveChatConfig(inbox)
+	if err != nil {
 		app.lo.Error("error parsing live chat config", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
 	}
@@ -805,6 +658,189 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	}
 
 	return r.SendEnvelope(insertedMessage)
+}
+
+// -----------------------------------------------------------------------------
+// Helper functions
+// -----------------------------------------------------------------------------
+
+// parseLiveChatConfig parses the livechat.Config from an inbox's Config JSON.
+func parseLiveChatConfig(inbox imodels.Inbox) (livechat.Config, error) {
+	var config livechat.Config
+	if err := json.Unmarshal(inbox.Config, &config); err != nil {
+		return livechat.Config{}, fmt.Errorf("error parsing live chat config: %w", err)
+	}
+	return config, nil
+}
+
+// userTypeLabel returns "visitor" or "user" based on the isVisitor flag.
+func userTypeLabel(isVisitor bool) string {
+	if isVisitor {
+		return "visitor"
+	}
+	return "user"
+}
+
+// validateLiveChatInbox validates inbox_id from query params and returns the inbox and parsed config.
+// Used by public widget endpoints that don't require JWT authentication.
+func validateLiveChatInbox(r *fastglue.Request) (imodels.Inbox, livechat.Config, error) {
+	app := r.Context.(*App)
+	inboxID := r.RequestCtx.QueryArgs().GetUintOrZero("inbox_id")
+
+	if inboxID <= 0 {
+		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
+			fasthttp.StatusBadRequest,
+			app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"),
+			nil, envelope.InputError)
+	}
+
+	inbox, err := app.inbox.GetDBRecord(inboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox", "inbox_id", inboxID, "error", err)
+		return imodels.Inbox{}, livechat.Config{}, sendErrorEnvelope(r, err)
+	}
+
+	if inbox.Channel != livechat.ChannelLiveChat {
+		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
+			fasthttp.StatusBadRequest,
+			app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"),
+			nil, envelope.InputError)
+	}
+
+	if !inbox.Enabled {
+		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
+			fasthttp.StatusBadRequest,
+			app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"),
+			nil, envelope.InputError)
+	}
+
+	config, err := parseLiveChatConfig(inbox)
+	if err != nil {
+		app.lo.Error("error parsing live chat config", "error", err)
+		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
+			fasthttp.StatusInternalServerError,
+			app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"),
+			nil, envelope.GeneralError)
+	}
+
+	return inbox, config, nil
+}
+
+// processCustomAttributesForUser validates and saves custom attributes from JWT and form data for an existing user.
+func processCustomAttributesForUser(app *App, contactID int, claims *Claims, formData map[string]any, config livechat.Config) {
+	formCustomAttributes := validateCustomAttributes(formData, config, app)
+	var jwtAttribs map[string]any
+	if claims != nil {
+		jwtAttribs = claims.CustomAttributes
+	}
+	mergedAttributes := mergeCustomAttributes(jwtAttribs, formCustomAttributes)
+
+	if len(mergedAttributes) > 0 {
+		if err := app.user.SaveCustomAttributes(contactID, mergedAttributes, false); err != nil {
+			app.lo.Error("error updating contact custom attributes", "contact_id", contactID, "error", err)
+			// Don't fail the request for custom attributes update failure
+		}
+	}
+}
+
+// createExternalUser creates a new contact from JWT claims with external user ID.
+// Returns the new contact ID.
+func createExternalUser(app *App, claims Claims, formData map[string]any, config livechat.Config) (int, error) {
+	formCustomAttributes := validateCustomAttributes(formData, config, app)
+	mergedAttributes := mergeCustomAttributes(claims.CustomAttributes, formCustomAttributes)
+
+	customAttribJSON, err := json.Marshal(mergedAttributes)
+	if err != nil {
+		app.lo.Error("error marshalling custom attributes", "error", err)
+		customAttribJSON = []byte("{}")
+	}
+
+	user := umodels.User{
+		FirstName:        claims.FirstName,
+		LastName:         claims.LastName,
+		Email:            null.NewString(claims.Email, claims.Email != ""),
+		ExternalUserID:   null.NewString(claims.ExternalUserID, claims.ExternalUserID != ""),
+		CustomAttributes: customAttribJSON,
+	}
+	if err := app.user.CreateContact(&user); err != nil {
+		app.lo.Error("error creating contact with external ID", "external_user_id", claims.ExternalUserID, "error", err)
+		return 0, err
+	}
+	return user.ID, nil
+}
+
+// createVisitorContact creates a new visitor contact from form data.
+// Returns the contact ID and a new JWT for the visitor.
+func createVisitorContact(app *App, formData map[string]any, config livechat.Config, inbox imodels.Inbox) (contactID int, jwt string, err error) {
+	// Validate form data and get final name/email for new visitor
+	finalName, finalEmail, err := validateFormData(formData, config, nil)
+	if err != nil {
+		return 0, "", err
+	}
+
+	// Process custom attributes from form data
+	formCustomAttributes := validateCustomAttributes(formData, config, app)
+
+	var customAttribJSON []byte
+	if len(formCustomAttributes) > 0 {
+		customAttribJSON, err = json.Marshal(formCustomAttributes)
+		if err != nil {
+			app.lo.Error("error marshalling form custom attributes", "error", err)
+			customAttribJSON = []byte("{}")
+		}
+	} else {
+		customAttribJSON = []byte("{}")
+	}
+
+	visitor := umodels.User{
+		Email:            null.NewString(finalEmail, finalEmail != ""),
+		FirstName:        finalName,
+		CustomAttributes: customAttribJSON,
+	}
+
+	if err := app.user.CreateVisitor(&visitor); err != nil {
+		app.lo.Error("error creating visitor contact", "error", err)
+		return 0, "", err
+	}
+
+	newJWT, err := generateUserJWTWithSecret(visitor.ID, true, time.Now().Add(87600*time.Hour), []byte(inbox.Secret.String)) // 10 years
+	if err != nil {
+		app.lo.Error("error generating visitor JWT", "error", err)
+		return 0, "", err
+	}
+
+	return visitor.ID, newJWT, nil
+}
+
+// checkConversationPermissions checks if the user is allowed to start a conversation based on inbox config.
+// Returns an error if the user is not allowed to start a conversation.
+func checkConversationPermissions(app *App, config livechat.Config, isVisitor bool, contactID, inboxID int) error {
+	var allowStartConversation, preventMultipleConversations bool
+	if isVisitor {
+		allowStartConversation = config.Visitors.AllowStartConversation
+		preventMultipleConversations = config.Visitors.PreventMultipleConversations
+	} else {
+		allowStartConversation = config.Users.AllowStartConversation
+		preventMultipleConversations = config.Users.PreventMultipleConversations
+	}
+
+	if !allowStartConversation {
+		return fmt.Errorf("not allowed to start conversation")
+	}
+
+	if preventMultipleConversations {
+		conversations, err := app.conversation.GetContactChatConversations(contactID, inboxID)
+		if err != nil {
+			app.lo.Error("error fetching "+userTypeLabel(isVisitor)+" conversations", "contact_id", contactID, "error", err)
+			return fmt.Errorf("error checking existing conversations: %w", err)
+		}
+		if len(conversations) > 0 {
+			app.lo.Info(userTypeLabel(isVisitor)+" attempted to start new conversation but already has one", "contact_id", contactID, "conversations_count", len(conversations))
+			return fmt.Errorf("multiple conversations not allowed")
+		}
+	}
+
+	return nil
 }
 
 // buildConversationResponseWithBusinessHours builds conversation response with business hours info

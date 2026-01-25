@@ -320,6 +320,29 @@ FROM users u
 LEFT JOIN user_roles ur ON ur.user_id = u.id
 LEFT JOIN roles r ON r.id = ur.role_id
 LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
-WHERE u.deleted_at IS NULL 
+WHERE u.deleted_at IS NULL
     AND u.external_user_id = $1
 GROUP BY u.id;
+
+-- name: merge-visitor-to-contact
+WITH transfer_conversations AS (
+    UPDATE conversations
+    SET contact_id = $2, updated_at = now()
+    WHERE contact_id = $1
+    RETURNING id
+),
+transfer_messages AS (
+    UPDATE conversation_messages
+    SET sender_id = $2
+    WHERE sender_id = $1 AND sender_type = 'contact'
+    RETURNING id
+),
+delete_visitor AS (
+    DELETE FROM users
+    WHERE id = $1 AND type = 'visitor'
+    RETURNING id
+)
+SELECT
+    (SELECT COUNT(*) FROM transfer_conversations) as conversations_transferred,
+    (SELECT COUNT(*) FROM transfer_messages) as messages_transferred,
+    (SELECT COUNT(*) FROM delete_visitor) as visitor_deleted;

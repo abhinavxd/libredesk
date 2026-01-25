@@ -87,10 +87,11 @@ type queries struct {
 	InsertVisitor          *sqlx.Stmt `query:"insert-visitor"`
 	ToggleEnable           *sqlx.Stmt `query:"toggle-enable"`
 	// API key queries
-	GetUserByAPIKey      *sqlx.Stmt `query:"get-user-by-api-key"`
-	SetAPIKey            *sqlx.Stmt `query:"set-api-key"`
-	RevokeAPIKey         *sqlx.Stmt `query:"revoke-api-key"`
-	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
+	GetUserByAPIKey       *sqlx.Stmt `query:"get-user-by-api-key"`
+	SetAPIKey             *sqlx.Stmt `query:"set-api-key"`
+	RevokeAPIKey          *sqlx.Stmt `query:"revoke-api-key"`
+	UpdateAPIKeyLastUsed  *sqlx.Stmt `query:"update-api-key-last-used"`
+	MergeVisitorToContact *sqlx.Stmt `query:"merge-visitor-to-contact"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -352,6 +353,15 @@ func (u *Manager) RevokeAPIKey(userID int) error {
 	if _, err := u.q.RevokeAPIKey.Exec(userID); err != nil {
 		u.lo.Error("error revoking API key", "error", err, "user_id", userID)
 		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorRevoking", "name", "{globals.terms.apiKey}"), nil)
+	}
+	return nil
+}
+
+// MergeVisitorToContact transfers conversations from visitor to contact and deletes the visitor.
+func (u *Manager) MergeVisitorToContact(visitorID, contactID int) error {
+	if _, err := u.q.MergeVisitorToContact.Exec(visitorID, contactID); err != nil {
+		u.lo.Error("error merging visitor to contact", "visitor_id", visitorID, "contact_id", contactID, "error", err)
+		return fmt.Errorf("merging visitor to contact: %w", err)
 	}
 	return nil
 }

@@ -23,6 +23,7 @@
             :fileUploadEnabled="config.features?.file_upload || false"
             :emojiEnabled="config.features?.emoji || false"
             :uploading="isUploading"
+            :canUploadFiles="!!chatStore.currentConversation?.uuid"
             @fileUpload="handleFileUpload"
             @emojiSelect="handleEmojiSelect"
           />
@@ -59,7 +60,7 @@ import { sendWidgetTyping } from '../websocket.js'
 import { convertTextToHtml } from '@shared-ui/utils/string.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageInputActions from './MessageInputActions.vue'
-import api from '@widget/api/index.js'
+import api, { setVisitorJWT } from '@widget/api/index.js'
 
 const props = defineProps({
   formData: {
@@ -98,9 +99,9 @@ const initChatConversation = async (messageText) => {
   const resp = await api.initChatConversation(payload)
   const { conversation, jwt, messages } = resp.data.data
 
-  // Set user session token if not already set.
-  if (!userStore.userSessionToken) {
+  if (!userStore.userSessionToken && jwt) {
     userStore.setSessionToken(jwt)
+    setVisitorJWT(jwt)
   }
 
   // Add the new conversation to the list

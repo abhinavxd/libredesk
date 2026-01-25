@@ -12,7 +12,7 @@
 
     <!-- File Upload Button -->
     <Button
-      v-if="fileUploadEnabled"
+      v-if="fileUploadEnabled && canUploadFiles"
       @click="triggerFileUpload"
       :disabled="uploading"
       variant="ghost"
@@ -67,6 +67,10 @@ const props = defineProps({
   uploading: {
     type: Boolean,
     default: false
+  },
+  canUploadFiles: {
+    type: Boolean,
+    default: true
   }
 })
 
