@@ -13,14 +13,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// MonitorAgentAvailability continuously checks for user activity and sets them offline if inactive for more than 5 minutes.
-func (u *Manager) MonitorAgentAvailability(ctx context.Context) {
+// MonitorUserAvailability continuously checks for user activity and sets them offline if inactive for more than 5 minutes.
+func (u *Manager) MonitorUserAvailability(ctx context.Context, onUsersOffline func([]int)) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			u.markInactiveAgentsOffline()
+			if userIDs := u.MarkInactiveUsersOffline(); len(userIDs) > 0 && onUsersOffline != nil {
+				onUsersOffline(userIDs)
+			}
 		case <-ctx.Done():
 			return
 		}
@@ -154,16 +156,18 @@ func (u *Manager) SoftDeleteAgent(id int) error {
 	return nil
 }
 
-// markInactiveAgentsOffline sets agents offline if they have been inactive for more than 5 minutes.
-func (u *Manager) markInactiveAgentsOffline() {
-	if res, err := u.q.UpdateInactiveOffline.Exec(); err != nil {
+// MarkInactiveUsersOffline sets users offline if they have been inactive for more than 5 minutes.
+// Returns the IDs of users that were marked offline.
+func (u *Manager) MarkInactiveUsersOffline() []int {
+	var userIDs []int
+	if err := u.q.UpdateInactiveOffline.Select(&userIDs); err != nil {
 		u.lo.Error("error setting users offline", "error", err)
-	} else {
-		rows, _ := res.RowsAffected()
-		if rows > 0 {
-			u.lo.Info("set inactive users offline", "count", rows)
-		}
+		return nil
 	}
+	if len(userIDs) > 0 {
+		u.lo.Info("set inactive users offline", "count", len(userIDs))
+	}
+	return userIDs
 }
 
 // GetAllAgents returns a list of all agents.

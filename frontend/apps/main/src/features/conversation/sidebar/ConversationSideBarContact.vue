@@ -1,12 +1,20 @@
 <template>
   <div class="space-y-2">
     <div class="flex justify-between items-start">
-      <Avatar class="size-20">
-        <AvatarImage :src="conversation?.contact?.avatar_url || ''" />
-        <AvatarFallback>
-          {{ conversation?.contact?.first_name?.toUpperCase().substring(0, 2) }}
-        </AvatarFallback>
-      </Avatar>
+      <div class="relative">
+        <Avatar class="size-20">
+          <AvatarImage :src="conversation?.contact?.avatar_url || ''" />
+          <AvatarFallback>
+            {{ conversation?.contact?.first_name?.toUpperCase().substring(0, 2) }}
+          </AvatarFallback>
+        </Avatar>
+        <StatusDot
+          v-if="isLivechat"
+          :status="contactStatus"
+          size="lg"
+          class="absolute bottom-1 right-1 border-2 border-background"
+        />
+      </div>
       <Button
         variant="ghost"
         size="icon"
@@ -79,6 +87,7 @@ import { computed } from 'vue'
 import { ViewVerticalIcon } from '@radix-icons/vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
+import StatusDot from '@shared-ui/components/StatusDot.vue'
 import { Mail, Phone, ExternalLink, AlertCircle, IdCard } from 'lucide-vue-next'
 import countries from '@/constants/countries.js'
 import { useEmitter } from '@/composables/useEmitter'
@@ -104,4 +113,7 @@ const phoneNumber = computed(() => {
   const callingCode = country ? country.calling_code : countryCodeValue
   return `${callingCode} ${number}`
 })
+
+const isLivechat = computed(() => conversation.value?.inbox_channel === 'livechat')
+const contactStatus = computed(() => conversation.value?.contact?.availability_status)
 </script>

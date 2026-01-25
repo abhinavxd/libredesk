@@ -104,10 +104,16 @@ func handleWidgetWS(r *fastglue.Request) error {
 				if msg.JWT != "" && inboxID != 0 {
 					if claims, err := validateWidgetMessageJWT(app, msg.JWT, inboxID); err == nil {
 						if userID, err := resolveUserIDFromClaims(app, claims); err == nil {
+							// Check if user was offline before updating
+							wasOffline := app.user.IsOffline(userID)
 							if err := app.user.UpdateLastActive(userID); err != nil {
 								app.lo.Error("error updating user last active timestamp", "user_id", userID, "error", err)
 							} else {
 								app.lo.Debug("updated user last active timestamp", "user_id", userID)
+								// Broadcast online status if user just came online
+								if wasOffline {
+									app.conversation.BroadcastContactStatus(userID, "online")
+								}
 							}
 						}
 					}

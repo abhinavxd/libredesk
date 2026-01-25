@@ -241,7 +241,11 @@ func main() {
 	go sla.Run(ctx, slaEvaluationInterval)
 	go sla.SendNotifications(ctx)
 	go media.DeleteUnlinkedMedia(ctx)
-	go user.MonitorAgentAvailability(ctx)
+	go user.MonitorUserAvailability(ctx, func(userIDs []int) {
+		for _, id := range userIDs {
+			conversation.BroadcastContactStatus(id, "offline")
+		}
+	})
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
 

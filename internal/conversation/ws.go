@@ -53,6 +53,19 @@ func (m *Manager) BroadcastConversationUpdate(conversationUUID, prop string, val
 	m.broadcastToUsers([]int{}, message)
 }
 
+// BroadcastContactStatus broadcasts a contact's availability status to all agents.
+func (m *Manager) BroadcastContactStatus(contactID int, status string) {
+	message := wsmodels.Message{
+		Type: wsmodels.MessageTypeConversationPropertyUpdate,
+		Data: map[string]interface{}{
+			"contact_id": contactID,
+			"prop":       "contact.availability_status",
+			"value":      status,
+		},
+	}
+	m.broadcastToUsers([]int{}, message)
+}
+
 // BroadcastTypingToConversation broadcasts typing status to all subscribers of a conversation.
 // Set broadcastToWidgets to false when the typing event originates from a widget client to avoid echo.
 func (m *Manager) BroadcastTypingToConversation(conversationUUID string, isTyping bool, broadcastToWidgets bool) {

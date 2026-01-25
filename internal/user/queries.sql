@@ -126,10 +126,14 @@ WHERE id = $1;
 -- name: update-inactive-offline
 UPDATE users
 SET availability_status = 'offline'
-WHERE 
-type = 'agent' 
-AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL '5 minutes')
-AND availability_status NOT IN ('offline', 'away_and_reassigning', 'away_manual');
+WHERE
+  type IN ('agent', 'contact', 'visitor')
+  AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL '5 minutes')
+  AND availability_status NOT IN ('offline', 'away_and_reassigning', 'away_manual')
+RETURNING id;
+
+-- name: get-availability-status
+SELECT availability_status FROM users WHERE id = $1;
 
 -- name: set-reset-password-token
 UPDATE users

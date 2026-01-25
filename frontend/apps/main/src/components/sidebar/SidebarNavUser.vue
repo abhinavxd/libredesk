@@ -5,23 +5,19 @@
         size="md"
         class="p-0"
       >
-        <Avatar class="h-8 w-8 rounded relative overflow-visible">
-          <AvatarImage :src="userStore.avatar" alt="U" class="rounded" />
-          <AvatarFallback class="rounded">
-            {{ userStore.getInitials }}
-          </AvatarFallback>
-          <div
-            class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-background"
-            :class="{
-              'bg-green-500': userStore.user.availability_status === 'online',
-              'bg-amber-500':
-                userStore.user.availability_status === 'away' ||
-                userStore.user.availability_status === 'away_manual' ||
-                userStore.user.availability_status === 'away_and_reassigning',
-              'bg-gray-400': userStore.user.availability_status === 'offline'
-            }"
-          ></div>
-        </Avatar>
+        <div class="relative">
+          <Avatar class="h-8 w-8 rounded">
+            <AvatarImage :src="userStore.avatar" alt="U" class="rounded" />
+            <AvatarFallback class="rounded">
+              {{ userStore.getInitials }}
+            </AvatarFallback>
+          </Avatar>
+          <StatusDot
+            :status="userStore.user.availability_status"
+            size="md"
+            class="absolute bottom-0 right-0 border border-background"
+          />
+        </div>
         <div class="grid flex-1 text-left text-sm leading-tight">
           <span class="truncate font-semibold">{{ userStore.getFullName }}</span>
           <span class="truncate text-xs">{{ userStore.email }}</span>
@@ -121,6 +117,7 @@ import {
 } from '@shared-ui/components/ui/dropdown-menu'
 import { SidebarMenuButton } from '@shared-ui/components/ui/sidebar'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
+import StatusDot from '@shared-ui/components/StatusDot.vue'
 import { Switch } from '@shared-ui/components/ui/switch'
 import { ChevronsUpDown, CircleUserRound, LogOut, Moon, Sun } from 'lucide-vue-next'
 import { useUserStore } from '../../stores/user'

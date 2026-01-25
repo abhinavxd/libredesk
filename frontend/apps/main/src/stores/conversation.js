@@ -665,7 +665,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   /**
    * Update a conversation property, supports nested paths via dot notation
-   * @param {Object} update - { uuid, prop, value }
+   * @param {Object} update - { uuid, prop, value } or { contact_id, prop, value }
    */
   function updateConversationProp (update) {
     const updateNested = (obj, prop, value) => {
@@ -680,7 +680,22 @@ export const useConversationStore = defineStore('conversation', () => {
       target[lastKey] = value
     }
 
-    const { uuid, prop, value } = update
+    const { uuid, contact_id, prop, value } = update
+
+    // Handle contact status updates (broadcast by contact_id)
+    if (contact_id && prop === 'contact.availability_status') {
+      // Update current conversation if it belongs to this contact
+      if (conversation.data?.contact_id === contact_id) {
+        updateNested(conversation.data, prop, value)
+      }
+      // Update conversations in the list that belong to this contact
+      conversations?.data?.forEach(c => {
+        if (c.contact_id === contact_id) {
+          updateNested(c, prop, value)
+        }
+      })
+      return
+    }
 
     // Conversation is currently open? Update it.
     if (conversation.data?.uuid === uuid) {

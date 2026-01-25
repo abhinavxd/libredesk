@@ -74,6 +74,7 @@ type queries struct {
 	UpdateAvailability     *sqlx.Stmt `query:"update-availability"`
 	UpdateLastActiveAt     *sqlx.Stmt `query:"update-last-active-at"`
 	UpdateInactiveOffline  *sqlx.Stmt `query:"update-inactive-offline"`
+	GetAvailabilityStatus  *sqlx.Stmt `query:"get-availability-status"`
 	UpdateLastLoginAt      *sqlx.Stmt `query:"update-last-login-at"`
 	SoftDeleteAgent        *sqlx.Stmt `query:"soft-delete-agent"`
 	SetUserPassword        *sqlx.Stmt `query:"set-user-password"`
@@ -259,6 +260,15 @@ func (u *Manager) UpdateLastActive(id int) error {
 		return fmt.Errorf("updating user last active at: %w", err)
 	}
 	return nil
+}
+
+// IsOffline returns true if the user's availability status is offline.
+func (u *Manager) IsOffline(id int) bool {
+	var status string
+	if err := u.q.GetAvailabilityStatus.Get(&status, id); err != nil {
+		return true
+	}
+	return status == "offline"
 }
 
 // SaveCustomAttributes sets or merges custom attributes for a user.
