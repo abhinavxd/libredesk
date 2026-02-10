@@ -77,7 +77,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/
 import { useStorage } from '@vueuse/core'
 import AdminPageWithHelp from '@/layouts/admin/AdminPageWithHelp.vue'
 import { useI18n } from 'vue-i18n'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../../api'
 
 const templateType = useStorage('templateType', 'email_outgoing')

@@ -193,7 +193,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/u
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
-import { handleHTTPError } from '@main/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { getVisiblePages } from '@main/utils/pagination'
 import api from '@main/api'
 

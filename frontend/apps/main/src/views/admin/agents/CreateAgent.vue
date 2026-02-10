@@ -8,7 +8,7 @@
 <script setup>
 import { ref } from 'vue'
 import AgentForm from '@/features/admin/agents/AgentForm.vue'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '../../../composables/useEmitter'

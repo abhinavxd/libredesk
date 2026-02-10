@@ -21,7 +21,7 @@ import { Spinner } from '@shared-ui/components/ui/spinner'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

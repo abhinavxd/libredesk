@@ -116,7 +116,7 @@ import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.v
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../../api'
 import { useI18n } from 'vue-i18n'
 

@@ -29,7 +29,7 @@ import { Spinner } from '@shared-ui/components/ui/spinner'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
 import { useEmitter } from '@/composables/useEmitter'
-import { handleHTTPError } from '@/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 
 const emitter = useEmitter()

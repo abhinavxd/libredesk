@@ -1,7 +1,7 @@
 import { ref, readonly } from 'vue'
 import { useEmitter } from './useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents.js'
-import { handleHTTPError } from '../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../api'
 
 /**

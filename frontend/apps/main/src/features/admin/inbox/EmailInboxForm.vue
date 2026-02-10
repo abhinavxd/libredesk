@@ -679,7 +679,7 @@ import {
   PROVIDER_GOOGLE,
   PROVIDER_MICROSOFT
 } from '@/constants/auth.js'
-import { handleHTTPError } from '@/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useAppSettingsStore } from '@/stores/appSettings'
 
 const props = defineProps({

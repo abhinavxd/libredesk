@@ -73,7 +73,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { handleHTTPError } from '../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../api'
 import { useEmitter } from '../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'

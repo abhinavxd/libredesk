@@ -14,7 +14,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { columns } from '../../../features/admin/teams/TeamsDataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { Spinner } from '@shared-ui/components/ui/spinner'

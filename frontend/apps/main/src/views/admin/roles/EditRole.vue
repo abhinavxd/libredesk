@@ -15,7 +15,7 @@ import api from '../../../api'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { useI18n } from 'vue-i18n'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 
 const emitter = useEmitter()
 const { t } = useI18n()

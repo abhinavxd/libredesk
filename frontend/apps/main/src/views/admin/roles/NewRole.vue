@@ -12,7 +12,7 @@ import RoleForm from '@/features/admin/roles/RoleForm.vue'
 import api from '../../../api'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 

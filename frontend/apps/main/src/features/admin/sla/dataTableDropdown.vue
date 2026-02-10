@@ -61,7 +61,7 @@ import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
 import api from '../../../api'
 import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '../../../utils/http.js'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 

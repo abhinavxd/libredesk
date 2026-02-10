@@ -73,7 +73,7 @@ import { Button } from '@shared-ui/components/ui/button'
 import api from '../../../api'
 import { useEmitter } from '../../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 
 const emit = useEmitter()

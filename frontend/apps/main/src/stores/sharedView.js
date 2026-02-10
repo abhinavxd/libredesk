@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { handleHTTPError } from '@main/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import api from '@main/api'

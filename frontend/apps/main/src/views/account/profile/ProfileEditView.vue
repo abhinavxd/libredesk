@@ -67,7 +67,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/av
 import { ref } from 'vue'
 import VuePictureCropper, { cropper } from 'vue-picture-cropper'
 import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import {
   Dialog,

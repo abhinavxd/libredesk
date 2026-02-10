@@ -121,7 +121,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { handleHTTPError } from '../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../api'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useTemporaryClass } from '../../composables/useTemporaryClass'

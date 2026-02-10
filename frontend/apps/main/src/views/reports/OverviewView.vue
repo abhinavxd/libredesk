@@ -257,7 +257,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useEmitter } from '../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { handleHTTPError } from '../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { formatDuration } from '@shared-ui/utils/datetime.js'
 import Card from '@/features/reports/OverviewCard.vue'
 import LineChart from '@/features/reports/OverviewLineChart.vue'

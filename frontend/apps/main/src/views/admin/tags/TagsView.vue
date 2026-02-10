@@ -74,7 +74,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from '../../../features/admin/tags/formSchema.js'
 import { useEmitter } from '../../../composables/useEmitter.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { handleHTTPError } from '../../../utils/http.js'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import api from '../../../api/index.js'
 

@@ -2,7 +2,7 @@ import { ref, watch } from 'vue'
 import { watchDebounced, useStorage, useEventListener } from '@vueuse/core'
 import { useConversationStore } from '@main/stores/conversation'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
-import { getTextFromHTML } from '@main/utils/strings'
+import { getTextFromHTML } from '@shared-ui/utils/string.js'
 import api from '@main/api'
 
 /**

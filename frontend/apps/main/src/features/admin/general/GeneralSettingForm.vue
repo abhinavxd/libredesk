@@ -208,7 +208,7 @@ import {
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter.js'
-import { handleHTTPError } from '../../../utils/http.js'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { timeZones } from '../../../constants/timezones.js'
 import { useI18n } from 'vue-i18n'
 import api from '../../../api/index.js'

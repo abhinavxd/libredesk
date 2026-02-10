@@ -109,7 +109,7 @@
 <script setup>
 import { ref, onMounted, watch, computed, toRaw } from 'vue'
 import { useStorage } from '@vueuse/core'
-import { handleHTTPError } from '@main/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { useUserStore } from '@main/stores/user'

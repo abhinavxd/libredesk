@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES } from '../constants/conversation'
-import { handleHTTPError } from '../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { computeRecipientsFromMessage } from '../utils/email-recipients'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'

@@ -113,7 +113,7 @@ import ContactNotes from '@/features/contact/ContactNotes.vue'
 import { createFormSchema } from '../../features/contact/formSchema.js'
 import { useEmitter } from '../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents'
-import { handleHTTPError } from '../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 

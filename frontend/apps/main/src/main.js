@@ -6,7 +6,7 @@ import router from './router'
 import mitt from 'mitt'
 import api from './api'
 import '@shared-ui/assets/styles/main.scss'
-import './utils/strings.js'
+import '@shared-ui/utils/string.js'
 import Root from './Root.vue'
 
 const setFavicon = (url) => {

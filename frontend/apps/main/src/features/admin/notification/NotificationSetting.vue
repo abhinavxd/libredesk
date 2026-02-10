@@ -25,7 +25,7 @@ import { useI18n } from 'vue-i18n'
 import NotificationsForm from './NotificationSettingForm.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
-import { handleHTTPError } from '@main/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 

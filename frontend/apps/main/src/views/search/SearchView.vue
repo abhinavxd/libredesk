@@ -52,7 +52,7 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { handleHTTPError } from '../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Button } from '@shared-ui/components/ui/button'
 import SearchHeader from '@/features/search/SearchHeader.vue'
 import SearchResults from '@/features/search/SearchResults.vue'

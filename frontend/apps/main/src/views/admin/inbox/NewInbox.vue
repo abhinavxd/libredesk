@@ -102,7 +102,7 @@ import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
 import api from '../../../api'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '../../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

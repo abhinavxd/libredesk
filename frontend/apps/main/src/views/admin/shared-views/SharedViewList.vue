@@ -25,7 +25,7 @@ import { createColumns } from '@/features/admin/shared-views/dataTableColumns.js
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { handleHTTPError } from '@/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'

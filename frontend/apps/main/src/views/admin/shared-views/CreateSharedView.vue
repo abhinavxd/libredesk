@@ -9,7 +9,7 @@
 import { ref } from 'vue'
 import SharedViewForm from '@/features/admin/shared-views/SharedViewForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
-import { handleHTTPError } from '@/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'

@@ -117,7 +117,7 @@ import {
 import { Upload } from 'lucide-vue-next'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import CopyButton from '@/components/button/CopyButton.vue'
-import { handleHTTPError } from '@/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 

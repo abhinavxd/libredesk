@@ -79,7 +79,7 @@ import { useConversationFilters } from '../../composables/useConversationFilters
 import { toTypedSchema } from '@vee-validate/zod'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { useEmitter } from '../../composables/useEmitter'
-import { handleHTTPError } from '../../utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { OPERATOR } from '../../constants/filterConfig.js'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'

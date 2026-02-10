@@ -103,7 +103,7 @@ import {
 } from '@shared-ui/components/ui/dialog/index.js'
 import { CONVERSATION_DEFAULT_STATUSES_LIST } from '../../../constants/conversation.js'
 import { useEmitter } from '../../../composables/useEmitter.js'
-import { handleHTTPError } from '../../../utils/http.js'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'
 import api from '../../../api/index.js'

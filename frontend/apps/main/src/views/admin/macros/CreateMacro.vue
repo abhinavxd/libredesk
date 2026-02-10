@@ -9,7 +9,7 @@
 import { ref } from 'vue'
 import MacroForm from '@main/features/admin/macros/MacroForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
-import { handleHTTPError } from '@main/utils/http'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
