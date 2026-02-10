@@ -152,9 +152,9 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	redirectURI := oauthData["redirect_uri"]
 	clientID := oauthData["client_id"]
 	clientSecret := oauthData["client_secret"]
-	tenantID := oauthData["tenant_id"]   // Empty string if not set
-	flowType := oauthData["flow_type"]   // "new_inbox" or "reconnect"
-	inboxIDStr := oauthData["inbox_id"]  // Inbox ID for reconnect flow
+	tenantID := oauthData["tenant_id"]  // Empty string if not set
+	flowType := oauthData["flow_type"]  // "new_inbox" or "reconnect"
+	inboxIDStr := oauthData["inbox_id"] // Inbox ID for reconnect flow
 
 	// Validate provider matches URL parameter
 	if storedProvider != provider {
@@ -310,11 +310,12 @@ func handleOAuthCallback(r *fastglue.Request) error {
 
 	// Create inbox config
 	config := imodels.Config{
-		SMTP:     []imodels.SMTPConfig{smtpConfig},
-		IMAP:     []imodels.IMAPConfig{imapConfig},
-		From:     userEmail,
-		AuthType: imodels.AuthTypeOAuth2,
-		OAuth:    oauthConfig,
+		SMTP:                 []imodels.SMTPConfig{smtpConfig},
+		IMAP:                 []imodels.IMAPConfig{imapConfig},
+		From:                 userEmail,
+		AuthType:             imodels.AuthTypeOAuth2,
+		OAuth:                oauthConfig,
+		EnablePlusAddressing: true,
 	}
 
 	configJSON, err := json.Marshal(config)

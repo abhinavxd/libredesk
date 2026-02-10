@@ -44,16 +44,15 @@ const breadcrumbLinks = [
 
 const submitForm = (values) => {
   let payload
-  
+
   if (inbox.value.channel === 'email') {
-    // Prepare request payload from form values
     const config = {
       auth_type: values.auth_type,
+      enable_plus_addressing: values.enable_plus_addressing,
       imap: [{ ...values.imap }],
       smtp: [{ ...values.smtp }]
     }
 
-    // Only add oauth if auth_type is oauth2
     if (values.auth_type === AUTH_TYPE_OAUTH2) {
       config.oauth = values.oauth
     }
@@ -64,7 +63,6 @@ const submitForm = (values) => {
       config
     }
 
-    // Set dummy passwords to empty string
     if (payload.config.imap[0].password?.includes('•')) {
       payload.config.imap[0].password = ''
     }
@@ -130,6 +128,7 @@ onMounted(async () => {
     }
     inboxData.auth_type = inboxData?.config?.auth_type || AUTH_TYPE_PASSWORD
     inboxData.oauth = inboxData?.config?.oauth || {}
+    inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
     inbox.value = inboxData
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

@@ -6,8 +6,8 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-// V0_12_0 updates the database schema to v0.12.0 (Live Chat feature).
-func V0_12_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+// V2_0_0 updates the database schema to v2.0.0 (Live Chat feature).
+func V2_0_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	// Add 'livechat' to the channels enum if not already present
 	var exists bool
 	err := db.Get(&exists, `

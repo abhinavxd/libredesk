@@ -33,6 +33,7 @@ type Email struct {
 	headers              map[string]string
 	lo                   *logf.Logger
 	from                 string
+	enablePlusAddressing bool
 	messageStore         inbox.MessageStore
 	userStore            inbox.UserStore
 	wg                   sync.WaitGroup
@@ -77,6 +78,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		userStore:            userStore,
 		oauth:                opts.Config.OAuth,
 		authType:             opts.Config.AuthType,
+		enablePlusAddressing: opts.Config.EnablePlusAddressing,
 		tokenRefreshCallback: opts.TokenRefreshCallback,
 	}
 	return e, nil
@@ -124,11 +126,12 @@ func (e *Email) getCurrentConfig() models.Config {
 	e.oauthMu.RUnlock()
 
 	return models.Config{
-		SMTP:     e.smtpCfg,
-		IMAP:     e.imapCfg,
-		From:     e.from,
-		OAuth:    oauth,
-		AuthType: e.authType,
+		SMTP:                 e.smtpCfg,
+		IMAP:                 e.imapCfg,
+		From:                 e.from,
+		OAuth:                oauth,
+		AuthType:             e.authType,
+		EnablePlusAddressing: e.enablePlusAddressing,
 	}
 }
 

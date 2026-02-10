@@ -7,6 +7,7 @@ export const createFormSchema = (t) => z.object({
   from: z.string().min(1, t('globals.messages.required')),
   enabled: z.boolean().optional(),
   csat_enabled: z.boolean().optional(),
+  enable_plus_addressing: z.boolean().optional(),
   auth_type: z.enum([AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2]),
   oauth: z.object({
     access_token: z.string().optional(),

@@ -332,16 +332,18 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	switch current.Channel {
 	case "email":
 		var currentCfg struct {
-			AuthType string                   `json:"auth_type"`
-			OAuth    map[string]string        `json:"oauth"`
-			IMAP     []map[string]interface{} `json:"imap"`
-			SMTP     []map[string]interface{} `json:"smtp"`
+			AuthType             string            `json:"auth_type"`
+			OAuth                map[string]string `json:"oauth"`
+			IMAP                 []map[string]any  `json:"imap"`
+			SMTP                 []map[string]any  `json:"smtp"`
+			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
 		}
 		var updateCfg struct {
-			AuthType string                   `json:"auth_type"`
-			OAuth    map[string]string        `json:"oauth"`
-			IMAP     []map[string]interface{} `json:"imap"`
-			SMTP     []map[string]interface{} `json:"smtp"`
+			AuthType             string            `json:"auth_type"`
+			OAuth                map[string]string `json:"oauth"`
+			IMAP                 []map[string]any  `json:"imap"`
+			SMTP                 []map[string]any  `json:"smtp"`
+			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
 		}
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
@@ -541,15 +543,15 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		return config, nil
 	}
 
-	var cfg map[string]interface{}
+	var cfg map[string]any
 	if err := json.Unmarshal(config, &cfg); err != nil {
 		return nil, fmt.Errorf("unmarshalling config: %w", err)
 	}
 
 	// Encrypt SMTP passwords
-	if smtpSlice, ok := cfg["smtp"].([]interface{}); ok {
+	if smtpSlice, ok := cfg["smtp"].([]any); ok {
 		for i, smtpItem := range smtpSlice {
-			if smtpMap, ok := smtpItem.(map[string]interface{}); ok {
+			if smtpMap, ok := smtpItem.(map[string]any); ok {
 				if password, ok := smtpMap["password"].(string); ok && password != "" {
 					encrypted, err := crypto.Encrypt(password, m.encryptionKey)
 					if err != nil {
@@ -562,9 +564,9 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	}
 
 	// Encrypt IMAP passwords
-	if imapSlice, ok := cfg["imap"].([]interface{}); ok {
+	if imapSlice, ok := cfg["imap"].([]any); ok {
 		for i, imapItem := range imapSlice {
-			if imapMap, ok := imapItem.(map[string]interface{}); ok {
+			if imapMap, ok := imapItem.(map[string]any); ok {
 				if password, ok := imapMap["password"].(string); ok && password != "" {
 					encrypted, err := crypto.Encrypt(password, m.encryptionKey)
 					if err != nil {
@@ -577,7 +579,7 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	}
 
 	// Encrypt OAuth fields if present
-	if oauthMap, ok := cfg["oauth"].(map[string]interface{}); ok {
+	if oauthMap, ok := cfg["oauth"].(map[string]any); ok {
 		fields := []string{"client_secret", "access_token", "refresh_token"}
 		for _, fieldName := range fields {
 			if fieldValue, ok := oauthMap[fieldName].(string); ok && fieldValue != "" {
@@ -604,15 +606,15 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		return config, nil
 	}
 
-	var cfg map[string]interface{}
+	var cfg map[string]any
 	if err := json.Unmarshal(config, &cfg); err != nil {
 		return nil, fmt.Errorf("unmarshalling config: %w", err)
 	}
 
 	// Decrypt SMTP passwords
-	if smtpSlice, ok := cfg["smtp"].([]interface{}); ok {
+	if smtpSlice, ok := cfg["smtp"].([]any); ok {
 		for i, smtpItem := range smtpSlice {
-			if smtpMap, ok := smtpItem.(map[string]interface{}); ok {
+			if smtpMap, ok := smtpItem.(map[string]any); ok {
 				if password, ok := smtpMap["password"].(string); ok && password != "" {
 					decrypted, err := crypto.Decrypt(password, m.encryptionKey)
 					if err != nil {
@@ -625,9 +627,9 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	}
 
 	// Decrypt IMAP passwords
-	if imapSlice, ok := cfg["imap"].([]interface{}); ok {
+	if imapSlice, ok := cfg["imap"].([]any); ok {
 		for i, imapItem := range imapSlice {
-			if imapMap, ok := imapItem.(map[string]interface{}); ok {
+			if imapMap, ok := imapItem.(map[string]any); ok {
 				if password, ok := imapMap["password"].(string); ok && password != "" {
 					decrypted, err := crypto.Decrypt(password, m.encryptionKey)
 					if err != nil {
@@ -640,7 +642,7 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	}
 
 	// Decrypt OAuth fields if present
-	if oauthMap, ok := cfg["oauth"].(map[string]interface{}); ok {
+	if oauthMap, ok := cfg["oauth"].(map[string]any); ok {
 		fields := []string{"client_secret", "access_token", "refresh_token"}
 		for _, fieldName := range fields {
 			if fieldValue, ok := oauthMap[fieldName].(string); ok && fieldValue != "" {

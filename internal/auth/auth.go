@@ -101,6 +101,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 	})
 
 	st := sessredisstore.New(context.TODO(), rd)
+	st.SetTTL(time.Hour*9, true)
 	sess.UseStore(st)
 	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
 

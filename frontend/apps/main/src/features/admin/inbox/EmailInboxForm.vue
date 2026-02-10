@@ -54,9 +54,23 @@
           <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
         </FormControl>
       </FormItem>
-      <p class="!mt-2 text-muted-foreground text-sm">
+      <p class="!mt-2 text-muted-foreground text-xs">
         {{ $t('admin.inbox.csatSurveys.description_2') }}
       </p>
+    </FormField>
+
+    <FormField v-if="showFormFields" v-slot="{ componentField, handleChange }" name="enable_plus_addressing">
+      <FormItem class="flex flex-row items-center justify-between box p-4">
+        <div class="space-y-0.5">
+          <FormLabel class="text-base">{{ $t('admin.inbox.enablePlusAddressing') }}</FormLabel>
+          <FormDescription>
+            {{ $t('admin.inbox.enablePlusAddressing.description') }}
+          </FormDescription>
+        </div>
+        <FormControl>
+          <Switch :checked="componentField.modelValue" @update:checked="handleChange" />
+        </FormControl>
+      </FormItem>
     </FormField>
 
     <FormField v-if="setupMethod" v-slot="{ componentField }" name="auth_type">
@@ -729,6 +743,7 @@ const form = useForm({
     from: '',
     enabled: true,
     csat_enabled: false,
+    enable_plus_addressing: true,
     auth_type: AUTH_TYPE_PASSWORD,
     imap: {
       host: 'imap.gmail.com',

@@ -173,6 +173,7 @@ const submitForm = (values) => {
     from: values.from,
     channel: channelName,
     config: {
+      enable_plus_addressing: values.enable_plus_addressing,
       imap: [values.imap],
       smtp: [values.smtp]
     }

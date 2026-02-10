@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/mail"
 	"strconv"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
@@ -56,6 +58,11 @@ func handleCreateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), err.Error(), envelope.InputError)
 	}
 
+	// Trim whitespace from inbox fields and config.
+	if err := trimInboxFields(&inbox); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "config"), err.Error(), envelope.InputError)
+	}
+
 	createdInbox, err := app.inbox.Create(inbox)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -92,6 +99,11 @@ func handleUpdateInbox(r *fastglue.Request) error {
 
 	if err := r.Decode(&inbox, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), err.Error(), envelope.InputError)
+	}
+
+	// Trim whitespace from inbox fields and config.
+	if err := trimInboxFields(&inbox); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "config"), err.Error(), envelope.InputError)
 	}
 
 	if err := validateInbox(app, inbox); err != nil {
@@ -277,4 +289,50 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 	}
 
 	return nil
+}
+
+// trimInboxFields trims whitespace from inbox fields and its email config if applicable.
+func trimInboxFields(inb *imodels.Inbox) error {
+	inb.Name = strings.TrimSpace(inb.Name)
+	inb.From = strings.TrimSpace(inb.From)
+
+	// Trim email config fields if this is an email channel.
+	if inb.Channel == inbox.ChannelEmail && len(inb.Config) > 0 {
+		var cfg imodels.Config
+		if err := json.Unmarshal(inb.Config, &cfg); err != nil {
+			return err
+		}
+		trimEmailConfig(&cfg)
+		trimmedConfig, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		inb.Config = trimmedConfig
+	}
+	return nil
+}
+
+// trimEmailConfig trims whitespace from email configuration fields.
+// Passwords and secrets are intentionally NOT trimmed.
+func trimEmailConfig(cfg *imodels.Config) {
+	// Trim IMAP configs.
+	for i := range cfg.IMAP {
+		cfg.IMAP[i].Host = strings.TrimSpace(cfg.IMAP[i].Host)
+		cfg.IMAP[i].Username = strings.TrimSpace(cfg.IMAP[i].Username)
+		cfg.IMAP[i].Mailbox = strings.TrimSpace(cfg.IMAP[i].Mailbox)
+	}
+
+	// Trim SMTP configs.
+	for i := range cfg.SMTP {
+		cfg.SMTP[i].Host = strings.TrimSpace(cfg.SMTP[i].Host)
+		cfg.SMTP[i].Username = strings.TrimSpace(cfg.SMTP[i].Username)
+		cfg.SMTP[i].HelloHostname = strings.TrimSpace(cfg.SMTP[i].HelloHostname)
+	}
+
+	// Trim OAuth config.
+	if cfg.OAuth != nil {
+		cfg.OAuth.Provider = strings.TrimSpace(cfg.OAuth.Provider)
+		cfg.OAuth.ClientID = strings.TrimSpace(cfg.OAuth.ClientID)
+		cfg.OAuth.TenantID = strings.TrimSpace(cfg.OAuth.TenantID)
+	}
 }

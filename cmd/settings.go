@@ -47,13 +47,18 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
 
+	// Trim whitespace from string fields.
+	req.SiteName = strings.TrimSpace(req.SiteName)
+	req.FaviconURL = strings.TrimSpace(req.FaviconURL)
+	req.LogoURL = strings.TrimSpace(req.LogoURL)
+	req.Timezone = strings.TrimSpace(req.Timezone)
+	// Trim whitespace and trailing slash from root URL.
+	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
+
 	// Get current language before update.
 	app.Lock()
 	oldLang := ko.String("app.lang")
 	app.Unlock()
-
-	// Remove any trailing slash `/` from the root url.
-	req.RootURL = strings.TrimRight(req.RootURL, "/")
 
 	if err := app.setting.Update(req); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -112,6 +117,14 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
+
+	// Trim whitespace from string fields (Password intentionally NOT trimmed).
+	req.Host = strings.TrimSpace(req.Host)
+	req.Username = strings.TrimSpace(req.Username)
+	req.EmailAddress = strings.TrimSpace(req.EmailAddress)
+	req.HelloHostname = strings.TrimSpace(req.HelloHostname)
+	req.IdleTimeout = strings.TrimSpace(req.IdleTimeout)
+	req.WaitTimeout = strings.TrimSpace(req.WaitTimeout)
 
 	out, err := app.setting.GetByPrefix("notification.email")
 	if err != nil {

@@ -23,8 +23,8 @@ write_timeout = "5s"
 # Maximum request body size in bytes (100MB)
 # If you are using proxy, you may need to configure them to allow larger request bodies.
 max_body_size = 104857600
-# Size of the read buffer for incoming requests
-read_buffer_size = 4096
+# Size of the read buffer for incoming requests (also limits max header size).
+read_buffer_size = 65536
 # Keepalive settings.
 keepalive_timeout = "10s"
 

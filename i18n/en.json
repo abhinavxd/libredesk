@@ -559,6 +559,8 @@
   "admin.inbox.heloHostname.description": "The hostname to use in the HELO/EHLO command. If not set, defaults to localhost.",
   "admin.inbox.skipTLSVerification": "Skip TLS Verification",
   "admin.inbox.skipTLSVerification.description": "Skip hostname check on the TLS certificate.",
+  "admin.inbox.enablePlusAddressing": "Enable plus addressing",
+  "admin.inbox.enablePlusAddressing.description": "Improves conversation threading but requires provider support (e.g., Gmail, Microsoft 365).",
   "admin.inbox.chooseChannel": "Choose a channel",
   "admin.inbox.configureChannel": "Configure channel",
   "admin.inbox.createEmailInbox": "Create Email Inbox",

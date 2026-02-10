@@ -34,11 +34,12 @@ type Inbox struct {
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.
 type Config struct {
-	AuthType string       `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
-	OAuth    *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2"
-	SMTP     []SMTPConfig `json:"smtp"`
-	IMAP     []IMAPConfig `json:"imap"`
-	From     string       `json:"from"`
+	AuthType             string       `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
+	OAuth                *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2"
+	SMTP                 []SMTPConfig `json:"smtp"`
+	IMAP                 []IMAPConfig `json:"imap"`
+	From                 string       `json:"from"`
+	EnablePlusAddressing bool         `json:"enable_plus_addressing"` // Enable plus-addressing in Reply-To header for conversation matching
 }
 
 // OAuthConfig holds OAuth 2.0 authentication details.
