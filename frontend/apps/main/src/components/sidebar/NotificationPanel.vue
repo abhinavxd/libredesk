@@ -141,7 +141,7 @@ import {
 import { Button } from '@shared-ui/components/ui/button'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { useNotificationStore } from '@main/stores/notification'
-import { getRelativeTime } from '@main/utils/datetime'
+import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 
 const emit = defineEmits(['close'])
 

@@ -117,8 +117,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getRelativeTime } from '@main/utils/datetime'
-import { Mail, Reply, Pencil, MailOpen, MessageCircle } from 'lucide-vue-next'
+import { getRelativeTime } from '@shared-ui/utils/datetime.js'
+import { Mail, Reply, Pencil, MailOpen } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,
