@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -15,14 +16,17 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
 const (
-	ChannelEmail = "email"
+	ChannelEmail    = "email"
+	ChannelLiveChat = "livechat"
 )
 
 var (
@@ -49,7 +53,7 @@ type Identifier interface {
 // MessageHandler defines methods for handling message operations.
 type MessageHandler interface {
 	Receive(context.Context) error
-	Send(models.Message) error
+	Send(models.OutboundMessage) error
 }
 
 // Inbox combines the operations of an inbox including its lifecycle, identification, and message handling.
@@ -70,6 +74,7 @@ type MessageStore interface {
 // UserStore defines methods for fetching user information.
 type UserStore interface {
 	GetContact(id int, email string) (umodels.User, error)
+	GetAgent(id int, email string) (umodels.User, error)
 }
 
 // Opts contains the options for initializing the inbox manager.
@@ -168,6 +173,9 @@ func (m *Manager) GetDBRecord(id int) (imodels.Inbox, error) {
 	}
 	inbox.Config = decryptedConfig
 
+	// Decrypt secret field
+	m.decryptInboxSecret(&inbox)
+
 	return inbox, nil
 }
 
@@ -187,6 +195,9 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.terms.inbox")), nil)
 		}
 		inboxes[i].Config = decryptedConfig
+
+		// Decrypt secret field
+		m.decryptInboxSecret(&inboxes[i])
 	}
 
 	return inboxes, nil
@@ -194,6 +205,19 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 
 // Create creates an inbox in the DB.
 func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
+	// Generate and encrypt secret for livechat inboxes if not provided
+	if inbox.Channel == ChannelLiveChat && !inbox.Secret.Valid {
+		secret, err := stringutil.RandomAlphanumeric(32)
+		if err != nil {
+			return imodels.Inbox{}, fmt.Errorf("generating inbox secret: %w", err)
+		}
+		encryptedSecret, err := crypto.Encrypt(secret, m.encryptionKey)
+		if err != nil {
+			return imodels.Inbox{}, fmt.Errorf("encrypting inbox secret: %w", err)
+		}
+		inbox.Secret = null.StringFrom(encryptedSecret)
+	}
+
 	// Encrypt sensitive fields before saving
 	encryptedConfig, err := m.encryptInboxConfig(inbox.Config)
 	if err != nil {
@@ -202,7 +226,7 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 	}
 
 	var createdInbox imodels.Inbox
-	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled); err != nil {
+	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Secret, inbox.LinkedEmailInboxID); err != nil {
 		m.lo.Error("error creating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.inbox}"), nil)
 	}
@@ -214,6 +238,9 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 	} else {
 		createdInbox.Config = decryptedConfig
 	}
+
+	// Decrypt secret field
+	m.decryptInboxSecret(&createdInbox)
 
 	return createdInbox, nil
 }
@@ -371,6 +398,18 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			return imodels.Inbox{}, err
 		}
 		inbox.Config = updatedConfig
+	case "livechat":
+		// Preserve existing secret if update contains password dummy
+		if inbox.Secret.Valid && strings.Contains(inbox.Secret.String, stringutil.PasswordDummy) {
+			inbox.Secret = current.Secret
+		} else if inbox.Secret.Valid && inbox.Secret.String != "" {
+			// Encrypt new secret
+			encryptedSecret, err := crypto.Encrypt(inbox.Secret.String, m.encryptionKey)
+			if err != nil {
+				return imodels.Inbox{}, fmt.Errorf("encrypting inbox secret: %w", err)
+			}
+			inbox.Secret = null.StringFrom(encryptedSecret)
+		}
 	}
 
 	// Encrypt sensitive fields before updating
@@ -382,7 +421,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 
 	// Update the inbox in the DB.
 	var updatedInbox imodels.Inbox
-	if err := m.queries.Update.Get(&updatedInbox, id, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Enabled); err != nil {
+	if err := m.queries.Update.Get(&updatedInbox, id, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.Enabled, inbox.Secret, inbox.LinkedEmailInboxID); err != nil {
 		m.lo.Error("error updating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.inbox}"), nil)
 	}
@@ -394,6 +433,9 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	} else {
 		updatedInbox.Config = decryptedConfig
 	}
+
+	// Decrypt secret field
+	m.decryptInboxSecret(&updatedInbox)
 
 	return updatedInbox, nil
 }
@@ -487,6 +529,9 @@ func (m *Manager) getActive() ([]imodels.Inbox, error) {
 			return nil, fmt.Errorf("decrypting inbox config for ID %d: %w", inboxes[i].ID, err)
 		}
 		inboxes[i].Config = decryptedConfig
+
+		// Decrypt secret field
+		m.decryptInboxSecret(&inboxes[i])
 	}
 
 	return inboxes, nil
@@ -616,4 +661,16 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	}
 
 	return decrypted, nil
+}
+
+// decryptInboxSecret decrypts the inbox secret field if present.
+func (m *Manager) decryptInboxSecret(inbox *imodels.Inbox) {
+	if inbox.Secret.Valid && inbox.Secret.String != "" {
+		decrypted, err := crypto.Decrypt(inbox.Secret.String, m.encryptionKey)
+		if err != nil {
+			m.lo.Error("error decrypting inbox secret", "inbox_id", inbox.ID, "error", err)
+			return
+		}
+		inbox.Secret = null.StringFrom(decrypted)
+	}
 }

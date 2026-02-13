@@ -38,6 +38,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/tag"
@@ -57,7 +58,8 @@ var (
 	ko          = koanf.New(".")
 	ctx         = context.Background()
 	appName     = "libredesk"
-	frontendDir = "frontend/dist"
+	frontendDir = "frontend/dist/main"
+	widgetDir   = "frontend/dist/widget"
 
 	// Injected at build time.
 	buildString   string
@@ -70,7 +72,6 @@ const (
 
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
-	redis            *redis.Client
 	fs               stuffbin.FileSystem
 	consts           atomic.Value
 	auth             *auth_.Auth
@@ -103,6 +104,8 @@ type App struct {
 	customAttribute  *customAttribute.Manager
 	report           *report.Manager
 	webhook          *webhook.Manager
+	rateLimit        *ratelimit.Limiter
+	redis            *redis.Client
 	importer         *importer.Importer
 
 	// Global state that stores data on an available app update.
@@ -219,26 +222,35 @@ func main() {
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
 		autoassigner                = initAutoAssigner(team, user, conversation)
+		rateLimiter                 = initRateLimit(rdb)
 	)
+
+	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
 
+	// Start inboxes.
 	startInboxes(ctx, inbox, conversation, user)
+
 	go automation.Run(ctx, automationWorkers)
 	go autoassigner.Run(ctx, autoAssignInterval)
 	go conversation.Run(ctx, messageIncomingQWorkers, messageOutgoingQWorkers, messageOutgoingScanInterval)
 	go conversation.RunUnsnoozer(ctx, unsnoozeInterval)
+	go conversation.RunContinuity(ctx)
 	go webhook.Run(ctx)
 	go notifier.Run(ctx)
 	go sla.Run(ctx, slaEvaluationInterval)
 	go sla.SendNotifications(ctx)
 	go media.DeleteUnlinkedMedia(ctx)
-	go user.MonitorAgentAvailability(ctx)
+	go user.MonitorUserAvailability(ctx, func(userIDs []int) {
+		for _, id := range userIDs {
+			conversation.BroadcastContactStatus(id, "offline")
+		}
+	})
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
 
 	var app = &App{
 		lo:               lo,
-		redis:            rdb,
 		fs:               fs,
 		sla:              sla,
 		oidc:             oidc,
@@ -253,12 +265,10 @@ func main() {
 		priority:         priority,
 		tmpl:             template,
 		notifier:         notifier,
-		userNotification: userNotification,
 		consts:           atomic.Value{},
 		conversation:     conversation,
 		automation:       automation,
 		businessHours:    businessHours,
-		importer:         initImporter(i18n),
 		activityLog:      initActivityLog(db, i18n),
 		customAttribute:  initCustomAttribute(db, i18n),
 		authz:            initAuthz(i18n),
@@ -270,7 +280,11 @@ func main() {
 		tag:              initTag(db, i18n),
 		macro:            initMacro(db, i18n),
 		ai:               initAI(db, i18n),
+		importer:         initImporter(i18n),
 		webhook:          webhook,
+		rateLimit:        rateLimiter,
+		redis:            rdb,
+		userNotification: userNotification,
 	}
 	app.consts.Store(constants)
 
