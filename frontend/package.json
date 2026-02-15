@@ -48,7 +48,7 @@
     "lucide-vue-next": "^0.378.0",
     "mitt": "^3.0.1",
     "pinia": "^2.1.7",
-    "qs": "^6.14.1",
+    "qs": "^6.14.2",
     "radix-vue": "^1.9.17",
     "reka-ui": "^2.2.0",
     "tailwind-merge": "^2.3.0",
