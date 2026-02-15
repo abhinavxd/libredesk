@@ -119,6 +119,8 @@ workers = 5
 queue_size = 10000
 # HTTP timeout for webhook requests
 timeout = "15s"
+# CIDR ranges allowed to bypass SSRF protection (e.g. ["10.0.0.0/8"])
+allowed_hosts = []
 
 [conversation]
 # How often to check for conversations to unsnooze
