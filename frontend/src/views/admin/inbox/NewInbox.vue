@@ -156,6 +156,7 @@ const submitForm = (values) => {
   const payload = {
     name: values.name,
     from: values.from,
+    from_name_template: values.from_name_template || '',
     channel: channelName,
     config: {
       enable_plus_addressing: values.enable_plus_addressing,
