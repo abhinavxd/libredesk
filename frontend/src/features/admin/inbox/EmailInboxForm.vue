@@ -29,6 +29,23 @@
       </FormItem>
     </FormField>
 
+    <FormField v-if="showFormFields" v-slot="{ componentField }" name="from_name_template">
+      <FormItem>
+        <FormLabel>{{ $t('admin.inbox.fromNameTemplate') }}</FormLabel>
+        <FormControl>
+          <Input
+            type="text"
+            :placeholder="t('admin.inbox.fromNameTemplate.placeholder')"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          {{ $t('admin.inbox.fromNameTemplate.description') }}
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <!-- Toggle Fields -->
     <FormField v-if="showFormFields" v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem class="flex flex-row items-center justify-between box p-4">
@@ -741,6 +758,7 @@ const form = useForm({
   initialValues: {
     name: '',
     from: '',
+    from_name_template: '',
     enabled: true,
     csat_enabled: false,
     enable_plus_addressing: true,
