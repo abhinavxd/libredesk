@@ -54,3 +54,12 @@ func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filters
 	}
 	return u.GetAllUsers(page, pageSize, models.UserTypeContact, order, orderBy, filtersJSON)
 }
+
+// SoftDeleteContact soft deletes a contact by ID.
+func (u *Manager) SoftDeleteContact(id int) error {
+	if _, err := u.q.SoftDeleteContact.Exec(id); err != nil {
+		u.lo.Error("error deleting contact", "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.contact}"), nil)
+	}
+	return nil
+}

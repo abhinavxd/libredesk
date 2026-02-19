@@ -268,3 +268,8 @@ WHERE id = $1;
 UPDATE users 
 SET api_key_last_used_at = now()
 WHERE id = $1;
+-- name: soft-delete-contact
+UPDATE users
+SET deleted_at = now(), updated_at = now()
+WHERE id = $1 AND type = 'contact'
+RETURNING id;

@@ -285,3 +285,25 @@ func handleBlockContact(r *fastglue.Request) error {
 	}
 	return r.SendEnvelope(contact)
 }
+
+
+// handleDeleteContact soft deletes a contact.
+func handleDeleteContact(r *fastglue.Request) error {
+	var (
+		app          = r.Context.(*App)
+		contactID, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+		auser        = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+
+	if contactID <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+	}
+
+	app.lo.Info("deleting contact", "contact_id", contactID, "actor_id", auser.ID)
+
+	if err := app.user.SoftDeleteContact(contactID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(true)
+}
