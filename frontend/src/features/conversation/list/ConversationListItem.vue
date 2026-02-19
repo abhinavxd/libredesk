@@ -42,6 +42,11 @@
               </span>
             </div>
 
+            <!-- Subject -->
+            <p v-if="conversation.subject" class="text-xs font-medium text-muted-foreground truncate">
+              {{ conversation.subject }}
+            </p>
+
             <!-- Inbox name -->
             <p class="text-xs text-gray-400 flex items-center gap-1.5">
               <Mail class="w-3.5 h-3.5 text-gray-400/80" />
