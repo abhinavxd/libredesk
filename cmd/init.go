@@ -600,6 +600,7 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 	}
 
 	config.From = inboxRecord.From
+	config.FromNameTemplate = inboxRecord.FromNameTemplate
 
 	if len(config.From) == 0 {
 		log.Printf("WARNING: No `from` email address set for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
