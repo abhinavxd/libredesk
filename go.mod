@@ -3,6 +3,7 @@ module github.com/abhinavxd/libredesk
 go 1.25.0
 
 require (
+	github.com/abhinavxd/ssrfguard v0.1.0
 	github.com/casbin/casbin/v2 v2.99.0
 	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/disintegration/imaging v1.6.2

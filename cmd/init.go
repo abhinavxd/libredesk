@@ -985,6 +985,7 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 		QueueSize:     ko.MustInt("webhook.queue_size"),
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
+		AllowedHosts:  ko.Strings("webhook.allowed_hosts"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)
