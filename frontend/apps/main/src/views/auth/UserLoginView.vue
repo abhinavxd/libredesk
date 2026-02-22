@@ -195,14 +195,12 @@ const redirectToOIDC = (provider) => {
 
 const validateForm = () => {
   if (!validateEmail(loginForm.value.email) && loginForm.value.email !== 'System') {
-    errorMessage.value = t('globals.messages.invalidEmailAddress')
+    errorMessage.value = t('validation.invalidEmail')
     useTemporaryClass('login-container', 'animate-shake')
     return false
   }
   if (!loginForm.value.password) {
-    errorMessage.value = t('globals.messages.cannotBeEmpty', {
-      name: t('globals.terms.password')
-    })
+    errorMessage.value = t('validation.passwordCannotBeEmpty')
     useTemporaryClass('login-container', 'animate-shake')
     return false
   }

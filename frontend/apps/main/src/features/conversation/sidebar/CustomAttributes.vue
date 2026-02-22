@@ -99,7 +99,7 @@
             <template v-else-if="attribute.data_type === 'list'">
               <Select v-model="editingValue">
                 <SelectTrigger>
-                  <SelectValue :placeholder="t('globals.messages.select', { name: t('globals.terms.value') })" />
+                  <SelectValue :placeholder="t('placeholders.selectValue')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="option in attribute.values" :key="option" :value="option">
@@ -195,9 +195,7 @@ const getValidationSchema = (attribute) => {
         (val) => Number(val),
         z
           .number({
-            invalid_type_error: t('globals.messages.invalid', {
-              name: t('globals.terms.value').toLowerCase()
-            })
+            invalid_type_error: t('validation.invalidValue')
           })
           .nullable()
       )
@@ -208,27 +206,21 @@ const getValidationSchema = (attribute) => {
         .string()
         .refine(
           (val) => !isNaN(Date.parse(val)),
-          t('globals.messages.invalid', {
-            name: t('globals.terms.value').toLowerCase()
-          })
+          t('validation.invalidValue')
         )
         .nullable()
     case 'link':
       return z
         .string()
         .url(
-          t('globals.messages.invalid', {
-            name: t('globals.terms.url').toLowerCase()
-          })
+          t('validation.invalidUrl')
         )
         .nullable()
     case 'list':
       return z
         .string()
         .refine((val) => attribute.values.includes(val), {
-          message: t('globals.messages.invalid', {
-            name: t('globals.terms.value').toLowerCase()
-          })
+          message: t('validation.invalidValue')
         })
         .nullable()
     default:

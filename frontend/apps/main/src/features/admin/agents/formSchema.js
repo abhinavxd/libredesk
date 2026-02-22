@@ -6,13 +6,13 @@ export const createFormSchema = (t) => z.object({
       required_error: t('globals.messages.required'),
     })
     .min(2, {
-      message: t('form.error.minmax', {
+      message: t('validation.minmax', {
         min: 2,
         max: 50,
       })
     })
     .max(50, {
-      message: t('form.error.minmax', {
+      message: t('validation.minmax', {
         min: 2,
         max: 50,
       })
@@ -25,16 +25,14 @@ export const createFormSchema = (t) => z.object({
       required_error: t('globals.messages.required'),
     })
     .email({
-      message: t('globals.messages.invalidEmailAddress'),
+      message: t('validation.invalidEmail'),
     }),
 
   send_welcome_email: z.boolean().optional(),
 
   teams: z.array(z.string()).default([]),
 
-  roles: z.array(z.string()).min(1, t('globals.messages.selectAtLeastOne', {
-    name: t('globals.terms.role')
-  })),
+  roles: z.array(z.string()).min(1, t('validation.selectAtLeastOneRole')),
 
   new_password: z
     .string()

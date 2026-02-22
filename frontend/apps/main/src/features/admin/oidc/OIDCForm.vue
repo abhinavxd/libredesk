@@ -7,7 +7,7 @@
           <Select v-bind="componentField">
             <SelectTrigger>
               <SelectValue
-                :placeholder="t('globals.messages.select', { name: t('globals.terms.provider') })"
+                :placeholder="t('placeholders.selectProvider')"
               />
             </SelectTrigger>
             <SelectContent>

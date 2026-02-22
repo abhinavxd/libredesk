@@ -25,9 +25,7 @@
       <DialogHeader>
         <DialogTitle>
           {{
-            $t('globals.messages.edit', {
-              name: $t('globals.terms.status')
-            })
+            $t('status.edit')
           }}
         </DialogTitle>
         <DialogDescription>
@@ -52,9 +50,7 @@
         <AlertDialogTitle> {{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
         <AlertDialogDescription>
           {{
-            $t('globals.messages.deletionConfirmation', {
-              name: $t('globals.terms.status').toLowerCase()
-            })
+            $t('status.deletionConfirmation')
           }}
         </AlertDialogDescription>
       </AlertDialogHeader>

@@ -5,9 +5,7 @@
       <router-link :to="{ name: 'new-macro' }">
         <Button>
           {{
-            $t('globals.messages.new', {
-              name: $t('globals.terms.macro')
-            })
+            $t('macro.new')
           }}
         </Button>
       </router-link>

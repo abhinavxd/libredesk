@@ -78,18 +78,8 @@
           <DialogTitle>
             {{
               editor?.isActive('link')
-                ? $t('globals.messages.edit', {
-                    name:
-                      $t('globals.terms.link', 1).toLowerCase() +
-                      ' ' +
-                      $t('globals.terms.url', 1).toLowerCase()
-                  })
-                : $t('globals.messages.add', {
-                    name:
-                      $t('globals.terms.link', 1).toLowerCase() +
-                      ' ' +
-                      $t('globals.terms.url', 1).toLowerCase()
-                  })
+                ? $t('editor.editLinkUrl')
+                : $t('editor.addLinkUrl')
             }}
           </DialogTitle>
           <DialogDescription></DialogDescription>
@@ -99,7 +89,7 @@
             <Input
               v-model="linkUrl"
               type="text"
-              :placeholder="$t('globals.messages.enter', { name: $t('globals.terms.url', 1) })"
+              :placeholder="$t('placeholders.enterUrl')"
               @keydown.enter.prevent="setLink"
             />
           </div>
@@ -110,7 +100,7 @@
               @click="unsetLink"
               v-if="editor?.isActive('link')"
             >
-              {{ $t('globals.messages.remove', { name: $t('globals.terms.link', 1) }) }}
+              {{ $t('actions.removeLink') }}
             </Button>
             <Button type="submit">
               {{ $t('globals.messages.save') }}

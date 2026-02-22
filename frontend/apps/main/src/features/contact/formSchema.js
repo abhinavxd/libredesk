@@ -6,13 +6,13 @@ export const createFormSchema = (t) => z.object({
             required_error: t('globals.messages.required'),
         })
         .min(2, {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 2,
                 max: 50,
             })
         })
         .max(50, {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 2,
                 max: 50,
             })
@@ -23,7 +23,7 @@ export const createFormSchema = (t) => z.object({
         .string()
         .optional()
         .refine(val => !val || (/^\d{1,15}$/.test(val)), {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 1,
                 max: 15,
             })
@@ -36,6 +36,6 @@ export const createFormSchema = (t) => z.object({
             required_error: t('globals.messages.required'),
         })
         .email({
-            message: t('globals.messages.invalidEmailAddress'),
+            message: t('validation.invalidEmail'),
         }),
 })

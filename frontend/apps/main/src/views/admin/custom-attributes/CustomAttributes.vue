@@ -11,9 +11,7 @@
                 <DialogTrigger as-child @click="newCustomAttribute">
                   <Button class="ml-auto">
                     {{
-                      $t('globals.messages.new', {
-                        name: $t('globals.terms.customAttribute').toLowerCase()
-                      })
+                      $t('customAttribute.new')
                     }}
                   </Button>
                 </DialogTrigger>
@@ -22,12 +20,8 @@
                     <DialogTitle>
                       {{
                         isEditing
-                          ? $t('globals.messages.edit', {
-                              name: $t('globals.terms.customAttribute').toLowerCase()
-                            })
-                          : $t('globals.messages.new', {
-                              name: $t('globals.terms.customAttribute').toLowerCase()
-                            })
+                          ? $t('customAttribute.edit')
+                          : $t('customAttribute.new')
                       }}
                     </DialogTitle>
                     <DialogDescription/>
@@ -69,10 +63,7 @@
       </template>
 
       <template #help>
-        <p>
-          Custom attributes help you set additional details about your contacts or conversations
-          such as the subscription plan or the date of their first purchase.
-        </p>
+        <p>{{ $t('admin.customAttribute.help') }}</p>
       </template>
     </AdminPageWithHelp>
   </div>
@@ -177,16 +168,12 @@ const onSubmit = form.handleSubmit(async (values) => {
     if (values.id) {
       await api.updateCustomAttribute(values.id, values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.updatedSuccessfully', {
-          name: t('globals.terms.customAttribute')
-        })
+        description: t('globals.messages.savedSuccessfully')
       })
     } else {
       await api.createCustomAttribute(values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.createdSuccessfully', {
-          name: t('globals.terms.customAttribute')
-        })
+        description: t('globals.messages.savedSuccessfully')
       })
     }
 

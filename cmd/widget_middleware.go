@@ -39,7 +39,7 @@ func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) erro
 
 		inboxID, err := strconv.Atoi(inboxIDHeader)
 		if err != nil || inboxID <= 0 {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidInbox"), nil, envelope.InputError)
 		}
 
 		// Always fetch and validate inbox
@@ -50,12 +50,12 @@ func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) erro
 		}
 
 		if !inbox.Enabled {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("status.disabledInbox"), nil, envelope.InputError)
 		}
 
 		// Check if inbox is the correct type for widget requests
 		if inbox.Channel != livechat.ChannelLiveChat {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.notFoundInbox"), nil, envelope.InputError)
 		}
 
 		// Always store inbox data in context
@@ -89,7 +89,7 @@ func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) erro
 			envErr, ok := err.(envelope.Error)
 			if ok && envErr.ErrorType != envelope.NotFoundError {
 				app.lo.Error("error resolving user ID from JWT claims", "error", err)
-				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 			}
 		}
 

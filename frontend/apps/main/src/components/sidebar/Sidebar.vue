@@ -216,11 +216,7 @@ const viewToDelete = ref(null)
               <SidebarMenuItem v-for="item in filteredContactsNavItems" :key="item.titleKey">
                 <SidebarMenuButton :isActive="isActiveParent(item.href)" asChild>
                   <router-link :to="item.href">
-                    <span>{{
-                      t('globals.messages.all', {
-                        name: t(item.titleKey, 2).toLowerCase()
-                      })
-                    }}</span>
+                    <span>{{ t(item.allLabelKey) }}</span>
                   </router-link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -390,13 +386,7 @@ const viewToDelete = ref(null)
                 <SidebarMenuButton asChild>
                   <a href="#" @click="emit('createConversation')">
                     <Plus />
-                    <span
-                      >{{
-                        t('globals.messages.new', {
-                          name: t('globals.terms.conversation').toLowerCase()
-                        })
-                      }}
-                    </span>
+                    <span>{{ t('conversation.newConversation') }}</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -608,7 +598,7 @@ const viewToDelete = ref(null)
       <AlertDialogHeader>
         <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ t('globals.messages.deletionConfirmation', { name: t('globals.terms.view') }) }}
+          {{ t('confirm.deleteView') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>

@@ -8,11 +8,8 @@
     </template>
 
     <template #help>
-      <p>Configure SMTP server settings for sending email notifications to team members.</p>
-      <p>
-        Once configured, teammates receive automated alerts for conversation assignments, SLA
-        breaches, and other important events.
-      </p>
+      <p>{{ $t('admin.notification.help.description') }}</p>
+      <p>{{ $t('admin.notification.help.detail') }}</p>
     </template>
   </AdminPageWithHelp>
 </template>

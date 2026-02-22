@@ -51,17 +51,13 @@ export function useConversationFilters () {
             options: cStore.priorityOptions
         },
         assigned_team_id: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.team').toLowerCase()
-            }),
+            label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: tStore.options
         },
         assigned_user_id: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.agent').toLowerCase()
-            }),
+            label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: uStore.options
@@ -126,17 +122,13 @@ export function useConversationFilters () {
             options: cStore.priorityOptions
         },
         assigned_team: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.team').toLowerCase()
-            }),
+            label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: tStore.options
         },
         assigned_user: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.agent').toLowerCase()
-            }),
+            label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: uStore.options
@@ -163,17 +155,13 @@ export function useConversationFilters () {
             options: cStore.priorityOptions
         },
         assigned_team: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.team').toLowerCase()
-            }),
+            label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: tStore.options
         },
         assigned_user: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.agent').toLowerCase()
-            }),
+            label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: uStore.options
@@ -208,122 +196,86 @@ export function useConversationFilters () {
 
     const conversationActions = computed(() => ({
         assign_team: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.team').toLowerCase()
-            }),
+            label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
             options: tStore.options
         },
         assign_user: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.agent').toLowerCase()
-            }),
+            label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             options: uStore.options
         },
         set_status: {
-            label: t('globals.messages.set', {
-                name: t('globals.terms.status').toLowerCase()
-            }),
+            label: t('actions.setStatus'),
             type: FIELD_TYPE.SELECT,
             options: cStore.statusOptionsNoSnooze
         },
         set_priority: {
-            label: t('globals.messages.set', {
-                name: t('globals.terms.priority').toLowerCase()
-            }),
+            label: t('actions.setPriority'),
             type: FIELD_TYPE.SELECT,
             options: cStore.priorityOptions
         },
         send_private_note: {
-            label: t('globals.messages.send', {
-                name: t('globals.terms.privateNote').toLowerCase()
-            }),
+            label: t('actions.sendPrivateNote'),
             type: FIELD_TYPE.RICHTEXT
         },
         send_reply: {
-            label: t('globals.messages.send', {
-                name: t('globals.terms.reply').toLowerCase()
-            }),
+            label: t('actions.sendReply'),
             type: FIELD_TYPE.RICHTEXT
         },
         send_csat: {
-            label: t('globals.messages.send', {
-                name: t('globals.terms.csat').toLowerCase()
-            }),
+            label: t('actions.sendCsat'),
         },
         set_sla: {
-            label: t('globals.messages.set', {
-                name: t('globals.terms.sla').toLowerCase()
-            }),
+            label: t('actions.setSla'),
             type: FIELD_TYPE.SELECT,
             options: slaStore.options
         },
         add_tags: {
-            label: t('globals.messages.add', {
-                name: t('globals.terms.tag', 2).toLowerCase()
-            }),
+            label: t('actions.addTags'),
             type: FIELD_TYPE.TAG
         },
         set_tags: {
-            label: t('globals.messages.set', {
-                name: t('globals.terms.tag', 2).toLowerCase()
-            }),
+            label: t('actions.setTags'),
             type: FIELD_TYPE.TAG
         },
         remove_tags: {
-            label: t('globals.messages.remove', {
-                name: t('globals.terms.tag', 2).toLowerCase()
-            }),
+            label: t('actions.removeTags'),
             type: FIELD_TYPE.TAG
         }
     }))
 
     const macroActions = computed(() => ({
         assign_team: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.team').toLowerCase()
-            }),
+            label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
             options: tStore.options
         },
         assign_user: {
-            label: t('globals.messages.assign', {
-                name: t('globals.terms.agent').toLowerCase()
-            }),
+            label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             options: uStore.options
         },
         set_status: {
-            label: t('globals.messages.set', {
-                name: t('globals.terms.status').toLowerCase()
-            }),
+            label: t('actions.setStatus'),
             type: FIELD_TYPE.SELECT,
             options: cStore.statusOptionsNoSnooze
         },
         set_priority: {
-            label: t('globals.messages.set', {
-                name: t('globals.terms.priority').toLowerCase()
-            }),
+            label: t('actions.setPriority'),
             type: FIELD_TYPE.SELECT,
             options: cStore.priorityOptions
         },
         add_tags: {
-            label: t('globals.messages.add', {
-                name: t('globals.terms.tag', 2).toLowerCase()
-            }),
+            label: t('actions.addTags'),
             type: FIELD_TYPE.TAG
         },
         set_tags: {
-            label: t('globals.messages.set', {
-                name: t('globals.terms.tag', 2).toLowerCase()
-            }),
+            label: t('actions.setTags'),
             type: FIELD_TYPE.TAG
         },
         remove_tags: {
-            label: t('globals.messages.remove', {
-                name: t('globals.terms.tag', 2).toLowerCase()
-            }),
+            label: t('actions.removeTags'),
             type: FIELD_TYPE.TAG
         }
     }))

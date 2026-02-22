@@ -48,7 +48,7 @@
         class="flex flex-col items-center justify-center py-8 text-muted-foreground"
       >
         <BellOff class="h-8 w-8 mb-2" />
-        <p class="text-sm">{{ t('globals.messages.noResults', { name: t('globals.terms.notification', 2) }) }}</p>
+        <p class="text-sm">{{ t('toast.noNotificationsFound') }}</p>
       </div>
 
       <!-- Notifications -->

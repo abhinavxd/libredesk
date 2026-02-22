@@ -16,7 +16,7 @@
                   @update:modelValue="(value) => handleFieldChange(value, index)"
                 >
                   <SelectTrigger class="m-auto">
-                    <SelectValue :placeholder="t('globals.messages.select', { name: t('globals.terms.action').toLowerCase() })" />
+                    <SelectValue :placeholder="t('placeholders.selectAction')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -40,7 +40,7 @@
                 <SelectTag
                   v-model="action.value"
                   :items="tagsStore.tagNames.map((tag) => ({ label: tag, value: tag }))"
-                  :placeholder="t('globals.messages.select', { name: t('globals.terms.tag', 2).toLowerCase() })"
+                  :placeholder="t('placeholders.selectTags')"
                 />
               </div>
 
@@ -51,7 +51,7 @@
                 <SelectComboBox
                   v-model="action.value[0]"
                   :items="conversationActions[action.type]?.options"
-                  :placeholder="t('globals.messages.select', { name: '' })"
+                  :placeholder="t('placeholders.selectValue')"
                   @select="handleValueChange($event, index)"
                   :type="action.type === 'assign_team' ? 'team' : 'user'"
                 />
@@ -69,7 +69,7 @@
               :autoFocus="false"
               v-model:htmlContent="action.value[0]"
               @update:htmlContent="(value) => handleEditorChange(value, index)"
-              :placeholder="t('editor.newLine') + t('editor.send') + t('editor.ctrlK')"
+              :placeholder="t('editor.hint.full')"
             />
           </div>
         </div>
@@ -77,9 +77,7 @@
     </div>
     <div>
       <Button variant="outline" @click.prevent="addAction">{{
-        $t('globals.messages.add', {
-          name: $t('globals.terms.action')
-        })
+        $t('actions.addAction')
       }}</Button>
     </div>
   </div>

@@ -1,76 +1,71 @@
 <template>
   <form @submit="onSubmit" class="space-y-6">
+    <div class="grid gap-6 md:grid-cols-2">
     <FormField name="emoji" v-slot="{ componentField }">
       <FormItem ref="emojiPickerContainer" class="relative">
-        <FormLabel>Emoji</FormLabel>
+        <FormLabel>{{ $t('admin.team.emoji') }}</FormLabel>
         <FormControl>
           <Input type="text" v-bind="componentField" @click="toggleEmojiPicker" />
           <div v-if="isEmojiPickerVisible" class="absolute z-10 mt-2">
             <EmojiPicker :native="true" @select="onSelectEmoji" class="w-[300px]" />
           </div>
         </FormControl>
-        <FormDescription>Display emoji for this team.</FormDescription>
+        <FormDescription>{{ $t('admin.team.emoji.description') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="name">
       <FormItem>
-        <FormLabel>Name</FormLabel>
+        <FormLabel>{{ $t('globals.terms.name', 1) }}</FormLabel>
         <FormControl>
-          <Input type="text" placeholder="Name" v-bind="componentField" />
+          <Input type="text" :placeholder="$t('globals.terms.name', 1)" v-bind="componentField" />
         </FormControl>
-        <FormDescription>Select an unique name for the team.</FormDescription>
+        <FormDescription>{{ $t('admin.team.name.description') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField name="conversation_assignment_type" v-slot="{ componentField }">
       <FormItem>
-        <FormLabel>Auto assignment type</FormLabel>
+        <FormLabel>{{ $t('admin.team.assignmentType') }}</FormLabel>
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger>
-              <SelectValue placeholder="Select a assignment type" />
+              <SelectValue :placeholder="$t('admin.team.assignmentType.placeholder')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem v-for="at in assignmentTypes" :key="at" :value="at">
-                  {{ at }}
+                <SelectItem v-for="at in assignmentTypes" :key="at.value" :value="at.value">
+                  {{ at.label }}
                 </SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
         </FormControl>
-        <FormDescription>
-          Round robin: Conversations are assigned to team members in a round-robin fashion. <br />
-          Manual: Conversations are to be picked by team members.
-        </FormDescription>
+        <FormDescription>{{ $t('admin.team.assignmentType.description') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="max_auto_assigned_conversations">
       <FormItem>
-        <FormLabel>Maximum auto-assigned conversations</FormLabel>
+        <FormLabel>{{ $t('admin.team.maxAutoAssigned') }}</FormLabel>
         <FormControl>
           <Input type="number" placeholder="0" v-bind="componentField" />
         </FormControl>
-        <FormDescription>
-          Maximum number of conversations that can be auto-assigned to an agent, conversations in
-          "Resolved" or "Closed" states do not count toward this limit. Set to 0 for unlimited.
-        </FormDescription>
+        <FormDescription>{{ $t('admin.team.maxAutoAssigned.description') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="timezone">
       <FormItem>
-        <FormLabel>Timezone</FormLabel>
+        <FormLabel>{{ $t('globals.terms.timezone', 1) }}</FormLabel>
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger>
-              <SelectValue placeholder="Select a timezone" />
+              <SelectValue :placeholder="$t('admin.general.timezone.placeholder')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -81,22 +76,22 @@
             </SelectContent>
           </Select>
         </FormControl>
-        <FormDescription>Team's timezone will be used to calculate SLA.</FormDescription>
+        <FormDescription>{{ $t('admin.team.timezone.description') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="business_hours_id">
       <FormItem>
-        <FormLabel>Business hours</FormLabel>
+        <FormLabel>{{ $t('globals.terms.businessHour', 2) }}</FormLabel>
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger>
-              <SelectValue placeholder="Select business hours" />
+              <SelectValue :placeholder="$t('admin.general.businessHours.placeholder')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem :value = 0>None</SelectItem>
+                <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
                 <SelectItem v-for="bh in businessHours" :key="bh.id" :value="bh.id">
                   {{ bh.name }}
                 </SelectItem>
@@ -104,24 +99,22 @@
             </SelectContent>
           </Select>
         </FormControl>
-        <FormDescription
-          >Default business hours for the team, will be used to calculate SLA.</FormDescription
-        >
+        <FormDescription>{{ $t('admin.team.businessHours.description') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="sla_policy_id">
       <FormItem>
-        <FormLabel>SLA policy</FormLabel>
+        <FormLabel>{{ $t('globals.terms.slaPolicy') }}</FormLabel>
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger>
-              <SelectValue placeholder="Select policy" />
+              <SelectValue :placeholder="$t('admin.team.slaPolicy.placeholder')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem :value= 0>None</SelectItem>
+                <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
                 <SelectItem
                   v-for="sla in slaStore.options"
                   :key="sla.value"
@@ -133,25 +126,23 @@
             </SelectContent>
           </Select>
         </FormControl>
-        <FormDescription
-          >SLA policy to be auto applied to conversations, when conversations are assigned to this
-          team.</FormDescription
-        >
+        <FormDescription>{{ $t('admin.team.slaPolicy.description') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
+    </div>
 
     <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
   </form>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { teamFormSchema } from './teamFormSchema.js'
+import { createTeamFormSchema } from './teamFormSchema.js'
 import {
   Select,
   SelectContent,
@@ -177,21 +168,30 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useSlaStore } from '../../../stores/sla.js'
 import { timeZones } from '../../../constants/timezones.js'
 import api from '../../../api/index.js'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const emitter = useEmitter()
 const slaStore = useSlaStore()
-const assignmentTypes = ['Round robin', 'Manual']
+const assignmentTypes = computed(() => [
+  { value: 'Round robin', label: t('admin.team.assignmentType.roundRobin') },
+  { value: 'Manual', label: t('admin.team.assignmentType.manual') }
+])
 const businessHours = ref([])
 
 const props = defineProps({
   initialValues: { type: Object, required: false },
   submitForm: { type: Function, required: true },
-  submitLabel: { type: String, default: 'Submit' },
+  submitLabel: { type: String, default: '' },
   isLoading: { type: Boolean }
 })
 
+const submitLabel = computed(() => {
+  return props.submitLabel || t('globals.messages.submit')
+})
+
 const form = useForm({
-  validationSchema: toTypedSchema(teamFormSchema)
+  validationSchema: toTypedSchema(createTeamFormSchema(t))
 })
 
 const isEmojiPickerVisible = ref(false)
@@ -209,16 +209,15 @@ const fetchBusinessHours = async () => {
     const response = await api.getAllBusinessHours()
     businessHours.value = response.data.data
   } catch (error) {
-    // If unauthorized (no permission), show a toast message.
     const toastPayload =
       error.response.status === 403
         ? {
-            title: 'Unauthorized',
+            title: t('globals.terms.unAuthorized'),
             variant: 'destructive',
-            description: 'You do not have permission to view business hours.'
+            description: t('admin.team.noPermissionBusinessHours')
           }
         : {
-            title: 'Could not fetch business hours',
+            title: t('admin.team.couldNotFetchBusinessHours'),
             variant: 'destructive',
             description: handleHTTPError(error).message
           }

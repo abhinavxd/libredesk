@@ -27,7 +27,7 @@ const macroStore = useMacroStore()
 
 const breadcrumbLinks = [
   { path: 'macro-list', label: t('globals.terms.macro', 2) },
-  { path: '', label: t('globals.messages.edit', { name: t('globals.terms.macro') }) }
+  { path: '', label: t('macro.editMacro') }
 ]
 
 const submitForm = (values) => {
@@ -43,9 +43,7 @@ const updateMacro = async (payload) => {
     await macroStore.loadMacros(true)
     
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.macro')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

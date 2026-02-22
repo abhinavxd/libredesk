@@ -57,19 +57,13 @@
                   <Select v-bind="componentField" @update:modelValue="handleInput">
                     <SelectTrigger>
                       <SelectValue
-                        :placeholder="
-                          t('globals.messages.select', { name: t('globals.terms.type') })
-                        "
+                        :placeholder="t('placeholders.selectType')"
                       />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
                         <SelectItem value="new_conversation">
-                          {{
-                            $t('globals.messages.new', {
-                              name: $t('globals.terms.conversation')
-                            })
-                          }}
+                          {{ $t('conversation.newConversation') }}
                         </SelectItem>
                         <SelectItem value="conversation_update">
                           {{ $t('admin.automation.conversationUpdate') }}
@@ -81,11 +75,7 @@
                     </SelectContent>
                   </Select>
                 </FormControl>
-                <FormDescription>{{
-                  $t('globals.messages.typeOf', {
-                    name: $t('globals.terms.rule')
-                  })
-                }}</FormDescription>
+                <FormDescription>{{ $t('automation.typeOfRule') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
@@ -99,11 +89,7 @@
                       v-model="componentField.modelValue"
                       @update:modelValue="handleChange"
                       :items="conversationEventOptions"
-                      :placeholder="
-                        t('globals.messages.select', {
-                          name: $t('globals.terms.event', 2).toLowerCase()
-                        })
-                      "
+                      :placeholder="t('placeholders.selectEvents')"
                     >
                     </SelectTag>
                   </FormControl>
@@ -245,15 +231,11 @@ const rule = ref({
 
 const conversationEventOptions = [
   {
-    label: t('globals.messages.assigned', {
-      name: t('globals.terms.agent')
-    }),
+    label: t('conversation.agentAssigned'),
     value: 'conversation.user.assigned'
   },
   {
-    label: t('globals.messages.assigned', {
-      name: t('globals.terms.team')
-    }),
+    label: t('conversation.teamAssigned'),
     value: 'conversation.team.assigned'
   },
   { label: t('admin.automation.event.priority.change'), value: 'conversation.priority.change' },
@@ -270,13 +252,8 @@ const props = defineProps({
 })
 
 const breadcrumbPageLabel = () => {
-  if (props.id > 0)
-    return t('globals.messages.edit', {
-      name: t('globals.terms.rule')
-    })
-  return t('globals.messages.new', {
-    name: t('globals.terms.rule')
-  })
+  if (props.id > 0) return t('automation.editRule')
+  return t('automation.newRule')
 }
 
 const formTitle = computed(() => {
@@ -387,9 +364,7 @@ const handleSave = async (values) => {
       router.push({ name: 'automations' })
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully', {
-        name: t('globals.terms.rule')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

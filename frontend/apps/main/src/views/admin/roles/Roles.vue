@@ -5,7 +5,7 @@
     </template>
 
     <template #help>
-      <p>Manage roles and their permissions for fine-grained control over your support desk.</p>
+      <p>{{ $t('admin.role.help') }}</p>
     </template>
   </AdminPageWithHelp>
 </template>

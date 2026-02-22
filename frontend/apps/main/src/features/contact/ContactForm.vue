@@ -50,7 +50,7 @@
                 <ComboBox
                   v-bind="componentField"
                   :items="allCountries"
-                  :placeholder="t('globals.messages.select', { name: '' })"
+                  :placeholder="t('globals.messages.select')"
                   :buttonClass="'rounded-r-none border-r-0'"
                 >
                   <template #item="{ item }">
@@ -99,7 +99,7 @@
 
     <div v-if="userStore.can('contacts:write')">
       <Button type="submit" :isLoading="formLoading" :disabled="formLoading">
-        {{ t('globals.messages.update', { name: t('globals.terms.contact').toLowerCase() }) }}
+        {{ t('contact.updateContact') }}
       </Button>
     </div>
   </form>

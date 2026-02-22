@@ -24,9 +24,7 @@ const breadcrumbLinks = [
   { path: 'agent-list', label: t('globals.terms.agent', 2) },
   {
     path: '',
-    label: t('globals.messages.new', {
-      name: t('globals.terms.agent', 1).toLowerCase()
-    })
+    label: t('agent.new')
   }
 ]
 
@@ -39,9 +37,7 @@ const createNewUser = async (values) => {
     formLoading.value = true
     await api.createUser(values)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.agent', 1)
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
     router.push({ name: 'agent-list' })
   } catch (error) {

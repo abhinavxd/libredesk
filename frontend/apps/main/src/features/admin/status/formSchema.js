@@ -5,13 +5,13 @@ export const createFormSchema = (t) => z.object({
       required_error: t('globals.messages.required'),
     })
     .min(1, {
-      message: t('form.error.minmax', {
+      message: t('validation.minmax', {
         min: 1,
         max: 25,
       })
     })
     .max(25, {
-      message: t('form.error.minmax', {
+      message: t('validation.minmax', {
         min: 1,
         max: 25,
       })

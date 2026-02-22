@@ -7,7 +7,7 @@
         <Input
           type="text"
           v-model="searchTerm"
-          placeholder="Search by email"
+          :placeholder="$t('contact.searchByEmail')"
           @input="fetchContactsDebounced"
         />
 
@@ -25,8 +25,8 @@
                 <SelectValue :placeholder="orderByField" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="'users.created_at'">Created at</SelectItem>
-                <SelectItem :value="'users.email'">Email</SelectItem>
+                <SelectItem :value="'users.created_at'">{{ $t('globals.terms.createdAt') }}</SelectItem>
+                <SelectItem :value="'users.email'">{{ $t('globals.terms.email') }}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -36,8 +36,8 @@
                 <SelectValue :placeholder="orderByDirection" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="'asc'">Ascending</SelectItem>
-                <SelectItem :value="'desc'">Descending</SelectItem>
+                <SelectItem :value="'asc'">{{ $t('contact.ascending') }}</SelectItem>
+                <SelectItem :value="'desc'">{{ $t('contact.descending') }}</SelectItem>
               </SelectContent>
             </Select>
           </PopoverContent>
@@ -79,7 +79,7 @@
                   {{ contact.first_name }} {{ contact.last_name }}
                 </h4>
                 <Badge v-if="contact.type" variant="secondary" class="text-xs px-1.5 py-0">
-                  {{ contact.type.titleCase() }}
+                  {{ contact.type === 'visitor' ? $t('contact.type.visitor') : $t('contact.type.contact') }}
                 </Badge>
               </div>
               <p class="text-xs text-muted-foreground truncate">
@@ -89,7 +89,7 @@
           </div>
         </Card>
         <div v-if="contacts.length === 0" class="flex items-center justify-center w-full h-32">
-          <p class="text-lg text-muted-foreground">No contacts found</p>
+          <p class="text-lg text-muted-foreground">{{ $t('contact.noContactsFound') }}</p>
         </div>
       </template>
     </div>

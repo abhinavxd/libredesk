@@ -87,7 +87,7 @@ const resetForm = ref({
 
 const validateForm = () => {
   if (!validateEmail(resetForm.value.email)) {
-    errorMessage.value = t('globals.messages.invalidEmailAddress')
+    errorMessage.value = t('validation.invalidEmail')
     useTemporaryClass('reset-password-container', 'animate-shake')
     return false
   }

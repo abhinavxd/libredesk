@@ -10,8 +10,8 @@
           <Settings size="18" />
           <SelectValue>{{
             executionMode === 'first_match'
-              ? 'Execute the first matching rule'
-              : 'Execute all matching rules'
+              ? $t('admin.automation.executeFirstMatchingRule')
+              : $t('admin.automation.executeAllMatchingRules')
           }}</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -30,9 +30,7 @@
       <div class="text-center space-y-2">
         <p class="text-muted-foreground">
           {{
-            $t('globals.messages.noResults', {
-              name: $t('globals.terms.rule', 2).toLowerCase()
-            })
+            $t('admin.automation.noRulesFound')
           }}
         </p>
       </div>

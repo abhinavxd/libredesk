@@ -9,7 +9,7 @@
         <Plus class="w-6 h-6 text-muted-foreground" />
       </div>
       <h3 class="text-sm font-medium text-foreground mb-2">
-        {{ $t('globals.messages.no', { name: $t('globals.terms.action', 2).toLowerCase() }) }}
+        {{ $t('actions.noActions') }}
       </h3>
       <Button
         @click.prevent="add"
@@ -33,9 +33,7 @@
               <div class="flex flex-col sm:flex-row gap-4">
                 <div class="flex-1 max-w-xs">
                   <label class="block text-sm font-medium mb-2">{{
-                    $t('globals.messages.type', {
-                      name: $t('globals.terms.action')
-                    })
+                    $t('macro.actionType')
                   }}</label>
                   <Select
                     v-model="action.type"
@@ -63,7 +61,7 @@
                   v-if="action.type && config.actions[action.type]?.type === 'select'"
                   class="flex-1 max-w-xs"
                 >
-                  <label class="block text-sm font-medium mb-2">Value</label>
+                  <label class="block text-sm font-medium mb-2">{{ $t('globals.terms.value', 1) }}</label>
 
                   <SelectComboBox
                     v-if="action.type === 'assign_user'"
@@ -101,7 +99,7 @@
                 <SelectTag
                   v-model="action.value"
                   :items="tagsStore.tagNames.map((tag) => ({ label: tag, value: tag }))"
-                  placeholder="Select tags"
+                  :placeholder="$t('placeholders.selectTags')"
                 />
               </div>
             </div>

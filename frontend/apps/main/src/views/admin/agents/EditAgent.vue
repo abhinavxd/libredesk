@@ -27,9 +27,7 @@ const breadcrumbLinks = [
   { path: 'agent-list', label: t('globals.terms.agent', 2) },
   {
     path: '',
-    label: t('globals.messages.edit', {
-      name: t('globals.terms.agent', 1).toLowerCase()
-    })
+    label: t('agent.edit')
   }
 ]
 
@@ -42,9 +40,7 @@ const updateUser = async (payload) => {
     formLoading.value = true
     await api.updateUser(user.value.id, payload)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.agent', 1)
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

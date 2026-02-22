@@ -5,9 +5,7 @@
       <router-link :to="{ name: 'new-shared-view' }">
         <Button>
           {{
-            $t('globals.messages.new', {
-              name: $t('globals.terms.sharedView').toLowerCase()
-            })
+            $t('sharedView.new')
           }}
         </Button>
       </router-link>

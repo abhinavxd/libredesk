@@ -22,9 +22,7 @@
         <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
         <AlertDialogDescription>
           {{
-            t('globals.messages.deletionConfirmation', {
-              name: t('globals.terms.slaPolicy').toLowerCase()
-            })
+            t('sla.deletionConfirmation')
           }}
         </AlertDialogDescription>
       </AlertDialogHeader>

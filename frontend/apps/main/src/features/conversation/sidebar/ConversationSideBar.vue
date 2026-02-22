@@ -12,10 +12,8 @@
           <!-- Agent assignment -->
           <SelectComboBox
             v-model="conversationStore.current.assigned_user_id"
-            :items="[{ value: 'none', label: 'None' }, ...usersStore.options]"
-            :placeholder="
-              t('globals.messages.select', { name: t('globals.terms.agent').toLowerCase() })
-            "
+            :items="[{ value: 'none', label: t('globals.terms.none') }, ...usersStore.options]"
+            :placeholder="t('placeholders.selectAgent')"
             @select="selectAgent"
             type="user"
           />
@@ -23,10 +21,8 @@
           <!-- Team assignment -->
           <SelectComboBox
             v-model="conversationStore.current.assigned_team_id"
-            :items="[{ value: 'none', label: 'None' }, ...teamsStore.options]"
-            :placeholder="
-              t('globals.messages.select', { name: t('globals.terms.team').toLowerCase() })
-            "
+            :items="[{ value: 'none', label: t('globals.terms.none') }, ...teamsStore.options]"
+            :placeholder="t('placeholders.selectTeam')"
             @select="selectTeam"
             type="team"
           />
@@ -35,9 +31,7 @@
           <SelectComboBox
             v-model="conversationStore.current.priority_id"
             :items="priorityOptions"
-            :placeholder="
-              t('globals.messages.select', { name: t('globals.terms.priority').toLowerCase() })
-            "
+            :placeholder="t('placeholders.selectPriority')"
             @select="selectPriority"
             type="priority"
           />
@@ -47,9 +41,7 @@
             v-if="conversationStore.current"
             v-model="conversationStore.current.tags"
             :items="tags.map((tag) => ({ label: tag, value: tag }))"
-            :placeholder="
-              t('globals.messages.select', { name: t('globals.terms.tag', 2).toLowerCase() })
-            "
+            :placeholder="t('placeholders.selectTags')"
           />
         </AccordionContent>
       </AccordionItem>
@@ -234,9 +226,7 @@ const updateContactCustomAttributes = async (attributes) => {
     conversationStore.current.contact.custom_attributes = attributes
     await api.updateContactCustomAttribute(conversationStore.current.uuid, attributes)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.attribute')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

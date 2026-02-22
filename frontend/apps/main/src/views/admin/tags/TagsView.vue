@@ -9,18 +9,14 @@
               <Dialog v-model:open="dialogOpen">
                 <DialogTrigger as-child>
                   <Button class="ml-auto">{{
-                    t('globals.messages.new', {
-                      name: t('globals.terms.tag')
-                    })
+                    t('tag.new')
                   }}</Button>
                 </DialogTrigger>
                 <DialogContent class="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle class="mb-1">
                       {{
-                        t('globals.messages.new', {
-                          name: t('globals.terms.tag')
-                        })
+                        t('tag.new')
                       }}
                     </DialogTitle>
                     <DialogDescription>
@@ -45,7 +41,7 @@
       </template>
 
       <template #help>
-        <p>Tags help you categorize your conversations. Create or edit tags here.</p>
+        <p>{{ $t('admin.tag.help') }}</p>
       </template>
     </AdminPageWithHelp>
   </div>
@@ -109,7 +105,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     dialogOpen.value = false
     getTags()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.createdSuccessfully', { name: t('globals.terms.tag') }),
+      description: t('globals.messages.savedSuccessfully'),
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

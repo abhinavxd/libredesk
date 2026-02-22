@@ -309,7 +309,7 @@ func serveIndexPage(r *fastglue.Request) error {
 	// Serve the index.html file from the embedded filesystem.
 	file, err := app.fs.Get(path.Join(frontendDir, "index.html"))
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
 	r.RequestCtx.SetBody(file.ReadBytes())
@@ -317,7 +317,7 @@ func serveIndexPage(r *fastglue.Request) error {
 	// Set CSRF cookie if not already set.
 	if err := app.auth.SetCSRFCookie(r); err != nil {
 		app.lo.Error("error setting csrf cookie", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorSaving", "name", "{globals.terms.session}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	return nil
 }
@@ -336,18 +336,18 @@ func validateWidgetReferer(app *App, r *fastglue.Request, inboxID int) error {
 	inbox, err := app.inbox.GetDBRecord(inboxID)
 	if err != nil {
 		app.lo.Error("error fetching inbox for referer check", "inbox_id", inboxID, "error", err)
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundInbox"), nil, envelope.NotFoundError)
 	}
 
 	if !inbox.Enabled {
-		return r.SendErrorEnvelope(http.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(http.StatusBadRequest, app.i18n.T("status.disabledInbox"), nil, envelope.InputError)
 	}
 
 	// Parse the live chat config
 	var config livechat.Config
 	if err := json.Unmarshal(inbox.Config, &config); err != nil {
 		app.lo.Error("error parsing live chat config for referer check", "error", err)
-		return r.SendErrorEnvelope(http.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(http.StatusInternalServerError, app.i18n.T("validation.invalidInbox"), nil, envelope.GeneralError)
 	}
 
 	// If trusted domains list is empty, allow all referers
@@ -385,7 +385,7 @@ func serveWidgetIndexPage(r *fastglue.Request) error {
 	// Serve the index.html file from the embedded filesystem.
 	file, err := app.fs.Get(path.Join(widgetDir, "index.html"))
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
 	r.RequestCtx.SetBody(file.ReadBytes())
@@ -402,7 +402,7 @@ func serveStaticFiles(r *fastglue.Request) error {
 
 	file, err := app.fs.Get(filePath)
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
 	// Set the appropriate Content-Type based on the file extension.
@@ -427,7 +427,7 @@ func serveFrontendStaticFiles(r *fastglue.Request) error {
 	finalPath := filepath.Join(frontendDir, filePath)
 	file, err := app.fs.Get(finalPath)
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
 	// Set the appropriate Content-Type based on the file extension.
@@ -450,7 +450,7 @@ func serveWidgetStaticFiles(r *fastglue.Request) error {
 
 	file, err := app.fs.Get(finalPath)
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
 	// Set the appropriate Content-Type based on the file extension.
@@ -475,7 +475,7 @@ func serveWidgetJS(r *fastglue.Request) error {
 	// Serve the widget.js file from the embedded filesystem.
 	file, err := app.fs.Get("static/widget.js")
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
 	r.RequestCtx.SetBody(file.ReadBytes())

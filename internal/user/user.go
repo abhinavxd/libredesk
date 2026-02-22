@@ -118,7 +118,7 @@ func (u *Manager) VerifyPassword(email string, password []byte) (models.User, er
 			return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 		}
 		u.lo.Error("error fetching user from db", "error", err)
-		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+		return user, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if err := u.verifyPassword(password, user.Password.String); err != nil {
 		return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
@@ -131,7 +131,7 @@ func (u *Manager) GetAllUsers(page, pageSize int, userTypes []string, order, ord
 	query, qArgs, err := u.makeUserListQuery(page, pageSize, userTypes, order, orderBy, filtersJSON)
 	if err != nil {
 		u.lo.Error("error creating user list query", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Start a read-only txn.
@@ -140,7 +140,7 @@ func (u *Manager) GetAllUsers(page, pageSize int, userTypes []string, order, ord
 	})
 	if err != nil {
 		u.lo.Error("error starting read-only transaction", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
@@ -148,7 +148,7 @@ func (u *Manager) GetAllUsers(page, pageSize int, userTypes []string, order, ord
 	var users = make([]models.UserCompact, 0)
 	if err := tx.Select(&users, query, qArgs...); err != nil {
 		u.lo.Error("error fetching users", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	return users, nil
@@ -157,16 +157,16 @@ func (u *Manager) GetAllUsers(page, pageSize int, userTypes []string, order, ord
 // Get retrieves an user by ID or email or type. At least one of ID or email must be provided.
 func (u *Manager) Get(id int, email string, userType []string) (models.User, error) {
 	if id == 0 && email == "" {
-		return models.User{}, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.user}"), nil)
+		return models.User{}, envelope.NewError(envelope.InputError, u.i18n.T("validation.invalidUser"), nil)
 	}
 
 	var user models.User
 	if err := u.q.GetUser.Get(&user, id, email, pq.Array(userType)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return user, envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.user}"), nil)
+			return user, envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundUser"), nil)
 		}
 		u.lo.Error("error fetching user from db", "error", err)
-		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+		return user, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return user, nil
 }
@@ -181,10 +181,10 @@ func (u *Manager) GetByExternalID(externalUserID string) (models.User, error) {
 	var user models.User
 	if err := u.q.GetUserByExternalID.Get(&user, externalUserID); err != nil {
 		if err == sql.ErrNoRows {
-			return user, envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.user}"), nil)
+			return user, envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundUser"), nil)
 		}
 		u.lo.Error("error fetching user by external ID", "external_user_id", externalUserID, "error", err)
-		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+		return user, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return user, nil
 }
@@ -193,7 +193,7 @@ func (u *Manager) GetByExternalID(externalUserID string) (models.User, error) {
 func (u *Manager) UpdateAvatar(id int, path string) error {
 	if _, err := u.q.UpdateAvatar.Exec(id, null.NewString(path, path != "")); err != nil {
 		u.lo.Error("error updating user avatar", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -202,7 +202,7 @@ func (u *Manager) UpdateAvatar(id int, path string) error {
 func (u *Manager) UpdateLastLoginAt(id int) error {
 	if _, err := u.q.UpdateLastLoginAt.Exec(id); err != nil {
 		u.lo.Error("error updating user last login at", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -213,11 +213,11 @@ func (u *Manager) SetResetPasswordToken(id int) (string, error) {
 	token, err := stringutil.RandomAlphanumeric(32)
 	if err != nil {
 		u.lo.Error("error generating reset password token", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, u.i18n.T("user.errorGeneratingPasswordToken"), nil)
+		return "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if _, err := u.q.SetResetPasswordToken.Exec(id, token); err != nil {
 		u.lo.Error("error setting reset password token", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, u.i18n.T("user.errorGeneratingPasswordToken"), nil)
+		return "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return token, nil
 }
@@ -231,12 +231,12 @@ func (u *Manager) ResetPassword(token, password string) error {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		u.lo.Error("error generating bcrypt password", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.password}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	rows, err := u.q.SetPassword.Exec(passwordHash, token)
 	if err != nil {
 		u.lo.Error("error setting new password", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.password}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if count, _ := rows.RowsAffected(); count == 0 {
 		return envelope.NewError(envelope.InputError, u.i18n.T("user.resetPasswordTokenExpired"), nil)
@@ -248,7 +248,7 @@ func (u *Manager) ResetPassword(token, password string) error {
 func (u *Manager) UpdateAvailability(id int, status string) error {
 	if _, err := u.q.UpdateAvailability.Exec(id, status); err != nil {
 		u.lo.Error("error updating user availability", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -277,7 +277,7 @@ func (u *Manager) SaveCustomAttributes(id int, customAttributes map[string]any, 
 	jsonb, err := json.Marshal(customAttributes)
 	if err != nil {
 		u.lo.Error("error marshalling custom attributes", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	var execErr error
 	if replace {
@@ -287,7 +287,7 @@ func (u *Manager) SaveCustomAttributes(id int, customAttributes map[string]any, 
 	}
 	if execErr != nil {
 		u.lo.Error("error saving custom attributes", "error", execErr)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -296,7 +296,7 @@ func (u *Manager) SaveCustomAttributes(id int, customAttributes map[string]any, 
 func (u *Manager) ToggleEnabled(id int, typ string, enabled bool) error {
 	if _, err := u.q.ToggleEnable.Exec(id, typ, enabled); err != nil {
 		u.lo.Error("error toggling user enabled status", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -307,27 +307,27 @@ func (u *Manager) GenerateAPIKey(userID int) (string, string, error) {
 	apiKey, err := stringutil.RandomAlphanumeric(32)
 	if err != nil {
 		u.lo.Error("error generating API key", "error", err, "user_id", userID)
-		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.apiKey}"), nil)
+		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Generate API secret (64 characters)
 	apiSecret, err := stringutil.RandomAlphanumeric(64)
 	if err != nil {
 		u.lo.Error("error generating API secret", "error", err, "user_id", userID)
-		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.apiKey}"), nil)
+		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Hash the API secret for storage
 	secretHash, err := bcrypt.GenerateFromPassword([]byte(apiSecret), bcrypt.DefaultCost)
 	if err != nil {
 		u.lo.Error("error hashing API secret", "error", err, "user_id", userID)
-		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.apiKey}"), nil)
+		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Update user with API key.
 	if _, err := u.q.SetAPIKey.Exec(userID, apiKey, string(secretHash)); err != nil {
 		u.lo.Error("error saving API key", "error", err, "user_id", userID)
-		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.apiKey}"), nil)
+		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	return apiKey, apiSecret, nil
@@ -340,14 +340,14 @@ func (u *Manager) ValidateAPIKey(apiKey, apiSecret string) (models.User, error) 
 	// Find user by API key.
 	if err := u.q.GetUserByAPIKey.Get(&user, apiKey); err != nil {
 		if err == sql.ErrNoRows {
-			return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.Ts("globals.messages.invalid", "name", u.i18n.P("globals.terms.credential")), nil)
+			return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.T("validation.invalidCredential"), nil)
 		}
-		return user, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil)
+		return user, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Verify API secret.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.APISecret.String), []byte(apiSecret)); err != nil {
-		return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.Ts("globals.messages.invalid", "name", u.i18n.T("globals.terms.credential")), nil)
+		return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.T("validation.invalidCredential"), nil)
 	}
 
 	// Update last used timestamp.
@@ -362,7 +362,7 @@ func (u *Manager) ValidateAPIKey(apiKey, apiSecret string) (models.User, error) 
 func (u *Manager) RevokeAPIKey(userID int) error {
 	if _, err := u.q.RevokeAPIKey.Exec(userID); err != nil {
 		u.lo.Error("error revoking API key", "error", err, "user_id", userID)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorRevoking", "name", "{globals.terms.apiKey}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

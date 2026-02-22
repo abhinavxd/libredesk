@@ -1,5 +1,6 @@
 <template>
   <form @submit="onSubmit" class="space-y-6 w-full">
+    <div class="grid gap-6 md:grid-cols-2">
     <FormField v-slot="{ field }" name="site_name">
       <FormItem>
         <FormLabel>{{ t('admin.general.siteName') }}</FormLabel>
@@ -23,15 +24,15 @@
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="da">Danish</SelectItem>
-                <SelectItem value="de">German</SelectItem>
+                <SelectItem value="da">Dansk</SelectItem>
+                <SelectItem value="de">Deutsch</SelectItem>
                 <SelectItem value="en">English</SelectItem>
-                <SelectItem value="fa">Farsi</SelectItem>
-                <SelectItem value="fr">French</SelectItem>
-                <SelectItem value="it">Italian</SelectItem>
-                <SelectItem value="ja">Japanese</SelectItem>
-                <SelectItem value="es">Spanish</SelectItem>
-                <SelectItem value="mr">Marathi</SelectItem>
+                <SelectItem value="es">Español</SelectItem>
+                <SelectItem value="fa">فارسی</SelectItem>
+                <SelectItem value="fr">Français</SelectItem>
+                <SelectItem value="it">Italiano</SelectItem>
+                <SelectItem value="ja">日本語</SelectItem>
+                <SelectItem value="mr">मराठी</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -151,6 +152,7 @@
       </FormItem>
     </FormField>
 
+    <div class="md:col-span-2">
     <FormField name="allowed_file_upload_extensions" v-slot="{ componentField, handleChange }">
       <FormItem>
         <FormLabel>
@@ -171,6 +173,8 @@
         <FormMessage />
       </FormItem>
     </FormField>
+    </div>
+    </div>
 
     <Button type="submit" :isLoading="formLoading"> {{ submitLabel }} </Button>
   </form>
@@ -267,9 +271,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     formLoading.value = true
     await props.submitForm(values)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.setting', 2)
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

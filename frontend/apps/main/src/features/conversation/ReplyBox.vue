@@ -243,9 +243,7 @@ const updateProvider = async (values) => {
     await api.updateAIProvider({ api_key: values.apiKey, provider: 'openai' })
     openAIKeyPrompt.value = false
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully', {
-        name: t('globals.terms.apiKey')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

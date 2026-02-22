@@ -37,7 +37,7 @@
               @update:modelValue="(value) => handleFieldChange(value, index)"
             >
               <SelectTrigger class="w-56">
-                <SelectValue :placeholder="t('globals.messages.select', { name: t('globals.terms.field').toLowerCase() })" />
+                <SelectValue :placeholder="t('placeholders.selectField')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -65,7 +65,7 @@
               @update:modelValue="(value) => handleOperatorChange(value, index)"
             >
               <SelectTrigger class="w-56">
-                <SelectValue :placeholder="t('globals.messages.select', { name: t('globals.terms.operator').toLowerCase() })" />
+                <SelectValue :placeholder="t('placeholders.selectOperator')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -85,7 +85,7 @@
               <!-- Plain text input -->
               <Input
                 type="text"
-                :placeholder="t('globals.messages.set', { name: t('globals.terms.value').toLowerCase() })"
+                :placeholder="t('actions.setValue')"
                 v-if="inputType(index) === 'text'"
                 v-model="rule.value"
                 @update:modelValue="(value) => handleValueChange(value, index)"
@@ -94,7 +94,7 @@
               <!-- Number input -->
               <Input
                 type="number"
-                :placeholder="t('globals.messages.set', { name: t('globals.terms.value').toLowerCase() })"
+                :placeholder="t('actions.setValue')"
                 v-if="inputType(index) === 'number'"
                 v-model="rule.value"
                 @update:modelValue="(value) => handleValueChange(value, index)"
@@ -124,7 +124,7 @@
                     <TagsInputItemText />
                     <TagsInputItemDelete />
                   </TagsInputItem>
-                  <TagsInputInput :placeholder="t('globals.messages.select', { name: t('globals.terms.value').toLowerCase() })" />
+                  <TagsInputInput :placeholder="t('placeholders.selectValue')" />
                 </TagsInput>
                 <p class="text-xs text-gray-500 mt-1">
                   {{ $t('globals.messages.pressEnterToSelectAValue') }}
@@ -134,7 +134,7 @@
               <!-- Date input -->
               <Input
                 type="date"
-                :placeholder="t('globals.messages.set', { name: t('globals.terms.value').toLowerCase() })"
+                :placeholder="t('actions.setValue')"
                 v-if="inputType(index) === 'date'"
                 v-model="rule.value"
                 @update:modelValue="(value) => handleValueChange(value, index)"
@@ -147,12 +147,12 @@
                 v-if="inputType(index) === 'boolean'"
               >
                 <SelectTrigger>
-                  <SelectValue :placeholder="t('globals.messages.select', { name: t('globals.terms.value').toLowerCase() })" />
+                  <SelectValue :placeholder="t('placeholders.selectValue')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="true">True</SelectItem>
-                    <SelectItem value="false">False</SelectItem>
+                    <SelectItem value="true">{{ $t('globals.messages.true') }}</SelectItem>
+                    <SelectItem value="false">{{ $t('globals.messages.false') }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -178,9 +178,7 @@
       <div>
         <Button variant="outline" size="sm" @click.prevent="addCondition">
           {{
-            $t('globals.messages.add', {
-              name: $t('globals.terms.condition')
-            })
+            $t('actions.addCondition')
           }}
         </Button>
       </div>

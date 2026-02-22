@@ -181,6 +181,7 @@ export const accountNavItems = [
 export const contactNavItems = [
   {
     titleKey: 'globals.terms.contact',
+    allLabelKey: 'contact.allContacts',
     href: '/contacts',
     isTitleKeyPlural: true
   }

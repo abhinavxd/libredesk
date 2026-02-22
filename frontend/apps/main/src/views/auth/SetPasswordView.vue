@@ -13,9 +13,7 @@
           <div class="space-y-2">
             <Label for="password" class="text-sm font-medium text-foreground">
               {{
-                t('globals.messages.new', {
-                  name: t('globals.terms.password').toLowerCase()
-                })
+                t('auth.newPassword')
               }}
             </Label>
             <Input
@@ -104,7 +102,7 @@ onMounted(() => {
     router.push({ name: 'login' })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: 'Invalid reset link. Please request a new password reset link.'
+      description: t('auth.invalidResetLink')
     })
   }
 })

@@ -312,7 +312,7 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	query, pageSize, qArgs, err := m.generateMessagesQuery(m.q.GetMessages, qArgs, page, pageSize)
 	if err != nil {
 		m.lo.Error("error generating messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
@@ -321,12 +321,12 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	defer tx.Rollback()
 	if err != nil {
 		m.lo.Error("error preparing get messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	if err := tx.Select(&messages, query, qArgs...); err != nil {
 		m.lo.Error("error fetching conversations", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	return messages, pageSize, nil
@@ -337,7 +337,7 @@ func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 	var message models.Message
 	if err := m.q.GetMessage.Get(&message, uuid); err != nil {
 		m.lo.Error("error fetching message", "uuid", uuid, "error", err)
-		return message, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
+		return message, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return message, nil
 }
@@ -367,7 +367,7 @@ func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
 func (m *Manager) MarkMessageAsPending(uuid string) error {
 	if err := m.UpdateMessageStatus(uuid, models.MessageStatusPending); err != nil {
 		m.lo.Error("error marking message as pending", "uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorSendingMessage"), nil)
 	}
 	return nil
 }
@@ -433,7 +433,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	}
 
 	if !inboxRecord.Enabled {
-		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil)
+		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
 	}
 
 	var sourceID string
@@ -453,12 +453,12 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			metaMap["bcc"] = bcc
 		}
 		if len(to) == 0 {
-			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "`to`"), nil)
+		return message, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "`to`"), nil)
 		}
 		sourceID, err = stringutil.GenerateEmailMessageID(conversationUUID, inboxRecord.From)
 		if err != nil {
 			m.lo.Error("error generating source message id", "error", err)
-			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.errorGeneratingMessageID"), nil)
+			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 	}
 
@@ -466,7 +466,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	metaJSON, err := json.Marshal(metaMap)
 	if err != nil {
 		m.lo.Error("error marshalling message meta map to JSON", "error", err)
-		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil)
+		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Insert the message into the database
@@ -511,7 +511,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	if err := m.q.InsertMessage.Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
 		m.lo.Error("error inserting message in db", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Attach just inserted message to the media.
@@ -610,7 +610,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 	content, err := m.getMessageActivityContent(activityType, newValue, actor.FullName())
 	if err != nil {
 		m.lo.Error("error could not generate activity content", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorGenerating", "name", "{globals.terms.activityMessage}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	message := models.Message{
@@ -626,7 +626,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 
 	if err := m.InsertMessage(&message); err != nil {
 		m.lo.Error("error inserting activity message", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.activityMessage}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -844,10 +844,10 @@ func (m *Manager) GetConversationByMessageID(id int) (models.Conversation, error
 	var conversation = models.Conversation{}
 	if err := m.q.GetConversationByMessageID.Get(&conversation, id); err != nil {
 		if err == sql.ErrNoRows {
-			return conversation, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.conversation}"), nil)
+			return conversation, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundConversation"), nil)
 		}
 		m.lo.Error("error fetching message from DB", "error", err)
-		return conversation, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil)
+		return conversation, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return conversation, nil
 }

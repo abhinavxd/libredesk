@@ -6,9 +6,7 @@
       <div>
         <RouterLink :to="{ name: 'new-sso' }">
           <Button>{{
-            $t('globals.messages.new', {
-              name: $t('globals.terms.sso')
-            })
+            $t('oidc.new')
           }}</Button>
         </RouterLink>
       </div>

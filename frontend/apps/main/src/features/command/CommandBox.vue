@@ -10,7 +10,7 @@
       </CommandEmpty>
 
       <!-- Snooze Options -->
-      <CommandGroup v-if="nestedCommand === 'snooze'" heading="Snooze for">
+      <CommandGroup v-if="nestedCommand === 'snooze'" :heading="t('command.snoozeFor')">
         <CommandItem value="1 hour" @select="handleSnooze(60)" class="text-base py-3">
           1 {{ $t('globals.terms.hour') }}
         </CommandItem>
@@ -41,7 +41,7 @@
           nestedCommand === 'apply-macro-to-new-conversation'
         "
       >
-        <CommandGroup heading="Apply macro">
+        <CommandGroup :heading="$t('actions.applyMacro')">
           <div class="min-h-[400px]">
             <div class="h-[60vh] grid grid-cols-12">
               <!-- Left Column: Macro List (30%) -->
@@ -158,7 +158,7 @@
           @select="setNestedCommand('apply-macro-to-existing-conversation')"
           class="text-base py-3"
         >
-          {{ $t('globals.messages.apply', { name: t('globals.terms.macro').toLowerCase() }) }}
+          {{ $t('actions.applyMacro') }}
         </CommandItem>
         <CommandItem value="conv-snooze" @select="setNestedCommand('snooze')" class="text-base py-3">
           {{ $t('globals.terms.snooze') }}
@@ -281,13 +281,13 @@ function handleApplyMacro(macro) {
 
 const getActionLabel = computed(() => (action) => {
   const prefixes = {
-    assign_user: t('globals.messages.assign', { name: t('globals.terms.agent').toLowerCase() }),
-    assign_team: t('globals.messages.assign', { name: t('globals.terms.team').toLowerCase() }),
-    set_status: t('globals.messages.set', { name: t('globals.terms.status').toLowerCase() }),
-    set_priority: t('globals.messages.set', { name: t('globals.terms.priority').toLowerCase() }),
-    add_tags: t('globals.messages.add', { name: t('globals.terms.tag', 2).toLowerCase() }),
-    set_tags: t('globals.messages.set', { name: t('globals.terms.tag', 2).toLowerCase() }),
-    remove_tags: t('globals.messages.remove', { name: t('globals.terms.tag', 2).toLowerCase() })
+    assign_user: t('actions.assignAgent'),
+    assign_team: t('actions.assignTeam'),
+    set_status: t('actions.setStatus'),
+    set_priority: t('actions.setPriority'),
+    add_tags: t('actions.addTags'),
+    set_tags: t('actions.setTags'),
+    remove_tags: t('actions.removeTags')
   }
   return `${prefixes[action.type]}: ${action.display_value.length > 0 ? action.display_value.join(', ') : action.value.join(', ')}`
 })

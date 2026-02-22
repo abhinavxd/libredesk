@@ -14,7 +14,7 @@ export const createFormSchema = (t) =>
         required_error: t('globals.messages.required')
       })
       .url({
-        message: t('form.error.validUrl')
+        message: t('validation.invalidUrl')
       }),
     events: z.array(z.string()).min(1, {
       message: t('globals.messages.required')

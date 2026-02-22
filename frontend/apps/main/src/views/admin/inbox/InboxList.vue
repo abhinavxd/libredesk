@@ -6,9 +6,7 @@
       <router-link :to="{ name: 'new-inbox' }">
         <Button>
           {{
-            $t('globals.messages.new', {
-              name: $t('globals.terms.inbox')
-            })
+            $t('inbox.new')
           }}
         </Button>
       </router-link>
@@ -52,7 +50,7 @@ onMounted(async () => {
   if (errorCode) {
     let msg
     if (errorCode === 'oauth_denied') {
-      msg = t('globals.messages.denied', { name: t('globals.terms.authorization') })
+      msg = t('toast.authorizationDenied')
     } else if (errorCode === 'inbox_already_exists') {
       msg = t('inbox.oauthAlreadyExists')
     } else if (errorCode === 'inbox_not_found') {
@@ -60,7 +58,7 @@ onMounted(async () => {
     } else if (errorCode === 'email_mismatch') {
       msg = t('inbox.oauthEmailMismatch')
     } else {
-      msg = t('globals.messages.errorConnecting', { name: t('globals.terms.inbox') })
+      msg = t('toast.errorConnectingInbox')
     }
     setTimeout(() => {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -71,8 +69,8 @@ onMounted(async () => {
   } else if (successCode) {
     const msg =
       successCode === 'oauth_reconnected'
-        ? t('globals.messages.reconnectedSuccessfully', { name: t('globals.terms.inbox') })
-        : t('globals.messages.connectedSuccessfully', { name: t('globals.terms.inbox') })
+        ? t('toast.inboxReconnected')
+        : t('toast.inboxConnected')
     setTimeout(() => {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: msg })
     }, 500)

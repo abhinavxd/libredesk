@@ -30,7 +30,7 @@
           </FormField>
           <FormField v-slot="{ componentField }" name="filters">
             <FormItem>
-              <FormLabel>Filters</FormLabel>
+              <FormLabel>{{ $t('globals.terms.filter', 2) }}</FormLabel>
               <FormControl>
                 <FilterBuilder
                   :fields="filterFields"
@@ -179,16 +179,12 @@ const onSubmit = form.handleSubmit(async (values) => {
     if (values.id) {
       await api.updateView(values.id, values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.updatedSuccessfully', {
-          name: t('globals.terms.view')
-        })
+        description: t('globals.messages.savedSuccessfully')
       })
     } else {
       await api.createView(values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.createdSuccessfully', {
-          name: t('globals.terms.view')
-        })
+        description: t('globals.messages.savedSuccessfully')
       })
     }
     emitter.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'view' })

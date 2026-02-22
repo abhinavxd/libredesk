@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'url'
+import { createRequire } from 'module'
 import path from 'path'
 import autoprefixer from 'autoprefixer'
 import tailwind from 'tailwindcss'
@@ -6,21 +7,35 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
 
 export default defineConfig(({ mode }) => {
-  // Determine which app to serve based on mode
   const isWidget = mode === 'widget'
   const appPath = isWidget ? 'apps/widget' : 'apps/main'
+
+  // Load shared tailwind config but scope content to current app only,
+  // so each app's CSS bundle doesn't include unused classes from the other.
+  const tailwindConfig = require('./tailwind.config.cjs')
+  const scopedContent = [
+    `./apps/${isWidget ? 'widget' : 'main'}/src/**/*.{js,ts,vue}`,
+    './shared-ui/**/*.{js,ts,vue}',
+  ]
 
   return {
     base: isWidget ? '/widget/' : '/',
     css: {
       postcss: {
-        plugins: [tailwind(), autoprefixer()],
+        plugins: [tailwind({ ...tailwindConfig, content: scopedContent }), autoprefixer()],
       },
     },
-    root: mode === 'widget' ? path.resolve(__dirname, 'apps/widget') : path.resolve(__dirname, 'apps/main'),
+    root: path.resolve(__dirname, appPath),
+    // Separate cache per app to avoid stale/conflicting caches.
+    cacheDir: path.resolve(__dirname, `node_modules/.vite-${isWidget ? 'widget' : 'main'}`),
     server: {
+      // Allow access to parent dir so shared-ui imports work in dev.
+      fs: {
+        allow: [path.resolve(__dirname)],
+      },
       port: isWidget ? 8001 : 8000,
       proxy: {
         '/api': {

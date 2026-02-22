@@ -5,14 +5,14 @@
     </template>
 
     <template #help>
-      <p>Configure single sign-on with one or more OpenID Connect providers.</p>
+      <p>{{ $t('admin.oidc.help') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/sso"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        <p>Learn more</p>
+        <p>{{ $t('globals.messages.learnMore') }}</p>
       </a>
     </template>
   </AdminPageWithHelp>

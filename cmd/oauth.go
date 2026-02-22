@@ -54,7 +54,7 @@ func handleOAuthAuthorize(r *fastglue.Request) error {
 
 	// Validate credentials
 	if req.ClientID == "" || req.ClientSecret == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.badRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "credentials"), nil, envelope.InputError)
 	}
 
 	if req.FlowType != FlowTypeNewInbox && req.FlowType != FlowTypeReconnect {
@@ -68,7 +68,7 @@ func handleOAuthAuthorize(r *fastglue.Request) error {
 	state, err := stringutil.RandomAlphanumeric(32)
 	if err != nil {
 		app.lo.Error("Failed to generate OAuth state", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorGenerating", "name", "state"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	// Store OAuth data in Redis with 15 min expiry

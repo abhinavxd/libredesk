@@ -25,7 +25,7 @@
                 {{ contact.first_name }} {{ contact.last_name }}
               </h2>
               <Badge v-if="contact.type" variant="secondary">
-                {{ contact.type.titleCase() }}
+                {{ contact.type === 'visitor' ? $t('contact.type.visitor') : $t('contact.type.contact') }}
               </Badge>
             </div>
 
@@ -62,8 +62,8 @@
             <DialogTitle>
               {{
                 contact?.enabled
-                  ? t('globals.messages.block', { name: t('globals.terms.contact') })
-                  : t('globals.messages.unblock', { name: t('globals.terms.contact') })
+                  ? t('contact.blockContact')
+                  : t('contact.unblockContact')
               }}
             </DialogTitle>
             <DialogDescription>
@@ -131,7 +131,7 @@ const form = useForm({
 
 const breadcrumbLinks = [
   { path: 'contacts', label: t('globals.terms.contact', 2) },
-  { path: '', label: t('globals.messages.edit', { name: t('globals.terms.contact') }) }
+  { path: '', label: t('contact.editContact') }
 ]
 
 onMounted(fetchContact)
@@ -166,10 +166,11 @@ async function toggleBlock() {
       enabled: !contact.value.enabled
     })
     await fetchContact()
-    const messageKey = contact.value.enabled
-      ? 'globals.messages.unblockedSuccessfully'
-      : 'globals.messages.blockedSuccessfully'
-    emitToast(t(messageKey, { name: t('globals.terms.contact') }))
+    emitToast(
+      contact.value.enabled
+        ? t('contact.unblockedSuccessfully')
+        : t('contact.blockedSuccessfully')
+    )
   } catch (err) {
     showError(err)
   }
@@ -180,7 +181,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     formLoading.value = true
     await api.updateContact(contact.value.id, { ...values })
     await fetchContact()
-    emitToast(t('globals.messages.updatedSuccessfully', { name: t('globals.terms.contact') }))
+    emitToast(t('globals.messages.savedSuccessfully'))
   } catch (err) {
     showError(err)
   } finally {
@@ -202,7 +203,7 @@ async function onUpload(file) {
     const { data } = await api.updateContact(contact.value.id, formData)
     contact.value.avatar_url = data.avatar_url
     form.setFieldValue('avatar_url', data.avatar_url)
-    emitToast(t('globals.messages.updatedSuccessfully', { name: t('globals.terms.avatar') }))
+    emitToast(t('toast.avatarUpdated'))
     fetchContact()
   } catch (err) {
     showError(err)

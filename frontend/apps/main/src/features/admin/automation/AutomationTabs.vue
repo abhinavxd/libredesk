@@ -3,9 +3,7 @@
     <TabsList class="grid w-full grid-cols-3 mb-5">
       <TabsTrigger value="new_conversation">
         {{
-          $t('globals.messages.new', {
-            name: $t('globals.terms.conversation')
-          })
+          $t('conversation.new')
         }}
       </TabsTrigger>
       <TabsTrigger value="conversation_update">

@@ -43,16 +43,12 @@ const submitForm = async (values) => {
     if (props.id) {
       await api.updateBusinessHours(props.id, values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.updatedSuccessfully', {
-          name: t('globals.terms.businessHour', 2)
-        })
+        description: t('globals.messages.savedSuccessfully')
       })
     } else {
       await api.createBusinessHours(values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.createdSuccessfully', {
-          name: t('globals.terms.businessHour', 2)
-        })
+        description: t('globals.messages.savedSuccessfully')
       })
       router.push({ name: 'business-hours-list' })
     }

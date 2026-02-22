@@ -97,9 +97,7 @@
           <DialogTrigger as-child>
             <Button @click="openHolidayForm = true">
               {{
-                t('globals.messages.new', {
-                  name: t('globals.terms.holiday')
-                })
+                t('businessHour.newHoliday')
               }}
             </Button>
           </DialogTrigger>
@@ -115,9 +113,7 @@
         <DialogHeader>
           <DialogTitle>
             {{
-              t('globals.messages.new', {
-                name: t('globals.terms.holiday')
-              })
+              t('businessHour.newHoliday')
             }}
           </DialogTitle>
           <DialogDescription />

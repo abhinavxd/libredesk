@@ -6,9 +6,7 @@
         <router-link :to="{ name: 'new-business-hours' }">
           <Button>
             {{
-              $t('globals.messages.new', {
-                name: $t('globals.terms.businessHour')
-              })
+              $t('businessHour.new')
             }}
           </Button>
         </router-link>

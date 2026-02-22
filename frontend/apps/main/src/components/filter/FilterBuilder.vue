@@ -14,7 +14,7 @@
             <SelectTrigger>
               <SelectValue
                 :placeholder="
-                  t('globals.messages.select', { name: t('globals.terms.field').toLowerCase() })
+                  t('placeholders.selectField')
                 "
               />
             </SelectTrigger>
@@ -34,7 +34,7 @@
             <SelectTrigger>
               <SelectValue
                 :placeholder="
-                  t('globals.messages.select', { name: t('globals.terms.operator').toLowerCase() })
+                  t('placeholders.selectOperator')
                 "
               />
             </SelectTrigger>
@@ -56,7 +56,7 @@
                 v-if="getFieldType(modelFilter) === FIELD_TYPE.MULTI_SELECT"
                 v-model="modelFilter.value"
                 :items="getFieldOptions(modelFilter)"
-                :placeholder="t('globals.messages.select', { name: t('globals.terms.tag', 2) })"
+                :placeholder="t('placeholders.selectTags')"
               />
 
               <SelectComboBox
@@ -66,7 +66,7 @@
                 "
                 v-model="modelFilter.value"
                 :items="getFieldOptions(modelFilter)"
-                :placeholder="t('globals.messages.select', { name: '' })"
+                :placeholder="t('placeholders.selectValue')"
                 type="user"
               />
 
@@ -77,7 +77,7 @@
                 "
                 v-model="modelFilter.value"
                 :items="getFieldOptions(modelFilter)"
-                :placeholder="t('globals.messages.select', { name: '' })"
+                :placeholder="t('placeholders.selectValue')"
                 type="team"
               />
 
@@ -85,7 +85,7 @@
                 v-else-if="getFieldOptions(modelFilter).length > 0"
                 v-model="modelFilter.value"
                 :items="getFieldOptions(modelFilter)"
-                :placeholder="t('globals.messages.select', { name: '' })"
+                :placeholder="t('placeholders.selectValue')"
               />
 
               <Input
@@ -106,9 +106,7 @@
       <Button variant="ghost" size="sm" @click.stop="addFilter" class="text-slate-600">
         <Plus class="w-3 h-3 mr-1" />
         {{
-          $t('globals.messages.add', {
-            name: $t('globals.terms.filter')
-          })
+          $t('filter.add')
         }}
       </Button>
       <div class="flex gap-2" v-if="showButtons">

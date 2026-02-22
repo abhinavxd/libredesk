@@ -14,9 +14,7 @@ export function useActivityLogFilters () {
             options: uStore.options
         },
         activity_type: {
-            label: t('globals.messages.type', {
-                name: t('globals.terms.activityLog')
-            }),
+            label: t('activityLog.type'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: [{

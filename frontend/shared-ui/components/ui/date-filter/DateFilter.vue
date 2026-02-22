@@ -4,9 +4,7 @@
       <SelectTrigger class="w-[140px] h-8 text-xs">
         <SelectValue
           :placeholder="
-            t('globals.messages.select', {
-              name: t('globals.terms.day', 2)
-            })
+            t('dateFilter.selectDays')
           "
         />
       </SelectTrigger>
@@ -14,49 +12,32 @@
         <SelectItem value="0">{{ $t('globals.terms.today') }}</SelectItem>
         <SelectItem value="1">
           {{
-            $t('globals.messages.lastNItems', {
-              n: 1,
-              name: t('globals.terms.day', 1).toLowerCase()
-            })
+            $t('dateFilter.lastNDays', { n: 1 })
           }}
         </SelectItem>
         <SelectItem value="2">
           {{
-            $t('globals.messages.lastNItems', {
-              n: 2,
-              name: t('globals.terms.day', 2).toLowerCase()
-            })
+            $t('dateFilter.lastNDays', { n: 2 })
           }}
         </SelectItem>
         <SelectItem value="7">
           {{
-            $t('globals.messages.lastNItems', {
-              n: 7,
-              name: t('globals.terms.day', 2).toLowerCase()
-            })
+            $t('dateFilter.lastNDays', { n: 7 })
           }}
         </SelectItem>
         <SelectItem value="30">
           {{
-            $t('globals.messages.lastNItems', {
-              n: 30,
-              name: t('globals.terms.day', 2).toLowerCase()
-            })
+            $t('dateFilter.lastNDays', { n: 30 })
           }}
         </SelectItem>
         <SelectItem value="90">
           {{
-            $t('globals.messages.lastNItems', {
-              n: 90,
-              name: t('globals.terms.day', 2).toLowerCase()
-            })
+            $t('dateFilter.lastNDays', { n: 90 })
           }}
         </SelectItem>
         <SelectItem value="custom">
           {{
-            $t('globals.messages.custom', {
-              name: t('globals.terms.day', 2).toLowerCase()
-            })
+            $t('dateFilter.custom')
           }}
         </SelectItem>
       </SelectContent>

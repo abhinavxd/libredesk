@@ -26,9 +26,7 @@ const breadcrumbLinks = [
   { path: 'shared-view-list', label: t('globals.terms.sharedView', 2) },
   {
     path: '',
-    label: t('globals.messages.new', {
-      name: t('globals.terms.sharedView').toLowerCase()
-    })
+    label: t('sharedView.new')
   }
 ]
 
@@ -44,9 +42,7 @@ const createSharedView = async (values) => {
     await sharedViewStore.refresh()
 
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.sharedView')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
     router.push({ name: 'shared-view-list' })
   } catch (error) {

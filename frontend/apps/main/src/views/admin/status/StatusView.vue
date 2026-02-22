@@ -10,9 +10,7 @@
                 <DialogTrigger as-child>
                   <Button class="ml-auto">
                     {{
-                      $t('globals.messages.new', {
-                        name: $t('globals.terms.status')
-                      })
+                      $t('status.new')
                     }}
                   </Button>
                 </DialogTrigger>
@@ -20,9 +18,7 @@
                   <DialogHeader>
                     <DialogTitle>
                       {{
-                        $t('globals.messages.new', {
-                          name: $t('globals.terms.status')
-                        })
+                        $t('status.new')
                       }}
                     </DialogTitle>
                     <DialogDescription>
@@ -49,7 +45,7 @@
       </template>
 
       <template #help>
-        <p>Create custom conversation statuses to extend default workflow.</p>
+        <p>{{ $t('admin.status.help') }}</p>
       </template>
     </AdminPageWithHelp>
   </div>

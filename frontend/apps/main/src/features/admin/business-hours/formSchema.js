@@ -8,8 +8,8 @@ export const createFormSchema = (t) => z.object({
     is_always_open: z.boolean(),
     hours: z.record(
         z.object({
-            open: z.string().regex(timeRegex, t('form.error.time.invalid')),
-            close: z.string().regex(timeRegex, t('form.error.time.invalid')),
+            open: z.string().regex(timeRegex, t('validation.invalidTimeFormat')),
+            close: z.string().regex(timeRegex, t('validation.invalidTimeFormat')),
         })
     ).optional()
 }).superRefine((data, ctx) => {

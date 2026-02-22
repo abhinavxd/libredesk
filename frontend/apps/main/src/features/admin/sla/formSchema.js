@@ -13,13 +13,13 @@ export const createFormSchema = (t) =>
                 .min(1, { message: t('admin.sla.description.valid') })
                 .max(255, { message: t('admin.sla.description.valid') }),
             first_response_time: z.string().nullable().optional().refine(val => !val || isGoHourMinuteDuration(val), {
-                message: t('globals.messages.goHourMinuteDuration'),
+                message: t('validation.invalidDuration'),
             }),
             resolution_time: z.string().nullable().optional().refine(val => !val || isGoHourMinuteDuration(val), {
-                message: t('globals.messages.goHourMinuteDuration'),
+                message: t('validation.invalidDuration'),
             }),
             next_response_time: z.string().nullable().optional().refine(val => !val || isGoHourMinuteDuration(val), {
-                message: t('globals.messages.goHourMinuteDuration'),
+                message: t('validation.invalidDuration'),
             }),
             notifications: z
                 .array(
@@ -32,9 +32,7 @@ export const createFormSchema = (t) =>
                             recipients: z
                                 .array(z.string())
                                 .min(1, {
-                                    message: t('globals.messages.selectAtLeastOne', {
-                                        name: t('globals.terms.recipient').toLowerCase(),
-                                    })
+                                    message: t('validation.selectAtLeastOneRecipient')
                                 }),
                         })
                         .superRefine((obj, ctx) => {
@@ -48,7 +46,7 @@ export const createFormSchema = (t) =>
                                 } else if (!isGoHourMinuteDuration(obj.time_delay)) {
                                     ctx.addIssue({
                                         code: z.ZodIssueCode.custom,
-                                        message: t('globals.messages.goHourMinuteDuration'),
+                                        message: t('validation.invalidDuration'),
                                         path: ['time_delay'],
                                     });
                                 }

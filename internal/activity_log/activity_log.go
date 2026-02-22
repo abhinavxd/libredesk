@@ -61,7 +61,7 @@ func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int)
 	query, qArgs, err := m.makeQuery(page, pageSize, order, orderBy, filtersJSON)
 	if err != nil {
 		m.lo.Error("error creating activity log list query", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.activityLog}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Start a read-only txn.
@@ -70,7 +70,7 @@ func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int)
 	})
 	if err != nil {
 		m.lo.Error("error starting read-only transaction", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.activityLog}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
@@ -78,16 +78,19 @@ func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int)
 	var activityLogs = make([]models.ActivityLog, 0)
 	if err := tx.Select(&activityLogs, query, qArgs...); err != nil {
 		m.lo.Error("error fetching activity logs", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.activityLog}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return activityLogs, nil
 }
 
 // Login records a login event for the given user.
 func (al *Manager) Login(userID int, email, ip string) error {
+	description := al.i18n.Ts("activityLog.agentLogin",
+		"email", email,
+		"userId", fmt.Sprintf("#%d", userID))
 	return al.create(
 		models.AgentLogin,
-		fmt.Sprintf("%s (#%d) logged in", email, userID),
+		description,
 		userID,
 		umodels.UserModel,
 		userID,
@@ -97,9 +100,12 @@ func (al *Manager) Login(userID int, email, ip string) error {
 
 // Logout records a logout event for the given user.
 func (al *Manager) Logout(userID int, email, ip string) error {
+	description := al.i18n.Ts("activityLog.agentLogout",
+		"email", email,
+		"userId", fmt.Sprintf("#%d", userID))
 	return al.create(
 		models.AgentLogout,
-		fmt.Sprintf("%s (#%d) logged out", email, userID),
+		description,
 		userID,
 		umodels.UserModel,
 		userID,
@@ -111,9 +117,15 @@ func (al *Manager) Logout(userID int, email, ip string) error {
 func (al *Manager) Away(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
 	var description string
 	if targetID != 0 && targetEmail != "" && (targetID != actorID || targetEmail != actorEmail) {
-		description = fmt.Sprintf("%s (#%d) changed %s (#%d) status to away", actorEmail, actorID, targetEmail, targetID)
+		description = al.i18n.Ts("activityLog.agentAway",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID),
+			"targetEmail", targetEmail,
+			"targetId", fmt.Sprintf("#%d", targetID))
 	} else {
-		description = fmt.Sprintf("%s (#%d) is away", actorEmail, actorID)
+		description = al.i18n.Ts("activityLog.agentAwaySelf",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID))
 	}
 	return al.create(
 		models.AgentAway, /* activity type*/
@@ -129,9 +141,15 @@ func (al *Manager) Away(actorID int, actorEmail, ip string, targetID int, target
 func (al *Manager) AwayReassigned(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
 	var description string
 	if targetID != 0 && targetEmail != "" && (targetID != actorID || targetEmail != actorEmail) {
-		description = fmt.Sprintf("%s (#%d) changed %s (#%d) status to away and reassigning", actorEmail, actorID, targetEmail, targetID)
+		description = al.i18n.Ts("activityLog.agentAwayReassign",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID),
+			"targetEmail", targetEmail,
+			"targetId", fmt.Sprintf("#%d", targetID))
 	} else {
-		description = fmt.Sprintf("%s (#%d) is away and reassigning", actorEmail, actorID)
+		description = al.i18n.Ts("activityLog.agentAwayReassignSelf",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID))
 	}
 	return al.create(
 		models.AgentAwayReassigned, /* activity type*/
@@ -147,9 +165,15 @@ func (al *Manager) AwayReassigned(actorID int, actorEmail, ip string, targetID i
 func (al *Manager) Online(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
 	var description string
 	if targetID != 0 && targetEmail != "" && (targetID != actorID || targetEmail != actorEmail) {
-		description = fmt.Sprintf("%s (#%d) changed %s (#%d) status to online", actorEmail, actorID, targetEmail, targetID)
+		description = al.i18n.Ts("activityLog.agentOnline",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID),
+			"targetEmail", targetEmail,
+			"targetId", fmt.Sprintf("#%d", targetID))
 	} else {
-		description = fmt.Sprintf("%s (#%d) is online", actorEmail, actorID)
+		description = al.i18n.Ts("activityLog.agentOnlineSelf",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID))
 	}
 	return al.create(
 		models.AgentOnline, /* activity type*/
@@ -184,7 +208,11 @@ func (al *Manager) UserAvailability(actorID int, actorEmail, status, ip, targetE
 
 // PasswordSet records a password set event.
 func (al *Manager) PasswordSet(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
-	description := fmt.Sprintf("%s (#%d) set password for %s (#%d)", actorEmail, actorID, targetEmail, targetID)
+	description := al.i18n.Ts("activityLog.agentPasswordSet",
+		"actorEmail", actorEmail,
+		"actorId", fmt.Sprintf("#%d", actorID),
+		"targetEmail", targetEmail,
+		"targetId", fmt.Sprintf("#%d", targetID))
 	return al.create(
 		models.AgentPasswordSet,
 		description,
@@ -199,14 +227,27 @@ func (al *Manager) PasswordSet(actorID int, actorEmail, ip string, targetID int,
 func (al *Manager) RolePermissionsChanged(actorID int, actorEmail, ip string, roleID int, roleName string, added, removed []string) error {
 	var description string
 	if len(removed) > 0 && len(added) > 0 {
-		description = fmt.Sprintf("%s (#%d) removed permission(s) %s and added permission(s) %s to role %s (#%d)",
-			actorEmail, actorID, strings.Join(removed, ", "), strings.Join(added, ", "), roleName, roleID)
+		description = al.i18n.Ts("activityLog.rolePermissionsChanged",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID),
+			"removed", strings.Join(removed, ", "),
+			"added", strings.Join(added, ", "),
+			"roleName", roleName,
+			"roleId", fmt.Sprintf("#%d", roleID))
 	} else if len(removed) > 0 {
-		description = fmt.Sprintf("%s (#%d) removed permission(s) %s from role %s (#%d)",
-			actorEmail, actorID, strings.Join(removed, ", "), roleName, roleID)
+		description = al.i18n.Ts("activityLog.rolePermissionsRemoved",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID),
+			"permissions", strings.Join(removed, ", "),
+			"roleName", roleName,
+			"roleId", fmt.Sprintf("#%d", roleID))
 	} else if len(added) > 0 {
-		description = fmt.Sprintf("%s (#%d) added permission(s) %s to role %s (#%d)",
-			actorEmail, actorID, strings.Join(added, ", "), roleName, roleID)
+		description = al.i18n.Ts("activityLog.rolePermissionsAdded",
+			"actorEmail", actorEmail,
+			"actorId", fmt.Sprintf("#%d", actorID),
+			"permissions", strings.Join(added, ", "),
+			"roleName", roleName,
+			"roleId", fmt.Sprintf("#%d", roleID))
 	} else {
 		return nil // No changes
 	}
@@ -224,7 +265,7 @@ func (al *Manager) RolePermissionsChanged(actorID int, actorEmail, ip string, ro
 func (m *Manager) create(activityType, activityDescription string, actorID int, targetModelType string, targetModelID int, ip string) error {
 	if _, err := m.q.InsertActivity.Exec(activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {
 		m.lo.Error("error inserting activity log", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.activityLog}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

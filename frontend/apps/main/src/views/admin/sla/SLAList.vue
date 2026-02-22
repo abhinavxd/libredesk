@@ -6,9 +6,7 @@
         <router-link :to="{ name: 'new-sla' }">
           <Button>
             {{
-              t('globals.messages.new', {
-                name: t('globals.terms.slaPolicy')
-              })
+              t('sla.new')
             }}
           </Button>
         </router-link>

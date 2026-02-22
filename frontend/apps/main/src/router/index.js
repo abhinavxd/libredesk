@@ -5,6 +5,7 @@ import InboxLayout from '@main/layouts/inbox/InboxLayout.vue'
 import AccountLayout from '@main/layouts/account/AccountLayout.vue'
 import AdminLayout from '@main/layouts/admin/AdminLayout.vue'
 import { useAppSettingsStore } from '../stores/appSettings'
+import { getI18n } from '../i18n'
 
 const routes = [
   {
@@ -15,19 +16,19 @@ const routes = [
         path: '',
         name: 'login',
         component: () => import('@main/views/auth/UserLoginView.vue'),
-        meta: { title: 'Login' }
+        meta: { titleKey: 'auth.signInButton' }
       },
       {
         path: 'reset-password',
         name: 'reset-password',
         component: () => import('@main/views/auth/ResetPasswordView.vue'),
-        meta: { title: 'Reset Password' }
+        meta: { titleKey: 'auth.resetPassword' }
       },
       {
         path: 'set-password',
         name: 'set-password',
         component: () => import('@main/views/auth/SetPasswordView.vue'),
-        meta: { title: 'Set Password' }
+        meta: { titleKey: 'auth.setNewPassword' }
       }
     ]
   },
@@ -39,13 +40,13 @@ const routes = [
         path: 'contacts',
         name: 'contacts',
         component: () => import('@main/views/contact/ContactsView.vue'),
-        meta: { title: 'All contacts' }
+        meta: { titleKey: 'contact.allContacts' }
       },
       {
         path: 'contacts/:id',
         name: 'contact-detail',
         component: () => import('@main/views/contact/ContactDetailView.vue'),
-        meta: { title: 'Contacts' }
+        meta: { titleKey: 'globals.terms.contact', titleCount: 2 }
       },
       {
         path: '/reports',
@@ -56,7 +57,7 @@ const routes = [
             path: 'overview',
             name: 'overview',
             component: () => import('@main/views/reports/OverviewView.vue'),
-            meta: { title: 'Overview' }
+            meta: { titleKey: 'globals.terms.overview' }
           }
         ]
       },
@@ -65,20 +66,20 @@ const routes = [
         name: 'teams',
         props: true,
         component: InboxLayout,
-        meta: { title: 'Team inbox', hidePageHeader: true },
+        meta: { titleKey: 'globals.terms.teamInbox', hidePageHeader: true },
         children: [
           {
             path: '',
             name: 'team-inbox',
             component: () => import('@main/views/inbox/InboxView.vue'),
-            meta: { title: 'Team inbox' },
+            meta: { titleKey: 'globals.terms.teamInbox' },
             children: [
               {
                 path: 'conversation/:uuid',
                 name: 'team-inbox-conversation',
                 component: () => import('@main/views/conversation/ConversationDetailView.vue'),
                 props: true,
-                meta: { title: 'Team inbox', hidePageHeader: true }
+                meta: { titleKey: 'globals.terms.teamInbox', hidePageHeader: true }
               }
             ]
           }
@@ -89,20 +90,20 @@ const routes = [
         name: 'views',
         props: true,
         component: InboxLayout,
-        meta: { title: 'View inbox', hidePageHeader: true },
+        meta: { titleKey: 'globals.terms.inbox', hidePageHeader: true },
         children: [
           {
             path: '',
             name: 'view-inbox',
             component: () => import('@main/views/inbox/InboxView.vue'),
-            meta: { title: 'View inbox' },
+            meta: { titleKey: 'globals.terms.inbox' },
             children: [
               {
                 path: 'conversation/:uuid',
                 name: 'view-inbox-conversation',
                 component: () => import('@main/views/conversation/ConversationDetailView.vue'),
                 props: true,
-                meta: { title: 'View inbox', hidePageHeader: true }
+                meta: { titleKey: 'globals.terms.inbox', hidePageHeader: true }
               }
             ]
           }
@@ -112,7 +113,7 @@ const routes = [
         path: 'inboxes/search',
         name: 'search',
         component: () => import('@main/views/search/SearchView.vue'),
-        meta: { title: 'Search', hidePageHeader: true }
+        meta: { titleKey: 'globals.terms.search', hidePageHeader: true }
       },
       {
         path: '/inboxes/:type(assigned|unassigned|all|mentioned)?',
@@ -120,18 +121,20 @@ const routes = [
         redirect: '/inboxes/assigned',
         component: InboxLayout,
         props: true,
-        meta: { title: 'Inbox', hidePageHeader: true },
+        meta: { titleKey: 'globals.terms.inbox', hidePageHeader: true },
         children: [
           {
             path: '',
             name: 'inbox',
             component: () => import('@main/views/inbox/InboxView.vue'),
             meta: {
-              title: 'Inbox',
-              type: (route) => {
-                if (route.params.type === 'assigned') return 'My inbox'
-                if (route.params.type === 'mentioned') return 'Mentions'
-                return route.params.type
+              titleKey: 'globals.terms.inbox',
+              typeKey: (route) => {
+                if (route.params.type === 'assigned') return 'conversation.myInbox'
+                if (route.params.type === 'mentioned') return 'conversation.mentions'
+                if (route.params.type === 'unassigned') return 'conversation.unassigned'
+                if (route.params.type === 'all') return 'conversation.all'
+                return ''
               }
             },
             children: [
@@ -141,11 +144,13 @@ const routes = [
                 component: () => import('@main/views/conversation/ConversationDetailView.vue'),
                 props: true,
                 meta: {
-                  title: 'Inbox',
-                  type: (route) => {
-                    if (route.params.type === 'assigned') return 'My inbox'
-                    if (route.params.type === 'mentioned') return 'Mentions'
-                    return route.params.type
+                  titleKey: 'globals.terms.inbox',
+                  typeKey: (route) => {
+                    if (route.params.type === 'assigned') return 'conversation.myInbox'
+                    if (route.params.type === 'mentioned') return 'conversation.mentions'
+                    if (route.params.type === 'unassigned') return 'conversation.unassigned'
+                    if (route.params.type === 'all') return 'conversation.all'
+                    return ''
                   },
                   hidePageHeader: true
                 }
@@ -160,13 +165,13 @@ const routes = [
         redirect: '/account/profile',
         component: AccountLayout,
         props: true,
-        meta: { title: 'Account' },
+        meta: { titleKey: 'globals.terms.account' },
         children: [
           {
             path: 'profile',
             name: 'profile',
             component: () => import('@main/views/account/profile/ProfileEditView.vue'),
-            meta: { title: 'Edit Profile' }
+            meta: { titleKey: 'account.editProfile' }
           }
         ]
       },
@@ -174,24 +179,24 @@ const routes = [
         path: '/admin',
         name: 'admin',
         component: AdminLayout,
-        meta: { title: 'Admin' },
+        meta: { titleKey: 'globals.terms.admin' },
         children: [
           {
             path: 'custom-attributes',
             name: 'custom-attributes',
             component: () => import('@main/views/admin/custom-attributes/CustomAttributes.vue'),
-            meta: { title: 'Custom attributes' }
+            meta: { titleKey: 'globals.terms.customAttribute', titleCount: 2 }
           },
           {
             path: 'general',
             name: 'general',
             component: () => import('@main/views/admin/general/General.vue'),
-            meta: { title: 'General' }
+            meta: { titleKey: 'globals.terms.general' }
           },
           {
             path: 'business-hours',
             component: () => import('@main/views/admin/business-hours/BusinessHours.vue'),
-            meta: { title: 'Business Hours' },
+            meta: { titleKey: 'globals.terms.businessHour', titleCount: 2 },
             children: [
               {
                 path: '',
@@ -203,7 +208,7 @@ const routes = [
                 name: 'new-business-hours',
                 component: () =>
                   import('@main/views/admin/business-hours/CreateOrEditBusinessHours.vue'),
-                meta: { title: 'New Business Hours' }
+                meta: { titleKey: 'businessHour.new' }
               },
               {
                 path: ':id/edit',
@@ -211,14 +216,14 @@ const routes = [
                 props: true,
                 component: () =>
                   import('@main/views/admin/business-hours/CreateOrEditBusinessHours.vue'),
-                meta: { title: 'Edit Business Hours' }
+                meta: { titleKey: 'businessHour.edit' }
               }
             ]
           },
           {
             path: 'sla',
             component: () => import('@main/views/admin/sla/SLA.vue'),
-            meta: { title: 'SLA' },
+            meta: { titleKey: 'globals.terms.sla' },
             children: [
               {
                 path: '',
@@ -229,21 +234,21 @@ const routes = [
                 path: 'new',
                 name: 'new-sla',
                 component: () => import('@main/views/admin/sla/CreateEditSLA.vue'),
-                meta: { title: 'New SLA' }
+                meta: { titleKey: 'sla.new' }
               },
               {
                 path: ':id/edit',
                 props: true,
                 name: 'edit-sla',
                 component: () => import('@main/views/admin/sla/CreateEditSLA.vue'),
-                meta: { title: 'Edit SLA' }
+                meta: { titleKey: 'sla.edit' }
               }
             ]
           },
           {
             path: 'inboxes',
             component: () => import('@main/views/admin/inbox/InboxView.vue'),
-            meta: { title: 'Inboxes' },
+            meta: { titleKey: 'globals.terms.inbox', titleCount: 2 },
             children: [
               {
                 path: '',
@@ -254,30 +259,30 @@ const routes = [
                 path: 'new',
                 name: 'new-inbox',
                 component: () => import('@main/views/admin/inbox/NewInbox.vue'),
-                meta: { title: 'New Inbox' }
+                meta: { titleKey: 'inbox.new' }
               },
               {
                 path: ':id/edit',
                 props: true,
                 name: 'edit-inbox',
                 component: () => import('@main/views/admin/inbox/EditInbox.vue'),
-                meta: { title: 'Edit Inbox' }
+                meta: { titleKey: 'inbox.edit' }
               }
             ]
           },
           {
             path: 'notification',
             component: () => import('@main/features/admin/notification/NotificationSetting.vue'),
-            meta: { title: 'Notification Settings' }
+            meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
           },
           {
             path: 'teams',
-            meta: { title: 'Teams' },
+            meta: { titleKey: 'globals.terms.team', titleCount: 2 },
             children: [
               {
                 path: 'agents',
                 component: () => import('@main/views/admin/agents/Agents.vue'),
-                meta: { title: 'Agents' },
+                meta: { titleKey: 'globals.terms.agent', titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -288,21 +293,21 @@ const routes = [
                     path: 'new',
                     name: 'new-agent',
                     component: () => import('@main/views/admin/agents/CreateAgent.vue'),
-                    meta: { title: 'Create agent' }
+                    meta: { titleKey: 'agent.new' }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-agent',
                     component: () => import('@main/views/admin/agents/EditAgent.vue'),
-                    meta: { title: 'Edit agent' }
+                    meta: { titleKey: 'agent.edit' }
                   }
                 ]
               },
               {
                 path: 'teams',
                 component: () => import('@main/views/admin/teams/Teams.vue'),
-                meta: { title: 'Teams' },
+                meta: { titleKey: 'globals.terms.team', titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -313,21 +318,21 @@ const routes = [
                     path: 'new',
                     name: 'new-team',
                     component: () => import('@main/views/admin/teams/CreateTeamForm.vue'),
-                    meta: { title: 'Create Team' }
+                    meta: { titleKey: 'team.new' }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-team',
                     component: () => import('@main/views/admin/teams/EditTeamForm.vue'),
-                    meta: { title: 'Edit Team' }
+                    meta: { titleKey: 'team.edit' }
                   }
                 ]
               },
               {
                 path: 'roles',
                 component: () => import('@main/views/admin/roles/Roles.vue'),
-                meta: { title: 'Roles' },
+                meta: { titleKey: 'globals.terms.role', titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -338,14 +343,14 @@ const routes = [
                     path: 'new',
                     name: 'new-role',
                     component: () => import('@main/views/admin/roles/NewRole.vue'),
-                    meta: { title: 'Create Role' }
+                    meta: { titleKey: 'role.new' }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-role',
                     component: () => import('@main/views/admin/roles/EditRole.vue'),
-                    meta: { title: 'Edit Role' }
+                    meta: { titleKey: 'role.edit' }
                   }
                 ]
               },
@@ -353,7 +358,7 @@ const routes = [
                 path: 'activity-log',
                 name: 'activity-log',
                 component: () => import('@main/views/admin/activity-log/ActivityLog.vue'),
-                meta: { title: 'Activity Log' }
+                meta: { titleKey: 'globals.terms.activityLog', titleCount: 2 }
               }
             ]
           },
@@ -361,21 +366,21 @@ const routes = [
             path: 'automations',
             component: () => import('@main/views/admin/automations/Automation.vue'),
             name: 'automations',
-            meta: { title: 'Automations' },
+            meta: { titleKey: 'globals.terms.automation', titleCount: 2 },
             children: [
               {
                 path: 'new',
                 props: true,
                 name: 'new-automation',
                 component: () => import('@main/views/admin/automations/CreateOrEditRule.vue'),
-                meta: { title: 'Create Automation' }
+                meta: { titleKey: 'automation.newRule' }
               },
               {
                 path: ':id/edit',
                 props: true,
                 name: 'edit-automation',
                 component: () => import('@main/views/admin/automations/CreateOrEditRule.vue'),
-                meta: { title: 'Edit Automation' }
+                meta: { titleKey: 'automation.editRule' }
               }
             ]
           },
@@ -383,21 +388,21 @@ const routes = [
             path: 'templates',
             component: () => import('@main/views/admin/templates/Templates.vue'),
             name: 'templates',
-            meta: { title: 'Templates' },
+            meta: { titleKey: 'globals.terms.template', titleCount: 2 },
             children: [
               {
                 path: ':id/edit',
                 name: 'edit-template',
                 props: true,
                 component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { title: 'Edit Template' }
+                meta: { titleKey: 'template.edit' }
               },
               {
                 path: 'new',
                 name: 'new-template',
                 props: true,
                 component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { title: 'New Template' }
+                meta: { titleKey: 'template.new' }
               }
             ]
           },
@@ -405,7 +410,7 @@ const routes = [
             path: 'sso',
             component: () => import('@main/views/admin/oidc/OIDC.vue'),
             name: 'sso',
-            meta: { title: 'SSO' },
+            meta: { titleKey: 'globals.terms.sso' },
             children: [
               {
                 path: '',
@@ -417,13 +422,13 @@ const routes = [
                 props: true,
                 name: 'edit-sso',
                 component: () => import('@main/views/admin/oidc/CreateEditOIDC.vue'),
-                meta: { title: 'Edit SSO' }
+                meta: { titleKey: 'oidc.edit' }
               },
               {
                 path: 'new',
                 name: 'new-sso',
                 component: () => import('@main/views/admin/oidc/CreateEditOIDC.vue'),
-                meta: { title: 'New SSO' }
+                meta: { titleKey: 'oidc.new' }
               }
             ]
           },
@@ -431,7 +436,7 @@ const routes = [
             path: 'webhooks',
             component: () => import('@main/views/admin/webhooks/Webhooks.vue'),
             name: 'webhooks',
-            meta: { title: 'Webhooks' },
+            meta: { titleKey: 'globals.terms.webhook', titleCount: 2 },
             children: [
               {
                 path: '',
@@ -443,34 +448,34 @@ const routes = [
                 props: true,
                 name: 'edit-webhook',
                 component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'),
-                meta: { title: 'Edit Webhook' }
+                meta: { titleKey: 'webhook.edit' }
               },
               {
                 path: 'new',
                 name: 'new-webhook',
                 component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'),
-                meta: { title: 'New Webhook' }
+                meta: { titleKey: 'webhook.new' }
               }
             ]
           },
           {
             path: 'conversations',
-            meta: { title: 'Conversations' },
+            meta: { titleKey: 'globals.terms.conversation', titleCount: 2 },
             children: [
               {
                 path: 'tags',
                 component: () => import('@main/views/admin/tags/TagsView.vue'),
-                meta: { title: 'Tags' }
+                meta: { titleKey: 'globals.terms.tag', titleCount: 2 }
               },
               {
                 path: 'statuses',
                 component: () => import('@main/views/admin/status/StatusView.vue'),
-                meta: { title: 'Statuses' }
+                meta: { titleKey: 'globals.terms.status', titleCount: 2 }
               },
               {
                 path: 'macros',
                 component: () => import('@main/views/admin/macros/Macros.vue'),
-                meta: { title: 'Macros' },
+                meta: { titleKey: 'globals.terms.macro', titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -481,39 +486,39 @@ const routes = [
                     path: 'new',
                     name: 'new-macro',
                     component: () => import('@main/views/admin/macros/CreateMacro.vue'),
-                    meta: { title: 'Create Macro' }
+                    meta: { titleKey: 'macro.new' }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-macro',
                     component: () => import('@main/views/admin/macros/EditMacro.vue'),
-                    meta: { title: 'Edit Macro' }
+                    meta: { titleKey: 'macro.editMacro' }
                   }
                 ]
               },
               {
                 path: 'shared-views',
-                component: () => import('@/views/admin/shared-views/SharedViews.vue'),
-                meta: { title: 'Shared views' },
+                component: () => import('@main/views/admin/shared-views/SharedViews.vue'),
+                meta: { titleKey: 'globals.terms.sharedView', titleCount: 2 },
                 children: [
                   {
                     path: '',
                     name: 'shared-view-list',
-                    component: () => import('@/views/admin/shared-views/SharedViewList.vue')
+                    component: () => import('@main/views/admin/shared-views/SharedViewList.vue')
                   },
                   {
                     path: 'new',
                     name: 'new-shared-view',
-                    component: () => import('@/views/admin/shared-views/CreateSharedView.vue'),
-                    meta: { title: 'Create shared view' }
+                    component: () => import('@main/views/admin/shared-views/CreateSharedView.vue'),
+                    meta: { titleKey: 'sharedView.new' }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-shared-view',
-                    component: () => import('@/views/admin/shared-views/EditSharedView.vue'),
-                    meta: { title: 'Edit shared view' }
+                    component: () => import('@main/views/admin/shared-views/EditSharedView.vue'),
+                    meta: { titleKey: 'sharedView.editSharedView' }
                   }
                 ]
               }
@@ -537,10 +542,14 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  // Make page title with the route name and site name
   const appSettingsStore = useAppSettingsStore()
   const siteName = appSettingsStore.settings?.['app.site_name'] || 'Libredesk'
-  const pageTitle = to.meta?.title || ''
+  const i18n = getI18n()
+  const typeKey = typeof to.meta?.typeKey === 'function' ? to.meta.typeKey(to) : ''
+  const titleKey = typeKey || to.meta?.titleKey
+  const pageTitle = titleKey && i18n
+    ? i18n.global.t(titleKey, to.meta?.titleCount || 1)
+    : ''
   document.title = `${pageTitle} - ${siteName}`
   next()
 })

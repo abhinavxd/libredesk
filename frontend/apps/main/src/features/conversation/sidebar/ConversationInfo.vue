@@ -133,9 +133,7 @@ const updateCustomAttributes = async (attributes) => {
     conversationStore.current.custom_attributes = attributes
     await api.updateConversationCustomAttribute(conversation.value.uuid, attributes)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.attribute')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

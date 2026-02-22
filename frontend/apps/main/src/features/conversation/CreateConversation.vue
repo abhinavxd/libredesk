@@ -4,11 +4,7 @@
       <DialogContent class="max-w-5xl w-full h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {{
-              $t('globals.messages.new', {
-                name: $t('globals.terms.conversation').toLowerCase()
-              })
-            }}
+            {{ $t('conversation.newConversation') }}
           </DialogTitle>
           <DialogDescription />
         </DialogHeader>
@@ -30,19 +26,24 @@
                   </FormControl>
                   <FormMessage />
 
-                  <ul
+                  <div
                     v-if="searchResults.length"
-                    class="border rounded p-2 max-h-60 overflow-y-auto absolute w-full z-50 shadow bg-background"
+                    class="absolute w-full z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
                   >
-                    <li
-                      v-for="contact in searchResults"
-                      :key="contact.email"
-                      @click="selectContact(contact)"
-                      class="cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      {{ contact.first_name }} {{ contact.last_name }} ({{ contact.email }})
-                    </li>
-                  </ul>
+                    <ul class="max-h-60 overflow-y-auto">
+                      <li
+                        v-for="contact in searchResults"
+                        :key="contact.email"
+                        @click="selectContact(contact)"
+                        class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <div>
+                          <p class="font-medium">{{ contact.first_name }} {{ contact.last_name }}</p>
+                          <p class="text-xs text-muted-foreground">{{ contact.email }}</p>
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
                 </FormItem>
               </FormField>
 
@@ -52,7 +53,7 @@
                   <FormItem>
                     <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
                     <FormControl>
-                      <Input type="text" placeholder="" v-bind="componentField" required />
+                      <Input type="text" placeholder="" v-bind="componentField" :disabled="!!selectedContact" required />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -62,7 +63,7 @@
                   <FormItem>
                     <FormLabel>{{ $t('globals.terms.lastName') }}</FormLabel>
                     <FormControl>
-                      <Input type="text" placeholder="" v-bind="componentField" />
+                      <Input type="text" placeholder="" v-bind="componentField" :disabled="!!selectedContact" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -88,9 +89,7 @@
                       <Select v-bind="componentField">
                         <SelectTrigger>
                           <SelectValue
-                            :placeholder="
-                              t('globals.messages.select', { name: t('globals.terms.inbox') })
-                            "
+                            :placeholder="t('placeholders.selectInbox')"
                           />
                         </SelectTrigger>
                         <SelectContent>
@@ -117,20 +116,14 @@
                 <FormField v-slot="{ componentField }" name="team_id">
                   <FormItem>
                     <FormLabel>
-                      {{
-                        $t('globals.messages.assign', {
-                          name: t('globals.terms.team').toLowerCase()
-                        })
-                      }}
-                      ({{ $t('globals.terms.optional').toLowerCase() }})
+                      {{ $t('actions.assignTeam') }}
+                      ({{ $t('globals.terms.optional') }})
                     </FormLabel>
                     <FormControl>
                       <SelectComboBox
                         v-bind="componentField"
-                        :items="[{ value: 'none', label: 'None' }, ...teamStore.options]"
-                        :placeholder="
-                          t('globals.messages.select', { name: t('globals.terms.team') })
-                        "
+                        :items="[{ value: 'none', label: t('globals.terms.none') }, ...teamStore.options]"
+                        :placeholder="t('placeholders.selectTeam')"
                         type="team"
                       />
                     </FormControl>
@@ -142,20 +135,14 @@
                 <FormField v-slot="{ componentField }" name="agent_id">
                   <FormItem>
                     <FormLabel>
-                      {{
-                        $t('globals.messages.assign', {
-                          name: t('globals.terms.agent').toLowerCase()
-                        })
-                      }}
-                      ({{ $t('globals.terms.optional').toLowerCase() }})
+                      {{ $t('actions.assignAgent') }}
+                      ({{ $t('globals.terms.optional') }})
                     </FormLabel>
                     <FormControl>
                       <SelectComboBox
                         v-bind="componentField"
-                        :items="[{ value: 'none', label: 'None' }, ...uStore.options]"
-                        :placeholder="
-                          t('globals.messages.select', { name: t('globals.terms.agent') })
-                        "
+                        :items="[{ value: 'none', label: t('globals.terms.none') }, ...uStore.options]"
+                        :placeholder="t('placeholders.selectAgent')"
                         type="user"
                       />
                     </FormControl>
@@ -176,7 +163,7 @@
                     <Editor
                       v-model:htmlContent="componentField.modelValue"
                       @update:htmlContent="(value) => componentField.onChange(value)"
-                      :placeholder="t('editor.newLine') + t('editor.ctrlK')"
+                      :placeholder="t('editor.hint.newLineCtrlK')"
                       :insertContent="insertContent"
                       :autoFocus="false"
                       class="w-full flex-1 overflow-y-auto p-2 box min-h-0"
@@ -284,6 +271,7 @@ const conversationStore = useConversationStore()
 const macroStore = useMacroStore()
 let timeoutId = null
 const insertContent = ref('')
+const selectedContact = ref(null)
 
 const handleEmojiSelect = (emoji) => {
   insertContent.value = undefined
@@ -306,22 +294,18 @@ const isDisabled = computed(() => {
 const formSchema = z.object({
   subject: z.string().min(
     1,
-    t('globals.messages.cannotBeEmpty', {
-      name: t('globals.terms.subject')
-    })
+    t('validation.subjectCannotBeEmpty')
   ),
   content: z.string().min(
     1,
-    t('globals.messages.cannotBeEmpty', {
-      name: t('globals.terms.message')
-    })
+    t('validation.messageCannotBeEmpty')
   ),
   inbox_id: z.any().refine((val) => inboxStore.options.some((option) => option.value === val), {
     message: t('globals.messages.required')
   }),
   team_id: z.any().optional(),
   agent_id: z.any().optional(),
-  contact_email: z.string().email(t('globals.messages.invalidEmailAddress')),
+  contact_email: z.string().email(t('validation.invalidEmail')),
   first_name: z.string().min(1, t('globals.messages.required')),
   last_name: z.string().optional()
 })
@@ -360,6 +344,11 @@ const form = useForm({
 
 watch(emailQuery, (newVal) => {
   form.setFieldValue('contact_email', newVal)
+  if (selectedContact.value && newVal !== selectedContact.value.email) {
+    selectedContact.value = null
+    form.setFieldValue('first_name', '')
+    form.setFieldValue('last_name', '')
+  }
 })
 
 const handleSearchContacts = async () => {
@@ -386,6 +375,7 @@ const handleSearchContacts = async () => {
 }
 
 const selectContact = (contact) => {
+  selectedContact.value = contact
   emailQuery.value = contact.email
   form.setFieldValue('first_name', contact.first_name)
   form.setFieldValue('last_name', contact.last_name || '')

@@ -26,10 +26,10 @@ export const createFormSchema = (t) => z.object({
     tls_type: z.enum(['none', 'starttls', 'tls']),
     tls_skip_verify: z.boolean().optional(),
     scan_inbox_since: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
-      message: t('globals.messages.goDuration')
+      message: t('validation.invalidDuration')
     }),
     read_interval: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
-      message: t('globals.messages.goDuration')
+      message: t('validation.invalidDuration')
     })
   }),
   smtp: z.object({
@@ -40,10 +40,10 @@ export const createFormSchema = (t) => z.object({
     max_conns: z.number().min(1),
     max_msg_retries: z.number().min(0).max(100),
     idle_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
-      message: t('globals.messages.goDuration')
+      message: t('validation.invalidDuration')
     }),
     wait_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
-      message: t('globals.messages.goDuration')
+      message: t('validation.invalidDuration')
     }),
     tls_type: z.enum(['none', 'starttls', 'tls']),
     tls_skip_verify: z.boolean().optional(),

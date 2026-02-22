@@ -4,7 +4,7 @@
       <router-view></router-view>
     </template>
     <template #help>
-      <p>Combine multiple conversation actions into single-click macros.</p>
+      <p>{{ $t('admin.macro.help') }}</p>
     </template>
   </AdminPageWithHelp>
 </template>

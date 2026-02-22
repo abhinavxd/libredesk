@@ -11,11 +11,11 @@ export const createFormSchema = (t) => z.object({
     }),
     port: z
         .number({
-            invalid_type_error: t('globals.messages.invalidValue', { name: t('globals.terms.port') }),
+            invalid_type_error: t('validation.invalidPortValue'),
             required_error: t('globals.messages.required')
         })
-        .min(1, { message: t('form.error.minmaxNumber', { min: 1, max: 65535 }) })
-        .max(65535, { message: t('form.error.minmaxNumber', { min: 1, max: 65535 }) })
+        .min(1, { message: t('validation.minmaxNumber', { min: 1, max: 65535 }) })
+        .max(65535, { message: t('validation.minmaxNumber', { min: 1, max: 65535 }) })
         .default(587),
     password: z.string().nonempty({
         message: t('globals.messages.required')
@@ -25,18 +25,18 @@ export const createFormSchema = (t) => z.object({
             invalid_type_error: t('globals.messages.mustBeNumber'),
             required_error: t('globals.messages.required')
         })
-        .min(1, { message: t('form.error.minmaxNumber', { min: 1, max: 1000 }) })
-        .max(1000, { message: t('form.error.minmaxNumber', { min: 1, max: 1000 }) }),
+        .min(1, { message: t('validation.minmaxNumber', { min: 1, max: 1000 }) })
+        .max(1000, { message: t('validation.minmaxNumber', { min: 1, max: 1000 }) }),
     idle_timeout: z
         .string()
         .refine(isGoDuration, {
-            message: t('globals.messages.goDuration')
+            message: t('validation.invalidDuration')
         })
         .default('15s'),
     wait_timeout: z
         .string()
         .refine(isGoDuration, {
-            message: t('globals.messages.goDuration')
+            message: t('validation.invalidDuration')
         })
         .default('5s'),
     auth_protocol: z.enum(['plain', 'login', 'cram', 'none']),
@@ -48,8 +48,8 @@ export const createFormSchema = (t) => z.object({
             invalid_type_error: t('globals.messages.mustBeNumber'),
             required_error: t('globals.messages.required')
         })
-        .min(0, { message: t('form.error.minmaxNumber', { min: 0, max: 1000 }) })
-        .max(1000, { message: t('form.error.minmaxNumber', { min: 0, max: 1000 }) })
+        .min(0, { message: t('validation.minmaxNumber', { min: 0, max: 1000 }) })
+        .max(1000, { message: t('validation.minmaxNumber', { min: 0, max: 1000 }) })
         .default(2),
     hello_hostname: z.string().optional(),
     tls_type: z.enum(['none', 'starttls', 'tls']),

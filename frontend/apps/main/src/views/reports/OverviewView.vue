@@ -230,11 +230,7 @@
                 <span class="text-sm font-semibold">{{ formatCompactNumber(tag.count) }}</span>
               </div>
               <p v-if="!tagDistributionData.top_tags?.length" class="text-sm text-muted-foreground">
-                {{
-                  $t('globals.messages.noResults', {
-                    item: $t('globals.terms.tags').toLowerCase()
-                  })
-                }}
+                {{ $t('report.noTagsFound') }}
               </p>
             </div>
           </div>

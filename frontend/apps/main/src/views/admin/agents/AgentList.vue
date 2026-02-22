@@ -10,9 +10,7 @@
       />
       <router-link :to="{ name: 'new-agent' }">
         <Button>{{
-          $t('globals.messages.new', {
-            name: $t('globals.terms.agent', 1)
-          })
+          $t('agent.new')
         }}</Button>
       </router-link>
     </div>

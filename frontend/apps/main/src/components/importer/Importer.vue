@@ -7,11 +7,7 @@
     <Dialog v-model:open="showDialog">
       <DialogContent class="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{{
-            $t('globals.messages.import', {
-              name: $t(entityKey, 2).toLowerCase()
-            })
-          }}</DialogTitle>
+          <DialogTitle>{{ $t('globals.messages.import') }}</DialogTitle>
         </DialogHeader>
 
         <div class="space-y-4 py-4">
@@ -24,7 +20,7 @@
                 {{
                   file
                     ? file.name
-                    : $t('globals.messages.select', { name: $t('globals.terms.csvFile') })
+                    : $t('placeholders.selectCsvFile')
                 }}
               </span>
               <Upload class="h-4 w-4 text-muted-foreground flex-shrink-0" />

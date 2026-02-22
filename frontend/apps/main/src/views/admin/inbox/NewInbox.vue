@@ -113,7 +113,7 @@ const selectedChannel = ref(null)
 const router = useRouter()
 const breadcrumbLinks = [
   { path: 'inbox-list', label: t('globals.terms.inbox', 2) },
-  { path: '', label: t('globals.messages.new', { name: t('globals.terms.inbox') }) }
+  { path: '', label: t('inbox.newInbox') }
 ]
 
 const steps = [
@@ -150,8 +150,8 @@ const channels = [
     icon: Mail
   },
   {
-    title: 'Live Chat',
-    subTitle: 'Create a live chat inbox for real-time customer support',
+    title: t('globals.terms.liveChat'),
+    subTitle: t('admin.inbox.createLiveChatInbox'),
     onClick: selectLiveChatChannel,
     icon: MessageCircle
   }
@@ -197,9 +197,7 @@ async function createInbox(payload) {
     isLoading.value = true
     await api.createInbox(payload)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.inbox')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
     router.push({ name: 'inbox-list' })
   } catch (error) {

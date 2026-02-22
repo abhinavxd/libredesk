@@ -59,7 +59,7 @@
             @click="toggleBcc"
             class="text-sm bg-secondary text-secondary-foreground hover:bg-secondary/80"
           >
-            {{ showBcc ? 'Remove BCC' : 'BCC' }}
+            {{ showBcc ? $t('replyBox.removeBCC') : $t('replyBox.bcc') }}
           </Button>
         </div>
         <div v-if="showBcc" class="flex items-center space-x-2">
@@ -90,7 +90,7 @@
         v-model:htmlContent="htmlContent"
         v-model:textContent="textContent"
         :message-type="messageType"
-        :placeholder="t('editor.newLine') + t('editor.send') + t('editor.ctrlK')"
+        :placeholder="t('editor.hint.full')"
         :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"

@@ -28,7 +28,7 @@ export const createColumns = (t) => [
     },
     cell: function ({ row }) {
       const visibility = row.getValue('visibility')
-      const label = visibility === 'all' ? t('globals.messages.all', { name: t('globals.terms.agent', 2).toLowerCase() }) : t('globals.terms.team')
+      const label = visibility === 'all' ? t('sharedView.allAgents') : t('globals.terms.team')
       return h('div', { class: 'text-center capitalize' }, label)
     }
   },

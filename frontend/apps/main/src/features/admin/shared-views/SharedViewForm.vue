@@ -41,11 +41,7 @@
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="all">{{
-                  t('globals.messages.all', {
-                    name: t('globals.terms.agent', 2).toLowerCase()
-                  })
-                }}</SelectItem>
+                <SelectItem value="all">{{ t('sharedView.allAgents') }}</SelectItem>
                 <SelectItem value="team">{{ t('globals.terms.team') }}</SelectItem>
               </SelectGroup>
             </SelectContent>
@@ -62,7 +58,7 @@
           <SelectComboBox
             v-bind="componentField"
             :items="tStore.options"
-            :placeholder="t('globals.messages.select', { name: t('globals.terms.team').toLowerCase() })"
+            :placeholder="t('placeholders.selectTeam')"
             type="team"
           />
         </FormControl>

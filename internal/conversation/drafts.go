@@ -15,7 +15,7 @@ func (m *Manager) UpsertConversationDraft(conversationID, userID int, content st
 
 	if err := m.q.UpsertConversationDraft.Get(&draft, conversationID, userID, content, meta); err != nil {
 		m.lo.Error("error upserting conversation draft", "conversation_id", conversationID, "user_id", userID, "error", err)
-		return draft, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "draft"), nil)
+		return draft, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	return draft, nil
@@ -26,7 +26,7 @@ func (m *Manager) GetAllUserDrafts(userID int) ([]models.ConversationDraft, erro
 	var drafts = make([]models.ConversationDraft, 0)
 	if err := m.q.GetAllUserDrafts.Select(&drafts, userID); err != nil {
 		m.lo.Error("error fetching user drafts", "user_id", userID, "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "drafts"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return drafts, nil
 }
@@ -40,7 +40,7 @@ func (m *Manager) DeleteConversationDraft(conversationID int, uuid string, userI
 
 	if _, err := m.q.DeleteConversationDraft.Exec(conversationID, uuidParam, userID); err != nil {
 		m.lo.Error("error deleting conversation draft", "conversation_id", conversationID, "uuid", uuid, "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "draft"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	return nil

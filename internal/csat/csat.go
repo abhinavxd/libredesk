@@ -67,7 +67,7 @@ func (m *Manager) Create(conversationID int) (models.CSATResponse, error) {
 	)
 	if err := m.q.Insert.QueryRow(conversationID).Scan(&uuid); err != nil {
 		m.lo.Error("error creating CSAT", "error", err)
-		return rsp, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.csatSurvey}"), nil)
+		return rsp, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return m.Get(uuid)
 }
@@ -78,7 +78,7 @@ func (m *Manager) Get(uuid string) (models.CSATResponse, error) {
 	err := m.q.Get.Get(&csat, uuid)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return csat, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.csatSurvey}"), nil)
+			return csat, envelope.NewError(envelope.InputError, m.i18n.T("validation.notFoundCsatSurvey"), nil)
 		}
 		m.lo.Error("error getting CSAT", "error", err)
 		return csat, err
@@ -100,7 +100,7 @@ func (m *Manager) UpdateResponse(uuid string, score int, feedback string) error 
 	_, err = m.q.Update.Exec(uuid, score, feedback)
 	if err != nil {
 		m.lo.Error("error updating CSAT", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorSaving", "name", "{globals.terms.csatResponse}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

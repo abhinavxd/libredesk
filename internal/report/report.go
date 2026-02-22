@@ -67,18 +67,18 @@ func (m *Manager) GetOverViewCounts() (json.RawMessage, error) {
 	})
 	if err != nil {
 		m.lo.Error("error starting db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
 	if err := tx.Get(&counts, m.q.GetOverviewCounts); err != nil {
 		m.lo.Error("error fetching overview counts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	return counts, nil
@@ -91,7 +91,7 @@ func (m *Manager) GetOverviewSLA(days int) (json.RawMessage, error) {
 	})
 	if err != nil {
 		m.lo.Error("error starting db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
@@ -100,18 +100,18 @@ func (m *Manager) GetOverviewSLA(days int) (json.RawMessage, error) {
 	query := fmt.Sprintf(m.q.GetOverviewSLA, days, days, days, days)
 	if err := tx.Get(&result, query); err != nil {
 		m.lo.Error("error fetching overview SLA data", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	slaData, err := json.Marshal(result)
 	if err != nil {
 		m.lo.Error("error marshaling SLA data", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingCount", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	return slaData, nil
@@ -125,14 +125,14 @@ func (m *Manager) GetOverviewChart(days int) (json.RawMessage, error) {
 	})
 	if err != nil {
 		m.lo.Error("error starting db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingChart", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
 	query := fmt.Sprintf(m.q.GetOverviewCharts, days, days, days, days)
 	if err := tx.Get(&stats, query); err != nil {
 		m.lo.Error("error fetching overview charts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetchingChart", "name", "{globals.terms.overview}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return stats, nil
 }
@@ -145,14 +145,14 @@ func (m *Manager) GetOverviewCSAT(days int) (json.RawMessage, error) {
 	})
 	if err != nil {
 		m.lo.Error("error starting db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.csat}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
 	query := fmt.Sprintf(m.q.GetOverviewCSAT, days, days)
 	if err := tx.Get(&stats, query); err != nil {
 		m.lo.Error("error fetching overview CSAT", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.csat}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return stats, nil
 }
@@ -165,14 +165,14 @@ func (m *Manager) GetOverviewMessageVolume(days int) (json.RawMessage, error) {
 	})
 	if err != nil {
 		m.lo.Error("error starting db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
 	query := fmt.Sprintf(m.q.GetOverviewMessageVolume, days, days)
 	if err := tx.Get(&stats, query); err != nil {
 		m.lo.Error("error fetching overview message volume", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return stats, nil
 }
@@ -185,14 +185,14 @@ func (m *Manager) GetOverviewTagDistribution(days int) (json.RawMessage, error) 
 	})
 	if err != nil {
 		m.lo.Error("error starting db txn", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.tag}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
 	query := fmt.Sprintf(m.q.GetOverviewTagDistribution, days, days, days, days)
 	if err := tx.Get(&stats, query); err != nil {
 		m.lo.Error("error fetching overview tag distribution", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.tag}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return stats, nil
 }

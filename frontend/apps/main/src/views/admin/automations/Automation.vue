@@ -5,9 +5,7 @@
         <div class="flex justify-between mb-5">
           <div class="ml-auto">
             <Button @click="newRule">{{
-              $t('globals.messages.new', {
-                name: $t('globals.terms.rule')
-              })
+              $t('automation.new')
             }}</Button>
           </div>
         </div>
@@ -19,11 +17,8 @@
     </template>
 
     <template #help>
-      <p>Create automation rules to streamline your support workflow.</p>
-      <p>
-        Set actions to be performed when a conversation matches the rule criteria when it is created
-        or updated or run rules hourly.
-      </p>
+      <p>{{ $t('admin.automation.help.description') }}</p>
+      <p>{{ $t('admin.automation.help.detail') }}</p>
     </template>
   </AdminPageWithHelp>
 </template>

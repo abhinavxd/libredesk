@@ -116,9 +116,7 @@ const props = defineProps({
 const emptyText = computed(
   () =>
     props.emptyText ||
-    t('globals.messages.noResults', {
-      name: t('globals.terms.result', 2).toLowerCase()
-    })
+    t('globals.messages.noResultsFound')
 )
 
 const sorting = ref([])

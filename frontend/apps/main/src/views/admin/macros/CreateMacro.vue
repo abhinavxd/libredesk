@@ -26,9 +26,7 @@ const breadcrumbLinks = [
   { path: 'macro-list', label: t('globals.terms.macro', 2) },
   {
     path: '',
-    label: t('globals.messages.new', {
-      name: t('globals.terms.macro')
-    })
+    label: t('macro.new')
   }
 ]
 
@@ -44,9 +42,7 @@ const createMacro = async (values) => {
     await macroStore.loadMacros(true)
     
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.macro')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
     router.push({ name: 'macro-list' })
   } catch (error) {

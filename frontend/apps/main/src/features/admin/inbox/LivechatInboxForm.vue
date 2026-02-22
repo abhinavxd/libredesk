@@ -62,7 +62,7 @@
           <FormField v-slot="{ componentField }" name="config.brand_name">
             <FormItem>
               <FormLabel>{{
-                $t('globals.terms.brand') + ' ' + $t('globals.terms.name').toLowerCase()
+                $t('globals.terms.brandName')
               }}</FormLabel>
               <FormControl>
                 <Input type="text" placeholder="" v-bind="componentField" />
@@ -77,11 +77,11 @@
               <FormControl>
                 <Select v-bind="componentField">
                   <SelectTrigger>
-                    <SelectValue placeholder="Select language" />
+                    <SelectValue :placeholder="$t('admin.general.language.placeholder')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="mr">Marathi</SelectItem>
+                    <SelectItem value="mr">मराठी</SelectItem>
                   </SelectContent>
                 </Select>
               </FormControl>
@@ -97,15 +97,11 @@
                 <Select v-bind="componentField">
                   <SelectTrigger>
                     <SelectValue
-                      :placeholder="
-                        $t('globals.messages.select', {
-                          name: $t('globals.terms.inbox').toLowerCase()
-                        })
-                      "
+                      :placeholder="$t('placeholders.selectInbox')"
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem :value="0"> None </SelectItem>
+                    <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
                     <SelectItem v-for="inbox in emailInboxes" :key="inbox.id" :value="inbox.id">
                       {{ inbox.name }}
                     </SelectItem>
@@ -199,7 +195,7 @@
                   <FormControl>
                     <Select v-bind="componentField">
                       <SelectTrigger>
-                        <SelectValue placeholder="Select position" />
+                        <SelectValue :placeholder="$t('placeholders.selectPosition')" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="left">{{
@@ -271,7 +267,7 @@
               <FormControl>
                 <Textarea
                   v-bind="componentField"
-                  placeholder="Welcome! How can we help you today?"
+                  :placeholder="$t('placeholders.greetingMessage')"
                   rows="2"
                 />
               </FormControl>
@@ -286,7 +282,7 @@
             <FormItem>
               <FormLabel>{{ $t('admin.inbox.livechat.introductionMessage') }}</FormLabel>
               <FormControl>
-                <Textarea v-bind="componentField" placeholder="We're here to help!" rows="2" />
+                <Textarea v-bind="componentField" :placeholder="$t('placeholders.introductionMessage')" rows="2" />
               </FormControl>
               <FormDescription>{{
                 $t('admin.inbox.livechat.greetingMessage.variables')
@@ -301,7 +297,7 @@
               <FormControl>
                 <Textarea
                   v-bind="componentField"
-                  placeholder="Ask us anything, or share your feedback."
+                  :placeholder="$t('placeholders.chatIntroduction')"
                   rows="2"
                 />
               </FormControl>
@@ -329,7 +325,7 @@
                     <div class="flex-1 grid grid-cols-2 gap-2">
                       <Input
                         v-model="link.text"
-                        placeholder="Link Text"
+                        :placeholder="$t('placeholders.linkText')"
                         @input="updateExternalLinks"
                       />
                       <Input
@@ -393,7 +389,7 @@
                 <FormControl>
                   <Textarea
                     v-bind="componentField"
-                    placeholder="Our response times are slower than usual. We're working hard to get to your message."
+                    :placeholder="$t('placeholders.noticeBannerText')"
                     rows="2"
                   />
                 </FormControl>
@@ -604,7 +600,7 @@
                       $t('admin.inbox.livechat.startConversationButtonText')
                     }}</FormLabel>
                     <FormControl>
-                      <Input v-bind="componentField" placeholder="Start conversation" />
+                      <Input v-bind="componentField" :placeholder="$t('placeholders.startConversation')" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -660,7 +656,7 @@
                       $t('admin.inbox.livechat.startConversationButtonText')
                     }}</FormLabel>
                     <FormControl>
-                      <Input v-bind="componentField" placeholder="Start conversation" />
+                      <Input v-bind="componentField" :placeholder="$t('placeholders.startConversation')" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

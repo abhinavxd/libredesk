@@ -1,5 +1,6 @@
 <template>
   <form @submit="onSubmit" class="space-y-8">
+    <div class="grid gap-6 md:grid-cols-2">
     <FormField v-slot="{ componentField }" name="name">
       <FormItem>
         <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
@@ -56,6 +57,7 @@
         <FormMessage />
       </FormItem>
     </FormField>
+    </div>
 
     <!-- Notifications Section -->
     <div class="space-y-6">
@@ -109,10 +111,10 @@
                   {{
                     notification.type === 'warning' ? t('admin.sla.warning') : t('admin.sla.breach')
                   }}
-                  {{ t('globals.terms.alert').toLowerCase() }}
+                  {{ t('globals.terms.alert') }}
                 </div>
                 <p class="text-xs text-muted-foreground">
-                  {{ notification.type === 'warning' ? 'Pre-breach alert' : 'Post-breach alert' }}
+                  {{ notification.type === 'warning' ? t('admin.sla.preBreachAlert') : t('admin.sla.postBreachAlert') }}
                 </p>
               </div>
             </div>
@@ -175,9 +177,7 @@
                       <Input
                         type="text"
                         :placeholder="
-                          t('globals.messages.enter', {
-                            name: t('globals.terms.duration').toLowerCase()
-                          })
+                          t('sla.enterDuration')
                         "
                         v-bind="componentField"
                         @keydown.enter.prevent
@@ -204,7 +204,7 @@
                     <SelectTag
                       :items="
                         usersStore.options.concat({
-                          label: 'Assigned user',
+                          label: t('admin.sla.assignedUser'),
                           value: 'assigned_user'
                         })
                       "
@@ -229,9 +229,7 @@
                   <Select v-bind="componentField">
                     <SelectTrigger class="w-full">                        <SelectValue
                         :placeholder="
-                          t('globals.messages.select', {
-                            name: t('globals.terms.slaMetric').toLowerCase()
-                          })
+                          t('sla.selectMetric')
                         "
                       />
                     </SelectTrigger>

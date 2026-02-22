@@ -171,11 +171,13 @@ const route = useRoute()
 const { t } = useI18n()
 
 const title = computed(() => {
-  const typeValue = route.meta?.type?.(route)
-  return (
-    (typeValue || route.meta?.title || '').charAt(0).toUpperCase() +
-    (typeValue || route.meta?.title || '').slice(1)
-  )
+  const typeKey = route.meta?.typeKey?.(route)
+  if (typeKey) {
+    return t(typeKey)
+  }
+  const key = route.meta?.titleKey
+  if (!key) return ''
+  return t(key, route.meta?.titleCount || 1)
 })
 
 const handleStatusChange = (status) => {

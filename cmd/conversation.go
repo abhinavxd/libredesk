@@ -182,7 +182,7 @@ func handleGetViewConversations(r *fastglue.Request) error {
 	)
 	page, pageSize := getPagination(r)
 	if viewID < 1 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`view_id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	// Check if user has access to the view.
@@ -238,7 +238,7 @@ func handleGetViewConversations(r *fastglue.Request) error {
 
 	// No lists found, user doesn't have access to any conversations.
 	if len(lists) == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
 
 	conversations, err := app.conversation.GetViewConversationsList(user.ID, user.ID, user.Teams.IDs(), lists, order, orderBy, string(view.Filters), page, pageSize)
@@ -272,7 +272,7 @@ func handleGetTeamUnassignedConversations(r *fastglue.Request) error {
 	page, pageSize := getPagination(r)
 	teamID, _ := strconv.Atoi(teamIDStr)
 	if teamID < 1 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`team_id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	// Check if user belongs to the team.
@@ -402,7 +402,7 @@ func handleUpdateUserAssignee(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error decoding assignee change request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID, "")
@@ -438,7 +438,7 @@ func handleUpdateTeamAssignee(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error decoding team assignee change request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	assigneeID := req.AssigneeID
@@ -480,7 +480,7 @@ func handleUpdateConversationPriority(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error decoding priority update request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	priority := req.Priority
@@ -514,7 +514,7 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error decoding status update request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	status := req.Status
@@ -530,7 +530,7 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 	if status == cmodels.StatusSnoozed {
 		_, err := time.ParseDuration(snoozedUntil)
 		if err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`snoozed_until`"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 		}
 	}
 
@@ -576,7 +576,7 @@ func handleUpdateConversationtags(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error decoding tags update request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	tagNames := req.Tags
@@ -606,7 +606,7 @@ func handleUpdateConversationCustomAttributes(r *fastglue.Request) error {
 	)
 	if err := r.Decode(&attributes, ""); err != nil {
 		app.lo.Error("error unmarshalling custom attributes JSON", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	// Enforce conversation access.
@@ -636,7 +636,7 @@ func handleUpdateContactCustomAttributes(r *fastglue.Request) error {
 	)
 	if err := r.Decode(&attributes, ""); err != nil {
 		app.lo.Error("error unmarshalling custom attributes JSON", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	// Enforce conversation access.
@@ -734,7 +734,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error decoding create conversation request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	// Validate the request
@@ -755,7 +755,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		LastName:  req.LastName,
 	}
 	if err := app.user.CreateContact(&contact); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.contact}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 
 	// Create conversation first.
@@ -769,7 +769,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	)
 	if err != nil {
 		app.lo.Error("error creating conversation", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.conversation}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 
 	// Get media for the attachment ids.
@@ -778,7 +778,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		m, err := app.media.Get(id, "")
 		if err != nil {
 			app.lo.Error("error fetching media", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.media}"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
 		media = append(media, m)
 	}
@@ -792,7 +792,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 				app.lo.Error("error deleting conversation", "error", err)
 			}
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
 		}
 	case umodels.UserTypeContact:
 		// Create contact message.
@@ -801,11 +801,11 @@ func handleCreateConversation(r *fastglue.Request) error {
 			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 				app.lo.Error("error deleting conversation", "error", err)
 			}
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
 		}
 	default:
 		// Guard anyway.
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`initiator`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	// Assign the conversation to team/agent if provided, always assign team first as it clears assigned agent.
@@ -840,10 +840,10 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`first_name`"), nil)
 	}
 	if !stringutil.ValidEmail(req.Email) {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "`contact_email`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
 	}
 	if req.Initiator != umodels.UserTypeContact && req.Initiator != umodels.UserTypeAgent {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "`initiator`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Check if inbox exists and is enabled.
@@ -852,7 +852,7 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 		return err
 	}
 	if !inbox.Enabled {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.disabled", "name", "inbox"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.disabled"), nil)
 	}
 
 	return nil

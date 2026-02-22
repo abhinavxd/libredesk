@@ -18,11 +18,7 @@
         }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="handleTest">
-        {{
-          $t('globals.messages.send', {
-            name: $t('globals.terms.test').toLowerCase()
-          })
-        }}
+        {{ $t('actions.sendTest') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="() => (alertOpen = true)" class="text-destructive">
@@ -36,7 +32,7 @@
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ $t('globals.messages.deletionConfirmation', { name: $t('globals.terms.webhook') }) }}
+          {{ $t('confirm.deleteWebhook') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
@@ -101,9 +97,7 @@ async function handleDelete() {
     })
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       title: 'Success',
-      description: t('globals.messages.deletedSuccessfully', {
-        name: t('globals.terms.webhook')
-      })
+      description: t('globals.messages.deletedSuccessfully')
     })
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -121,9 +115,7 @@ async function handleToggle() {
     })
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.webhook')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -138,9 +130,7 @@ async function handleTest() {
     await api.testWebhook(props.webhook.id)
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
-      description: t('globals.messages.sentSuccessfully', {
-        name: t('globals.terms.webhook')
-      })
+      description: t('webhook.sentSuccessfully')
     })
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {

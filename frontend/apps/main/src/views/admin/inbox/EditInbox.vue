@@ -38,8 +38,8 @@ const formLoading = ref(false)
 const isLoading = ref(false)
 const inbox = ref({})
 const breadcrumbLinks = [
-  { path: 'inbox-list', label: 'Inboxes' },
-  { path: '', label: 'Edit Inbox' }
+  { path: 'inbox-list', label: t('globals.terms.inbox', 2) },
+  { path: '', label: t('inbox.edit') }
 ]
 
 const submitForm = (values) => {
@@ -99,9 +99,7 @@ const updateInbox = async (payload) => {
     isLoading.value = true
     await api.updateInbox(inbox.value.id, payload)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.inbox')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

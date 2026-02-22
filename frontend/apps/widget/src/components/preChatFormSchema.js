@@ -11,13 +11,13 @@ export const createPreChatFormSchema = (t, fields = []) => {
       switch (field.type) {
         case 'email':
           fieldSchema = z.string().email({
-            message: t('globals.messages.invalidEmail')
+            message: t('validation.invalidEmail')
           })
           break
         
         case 'number':
           fieldSchema = z.coerce.number({
-            invalid_type_error: t('globals.messages.invalid', { name: field.label })
+            invalid_type_error: t('validation.invalid')
           })
           break
         
@@ -27,13 +27,13 @@ export const createPreChatFormSchema = (t, fields = []) => {
         
         case 'date':
           fieldSchema = z.string().regex(/^(\d{4}-\d{2}-\d{2}|)$/, {
-            message: t('globals.messages.invalid', { name: field.label })
+            message: t('validation.invalid')
           })
           break
         
         case 'link':
           fieldSchema = z.string().refine((val) => val === '' || z.string().url().safeParse(val).success, {
-            message: t('globals.messages.invalid', { name: t('globals.terms.url').toLowerCase() })
+            message: t('validation.invalidUrl')
           })
           break
         
@@ -47,7 +47,7 @@ export const createPreChatFormSchema = (t, fields = []) => {
       
       if (field.required && field.type !== 'checkbox') {
         fieldSchema = fieldSchema.min(1, {
-          message: t('globals.messages.required', { name: field.label || field.key })
+          message: t('globals.messages.required')
         })
       } else if (field.type !== 'checkbox') {
         fieldSchema = fieldSchema.optional()

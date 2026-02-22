@@ -6,9 +6,7 @@
       <div>
         <RouterLink :to="{ name: 'new-webhook' }">
           <Button>{{
-            $t('globals.messages.new', {
-              name: $t('globals.terms.webhook')
-            })
+            $t('webhook.new')
           }}</Button>
         </RouterLink>
       </div>

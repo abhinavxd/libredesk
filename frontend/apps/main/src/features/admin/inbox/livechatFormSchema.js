@@ -12,16 +12,12 @@ export const createFormSchema = (t) => z.object({
     show_powered_by: z.boolean(),
     language: z.string().min(1, { message: t('globals.messages.required') }),
     logo_url: z.string().url({
-      message: t('globals.messages.invalid', {
-        name: t('globals.terms.url').toLowerCase()
-      })
+      message: t('validation.invalidUrl')
     }).optional().or(z.literal('')),
     launcher: z.object({
       position: z.enum(['left', 'right']),
       logo_url: z.string().url({
-        message: t('globals.messages.invalid', {
-          name: t('globals.terms.url').toLowerCase()
-        })
+        message: t('validation.invalidUrl')
       }).optional().or(z.literal('')),
       spacing: z.object({
         side: z.number().min(0),
@@ -40,9 +36,7 @@ export const createFormSchema = (t) => z.object({
     }),
     colors: z.object({
       primary: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
-        message: t('globals.messages.invalid', {
-          name: t('admin.inbox.livechat.colors').toLowerCase()
-        })
+        message: t('validation.invalidColor')
       }),
     }),
     features: z.object({
@@ -54,9 +48,7 @@ export const createFormSchema = (t) => z.object({
     external_links: z.array(z.object({
       text: z.string().min(1),
       url: z.string().url({
-        message: t('globals.messages.invalid', {
-          name: t('globals.terms.url').toLowerCase()
-        })
+        message: t('validation.invalidUrl')
       })
     })),
     visitors: z.object({

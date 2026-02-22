@@ -24,9 +24,7 @@ const breadcrumbLinks = [
   { path: 'role-list', label: t('globals.terms.role', 2) },
   {
     path: '',
-    label: t('globals.messages.new', {
-      name: t('globals.terms.role')
-    })
+    label: t('role.new')
   }
 ]
 
@@ -35,9 +33,7 @@ const submitForm = async (values) => {
     formLoading.value = true
     await api.createRole(values)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.role')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
     router.push({ name: 'role-list' })
   } catch (error) {

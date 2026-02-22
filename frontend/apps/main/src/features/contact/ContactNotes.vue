@@ -13,7 +13,7 @@
         class="transition-all hover:bg-primary/10 hover:border-primary/30"
       >
         <PlusIcon class="mr-2" size="18" />
-        {{ $t('globals.messages.new', { name: $t('globals.terms.note') }) }}
+        {{ $t('contact.newNote') }}
       </Button>
     </div>
 
@@ -29,13 +29,13 @@
             <Editor
               v-model:htmlContent="newNote"
               @update:htmlContent="(value) => (newNote = value)"
-              :placeholder="t('editor.newLine') + t('editor.send')"
+              :placeholder="t('editor.hint.newLineSend')"
             />
           </div>
           <div class="flex justify-end space-x-3 pt-2">
-            <Button variant="outline" @click="cancelAddNote"> Cancel </Button>
+            <Button variant="outline" @click="cancelAddNote"> {{ $t('globals.messages.cancel') }} </Button>
             <Button type="submit" :disabled="!newNote.trim()">
-              {{ $t('globals.messages.save') + ' ' + $t('globals.terms.note').toLowerCase() }}
+              {{ $t('contact.saveNote') }}
             </Button>
           </div>
         </div>
@@ -79,7 +79,7 @@
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" class="h-8 w-8 rounded-full">
                   <MoreVerticalIcon class="h-4 w-4" />
-                  <span class="sr-only">Open menu</span>
+                  <span class="sr-only">{{ $t('globals.terms.openMenu') }}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-[180px]">
@@ -89,7 +89,7 @@
                 >
                   <TrashIcon class="mr-2" size="15" />
                   {{
-                    $t('globals.messages.delete', { name: $t('globals.terms.note').toLowerCase() })
+                    $t('contact.deleteNote')
                   }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -125,7 +125,7 @@
         </p>
         <Button variant="outline" class="mt-3 border-gray-300" @click="startAddingNote">
           <PlusIcon class="mr-2" size="15" />
-          {{ $t('globals.messages.add', { name: $t('globals.terms.note').toLowerCase() }) }}
+          {{ $t('contact.addNote') }}
         </Button>
       </div>
     </div>

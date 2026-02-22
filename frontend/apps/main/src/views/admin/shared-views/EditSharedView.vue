@@ -32,7 +32,7 @@ const sharedViewStore = useSharedViewStore()
 
 const breadcrumbLinks = [
   { path: 'shared-view-list', label: t('globals.terms.sharedView', 2) },
-  { path: '', label: t('globals.messages.edit', { name: t('globals.terms.sharedView') }) }
+  { path: '', label: t('sharedView.editSharedView') }
 ]
 
 const submitForm = (values) => {
@@ -48,9 +48,7 @@ const updateSharedView = async (payload) => {
     await sharedViewStore.refresh()
 
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.sharedView')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

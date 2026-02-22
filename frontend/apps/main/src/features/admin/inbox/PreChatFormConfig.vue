@@ -23,7 +23,7 @@
         <Input
           type="text"
           v-model="prechatConfig.title"
-          placeholder="Tell us about yourself"
+          :placeholder="$t('placeholders.tellUsAboutYourself')"
           class="mt-1"
         />
         <p class="text-sm text-muted-foreground mt-1">
@@ -67,7 +67,7 @@
                     <div>
                       <div class="font-medium">{{ field.label }}</div>
                       <div class="text-sm text-muted-foreground">
-                        {{ field.type }} {{ field.is_default ? '(Default)' : '(Custom)' }}
+                        {{ field.type }} ({{ field.is_default ? $t('globals.terms.default') : $t('globals.terms.custom') }})
                       </div>
                     </div>
                   </div>
@@ -90,7 +90,7 @@
                     <!-- Label -->
                     <div>
                       <label class="text-sm font-medium">{{ $t('globals.terms.label') }}</label>
-                      <Input v-model="field.label" placeholder="Field label" class="mt-1" />
+                      <Input v-model="field.label" :placeholder="$t('placeholders.fieldLabel')" class="mt-1" />
                     </div>
 
                     <!-- Placeholder -->
@@ -100,7 +100,7 @@
                       </label>
                       <Input
                         v-model="field.placeholder"
-                        placeholder="Field placeholder"
+                        :placeholder="$t('placeholders.fieldPlaceholder')"
                         class="mt-1"
                       />
                     </div>

@@ -20,9 +20,7 @@
     <DialogContent class="sm:max-w-[425px]">
       <DialogHeader>
         <DialogTitle>{{
-          t('globals.messages.edit', {
-            name: t('globals.terms.tag')
-          })
+          t('tag.edit')
         }}</DialogTitle>
         <DialogDescription> {{ t('admin.conversationTags.edit.description') }} </DialogDescription>
       </DialogHeader>
@@ -114,7 +112,7 @@ const form = useForm({
 const onSubmit = form.handleSubmit(async (values) => {
   await api.updateTag(props.tag.id, values)
   emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-    description: t('globals.messages.updatedSuccessfully', { name: t('globals.terms.tag') })
+    description: t('globals.messages.savedSuccessfully')
   })
   dialogOpen.value = false
   emitRefreshTagsList()

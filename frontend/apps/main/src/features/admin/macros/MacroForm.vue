@@ -35,7 +35,7 @@
     >
       <FormItem>
         <FormLabel>
-          {{ t('globals.terms.action', 2) }} ({{ t('globals.terms.optional', 1).toLowerCase() }})
+          {{ t('globals.terms.action', 2) }} ({{ t('globals.terms.optional', 1) }})
         </FormLabel>
         <FormControl>
           <ActionBuilder
@@ -56,15 +56,11 @@
             :items="[
               { label: t('globals.messages.replying'), value: 'replying' },
               {
-                label: t('globals.messages.starting', {
-                  name: t('globals.terms.conversation').toLowerCase()
-                }),
+                label: t('actions.startingConversation'),
                 value: 'starting_conversation'
               },
               {
-                label: t('globals.messages.adding', {
-                  name: t('globals.terms.privateNote', 2).toLowerCase()
-                }),
+                label: t('actions.addingPrivateNotes'),
                 value: 'adding_private_note'
               }
             ]"
@@ -94,11 +90,7 @@
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="all">{{
-                  t('globals.messages.all', {
-                    name: t('globals.terms.agent', 2).toLowerCase()
-                  })
-                }}</SelectItem>
+                <SelectItem value="all">{{ t('sharedView.allAgents') }}</SelectItem>
                 <SelectItem value="team">{{ t('globals.terms.team') }}</SelectItem>
                 <SelectItem value="user">{{ t('globals.terms.agent') }}</SelectItem>
               </SelectGroup>
@@ -116,9 +108,7 @@
           <SelectComboBox
             v-bind="componentField"
             :items="tStore.options"
-            :placeholder="
-              t('globals.messages.select', { name: t('globals.terms.team').toLowerCase() })
-            "
+            :placeholder="t('placeholders.selectTeam')"
             type="team"
           />
         </FormControl>
@@ -133,9 +123,7 @@
           <SelectComboBox
             v-bind="componentField"
             :items="uStore.options"
-            :placeholder="
-              t('globals.messages.select', { name: t('globals.terms.agent').toLowerCase() })
-            "
+            :placeholder="t('placeholders.selectAgent')"
             type="user"
           />
         </FormControl>
@@ -217,11 +205,9 @@ const form = useForm({
 
 const actionConfig = ref({
   actions: macroActions,
-  typePlaceholder: t('globals.messages.select', { name: t('globals.terms.action').toLowerCase() }),
-  valuePlaceholder: t('globals.messages.select', { name: t('globals.terms.value').toLowerCase() }),
-  addButtonText: t('globals.messages.new', {
-    name: t('globals.terms.action').toLowerCase()
-  })
+  typePlaceholder: t('placeholders.selectAction'),
+  valuePlaceholder: t('placeholders.selectValue'),
+  addButtonText: t('actions.addAction')
 })
 
 const onSubmit = form.handleSubmit(async (values) => {

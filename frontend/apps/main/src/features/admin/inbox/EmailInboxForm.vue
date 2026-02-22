@@ -320,7 +320,7 @@
                 <SelectValue :placeholder="t('globals.messages.selectTLS')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">OFF</SelectItem>
+                <SelectItem value="none">{{ $t('globals.terms.off') }}</SelectItem>
                 <SelectItem value="tls">SSL/TLS</SelectItem>
                 <SelectItem value="starttls">STARTTLS</SelectItem>
               </SelectContent>
@@ -472,13 +472,13 @@
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="t('globals.messages.select', { name: t('globals.terms.protocol') })" />
+                <SelectValue :placeholder="t('placeholders.selectProtocol')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="login">Login</SelectItem>
+                <SelectItem value="login">{{ $t('admin.inbox.authProtocol.login') }}</SelectItem>
                 <SelectItem value="cram">CRAM</SelectItem>
-                <SelectItem value="plain">Plain</SelectItem>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="plain">{{ $t('admin.inbox.authProtocol.plain') }}</SelectItem>
+                <SelectItem value="none">{{ $t('globals.terms.none') }}</SelectItem>
               </SelectContent>
             </Select>
           </FormControl>
@@ -496,7 +496,7 @@
                 <SelectValue :placeholder="t('globals.messages.selectTLS')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">OFF</SelectItem>
+                <SelectItem value="none">{{ $t('globals.terms.off') }}</SelectItem>
                 <SelectItem value="tls">SSL/TLS</SelectItem>
                 <SelectItem value="starttls">STARTTLS</SelectItem>
               </SelectContent>
@@ -867,7 +867,7 @@ const copyToClipboard = async (text) => {
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.errorCopying')
+      description: t('globals.messages.somethingWentWrong')
     })
   }
 }

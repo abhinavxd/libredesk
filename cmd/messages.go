@@ -169,7 +169,7 @@ func handleSendMessage(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error unmarshalling message request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	// Make sure the inbox is enabled.
@@ -178,12 +178,12 @@ func handleSendMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if !inbox.Enabled {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("status.disabledInbox"), nil, envelope.InputError)
 	}
 
 	// Prepare attachments.
 	if req.SenderType != umodels.UserTypeAgent && req.SenderType != umodels.UserTypeContact {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`sender_type`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	// Contacts cannot send private messages
@@ -195,14 +195,16 @@ func handleSendMessage(r *fastglue.Request) error {
 	if req.SenderType == umodels.UserTypeContact {
 		parts := strings.Split(authzModels.PermMessagesWriteAsContact, ":")
 		if len(parts) != 2 {
-			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorChecking", "name", "{globals.terms.permission}"), nil))
+			app.lo.Error("error parsing permission string", "permission", authzModels.PermMessagesWriteAsContact)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 		}
 		ok, err := app.authz.Enforce(user, parts[0], parts[1])
 		if err != nil {
-			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorChecking", "name", "{globals.terms.permission}"), nil))
+			app.lo.Error("error checking permission", "error", err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 		}
 		if !ok {
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 		}
 	}
 
@@ -212,7 +214,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		m, err := app.media.Get(id, "")
 		if err != nil {
 			app.lo.Error("error fetching media", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.media}"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
 		if m.ModelID.Int > 0 {
 			// Attachment is already associated with another model. Skip it.

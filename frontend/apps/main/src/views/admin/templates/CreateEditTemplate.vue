@@ -45,14 +45,10 @@ const submitForm = async (values) => {
     let toastDescription = ''
     if (props.id) {
       await api.updateTemplate(props.id, values)
-      toastDescription = t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.template')
-      })
+      toastDescription = t('globals.messages.savedSuccessfully')
     } else {
       await api.createTemplate(values)
-      toastDescription = t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.template')
-      })
+      toastDescription = t('globals.messages.savedSuccessfully')
       router.push({ name: 'templates' })
       emitter.emit(EMITTER_EVENTS.REFRESH_LIST, {
         model: 'templates'

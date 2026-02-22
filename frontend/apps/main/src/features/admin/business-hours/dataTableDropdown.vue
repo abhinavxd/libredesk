@@ -24,9 +24,7 @@
         </AlertDialogTitle>
         <AlertDialogDescription>
           {{
-            t('globals.messages.deletionConfirmation', {
-              name: t('globals.terms.businessHour').toLowerCase()
-            })
+            t('businessHour.deletionConfirmation')
           }}
         </AlertDialogDescription>
       </AlertDialogHeader>

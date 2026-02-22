@@ -5,15 +5,15 @@
     </template>
 
     <template #help>
-      <p>Configure webhooks to receive real-time notifications when events occur in your Libredesk workspace.</p>
-      <p>Webhooks allow you to integrate Libredesk with external services by sending HTTP POST requests when specific events happen.</p>
+      <p>{{ $t('admin.webhook.help.description') }}</p>
+      <p>{{ $t('admin.webhook.help.detail') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/webhooks"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        <p>Learn more</p>
+        <p>{{ $t('globals.messages.learnMore') }}</p>
       </a>
     </template>
   </AdminPageWithHelp>

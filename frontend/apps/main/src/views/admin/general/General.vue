@@ -10,7 +10,7 @@
       </div>
     </template>
     <template #help>
-      <p>General settings for your support desk like timezone, working hours, etc.</p>
+      <p>{{ $t('admin.general.help') }}</p>
     </template>
   </AdminPageWithHelp>
 </template>

@@ -9,13 +9,13 @@ export const createFormSchema = (t) => z.object({
             required_error: t('globals.messages.required'),
         })
         .min(3, {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 3,
                 max: 140,
             })
         })
         .max(140, {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 3,
                 max: 140,
             })
@@ -25,34 +25,32 @@ export const createFormSchema = (t) => z.object({
             required_error: t('globals.messages.required'),
         })
         .min(3, {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 3,
                 max: 140,
             })
         })
         .max(140, {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 3,
                 max: 140,
             })
         })
         .regex(/^[a-z0-9_]+$/, {
-            message: t('globals.messages.invalid', {
-                name: t('globals.terms.key'),
-            }),
+            message: t('validation.invalidKey'),
         }),
     description: z
         .string({
             required_error: t('globals.messages.required'),
         })
         .min(3, {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 3,
                 max: 300,
             })
         })
         .max(300, {
-            message: t('form.error.minmax', {
+            message: t('validation.minmax', {
                 min: 3,
                 max: 300,
             })

@@ -58,8 +58,8 @@ const getInitials = (name) => {
 }
 
 const getTypeLabel = (type) => {
-  if (type === 'agent') return t('globals.terms.agent').toLowerCase()
-  if (type === 'team') return t('globals.terms.team').toLowerCase()
+  if (type === 'agent') return t('globals.terms.agent')
+  if (type === 'team') return t('globals.terms.team')
   return type
 }
 

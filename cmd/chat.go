@@ -141,7 +141,7 @@ func handleChatInit(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error unmarshalling chat init request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	if req.Message == "" {
@@ -153,12 +153,12 @@ func handleChatInit(r *fastglue.Request) error {
 	inboxID, err := getWidgetInboxID(r)
 	if err != nil {
 		app.lo.Error("error getting inbox ID from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
 		app.lo.Error("error getting inbox from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	var (
@@ -172,7 +172,7 @@ func handleChatInit(r *fastglue.Request) error {
 	config, err := parseLiveChatConfig(inbox)
 	if err != nil {
 		app.lo.Error("error parsing live chat config", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("validation.invalidInbox"), nil, envelope.GeneralError)
 	}
 
 	// Handle authenticated user vs visitor
@@ -185,13 +185,13 @@ func handleChatInit(r *fastglue.Request) error {
 				envErr, ok := err.(envelope.Error)
 				if ok && envErr.ErrorType != envelope.NotFoundError {
 					app.lo.Error("error fetching user by external ID", "external_user_id", claims.ExternalUserID, "error", err)
-					return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+					return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 				}
 
 				// User doesn't exist, create new contact
 				contactID, err = createExternalUser(app, *claims, req.FormData, config)
 				if err != nil {
-					return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+					return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 				}
 			} else {
 				// User exists, update custom attributes from both JWT and form
@@ -205,7 +205,7 @@ func handleChatInit(r *fastglue.Request) error {
 			contactID, err = getWidgetContactID(r)
 			if err != nil {
 				app.lo.Error("error getting contact ID from middleware context", "error", err)
-				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 			}
 
 			// Update custom attributes from both JWT and form
@@ -222,16 +222,16 @@ func handleChatInit(r *fastglue.Request) error {
 			if strings.Contains(visitorErr.Error(), "required") || strings.Contains(visitorErr.Error(), "invalid") {
 				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, visitorErr.Error(), nil, envelope.InputError)
 			}
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
 	}
 
 	// Check conversation permissions based on user type.
 	if err := checkConversationPermissions(app, config, isVisitor, contactID, inboxID); err != nil {
 		if strings.Contains(err.Error(), "not allowed") || strings.Contains(err.Error(), "multiple conversations") {
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.notAllowed", "name", ""), nil, envelope.PermissionError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("globals.messages.notAllowed"), nil, envelope.PermissionError)
 		}
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	app.lo.Info("creating new live chat conversation for user", "user_id", contactID, "inbox_id", inboxID, "is_visitor", isVisitor)
@@ -247,7 +247,7 @@ func handleChatInit(r *fastglue.Request) error {
 	)
 	if err != nil {
 		app.lo.Error("error creating conversation", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 	}
 
 	// Insert initial message.
@@ -265,10 +265,10 @@ func handleChatInit(r *fastglue.Request) error {
 		// Clean up conversation if message insert fails.
 		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 			app.lo.Error("error deleting conversation after message insert failure", "conversation_uuid", conversationUUID, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 		}
 		app.lo.Error("error inserting initial message", "conversation_uuid", conversationUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 	}
 
 	// Process post-message hooks for the new conversation and initial message.
@@ -279,7 +279,7 @@ func handleChatInit(r *fastglue.Request) error {
 	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching created conversation", "conversation_uuid", conversationUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	// Build response with conversation and messages and add business hours info.
@@ -319,7 +319,7 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 	contactID, err := getWidgetContactID(r)
 	if err != nil {
 		app.lo.Error("error getting contact ID from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
@@ -331,7 +331,7 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 	// Make sure the conversation belongs to the contact.
 	if conversation.ContactID != contactID {
 		app.lo.Error("unauthorized access to conversation", "conversation_uuid", conversationUUID, "contact_id", contactID, "conversation_contact_id", conversation.ContactID)
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
 
 	// Update last seen timestamp.
@@ -347,7 +347,7 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 	if claims != nil && len(claims.CustomAttributes) > 0 {
 		if err := app.user.SaveCustomAttributes(contactID, claims.CustomAttributes, false); err != nil {
 			app.lo.Error("error updating contact custom attributes", "contact_id", contactID, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
 	}
 
@@ -369,7 +369,7 @@ func handleChatGetConversation(r *fastglue.Request) error {
 	contactID, err := getWidgetContactID(r)
 	if err != nil {
 		app.lo.Error("error getting contact ID from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	// Fetch conversation
@@ -382,7 +382,7 @@ func handleChatGetConversation(r *fastglue.Request) error {
 	// Make sure the conversation belongs to the contact.
 	if conversation.ContactID != contactID {
 		app.lo.Error("unauthorized access to conversation", "conversation_uuid", conversationUUID, "contact_id", contactID, "conversation_contact_id", conversation.ContactID)
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
 
 	// Build conversation response with messages and attachments.
@@ -404,20 +404,20 @@ func handleGetConversations(r *fastglue.Request) error {
 	contactID, err := getWidgetContactID(r)
 	if err != nil {
 		app.lo.Error("error getting contact ID from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	inboxID, err := getWidgetInboxID(r)
 	if err != nil {
 		app.lo.Error("error getting inbox ID from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	// Fetch conversations for the contact and convert to ChatConversation format.
 	chatConversations, err := app.conversation.GetContactChatConversations(contactID, inboxID)
 	if err != nil {
 		app.lo.Error("error fetching conversations for contact", "contact_id", contactID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.conversation}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(chatConversations)
@@ -436,7 +436,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Error("error unmarshalling chat message request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	if req.Message == "" {
@@ -447,13 +447,13 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	senderID, err := getWidgetContactID(r)
 	if err != nil {
 		app.lo.Error("error getting contact ID from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
 		app.lo.Error("error getting inbox from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	// Fetch conversation to ensure it exists
@@ -467,18 +467,18 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	sender, err := app.user.Get(senderID, "", []string{})
 	if err != nil {
 		app.lo.Error("error fetching sender user", "sender_id", senderID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	// Make sure the conversation belongs to the sender.
 	if conversation.ContactID != senderID {
 		app.lo.Error("access denied: user attempted to access conversation owned by different contact", "conversation_uuid", conversationUUID, "requesting_contact_id", senderID, "conversation_owner_id", conversation.ContactID)
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
 
 	// Make sure the inbox is enabled.
 	if !inbox.Enabled {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("status.disabledInbox"), nil, envelope.InputError)
 	}
 
 	// Insert incoming message and run post processing hooks.
@@ -495,14 +495,14 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	}
 	if message, err = app.conversation.ProcessIncomingLiveChatMessage(message); err != nil {
 		app.lo.Error("error processing incoming message", "conversation_uuid", conversationUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorSending", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 	}
 
 	// Fetch just inserted message to return.
 	message, err = app.conversation.GetMessage(message.UUID)
 	if err != nil {
 		app.lo.Error("error fetching inserted message", "message_uuid", message.UUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(cmodels.ChatMessage{
@@ -533,20 +533,20 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
 		app.lo.Error("error parsing form data.", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
 	}
 
 	// Get authenticated data from middleware context
 	senderID, err := getWidgetContactID(r)
 	if err != nil {
 		app.lo.Error("error getting contact ID from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.user}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
 		app.lo.Error("error getting inbox from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	// Get conversation UUID from form data
@@ -565,30 +565,30 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 
 	if conversation.ContactID != senderID {
 		app.lo.Error("access denied: user attempted to access conversation owned by different contact", "conversation_uuid", conversationUUID, "requesting_contact_id", senderID, "conversation_owner_id", conversation.ContactID)
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
 
 	// Make sure file upload is enabled for the inbox.
 	config, err := parseLiveChatConfig(inbox)
 	if err != nil {
 		app.lo.Error("error parsing live chat config", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("validation.invalidInbox"), nil, envelope.GeneralError)
 	}
 
 	if !config.Features.FileUpload {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.fileUpload}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("status.disabledFileUpload"), nil, envelope.InputError)
 	}
 
 	files, ok := form.File["files"]
 	if !ok || len(files) == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.notFoundFile"), nil, envelope.InputError)
 	}
 
 	fileHeader := files[0]
 	file, err := fileHeader.Open()
 	if err != nil {
 		app.lo.Error("error reading uploaded file", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.terms.file}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 	defer file.Close()
 
@@ -620,7 +620,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	fileContent := make([]byte, srcFileSize)
 	if _, err := file.Read(fileContent); err != nil {
 		app.lo.Error("error reading file content", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.terms.file}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	message := cmodels.Message{
@@ -647,14 +647,14 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	// Process the incoming message with attachment.
 	if message, err = app.conversation.ProcessIncomingLiveChatMessage(message); err != nil {
 		app.lo.Error("error processing incoming message with attachment", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 	}
 
 	// Fetch the inserted message to get the media information.
 	insertedMessage, err := app.conversation.GetMessage(message.UUID)
 	if err != nil {
 		app.lo.Error("error fetching inserted message", "message_uuid", message.UUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.message}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(insertedMessage)
@@ -703,14 +703,14 @@ func validateLiveChatInbox(r *fastglue.Request) (imodels.Inbox, livechat.Config,
 	if inbox.Channel != livechat.ChannelLiveChat {
 		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
 			fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.inbox}"),
+			app.i18n.T("validation.notFoundInbox"),
 			nil, envelope.InputError)
 	}
 
 	if !inbox.Enabled {
 		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
 			fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.disabled", "name", "{globals.terms.inbox}"),
+			app.i18n.T("status.disabledInbox"),
 			nil, envelope.InputError)
 	}
 
@@ -719,7 +719,7 @@ func validateLiveChatInbox(r *fastglue.Request) (imodels.Inbox, livechat.Config,
 		app.lo.Error("error parsing live chat config", "error", err)
 		return imodels.Inbox{}, livechat.Config{}, r.SendErrorEnvelope(
 			fasthttp.StatusInternalServerError,
-			app.i18n.Ts("globals.messages.invalid", "name", "{globals.terms.inbox}"),
+			app.i18n.T("validation.invalidInbox"),
 			nil, envelope.GeneralError)
 	}
 

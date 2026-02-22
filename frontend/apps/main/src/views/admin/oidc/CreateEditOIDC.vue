@@ -47,15 +47,11 @@ const submitForm = async (values) => {
         values.client_secret = ''
       }
       await api.updateOIDC(props.id, values)
-      toastDescription = t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.provider')
-      })
+      toastDescription = t('globals.messages.savedSuccessfully')
     } else {
       await api.createOIDC(values)
       router.push({ name: 'sso-list' })
-      toastDescription = t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.provider')
-      })
+      toastDescription = t('globals.messages.savedSuccessfully')
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       title: 'Success',

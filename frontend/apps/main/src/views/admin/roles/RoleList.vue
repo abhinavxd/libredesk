@@ -5,9 +5,7 @@
       <router-link :to="{ name: 'new-role' }">
         <Button>
           {{
-            $t('globals.messages.new', {
-              name: $t('globals.terms.role')
-            })
+            $t('role.new')
           }}
         </Button>
       </router-link>

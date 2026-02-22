@@ -70,7 +70,7 @@ func (m *Manager) Update(id int, t models.Template) (models.Template, error) {
 	var result models.Template
 	if err := m.q.UpdateTemplate.Get(&result, id, t.Name, t.Body, t.IsDefault, t.Subject, t.Type); err != nil {
 		m.lo.Error("error updating template", "error", err)
-		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.template}"), nil)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return result, nil
 }
@@ -86,7 +86,7 @@ func (m *Manager) Create(t models.Template) (models.Template, error) {
 			return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil)
 		}
 		m.lo.Error("error inserting template", "error", err)
-		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.template}"), nil)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return result, nil
 }
@@ -96,7 +96,7 @@ func (m *Manager) GetAll(typ string) ([]models.Template, error) {
 	var templates = make([]models.Template, 0)
 	if err := m.q.GetAllTemplates.Select(&templates, typ); err != nil {
 		m.lo.Error("error fetching templates", "error", err)
-		return templates, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.template}"), nil)
+		return templates, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return templates, nil
 }
@@ -106,10 +106,10 @@ func (m *Manager) Get(id int) (models.Template, error) {
 	var templates = models.Template{}
 	if err := m.q.GetTemplate.Get(&templates, id); err != nil {
 		if err == sql.ErrNoRows {
-			return templates, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.template}"), nil)
+			return templates, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundTemplate"), nil)
 		}
 		m.lo.Error("error fetching template", "error", err)
-		return templates, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.template}"), nil)
+		return templates, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return templates, nil
 }
@@ -119,14 +119,14 @@ func (m *Manager) Delete(id int) error {
 	// Do not allow deletion of built-in templates.
 	isBuiltIn, err := m.isBuiltIn(id)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.template}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if isBuiltIn {
 		return envelope.NewError(envelope.PermissionError, m.i18n.T("template.cannotDeleteBuiltInTemplate"), nil)
 	}
 	if _, err := m.q.DeleteTemplate.Exec(id); err != nil {
 		m.lo.Error("error deleting template", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.template}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

@@ -37,9 +37,7 @@
             <div class="flex flex-col items-center space-y-4">
               <span class="text-md text-muted-foreground">
                 {{
-                  $t('globals.messages.noResults', {
-                    name: $t('globals.terms.result', 2).toLowerCase()
-                  })
+                  $t('globals.messages.noResultsFound')
                 }}
               </span>
             </div>

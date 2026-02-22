@@ -52,6 +52,133 @@
       </div>
     </div>
 
+    <FormField v-slot="{ value, handleChange }" type="checkbox" name="enabled" v-if="!isNewForm">
+      <FormItem class="flex flex-row items-start gap-x-3 space-y-0">
+        <FormControl>
+          <Checkbox :checked="value" @update:checked="handleChange" />
+        </FormControl>
+        <div class="space-y-1 leading-none">
+          <FormLabel> {{ $t('globals.terms.enabled') }} </FormLabel>
+          <FormMessage />
+        </div>
+      </FormItem>
+    </FormField>
+
+    <!-- Form Fields -->
+    <div class="grid gap-6 md:grid-cols-2">
+    <FormField v-slot="{ field }" name="first_name">
+      <FormItem v-auto-animate>
+        <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
+        <FormControl>
+          <Input type="text" placeholder="" v-bind="field" />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ field }" name="last_name">
+      <FormItem>
+        <FormLabel>{{ $t('globals.terms.lastName') }}</FormLabel>
+        <FormControl>
+          <Input type="text" placeholder="" v-bind="field" />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ field }" name="email">
+      <FormItem v-auto-animate>
+        <FormLabel>{{ $t('globals.terms.email') }}</FormLabel>
+        <FormControl>
+          <Input type="email" placeholder="" v-bind="field" />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ componentField, handleChange }" name="teams">
+      <FormItem v-auto-animate>
+        <FormLabel>{{ $t('globals.terms.team', 2) }}</FormLabel>
+        <FormControl>
+          <SelectTag
+            :items="teamOptions"
+            :placeholder="t('placeholders.selectTeams')"
+            v-model="componentField.modelValue"
+            @update:modelValue="handleChange"
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ componentField, handleChange }" name="roles">
+      <FormItem v-auto-animate>
+        <FormLabel>{{ $t('globals.terms.role', 2) }}</FormLabel>
+        <FormControl>
+          <SelectTag
+            :items="roleOptions"
+            :placeholder="
+              t('role.select')
+            "
+            v-model="componentField.modelValue"
+            @update:modelValue="handleChange"
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ componentField }" name="availability_status" v-if="!isNewForm">
+      <FormItem>
+        <FormLabel>{{ t('globals.terms.availabilityStatus') }}</FormLabel>
+        <FormControl>
+          <Select v-bind="componentField" v-model="componentField.modelValue">
+            <SelectTrigger>
+              <SelectValue
+                :placeholder="
+                  t('agent.selectAvailabilityStatus')
+                "
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="active_group">{{ t('globals.terms.active') }}</SelectItem>
+                <SelectItem value="away_manual">{{ t('globals.terms.away') }}</SelectItem>
+                <SelectItem value="away_and_reassigning">
+                  {{ t('globals.terms.awayReassigning') }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ field }" name="new_password" v-if="!isNewForm">
+      <FormItem v-auto-animate>
+        <FormLabel>{{ t('globals.terms.setPassword') }}</FormLabel>
+        <FormControl>
+          <Input type="password" placeholder="" v-bind="field" />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField name="send_welcome_email" v-slot="{ value, handleChange }" v-if="isNewForm">
+      <FormItem>
+        <FormControl>
+          <div class="flex items-center space-x-2">
+            <Checkbox :checked="value" @update:checked="handleChange" />
+            <Label>{{ $t('globals.terms.sendWelcomeEmail') }}</Label>
+          </div>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    </div>
+
     <!-- API Key Management Section -->
     <div class="bg-muted/30 box p-4 space-y-4" v-if="!isNewForm">
       <!-- Header -->
@@ -113,7 +240,7 @@
         <p class="text-sm text-gray-500 mb-3">{{ $t('admin.agent.apiKey.noKey') }}</p>
         <Button type="button" @click="generateAPIKey" :disabled="isAPIKeyLoading">
           <Plus class="w-4 h-4 mr-1" />
-          {{ $t('globals.messages.generate', { name: $t('globals.terms.apiKey') }) }}
+          {{ $t('agent.generateApiKey') }}
         </Button>
       </div>
     </div>
@@ -123,7 +250,7 @@
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {{ $t('globals.messages.generated', { name: $t('globals.terms.apiKey') }) }}
+            {{ $t('toast.apiKeyGenerated') }}
           </DialogTitle>
           <DialogDescription> </DialogDescription>
         </DialogHeader>
@@ -165,134 +292,6 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
-
-    <!-- Form Fields -->
-    <FormField v-slot="{ field }" name="first_name">
-      <FormItem v-auto-animate>
-        <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="field" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ field }" name="last_name">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.lastName') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="field" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ field }" name="email">
-      <FormItem v-auto-animate>
-        <FormLabel>{{ $t('globals.terms.email') }}</FormLabel>
-        <FormControl>
-          <Input type="email" placeholder="" v-bind="field" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ componentField, handleChange }" name="teams">
-      <FormItem v-auto-animate>
-        <FormLabel>{{ $t('globals.terms.team', 2) }}</FormLabel>
-        <FormControl>
-          <SelectTag
-            :items="teamOptions"
-            :placeholder="t('globals.messages.select', { name: t('globals.terms.team', 2) })"
-            v-model="componentField.modelValue"
-            @update:modelValue="handleChange"
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ componentField, handleChange }" name="roles">
-      <FormItem v-auto-animate>
-        <FormLabel>{{ $t('globals.terms.role', 2) }}</FormLabel>
-        <FormControl>
-          <SelectTag
-            :items="roleOptions"
-            :placeholder="
-              t('globals.messages.select', {
-                name: $t('globals.terms.role', 2)
-              })
-            "
-            v-model="componentField.modelValue"
-            @update:modelValue="handleChange"
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ componentField }" name="availability_status" v-if="!isNewForm">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.availabilityStatus') }}</FormLabel>
-        <FormControl>
-          <Select v-bind="componentField" v-model="componentField.modelValue">
-            <SelectTrigger>
-              <SelectValue
-                :placeholder="
-                  t('globals.messages.select', {
-                    name: t('globals.terms.availabilityStatus')
-                  })
-                "
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="active_group">{{ t('globals.terms.active') }}</SelectItem>
-                <SelectItem value="away_manual">{{ t('globals.terms.away') }}</SelectItem>
-                <SelectItem value="away_and_reassigning">
-                  {{ t('globals.terms.awayReassigning') }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ field }" name="new_password" v-if="!isNewForm">
-      <FormItem v-auto-animate>
-        <FormLabel>{{ t('globals.terms.setPassword') }}</FormLabel>
-        <FormControl>
-          <Input type="password" placeholder="" v-bind="field" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField name="send_welcome_email" v-slot="{ value, handleChange }" v-if="isNewForm">
-      <FormItem>
-        <FormControl>
-          <div class="flex items-center space-x-2">
-            <Checkbox :checked="value" @update:checked="handleChange" />
-            <Label>{{ $t('globals.terms.sendWelcomeEmail') }}</Label>
-          </div>
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ value, handleChange }" type="checkbox" name="enabled" v-if="!isNewForm">
-      <FormItem class="flex flex-row items-start gap-x-3 space-y-0">
-        <FormControl>
-          <Checkbox :checked="value" @update:checked="handleChange" />
-        </FormControl>
-        <div class="space-y-1 leading-none">
-          <FormLabel> {{ $t('globals.terms.enabled') }} </FormLabel>
-          <FormMessage />
-        </div>
-      </FormItem>
-    </FormField>
 
     <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
   </form>
@@ -392,7 +391,7 @@ onMounted(async () => {
   } catch (err) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.errorFetching')
+      description: t('globals.messages.somethingWentWrong')
     })
   }
 })
@@ -450,17 +449,13 @@ const generateAPIKey = async () => {
 
       showAPIKeyDialog.value = true
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.generatedSuccessfully', {
-          name: t('globals.terms.apiKey')
-        })
+        description: t('agent.apiKeyGenerated')
       })
     }
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.errorGenerating', {
-        name: t('globals.terms.apiKey')
-      })
+      description: t('globals.messages.somethingWentWrong')
     })
   } finally {
     isAPIKeyLoading.value = false
@@ -480,16 +475,12 @@ const revokeAPIKey = async () => {
     apiKeyData.value.api_secret = ''
     apiKeyLastUsedAt.value = null
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.revokedSuccessfully', {
-        name: t('globals.terms.apiKey')
-      })
+      description: t('agent.apiKeyRevoked')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.errorRevoking', {
-        name: t('globals.terms.apiKey')
-      })
+      description: t('globals.messages.somethingWentWrong')
     })
   } finally {
     isAPIKeyLoading.value = false

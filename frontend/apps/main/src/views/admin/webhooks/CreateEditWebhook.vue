@@ -18,9 +18,7 @@
             @click="handleTestWebhook"
           >
             {{
-              $t('globals.messages.send', {
-                name: t('globals.terms.test').toLowerCase()
-              })
+              $t('webhook.sendTest')
             }}
           </Button>
         </div>
@@ -82,15 +80,11 @@ const onSubmit = form.handleSubmit(async (values) => {
         values.secret = ''
       }
       await api.updateWebhook(props.id, values)
-      toastDescription = t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.webhook')
-      })
+      toastDescription = t('globals.messages.savedSuccessfully')
     } else {
       await api.createWebhook(values)
       router.push({ name: 'webhook-list' })
-      toastDescription = t('globals.messages.createdSuccessfully', {
-        name: t('globals.terms.webhook')
-      })
+      toastDescription = t('globals.messages.savedSuccessfully')
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
@@ -114,9 +108,7 @@ const handleTestWebhook = async () => {
     await api.testWebhook(props.id)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
-      description: t('globals.messages.sentSuccessfully', {
-        name: t('globals.terms.webhook')
-      })
+      description: t('webhook.sentSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

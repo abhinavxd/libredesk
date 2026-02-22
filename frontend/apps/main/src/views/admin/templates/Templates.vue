@@ -13,9 +13,7 @@
                   :disabled="templateType !== 'email_outgoing'"
                 >
                   {{
-                    $t('globals.messages.new', {
-                      name: $t('globals.terms.template')
-                    })
+                    $t('template.new')
                   }}
                 </Button>
               </div>
@@ -46,15 +44,15 @@
       </template>
 
       <template #help>
-        <p>Design templates for customer communications and responses.</p>
-        <p>Modify content for internal and external emails.</p>
+        <p>{{ $t('admin.template.help.description') }}</p>
+        <p>{{ $t('admin.template.help.detail') }}</p>
         <a
           href="https://docs.libredesk.io/configuration/email-templates"
           target="_blank"
           rel="noopener noreferrer"
           class="link-style"
         >
-          <p>Learn more</p>
+          <p>{{ $t('globals.messages.learnMore') }}</p>
         </a>
       </template>
     </AdminPageWithHelp>

@@ -5,7 +5,7 @@
     </template>
 
     <template #help>
-      <p>Manage support agents, roles, permissions and teams.</p>
+      <p>{{ $t('admin.agent.help') }}</p>
     </template>
   </AdminPageWithHelp>
 </template>

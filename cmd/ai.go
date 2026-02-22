@@ -23,7 +23,7 @@ func handleAICompletion(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
 
 	resp, err := app.ai.Completion(req.PromptKey, req.Content)
@@ -52,7 +52,7 @@ func handleUpdateAIProvider(r *fastglue.Request) error {
 		req providerUpdateReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
 	if err := app.ai.UpdateProvider(req.Provider, req.APIKey); err != nil {
 		return sendErrorEnvelope(r, err)

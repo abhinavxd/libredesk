@@ -45,8 +45,8 @@ onMounted(async () => {
 })
 
 const breadcrumbLinks = [
-  { path: 'role-list', label: 'Roles' },
-  { path: '', label: 'Edit role' }
+  { path: 'role-list', label: t('globals.terms.role', 2) },
+  { path: '', label: t('role.edit') }
 ]
 
 const submitForm = async (values) => {
@@ -54,9 +54,7 @@ const submitForm = async (values) => {
     formLoading.value = true
     await api.updateRole(props.id, values)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.updatedSuccessfully', {
-        name: t('globals.terms.role')
-      })
+      description: t('globals.messages.savedSuccessfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
