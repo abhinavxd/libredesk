@@ -70,16 +70,16 @@ func (o *Manager) Get(id int) (models.OIDC, error) {
 	var oidc models.OIDC
 	if err := o.q.GetOIDC.Get(&oidc, id); err != nil {
 		if err == sql.ErrNoRows {
-			return oidc, envelope.NewError(envelope.NotFoundError, o.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.oidcProvider}"), nil)
+			return oidc, envelope.NewError(envelope.NotFoundError, o.i18n.T("validation.notFoundOidcProvider"), nil)
 		}
 
 		o.lo.Error("error fetching oidc", "error", err)
-		return oidc, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.oidcProvider}"), nil)
+		return oidc, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Decrypt sensitive fields
 	if err := o.decryptOIDC(&oidc); err != nil {
-		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.oidcProvider}"), nil)
+		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Set logo and redirect URL.
@@ -97,7 +97,7 @@ func (o *Manager) GetAll() ([]models.OIDC, error) {
 	var oidc = make([]models.OIDC, 0)
 	if err := o.q.GetAllOIDC.Select(&oidc); err != nil {
 		o.lo.Error("error fetching oidc", "error", err)
-		return oidc, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.oidcProvider}"), nil)
+		return oidc, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Get root URL of the app.
@@ -108,7 +108,7 @@ func (o *Manager) GetAll() ([]models.OIDC, error) {
 
 	// Decrypt sensitive fields
 	if err := o.decryptOIDCSlice(oidc); err != nil {
-		return nil, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.oidcProvider}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Set logo and redirect URL for each record
@@ -124,13 +124,13 @@ func (o *Manager) Create(oidc models.OIDC) (models.OIDC, error) {
 	// Encrypt sensitive fields before saving
 	encryptedClientID, encryptedClientSecret, err := o.encryptOIDC(oidc.ClientID, oidc.ClientSecret)
 	if err != nil {
-		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.oidcProvider}"), nil)
+		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	var createdOIDC models.OIDC
 	if err := o.q.InsertOIDC.Get(&createdOIDC, oidc.Name, oidc.Provider, oidc.ProviderURL, encryptedClientID, encryptedClientSecret, oidc.LogoURL); err != nil {
 		o.lo.Error("error inserting oidc", "error", err)
-		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.oidcProvider}"), nil)
+		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Decrypt fields before returning (ignore errors as these are non-critical for creation response)
@@ -156,13 +156,13 @@ func (o *Manager) Update(id int, oidc models.OIDC) (models.OIDC, error) {
 	// Encrypt sensitive fields before updating
 	encryptedClientID, encryptedClientSecret, err := o.encryptOIDC(oidc.ClientID, oidc.ClientSecret)
 	if err != nil {
-		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.oidcProvider}"), nil)
+		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	var updatedOIDC models.OIDC
 	if err := o.q.UpdateOIDC.Get(&updatedOIDC, id, oidc.Name, oidc.Provider, oidc.ProviderURL, encryptedClientID, encryptedClientSecret, oidc.Enabled, oidc.LogoURL); err != nil {
 		o.lo.Error("error updating oidc", "error", err)
-		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.oidcProvider}"), nil)
+		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Decrypt fields before returning (ignore errors as these are non-critical for update response)
@@ -177,7 +177,7 @@ func (o *Manager) Update(id int, oidc models.OIDC) (models.OIDC, error) {
 func (o *Manager) Delete(id int) error {
 	if _, err := o.q.DeleteOIDC.Exec(id); err != nil {
 		o.lo.Error("error deleting oidc", "error", err)
-		return envelope.NewError(envelope.GeneralError, o.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.oidcProvider}"), nil)
+		return envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

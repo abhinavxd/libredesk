@@ -23,7 +23,7 @@ func handleLogin(r *fastglue.Request) error {
 
 	// Decode JSON request.
 	if err := r.Decode(&loginReq, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	if loginReq.Email == "" || loginReq.Password == "" {
@@ -48,12 +48,12 @@ func handleLogin(r *fastglue.Request) error {
 		LastName:  user.LastName,
 	}, r); err != nil {
 		app.lo.Error("error saving session", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorSaving", "name", "{globals.terms.session}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	// Set CSRF cookie if not already set.
 	if err := app.auth.SetCSRFCookie(r); err != nil {
 		app.lo.Error("error setting csrf cookie", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorSaving", "name", "{globals.terms.session}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 
 	// Update last login time.
@@ -83,7 +83,8 @@ func handleLogout(r *fastglue.Request) error {
 	}
 
 	if err := app.auth.DestroySession(r); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorDestroying", "name", "{globals.terms.session}"), nil))
+		app.lo.Error("error destroying session", "error", err)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	// Add no-cache headers.
 	r.RequestCtx.Response.Header.Add("Cache-Control",

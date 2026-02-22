@@ -11,6 +11,9 @@ importers:
       '@codemirror/lang-html':
         specifier: ^6.4.9
         version: 6.4.9
+      '@codemirror/lang-javascript':
+        specifier: ^6.2.4
+        version: 6.2.4
       '@codemirror/theme-one-dark':
         specifier: ^6.1.3
         version: 6.1.3
@@ -93,8 +96,8 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0
       lucide-vue-next:
-        specifier: ^0.378.0
-        version: 0.378.0(vue@3.5.13(typescript@5.7.3))
+        specifier: ^0.525.0
+        version: 0.525.0(vue@3.5.13(typescript@5.7.3))
       mitt:
         specifier: ^3.0.1
         version: 3.0.1
@@ -2545,8 +2548,8 @@ packages:
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
 
-  lucide-vue-next@0.378.0:
-    resolution: {integrity: sha512-tz2IUhdOf1q0x1mPOTZEJZYfXVLreQorO2ax4M+CxGOTgCNgXH3cljIWWfJ4jUvxn5rbkFlGPbl9EIfIelZBRA==}
+  lucide-vue-next@0.525.0:
+    resolution: {integrity: sha512-Xf8+x8B2DrnGDV/rxylS+KBp2FIe6ljwDn2JsGTZZvXIfhmm/q+nv8RuGO1OyoMjOVkkz7CqtUqJfwtFPRbB2w==}
     peerDependencies:
       vue: '>=3.0.1'
 
@@ -6104,7 +6107,7 @@ snapshots:
 
   lru-cache@10.4.3: {}
 
-  lucide-vue-next@0.378.0(vue@3.5.13(typescript@5.7.3)):
+  lucide-vue-next@0.525.0(vue@3.5.13(typescript@5.7.3)):
     dependencies:
       vue: 3.5.13(typescript@5.7.3)
 

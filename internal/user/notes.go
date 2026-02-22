@@ -10,7 +10,7 @@ func (u *Manager) GetNotes(id int) ([]models.Note, error) {
 	var notes = make([]models.Note, 0)
 	if err := u.q.GetNotes.Select(&notes, id); err != nil {
 		u.lo.Error("error fetching user notes", "error", err)
-		return notes, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", u.i18n.P("globals.terms.note")), nil)
+		return notes, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return notes, nil
 }
@@ -20,7 +20,7 @@ func (u *Manager) GetNote(id int) (models.Note, error) {
 	var note models.Note
 	if err := u.q.GetNote.Get(&note, id); err != nil {
 		u.lo.Error("error fetching user note", "error", err)
-		return note, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", u.i18n.P("globals.terms.note")), nil)
+		return note, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return note, nil
 }
@@ -30,7 +30,7 @@ func (u *Manager) CreateNote(userID, authorID int, note string) (models.Note, er
 	var createdNote models.Note
 	if err := u.q.InsertNote.Get(&createdNote, userID, authorID, note); err != nil {
 		u.lo.Error("error creating user note", "error", err)
-		return createdNote, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", u.i18n.P("globals.terms.note")), nil)
+		return createdNote, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return createdNote, nil
 }
@@ -39,7 +39,7 @@ func (u *Manager) CreateNote(userID, authorID int, note string) (models.Note, er
 func (u *Manager) DeleteNote(noteID int, contactID int) error {
 	if _, err := u.q.DeleteNote.Exec(noteID, contactID); err != nil {
 		u.lo.Error("error deleting user note", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorDeleting", "name", u.i18n.P("globals.terms.note")), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

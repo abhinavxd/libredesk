@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@main/*": ["apps/main/src/*"],
+      "@widget/*": ["apps/widget/src/*"],
+      "@shared-ui/*": ["shared-ui/*"]
     }
   },
   "exclude": ["node_modules", "dist"]

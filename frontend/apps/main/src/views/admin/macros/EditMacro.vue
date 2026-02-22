@@ -1,0 +1,79 @@
+<template>
+  <div class="mb-5">
+    <CustomBreadcrumb :links="breadcrumbLinks" />
+  </div>
+  <Spinner v-if="isLoading" />
+  <MacroForm :initialValues="macro" :submitForm="submitForm" :isLoading="formLoading" v-else />
+</template>
+
+<script setup>
+import { onMounted, ref } from 'vue'
+import api from '@main/api'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
+import MacroForm from '@main/features/admin/macros/MacroForm.vue'
+import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import { useI18n } from 'vue-i18n'
+import { Spinner } from '@shared-ui/components/ui/spinner'
+import { useMacroStore } from '@main/stores/macro'
+
+const macro = ref({})
+const { t } = useI18n()
+const isLoading = ref(false)
+const formLoading = ref(false)
+const emitter = useEmitter()
+const macroStore = useMacroStore()
+
+const breadcrumbLinks = [
+  { path: 'macro-list', label: t('globals.terms.macro', 2) },
+  { path: '', label: t('macro.editMacro') }
+]
+
+const submitForm = (values) => {
+  updateMacro(values)
+}
+
+const updateMacro = async (payload) => {
+  try {
+    formLoading.value = true
+    await api.updateMacro(macro.value.id, payload)
+    
+    // Reload macros from server
+    await macroStore.loadMacros(true)
+    
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('globals.messages.savedSuccessfully')
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    formLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  try {
+    isLoading.value = true
+    const resp = await api.getMacro(props.id)
+    macro.value = resp.data.data
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isLoading.value = false
+  }
+})
+
+const props = defineProps({
+  id: {
+    type: String,
+    required: true
+  }
+})
+</script>

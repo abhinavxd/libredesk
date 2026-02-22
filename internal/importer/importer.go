@@ -112,7 +112,7 @@ func (i *Importer) GetStatus(namespace string) (*Job, error) {
 	status, exists := i.jobs[namespace]
 	if !exists {
 		return nil, envelope.NewError(envelope.NotFoundError,
-			i.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.import}"), nil)
+			i.i18n.T("validation.notFoundImport"), nil)
 	}
 
 	return status, nil

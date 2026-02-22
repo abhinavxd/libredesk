@@ -61,10 +61,10 @@ func (v *Manager) Get(id int) (models.View, error) {
 	var view = models.View{}
 	if err := v.q.GetView.Get(&view, id); err != nil {
 		if err == sql.ErrNoRows {
-			return view, envelope.NewError(envelope.NotFoundError, v.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.view}"), nil)
+			return view, envelope.NewError(envelope.NotFoundError, v.i18n.T("validation.notFoundView"), nil)
 		}
 		v.lo.Error("error fetching view", "error", err)
-		return view, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.view}"), nil)
+		return view, envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return view, nil
 }
@@ -74,7 +74,7 @@ func (v *Manager) GetUsersViews(userID int) ([]models.View, error) {
 	views := make([]models.View, 0)
 	if err := v.q.GetUserViews.Select(&views, userID); err != nil {
 		v.lo.Error("error fetching views", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.view}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return views, nil
 }
@@ -84,7 +84,7 @@ func (v *Manager) GetSharedViewsForUser(teamIDs []int) ([]models.View, error) {
 	views := make([]models.View, 0)
 	if err := v.q.GetSharedViewsForUser.Select(&views, pq.Array(teamIDs)); err != nil {
 		v.lo.Error("error fetching shared views", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.view}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return views, nil
 }
@@ -94,7 +94,7 @@ func (v *Manager) GetAllSharedViews() ([]models.View, error) {
 	views := make([]models.View, 0)
 	if err := v.q.GetAllSharedViews.Select(&views); err != nil {
 		v.lo.Error("error fetching all shared views", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.view}"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return views, nil
 }
@@ -104,7 +104,7 @@ func (v *Manager) Create(name string, filter []byte, userID int) (models.View, e
 	var createdView models.View
 	if err := v.q.InsertView.Get(&createdView, name, filter, models.VisibilityUser, userID, nil); err != nil {
 		v.lo.Error("error inserting view", "error", err)
-		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.view}"), nil)
+		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return createdView, nil
 }
@@ -114,7 +114,7 @@ func (v *Manager) CreateSharedView(name string, filter []byte, visibility string
 	var createdView models.View
 	if err := v.q.InsertView.Get(&createdView, name, filter, visibility, nil, teamID); err != nil {
 		v.lo.Error("error inserting shared view", "error", err)
-		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.view}"), nil)
+		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return createdView, nil
 }
@@ -124,7 +124,7 @@ func (v *Manager) Update(id int, name string, filter []byte, userID int) (models
 	var updatedView models.View
 	if err := v.q.UpdateView.Get(&updatedView, id, name, filter, models.VisibilityUser, userID, nil); err != nil {
 		v.lo.Error("error updating view", "error", err)
-		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.view}"), nil)
+		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return updatedView, nil
 }
@@ -134,7 +134,7 @@ func (v *Manager) UpdateSharedView(id int, name string, filter []byte, visibilit
 	var updatedView models.View
 	if err := v.q.UpdateView.Get(&updatedView, id, name, filter, visibility, nil, teamID); err != nil {
 		v.lo.Error("error updating shared view", "error", err)
-		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.view}"), nil)
+		return models.View{}, envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return updatedView, nil
 }
@@ -143,7 +143,7 @@ func (v *Manager) UpdateSharedView(id int, name string, filter []byte, visibilit
 func (v *Manager) Delete(id int) error {
 	if _, err := v.q.DeleteView.Exec(id); err != nil {
 		v.lo.Error("error deleting view", "error", err)
-		return envelope.NewError(envelope.GeneralError, v.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.view}"), nil)
+		return envelope.NewError(envelope.GeneralError, v.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/volatiletech/null/v9"
 )
 
 // Authentication type constants.
@@ -18,15 +19,17 @@ const (
 
 // Inbox represents a inbox record in DB.
 type Inbox struct {
-	ID          int             `db:"id" json:"id"`
-	CreatedAt   time.Time       `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time       `db:"updated_at" json:"updated_at"`
-	Name        string          `db:"name" json:"name"`
-	Channel     string          `db:"channel" json:"channel"`
-	Enabled     bool            `db:"enabled" json:"enabled"`
-	CSATEnabled bool            `db:"csat_enabled" json:"csat_enabled"`
-	From        string          `db:"from" json:"from"`
-	Config      json.RawMessage `db:"config" json:"config"`
+	ID                 int             `db:"id" json:"id"`
+	CreatedAt          time.Time       `db:"created_at" json:"created_at"`
+	UpdatedAt          time.Time       `db:"updated_at" json:"updated_at"`
+	Name               string          `db:"name" json:"name"`
+	Channel            string          `db:"channel" json:"channel"`
+	Enabled            bool            `db:"enabled" json:"enabled"`
+	CSATEnabled        bool            `db:"csat_enabled" json:"csat_enabled"`
+	From               string          `db:"from" json:"from"`
+	Config             json.RawMessage `db:"config" json:"config"`
+	Secret             null.String     `db:"secret" json:"secret"`
+	LinkedEmailInboxID null.Int        `db:"linked_email_inbox_id" json:"linked_email_inbox_id"`
 }
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.
@@ -128,7 +131,11 @@ func (m *Inbox) ClearPasswords() error {
 		}
 
 		m.Config = clearedConfig
-
+	case "livechat":
+		// Mask the secret field for livechat
+		if m.Secret.Valid && m.Secret.String != "" {
+			m.Secret = null.StringFrom(strings.Repeat(stringutil.PasswordDummy, 10))
+		}
 	default:
 		return nil
 	}

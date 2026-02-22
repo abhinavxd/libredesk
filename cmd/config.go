@@ -21,7 +21,7 @@ func handleGetConfig(r *fastglue.Request) error {
 	var settings map[string]any
 	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
 		app.lo.Error("error unmarshalling settings", "err", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorFetching", "name", app.i18n.T("globals.terms.setting")), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 
 	// Filter to only include public fields needed for initial app load

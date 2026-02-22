@@ -29,6 +29,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	"github.com/abhinavxd/libredesk/internal/media"
@@ -37,6 +38,7 @@ import (
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
@@ -159,7 +161,8 @@ func initConstants() *constants {
 // initFS initializes the stuffbin FileSystem.
 func initFS() stuffbin.FileSystem {
 	var files = []string{
-		"frontend/dist",
+		"frontend/dist/main",
+		"frontend/dist/widget",
 		"i18n",
 		"static",
 	}
@@ -251,11 +254,29 @@ func initConversations(
 	webhook *webhook.Manager,
 	dispatcher *notifier.Dispatcher,
 ) *conversation.Manager {
+	continuityConfig := &conversation.ContinuityConfig{}
+
+	if ko.Exists("conversation.continuity.batch_check_interval") {
+		continuityConfig.BatchCheckInterval = ko.MustDuration("conversation.continuity.batch_check_interval")
+	}
+
+	if ko.Exists("conversation.continuity.offline_threshold") {
+		continuityConfig.OfflineThreshold = ko.MustDuration("conversation.continuity.offline_threshold")
+	}
+
+	if ko.Exists("conversation.continuity.min_email_interval") {
+		continuityConfig.MinEmailInterval = ko.MustDuration("conversation.continuity.min_email_interval")
+	}
+
+	if ko.Exists("conversation.continuity.max_messages_per_email") {
+		continuityConfig.MaxMessagesPerEmail = ko.MustInt("conversation.continuity.max_messages_per_email")
+	}
 	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, dispatcher, conversation.Opts{
 		DB:                       db,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
 		IncomingMessageQueueSize: ko.MustInt("message.incoming_queue_size"),
+		ContinuityConfig:         continuityConfig,
 	})
 	if err != nil {
 		log.Fatalf("error initializing conversation manager: %v", err)
@@ -640,12 +661,42 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 	return inbox, nil
 }
 
+// initLiveChatInbox initializes the live chat inbox.
+func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
+	var config livechat.Config
+
+	// Load JSON data into Koanf.
+	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+		return nil, fmt.Errorf("loading config: %w", err)
+	}
+
+	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
+	}
+
+	inbox, err := livechat.New(msgStore, usrStore, livechat.Opts{
+		ID:     inboxRecord.ID,
+		Config: config,
+		Lo:     initLogger("livechat_inbox"),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("initializing `%s` inbox: `%s` error : %w", inboxRecord.Channel, inboxRecord.Name, err)
+	}
+
+	log.Printf("`%s` inbox successfully initialized", inboxRecord.Name)
+
+	return inbox, nil
+}
+
 // makeInboxInitializer creates an inbox initializer function.
 func makeInboxInitializer(mgr *inbox.Manager) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
 	return func(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
 		switch inboxR.Channel {
 		case inbox.ChannelEmail:
 			return initEmailInbox(inboxR, msgStore, usrStore, mgr)
+		case inbox.ChannelLiveChat:
+			return initLiveChatInbox(inboxR, msgStore, usrStore)
 		default:
 			return nil, fmt.Errorf("unknown inbox channel: %s", inboxR.Channel)
 		}
@@ -1010,4 +1061,13 @@ func getLogLevel(lvl string) logf.Level {
 	default:
 		return logf.InfoLevel
 	}
+}
+
+// initRateLimit initializes the rate limiter.
+func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
+	var config ratelimit.Config
+	if err := ko.UnmarshalWithConf("rate_limit", &config, koanf.UnmarshalConf{Tag: "toml"}); err != nil {
+		log.Fatalf("error unmarshalling rate limit config: %v", err)
+	}
+	return ratelimit.New(redisClient, config)
 }

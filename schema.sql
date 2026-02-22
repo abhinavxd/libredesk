@@ -1,13 +1,14 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email');
+DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email', 'livechat');
 DROP TYPE IF EXISTS "message_type" CASCADE; CREATE TYPE "message_type" AS ENUM ('incoming','outgoing','activity');
 DROP TYPE IF EXISTS "message_sender_type" CASCADE; CREATE TYPE "message_sender_type" AS ENUM ('agent','contact');
 DROP TYPE IF EXISTS "message_status" CASCADE; CREATE TYPE "message_status" AS ENUM ('received','sent','failed','pending');
 DROP TYPE IF EXISTS "content_type" CASCADE; CREATE TYPE "content_type" AS ENUM ('text','html');
 DROP TYPE IF EXISTS "conversation_assignment_type" CASCADE; CREATE TYPE "conversation_assignment_type" AS ENUM ('Round robin','Manual');
 DROP TYPE IF EXISTS "template_type" CASCADE; CREATE TYPE "template_type" AS ENUM ('email_outgoing', 'email_notification');
-DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact');
+-- Visitors are unauthenticated contacts.
+DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact', 'visitor');
 DROP TYPE IF EXISTS "ai_provider" CASCADE; CREATE TYPE "ai_provider" AS ENUM ('openai');
 DROP TYPE IF EXISTS "automation_execution_mode" CASCADE; CREATE TYPE "automation_execution_mode" AS ENUM ('all', 'first_match');
 DROP TYPE IF EXISTS "macro_visibility" CASCADE; CREATE TYPE "macro_visibility" AS ENUM ('all', 'team', 'user');
@@ -84,6 +85,8 @@ CREATE TABLE inboxes (
 	csat_enabled bool DEFAULT false NOT NULL,
 	config jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"from" TEXT NULL,
+	secret TEXT NULL,
+	linked_email_inbox_id INT REFERENCES inboxes(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_inboxes_on_name CHECK (length("name") <= 140)
 );
 
@@ -137,6 +140,7 @@ CREATE TABLE users (
     "password" VARCHAR(150) NULL,
     avatar_url TEXT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
+	external_user_id TEXT NULL,
     reset_password_token TEXT NULL,
     reset_password_token_expiry TIMESTAMPTZ NULL,
 	availability_status user_availability_status DEFAULT 'offline' NOT NULL,
@@ -153,10 +157,17 @@ CREATE TABLE users (
     CONSTRAINT constraint_users_on_first_name CHECK (LENGTH(first_name) <= 140),
     CONSTRAINT constraint_users_on_last_name CHECK (LENGTH(last_name) <= 140)
 );
-CREATE UNIQUE INDEX index_unique_users_on_email_and_type_when_deleted_at_is_null ON users (email, type)
-WHERE deleted_at IS NULL;
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
+CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
+	ON users(email)
+	WHERE type = 'agent' AND deleted_at IS NULL;
+CREATE UNIQUE INDEX index_unique_users_on_ext_id_when_type_is_contact 
+	ON users (external_user_id) 
+	WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL;
+CREATE UNIQUE INDEX index_unique_users_on_email_when_no_ext_id_contact
+	ON users (email) 
+	WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL;
 
 DROP TABLE IF EXISTS user_roles CASCADE;
 CREATE TABLE user_roles (
@@ -188,21 +199,6 @@ CREATE TABLE conversation_priorities (
 	"name" TEXT NOT NULL UNIQUE
 );
 
-DROP TABLE IF EXISTS contact_channels CASCADE;
-CREATE TABLE contact_channels (
-	id SERIAL PRIMARY KEY,
-	created_at TIMESTAMPTZ DEFAULT NOW(),
-	updated_at TIMESTAMPTZ DEFAULT NOW(),
-
-	-- Cascade deletes when contact or inbox is deleted.
-	contact_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-	inbox_id INT NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE,
-
-	identifier TEXT NOT NULL,
-	CONSTRAINT constraint_contact_channels_on_identifier CHECK (length(identifier) <= 1000),
-	CONSTRAINT constraint_contact_channels_on_inbox_id_and_contact_id_unique UNIQUE (inbox_id, contact_id)
-);
-
 DROP TABLE IF EXISTS conversations CASCADE;
 CREATE TABLE conversations (
     id BIGSERIAL PRIMARY KEY,
@@ -225,12 +221,13 @@ CREATE TABLE conversations (
 	inbox_id INT REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
 
 	-- Restrict delete.
-	contact_channel_id INT REFERENCES contact_channels(id) ON DELETE RESTRICT ON UPDATE CASCADE NOT NULL,
 	status_id INT REFERENCES conversation_statuses(id) ON DELETE RESTRICT ON UPDATE CASCADE NOT NULL,
     priority_id INT REFERENCES conversation_priorities(id) ON DELETE RESTRICT ON UPDATE CASCADE,
 
 	meta JSONB DEFAULT '{}'::jsonb NOT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
+    assignee_last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+	contact_last_seen_at TIMESTAMPTZ DEFAULT NOW(),
     first_reply_at TIMESTAMPTZ NULL,
     last_reply_at TIMESTAMPTZ NULL,
     closed_at TIMESTAMPTZ NULL,
@@ -241,11 +238,14 @@ CREATE TABLE conversations (
 	last_message_at TIMESTAMPTZ NULL,
 	last_message TEXT NULL,
 	last_message_sender message_sender_type NULL,
+	last_message_sender_id BIGINT REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
 	last_interaction TEXT NULL,
 	last_interaction_sender message_sender_type NULL,
+	last_interaction_sender_id BIGINT REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
 	last_interaction_at TIMESTAMPTZ NULL,
 	next_sla_deadline_at TIMESTAMPTZ NULL,
-	snoozed_until TIMESTAMPTZ NULL
+	snoozed_until TIMESTAMPTZ NULL,
+	last_continuity_email_sent_at TIMESTAMPTZ NULL
 );
 CREATE INDEX index_conversations_on_assigned_user_id ON conversations (assigned_user_id);
 CREATE INDEX index_conversations_on_assigned_team_id ON conversations (assigned_team_id);
@@ -259,6 +259,7 @@ CREATE INDEX index_conversations_on_last_message_at ON conversations (last_messa
 CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_interaction_at);
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
 CREATE INDEX index_conversations_on_waiting_since ON conversations (waiting_since);
+CREATE INDEX index_conversations_on_last_continuity_email_sent_at ON conversations (last_continuity_email_sent_at);
 
 DROP TABLE IF EXISTS conversation_messages CASCADE;
 CREATE TABLE conversation_messages (
@@ -283,6 +284,7 @@ CREATE INDEX index_conversation_messages_on_conversation_id ON conversation_mess
 CREATE INDEX index_conversation_messages_on_created_at ON conversation_messages (created_at);
 CREATE INDEX index_conversation_messages_on_source_id ON conversation_messages (source_id);
 CREATE INDEX index_conversation_messages_on_status ON conversation_messages (status);
+CREATE INDEX index_conversation_messages_on_conversation_id_and_created_at ON conversation_messages (conversation_id, created_at);
 
 DROP TABLE IF EXISTS automation_rules CASCADE;
 CREATE TABLE automation_rules (

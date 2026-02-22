@@ -64,7 +64,7 @@ func (m *UserNotificationManager) GetAll(userID, limit, offset int) ([]models.Us
 			return notifications, nil
 		}
 		m.lo.Error("error fetching notifications", "user_id", userID, "error", err)
-		return notifications, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.notification}"), nil)
+		return notifications, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return notifications, nil
 }
@@ -74,7 +74,7 @@ func (m *UserNotificationManager) GetStats(userID int) (models.NotificationStats
 	var stats models.NotificationStats
 	if err := m.q.GetNotificationStats.Get(&stats, userID); err != nil {
 		m.lo.Error("error fetching notification stats", "user_id", userID, "error", err)
-		return stats, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.notification}"), nil)
+		return stats, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return stats, nil
 }
@@ -87,7 +87,7 @@ func (m *UserNotificationManager) Create(userID int, notificationType models.Not
 	}
 	if err := m.q.InsertNotification.Get(&notification, userID, notificationType, title, body, conversationID, messageID, actorID, meta); err != nil {
 		m.lo.Error("error creating notification", "user_id", userID, "error", err)
-		return notification, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.notification}"), nil)
+		return notification, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return notification, nil
 }
@@ -97,10 +97,10 @@ func (m *UserNotificationManager) MarkAsRead(id, userID int) error {
 	var returnedID int
 	if err := m.q.MarkAsRead.Get(&returnedID, id, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.notification}"), nil)
+			return envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundNotification"), nil)
 		}
 		m.lo.Error("error marking notification as read", "id", id, "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.notification}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -109,7 +109,7 @@ func (m *UserNotificationManager) MarkAsRead(id, userID int) error {
 func (m *UserNotificationManager) MarkAllAsRead(userID int) error {
 	if _, err := m.q.MarkAllAsRead.Exec(userID); err != nil {
 		m.lo.Error("error marking all notifications as read", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.notification}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -118,7 +118,7 @@ func (m *UserNotificationManager) MarkAllAsRead(userID int) error {
 func (m *UserNotificationManager) Delete(id, userID int) error {
 	if _, err := m.q.DeleteNotification.Exec(id, userID); err != nil {
 		m.lo.Error("error deleting notification", "id", id, "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.notification}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -127,7 +127,7 @@ func (m *UserNotificationManager) Delete(id, userID int) error {
 func (m *UserNotificationManager) DeleteAll(userID int) error {
 	if _, err := m.q.DeleteAllNotifications.Exec(userID); err != nil {
 		m.lo.Error("error deleting all notifications", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.notification}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -137,7 +137,7 @@ func (m *UserNotificationManager) DeleteOldNotifications(ctx context.Context) er
 	res, err := m.q.DeleteOldNotifications.ExecContext(ctx)
 	if err != nil {
 		m.lo.Error("error deleting old notifications", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.notification}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	rowsAffected, _ := res.RowsAffected()
 	m.lo.Info("deleted old notifications", "rows_affected", rowsAffected)
