@@ -19,6 +19,7 @@ const (
 	// User types
 	UserTypeAgent   = "agent"
 	UserTypeContact = "contact"
+	UserTypeVisitor = "visitor"
 
 	// User availability statuses
 	Online  = "online"
@@ -63,6 +64,8 @@ type User struct {
 	Roles                  pq.StringArray       `db:"roles" json:"roles"`
 	Permissions            pq.StringArray       `db:"permissions" json:"permissions"`
 	CustomAttributes       json.RawMessage      `db:"custom_attributes" json:"custom_attributes"`
+	Meta                   json.RawMessage      `db:"meta" json:"meta"`
+	ExternalUserID         null.String          `db:"external_user_id" json:"external_user_id"`
 	Teams                  tmodels.TeamsCompact `db:"teams" json:"teams"`
 	ContactChannelID       int                  `db:"contact_channel_id" json:"contact_channel_id,omitempty"`
 	NewPassword            string               `db:"-" json:"new_password,omitempty"`
@@ -75,6 +78,17 @@ type User struct {
 	APIKey           null.String `db:"api_key" json:"api_key"`
 	APIKeyLastUsedAt null.Time   `db:"api_key_last_used_at" json:"api_key_last_used_at"`
 	APISecret        null.String `db:"api_secret" json:"-"`
+}
+
+// ChatUser is a user with limited fields for live chat.
+type ChatUser struct {
+	ID                 int         `db:"id" json:"id"`
+	FirstName          string      `db:"first_name" json:"first_name"`
+	LastName           string      `db:"last_name" json:"last_name"`
+	AvatarURL          null.String `db:"avatar_url" json:"avatar_url"`
+	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
+	Type               string      `db:"type" json:"type"`
+	ActiveAt           null.Time   `db:"active_at" json:"active_at"`
 }
 
 type Note struct {

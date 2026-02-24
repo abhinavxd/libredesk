@@ -35,7 +35,7 @@ func handleGetCustomAttribute(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	attribute, err := app.customAttribute.Get(id)
@@ -65,7 +65,7 @@ func handleCreateCustomAttribute(r *fastglue.Request) error {
 		attribute = cmodels.CustomAttribute{}
 	)
 	if err := r.Decode(&attribute, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 	if err := validateCustomAttribute(app, attribute); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -85,10 +85,10 @@ func handleUpdateCustomAttribute(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&attribute, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 	if err := validateCustomAttribute(app, attribute); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -107,7 +107,7 @@ func handleDeleteCustomAttribute(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	if err = app.customAttribute.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)

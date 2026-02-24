@@ -35,7 +35,7 @@ func handleCreateUserView(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 	if err := r.Decode(&view, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 	user, err := app.user.GetAgent(auser.ID, "")
 	if err != nil {
@@ -62,7 +62,7 @@ func handleDeleteUserView(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	user, err := app.user.GetAgent(auser.ID, "")
 	if err != nil {
@@ -91,10 +91,10 @@ func handleUpdateUserView(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&view, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 	user, err := app.user.GetAgent(auser.ID, "")
 	if err != nil {
@@ -155,7 +155,7 @@ func handleGetSharedView(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	view, err := app.view.Get(id)
 	if err != nil {
@@ -163,7 +163,7 @@ func handleGetSharedView(r *fastglue.Request) error {
 	}
 	// Ensure it's a shared view (not a personal view)
 	if view.Visibility == vmodels.VisibilityUser {
-		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.view}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.T("validation.notFoundView"), nil, envelope.NotFoundError)
 	}
 	return r.SendEnvelope(view)
 }
@@ -175,7 +175,7 @@ func handleCreateSharedView(r *fastglue.Request) error {
 		view = vmodels.View{}
 	)
 	if err := r.Decode(&view, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 
 	// Validation
@@ -198,10 +198,10 @@ func handleUpdateSharedView(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&view, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 
 	// Verify view exists and is shared
@@ -210,7 +210,7 @@ func handleUpdateSharedView(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if existingView.Visibility == vmodels.VisibilityUser {
-		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.view}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.T("validation.notFoundView"), nil, envelope.NotFoundError)
 	}
 
 	// Validation
@@ -230,7 +230,7 @@ func handleDeleteSharedView(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	// Verify view exists and is shared
@@ -239,7 +239,7 @@ func handleDeleteSharedView(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if existingView.Visibility == vmodels.VisibilityUser {
-		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.view}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.T("validation.notFoundView"), nil, envelope.NotFoundError)
 	}
 
 	if err = app.view.Delete(id); err != nil {
@@ -251,7 +251,7 @@ func handleDeleteSharedView(r *fastglue.Request) error {
 // validatePersonalViewOwnership checks if the user owns the personal view.
 func validatePersonalViewOwnership(app *App, view vmodels.View, userID int) error {
 	if view.UserID == nil || *view.UserID != userID || view.Visibility != vmodels.VisibilityUser {
-		return envelope.NewError(envelope.PermissionError, app.i18n.Ts("globals.messages.denied", "name", "{globals.terms.permission}"), nil)
+		return envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
 	}
 	return nil
 }
@@ -265,7 +265,7 @@ func validateSharedView(app *App, view vmodels.View) error {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`filters`"), nil)
 	}
 	if view.Visibility != vmodels.VisibilityAll && view.Visibility != vmodels.VisibilityTeam {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "`visibility`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if view.Visibility == vmodels.VisibilityTeam && (view.TeamID == nil || *view.TeamID <= 0) {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`team_id`"), nil)

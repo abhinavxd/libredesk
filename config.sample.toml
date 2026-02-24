@@ -128,6 +128,17 @@ unsnooze_interval = "5m"
 # How long to keep drafts before deleting them from the database. (e.g. "360h", "48h")
 draft_retention_period = "360h"
 
+[conversation.continuity]
+offline_threshold = "10m"
+batch_check_interval = "5m"
+max_messages_per_email = 10
+min_email_interval = "15m"
+
 [sla]
 # How often to evaluate SLA compliance for conversations
 evaluation_interval = "5m"
+
+[rate_limit]
+  [rate_limit.widget]
+    enabled = true
+    requests_per_minute = 100

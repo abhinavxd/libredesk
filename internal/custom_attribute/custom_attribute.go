@@ -59,10 +59,10 @@ func (m *Manager) Get(id int) (models.CustomAttribute, error) {
 	var customAttribute models.CustomAttribute
 	if err := m.q.GetCustomAttribute.Get(&customAttribute, id); err != nil {
 		if err == sql.ErrNoRows {
-			return customAttribute, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", m.i18n.P("globals.terms.customAttribute")), nil)
+			return customAttribute, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundCustomAttribute"), nil)
 		}
 		m.lo.Error("error fetching custom attribute", "error", err)
-		return customAttribute, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.terms.customAttribute")), nil)
+		return customAttribute, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return customAttribute, nil
 }
@@ -72,7 +72,7 @@ func (m *Manager) GetAll(appliesTo string) ([]models.CustomAttribute, error) {
 	var customAttributes = make([]models.CustomAttribute, 0)
 	if err := m.q.GetAllCustomAttributes.Select(&customAttributes, appliesTo); err != nil {
 		m.lo.Error("error fetching custom attributes", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.terms.customAttribute")), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return customAttributes, nil
 }
@@ -82,10 +82,10 @@ func (m *Manager) Create(attr models.CustomAttribute) (models.CustomAttribute, e
 	var createdAttr models.CustomAttribute
 	if err := m.q.InsertCustomAttribute.Get(&createdAttr, attr.AppliesTo, attr.Name, attr.Description, attr.Key, pq.Array(attr.Values), attr.DataType, attr.Regex, attr.RegexHint); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return models.CustomAttribute{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.errorAlreadyExists", "name", m.i18n.P("globals.terms.customAttribute")), nil)
+			return models.CustomAttribute{}, envelope.NewError(envelope.InputError, m.i18n.T("errors.alreadyExistsCustomAttribute"), nil)
 		}
 		m.lo.Error("error inserting custom attribute", "error", err)
-		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.customAttribute}"), nil)
+		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return createdAttr, nil
 }
@@ -95,7 +95,7 @@ func (m *Manager) Update(id int, attr models.CustomAttribute) (models.CustomAttr
 	var updatedAttr models.CustomAttribute
 	if err := m.q.UpdateCustomAttribute.Get(&updatedAttr, id, attr.AppliesTo, attr.Name, attr.Description, pq.Array(attr.Values), attr.Regex, attr.RegexHint); err != nil {
 		m.lo.Error("error updating custom attribute", "error", err)
-		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.customAttribute}"), nil)
+		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return updatedAttr, nil
 }
@@ -104,7 +104,7 @@ func (m *Manager) Update(id int, attr models.CustomAttribute) (models.CustomAttr
 func (m *Manager) Delete(id int) error {
 	if _, err := m.q.DeleteCustomAttribute.Exec(id); err != nil {
 		m.lo.Error("error deleting custom attribute", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.customAttribute}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

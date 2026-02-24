@@ -11,6 +11,7 @@ require (
 	github.com/emersion/go-message v0.18.1
 	github.com/fasthttp/websocket v1.5.9
 	github.com/ferluci/fast-realip v1.0.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gabriel-vasile/mimetype v1.4.11
 	github.com/google/uuid v1.6.0
 	github.com/jhillyerd/enmime v1.2.0
@@ -34,6 +35,7 @@ require (
 	github.com/rhnvrm/simples3 v0.10.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
+	github.com/taion809/haikunator v0.0.0-20150324135039-4e414e676fd1
 	github.com/valyala/fasthttp v1.62.0
 	github.com/volatiletech/null/v9 v9.0.0
 	github.com/zerodha/fastglue v1.8.0

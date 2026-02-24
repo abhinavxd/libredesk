@@ -42,6 +42,14 @@ type Store interface {
 	SignedURLValidator() func(name, sig string, exp int64) bool
 }
 
+// SignedURLStore defines the interface for stores that support signed URLs.
+// This is optional and only implemented by stores that need signed URL functionality (like fs).
+type SignedURLStore interface {
+	Store
+	GetSignedURL(name string) string
+	VerifySignature(name, signature string, expiresAt time.Time) bool
+}
+
 type Manager struct {
 	store   Store
 	lo      *logf.Logger
@@ -119,7 +127,7 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 	fName, err := m.store.Put(fileName, contentType, content)
 	if err != nil {
 		m.lo.Error("error uploading media", "error", err)
-		return "", "", envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUploading", "name", "{globals.terms.media}"), nil)
+		return "", "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUploadingFile"), nil)
 	}
 	return fName, contentType, nil
 }
@@ -129,7 +137,7 @@ func (m *Manager) Insert(disposition null.String, fileName, contentType, content
 	var id int
 	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid).Scan(&id); err != nil {
 		m.lo.Error("error inserting media", "error", err)
-		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorInserting", "name", "{globals.terms.media}"), nil)
+		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return m.Get(id, "")
 }
@@ -139,10 +147,10 @@ func (m *Manager) Get(id int, uuid string) (models.Media, error) {
 	var media models.Media
 	if err := m.queries.Get.Get(&media, id, uuid); err != nil {
 		if err == sql.ErrNoRows {
-			return media, envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.media}"), nil)
+			return media, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundMedia"), nil)
 		}
 		m.lo.Error("error fetching media", "error", err)
-		return media, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.media}"), nil)
+		return media, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	media.URL = m.GetURL(media.UUID, media.ContentType, media.Filename)
 	return media, nil
@@ -178,6 +186,16 @@ func (m *Manager) GetURL(uuid, contentType, fileName string) string {
 	return m.store.GetURL(uuid, disposition, fileName)
 }
 
+// GetSignedURL generates a signed URL for secure media access if the store supports it.
+// Returns a regular URL if the store doesn't support signed URLs.
+func (m *Manager) GetSignedURL(name string) string {
+	if signedStore, ok := m.store.(SignedURLStore); ok {
+		return signedStore.GetSignedURL(name)
+	}
+	// Fallback to regular URL if signed URLs not supported
+	return m.GetURL(name, "", "")
+}
+
 // SignedURLValidator returns the store's signature validator if available.
 // Returns nil if the store doesn't support signed URL validation.
 func (m *Manager) SignedURLValidator() func(name, sig string, exp int64) bool {
@@ -209,7 +227,7 @@ func (m *Manager) Delete(name string) error {
 		m.lo.Error("error deleting media from store", "error", err)
 		// If the file does not exist, ignore the error.
 		if !errors.Is(err, os.ErrNotExist) {
-			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.media}"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 	}
 
@@ -221,7 +239,7 @@ func (m *Manager) Delete(name string) error {
 	// Delete the media record from the database.
 	if _, err := m.queries.Delete.Exec(name); err != nil {
 		m.lo.Error("error deleting media from db", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.media}"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

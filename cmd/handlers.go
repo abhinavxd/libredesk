@@ -1,13 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"mime"
 	"net/http"
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -235,6 +239,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Actvity logs.
 	g.GET("/api/v1/activity-logs", perm(handleGetActivityLogs, "activity_logs:manage"))
 
+	// CSAT.
+	g.POST("/api/v1/csat/{uuid}/response", handleSubmitCSATResponse)
+
 	// User notifications.
 	g.GET("/api/v1/notifications", auth(handleGetUserNotifications))
 	g.GET("/api/v1/notifications/stats", auth(handleGetUserNotificationStats))
@@ -248,8 +255,22 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 		return handleWS(r, hub)
 	}))
 
+	// Live chat widget websocket.
+	g.GET("/widget/ws", handleWidgetWS)
+
+	// Widget APIs.
+	g.GET("/api/v1/widget/chat/settings/launcher", handleGetChatLauncherSettings)
+	g.GET("/api/v1/widget/chat/settings", handleGetChatSettings)
+	g.POST("/api/v1/widget/chat/conversations/init", rateLimitWidget(widgetAuth(handleChatInit)))
+	g.GET("/api/v1/widget/chat/conversations", rateLimitWidget(widgetAuth(handleGetConversations)))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", rateLimitWidget(widgetAuth(handleChatUpdateLastSeen)))
+	g.GET("/api/v1/widget/chat/conversations/{uuid}", rateLimitWidget(widgetAuth(handleChatGetConversation)))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", rateLimitWidget(widgetAuth(handleChatSendMessage)))
+	g.POST("/api/v1/widget/media/upload", rateLimitWidget(widgetAuth(handleWidgetMediaUpload)))
+
 	// Frontend pages.
 	g.GET("/", notAuthPage(serveIndexPage))
+	g.GET("/widget", serveWidgetIndexPage)
 	g.GET("/inboxes/{all:*}", authPage(serveIndexPage))
 	g.GET("/teams/{all:*}", authPage(serveIndexPage))
 	g.GET("/views/{all:*}", authPage(serveIndexPage))
@@ -259,8 +280,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/account/{all:*}", authPage(serveIndexPage))
 	g.GET("/reset-password", notAuthPage(serveIndexPage))
 	g.GET("/set-password", notAuthPage(serveIndexPage))
-	// FIXME: Don't need three separate routes for the same thing.
+
+	// Assets and static files.
+	// FIXME: Reduce the number of routes.
+	g.GET("/widget.js", serveWidgetJS)
 	g.GET("/assets/{all:*}", serveFrontendStaticFiles)
+	g.GET("/widget/assets/{all:*}", serveWidgetStaticFiles)
 	g.GET("/images/{all:*}", serveFrontendStaticFiles)
 	g.GET("/static/public/{all:*}", serveStaticFiles)
 
@@ -284,7 +309,7 @@ func serveIndexPage(r *fastglue.Request) error {
 	// Serve the index.html file from the embedded filesystem.
 	file, err := app.fs.Get(path.Join(frontendDir, "index.html"))
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
 	r.RequestCtx.SetBody(file.ReadBytes())
@@ -292,8 +317,79 @@ func serveIndexPage(r *fastglue.Request) error {
 	// Set CSRF cookie if not already set.
 	if err := app.auth.SetCSRFCookie(r); err != nil {
 		app.lo.Error("error setting csrf cookie", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorSaving", "name", "{globals.terms.session}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
+	return nil
+}
+
+// validateWidgetReferer validates the Referer header against trusted domains configured in the live chat inbox settings.
+func validateWidgetReferer(app *App, r *fastglue.Request, inboxID int) error {
+	// Get the Referer header from the request
+	referer := string(r.RequestCtx.Request.Header.Peek("Referer"))
+
+	// If no referer header is present, allow direct access.
+	if referer == "" {
+		return nil
+	}
+
+	// Get inbox configuration
+	inbox, err := app.inbox.GetDBRecord(inboxID)
+	if err != nil {
+		app.lo.Error("error fetching inbox for referer check", "inbox_id", inboxID, "error", err)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundInbox"), nil, envelope.NotFoundError)
+	}
+
+	if !inbox.Enabled {
+		return r.SendErrorEnvelope(http.StatusBadRequest, app.i18n.T("status.disabledInbox"), nil, envelope.InputError)
+	}
+
+	// Parse the live chat config
+	var config livechat.Config
+	if err := json.Unmarshal(inbox.Config, &config); err != nil {
+		app.lo.Error("error parsing live chat config for referer check", "error", err)
+		return r.SendErrorEnvelope(http.StatusInternalServerError, app.i18n.T("validation.invalidInbox"), nil, envelope.GeneralError)
+	}
+
+	// If trusted domains list is empty, allow all referers
+	if len(config.TrustedDomains) == 0 {
+		return nil
+	}
+
+	// Check if the referer matches any of the trusted domains
+	if !httputil.IsOriginTrusted(referer, config.TrustedDomains) {
+		app.lo.Warn("widget request from untrusted referer blocked",
+			"referer", referer,
+			"inbox_id", inboxID,
+			"trusted_domains", config.TrustedDomains)
+		return r.SendErrorEnvelope(http.StatusForbidden, "Widget not allowed from this origin: "+referer, nil, envelope.PermissionError)
+	}
+	app.lo.Debug("widget request from trusted referer allowed", "referer", referer, "inbox_id", inboxID)
+	return nil
+}
+
+// serveWidgetIndexPage serves the widget index page of the application.
+func serveWidgetIndexPage(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	// Extract inbox ID and validate trusted domains if present
+	inboxID := r.RequestCtx.QueryArgs().GetUintOrZero("inbox_id")
+	if err := validateWidgetReferer(app, r, inboxID); err != nil {
+		return err
+	}
+
+	// Prevent caching of the index page.
+	r.RequestCtx.Response.Header.Add("Cache-Control", "no-store, no-cache, must-revalidate, post-check=0, pre-check=0")
+	r.RequestCtx.Response.Header.Add("Pragma", "no-cache")
+	r.RequestCtx.Response.Header.Add("Expires", "-1")
+
+	// Serve the index.html file from the embedded filesystem.
+	file, err := app.fs.Get(path.Join(widgetDir, "index.html"))
+	if err != nil {
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
+	}
+	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
+	r.RequestCtx.SetBody(file.ReadBytes())
+
 	return nil
 }
 
@@ -306,7 +402,7 @@ func serveStaticFiles(r *fastglue.Request) error {
 
 	file, err := app.fs.Get(filePath)
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
 	// Set the appropriate Content-Type based on the file extension.
@@ -331,7 +427,7 @@ func serveFrontendStaticFiles(r *fastglue.Request) error {
 	finalPath := filepath.Join(frontendDir, filePath)
 	file, err := app.fs.Get(finalPath)
 	if err != nil {
-		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.file}"), nil, envelope.NotFoundError)
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
 	// Set the appropriate Content-Type based on the file extension.
@@ -341,6 +437,47 @@ func serveFrontendStaticFiles(r *fastglue.Request) error {
 		contentType = http.DetectContentType(file.ReadBytes())
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
+	r.RequestCtx.SetBody(file.ReadBytes())
+	return nil
+}
+
+// serveWidgetStaticFiles serves widget static assets from the embedded filesystem.
+func serveWidgetStaticFiles(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	filePath := string(r.RequestCtx.Path())
+	finalPath := filepath.Join(widgetDir, strings.TrimPrefix(filePath, "/widget"))
+
+	file, err := app.fs.Get(finalPath)
+	if err != nil {
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
+	}
+
+	// Set the appropriate Content-Type based on the file extension.
+	ext := filepath.Ext(filePath)
+	contentType := mime.TypeByExtension(ext)
+	if contentType == "" {
+		contentType = http.DetectContentType(file.ReadBytes())
+	}
+	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
+	r.RequestCtx.SetBody(file.ReadBytes())
+	return nil
+}
+
+// serveWidgetJS serves the widget JavaScript file.
+func serveWidgetJS(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	// Set appropriate headers for JavaScript
+	r.RequestCtx.Response.Header.Set("Content-Type", "application/javascript")
+	r.RequestCtx.Response.Header.Set("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+
+	// Serve the widget.js file from the embedded filesystem.
+	file, err := app.fs.Get("static/widget.js")
+	if err != nil {
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
+	}
+
 	r.RequestCtx.SetBody(file.ReadBytes())
 	return nil
 }
