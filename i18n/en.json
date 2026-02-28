@@ -579,6 +579,7 @@
   "admin.role.contacts.read": "View Contact Details",
   "admin.role.contacts.write": "Edit Contact Details",
   "admin.role.contacts.block": "Block Contacts",
+  "admin.role.contacts.delete": "Delete Contacts",
   "admin.role.contactNotes.read": "View Contact Notes",
   "admin.role.contactNotes.write": "Add Contact Notes",
   "admin.role.contactNotes.delete": "Delete Contact Notes",
