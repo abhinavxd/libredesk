@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"path/filepath"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
@@ -158,6 +160,33 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 
 	// Set from address of the inbox
 	message.From = inbox.FromAddress()
+
+	// If a from name template is configured and the sender is an agent,
+	// render the template and use the result as the display name.
+	if tpl := inbox.FromNameTemplate(); tpl != "" && message.SenderType == models.SenderTypeAgent {
+		if agent, err := m.userStore.GetAgent(message.SenderID, ""); err == nil {
+			if addr, parseErr := mail.ParseAddress(inbox.FromAddress()); parseErr == nil {
+				data := struct {
+					Agent struct{ FirstName, LastName, FullName string }
+					Inbox struct{ Name string }
+				}{}
+				data.Agent.FirstName = strings.TrimSpace(agent.FirstName)
+				data.Agent.LastName = strings.TrimSpace(agent.LastName)
+				data.Agent.FullName = strings.TrimSpace(agent.FirstName + " " + agent.LastName)
+				data.Inbox.Name = addr.Name
+
+				if t, err := template.New("from").Parse(tpl); err == nil {
+					var buf bytes.Buffer
+					if err := t.Execute(&buf, data); err == nil {
+						if name := strings.TrimSpace(buf.String()); name != "" {
+							addr.Name = name
+							message.From = addr.String()
+						}
+					}
+				}
+			}
+		}
+	}
 
 	// Set "In-Reply-To" and "References" headers, logging any errors but continuing to send the message.
 	// Include only the last 20 messages as references to avoid exceeding header size limits.
