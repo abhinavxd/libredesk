@@ -454,6 +454,12 @@ const routes = [
             ]
           },
           {
+            path: 'ai',
+            name: 'ai-settings',
+            component: () => import('@/views/admin/ai/AISettings.vue'),
+            meta: { title: 'AI Assist' }
+          },
+          {
             path: 'conversations',
             meta: { title: 'Conversations' },
             children: [

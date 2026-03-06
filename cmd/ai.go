@@ -11,8 +11,10 @@ type aiCompletionReq struct {
 }
 
 type providerUpdateReq struct {
-	Provider string `json:"provider"`
-	APIKey   string `json:"api_key"`
+	Provider    string `json:"provider"`
+	APIKey      string `json:"api_key"`
+	EndpointURL string `json:"endpoint_url"`
+	Model       string `json:"model"`
 }
 
 // handleAICompletion handles AI completion requests
@@ -45,6 +47,18 @@ func handleGetAIPrompts(r *fastglue.Request) error {
 	return r.SendEnvelope(resp)
 }
 
+// handleGetAIProvider returns the current AI provider config (sanitized).
+func handleGetAIProvider(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+	)
+	resp, err := app.ai.GetProvider()
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(resp)
+}
+
 // handleUpdateAIProvider updates the AI provider
 func handleUpdateAIProvider(r *fastglue.Request) error {
 	var (
@@ -54,7 +68,7 @@ func handleUpdateAIProvider(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil))
 	}
-	if err := app.ai.UpdateProvider(req.Provider, req.APIKey); err != nil {
+	if err := app.ai.UpdateProvider(req.Provider, req.APIKey, req.EndpointURL, req.Model); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope("Provider updated successfully")

@@ -10,6 +10,10 @@
             })
           }}
         </DialogDescription>
+        <p class="text-sm text-muted-foreground mt-2">
+          {{ $t('admin.ai.advancedSetup') }}
+          <router-link to="/admin/ai" class="text-primary underline">{{ $t('admin.ai.title') }}</router-link>
+        </p>
       </DialogHeader>
       <Form v-slot="{ handleSubmit }" as="" keep-values :validation-schema="formSchema">
         <form id="apiKeyForm" @submit="handleSubmit($event, updateProvider)">

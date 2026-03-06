@@ -738,5 +738,15 @@
   "importer.importCompleted": "Import completed: {success} of {total} successful, {errors} failed",
   "importer.csvMustContainHeadersAndData": "CSV must contain headers and at least one data row",
   "importer.importAlreadyInProgress": "Import already in progress",
-  "importer.agentCaseSensitiveNote": "Roles and teams must match exactly (case-sensitive)"
+  "importer.agentCaseSensitiveNote": "Roles and teams must match exactly (case-sensitive)",
+
+  "admin.ai.title": "AI Assist",
+  "admin.ai.help": "Configure the AI provider for AI Assist features like text completion and rewriting in the reply editor. Any OpenAI-compatible endpoint can be used, including self-hosted models.",
+  "admin.ai.endpointUrl": "Endpoint URL",
+  "admin.ai.endpointUrl.description": "The chat completions endpoint URL. Leave empty to use the default OpenAI endpoint.",
+  "admin.ai.model": "Model",
+  "admin.ai.model.description": "The model name to use for completions. Leave empty to use the default (gpt-4o-mini).",
+  "admin.ai.apiKeyConfigured": "API key is configured",
+  "admin.ai.apiKey.settingsDescription": "Enter a new key to update, or leave empty to keep the current key.",
+  "admin.ai.advancedSetup": "For advanced setup (custom endpoint, model)"
 }

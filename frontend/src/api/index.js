@@ -437,6 +437,7 @@ const updateAIProvider = (data) => http.put('/api/v1/ai/provider', data, {
     'Content-Type': 'application/json'
   }
 })
+const getAIProvider = () => http.get('/api/v1/ai/provider')
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
   headers: {
@@ -560,6 +561,7 @@ export default {
   updateAutomationRuleWeights,
   updateAutomationRulesExecutionMode,
   updateAIProvider,
+  getAIProvider,
   createAutomationRule,
   toggleAutomationRule,
   deleteAutomationRule,

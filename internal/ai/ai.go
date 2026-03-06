@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/crypto"
@@ -41,10 +42,25 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	GetDefaultProvider *sqlx.Stmt `query:"get-default-provider"`
-	GetPrompt          *sqlx.Stmt `query:"get-prompt"`
-	GetPrompts         *sqlx.Stmt `query:"get-prompts"`
-	SetOpenAIKey       *sqlx.Stmt `query:"set-openai-key"`
+	GetDefaultProvider   *sqlx.Stmt `query:"get-default-provider"`
+	GetPrompt            *sqlx.Stmt `query:"get-prompt"`
+	GetPrompts           *sqlx.Stmt `query:"get-prompts"`
+	UpdateProviderConfig *sqlx.Stmt `query:"update-provider-config"`
+}
+
+// providerConfig represents the JSONB config stored in ai_providers.
+type providerConfig struct {
+	APIKey      string `json:"api_key"`
+	EndpointURL string `json:"endpoint_url"`
+	Model       string `json:"model"`
+}
+
+// ProviderInfo is the sanitized response for GET /ai/provider (no decrypted key).
+type ProviderInfo struct {
+	Provider    string `json:"provider"`
+	EndpointURL string `json:"endpoint_url"`
+	Model       string `json:"model"`
+	HasAPIKey   bool   `json:"has_api_key"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -106,29 +122,87 @@ func (m *Manager) GetPrompts() ([]models.Prompt, error) {
 	return prompts, nil
 }
 
-// UpdateProvider updates a provider.
-func (m *Manager) UpdateProvider(provider, apiKey string) error {
+// GetProvider returns the default provider's config (sanitized, no decrypted key).
+func (m *Manager) GetProvider() (ProviderInfo, error) {
+	var p models.Provider
+	if err := m.q.GetDefaultProvider.Get(&p); err != nil {
+		m.lo.Error("error fetching provider details", "error", err)
+		return ProviderInfo{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.Ts("globals.terms.provider")), nil)
+	}
+
+	var cfg providerConfig
+	if p.Config != "" {
+		if err := json.Unmarshal([]byte(p.Config), &cfg); err != nil {
+			m.lo.Error("error parsing provider config", "error", err)
+			return ProviderInfo{}, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorParsing", "name", m.i18n.Ts("globals.terms.provider")), nil)
+		}
+	}
+
+	return ProviderInfo{
+		Provider:    p.Provider,
+		EndpointURL: cfg.EndpointURL,
+		Model:       cfg.Model,
+		HasAPIKey:   cfg.APIKey != "",
+	}, nil
+}
+
+// UpdateProvider updates a provider's config.
+func (m *Manager) UpdateProvider(provider, apiKey, endpointURL, model string) error {
+	// Validate endpoint URL if provided.
+	if endpointURL != "" && !strings.HasPrefix(endpointURL, "http://") && !strings.HasPrefix(endpointURL, "https://") {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.invalid", "name", "endpoint URL"), nil)
+	}
+
 	switch ProviderType(provider) {
 	case ProviderOpenAI:
-		return m.setOpenAIAPIKey(apiKey)
+		return m.updateOpenAIProvider(apiKey, endpointURL, model)
 	default:
 		m.lo.Error("unsupported provider type", "provider", provider)
 		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.invalid", "name", m.i18n.Ts("globals.terms.provider")), nil)
 	}
 }
 
-// setOpenAIAPIKey sets the OpenAI API key in the database.
-func (m *Manager) setOpenAIAPIKey(apiKey string) error {
-	// Encrypt API key before storing.
-	encryptedKey, err := crypto.Encrypt(apiKey, m.encryptionKey)
-	if err != nil {
-		m.lo.Error("error encrypting API key", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "OpenAI API Key"), nil)
+// updateOpenAIProvider updates the OpenAI provider config in the database.
+// If apiKey is empty, the existing key is preserved.
+func (m *Manager) updateOpenAIProvider(apiKey, endpointURL, model string) error {
+	// Read current config to preserve fields not being updated.
+	var p models.Provider
+	if err := m.q.GetDefaultProvider.Get(&p); err != nil {
+		m.lo.Error("error fetching provider for update", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.Ts("globals.terms.provider")), nil)
 	}
 
-	if _, err := m.q.SetOpenAIKey.Exec(encryptedKey); err != nil {
-		m.lo.Error("error setting OpenAI API key", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "OpenAI API Key"), nil)
+	var current providerConfig
+	if p.Config != "" {
+		if err := json.Unmarshal([]byte(p.Config), &current); err != nil {
+			m.lo.Error("error parsing provider config for update", "error", err)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorParsing", "name", m.i18n.Ts("globals.terms.provider")), nil)
+		}
+	}
+
+	// Only overwrite api_key if a new one is provided.
+	if apiKey != "" {
+		encryptedKey, err := crypto.Encrypt(apiKey, m.encryptionKey)
+		if err != nil {
+			m.lo.Error("error encrypting API key", "error", err)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "OpenAI API Key"), nil)
+		}
+		current.APIKey = encryptedKey
+	}
+
+	// Update endpoint_url and model (empty string means use defaults at runtime).
+	current.EndpointURL = endpointURL
+	current.Model = model
+
+	configJSON, err := json.Marshal(current)
+	if err != nil {
+		m.lo.Error("error marshalling provider config", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", m.i18n.Ts("globals.terms.provider")), nil)
+	}
+
+	if _, err := m.q.UpdateProviderConfig.Exec(string(configJSON)); err != nil {
+		m.lo.Error("error updating provider config", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", m.i18n.Ts("globals.terms.provider")), nil)
 	}
 	return nil
 }
@@ -158,20 +232,18 @@ func (m *Manager) getDefaultProviderClient() (ProviderClient, error) {
 
 	switch ProviderType(p.Provider) {
 	case ProviderOpenAI:
-		config := struct {
-			APIKey string `json:"api_key"`
-		}{}
-		if err := json.Unmarshal([]byte(p.Config), &config); err != nil {
+		var cfg providerConfig
+		if err := json.Unmarshal([]byte(p.Config), &cfg); err != nil {
 			m.lo.Error("error parsing provider config", "error", err)
 			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorParsing", "name", m.i18n.Ts("globals.terms.provider")), nil)
 		}
 		// Decrypt API key.
-		decryptedKey, err := crypto.Decrypt(config.APIKey, m.encryptionKey)
+		decryptedKey, err := crypto.Decrypt(cfg.APIKey, m.encryptionKey)
 		if err != nil {
 			m.lo.Error("error decrypting API key", "error", err)
 			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.Ts("globals.terms.provider")), nil)
 		}
-		return NewOpenAIClient(decryptedKey, m.lo), nil
+		return NewOpenAIClient(decryptedKey, cfg.EndpointURL, cfg.Model, m.lo), nil
 	default:
 		m.lo.Error("unsupported provider type", "provider", p.Provider)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.invalid", "name", m.i18n.Ts("globals.terms.provider")), nil)
