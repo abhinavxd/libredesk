@@ -7,11 +7,5 @@ SELECT id, created_at, updated_at, key, title, content FROM ai_prompts where key
 -- name: get-prompts
 SELECT id, created_at, updated_at, key, title FROM ai_prompts order by title;
 
--- name: set-openai-key
-UPDATE ai_providers 
-SET config = jsonb_set(
-    COALESCE(config, '{}'::jsonb),
-    '{api_key}', 
-    to_jsonb($1::text)
-) 
-WHERE provider = 'openai';
+-- name: update-provider-config
+UPDATE ai_providers SET config = $1::jsonb, updated_at = now() WHERE is_default = true;

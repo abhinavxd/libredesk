@@ -166,6 +166,11 @@ export const adminNavItems = [
         href: '/admin/webhooks',
         permission: 'webhooks:manage',
         isTitleKeyPlural: true
+      },
+      {
+        titleKey: 'admin.ai.title',
+        href: '/admin/ai',
+        permission: 'ai:manage'
       }
     ]
   }

@@ -12,29 +12,43 @@ import (
 	"github.com/zerodha/logf"
 )
 
+const (
+	defaultEndpointURL = "https://api.openai.com/v1/chat/completions"
+	defaultModel       = "gpt-4o-mini"
+)
+
 type OpenAIClient struct {
-	apikey string
-	lo     *logf.Logger
-	client *http.Client
+	apikey      string
+	endpointURL string
+	model       string
+	lo          *logf.Logger
+	client      *http.Client
 }
 
-func NewOpenAIClient(apiKey string, lo *logf.Logger) *OpenAIClient {
+func NewOpenAIClient(apiKey, endpointURL, model string, lo *logf.Logger) *OpenAIClient {
+	if endpointURL == "" {
+		endpointURL = defaultEndpointURL
+	}
+	if model == "" {
+		model = defaultModel
+	}
 	return &OpenAIClient{
-		apikey: apiKey,
-		lo:     lo,
-		client: &http.Client{Timeout: 10 * time.Second},
+		apikey:      apiKey,
+		endpointURL: endpointURL,
+		model:       model,
+		lo:          lo,
+		client:      &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
-// SendPrompt sends a prompt to the OpenAI API and returns the response text.
+// SendPrompt sends a prompt to the OpenAI-compatible API and returns the response text.
 func (o *OpenAIClient) SendPrompt(payload PromptPayload) (string, error) {
 	if o.apikey == "" {
 		return "", ErrApiKeyNotSet
 	}
 
-	apiURL := "https://api.openai.com/v1/chat/completions"
 	requestBody := map[string]interface{}{
-		"model": "gpt-4o-mini",
+		"model": o.model,
 		"messages": []map[string]string{
 			{"role": "system", "content": payload.SystemPrompt},
 			{"role": "user", "content": payload.UserPrompt},
@@ -49,7 +63,7 @@ func (o *OpenAIClient) SendPrompt(payload PromptPayload) (string, error) {
 		return "", fmt.Errorf("marshalling request body: %w", err)
 	}
 
-	req, err := http.NewRequest(fasthttp.MethodPost, apiURL, bytes.NewBuffer(bodyBytes))
+	req, err := http.NewRequest(fasthttp.MethodPost, o.endpointURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		o.lo.Error("error creating request", "error", err)
 		return "", fmt.Errorf("error creating request: %w", err)
