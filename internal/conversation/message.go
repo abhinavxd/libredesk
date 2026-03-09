@@ -163,9 +163,16 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 
 	// If a from name template is configured and the sender is an agent,
 	// render the template and use the result as the display name.
+	// System users are skipped as they send automated emails.
 	if tpl := inbox.FromNameTemplate(); tpl != "" && message.SenderType == models.SenderTypeAgent {
-		if agent, err := m.userStore.GetAgent(message.SenderID, ""); err == nil {
-			if addr, parseErr := mail.ParseAddress(inbox.FromAddress()); parseErr == nil {
+		agent, err := m.userStore.GetAgent(message.SenderID, "")
+		if err != nil {
+			m.lo.Error("error fetching agent for from name template", "error", err, "sender_id", message.SenderID)
+		} else if !agent.IsSystemUser() {
+			addr, err := mail.ParseAddress(inbox.FromAddress())
+			if err != nil {
+				m.lo.Error("error parsing inbox from address for name template", "error", err)
+			} else {
 				data := struct {
 					Agent struct{ FirstName, LastName, FullName string }
 					Inbox struct{ Name string }
@@ -175,13 +182,16 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 				data.Agent.FullName = strings.TrimSpace(agent.FirstName + " " + agent.LastName)
 				data.Inbox.Name = addr.Name
 
-				if t, err := template.New("from").Parse(tpl); err == nil {
+				t, err := template.New("from").Parse(tpl)
+				if err != nil {
+					m.lo.Error("error parsing from name template", "error", err, "template", tpl)
+				} else {
 					var buf bytes.Buffer
-					if err := t.Execute(&buf, data); err == nil {
-						if name := strings.TrimSpace(buf.String()); name != "" {
-							addr.Name = name
-							message.From = addr.String()
-						}
+					if err := t.Execute(&buf, data); err != nil {
+						m.lo.Error("error executing from name template", "error", err, "template", tpl)
+					} else if name := strings.TrimSpace(buf.String()); name != "" {
+						addr.Name = name
+						message.From = addr.String()
 					}
 				}
 			}

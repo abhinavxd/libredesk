@@ -514,6 +514,8 @@
   "admin.inbox.fromNameTemplate": "From display name template",
   "admin.inbox.fromNameTemplate.placeholder": "{'{{ .Agent.FirstName }} at {{ .Inbox.Name }}'}",
   "admin.inbox.fromNameTemplate.description": "Override the display name on outgoing emails when an agent replies. The email address from the field above is kept. Leave blank to use the name from the From email address as-is. Available variables: {'{{ .Agent.FirstName }}'}, {'{{ .Agent.LastName }}'}, {'{{ .Agent.FullName }}'}, {'{{ .Inbox.Name }}'}",
+  "admin.inbox.fromNameTemplate.invalidSyntax": "Invalid template syntax. Check that all opening and closing braces are balanced.",
+  "admin.inbox.fromNameTemplate.unknownVariable": "Unknown template variable. See the available variables listed in the field description.",
   "admin.inbox.enablePlusAddressing": "Enable plus addressing",
   "admin.inbox.enablePlusAddressing.description": "Improves conversation threading but requires provider support (e.g., Gmail, Microsoft 365).",
   "admin.inbox.chooseChannel": "Choose a channel",

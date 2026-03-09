@@ -6,8 +6,8 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-// FromNameTemplate adds the from_name_template column to the inboxes table.
-func FromNameTemplate(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+// V1_1_0 adds the from_name_template column to the inboxes table.
+func V1_1_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	_, err := db.Exec(`
 		ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS from_name_template TEXT NOT NULL DEFAULT '';
 	`)

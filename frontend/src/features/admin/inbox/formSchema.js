@@ -5,7 +5,22 @@ import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, t('globals.messages.required')),
   from: z.string().min(1, t('globals.messages.required')),
-  from_name_template: z.string().optional().default(''),
+  from_name_template: z.string().optional().default('')
+    .refine(
+      (val) => {
+        if (!val) return true
+        return (val.match(/\{\{/g) || []).length === (val.match(/\}\}/g) || []).length
+      },
+      { message: t('admin.inbox.fromNameTemplate.invalidSyntax') }
+    )
+    .refine(
+      (val) => {
+        if (!val) return true
+        const validVars = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
+        return [...val.matchAll(/\{\{\s*(.*?)\s*\}\}/g)].every(m => validVars.includes(m[1].trim()))
+      },
+      { message: t('admin.inbox.fromNameTemplate.unknownVariable') }
+    ),
   enabled: z.boolean().optional(),
   csat_enabled: z.boolean().optional(),
   enable_plus_addressing: z.boolean().optional(),
