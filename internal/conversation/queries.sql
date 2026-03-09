@@ -631,6 +631,9 @@ WHERE created_at < $1;
 INSERT INTO conversation_mentions (conversation_id, message_id, mentioned_user_id, mentioned_team_id, mentioned_by_user_id)
 VALUES ($1, $2, $3, $4, $5);
 
+-- name: delete-message
+DELETE FROM conversation_messages WHERE uuid = $1 AND private = true;
+
 -- name: mark-conversation-unread
 INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
 VALUES (
