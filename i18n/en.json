@@ -706,6 +706,7 @@
   "conversation.allLoaded": "All conversations loaded",
   "conversation.showQuotedText": "Show quoted text",
   "conversation.hideQuotedText": "Hide quoted text",
+  "conversation.deletePrivateNote": "Delete note",
   "conversation.sidebar.information": "Information",
   "conversation.sidebar.contactAttributes": "Contact attributes",
   "conversation.sidebar.previousConvo": "Previous conversations",

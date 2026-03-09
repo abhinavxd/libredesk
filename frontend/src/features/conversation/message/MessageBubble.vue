@@ -1,118 +1,128 @@
 <template>
-  <div class="flex flex-col text-left" :class="isOutgoing ? 'items-end' : 'items-start'">
-    <!-- Sender Name -->
-    <div class="mb-1" :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
-      <router-link
-        v-if="!isOutgoing"
-        :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
-        class="text-muted-foreground text-sm font-medium hover:underline hover:text-primary"
-      >
-        {{ getFullName }}
-      </router-link>
-      <p v-else class="text-muted-foreground text-sm font-medium">
-        {{ getFullName }}
-      </p>
-    </div>
-
-    <!-- Message Bubble -->
-    <div class="flex flex-row gap-2 w-full" :class="{ 'justify-end': isOutgoing }">
-      <!-- Avatar (left for incoming) -->
-      <router-link
-        v-if="!isOutgoing"
-        :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
-        class="flex-shrink-0"
-      >
-        <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
-          <AvatarImage :src="getAvatar" />
-          <AvatarFallback class="font-medium">
-            {{ avatarFallback }}
-          </AvatarFallback>
-        </Avatar>
-      </router-link>
-
-      <!-- Bubble Wrapper with max 80% width -->
-      <div
-        class="w-4/5"
-        :class="{ 'flex justify-end': isOutgoing }"
-        style="contain: inline-size"
-      >
-        <div
-          class="flex flex-col justify-end message-bubble"
-          :class="bubbleClasses"
-        >
-          <!-- Message Envelope -->
-          <MessageEnvelope :message="message" v-if="showEnvelope" />
-
-          <hr class="mb-2" v-if="showEnvelope" />
-
-          <!-- Message Content -->
-          <div
-            v-if="message.content_type === 'text'"
-            class="mb-1 native-html whitespace-pre-wrap"
-            :class="{ 'mb-3': message.attachments.length > 0 }"
+  <ContextMenu>
+    <ContextMenuTrigger asChild :disabled="!isPrivateMessage">
+      <div class="flex flex-col text-left" :class="isOutgoing ? 'items-end' : 'items-start'">
+        <!-- Sender Name -->
+        <div class="mb-1" :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
+          <router-link
+            v-if="!isOutgoing"
+            :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
+            class="text-muted-foreground text-sm font-medium hover:underline hover:text-primary"
           >
-            {{ sanitizedContent }}
-          </div>
-          <Letter
-            v-else
-            :html="sanitizedContent"
-            :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-            class="mb-1 native-html whitespace-pre-wrap break-words"
-            :class="{ 'mb-3': message.attachments.length > 0 }"
-          />
+            {{ getFullName }}
+          </router-link>
+          <p v-else class="text-muted-foreground text-sm font-medium">
+            {{ getFullName }}
+          </p>
+        </div>
 
-          <!-- Quoted Text Toggle (incoming only) -->
-          <div
-            v-if="!isOutgoing && hasQuotedContent"
-            @click="toggleQuote"
-            class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded transition-all"
+        <!-- Message Bubble -->
+        <div class="flex flex-row gap-2 w-full" :class="{ 'justify-end': isOutgoing }">
+          <!-- Avatar (left for incoming) -->
+          <router-link
+            v-if="!isOutgoing"
+            :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
+            class="flex-shrink-0"
           >
-            {{ showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText') }}
+            <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
+              <AvatarImage :src="getAvatar" />
+              <AvatarFallback class="font-medium">
+                {{ avatarFallback }}
+              </AvatarFallback>
+            </Avatar>
+          </router-link>
+
+          <!-- Bubble Wrapper with max 80% width -->
+          <div
+            class="w-4/5"
+            :class="{ 'flex justify-end': isOutgoing }"
+            style="contain: inline-size"
+          >
+            <div
+              class="flex flex-col justify-end message-bubble"
+              :class="bubbleClasses"
+            >
+              <!-- Message Envelope -->
+              <MessageEnvelope :message="message" v-if="showEnvelope" />
+
+              <hr class="mb-2" v-if="showEnvelope" />
+
+              <!-- Message Content -->
+              <div
+                v-if="message.content_type === 'text'"
+                class="mb-1 native-html whitespace-pre-wrap"
+                :class="{ 'mb-3': message.attachments.length > 0 }"
+              >
+                {{ sanitizedContent }}
+              </div>
+              <Letter
+                v-else
+                :html="sanitizedContent"
+                :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+                class="mb-1 native-html whitespace-pre-wrap break-words"
+                :class="{ 'mb-3': message.attachments.length > 0 }"
+              />
+
+              <!-- Quoted Text Toggle (incoming only) -->
+              <div
+                v-if="!isOutgoing && hasQuotedContent"
+                @click="toggleQuote"
+                class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded transition-all"
+              >
+                {{ showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText') }}
+              </div>
+
+              <!-- Attachments -->
+              <MessageAttachmentPreview :attachments="nonInlineAttachments" />
+
+              <!-- Spinner for Pending Messages (outgoing only) -->
+              <Spinner v-if="isOutgoing && message.status === 'pending'" size="w-4 h-4" />
+
+              <!-- Status Icons (outgoing only) -->
+              <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
+                <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
+                <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
+                <RotateCcw
+                  size="10"
+                  @click="retryMessage(message)"
+                  class="cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  v-if="showRetry"
+                />
+              </div>
+            </div>
           </div>
 
-          <!-- Attachments -->
-          <MessageAttachmentPreview :attachments="nonInlineAttachments" />
+          <!-- Avatar (right for outgoing) -->
+          <Avatar v-if="isOutgoing" class="cursor-pointer w-8 h-8">
+            <AvatarImage :src="getAvatar" />
+            <AvatarFallback class="font-medium">
+              {{ avatarFallback }}
+            </AvatarFallback>
+          </Avatar>
+        </div>
 
-          <!-- Spinner for Pending Messages (outgoing only) -->
-          <Spinner v-if="isOutgoing && message.status === 'pending'" size="w-4 h-4" />
-
-          <!-- Status Icons (outgoing only) -->
-          <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
-            <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
-            <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
-            <RotateCcw
-              size="10"
-              @click="retryMessage(message)"
-              class="cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-200"
-              v-if="showRetry"
-            />
-          </div>
+        <!-- Timestamp tooltip -->
+        <div :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
+          <Tooltip>
+            <TooltipTrigger>
+              <span class="text-muted-foreground text-xs mt-1">
+                {{ formatMessageTimestamp(message.created_at) }}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{{ formatFullTimestamp(message.created_at) }}</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
-
-      <!-- Avatar (right for outgoing) -->
-      <Avatar v-if="isOutgoing" class="cursor-pointer w-8 h-8">
-        <AvatarImage :src="getAvatar" />
-        <AvatarFallback class="font-medium">
-          {{ avatarFallback }}
-        </AvatarFallback>
-      </Avatar>
-    </div>
-
-    <!-- Timestamp tooltip -->
-    <div :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
-      <Tooltip>
-        <TooltipTrigger>
-          <span class="text-muted-foreground text-xs mt-1">
-            {{ formatMessageTimestamp(message.created_at) }}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{{ formatFullTimestamp(message.created_at) }}</p>
-        </TooltipContent>
-      </Tooltip>
-    </div>
-  </div>
+    </ContextMenuTrigger>
+    <ContextMenuContent v-if="isPrivateMessage">
+      <ContextMenuItem @click="handleDeleteNote" class="text-destructive">
+        <Trash2 class="w-4 h-4 mr-2" />
+        {{ t('conversation.deletePrivateNote') }}
+      </ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>
 </template>
 
 <script setup>
@@ -120,7 +130,13 @@ import { computed, ref } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import { useI18n } from 'vue-i18n'
-import { Lock, RotateCcw, Check } from 'lucide-vue-next'
+import { Lock, RotateCcw, Check, Trash2 } from 'lucide-vue-next'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 import { revertCIDToImageSrc } from '@/utils/strings'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Spinner } from '@/components/ui/spinner'
@@ -206,6 +222,10 @@ const showRetry = computed(() => isOutgoing.value && props.message.status === 'f
 
 const retryMessage = (msg) => {
   api.retryMessage(convStore.current.uuid, msg.uuid)
+}
+
+const handleDeleteNote = () => {
+  convStore.deleteMessage(convStore.current.uuid, props.message.uuid)
 }
 
 // Incoming-only: quoted text toggle
