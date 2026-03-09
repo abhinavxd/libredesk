@@ -18,15 +18,16 @@ const (
 
 // Inbox represents a inbox record in DB.
 type Inbox struct {
-	ID          int             `db:"id" json:"id"`
-	CreatedAt   time.Time       `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time       `db:"updated_at" json:"updated_at"`
-	Name        string          `db:"name" json:"name"`
-	Channel     string          `db:"channel" json:"channel"`
-	Enabled     bool            `db:"enabled" json:"enabled"`
-	CSATEnabled bool            `db:"csat_enabled" json:"csat_enabled"`
-	From        string          `db:"from" json:"from"`
-	Config      json.RawMessage `db:"config" json:"config"`
+	ID               int             `db:"id" json:"id"`
+	CreatedAt        time.Time       `db:"created_at" json:"created_at"`
+	UpdatedAt        time.Time       `db:"updated_at" json:"updated_at"`
+	Name             string          `db:"name" json:"name"`
+	Channel          string          `db:"channel" json:"channel"`
+	Enabled          bool            `db:"enabled" json:"enabled"`
+	CSATEnabled      bool            `db:"csat_enabled" json:"csat_enabled"`
+	From             string          `db:"from" json:"from"`
+	FromNameTemplate string          `db:"from_name_template" json:"from_name_template"`
+	Config           json.RawMessage `db:"config" json:"config"`
 }
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.
@@ -36,6 +37,7 @@ type Config struct {
 	SMTP                 []SMTPConfig `json:"smtp"`
 	IMAP                 []IMAPConfig `json:"imap"`
 	From                 string       `json:"from"`
+	FromNameTemplate     string       `json:"from_name_template"`
 	EnablePlusAddressing bool         `json:"enable_plus_addressing"` // Enable plus-addressing in Reply-To header for conversation matching
 }
 

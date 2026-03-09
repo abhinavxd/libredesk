@@ -84,6 +84,7 @@ CREATE TABLE inboxes (
 	csat_enabled bool DEFAULT false NOT NULL,
 	config jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"from" TEXT NULL,
+	from_name_template TEXT NOT NULL DEFAULT '',
 	CONSTRAINT constraint_inboxes_on_name CHECK (length("name") <= 140)
 );
 
