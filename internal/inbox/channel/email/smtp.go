@@ -37,8 +37,12 @@ func NewSmtpPool(configs []imodels.SMTPConfig, oauth *imodels.OAuthConfig) ([]*s
 
 		// Check if OAuth authentication should be used
 		if oauth != nil && oauth.AccessToken != "" {
+			username := cfg.Username
+			if upn := extractUPNFromToken(oauth.AccessToken); upn != "" {
+				username = upn
+			}
 			auth = &XOAuth2SMTPAuth{
-				Username: cfg.Username,
+				Username: username,
 				Token:    oauth.AccessToken,
 			}
 		} else {
@@ -246,4 +250,33 @@ func buildPlusAddress(email, conversationUUID string) string {
 		return email // fallback to original if invalid format
 	}
 	return fmt.Sprintf("%s+conv-%s@%s", parts[0], conversationUUID, parts[1])
+}
+// extractUPNFromToken extracts the UPN (User Principal Name) from a JWT access token.
+// Microsoft SMTP requires the XOAUTH2 username to match the token's UPN exactly.
+// Returns empty string if extraction fails (caller should fall back to cfg.Username).
+func extractUPNFromToken(accessToken string) string {
+	parts := strings.Split(accessToken, ".")
+	if len(parts) < 2 {
+		return ""
+	}
+
+	// Decode the payload (second part of the JWT).
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return ""
+	}
+
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return ""
+	}
+
+	// Prefer UPN, fall back to unique_name.
+	if upn, ok := claims["upn"].(string); ok && upn != "" {
+		return upn
+	}
+	if un, ok := claims["unique_name"].(string); ok && un != "" {
+		return un
+	}
+	return ""
 }
