@@ -49,7 +49,7 @@ func handleMarkNotificationAsRead(r *fastglue.Request) error {
 	)
 	if id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	if err := app.userNotification.MarkAsRead(id, auser.ID); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -77,7 +77,7 @@ func handleDeleteNotification(r *fastglue.Request) error {
 	)
 	if id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	if err := app.userNotification.Delete(id, auser.ID); err != nil {

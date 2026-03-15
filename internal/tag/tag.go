@@ -58,7 +58,7 @@ func (t *Manager) GetAll() ([]models.Tag, error) {
 	var tags = make([]models.Tag, 0)
 	if err := t.q.GetAllTags.Select(&tags); err != nil {
 		t.lo.Error("error fetching tags", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, t.i18n.Ts("globals.messages.errorFetching", "name", t.i18n.P("globals.terms.tag")), nil)
+		return nil, envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return tags, nil
 }
@@ -68,10 +68,10 @@ func (t *Manager) Create(name string) (models.Tag, error) {
 	var tag models.Tag
 	if err := t.q.InsertTag.Get(&tag, name); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return tag, envelope.NewError(envelope.ConflictError, t.i18n.Ts("globals.messages.errorAlreadyExists", "name", "{globals.terms.tag}"), nil)
+			return tag, envelope.NewError(envelope.ConflictError, t.i18n.T("errors.alreadyExistsTag"), nil)
 		}
 		t.lo.Error("error inserting tag", "error", err)
-		return tag, envelope.NewError(envelope.GeneralError, t.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.tag}"), nil)
+		return tag, envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return tag, nil
 }
@@ -80,7 +80,7 @@ func (t *Manager) Create(name string) (models.Tag, error) {
 func (t *Manager) Delete(id int) error {
 	if _, err := t.q.DeleteTag.Exec(id); err != nil {
 		t.lo.Error("error deleting tag", "error", err)
-		return envelope.NewError(envelope.GeneralError, t.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.tag}"), nil)
+		return envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -90,7 +90,7 @@ func (t *Manager) Update(id int, name string) (models.Tag, error) {
 	var tag models.Tag
 	if err := t.q.UpdateTag.Get(&tag, id, name); err != nil {
 		t.lo.Error("error updating tag", "error", err)
-		return tag, envelope.NewError(envelope.GeneralError, t.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.tag}"), nil)
+		return tag, envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return tag, nil
 }

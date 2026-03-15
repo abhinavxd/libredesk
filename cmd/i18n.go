@@ -1,8 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/knadh/go-i18n"
@@ -25,6 +29,48 @@ func handleGetI18nLang(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendBytes(http.StatusOK, "application/json", i.JSON())
+}
+
+// handleGetAvailableLanguages returns the list of available languages
+// by reading all JSON files from the /i18n/ directory in the embedded filesystem.
+func handleGetAvailableLanguages(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	files, err := app.fs.Glob("/i18n/*.json")
+	if err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, "error listing language files", nil))
+	}
+
+	type langInfo struct {
+		Code string `json:"code"`
+		Name string `json:"name"`
+	}
+
+	var langs []langInfo
+	for _, f := range files {
+		code := strings.TrimSuffix(filepath.Base(f), ".json")
+		b, err := app.fs.Read(f)
+		if err != nil {
+			continue
+		}
+
+		var meta map[string]string
+		if err := json.Unmarshal(b, &meta); err != nil {
+			continue
+		}
+
+		name := meta["_.name"]
+		if name == "" {
+			name = code
+		}
+		langs = append(langs, langInfo{Code: code, Name: name})
+	}
+
+	sort.Slice(langs, func(i, j int) bool {
+		return langs[i].Name < langs[j].Name
+	})
+
+	return r.SendEnvelope(langs)
 }
 
 // loadI18nLang loads the i18n language pack for the given language code.

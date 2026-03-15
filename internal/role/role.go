@@ -63,7 +63,7 @@ func (u *Manager) GetAll() ([]models.Role, error) {
 	var roles = make([]models.Role, 0)
 	if err := u.q.GetAll.Select(&roles); err != nil {
 		u.lo.Error("error fetching roles", "error", err)
-		return roles, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.role}"), nil)
+		return roles, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return roles, nil
 }
@@ -73,10 +73,10 @@ func (u *Manager) Get(id int) (models.Role, error) {
 	var role = models.Role{}
 	if err := u.q.Get.Get(&role, id); err != nil {
 		if err == sql.ErrNoRows {
-			return role, envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.role}"), nil)
+			return role, envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundRole"), nil)
 		}
 		u.lo.Error("error fetching role", "error", err)
-		return role, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.role}"), nil)
+		return role, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return role, nil
 }
@@ -95,7 +95,7 @@ func (u *Manager) Delete(id int) error {
 	}
 	if _, err := u.q.Delete.Exec(id); err != nil {
 		u.lo.Error("error deleting role", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.role}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -112,10 +112,10 @@ func (u *Manager) Create(r models.Role) (models.Role, error) {
 	var result models.Role
 	if err := u.q.Insert.Get(&result, r.Name, r.Description, pq.Array(validPermissions)); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.errorAlreadyExists", "name", "{globals.terms.role}"), nil)
+			return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.T("errors.alreadyExistsRole"), nil)
 		}
 		u.lo.Error("error inserting role", "error", err)
-		return models.Role{}, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.role}"), nil)
+		return models.Role{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return result, nil
 }
@@ -141,7 +141,7 @@ func (u *Manager) Update(id int, r models.Role) (models.Role, error) {
 	var result models.Role
 	if err := u.q.Update.Get(&result, id, r.Name, r.Description, pq.Array(validPermissions)); err != nil {
 		u.lo.Error("error updating role", "error", err)
-		return models.Role{}, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.role}"), nil)
+		return models.Role{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return result, nil
 }

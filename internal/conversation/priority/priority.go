@@ -55,7 +55,7 @@ func (m *Manager) GetAll() ([]models.Priority, error) {
 	var priorities = make([]models.Priority, 0)
 	if err := m.q.GetAll.Select(&priorities); err != nil {
 		m.lo.Error("error fetching priorities", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.P("globals.terms.priority")), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return priorities, nil
 }
@@ -65,7 +65,7 @@ func (m *Manager) Get(id int) (models.Priority, error) {
 	var priority models.Priority
 	if err := m.q.Get.Get(&priority, id); err != nil {
 		m.lo.Error("error fetching priority", "error", err)
-		return priority, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorFetching", "name", m.i18n.S("globals.terms.priority")), nil)
+		return priority, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return priority, nil
 }

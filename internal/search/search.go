@@ -53,13 +53,13 @@ func (s *Manager) Conversations(query string) ([]models.ConversationResult, erro
 	var refNumResults = make([]models.ConversationResult, 0)
 	if err := s.q.SearchConversationsByRefNum.Select(&refNumResults, query); err != nil {
 		s.lo.Error("error searching conversations", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.Ts("globals.messages.errorSearching", "name", s.i18n.Ts("globals.terms.conversation")), nil)
+		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	var emailResults = make([]models.ConversationResult, 0)
 	if err := s.q.SearchConversationsByContactEmail.Select(&emailResults, query); err != nil {
 		s.lo.Error("error searching conversations", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.Ts("globals.messages.errorSearching", "name", s.i18n.Ts("globals.terms.conversation")), nil)
+		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return append(refNumResults, emailResults...), nil
 }
@@ -69,7 +69,7 @@ func (s *Manager) Messages(query string) ([]models.MessageResult, error) {
 	var results = make([]models.MessageResult, 0)
 	if err := s.q.SearchMessages.Select(&results, query); err != nil {
 		s.lo.Error("error searching messages", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.Ts("globals.messages.errorSearching", "name", s.i18n.Ts("globals.terms.message")), nil)
+		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return results, nil
 }
@@ -79,7 +79,7 @@ func (s *Manager) Contacts(query string) ([]models.ContactResult, error) {
 	var results = make([]models.ContactResult, 0)
 	if err := s.q.SearchContacts.Select(&results, query); err != nil {
 		s.lo.Error("error searching contacts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.Ts("globals.messages.errorSearching", "name", s.i18n.Ts("globals.terms.contact")), nil)
+		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return results, nil
 }

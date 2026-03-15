@@ -168,7 +168,7 @@ func (a *Auth) LoginURL(providerID int, state string) (string, error) {
 	defer a.mu.RUnlock()
 	oauthCfg, ok := a.oauthCfgs[providerID]
 	if !ok {
-		return "", envelope.NewError(envelope.InputError, a.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.provider}"), nil)
+		return "", envelope.NewError(envelope.InputError, a.i18n.T("validation.notFoundProvider"), nil)
 	}
 	return oauthCfg.AuthCodeURL(state), nil
 }

@@ -76,7 +76,7 @@ func handleGetAgent(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	agent, err := app.user.GetAgent(id, "")
 	if err != nil {
@@ -96,7 +96,7 @@ func handleUpdateAgentAvailability(r *fastglue.Request) error {
 
 	// Decode JSON request
 	if err := r.Decode(&availReq, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	// Fetch entire agent
@@ -153,7 +153,7 @@ func handleUpdateCurrentAgent(r *fastglue.Request) error {
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
 		app.lo.Error("error parsing form data", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
 	}
 
 	files, ok := form.File["files"]
@@ -186,7 +186,7 @@ func handleCreateAgent(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	// Validate agent request
@@ -253,7 +253,7 @@ func handleUpdateAgent(r *fastglue.Request) error {
 	}
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	// Validate agent request
@@ -389,7 +389,7 @@ func handleResetPassword(r *fastglue.Request) error {
 
 	// Decode JSON request
 	if err := r.Decode(&resetReq, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
 	if resetReq.Email == "" {
@@ -442,7 +442,7 @@ func handleSetPassword(r *fastglue.Request) error {
 	}
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.errorParsing", "name", "{globals.terms.request}"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
 
 	if req.Password == "" {
@@ -464,7 +464,7 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 	file, err := fileHeader.Open()
 	if err != nil {
 		app.lo.Error("error opening uploaded file", "user_id", user.ID, "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorReading", "name", "{globals.terms.file}"), nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorUploadingFile"), nil)
 	}
 	defer file.Close()
 
@@ -498,7 +498,7 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, contentID, linkedModel, linkedID, file, int(srcFileSize), disposition, meta)
 	if err != nil {
 		app.lo.Error("error uploading file", "user_id", user.ID, "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorUploading", "name", "{globals.terms.file}"), nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorUploadingFile"), nil)
 	}
 
 	// Delete current avatar.
@@ -513,7 +513,7 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 	path, err := stringutil.GetPathFromURL(media.URL)
 	if err != nil {
 		app.lo.Debug("error getting path from URL", "user_id", user.ID, "url", media.URL, "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.Ts("globals.messages.errorUploading", "name", "{globals.terms.file}"), nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorUploadingFile"), nil)
 	}
 
 	if err := app.user.UpdateAvatar(user.ID, path); err != nil {
@@ -529,7 +529,7 @@ func handleGenerateAPIKey(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	// Check if user exists
@@ -563,7 +563,7 @@ func handleRevokeAPIKey(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`id`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
 	// Check if user exists
@@ -591,7 +591,7 @@ func validateAgentRequest(r *fastglue.Request, req *agentReq) error {
 	}
 
 	if !stringutil.ValidEmail(req.Email) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.invalid", "name", "`email`"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidEmail"), nil, envelope.InputError)
 	}
 
 	if req.Roles == nil {

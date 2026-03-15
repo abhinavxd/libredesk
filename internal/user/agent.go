@@ -13,14 +13,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// MonitorAgentAvailability continuously checks for user activity and sets them offline if inactive for more than 5 minutes.
-func (u *Manager) MonitorAgentAvailability(ctx context.Context) {
+// MonitorUserAvailability continuously checks for user activity and sets them offline if inactive for more than 5 minutes.
+func (u *Manager) MonitorUserAvailability(ctx context.Context, onUsersOffline func([]int)) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			u.markInactiveAgentsOffline()
+			if userIDs := u.MarkInactiveUsersOffline(); len(userIDs) > 0 && onUsersOffline != nil {
+				onUsersOffline(userIDs)
+			}
 		case <-ctx.Done():
 			return
 		}
@@ -29,7 +31,7 @@ func (u *Manager) MonitorAgentAvailability(ctx context.Context) {
 
 // GetAgent retrieves an agent by ID and also caches it for future requests.
 func (u *Manager) GetAgent(id int, email string) (models.User, error) {
-	agent, err := u.Get(id, email, models.UserTypeAgent)
+	agent, err := u.Get(id, email, []string{models.UserTypeAgent})
 	if err != nil {
 		return models.User{}, err
 	}
@@ -79,7 +81,7 @@ func (u *Manager) GetAgentsCompact() ([]models.UserCompact, error) {
 	var users = make([]models.UserCompact, 0)
 	if err := u.db.Select(&users, u.q.GetUsersCompact, pq.Array([]string{models.UserTypeAgent})); err != nil {
 		u.lo.Error("error fetching users from db", "error", err)
-		return users, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorFetching", "name", u.i18n.P("globals.terms.user")), nil)
+		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return users, nil
 }
@@ -89,7 +91,7 @@ func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string)
 	password, err := u.generatePassword()
 	if err != nil {
 		u.lo.Error("error generating password", "error", err)
-		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil)
+		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	var id = 0
@@ -100,9 +102,9 @@ func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string)
 			return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
 		}
 		u.lo.Error("error creating user", "error", err)
-		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}"), nil)
+		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	return u.Get(id, "", models.UserTypeAgent)
+	return u.Get(id, "", []string{models.UserTypeAgent})
 }
 
 // UpdateAgent updates an agent with individual field parameters
@@ -120,7 +122,7 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 		if err != nil {
 			u.lo.Error("error generating bcrypt password", "error", err)
-			return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
+			return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 		u.lo.Info("setting new password for user", "user_id", id)
 	}
@@ -131,7 +133,7 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 			return envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
 		}
 		u.lo.Error("error updating user", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	u.InvalidateAgentCache(id)
 	return nil
@@ -149,25 +151,27 @@ func (u *Manager) SoftDeleteAgent(id int) error {
 	}
 	if _, err := u.q.SoftDeleteAgent.Exec(id); err != nil {
 		u.lo.Error("error deleting user", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.user}"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
 
-// markInactiveAgentsOffline sets agents offline if they have been inactive for more than 5 minutes.
-func (u *Manager) markInactiveAgentsOffline() {
-	if res, err := u.q.UpdateInactiveOffline.Exec(); err != nil {
+// MarkInactiveUsersOffline sets users offline if they have been inactive for more than 5 minutes.
+// Returns the IDs of users that were marked offline.
+func (u *Manager) MarkInactiveUsersOffline() []int {
+	var userIDs []int
+	if err := u.q.UpdateInactiveOffline.Select(&userIDs); err != nil {
 		u.lo.Error("error setting users offline", "error", err)
-	} else {
-		rows, _ := res.RowsAffected()
-		if rows > 0 {
-			u.lo.Info("set inactive users offline", "count", rows)
-		}
+		return nil
 	}
+	if len(userIDs) > 0 {
+		u.lo.Info("set inactive users offline", "count", len(userIDs))
+	}
+	return userIDs
 }
 
 // GetAllAgents returns a list of all agents.
 func (u *Manager) GetAgents() ([]models.UserCompact, error) {
 	// Some dirty hack.
-	return u.GetAllUsers(1, 999999999, models.UserTypeAgent, "desc", "users.updated_at", "")
+	return u.GetAllUsers(1, 999999999, []string{models.UserTypeAgent}, "desc", "users.updated_at", "")
 }
