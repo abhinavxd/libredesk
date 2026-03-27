@@ -916,6 +916,90 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 	return nil
 }
 
+// NotifyAssignedUserOfIncomingEmail sends notifications to the currently assigned agent when a new inbound message arrives.
+func (m *Manager) NotifyAssignedUserOfIncomingEmail(conversationUUID string, message models.Message) error {
+	conversation, err := m.GetConversation(0, conversationUUID, "")
+	if err != nil {
+		return fmt.Errorf("fetching conversation: %w", err)
+	}
+
+	if !conversation.AssignedUserID.Valid {
+		return nil
+	}
+
+	agent, err := m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
+	if err != nil {
+		m.lo.Error("error fetching assigned agent for incoming email notification", "user_id", conversation.AssignedUserID.Int, "error", err)
+		return fmt.Errorf("fetching assigned agent: %w", err)
+	}
+
+	if agent.Email.String == "" {
+		m.lo.Debug("assigned agent has no email, sending in-app notification only", "user_id", agent.ID, "conversation_uuid", conversationUUID)
+	}
+
+	appRootURL := ""
+	if m.settingsStore != nil {
+		appRootURL, err = m.settingsStore.GetAppRootURL()
+		if err != nil {
+			m.lo.Error("error fetching app root url for incoming email notification", "conversation_uuid", conversationUUID, "error", err)
+		}
+	}
+
+	conversationURL := fmt.Sprintf("/inboxes/assigned/conversation/%s", conversation.UUID)
+	if appRootURL != "" {
+		conversationURL = fmt.Sprintf("%s/inboxes/assigned/conversation/%s", strings.TrimRight(appRootURL, "/"), conversation.UUID)
+	}
+
+	conversationSubject := conversation.Subject.String
+	if conversationSubject == "" {
+		conversationSubject = message.Subject
+	}
+	if conversationSubject == "" {
+		conversationSubject = "(no subject)"
+	}
+
+	messageBody := strings.TrimSpace(message.TextContent)
+	if messageBody == "" {
+		messageBody = strings.TrimSpace(message.Content)
+	}
+	if messageBody == "" {
+		messageBody = "(no message body)"
+	}
+
+	emailBody := fmt.Sprintf(
+		"Hi %s,\n\nA new customer email arrived for conversation #%s.\n\nCustomer: %s <%s>\nSubject: %s\n\nMessage:\n%s\n\nOpen conversation: %s\n",
+		agent.FirstName,
+		conversation.ReferenceNumber,
+		conversation.Contact.FullName(),
+		conversation.Contact.Email.String,
+		conversationSubject,
+		messageBody,
+		conversationURL,
+	)
+
+	emailSubject := fmt.Sprintf("New email on conversation #%s", conversation.ReferenceNumber)
+	var emailNotification *notifier.EmailNotification
+	if agent.Email.String != "" {
+		emailNotification = &notifier.EmailNotification{
+			Recipients: []string{agent.Email.String},
+			Subject:    emailSubject,
+			Content:    emailBody,
+		}
+	}
+
+	m.dispatcher.Send(notifier.Notification{
+		Type:             nmodels.NotificationTypeAssignment,
+		RecipientIDs:     []int{agent.ID},
+		Title:            emailSubject,
+		Body:             null.StringFrom(messageBody),
+		ConversationID:   null.IntFrom(conversation.ID),
+		ConversationUUID: conversation.UUID,
+		Email:            emailNotification,
+	})
+
+	return nil
+}
+
 // NotifyMention sends notifications (in-app, WebSocket, email) for mentions.
 // For team mentions, expands to all team members.
 func (m *Manager) NotifyMention(conversationUUID string, message models.Message, mentions []models.MentionInput, mentionedByUserID int) {
