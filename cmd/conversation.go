@@ -824,10 +824,11 @@ func handleCreateConversation(r *fastglue.Request) error {
 		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
 	}
 
-	// Trigger webhook event for conversation created.
+	// Trigger webhook event and evaluate automation rules for the new conversation.
 	conversation, err := app.conversation.GetConversation(conversationID, "", "")
 	if err == nil {
 		app.webhook.TriggerEvent(wmodels.EventConversationCreated, conversation)
+		app.automation.EvaluateNewConversationRules(conversation)
 	}
 
 	return r.SendEnvelope(conversation)
