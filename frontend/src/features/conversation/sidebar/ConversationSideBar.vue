@@ -2,6 +2,20 @@
   <div>
     <ConversationSideBarContact class="p-4" />
     <Accordion type="multiple" collapsible v-model="accordionState">
+      <!-- Shopify customer data -->
+      <AccordionItem
+        v-if="integrationStore.shopifyEnabled"
+        value="shopify"
+        class="accordion-item"
+      >
+        <AccordionTrigger class="accordion-trigger">
+          Shopify
+        </AccordionTrigger>
+        <AccordionContent class="accordion-content">
+          <ShopifyCustomerPanel />
+        </AccordionContent>
+      </AccordionItem>
+
       <AccordionItem value="actions" class="accordion-item">
         <AccordionTrigger class="accordion-trigger">
           {{ $t('globals.terms.action', 2) }}
@@ -119,10 +133,13 @@ import { useStorage } from '@vueuse/core'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '@/stores/customAttributes'
 import PreviousConversations from '@/features/conversation/sidebar/PreviousConversations.vue'
+import ShopifyCustomerPanel from '@/features/conversation/sidebar/ShopifyCustomerPanel.vue'
+import { useIntegrationStore } from '@/stores/integration'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import api from '@/api'
 
 const customAttributeStore = useCustomAttributeStore()
+const integrationStore = useIntegrationStore()
 const emitter = useEmitter()
 const conversationStore = useConversationStore()
 const usersStore = useUsersStore()

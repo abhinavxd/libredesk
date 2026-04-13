@@ -141,6 +141,7 @@ import { useMacroStore } from '@/stores/macro'
 import { useSharedViewStore } from '@/stores/sharedView'
 import { useTagStore } from '@/stores/tag'
 import { useCustomAttributeStore } from '@/stores/customAttributes'
+import { useIntegrationStore } from '@/stores/integration'
 import { useIdleDetection } from '@/composables/useIdleDetection'
 import PageHeader from './components/layout/PageHeader.vue'
 import ViewForm from '@/features/view/ViewForm.vue'
@@ -180,6 +181,7 @@ const macroStore = useMacroStore()
 const sharedViewStore = useSharedViewStore()
 const tagStore = useTagStore()
 const customAttributeStore = useCustomAttributeStore()
+const integrationStore = useIntegrationStore()
 const userViews = ref([])
 const view = ref({})
 const openCreateViewForm = ref(false)
@@ -212,7 +214,8 @@ const initStores = async () => {
     slaStore.fetchSlas(),
     macroStore.loadMacros(),
     tagStore.fetchTags(),
-    customAttributeStore.fetchCustomAttributes()
+    customAttributeStore.fetchCustomAttributes(),
+    integrationStore.fetchIntegrations()
   ])
 }
 

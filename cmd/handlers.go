@@ -182,6 +182,18 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/roles/{id}", perm(handleUpdateRole, "roles:manage"))
 	g.DELETE("/api/v1/roles/{id}", perm(handleDeleteRole, "roles:manage"))
 
+	// Integrations.
+	g.GET("/api/v1/integrations", perm(handleGetIntegrations, "integrations:manage"))
+	g.GET("/api/v1/integrations/shopify/customer", perm(handleGetShopifyCustomer, "conversations:read"))
+	g.GET("/api/v1/integrations/shopify/oauth/authorize", perm(handleShopifyOAuthAuthorize, "integrations:manage"))
+	g.GET("/api/v1/integrations/shopify/oauth/callback", handleShopifyOAuthCallback)
+	g.GET("/api/v1/integrations/{provider}", perm(handleGetIntegration, "integrations:manage"))
+	g.POST("/api/v1/integrations", perm(handleCreateIntegration, "integrations:manage"))
+	g.PUT("/api/v1/integrations/{provider}", perm(handleUpdateIntegration, "integrations:manage"))
+	g.DELETE("/api/v1/integrations/{provider}", perm(handleDeleteIntegration, "integrations:manage"))
+	g.PUT("/api/v1/integrations/{provider}/toggle", perm(handleToggleIntegration, "integrations:manage"))
+	g.POST("/api/v1/integrations/{provider}/test", perm(handleTestIntegration, "integrations:manage"))
+
 	// Webhooks.
 	g.GET("/api/v1/webhooks", perm(handleGetWebhooks, "webhooks:manage"))
 	g.GET("/api/v1/webhooks/{id}", perm(handleGetWebhook, "webhooks:manage"))

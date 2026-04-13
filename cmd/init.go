@@ -27,6 +27,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
 	"github.com/abhinavxd/libredesk/internal/importer"
+	"github.com/abhinavxd/libredesk/internal/integration"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
@@ -938,6 +939,21 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)
+	}
+	return m
+}
+
+// initIntegration initializes the integration manager.
+func initIntegration(db *sqlx.DB, i18n *i18n.I18n) *integration.Manager {
+	var lo = initLogger("integration")
+	m, err := integration.New(integration.Opts{
+		DB:            db,
+		Lo:            lo,
+		I18n:          i18n,
+		EncryptionKey: ko.MustString("app.encryption_key"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing integration manager: %v", err)
 	}
 	return m
 }

@@ -166,6 +166,11 @@ export const adminNavItems = [
         href: '/admin/webhooks',
         permission: 'webhooks:manage',
         isTitleKeyPlural: true
+      },
+      {
+        titleKey: 'Shopify',
+        href: '/admin/integrations/shopify',
+        permission: 'integrations:manage'
       }
     ]
   }
