@@ -445,6 +445,24 @@ const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`
 })
 const deleteContactNote = (id, noteId) => http.delete(`/api/v1/contacts/${id}/notes/${noteId}`)
 const getActivityLogs = (params) => http.get('/api/v1/activity-logs', { params })
+// Integrations.
+const getIntegrations = () => http.get('/api/v1/integrations')
+const getIntegration = (provider) => http.get(`/api/v1/integrations/${provider}`)
+const createIntegration = (data) =>
+  http.post('/api/v1/integrations', data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const updateIntegration = (provider, data) =>
+  http.put(`/api/v1/integrations/${provider}`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const deleteIntegration = (provider) => http.delete(`/api/v1/integrations/${provider}`)
+const toggleIntegration = (provider) => http.put(`/api/v1/integrations/${provider}/toggle`)
+const testIntegration = (provider) => http.post(`/api/v1/integrations/${provider}/test`)
+const getShopifyCustomer = (email) =>
+  http.get('/api/v1/integrations/shopify/customer', { params: { email } })
+const getShopifyOAuthURL = () => http.get('/api/v1/integrations/shopify/oauth/authorize')
+
 const getWebhooks = () => http.get('/api/v1/webhooks')
 const getWebhook = (id) => http.get(`/api/v1/webhooks/${id}`)
 const createWebhook = (data) =>
@@ -646,5 +664,14 @@ export default {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
-  deleteAllNotifications
+  deleteAllNotifications,
+  getIntegrations,
+  getIntegration,
+  createIntegration,
+  updateIntegration,
+  deleteIntegration,
+  toggleIntegration,
+  testIntegration,
+  getShopifyCustomer,
+  getShopifyOAuthURL
 }

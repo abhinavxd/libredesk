@@ -44,6 +44,8 @@ import (
 	"github.com/abhinavxd/libredesk/internal/team"
 	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user"
+	"github.com/abhinavxd/libredesk/internal/integration"
+	shopifyclient "github.com/abhinavxd/libredesk/internal/integration/shopify"
 	"github.com/abhinavxd/libredesk/internal/webhook"
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/koanf/v2"
@@ -103,6 +105,8 @@ type App struct {
 	customAttribute  *customAttribute.Manager
 	report           *report.Manager
 	webhook          *webhook.Manager
+	integration      *integration.Manager
+	shopify          *shopifyclient.Client
 	importer         *importer.Importer
 
 	// Global state that stores data on an available app update.
@@ -271,6 +275,8 @@ func main() {
 		macro:            initMacro(db, i18n),
 		ai:               initAI(db, i18n),
 		webhook:          webhook,
+		integration:      initIntegration(db, i18n),
+		shopify:          shopifyclient.New(lo),
 	}
 	app.consts.Store(constants)
 

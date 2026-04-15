@@ -454,6 +454,12 @@ const routes = [
             ]
           },
           {
+            path: 'integrations/shopify',
+            name: 'shopify-integration',
+            component: () => import('@/views/admin/integrations/ShopifyIntegrationView.vue'),
+            meta: { title: 'Shopify Integration' }
+          },
+          {
             path: 'conversations',
             meta: { title: 'Conversations' },
             children: [
