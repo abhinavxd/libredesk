@@ -740,6 +740,9 @@ func (m *Manager) processIncomingMessage(in models.IncomingMessage) error {
 		if err == nil {
 			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, conversation)
 			m.automation.EvaluateNewConversationRules(conversation)
+			if err := m.NotifyAssignedUserOfIncomingEmail(in.Message.ConversationUUID, in.Message); err != nil {
+				m.lo.Error("error sending incoming email notification", "conversation_uuid", in.Message.ConversationUUID, "error", err)
+			}
 		}
 		return nil
 	}
@@ -769,15 +772,16 @@ func (m *Manager) processIncomingMessage(in models.IncomingMessage) error {
 
 		if conversation.SLAPolicyID.Int == 0 {
 			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
-			return nil
-		}
-		if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AppliedSLAID.Int, conversation.SLAPolicyID.Int, conversation.AssignedTeamID.Int); err != nil && !errors.Is(err, sla.ErrUnmetSLAEventAlreadyExists) {
+		} else if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AppliedSLAID.Int, conversation.SLAPolicyID.Int, conversation.AssignedTeamID.Int); err != nil && !errors.Is(err, sla.ErrUnmetSLAEventAlreadyExists) {
 			m.lo.Error("error creating next response SLA event", "conversation_id", conversation.ID, "error", err)
 		} else if !deadline.IsZero() {
 			m.lo.Info("next response SLA event created for conversation", "conversation_id", conversation.ID, "deadline", deadline, "sla_policy_id", conversation.SLAPolicyID.Int)
 			m.BroadcastConversationUpdate(in.Message.ConversationUUID, "next_response_deadline_at", deadline.Format(time.RFC3339))
 			// Clear next response met at timestamp as this event was just created.
 			m.BroadcastConversationUpdate(in.Message.ConversationUUID, "next_response_met_at", nil)
+		}
+		if err := m.NotifyAssignedUserOfIncomingEmail(in.Message.ConversationUUID, in.Message); err != nil {
+			m.lo.Error("error sending incoming email notification", "conversation_uuid", in.Message.ConversationUUID, "error", err)
 		}
 	}
 	return nil
