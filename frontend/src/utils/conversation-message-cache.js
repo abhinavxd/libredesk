@@ -98,6 +98,17 @@ export default class MessageCache {
         return allMessages.length ? allMessages[0] : null
     }
     /**
+     * Removes a message from a conversation
+     */
+    removeMessage (convId, msgId) {
+        const conv = this.cache.get(convId)
+        if (!conv) return
+        conv.pages.forEach((msgs, page) => {
+            conv.pages.set(page, msgs.filter(m => m.uuid !== msgId))
+        })
+    }
+
+    /**
      * Updates message fields by applying update object
      */
     updateMessage (convId, msgId, updates) {

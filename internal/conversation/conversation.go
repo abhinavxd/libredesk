@@ -246,6 +246,7 @@ type queries struct {
 	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
 	MessageExistsBySourceID            *sqlx.Stmt `query:"message-exists-by-source-id"`
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
+	DeleteMessage                      *sqlx.Stmt `query:"delete-message"`
 
 	// Mention queries.
 	InsertMention *sqlx.Stmt `query:"insert-mention"`
