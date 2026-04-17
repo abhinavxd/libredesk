@@ -114,6 +114,11 @@
         async init () {
             try {
                 await this.fetchWidgetSettings();
+                if (!document.body) {
+                    await new Promise((resolve) => {
+                        document.addEventListener('DOMContentLoaded', resolve, { once: true });
+                    });
+                }
                 this.createElements();
                 this.setLauncherPosition();
                 this.widgetButtonWrapper.style.display = 'none';
@@ -617,8 +622,16 @@
         return window.Libredesk;
     };
 
-    if (window.LibredeskSettings) {
-        window.initLibredesk(window.LibredeskSettings);
+    function autoInit () {
+        if (window.LibredeskSettings) {
+            window.initLibredesk(window.LibredeskSettings);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', autoInit, { once: true });
+    } else {
+        autoInit();
     }
 
 })();
