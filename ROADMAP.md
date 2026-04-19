@@ -4,9 +4,10 @@
 A high-performance, omni-channel, self-hosted customer support desk.
 
 ## Near Term
-- GDPR - TODO
 - Bulk actions on conversations - TODO
+- Help articles with static site - TODO
+- AI assisants - TODO
 - Contact merging - TODO
 
 ## Mid Term
-- Full-fledged live chat widget - DONE
+- GDPR - TODO
