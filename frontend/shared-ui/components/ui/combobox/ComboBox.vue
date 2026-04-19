@@ -12,13 +12,13 @@
       </Button>
     </PopoverTrigger>
     <PopoverContent class="p-0">
-      <Command>
+      <Command v-model:search-term="searchTerm" :filter-function="passThroughFilter">
         <CommandInput class="h-9" :placeholder="placeholder" />
         <CommandEmpty>{{ $t('globals.messages.notFound') }}</CommandEmpty>
         <CommandList>
           <CommandGroup>
             <CommandItem
-              v-for="item in props.items"
+              v-for="item in visibleItems"
               :key="item.value"
               :value="JSON.stringify({ label: item.label, value: item.value })"
               @select="handleSelect"
@@ -52,6 +52,8 @@ import {
   CommandList
 } from '../command'
 
+const RENDER_CAP = 200
+
 const props = defineProps({
   items: {
     type: Array,
@@ -68,6 +70,17 @@ const props = defineProps({
 const emit = defineEmits(['select'])
 const value = defineModel()
 const open = ref(false)
+const searchTerm = ref('')
+
+const passThroughFilter = (items) => items
+
+const filteredItems = computed(() => {
+  const term = searchTerm.value?.trim().toLowerCase()
+  if (!term) return props.items
+  return props.items.filter((item) => String(item.label).toLowerCase().includes(term))
+})
+
+const visibleItems = computed(() => filteredItems.value.slice(0, RENDER_CAP))
 
 const selectedItem = computed(() => props.items.find((i) => i.value === value.value))
 const selectedLabel = computed(() => selectedItem.value?.label || props.defaultLabel)

@@ -88,6 +88,12 @@
                 :placeholder="t('placeholders.selectValue')"
               />
 
+              <DateFilterValue
+                v-else-if="getFieldType(modelFilter) === FIELD_TYPE.DATE"
+                v-model="modelFilter.value"
+                :range="modelFilter.operator === 'between'"
+              />
+
               <Input
                 v-else
                 v-model="modelFilter.value"
@@ -137,6 +143,7 @@ import { FIELD_TYPE } from '@/constants/filterConfig'
 import CloseButton from '@/components/button/CloseButton.vue'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import SelectTag from '@shared-ui/components/ui/select/SelectTag.vue'
+import DateFilterValue from '@/components/filter/DateFilterValue.vue'
 
 const props = defineProps({
   fields: {
