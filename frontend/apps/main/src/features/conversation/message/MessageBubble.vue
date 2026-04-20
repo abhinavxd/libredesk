@@ -60,12 +60,19 @@
           >
             {{ sanitizedContent }}
           </div>
-          <Letter
-            v-else
-            :html="sanitizedContent"
-            :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-            class="mb-1 native-html whitespace-pre-wrap break-words"
-            :class="{ 'mb-3': message.attachments.length > 0 }"
+          <div v-else ref="messageContentEl" @click="onMessageContentClick">
+            <Letter
+              :html="sanitizedContent"
+              :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+              class="mb-1 native-html whitespace-pre-wrap break-words"
+              :class="{ 'mb-3': message.attachments.length > 0 }"
+            />
+          </div>
+
+          <ImageLightbox
+            v-model="inlineLightboxOpen"
+            :images="inlineImages"
+            :start-index="inlineLightboxIndex"
           />
 
           <!-- Quoted Text Toggle (incoming only) -->
@@ -156,6 +163,7 @@ import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Letter } from 'vue-letter'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import MessageAttachmentPreview from '@main/features/conversation/message/attachment/MessageAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
@@ -238,6 +246,47 @@ const hasQuotedContent = computed(
 )
 const toggleQuote = () => {
   showQuotedText.value = !showQuotedText.value
+}
+
+// Inline image lightbox: click an <img> in the rendered email body to open it.
+// We enumerate images from the rendered DOM rather than the HTML source so we
+// inherit vue-letter's sanitization and don't have to parse HTML with regex
+// (which trips on attributes containing '>' and similar edge cases).
+const messageContentEl = ref(null)
+const inlineLightboxOpen = ref(false)
+const inlineLightboxIndex = ref(0)
+const inlineImages = ref([])
+
+// Re-walk the rendered <img> set on click. Cheaper than maintaining a watcher
+// on sanitizedContent, and always reflects what the user actually sees.
+const refreshInlineImages = () => {
+  const root = messageContentEl.value
+  if (!root) {
+    inlineImages.value = []
+    return
+  }
+  inlineImages.value = Array.from(root.querySelectorAll('img'))
+    .map((el) => ({ url: el.getAttribute('src'), name: el.getAttribute('alt') || '' }))
+    .filter((img) => img.url)
+}
+
+const onMessageContentClick = (event) => {
+  // Walk up so clicks on nested wrappers (e.g. <a><img></a>) still resolve.
+  const img = event.target?.closest?.('img')
+  if (!img || !messageContentEl.value?.contains(img)) return
+
+  // If the image is inside an anchor, suppress the navigation so the
+  // lightbox can take over.
+  const wrappingAnchor = img.closest('a')
+  if (wrappingAnchor && messageContentEl.value.contains(wrappingAnchor)) {
+    event.preventDefault()
+  }
+
+  refreshInlineImages()
+  const src = img.getAttribute('src')
+  const idx = inlineImages.value.findIndex((entry) => entry.url === src)
+  inlineLightboxIndex.value = idx >= 0 ? idx : 0
+  inlineLightboxOpen.value = true
 }
 
 // Envelope visibility (both directions)

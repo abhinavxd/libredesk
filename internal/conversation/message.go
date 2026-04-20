@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -157,6 +159,16 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	if err := m.attachAttachmentsToMessage(&message); err != nil {
 		handleError(err, "error attaching attachments to message")
 		return
+	}
+
+	// Embed inline images as CID parts so the email is self-contained and
+	// recipients see the images even if the URLs in our media store later
+	// expire or our server moves. Only applies to email channels.
+	if inb.Channel() == inbox.ChannelEmail {
+		if err := m.embedInlineImagesAsCID(&message); err != nil {
+			m.lo.Error("error embedding inline images as cid", "error", err, "message_id", message.ID)
+			// Non-fatal: send anyway with whatever URLs we have.
+		}
 	}
 
 	// Convert to OutboundMessage for transport
@@ -971,6 +983,173 @@ func (c *Manager) generateMessagesQuery(baseQuery string, qArgs []interface{}, p
 	return sqlQuery, pageSize, qArgs, nil
 }
 
+// imgSrcUploadsPattern matches an <img> tag whose src attribute points at our
+// /uploads/<uuid> path. Restricting to the src attribute (rather than free
+// text) prevents accidental rewrites of plain prose like "see /uploads/..."
+// or quoted-thread URL mentions outside of an <img>.
+//
+// Capture groups:
+//
+//	1: tag prefix up to and including the opening quote (`<img ... src="`)
+//	2: the entire src URL value
+//	3: media UUID
+//	4: the closing quote of the src attribute
+var imgSrcUploadsPattern = regexp.MustCompile(
+	`(?i)(<img[^>]*?\bsrc=["'])((?:https?://[^"'<>\s/]+)?/uploads/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\?[^"'<>\s]*)?)(["'])`,
+)
+
+// embedInlineImagesAsCID finds every <img src=".../uploads/<uuid>"> reference
+// in the outgoing message body, attaches the underlying file as an inline CID
+// part, and rewrites the src to "cid:<id>". The result is a self-contained
+// email: recipients see the images regardless of whether our media URLs later
+// expire, our domain changes, or the server is unreachable. Quoted thread
+// images from prior messages are picked up automatically.
+//
+// Authorisation: we only embed media that already lives on this conversation.
+// Otherwise an agent who can read conversation A could craft an outgoing reply
+// in conversation B with <img src="/uploads/<conv-A-uuid>"> and have us
+// dutifully exfiltrate conversation A's image to conversation B's customer.
+func (m *Manager) embedInlineImagesAsCID(message *models.Message) error {
+	matches := imgSrcUploadsPattern.FindAllStringSubmatch(message.Content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	// Track per-uuid Content-IDs so the same media file gets exactly one
+	// inline part even if it appears multiple times in the body.
+	cidByUUID := map[string]string{}
+
+	// Re-use any inline image already on the message (e.g. uploaded via the
+	// reply box) instead of fetching and attaching it twice. Anything already
+	// attached is by definition authorised.
+	for i := range message.Attachments {
+		att := &message.Attachments[i]
+		if att.UUID == "" || !strings.HasPrefix(strings.ToLower(att.ContentType), "image/") {
+			continue
+		}
+		cid := "ld-" + att.UUID
+		att.ContentID = cid
+		// Force header to inline disposition so smtppool emits it as part of
+		// the multipart/related, not as a regular attachment.
+		att.Header = attachment.MakeHeader(att.ContentType, cid, att.Name, "base64", "inline")
+		cidByUUID[att.UUID] = cid
+	}
+
+	// For URLs that point to media not yet on this message (commonly quoted
+	// thread images from previous replies), fetch + authorise + attach.
+	for _, sub := range matches {
+		uuid := sub[3]
+		if _, ok := cidByUUID[uuid]; ok {
+			continue
+		}
+		media, err := m.mediaStore.Get(0, uuid)
+		if err != nil {
+			m.lo.Debug("inline-image media not found, leaving URL unrewritten", "uuid", uuid, "error", err)
+			continue
+		}
+
+		// Authorisation: we're defending against an agent in conversation B
+		// crafting a reply with <img src="/uploads/<uuid from conv A>"> and
+		// having us embed conv A's image into conv B's outgoing email.
+		//
+		// The only way that attack succeeds is if the referenced media is
+		// already attached to a message in a different conversation. If it's
+		// orphan (model_id NULL) it hasn't been attached to anything yet —
+		// the most common case is the agent just uploaded it for this reply
+		// and the link hasn't been persisted yet. Orphans are safe to embed.
+		if media.Model.String == mmodels.ModelMessages && media.ModelID.Valid {
+			linkedConv, err := m.GetConversationByMessageID(media.ModelID.Int)
+			if err != nil {
+				m.lo.Warn("refusing to embed media: linked conversation lookup failed", "uuid", uuid, "linked_message_id", media.ModelID.Int, "error", err)
+				continue
+			}
+			if linkedConv.ID != message.ConversationID {
+				m.lo.Warn("refusing to embed media from a different conversation", "uuid", uuid, "linked_conversation_id", linkedConv.ID, "outgoing_conversation_id", message.ConversationID)
+				continue
+			}
+		}
+
+		if !strings.HasPrefix(strings.ToLower(media.ContentType), "image/") {
+			// Non-image references stay as plain links; CID inline only makes
+			// sense for things the email client will actually render inline.
+			continue
+		}
+		blob, err := m.mediaStore.GetBlob(media.UUID)
+		if err != nil {
+			m.lo.Warn("inline-image blob fetch failed, leaving URL unrewritten", "uuid", uuid, "error", err)
+			continue
+		}
+		cid := "ld-" + media.UUID
+		message.Attachments = append(message.Attachments, attachment.Attachment{
+			Name:        media.Filename,
+			UUID:        media.UUID,
+			ContentType: media.ContentType,
+			Content:     blob,
+			Size:        media.Size,
+			ContentID:   cid,
+			Header:      attachment.MakeHeader(media.ContentType, cid, media.Filename, "base64", "inline"),
+		})
+		cidByUUID[uuid] = cid
+	}
+
+	if len(cidByUUID) == 0 {
+		return nil
+	}
+
+	// Rewrite each matched img src to its corresponding cid: ref. Anything
+	// not in cidByUUID (foreign media, fetch failure, etc.) gets its src
+	// stripped to "" so the recipient sees a broken-image placeholder rather
+	// than an external HTTP request to our server (which could leak a UUID,
+	// burn signed-URL TTL, or act as a tracking pixel).
+	message.Content = imgSrcUploadsPattern.ReplaceAllStringFunc(message.Content, func(match string) string {
+		sub := imgSrcUploadsPattern.FindStringSubmatch(match)
+		if len(sub) < 5 {
+			return match
+		}
+		newSrc := ""
+		if cid, ok := cidByUUID[sub[3]]; ok {
+			newSrc = "cid:" + cid
+		}
+		// sub[1] = `<img ... src="`, sub[4] = closing quote. Drop the URL,
+		// substitute newSrc.
+		return sub[1] + newSrc + sub[4]
+	})
+
+	return nil
+}
+
+// replaceCIDInContent rewrites a cid: reference inside message HTML.
+// Image content types: just swap the cid: URL for the upload URL (browser renders as <img>).
+// Non-image content types (e.g. PDF): replace the entire <img> tag with a download link, since
+// browsers cannot render non-image files in <img> tags.
+func replaceCIDInContent(content, cidRef, uploadURL, filename, contentType string) string {
+	contentType = strings.ToLower(contentType)
+	if strings.HasPrefix(contentType, "image/") {
+		return strings.ReplaceAll(content, cidRef, uploadURL)
+	}
+
+	if filename == "" {
+		filename = "attachment"
+	}
+
+	// Tolerate XHTML-style self-closing tags (Outlook produces `<img ... />`
+	// with a space before the slash).
+	imgPattern := regexp.MustCompile(`<img[^>]*src=["']?` + regexp.QuoteMeta(cidRef) + `["']?[^>]*\s*/?>`)
+	// Both filename and uploadURL come from upstream sources we don't fully
+	// control (incoming email metadata, media store config). Escape both
+	// before splicing into stored HTML.
+	downloadLink := fmt.Sprintf(
+		`<a href="%s" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#f0f0f0;border-radius:4px;text-decoration:none;color:#333;font-size:13px;border:1px solid #ddd;">[file] %s</a>`,
+		html.EscapeString(uploadURL), html.EscapeString(filename),
+	)
+	replaced := imgPattern.ReplaceAllString(content, downloadLink)
+	if replaced == content {
+		// CID was referenced outside an <img> (uncommon). Fall back to plain URL substitution.
+		return strings.ReplaceAll(content, cidRef, uploadURL)
+	}
+	return replaced
+}
+
 // uploadMessageAttachments uploads all attachments for a message.
 func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 	if len(message.Attachments) == 0 {
@@ -994,7 +1173,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			// This attachment already exists, replace the cid:content_id with the media relative url, not using absolute path as the root path can change.
 			if exists {
 				m.lo.Debug("attachment with content ID already exists replacing content ID with media relative URL", "content_id", contentID, "media_uuid", uuid)
-				message.Content = strings.ReplaceAll(message.Content, fmt.Sprintf("cid:%s", attachment.ContentID), "/uploads/"+uuid)
+				message.Content = replaceCIDInContent(message.Content, fmt.Sprintf("cid:%s", attachment.ContentID), "/uploads/"+uuid, attachment.Name, attachment.ContentType)
 				continue
 			}
 
@@ -1034,6 +1213,13 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 				m.lo.Error("error uploading thumbnail", "error", err)
 			}
 		}
+
+		// Now that the file is uploaded, swap any cid: reference for the upload URL.
+		// For non-images this turns the broken <img> tag into a download link.
+		if contentID != "" {
+			message.Content = replaceCIDInContent(message.Content, fmt.Sprintf("cid:%s", contentID), "/uploads/"+media.UUID, attachment.Name, attachment.ContentType)
+		}
+
 		message.Media = append(message.Media, media)
 	}
 	return nil
