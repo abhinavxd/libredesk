@@ -140,42 +140,72 @@
         </Button>
       </div>
 
-      <!-- Sort dropdown-menu -->
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" class="w-30">
-            {{ conversationStore.getListSortField }}
-            <ChevronDown class="w-4 h-4 ml-2 opacity-50" />
+      <div class="flex items-center gap-1">
+        <!-- View-mode switcher -->
+        <div class="flex border rounded-md p-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7 w-7 p-0"
+            :class="viewMode === 'card' ? 'bg-accent text-foreground' : 'text-muted-foreground'"
+            :aria-label="t('conversation.list.viewMode.card')"
+            :title="t('conversation.list.viewMode.card')"
+            :aria-pressed="viewMode === 'card'"
+            @click="setViewMode('card')"
+          >
+            <LayoutList class="w-4 h-4" />
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem @click="handleSortChange('oldest')">
-            {{ $t('conversation.sort.oldestActivity') }}
-          </DropdownMenuItem>
-          <DropdownMenuItem @click="handleSortChange('newest')">
-            {{ $t('conversation.sort.newestActivity') }}
-          </DropdownMenuItem>
-          <DropdownMenuItem @click="handleSortChange('started_first')">
-            {{ $t('conversation.sort.startedFirst') }}
-          </DropdownMenuItem>
-          <DropdownMenuItem @click="handleSortChange('started_last')">
-            {{ $t('conversation.sort.startedLast') }}
-          </DropdownMenuItem>
-          <DropdownMenuItem @click="handleSortChange('waiting_longest')">
-            {{ $t('conversation.sort.waitingLongest') }}
-          </DropdownMenuItem>
-          <DropdownMenuItem @click="handleSortChange('next_sla_target')">
-            {{ $t('conversation.sort.nextSLATarget') }}
-          </DropdownMenuItem>
-          <DropdownMenuItem @click="handleSortChange('priority_first')">
-            {{ $t('conversation.sort.priorityFirst') }}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7 w-7 p-0"
+            :class="viewMode === 'table' ? 'bg-accent text-foreground' : 'text-muted-foreground'"
+            :aria-label="t('conversation.list.viewMode.table')"
+            :title="t('conversation.list.viewMode.table')"
+            :aria-pressed="viewMode === 'table'"
+            @click="setViewMode('table')"
+          >
+            <Table2 class="w-4 h-4" />
+          </Button>
+        </div>
+
+        <!-- Sort dropdown-menu -->
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" class="w-30">
+              {{ conversationStore.getListSortField }}
+              <ChevronDown class="w-4 h-4 ml-2 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem @click="handleSortChange('oldest')">
+              {{ $t('conversation.sort.oldestActivity') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="handleSortChange('newest')">
+              {{ $t('conversation.sort.newestActivity') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="handleSortChange('started_first')">
+              {{ $t('conversation.sort.startedFirst') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="handleSortChange('started_last')">
+              {{ $t('conversation.sort.startedLast') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="handleSortChange('waiting_longest')">
+              {{ $t('conversation.sort.waitingLongest') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="handleSortChange('next_sla_target')">
+              {{ $t('conversation.sort.nextSLATarget') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="handleSortChange('priority_first')">
+              {{ $t('conversation.sort.priorityFirst') }}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
 
     <!-- Content -->
-    <div class="flex-grow overflow-y-auto">
+    <div class="flex-grow overflow-y-auto overflow-x-auto">
       <EmptyList
         v-if="!hasConversations && !hasErrored && !isLoading"
         key="empty"
@@ -195,8 +225,15 @@
         :icon="MessageCircleWarning"
       />
 
-      <!-- Empty State -->
+      <!-- Conversation list (table view) -->
+      <ConversationTableView
+        v-if="!conversationStore.conversations.errorMessage && viewMode === 'table' && hasConversations"
+        :conversations="conversationStore.conversationsList"
+      />
+
+      <!-- Conversation list (card view) -->
       <TransitionGroup
+        v-else-if="viewMode === 'card'"
         enter-active-class="transition-all duration-300 ease-in-out"
         enter-from-class="opacity-0 transform translate-y-4"
         enter-to-class="opacity-100 transform translate-y-0"
@@ -204,10 +241,9 @@
         leave-from-class="opacity-100 transform translate-y-0"
         leave-to-class="opacity-0 transform translate-y-4"
       >
-        <!-- Conversation List -->
         <div
           v-if="!conversationStore.conversations.errorMessage"
-          key="list"
+          key="list-card"
           class="divide-y divide-border"
           :class="{ 'border-b border-border': hasConversations }"
         >
@@ -220,12 +256,12 @@
             class="transition-colors duration-200"
           />
         </div>
-
-        <!-- Loading Skeleton -->
-        <div v-if="isLoading" key="loading" class="space-y-4">
-          <ConversationListItemSkeleton v-for="index in 5" :key="index" />
-        </div>
       </TransitionGroup>
+
+      <!-- Loading Skeleton -->
+      <div v-if="isLoading" class="space-y-4">
+        <ConversationListItemSkeleton v-for="index in 5" :key="index" />
+      </div>
 
       <!-- Load More -->
       <div
@@ -257,7 +293,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2, X } from 'lucide-vue-next'
+import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2, X, LayoutList, Table2 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import {
@@ -277,9 +313,11 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { permissions as p } from '@/constants/permissions'
 import api from '@/api'
+import { useViewMode } from '@/composables/useViewMode'
 import EmptyList from '@/features/conversation/list/ConversationEmptyList.vue'
 import ConversationListItem from '@/features/conversation/list/ConversationListItem.vue'
 import ConversationListItemSkeleton from '@/features/conversation/list/ConversationListItemSkeleton.vue'
+import ConversationTableView from '@/features/conversation/list/ConversationTableView.vue'
 
 const conversationStore = useConversationStore()
 const usersStore = useUsersStore()
@@ -288,6 +326,7 @@ const userStore = useUserStore()
 const route = useRoute()
 const { t } = useI18n()
 const emitter = useEmitter()
+const { viewMode, setViewMode } = useViewMode()
 const bulkLoading = ref(false)
 
 const canAssignAgent = computed(() => userStore.can(p.CONVERSATIONS_UPDATE_USER_ASSIGNEE))

@@ -133,7 +133,6 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { Mail, MessageSquare, Reply, MailOpen } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
@@ -146,11 +145,11 @@ import {
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'
+import { useConversationRoute } from '@main/composables/useConversationRoute'
 import { useI18n } from 'vue-i18n'
 
 let timer = null
 const now = ref(new Date())
-const route = useRoute()
 const conversationStore = useConversationStore()
 const { t } = useI18n()
 const frdStatus = ref('')
@@ -167,24 +166,8 @@ const handleMarkAsUnread = () => {
   conversationStore.markAsUnread(props.conversation.uuid)
 }
 
-const conversationRoute = computed(() => {
-  const baseRoute = route.name.includes('team')
-    ? 'team-inbox-conversation'
-    : route.name.includes('view')
-      ? 'view-inbox-conversation'
-      : 'inbox-conversation'
-  return {
-    name: baseRoute,
-    params: {
-      uuid: props.conversation.uuid,
-      ...(baseRoute === 'team-inbox-conversation' && { teamID: route.params.teamID }),
-      ...(baseRoute === 'view-inbox-conversation' && { viewID: route.params.viewID })
-    },
-    query: props.conversation.mentioned_message_uuid
-      ? { scrollTo: props.conversation.mentioned_message_uuid }
-      : {}
-  }
-})
+const { buildConversationRoute } = useConversationRoute()
+const conversationRoute = computed(() => buildConversationRoute(props.conversation))
 
 onMounted(() => {
   timer = setInterval(() => {
