@@ -73,7 +73,7 @@ __________________
 
 ### Binary
 - Download the [latest release](https://github.com/abhinavxd/libredesk/releases) and extract the libredesk binary.
-- Edit config.toml and edit as needed.
+- Edit config.toml as needed.
 - `./libredesk --install` to setup the Postgres DB.
 - Run `./libredesk --set-system-user-password` to set the password for the System user.
 - Run `./libredesk` and visit `http://localhost:9000` and login with email `System` and the password you set using the --set-system-user-password command.
