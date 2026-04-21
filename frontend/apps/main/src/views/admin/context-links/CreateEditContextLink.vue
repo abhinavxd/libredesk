@@ -2,17 +2,19 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading" />
-  <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
-    <ContextLinkForm @submit.prevent="onSubmit" :form="form" :isNewForm="isNewForm">
-      <template #footer>
-        <div class="flex space-x-3">
-          <Button type="submit" :isLoading="formLoading">
-            {{ isNewForm ? t('globals.messages.create') : t('globals.messages.save') }}
-          </Button>
-        </div>
-      </template>
-    </ContextLinkForm>
+  <div class="relative">
+    <Spinner v-if="isLoading" />
+    <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+      <ContextLinkForm @submit.prevent="onSubmit" :form="form" :isNewForm="isNewForm">
+        <template #footer>
+          <div class="flex space-x-3">
+            <Button type="submit" :isLoading="formLoading">
+              {{ isNewForm ? t('globals.messages.create') : t('globals.messages.save') }}
+            </Button>
+          </div>
+        </template>
+      </ContextLinkForm>
+    </div>
   </div>
 </template>
 

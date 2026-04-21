@@ -1,6 +1,7 @@
 <template>
-  <Spinner v-if="isLoading" />
-  <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
+  <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
+    <Spinner v-if="isLoading" />
+    <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
     <div class="flex justify-end mb-5">
       <router-link :to="{ name: 'new-role' }">
         <Button>
@@ -13,6 +14,7 @@
     <div>
       <DataTable :columns="createColumns(t)" :data="roles" :loading="isLoading" />
     </div>
+  </div>
   </div>
 </template>
 

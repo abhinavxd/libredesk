@@ -1,13 +1,15 @@
 <template>
   <AdminSplitLayout>
     <template #content>
-      <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
-        <GeneralSettingForm
-          :submitForm="submitForm"
-          :initial-values="initialValues"
-          :available-languages="availableLanguages"
-        />
+      <div class="relative">
         <Spinner v-if="isLoading" />
+        <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+          <GeneralSettingForm
+            :submitForm="submitForm"
+            :initial-values="initialValues"
+            :available-languages="availableLanguages"
+          />
+        </div>
       </div>
     </template>
     <template #help>

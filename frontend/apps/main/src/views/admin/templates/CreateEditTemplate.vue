@@ -2,13 +2,15 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading" />
-  <TemplateForm
-    :initial-values="template"
-    :submitForm="submitForm"
-    :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
-    :isLoading="formLoading"
-  />
+  <div class="relative">
+    <Spinner v-if="isLoading" />
+    <TemplateForm
+      :initial-values="template"
+      :submitForm="submitForm"
+      :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
+      :isLoading="formLoading"
+    />
+  </div>
 </template>
 
 <script setup>

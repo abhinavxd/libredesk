@@ -1,6 +1,7 @@
 <template>
-  <Spinner v-if="isLoading" />
-  <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
+  <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
+    <Spinner v-if="isLoading" />
+    <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
     <div class="flex justify-end mb-5 gap-2">
       <Importer
         entity-key="globals.terms.agent"
@@ -29,6 +30,7 @@
     <div>
       <DataTable :columns="createColumns(t)" :data="data" :loading="isLoading" />
     </div>
+  </div>
   </div>
 </template>
 

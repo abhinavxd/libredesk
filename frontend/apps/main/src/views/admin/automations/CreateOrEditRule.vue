@@ -2,8 +2,9 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading"></Spinner>
-  <div class="space-y-4">
+  <div class="relative">
+    <Spinner v-if="isLoading" />
+    <div class="space-y-4">
     <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
       <form @submit="onSubmit">
         <div class="space-y-5">
@@ -146,6 +147,7 @@
         </div>
       </form>
     </div>
+  </div>
   </div>
 </template>
 

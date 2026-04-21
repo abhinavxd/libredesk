@@ -1,6 +1,7 @@
 <template>
-  <Spinner v-if="formLoading" />
-  <div :class="{ 'transition-opacity duration-300 opacity-50': formLoading }">
+  <div class="relative" :class="{ 'min-h-[60vh]': formLoading }">
+    <Spinner v-if="formLoading" />
+    <div :class="{ 'transition-opacity duration-300 opacity-50': formLoading }">
     <div class="flex justify-end mb-5">
       <router-link :to="{ name: 'new-macro' }">
         <Button>
@@ -13,6 +14,7 @@
     <div>
       <DataTable :columns="createColumns(t)" :data="macros" :loading="formLoading" />
     </div>
+  </div>
   </div>
 </template>
 

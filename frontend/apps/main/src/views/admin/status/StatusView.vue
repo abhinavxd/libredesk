@@ -1,8 +1,9 @@
 <template>
   <div>
-    <Spinner v-if="isLoading" />
     <AdminSplitLayout>
       <template #content>
+        <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
+        <Spinner v-if="isLoading" />
         <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
           <div class="flex justify-between mb-5">
             <div class="flex justify-end mb-4 w-full">
@@ -43,6 +44,7 @@
           <div>
             <DataTable :columns="createColumns(t, { onEdit: editStatus })" :data="statuses" :loading="isLoading" />
           </div>
+        </div>
         </div>
       </template>
 

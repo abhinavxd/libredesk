@@ -1,20 +1,22 @@
 <template>
-  <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
-    <div class="flex justify-between mb-5">
-      <div></div>
-      <div>
-        <router-link :to="{ name: 'new-sla' }">
-          <Button>
-            {{
-              t('sla.new')
-            }}
-          </Button>
-        </router-link>
+  <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
+    <Spinner v-if="isLoading" />
+    <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+      <div class="flex justify-between mb-5">
+        <div></div>
+        <div>
+          <router-link :to="{ name: 'new-sla' }">
+            <Button>
+              {{
+                t('sla.new')
+              }}
+            </Button>
+          </router-link>
+        </div>
       </div>
-    </div>
-    <div>
-      <Spinner v-if="isLoading"></Spinner>
-      <DataTable :columns="createColumns(t)" :data="slas" :loading="isLoading" />
+      <div>
+        <DataTable :columns="createColumns(t)" :data="slas" :loading="isLoading" />
+      </div>
     </div>
   </div>
 </template>

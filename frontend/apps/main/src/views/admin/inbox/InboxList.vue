@@ -1,6 +1,7 @@
 <template>
-  <Spinner v-if="isLoading" />
-  <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
+  <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
+    <Spinner v-if="isLoading" />
+    <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
     <div class="flex justify-between mb-5">
       <div></div>
       <router-link :to="{ name: 'new-inbox' }">
@@ -14,6 +15,7 @@
     <div>
       <DataTable :columns="columns" :data="data" :loading="isLoading" />
     </div>
+  </div>
   </div>
 </template>
 

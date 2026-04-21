@@ -2,9 +2,10 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading" />
-  <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
-    <WebhookForm @submit.prevent="onSubmit" :form="form" :isNewForm="isNewForm">
+  <div class="relative">
+    <Spinner v-if="isLoading" />
+    <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+      <WebhookForm @submit.prevent="onSubmit" :form="form" :isNewForm="isNewForm">
       <template #footer>
         <div class="flex space-x-3">
           <Button type="submit" :isLoading="formLoading">
@@ -24,6 +25,7 @@
         </div>
       </template>
     </WebhookForm>
+    </div>
   </div>
 </template>
 

@@ -2,14 +2,16 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading"></Spinner>
-  <BusinessHoursForm
-    :initial-values="businessHours"
-    :submitForm="submitForm"
-    :isNewForm="isNewForm"
-    :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
-    :isLoading="formLoading"
-  />
+  <div class="relative">
+    <Spinner v-if="isLoading" />
+    <BusinessHoursForm
+      :initial-values="businessHours"
+      :submitForm="submitForm"
+      :isNewForm="isNewForm"
+      :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
+      :isLoading="formLoading"
+    />
+  </div>
 </template>
 
 <script setup>

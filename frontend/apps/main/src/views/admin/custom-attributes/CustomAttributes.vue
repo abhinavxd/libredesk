@@ -1,8 +1,9 @@
 <template>
   <div>
-    <Spinner v-if="isLoading" />
     <AdminSplitLayout>
       <template #content>
+        <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
+        <Spinner v-if="isLoading" />
         <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
           <div class="flex justify-between mb-5">
             <div></div>
@@ -59,6 +60,7 @@
               </TabsContent>
             </Tabs>
           </div>
+        </div>
         </div>
       </template>
 

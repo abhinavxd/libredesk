@@ -1,6 +1,7 @@
 <template>
-  <Spinner v-if="isLoading" />
-  <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+  <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
+    <Spinner v-if="isLoading" />
+    <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
     <div class="flex justify-between mb-5">
       <div></div>
       <div>
@@ -14,6 +15,7 @@
     <div>
       <DataTable :columns="createColumns(t)" :data="oidc" :loading="isLoading" />
     </div>
+  </div>
   </div>
 </template>
 
