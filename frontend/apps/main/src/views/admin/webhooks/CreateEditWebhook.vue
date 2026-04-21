@@ -2,10 +2,8 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <div class="relative">
-    <Spinner v-if="isLoading" />
-    <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
-      <WebhookForm @submit.prevent="onSubmit" :form="form" :isNewForm="isNewForm">
+  <LoadingOverlay :loading="isLoading">
+    <WebhookForm @submit.prevent="onSubmit" :form="form" :isNewForm="isNewForm">
       <template #footer>
         <div class="flex space-x-3">
           <Button type="submit" :isLoading="formLoading">
@@ -25,15 +23,14 @@
         </div>
       </template>
     </WebhookForm>
-    </div>
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
 import { onMounted, ref, computed } from 'vue'
 import api from '../../../api'
 import WebhookForm from '@/features/admin/webhooks/WebhookForm.vue'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { Button } from '@shared-ui/components/ui/button'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'

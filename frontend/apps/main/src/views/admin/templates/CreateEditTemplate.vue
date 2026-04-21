@@ -2,15 +2,13 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <div class="relative">
-    <Spinner v-if="isLoading" />
+  <LoadingOverlay :loading="isLoading">
     <TemplateForm
       :initial-values="template"
       :submitForm="submitForm"
-      :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
       :isLoading="formLoading"
     />
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -19,7 +17,7 @@ import api from '../../../api'
 import TemplateForm from '@/features/admin/templates/TemplateForm.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'

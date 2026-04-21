@@ -2,10 +2,8 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <div class="relative">
-    <Spinner v-if="isLoading" />
+  <LoadingOverlay :loading="isLoading">
     <div class="space-y-4">
-    <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
       <form @submit="onSubmit">
         <div class="space-y-5">
           <div class="space-y-5">
@@ -147,8 +145,7 @@
         </div>
       </form>
     </div>
-  </div>
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -184,7 +181,7 @@ import {
   FormMessage,
   FormDescription
 } from '@shared-ui/components/ui/form'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useRoute } from 'vue-router'
 import { useRouter } from 'vue-router'

@@ -2,15 +2,13 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <div class="relative">
-    <Spinner v-if="isLoading" />
+  <LoadingOverlay :loading="isLoading">
     <SLAForm
       :initial-values="slaData"
       :submitForm="submitForm"
-      :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
       :isLoading="formLoading"
     />
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -18,7 +16,7 @@ import { onMounted, ref } from 'vue'
 import api from '../../../api'
 import SLAForm from '@/features/admin/sla/SLAForm.vue'
 import { useRouter } from 'vue-router'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'

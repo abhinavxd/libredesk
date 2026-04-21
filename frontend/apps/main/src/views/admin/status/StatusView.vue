@@ -2,9 +2,7 @@
   <div>
     <AdminSplitLayout>
       <template #content>
-        <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
-        <Spinner v-if="isLoading" />
-        <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
+        <LoadingOverlay :loading="isLoading" reserve-height>
           <div class="flex justify-between mb-5">
             <div class="flex justify-end mb-4 w-full">
               <Dialog v-model:open="dialogOpen">
@@ -44,8 +42,7 @@
           <div>
             <DataTable :columns="createColumns(t, { onEdit: editStatus })" :data="statuses" :loading="isLoading" />
           </div>
-        </div>
-        </div>
+        </LoadingOverlay>
       </template>
 
       <template #help>
@@ -61,7 +58,7 @@ import DataTable from '@main/components/datatable/DataTable.vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import { createColumns } from '../../../features/admin/status/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import StatusForm from '@/features/admin/status/StatusForm.vue'
 import {
   Dialog,

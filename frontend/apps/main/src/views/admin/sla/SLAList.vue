@@ -1,24 +1,21 @@
 <template>
-  <div class="relative" :class="{ 'min-h-[60vh]': isLoading }">
-    <Spinner v-if="isLoading" />
-    <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
-      <div class="flex justify-between mb-5">
-        <div></div>
-        <div>
-          <router-link :to="{ name: 'new-sla' }">
-            <Button>
-              {{
-                t('sla.new')
-              }}
-            </Button>
-          </router-link>
-        </div>
-      </div>
+  <LoadingOverlay :loading="isLoading" reserve-height>
+    <div class="flex justify-between mb-5">
+      <div></div>
       <div>
-        <DataTable :columns="createColumns(t)" :data="slas" :loading="isLoading" />
+        <router-link :to="{ name: 'new-sla' }">
+          <Button>
+            {{
+              t('sla.new')
+            }}
+          </Button>
+        </router-link>
       </div>
     </div>
-  </div>
+    <div>
+      <DataTable :columns="createColumns(t)" :data="slas" :loading="isLoading" />
+    </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -28,7 +25,7 @@ import { createColumns } from '../../../features/admin/sla/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { useEmitter } from '../../../composables/useEmitter'
 import { useI18n } from 'vue-i18n'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import api from '../../../api'
 

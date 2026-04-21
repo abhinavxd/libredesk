@@ -1,54 +1,50 @@
 <template>
   <div @change.stop @input.stop>
-    <template v-if="range">
-      <Popover v-model:open="rangeOpen">
-        <PopoverTrigger as-child>
-          <Button
-            variant="outline"
-            :class="
-              cn(
-                'w-full justify-start text-left font-normal',
-                !rangeLabel && 'text-muted-foreground'
-              )
-            "
-          >
-            <CalendarIcon class="mr-2 h-4 w-4" />
-            {{ rangeLabel || t('globals.terms.pickDate') }}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent class="w-auto p-0">
-          <RangeCalendar
-            :model-value="dateRange"
-            :number-of-months="2"
-            @update:model-value="handleRangePick"
-          />
-        </PopoverContent>
-      </Popover>
-    </template>
-    <template v-else>
-      <Popover v-model:open="open">
-        <PopoverTrigger as-child>
-          <Button
-            variant="outline"
-            :class="
-              cn(
-                'w-full justify-start text-left font-normal',
-                !modelValue && 'text-muted-foreground'
-              )
-            "
-          >
-            <CalendarIcon class="mr-2 h-4 w-4" />
-            {{ modelValue ? formatDisplay(modelValue) : t('globals.terms.pickDate') }}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent class="w-auto p-0">
-          <Calendar
-            :model-value="toCalendarDate(modelValue)"
-            @update:model-value="handlePick"
-          />
-        </PopoverContent>
-      </Popover>
-    </template>
+    <Popover v-if="range" v-model:open="rangeOpen">
+      <PopoverTrigger as-child>
+        <Button
+          variant="outline"
+          :class="
+            cn(
+              'w-full justify-start text-left font-normal',
+              !rangeLabel && 'text-muted-foreground'
+            )
+          "
+        >
+          <CalendarIcon class="mr-2 h-4 w-4" />
+          {{ rangeLabel || t('globals.terms.pickDate') }}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent class="w-auto p-0">
+        <RangeCalendar
+          :model-value="dateRange"
+          :number-of-months="2"
+          @update:model-value="handleRangePick"
+        />
+      </PopoverContent>
+    </Popover>
+    <Popover v-else v-model:open="open">
+      <PopoverTrigger as-child>
+        <Button
+          variant="outline"
+          :class="
+            cn(
+              'w-full justify-start text-left font-normal',
+              !modelValue && 'text-muted-foreground'
+            )
+          "
+        >
+          <CalendarIcon class="mr-2 h-4 w-4" />
+          {{ modelValue ? formatDisplay(modelValue) : t('globals.terms.pickDate') }}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent class="w-auto p-0">
+        <Calendar
+          :model-value="toCalendarDate(modelValue)"
+          @update:model-value="handlePick"
+        />
+      </PopoverContent>
+    </Popover>
   </div>
 </template>
 
