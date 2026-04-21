@@ -17,7 +17,8 @@ export const OPERATOR = {
     CONTAINS: 'contains',
     NOT_CONTAINS: 'not contains',
     GREATER_THAN: 'greater than',
-    LESS_THAN: 'less than'
+    LESS_THAN: 'less than',
+    BETWEEN: 'between'
 }
 
 export const FIELD_OPERATORS = {
@@ -37,7 +38,8 @@ export const FIELD_OPERATORS = {
         OPERATOR.SET,
         OPERATOR.NOT_SET,
         OPERATOR.GREATER_THAN,
-        OPERATOR.LESS_THAN
+        OPERATOR.LESS_THAN,
+        OPERATOR.BETWEEN
     ],
     NUMBER: [OPERATOR.EQUALS, OPERATOR.NOT_EQUALS, OPERATOR.GREATER_THAN, OPERATOR.LESS_THAN],
     MULTI_SELECT: [OPERATOR.CONTAINS, OPERATOR.NOT_CONTAINS, OPERATOR.SET, OPERATOR.NOT_SET]

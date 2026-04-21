@@ -14,6 +14,7 @@ export const createFormSchema = (t) => z.object({
   name: z.string().min(1, { message: t('globals.messages.required') }),
   enabled: z.boolean(),
   csat_enabled: z.boolean(),
+  prompt_tags_on_reply: z.boolean(),
   secret: z.string().nullable().optional(),
   linked_email_inbox_id: z.number().nullable().optional(),
   config: z.object({

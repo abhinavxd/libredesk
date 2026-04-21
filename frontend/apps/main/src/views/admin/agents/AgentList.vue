@@ -1,6 +1,5 @@
 <template>
-  <Spinner v-if="isLoading" />
-  <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
+  <LoadingOverlay :loading="isLoading" reserve-height>
     <div class="flex justify-end mb-5 gap-2">
       <Importer
         entity-key="globals.terms.agent"
@@ -29,7 +28,7 @@
     <div>
       <DataTable :columns="createColumns(t)" :data="data" :loading="isLoading" />
     </div>
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -38,7 +37,7 @@ import { createColumns } from '@/features/admin/agents/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import DataTable from '@/components/datatable/DataTable.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUsersStore } from '@/stores/users'

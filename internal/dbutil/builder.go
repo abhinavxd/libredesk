@@ -3,9 +3,12 @@ package dbutil
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 )
+
+var dateOnlyRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 // PaginationOptions represents the options for paginating a query.
 type PaginationOptions struct {
@@ -107,11 +110,31 @@ func buildWhereClause(filters []Filter, existingArgs []interface{}, allowedField
 
 		switch f.Operator {
 		case "equals":
+			if dateOnlyRe.MatchString(f.Value) {
+				conditions = append(conditions, fmt.Sprintf("%s >= $%d::DATE AND %s < ($%d::DATE + INTERVAL '1 day')", field, paramCount, field, paramCount))
+				args = append(args, f.Value)
+				paramCount++
+				break
+			}
 			conditions = append(conditions, field+fmt.Sprintf(" = $%d", paramCount))
 			args = append(args, f.Value)
 			paramCount++
 		case "not equals":
+			if dateOnlyRe.MatchString(f.Value) {
+				conditions = append(conditions, fmt.Sprintf("(%s < $%d::DATE OR %s >= ($%d::DATE + INTERVAL '1 day'))", field, paramCount, field, paramCount))
+				args = append(args, f.Value)
+				paramCount++
+				break
+			}
 			conditions = append(conditions, field+fmt.Sprintf(" != $%d", paramCount))
+			args = append(args, f.Value)
+			paramCount++
+		case "greater than":
+			conditions = append(conditions, field+fmt.Sprintf(" > $%d", paramCount))
+			args = append(args, f.Value)
+			paramCount++
+		case "less than":
+			conditions = append(conditions, field+fmt.Sprintf(" < $%d", paramCount))
 			args = append(args, f.Value)
 			paramCount++
 		case "set":
@@ -135,8 +158,14 @@ func buildWhereClause(filters []Filter, existingArgs []interface{}, allowedField
 			if len(values) != 2 {
 				return "", nil, fmt.Errorf("between requires 2 values")
 			}
-			conditions = append(conditions, fmt.Sprintf("%s BETWEEN $%d AND $%d", field, paramCount, paramCount+1))
-			args = append(args, strings.TrimSpace(values[0]), strings.TrimSpace(values[1]))
+			start := strings.TrimSpace(values[0])
+			end := strings.TrimSpace(values[1])
+			if dateOnlyRe.MatchString(start) && dateOnlyRe.MatchString(end) {
+				conditions = append(conditions, fmt.Sprintf("%s >= $%d::DATE AND %s < ($%d::DATE + INTERVAL '1 day')", field, paramCount, field, paramCount+1))
+			} else {
+				conditions = append(conditions, fmt.Sprintf("%s BETWEEN $%d AND $%d", field, paramCount, paramCount+1))
+			}
+			args = append(args, start, end)
 			paramCount += 2
 		case "ilike":
 			conditions = append(conditions, field+fmt.Sprintf(" ILIKE $%d", paramCount))

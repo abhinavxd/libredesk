@@ -326,12 +326,13 @@ func handleOAuthCallback(r *fastglue.Request) error {
 
 	// Create inbox
 	newInbox := imodels.Inbox{
-		Name:        fmt.Sprintf("%s Inbox", userEmail),
-		From:        userEmail,
-		Channel:     inbox.ChannelEmail,
-		Enabled:     true,
-		CSATEnabled: false,
-		Config:      json.RawMessage(configJSON),
+		Name:              fmt.Sprintf("%s Inbox", userEmail),
+		From:              userEmail,
+		Channel:           inbox.ChannelEmail,
+		Enabled:           true,
+		CSATEnabled:       false,
+		PromptTagsOnReply: false,
+		Config:            json.RawMessage(configJSON),
 	}
 
 	createdInbox, err := app.inbox.Create(newInbox)

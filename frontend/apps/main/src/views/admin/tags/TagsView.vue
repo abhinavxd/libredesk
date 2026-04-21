@@ -1,9 +1,8 @@
 <template>
   <div>
-    <Spinner v-if="isLoading" />
     <AdminSplitLayout>
       <template #content>
-        <div :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
+        <LoadingOverlay :loading="isLoading" reserve-height>
           <div class="flex justify-between mb-5">
             <div class="flex justify-end mb-4 w-full gap-2">
               <Importer
@@ -58,7 +57,7 @@
           <div>
             <DataTable :columns="createColumns(t, { onEdit: editTag })" :data="tags" :loading="isLoading" />
           </div>
-        </div>
+        </LoadingOverlay>
       </template>
 
       <template #help>
@@ -72,7 +71,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
-import { Spinner } from '@shared-ui/components/ui/spinner/index.js'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { createColumns } from '../../../features/admin/tags/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 

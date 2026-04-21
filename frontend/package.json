@@ -28,6 +28,7 @@
     "@radix-icons/vue": "^1.0.0",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/vue-table": "^8.19.2",
+    "@tanstack/vue-virtual": "^3.13.23",
     "@tiptap/extension-image": "^2.5.9",
     "@tiptap/extension-link": "^2.11.2",
     "@tiptap/extension-mention": "^2.11.2",

@@ -38,7 +38,7 @@
             <CommandEmpty>{{ $t('globals.messages.noResultsFound') }}</CommandEmpty>
             <CommandGroup>
               <CommandItem
-                v-for="item in filteredOptions"
+                v-for="item in visibleOptions"
                 :key="item.value"
                 :value="item.value"
                 @select="handleSelect"
@@ -72,6 +72,8 @@ import {
 import { computed, ref } from 'vue'
 import { useField } from 'vee-validate'
 
+const RENDER_CAP = 200
+
 const tags = defineModel({
   required: false,
   default: () => []
@@ -101,8 +103,6 @@ const { handleBlur } = useField(() => props.name, undefined, {
 const open = ref(false)
 const searchTerm = ref('')
 
-// Get all options that are not already selected and match the search term
-// If not search term is provided, return all available options
 const filteredOptions = computed(() => {
   const available = props.items.filter((item) => !tags.value.includes(item.value))
 
@@ -112,6 +112,8 @@ const filteredOptions = computed(() => {
     item.label.toLowerCase().includes(searchTerm.value.toLowerCase())
   )
 })
+
+const visibleOptions = computed(() => filteredOptions.value.slice(0, RENDER_CAP))
 
 const getLabel = (value) => {
   const item = props.items.find((item) => item.value === value)
@@ -130,7 +132,6 @@ const handleSelect = (event) => {
   }
 }
 
-// Custom filter function to filter items based on the search term
 const filterFunc = (remainingItemValues, term) => {
   const remainingItems = props.items.filter((item) => remainingItemValues.includes(item.value))
   return remainingItems

@@ -73,6 +73,11 @@ export function useConversationFilters () {
             type: FIELD_TYPE.MULTI_SELECT,
             operators: FIELD_OPERATORS.MULTI_SELECT,
             options: tagStore.tagOptions
+        },
+        created_at: {
+            label: t('globals.terms.createdAt'),
+            type: FIELD_TYPE.DATE,
+            operators: FIELD_OPERATORS.DATE
         }
     }))
 

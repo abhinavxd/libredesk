@@ -25,22 +25,24 @@
 
     <!-- Selected -->
     <template #selected="{ selected }">
-      <div class="flex items-center gap-2">
-        <div v-if="selected" class="flex items-center gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <div v-if="selected" class="flex items-center gap-2 min-w-0">
           <!--USER -->
-          <Avatar v-if="type === 'user'" class="w-7 h-7">
+          <Avatar v-if="type === 'user'" class="w-7 h-7 shrink-0">
             <AvatarImage :src="selected.avatar_url || ''" :alt="selected.label.slice(0, 2)" />
             <AvatarFallback>{{ selected.label.slice(0, 2).toUpperCase() }}</AvatarFallback>
           </Avatar>
 
           <!-- Others -->
-          <span v-else-if="selected.emoji">{{ selected.emoji }}</span>
-          <span>{{ selected.label }}</span>
-          <span v-if="isCurrentUser(selected)" class="text-muted-foreground text-xs"
+          <span v-else-if="selected.emoji" class="shrink-0">{{ selected.emoji }}</span>
+          <span class="truncate">{{ selected.label }}</span>
+          <span
+            v-if="isCurrentUser(selected)"
+            class="text-muted-foreground text-xs shrink-0"
             >({{ t('globals.terms.you') }})</span
           >
         </div>
-        <span v-else>{{ placeholder }}</span>
+        <span v-else class="truncate">{{ placeholder }}</span>
       </div>
     </template>
   </ComboBox>

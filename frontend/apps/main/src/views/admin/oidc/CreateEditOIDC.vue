@@ -2,21 +2,21 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading" />
-  <OIDCForm
-    :initial-values="oidc"
-    :submitForm="submitForm"
-    :isNewForm="isNewForm"
-    :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
-    :isLoading="formLoading"
-  />
+  <LoadingOverlay :loading="isLoading">
+    <OIDCForm
+      :initial-values="oidc"
+      :submitForm="submitForm"
+      :isNewForm="isNewForm"
+      :isLoading="formLoading"
+    />
+  </LoadingOverlay>
 </template>
 
 <script setup>
 import { onMounted, ref, computed } from 'vue'
 import api from '../../../api'
 import OIDCForm from '@/features/admin/oidc/OIDCForm.vue'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
