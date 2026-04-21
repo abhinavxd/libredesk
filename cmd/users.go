@@ -37,7 +37,10 @@ type setPasswordRequest struct {
 
 type availabilityRequest struct {
 	Status string `json:"status"`
+	Source string `json:"source"`
 }
+
+const availabilitySourceIdle = "idle"
 
 type agentReq struct {
 	FirstName          string   `json:"first_name"`
@@ -94,38 +97,38 @@ func handleUpdateAgentAvailability(r *fastglue.Request) error {
 		availReq availabilityRequest
 	)
 
-	// Decode JSON request
 	if err := r.Decode(&availReq, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
-	// Fetch entire agent
 	agent, err := app.user.GetAgent(auser.ID, "")
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Same status?
 	if agent.AvailabilityStatus == availReq.Status {
 		return r.SendEnvelope(agent)
 	}
 
-	// Update availability status
+	// Idle-driven transitions must never overwrite manual-away states.
+	if availReq.Source == availabilitySourceIdle &&
+		(agent.AvailabilityStatus == models.AwayManual || agent.AvailabilityStatus == models.AwayAndReassigning) {
+		return r.SendEnvelope(agent)
+	}
+
 	if err := app.user.UpdateAvailability(auser.ID, availReq.Status); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Notify widget clients about the agent's availability change.
 	go app.conversation.BroadcastAgentStatusToWidget(auser.ID, availReq.Status)
 
-	// Skip activity log if agent returns online from away (to avoid spam).
+	// Skip activity log when returning online from idle-away to avoid log spam.
 	if !(agent.AvailabilityStatus == models.Away && availReq.Status == models.Online) {
 		if err := app.activityLog.UserAvailability(auser.ID, auser.Email, availReq.Status, ip, "", 0); err != nil {
 			app.lo.Error("error creating activity log", "error", err)
 		}
 	}
 
-	// Fetch updated agent and return
 	agent, err = app.user.GetAgent(auser.ID, "")
 	if err != nil {
 		return sendErrorEnvelope(r, err)

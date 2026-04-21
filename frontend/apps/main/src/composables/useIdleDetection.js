@@ -12,7 +12,7 @@ export function useIdleDetection () {
 
     const goOnline = useThrottleFn(() => {
         if (userStore.user.availability_status === 'away' || userStore.user.availability_status === 'offline') {
-            userStore.updateUserAvailability('online', false)
+            userStore.updateUserAvailability('online', 'idle')
         }
     }, 200)
 
@@ -25,7 +25,7 @@ export function useIdleDetection () {
             Date.now() - lastActivity.value > AWAY_THRESHOLD &&
             userStore.user.availability_status === 'online'
         ) {
-            userStore.updateUserAvailability('away', false)
+            userStore.updateUserAvailability('away', 'idle')
         }
     }
 

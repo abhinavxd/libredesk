@@ -97,12 +97,13 @@ export const useUserStore = defineStore('user', () => {
     user.value.availability_status = newVal
   })
 
-  const updateUserAvailability = async (status, isManual = true) => {
+  const updateUserAvailability = async (status, source = 'user') => {
     try {
-      const apiStatus = status === 'away' && isManual ? 'away_manual' : status
-      await api.updateCurrentUserAvailability({ status: apiStatus })
-      user.value.availability_status = apiStatus
-      availabilityStatusStorage.value = apiStatus
+      const apiStatus = status === 'away' && source === 'user' ? 'away_manual' : status
+      const response = await api.updateCurrentUserAvailability({ status: apiStatus, source })
+      const returnedStatus = response?.data?.data?.availability_status ?? apiStatus
+      user.value.availability_status = returnedStatus
+      availabilityStatusStorage.value = returnedStatus
     } catch (error) {
       if (error?.response?.status === 401) window.location.href = '/'
     }
