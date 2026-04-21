@@ -47,9 +47,13 @@ type Provider struct {
 
 // Config holds OIDC providers and cookies security settings
 type Config struct {
-	Providers     []Provider
-	SecureCookies bool
+	Providers       []Provider
+	SecureCookies   bool
+	SessionLifetime time.Duration
 }
+
+// defaultSessionLifetime is used when Config.SessionLifetime is unset or non-positive.
+const defaultSessionLifetime = 9 * time.Hour
 
 // Auth is the auth service it manages OIDC authentication and sessions
 type Auth struct {
@@ -89,6 +93,11 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 		verifiers[provider.ID] = verifier
 	}
 
+	lifetime := cfg.SessionLifetime
+	if lifetime <= 0 {
+		lifetime = defaultSessionLifetime
+	}
+
 	sess := simplesessions.New(simplesessions.Options{
 		EnableAutoCreate: true,
 		SessionIDLength:  64,
@@ -97,12 +106,12 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 			IsHTTPOnly: true,
 			IsSecure:   cfg.SecureCookies,
 			SameSite:   http.SameSiteLaxMode,
-			MaxAge:     time.Hour * 9,
+			MaxAge:     lifetime,
 		},
 	})
 
 	st := sessredisstore.New(context.TODO(), rd)
-	st.SetTTL(time.Hour*9, true)
+	st.SetTTL(lifetime, false)
 	sess.UseStore(st)
 	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
 
