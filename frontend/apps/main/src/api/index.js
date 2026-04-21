@@ -321,6 +321,10 @@ const getConversationMessage = (cuuid, uuid) =>
   http.get(`/api/v1/conversations/${cuuid}/messages/${uuid}`)
 const retryMessage = (cuuid, uuid) =>
   http.put(`/api/v1/conversations/${cuuid}/messages/${uuid}/retry`)
+const updatePrivateNote = (cuuid, uuid, content) =>
+  http.put(`/api/v1/conversations/${cuuid}/messages/${uuid}/note`, { content })
+const deletePrivateNote = (cuuid, uuid) =>
+  http.delete(`/api/v1/conversations/${cuuid}/messages/${uuid}/note`)
 const getConversationMessages = (uuid, params) =>
   http.get(`/api/v1/conversations/${uuid}/messages`, { params })
 const sendMessage = (uuid, data) =>
@@ -594,6 +598,8 @@ export default {
   createConversation,
   sendMessage,
   retryMessage,
+  updatePrivateNote,
+  deletePrivateNote,
   createUser,
   createInbox,
   updateInbox,

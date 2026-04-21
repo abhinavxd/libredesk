@@ -852,3 +852,15 @@ WHERE c.assigned_user_id = $1
   AND u.availability_status = 'online'
 ORDER BY c.last_interaction_at DESC
 LIMIT 50;
+
+-- name: update-private-note-content
+UPDATE conversation_messages
+SET content = $2, text_content = $3, updated_at = NOW()
+WHERE uuid = $1 AND private = true AND type = 'outgoing';
+
+-- name: soft-delete-private-note
+UPDATE conversation_messages
+SET content = $2, text_content = $3,
+    meta = jsonb_set(COALESCE(meta, '{}')::jsonb, '{deleted}', 'true')::jsonb,
+    updated_at = NOW()
+WHERE uuid = $1 AND private = true AND type = 'outgoing';

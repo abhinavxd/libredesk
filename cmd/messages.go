@@ -174,6 +174,82 @@ func handleRetryMessage(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
+// handleUpdatePrivateNote updates the body of a private note. Only the
+// agent who authored the note can edit it.
+func handleUpdatePrivateNote(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		cuuid = r.RequestCtx.UserValue("cuuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   struct {
+			Content string `json:"content"`
+		}
+	)
+
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err = enforceConversationAccess(app, cuuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`content`"), nil, envelope.InputError)
+	}
+
+	msg, err := app.conversation.GetMessage(uuid)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if msg.ConversationUUID != cuuid || !msg.Private || msg.SenderType != cmodels.SenderTypeAgent || msg.SenderID != user.ID {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+	}
+
+	if err := app.conversation.UpdatePrivateNote(uuid, req.Content); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
+// handleDeletePrivateNote soft-deletes a private note, replacing the body
+// with a tombstone that records who deleted it. Only the original author
+// can delete their own note.
+func handleDeletePrivateNote(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		cuuid = r.RequestCtx.UserValue("cuuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err = enforceConversationAccess(app, cuuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	msg, err := app.conversation.GetMessage(uuid)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if msg.ConversationUUID != cuuid || !msg.Private || msg.SenderType != cmodels.SenderTypeAgent || msg.SenderID != user.ID {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+	}
+
+	actorName := strings.TrimSpace(user.FirstName + " " + user.LastName)
+	if err := app.conversation.SoftDeletePrivateNote(uuid, actorName); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
 // handleSendMessage sends a message in a conversation.
 func handleSendMessage(r *fastglue.Request) error {
 	var (
