@@ -23,6 +23,7 @@ DROP TYPE IF EXISTS "sla_notification_type" CASCADE; CREATE TYPE "sla_notificati
 DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online', 'agent_password_set', 'agent_role_permissions_changed');
 DROP TYPE IF EXISTS "macro_visible_when" CASCADE; CREATE TYPE "macro_visible_when" AS ENUM ('replying', 'starting_conversation', 'adding_private_note');
 DROP TYPE IF EXISTS "user_notification_type" CASCADE; CREATE TYPE "user_notification_type" AS ENUM ('mention', 'assignment', 'sla_warning', 'sla_breach');
+DROP TYPE IF EXISTS "conversation_status_category" CASCADE; CREATE TYPE "conversation_status_category" AS ENUM ('open', 'waiting', 'resolved');
 DROP TYPE IF EXISTS "webhook_event" CASCADE; CREATE TYPE webhook_event AS ENUM (
 	'conversation.created',
 	'conversation.status_changed',
@@ -189,7 +190,8 @@ CREATE TABLE conversation_statuses (
 	id SERIAL PRIMARY KEY,
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
-	"name" TEXT NOT NULL UNIQUE
+	"name" TEXT NOT NULL UNIQUE,
+	category conversation_status_category NOT NULL DEFAULT 'open'
 );
 
 DROP TABLE IF EXISTS conversation_priorities CASCADE;
@@ -741,11 +743,11 @@ INSERT INTO conversation_priorities (name) VALUES
 ('High');
 
 -- Default conversation statuses
-INSERT INTO conversation_statuses (name) VALUES
-('Open'),
-('Snoozed'),
-('Resolved'),
-('Closed');
+INSERT INTO conversation_statuses (name, category) VALUES
+('Open', 'open'),
+('Snoozed', 'waiting'),
+('Resolved', 'resolved'),
+('Closed', 'resolved');
 
 -- Default roles
 INSERT INTO

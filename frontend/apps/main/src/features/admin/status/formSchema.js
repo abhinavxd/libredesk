@@ -15,5 +15,8 @@ export const createFormSchema = (t) => z.object({
         min: 1,
         max: 25,
       })
-    })
+    }),
+  category: z.enum(['open', 'waiting', 'resolved'], {
+    required_error: t('globals.messages.required'),
+  })
 })

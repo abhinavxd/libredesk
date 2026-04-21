@@ -70,12 +70,15 @@ func (m *Manager) GetAll() ([]models.Status, error) {
 }
 
 // Create creates a new status.
-func (m *Manager) Create(name string) (models.Status, error) {
+func (m *Manager) Create(name, category string) (models.Status, error) {
 	var status models.Status
 	if err := m.validateStatusName(name); err != nil {
 		return status, err
 	}
-	if err := m.q.InsertStatus.Get(&status, name); err != nil {
+	if err := m.validateCategory(category); err != nil {
+		return status, err
+	}
+	if err := m.q.InsertStatus.Get(&status, name, category); err != nil {
 		m.lo.Error("error inserting status", "error", err)
 		return status, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -105,22 +108,25 @@ func (m *Manager) Delete(id int) error {
 }
 
 // Update updates a status by id.
-func (m *Manager) Update(id int, name string) (models.Status, error) {
+func (m *Manager) Update(id int, name, category string) (models.Status, error) {
 	var updatedStatus models.Status
 	if err := m.validateStatusName(name); err != nil {
 		return updatedStatus, err
 	}
-	// Disallow updating of default statuses.
+	if err := m.validateCategory(category); err != nil {
+		return updatedStatus, err
+	}
 	status, err := m.Get(id)
 	if err != nil {
 		return updatedStatus, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	// Default statuses are locked. Silently no-op and return the existing row.
 	if slices.Contains(models.DefaultStatuses, status.Name) {
-		return updatedStatus, envelope.NewError(envelope.InputError, m.i18n.T("conversationStatus.cannotUpdateDefault"), nil)
+		return status, nil
 	}
 
-	if err := m.q.UpdateStatus.Get(&updatedStatus, id, name); err != nil {
+	if err := m.q.UpdateStatus.Get(&updatedStatus, id, name, category); err != nil {
 		m.lo.Error("error updating status", "error", err)
 		return updatedStatus, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -144,6 +150,14 @@ func (m *Manager) validateStatusName(name string) error {
 	}
 	if len(name) > maxStatusNameLength {
 		return envelope.NewError(envelope.InputError, m.i18n.Ts("validation.tooLongStatus", "max", fmt.Sprintf("%d", maxStatusNameLength)), nil)
+	}
+	return nil
+}
+
+// validateCategory checks that the category is one of the allowed values.
+func (m *Manager) validateCategory(category string) error {
+	if !slices.Contains(models.ValidCategories, category) {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("validation.invalidFields", "name", "`category`"), nil)
 	}
 	return nil
 }
