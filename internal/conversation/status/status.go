@@ -121,9 +121,8 @@ func (m *Manager) Update(id int, name, category string) (models.Status, error) {
 		return updatedStatus, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Default statuses are locked. Silently no-op and return the existing row.
 	if slices.Contains(models.DefaultStatuses, status.Name) {
-		return status, nil
+		return updatedStatus, envelope.NewError(envelope.InputError, m.i18n.T("conversationStatus.cannotUpdateDefault"), nil)
 	}
 
 	if err := m.q.UpdateStatus.Get(&updatedStatus, id, name, category); err != nil {
@@ -154,7 +153,6 @@ func (m *Manager) validateStatusName(name string) error {
 	return nil
 }
 
-// validateCategory checks that the category is one of the allowed values.
 func (m *Manager) validateCategory(category string) error {
 	if !slices.Contains(models.ValidCategories, category) {
 		return envelope.NewError(envelope.InputError, m.i18n.Ts("validation.invalidFields", "name", "`category`"), nil)
