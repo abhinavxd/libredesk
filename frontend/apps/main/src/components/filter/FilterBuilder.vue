@@ -30,7 +30,11 @@
 
         <!-- Operator -->
         <div class="flex-1">
-          <Select v-model="modelFilter.operator" v-if="modelFilter.field">
+          <Select
+            :model-value="modelFilter.operator"
+            @update:model-value="(op) => changeOperator(modelFilter, op)"
+            v-if="modelFilter.field"
+          >
             <SelectTrigger>
               <SelectValue
                 :placeholder="
@@ -51,7 +55,7 @@
         <!-- Value -->
         <div class="flex-1">
           <div v-if="modelFilter.field && modelFilter.operator">
-            <template v-if="modelFilter.operator !== 'set' && modelFilter.operator !== 'not set'">
+            <template v-if="modelFilter.operator !== OPERATOR.SET && modelFilter.operator !== OPERATOR.NOT_SET">
               <SelectTag
                 v-if="getFieldType(modelFilter) === FIELD_TYPE.MULTI_SELECT"
                 v-model="modelFilter.value"
@@ -91,7 +95,7 @@
               <DateFilterValue
                 v-else-if="getFieldType(modelFilter) === FIELD_TYPE.DATE"
                 v-model="modelFilter.value"
-                :range="modelFilter.operator === 'between'"
+                :range="modelFilter.operator === OPERATOR.BETWEEN"
               />
 
               <Input
@@ -139,7 +143,7 @@ import { Plus } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { useI18n } from 'vue-i18n'
-import { FIELD_TYPE } from '@/constants/filterConfig'
+import { FIELD_TYPE, OPERATOR } from '@/constants/filterConfig'
 import CloseButton from '@/components/button/CloseButton.vue'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import SelectTag from '@shared-ui/components/ui/select/SelectTag.vue'
@@ -216,6 +220,14 @@ watch(
   },
   { deep: true }
 )
+
+const changeOperator = (filter, newOperator) => {
+  if (filter.operator === newOperator) return
+  if (filter.operator === OPERATOR.BETWEEN || newOperator === OPERATOR.BETWEEN) {
+    filter.value = ''
+  }
+  filter.operator = newOperator
+}
 
 const addFilter = () => {
   modelValue.value = [...modelValue.value, createFilter()]

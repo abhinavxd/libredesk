@@ -21,6 +21,8 @@ address = "0.0.0.0:9000"
 socket = ""
 # Do NOT disable secure cookies in production environment if you don't know exactly what you're doing!
 disable_secure_cookies = false
+# Session lifetime duration.
+session_lifetime = "9h"
 # Request read and write timeouts.
 read_timeout = "5s"
 write_timeout = "5s"

@@ -5,7 +5,7 @@
 
 Modern, open source, self-hosted omnichannel customer support desk. Live chat, email, and more in a single binary.
 
-![image](https://libredesk.io/hero.png?v=1)
+![image](https://libredesk.io/hero-dark-v2.png?q=2)
 
 
 Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live demo**](https://demo.libredesk.io/).
@@ -73,10 +73,10 @@ __________________
 
 ### Binary
 - Download the [latest release](https://github.com/abhinavxd/libredesk/releases) and extract the libredesk binary.
-- Copy config.sample.toml to config.toml and edit as needed.
-- `./libredesk --install` to setup the Postgres DB (or `--upgrade` to upgrade an existing DB. Upgrades are idempotent and running them multiple times have no side effects).
+- Edit config.toml as needed.
+- `./libredesk --install` to setup the Postgres DB.
 - Run `./libredesk --set-system-user-password` to set the password for the System user.
-- Run `./libredesk` and visit `http://localhost:9000` and login with username `System` and the password you set using the --set-system-user-password command.
+- Run `./libredesk` and visit `http://localhost:9000` and login with email `System` and the password you set using the --set-system-user-password command.
 
 See [installation docs](https://docs.libredesk.io/getting-started/installation)
 __________________

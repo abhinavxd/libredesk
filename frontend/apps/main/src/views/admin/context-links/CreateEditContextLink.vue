@@ -2,8 +2,7 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading" />
-  <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+  <LoadingOverlay :loading="isLoading">
     <ContextLinkForm @submit.prevent="onSubmit" :form="form" :isNewForm="isNewForm">
       <template #footer>
         <div class="flex space-x-3">
@@ -13,14 +12,14 @@
         </div>
       </template>
     </ContextLinkForm>
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
 import { onMounted, ref, computed } from 'vue'
 import api from '@/api'
 import ContextLinkForm from '@/features/admin/context-links/ContextLinkForm.vue'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { Button } from '@shared-ui/components/ui/button'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'

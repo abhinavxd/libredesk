@@ -13,7 +13,24 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="processSend(true)">{{
+        <AlertDialogAction @click="processSend(true, true)">{{
+          $t('replyBox.sendAnyway')
+        }}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
+  <AlertDialog :open="showMissingTagsWarning" @update:open="showMissingTagsWarning = $event">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ $t('replyBox.missingTagsTitle') }}</AlertDialogTitle>
+        <AlertDialogDescription>
+          {{ $t('replyBox.missingTagsDescription') }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click="processSend(false, true)">{{
           $t('replyBox.sendAnyway')
         }}</AlertDialogAction>
       </AlertDialogFooter>
@@ -138,6 +155,7 @@ import { useDraftManager } from '@main/composables/useDraftManager'
 import api from '@main/api'
 import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@main/stores/conversation'
+import { useInboxStore } from '@main/stores/inbox'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -181,6 +199,7 @@ const formSchema = toTypedSchema(
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
+const inboxStore = useInboxStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
 
@@ -221,6 +240,7 @@ const emailErrors = ref([])
 const aiPrompts = ref([])
 const replyBoxContentRef = ref(null)
 const showContactEmailWarning = ref(false)
+const showMissingTagsWarning = ref(false)
 const mentions = ref([])
 
 /**
@@ -297,13 +317,26 @@ const hasTextContent = computed(() => {
 /**
  * Processes the send action.
  */
-const processSend = async (skipContactEmailCheck = false) => {
+const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false) => {
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
   const hasContent = hasTextContent.value > 0 || mediaFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
   const isPrivate = messageType.value === 'private_note'
+
+  const currentInbox = inboxStore.inboxes.find(
+    (i) => i.id === conversationStore.current.inbox_id
+  )
+  if (
+    !isPrivate &&
+    !skipMissingTagsCheck &&
+    currentInbox?.prompt_tags_on_reply &&
+    !(conversationStore.current.tags?.length > 0)
+  ) {
+    showMissingTagsWarning.value = true
+    return
+  }
 
   if (!isPrivate && conversationStore.current.inbox_channel === 'email') {
     // Require at least one recipient in `to`.

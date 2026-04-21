@@ -2,9 +2,8 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading"></Spinner>
-  <div class="space-y-4">
-    <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+  <LoadingOverlay :loading="isLoading">
+    <div class="space-y-4">
       <form @submit="onSubmit">
         <div class="space-y-5">
           <div class="space-y-5">
@@ -29,7 +28,7 @@
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="" v-bind="field" />
+                  <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -39,7 +38,7 @@
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="" v-bind="field" />
+                  <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -146,7 +145,7 @@
         </div>
       </form>
     </div>
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -182,7 +181,7 @@ import {
   FormMessage,
   FormDescription
 } from '@shared-ui/components/ui/form'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useRoute } from 'vue-router'
 import { useRouter } from 'vue-router'

@@ -18,7 +18,8 @@ import (
 )
 
 var (
-	ErrTeamNotFound = errors.New("team not found")
+	ErrTeamNotFound  = errors.New("team not found")
+	ErrNoUsersInPool = errors.New("no users in pool")
 )
 
 const (
@@ -204,44 +205,44 @@ func (e *Engine) assignConversations() error {
 	}
 
 	for _, conversation := range unassignedConversations {
-		// Get user from the pool.
-		userIDStr, err := e.getUserFromPool(conversation.AssignedTeamID.Int)
-		if err != nil {
-			if err != ErrTeamNotFound {
-				e.lo.Error("error fetching user from balancer pool", "conversation_uuid", conversation.UUID, "error", err)
+		teamID := conversation.AssignedTeamID.Int
+		teamMax := e.teamMaxAutoAssignments[teamID]
+		poolSize := e.poolSize(teamID)
+
+		// Try each user in the pool; skip capped users and retry on assignment failure.
+		for range poolSize {
+			userIDStr, err := e.getUserFromPool(teamID)
+			if err != nil {
+				// Log other errors.
+				if err != ErrTeamNotFound && err != ErrNoUsersInPool {
+					e.lo.Error("error fetching user from balancer pool", "conversation_uuid", conversation.UUID, "error", err)
+				}
+				break
 			}
-			continue
-		}
 
-		// Convert to int.
-		userID, err := strconv.Atoi(userIDStr)
-		if err != nil {
-			e.lo.Error("error converting user id from string to int", "user_id", userIDStr, "error", err)
-			continue
-		}
-
-		// Get active conversations count for the user.
-		activeConversationsCount, err := e.conversationStore.ActiveUserConversationsCount(userID)
-		if err != nil {
-			e.lo.Error("error fetching active conversations count for user", "user_id", userID, "error", err)
-			continue
-		}
-
-		teamMaxAutoAssignments := e.teamMaxAutoAssignments[conversation.AssignedTeamID.Int]
-		// Check if user has reached the max auto assigned conversations limit,
-		// 0 is unlimited.
-		if teamMaxAutoAssignments != 0 {
-			if activeConversationsCount >= teamMaxAutoAssignments {
-				e.lo.Debug("user has reached max auto assigned conversations limit, skipping auto assignment", "user_id", userID,
-					"user_active_conversations_count", activeConversationsCount, "max_auto_assigned_conversations", teamMaxAutoAssignments)
+			userID, err := strconv.Atoi(userIDStr)
+			if err != nil {
+				e.lo.Error("error converting user id from string to int", "user_id", userIDStr, "error", err)
 				continue
 			}
-		}
 
-		// Assign conversation to user.
-		if err := e.conversationStore.UpdateConversationUserAssignee(conversation.UUID, userID, e.systemUser); err != nil {
-			e.lo.Error("error assigning conversation", "conversation_uuid", conversation.UUID, "error", err)
-			continue
+			activeConversationsCount, err := e.conversationStore.ActiveUserConversationsCount(userID)
+			if err != nil {
+				e.lo.Error("error fetching active conversations count for user", "user_id", userID, "error", err)
+				continue
+			}
+
+			if teamMax != 0 && activeConversationsCount >= teamMax {
+				e.lo.Debug("user has reached max auto assigned conversations limit, trying next user", "user_id", userID,
+					"user_active_conversations_count", activeConversationsCount, "max_auto_assigned_conversations", teamMax)
+				continue
+			}
+
+			if err := e.conversationStore.UpdateConversationUserAssignee(conversation.UUID, userID, e.systemUser); err != nil {
+				e.lo.Error("error assigning conversation", "conversation_uuid", conversation.UUID, "user_id", userID, "error", err)
+				continue
+			}
+			break
 		}
 	}
 	return nil
@@ -256,5 +257,20 @@ func (e *Engine) getUserFromPool(assignedTeamID int) (string, error) {
 	if !ok {
 		return "", ErrTeamNotFound
 	}
-	return pool.Get(), nil
+	id := pool.Get()
+	// Empty id means the pool has no users (e.g. all team members are away).
+	if id == "" {
+		return "", ErrNoUsersInPool
+	}
+	return id, nil
+}
+
+func (e *Engine) poolSize(teamID int) int {
+	e.balanceMu.Lock()
+	defer e.balanceMu.Unlock()
+	pool, ok := e.roundRobinBalancer[teamID]
+	if !ok {
+		return 0
+	}
+	return len(pool.ItemIDs())
 }

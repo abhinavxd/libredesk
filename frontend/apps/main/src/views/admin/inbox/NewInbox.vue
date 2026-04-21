@@ -134,6 +134,7 @@ const submitLiveChatForm = (values) => {
     channel: 'livechat',
     enabled: values.enabled ?? true,
     csat_enabled: values.csat_enabled ?? false,
+    prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
     config: values.config
   }
   createInbox(payload)

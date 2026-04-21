@@ -1,14 +1,13 @@
 <template>
   <AdminSplitLayout>
     <template #content>
-      <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+      <LoadingOverlay :loading="isLoading">
         <GeneralSettingForm
           :submitForm="submitForm"
           :initial-values="initialValues"
           :available-languages="availableLanguages"
         />
-        <Spinner v-if="isLoading" />
-      </div>
+      </LoadingOverlay>
     </template>
     <template #help>
       <p>{{ $t('admin.general.help') }}</p>
@@ -18,7 +17,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import GeneralSettingForm from '@/features/admin/general/GeneralSettingForm.vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'

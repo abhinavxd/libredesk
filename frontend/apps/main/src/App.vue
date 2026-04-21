@@ -136,6 +136,7 @@ import { EMITTER_EVENTS } from './constants/emitterEvents.js'
 import { useEmitter } from './composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useConversationStore } from './stores/conversation'
+import { CONVERSATION_LIST_TYPE } from './constants/conversation'
 import { useInboxStore } from './stores/inbox'
 import { useUsersStore } from './stores/users'
 import { useTeamStore } from './stores/team'
@@ -305,11 +306,18 @@ const listenViewRefresh = () => {
   emitter.on(EMITTER_EVENTS.REFRESH_LIST, refreshViews)
 }
 
-const refreshViews = (data) => {
+const refreshViews = async (data) => {
   openCreateViewForm.value = false
   // TODO: move model to constants.
   if (data?.model === 'view') {
-    getUserViews()
+    await getUserViews()
+    const openID = route.params.viewID
+    // If the open view was edited its filters may have changed, refetch.
+    if (openID && userViews.value.some((v) => String(v.id) === String(openID))) {
+      // Reset list and fetch conversations.
+      conversationStore.resetConversations()
+      conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], openID)
+    }
   }
 }
 </script>

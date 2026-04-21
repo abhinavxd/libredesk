@@ -37,5 +37,10 @@ func V2_2_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	_, err = db.Exec(`ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS prompt_tags_on_reply bool DEFAULT false NOT NULL;`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -70,6 +70,21 @@
       </FormItem>
     </FormField>
 
+    <FormField
+      v-if="showFormFields"
+      v-slot="{ componentField, handleChange }"
+      name="prompt_tags_on_reply"
+    >
+      <FormItem>
+        <SwitchField
+          :title="$t('admin.inbox.promptTagsOnReply')"
+          :description="$t('admin.inbox.promptTagsOnReply.description')"
+          :checked="componentField.modelValue"
+          @update:checked="handleChange"
+        />
+      </FormItem>
+    </FormField>
+
     <FormField v-if="setupMethod" v-slot="{ componentField }" name="auth_type">
       <FormItem>
         <FormControl>
@@ -750,6 +765,7 @@ const form = useForm({
     from: '',
     enabled: true,
     csat_enabled: false,
+    prompt_tags_on_reply: false,
     enable_plus_addressing: true,
     auth_type: AUTH_TYPE_PASSWORD,
     imap: {

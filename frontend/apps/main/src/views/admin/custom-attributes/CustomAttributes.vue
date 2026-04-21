@@ -1,9 +1,8 @@
 <template>
   <div>
-    <Spinner v-if="isLoading" />
     <AdminSplitLayout>
       <template #content>
-        <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+        <LoadingOverlay :loading="isLoading" reserve-height>
           <div class="flex justify-between mb-5">
             <div></div>
             <div class="flex justify-end mb-4">
@@ -59,7 +58,7 @@
               </TabsContent>
             </Tabs>
           </div>
-        </div>
+        </LoadingOverlay>
       </template>
 
       <template #help>
@@ -78,7 +77,7 @@ import { Button } from '@shared-ui/components/ui/button'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from '../../../features/admin/custom-attributes/formSchema.js'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useEmitter } from '../../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import {

@@ -1,6 +1,5 @@
 <template>
-  <Spinner v-if="formLoading" />
-  <div :class="{ 'transition-opacity duration-300 opacity-50': formLoading }">
+  <LoadingOverlay :loading="formLoading" reserve-height>
     <div class="flex justify-end mb-5">
       <router-link :to="{ name: 'new-shared-view' }">
         <Button>
@@ -13,14 +12,14 @@
     <div>
       <DataTable :columns="createColumns(t)" :data="sharedViews" :loading="formLoading" />
     </div>
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import DataTable from '@/components/datatable/DataTable.vue'
 import { createColumns } from '@/features/admin/shared-views/dataTableColumns.js'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
