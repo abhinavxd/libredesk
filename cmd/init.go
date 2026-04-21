@@ -1139,8 +1139,8 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 		RPM  int
 	}{
 		{"widget", 100},
-		{"auth", 20},
-		{"public", 60},
+		{"auth", 30},
+		{"public", 100},
 	}
 
 	for _, d := range defaults {
