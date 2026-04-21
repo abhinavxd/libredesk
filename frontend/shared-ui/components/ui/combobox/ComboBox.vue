@@ -7,7 +7,9 @@
         :aria-expanded="open"
         :class="['w-full justify-between', buttonClass]"
       >
-        <slot name="selected" :selected="selectedItem">{{ selectedLabel }}</slot>
+        <span class="min-w-0 flex-1 truncate text-left">
+          <slot name="selected" :selected="selectedItem">{{ selectedLabel }}</slot>
+        </span>
         <CaretSortIcon class="h-4 w-4 shrink-0 opacity-50" />
       </Button>
     </PopoverTrigger>
