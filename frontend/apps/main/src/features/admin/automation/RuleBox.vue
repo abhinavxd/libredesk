@@ -89,6 +89,7 @@
                 v-if="inputType(index) === 'text'"
                 v-model="rule.value"
                 @update:modelValue="(value) => handleValueChange(value, index)"
+                @keydown.enter.prevent
               />
 
               <!-- Number input -->
@@ -98,6 +99,7 @@
                 v-if="inputType(index) === 'number'"
                 v-model="rule.value"
                 @update:modelValue="(value) => handleValueChange(value, index)"
+                @keydown.enter.prevent
               />
 
               <!-- Select input -->
@@ -141,6 +143,7 @@
                 v-if="inputType(index) === 'date'"
                 v-model="rule.value"
                 @update:modelValue="(value) => handleValueChange(value, index)"
+                @keydown.enter.prevent
               />
 
               <!-- Boolean / Checkbox input -->

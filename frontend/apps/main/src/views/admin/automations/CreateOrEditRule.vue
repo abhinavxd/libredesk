@@ -30,7 +30,7 @@
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="" v-bind="field" />
+                  <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -40,7 +40,7 @@
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="" v-bind="field" />
+                  <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
                 </FormControl>
                 <FormMessage />
               </FormItem>
