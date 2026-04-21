@@ -331,16 +331,19 @@ WHERE uuid = $1;
 
 
 -- name: update-conversation-status
+WITH new_status AS (
+    SELECT id, category FROM conversation_statuses WHERE name = $2
+)
 UPDATE conversations
-SET status_id = (SELECT id FROM conversation_statuses WHERE name = $2),
-    resolved_at = COALESCE(resolved_at, CASE WHEN $2 IN ('Resolved', 'Closed') THEN NOW() END),
-    closed_at = COALESCE(closed_at, CASE WHEN $2 = 'Closed' THEN NOW() END),
+SET status_id     = (SELECT id FROM new_status),
+    resolved_at   = COALESCE(resolved_at, CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() END),
+    closed_at     = COALESCE(closed_at,   CASE WHEN $2 = 'Closed'                                  THEN NOW() END),
     snoozed_until = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE snoozed_until END,
-    updated_at = NOW()
+    updated_at    = NOW()
 WHERE uuid = $1;
 
 -- name: get-user-active-conversations-count
-SELECT COUNT(*) FROM conversations WHERE status_id IN (SELECT id FROM conversation_statuses WHERE name NOT IN ('Resolved', 'Closed')) and assigned_user_id = $1;
+SELECT COUNT(*) FROM conversations WHERE status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open') AND assigned_user_id = $1;
 
 -- name: update-conversation-priority
 UPDATE conversations 
@@ -449,7 +452,7 @@ WHERE m.uuid = $1;
 UPDATE conversations
 SET assigned_user_id = NULL,
     updated_at = NOW()
-WHERE assigned_user_id = $1 AND status_id in (SELECT id FROM conversation_statuses WHERE name NOT IN ('Resolved', 'Closed'));
+WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
 
 -- name: update-conversation-custom-attributes
 UPDATE conversations

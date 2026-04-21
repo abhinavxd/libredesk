@@ -13,7 +13,7 @@ import (
 
 	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
 	bmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	cstatusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
@@ -544,9 +544,9 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 		return fmt.Errorf("fetching applied SLA for notification: %w", err)
 	}
 
-	// If conversation is `Resolved` / `Closed`, mark the notification as processed and return.
-	if appliedSLA.ConversationStatus == cmodels.StatusResolved || appliedSLA.ConversationStatus == cmodels.StatusClosed {
-		m.lo.Info("marking sla notification as processed as the conversation is resolved/closed", "status", appliedSLA.ConversationStatus, "scheduled_notification_id", scheduledNotification.ID)
+	// Any status in the resolved category is terminal for SLA tracking.
+	if appliedSLA.ConversationStatusCategory == cstatusmodels.CategoryResolved {
+		m.lo.Info("marking sla notification as processed as the conversation is in a resolved-category status", "status", appliedSLA.ConversationStatus, "scheduled_notification_id", scheduledNotification.ID)
 		if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
 			m.lo.Error("error marking notification as processed", "error", err)
 		}

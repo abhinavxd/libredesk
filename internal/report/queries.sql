@@ -70,7 +70,7 @@ FROM
     conversations c
     INNER JOIN conversation_statuses s ON c.status_id = s.id
 WHERE
-    s.name not in ('Resolved', 'Closed');
+    s.category != 'resolved';
 
 -- name: get-overview-sla-counts
 WITH first_and_resolution AS (

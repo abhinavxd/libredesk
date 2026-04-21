@@ -74,8 +74,8 @@ WHERE id = $1;
 -- name: update-conversation-sla-deadline
 UPDATE conversations c
 SET next_sla_deadline_at = CASE
-    -- If resolved or closed, clear the deadline
-    WHEN c.status_id IN (SELECT id FROM conversation_statuses WHERE name IN ('Resolved', 'Closed')) THEN NULL
+    -- If the conversation is in a resolved-category status, clear the deadline
+    WHEN c.status_id IN (SELECT id FROM conversation_statuses WHERE category = 'resolved') THEN NULL
 
     -- If an external timestamp ($2) is provided (e.g. next_response), use the earliest of $2.
     WHEN $2::TIMESTAMPTZ IS NOT NULL THEN LEAST(
@@ -149,7 +149,8 @@ SELECT a.id,
    c.reference_number as conversation_reference_number,
    c.subject as conversation_subject,
    c.assigned_user_id as conversation_assigned_user_id,
-   s.name as conversation_status
+   s.name as conversation_status,
+   s.category as conversation_status_category
 FROM applied_slas a INNER JOIN conversations c on a.conversation_id = c.id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id
 WHERE a.id = $1;

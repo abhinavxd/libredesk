@@ -8,8 +8,36 @@ import (
 
 func V2_2_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	_, err := db.Exec(`
-		ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS prompt_tags_on_reply bool DEFAULT false NOT NULL;
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'conversation_status_category') THEN
+				CREATE TYPE conversation_status_category AS ENUM ('open', 'waiting', 'resolved');
+			END IF;
+		END$$;
 	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		ALTER TABLE conversation_statuses
+		ADD COLUMN IF NOT EXISTS category conversation_status_category NOT NULL DEFAULT 'open';
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`UPDATE conversation_statuses SET category = 'waiting'  WHERE name = 'Snoozed'`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`UPDATE conversation_statuses SET category = 'resolved' WHERE name IN ('Resolved', 'Closed')`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS prompt_tags_on_reply bool DEFAULT false NOT NULL;`)
 	if err != nil {
 		return err
 	}
