@@ -30,7 +30,11 @@
 
         <!-- Operator -->
         <div class="flex-1">
-          <Select v-model="modelFilter.operator" v-if="modelFilter.field">
+          <Select
+            :model-value="modelFilter.operator"
+            @update:model-value="(op) => changeOperator(modelFilter, op)"
+            v-if="modelFilter.field"
+          >
             <SelectTrigger>
               <SelectValue
                 :placeholder="
@@ -216,6 +220,14 @@ watch(
   },
   { deep: true }
 )
+
+const changeOperator = (filter, newOperator) => {
+  if (filter.operator === newOperator) return
+  if (filter.operator === 'between' || newOperator === 'between') {
+    filter.value = ''
+  }
+  filter.operator = newOperator
+}
 
 const addFilter = () => {
   modelValue.value = [...modelValue.value, createFilter()]
