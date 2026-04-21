@@ -6,8 +6,7 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-// V2_1_0 updates the database schema to v2.1.0.
-func V2_1_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+func V2_2_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	_, err := db.Exec(`
 		ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS prompt_tags_on_reply bool DEFAULT false NOT NULL;
 	`)
