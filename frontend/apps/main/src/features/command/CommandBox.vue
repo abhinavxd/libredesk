@@ -1,5 +1,11 @@
 <template>
-  <CommandDialog :open="open" @update:open="toggleOpen" class="transform-gpu z-[51] !min-w-[50vw]">
+  <CommandDialog
+    :open="open"
+    v-model:search-term="searchTerm"
+    :filter-function="isMacroMode ? passThroughFilter : undefined"
+    @update:open="toggleOpen"
+    class="transform-gpu z-[51] !min-w-[50vw]"
+  >
     <CommandInput :placeholder="t('command.typeCmdOrSearch')" @keydown="onInputKeydown" />
     <CommandList
       class="!min-h-[50vh] h-[50vh] !min-w-[50vw]"
@@ -41,19 +47,14 @@
       </CommandGroup>
 
       <!-- Macros -->
-      <div
-        v-if="
-          nestedCommand === 'apply-macro-to-existing-conversation' ||
-          nestedCommand === 'apply-macro-to-new-conversation'
-        "
-      >
+      <div v-if="isMacroMode">
         <CommandGroup :heading="$t('actions.applyMacro')">
           <div class="min-h-[400px]">
             <div class="h-[60vh] grid grid-cols-12">
               <!-- Left Column: Macro List (30%) -->
-              <div class="col-span-4 pr-2 border-r overflow-y-auto h-full">
+              <div ref="macroListRef" class="col-span-4 pr-2 border-r overflow-y-auto h-full">
                 <CommandItem
-                  v-for="(macro, index) in macroStore.macroOptions"
+                  v-for="(macro, index) in visibleMacros"
                   :key="macro.value"
                   :value="macro.label + '|' + index"
                   :data-index="index"
@@ -247,6 +248,8 @@ import { Label } from '@shared-ui/components/ui/label'
 import { useI18n } from 'vue-i18n'
 import { Letter } from 'vue-letter'
 
+const RENDER_CAP = 200
+
 const conversationStore = useConversationStore()
 const macroStore = useMacroStore()
 const { t } = useI18n()
@@ -257,6 +260,34 @@ const showDatePicker = ref(false)
 const datePickerOpen = ref(false)
 const selectedDate = ref(null)
 const selectedTime = ref('12:00')
+const searchTerm = ref('')
+const macroListRef = ref(null)
+
+const passThroughFilter = (items) => items
+
+const isMacroMode = computed(
+  () =>
+    nestedCommand.value === 'apply-macro-to-existing-conversation' ||
+    nestedCommand.value === 'apply-macro-to-new-conversation'
+)
+
+const macroSearchIndex = computed(() =>
+  macroStore.macroOptions.map((m) => ({ macro: m, labelLower: String(m.label).toLowerCase() }))
+)
+
+const visibleMacros = computed(() => {
+  const term = searchTerm.value?.trim().toLowerCase()
+  const index = macroSearchIndex.value
+  if (!term) {
+    const all = macroStore.macroOptions
+    return all.length > RENDER_CAP ? all.slice(0, RENDER_CAP) : all
+  }
+  const matched = []
+  for (let i = 0; i < index.length && matched.length < RENDER_CAP; i++) {
+    if (index[i].labelLower.includes(term)) matched.push(index[i].macro)
+  }
+  return matched
+})
 
 const { Meta_K, Ctrl_K } = useMagicKeys({
   passive: false,
@@ -370,24 +401,26 @@ const nestedCommandHandler = (data) => {
   open.value = data.open
 }
 
+let highlightObserver = null
+
+watch(macroListRef, (el) => {
+  highlightObserver?.disconnect()
+  highlightObserver = null
+  highlightedMacro.value = null
+  if (!el) return
+  highlightObserver = new MutationObserver(() => {
+    const idx = el.querySelector('[data-highlighted]')?.getAttribute('data-index')
+    highlightedMacro.value = idx != null ? visibleMacros.value[idx] : null
+  })
+  highlightObserver.observe(el, { attributes: true, attributeFilter: ['data-highlighted'], subtree: true })
+})
+
 onMounted(() => {
   emitter.on(EMITTER_EVENTS.SET_NESTED_COMMAND, nestedCommandHandler)
-  watchHighlightedMacro()
 })
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.SET_NESTED_COMMAND, nestedCommandHandler)
+  highlightObserver?.disconnect()
 })
-
-const watchHighlightedMacro = () => {
-  const observer = new MutationObserver(() => {
-    const highlightedEl = document.querySelector('[data-highlighted]')?.getAttribute('data-index')
-    highlightedMacro.value = highlightedEl ? macroStore.macroOptions[highlightedEl] : null
-  })
-
-  observer.observe(document.body, {
-    attributes: true,
-    subtree: true
-  })
-}
 </script>
