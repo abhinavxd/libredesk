@@ -24,10 +24,10 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="email_outgoing">
-          <DataTable :columns="createOutgoingEmailTableColumns(t)" :data="templates" :loading="isLoading" />
+          <DataTable :columns="createOutgoingEmailTableColumns(t)" :data="templates" :loading="isLoading" :searchable="false" />
         </TabsContent>
         <TabsContent value="email_notification">
-          <DataTable :columns="createEmailNotificationTableColumns(t)" :data="templates" :loading="isLoading" />
+          <DataTable :columns="createEmailNotificationTableColumns(t)" :data="templates" :loading="isLoading" :searchable="false" />
         </TabsContent>
       </Tabs>
     </div>

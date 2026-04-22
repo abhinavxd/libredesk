@@ -40,7 +40,7 @@
             </div>
           </div>
           <div>
-            <DataTable :columns="createColumns(t, { onEdit: editStatus })" :data="statuses" :loading="isLoading" />
+            <DataTable :columns="createColumns(t, { onEdit: editStatus })" :data="statuses" :loading="isLoading" :searchable="false" />
           </div>
         </LoadingOverlay>
       </template>

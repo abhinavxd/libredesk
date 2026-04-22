@@ -11,7 +11,7 @@
       </div>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="webhooks" :loading="isLoading" />
+      <DataTable :columns="createColumns(t)" :data="webhooks" :loading="isLoading" :searchable="false" />
     </div>
   </LoadingOverlay>
 </template>

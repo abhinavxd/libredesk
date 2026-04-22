@@ -6,7 +6,7 @@
       </router-link>
     </div>
     <div>
-      <DataTable :columns="columns" :data="data" :loading="isLoading" />
+      <DataTable :columns="columns" :data="data" :loading="isLoading" :searchable="false" />
     </div>
   </LoadingOverlay>
 </template>

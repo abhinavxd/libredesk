@@ -32,6 +32,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'enabled',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.enabled'))
     },
@@ -50,6 +51,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'created_at',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },
@@ -63,6 +65,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'updated_at',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
     },

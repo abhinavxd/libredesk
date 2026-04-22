@@ -1,5 +1,14 @@
 <template>
-  <div class="w-full">
+  <div class="w-full space-y-3">
+    <div v-if="searchable" class="relative max-w-sm">
+      <Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        v-model="globalFilter"
+        :placeholder="searchPlaceholder || t('globals.terms.search')"
+        class="pl-8"
+      />
+    </div>
+
     <div
       ref="scrollContainer"
       class="relative overflow-auto rounded-lg border border-border bg-card shadow-sm"
@@ -92,11 +101,17 @@
 </template>
 
 <script setup>
-import { FlexRender, getCoreRowModel, getSortedRowModel, useVueTable } from '@tanstack/vue-table'
+import {
+  FlexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useVueTable
+} from '@tanstack/vue-table'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
-import { ArrowUpDown, ChevronDown, ChevronUp, Ghost } from 'lucide-vue-next'
+import { ArrowUpDown, ChevronDown, ChevronUp, Ghost, Search } from 'lucide-vue-next'
 import {
   TableBody,
   TableCell,
@@ -104,6 +119,7 @@ import {
   TableHeader,
   TableRow
 } from '@shared-ui/components/ui/table'
+import { Input } from '@shared-ui/components/ui/input'
 
 const { t } = useI18n()
 
@@ -125,16 +141,21 @@ const props = defineProps({
   estimatedRowHeight: {
     type: Number,
     default: 52
+  },
+  searchable: {
+    type: Boolean,
+    default: true
+  },
+  searchPlaceholder: {
+    type: String,
+    default: ''
   }
 })
 
-const emptyText = computed(
-  () =>
-    props.emptyText ||
-    t('globals.messages.noResultsFound')
-)
-
 const sorting = ref([])
+const globalFilter = ref('')
+
+const emptyText = computed(() => props.emptyText || t('globals.messages.noResultsFound'))
 
 const table = useVueTable({
   get data() {
@@ -146,6 +167,9 @@ const table = useVueTable({
   state: {
     get sorting() {
       return sorting.value
+    },
+    get globalFilter() {
+      return globalFilter.value
     }
   },
   enableSortingRemoval: false,
@@ -153,8 +177,13 @@ const table = useVueTable({
     sorting.value =
       typeof updaterOrValue === 'function' ? updaterOrValue(sorting.value) : updaterOrValue
   },
+  onGlobalFilterChange: (updaterOrValue) => {
+    globalFilter.value =
+      typeof updaterOrValue === 'function' ? updaterOrValue(globalFilter.value) : updaterOrValue
+  },
   getCoreRowModel: getCoreRowModel(),
-  getSortedRowModel: getSortedRowModel()
+  getSortedRowModel: getSortedRowModel(),
+  getFilteredRowModel: getFilteredRowModel()
 })
 
 const scrollContainer = ref(null)

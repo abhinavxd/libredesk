@@ -32,6 +32,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'usage_count',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.usage'))
     },
@@ -41,6 +42,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'created_at',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },
@@ -50,6 +52,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'updated_at',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
     },
@@ -61,6 +64,7 @@ export const createColumns = (t) => [
     id: 'actions',
     enableHiding: false,
     enableSorting: false,
+    enableGlobalFilter: false,
     cell: ({ row }) => {
       const macro = row.original
       return h(

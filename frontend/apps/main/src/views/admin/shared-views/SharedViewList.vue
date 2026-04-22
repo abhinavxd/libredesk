@@ -10,7 +10,7 @@
       </router-link>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="sharedViews" :loading="formLoading" />
+      <DataTable :columns="createColumns(t)" :data="sharedViews" :loading="formLoading" :searchable="false" />
     </div>
   </LoadingOverlay>
 </template>
