@@ -86,6 +86,9 @@
               </Tooltip>
             </SidebarMenuItem>
             <SidebarMenuItem>
+              <ThemeSwitcher />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
               <SidebarNavUser />
             </SidebarMenuItem>
           </SidebarMenu>
@@ -172,10 +175,17 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import SidebarNavUser from '@main/components/sidebar/SidebarNavUser.vue'
 import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
+import ThemeSwitcher from '@main/components/sidebar/ThemeSwitcher.vue'
+import { useTheme } from '@main/composables/useTheme'
 import api from '@main/api'
 
 const route = useRoute()
 const emitter = useEmitter()
+
+// Apply the persisted theme to <html data-theme="..."> on app start. Called
+// here (not just inside ThemeSwitcher) so the attribute is set even when
+// only one theme is registered and the switcher UI is hidden.
+useTheme()
 
 // Small screen overlay - shown once per session for screens < 768px.
 const showSmallScreenOverlay = ref(window.screen.width < 768 && !sessionStorage.getItem('smallScreenDismissed'))

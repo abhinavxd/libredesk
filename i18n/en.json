@@ -974,6 +974,7 @@
   "template.deletionConfirmation": "This action cannot be undone. This will permanently delete this template.",
   "template.edit": "Edit template",
   "template.new": "New template",
+  "theme.switcher": "Theme",
   "toast.apiKeyGenerated": "API key generated",
   "toast.authorizationDenied": "Authorization denied",
   "toast.avatarUpdated": "Avatar updated successfully",
