@@ -140,12 +140,12 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 	// Reuse saved subject for threading, or build from first message on first email
 	emailSubject := conv.ContinuityEmailSubject.String
 	if emailSubject == "" {
-		emailSubject = fmt.Sprintf("#%s", conv.ReferenceNumber)
+		emailSubject = m.formatRefMarker(conv.ReferenceNumber)
 		if text := strings.TrimSpace(unreadMessages[0].TextContent); text != "" {
 			if len(text) > 100 {
 				text = text[:100] + "..."
 			}
-			emailSubject = fmt.Sprintf("%s - #%s", text, conv.ReferenceNumber)
+			emailSubject = fmt.Sprintf("%s - %s", text, emailSubject)
 		}
 	}
 

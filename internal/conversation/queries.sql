@@ -5,6 +5,7 @@ WHERE snoozed_until <= NOW();
 
 -- name: insert-conversation
 -- $11 = rate limit window start (timestamptz), $12 = max conversations (0 = unlimited)
+-- $13 = subject reference marker template (placeholder: {ref})
 WITH
 status_id AS (
     SELECT id FROM conversation_statuses WHERE name = $2
@@ -21,7 +22,7 @@ SELECT
    $4,
    $5,
    CASE
-      WHEN $8 = TRUE THEN CONCAT($6::text, ' - #', (SELECT reference_number FROM reference_number), '')
+      WHEN $8 = TRUE THEN CONCAT($6::text, ' - ', REPLACE($13::text, '{ref}', (SELECT reference_number FROM reference_number)))
       ELSE $6::text
    END,
    (SELECT reference_number FROM reference_number),

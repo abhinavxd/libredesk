@@ -84,6 +84,7 @@ type Manager struct {
 	closedMu                   sync.RWMutex
 	wg                         sync.WaitGroup
 	continuityConfig           ContinuityConfig
+	subjectRefFormat           string
 }
 
 // WidgetConversationView represents the conversation data for widget clients
@@ -176,6 +177,7 @@ type Opts struct {
 	OutgoingMessageQueueSize int
 	IncomingMessageQueueSize int
 	ContinuityConfig         *ContinuityConfig
+	SubjectRefFormat         string
 }
 
 // New initializes a new conversation Manager.
@@ -214,6 +216,13 @@ func New(
 		}
 	}
 
+	subjectRefFormat := opts.SubjectRefFormat
+	if subjectRefFormat == "" {
+		subjectRefFormat = "#{ref}"
+	} else if !strings.Contains(subjectRefFormat, "{ref}") {
+		return nil, fmt.Errorf("conversation.subject_ref_format must contain {ref} placeholder")
+	}
+
 	c := &Manager{
 		q:                          q,
 		wsHub:                      wsHub,
@@ -237,6 +246,7 @@ func New(
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
 		outgoingProcessingMessages: sync.Map{},
 		continuityConfig:           continuityConfig,
+		subjectRefFormat:           subjectRefFormat,
 	}
 
 	return c, nil
@@ -342,7 +352,7 @@ func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string,
 		since = time.Now().Add(-rateLimitWindow)
 	}
 
-	if err := c.q.InsertConversation.QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject, metaJSON, customAttrsJSON, since, maxConversations).Scan(&id, &uuid); err != nil {
+	if err := c.q.InsertConversation.QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject, metaJSON, customAttrsJSON, since, maxConversations, c.subjectRefFormat).Scan(&id, &uuid); err != nil {
 		if err == sql.ErrNoRows {
 			return 0, "", envelope.NewError(envelope.RateLimitError, c.i18n.T("globals.messages.tooManyRequests"), nil)
 		}
@@ -1822,4 +1832,8 @@ func (m *Manager) calculateBusinessHoursInfo(conversation models.Conversation) (
 	}
 
 	return businessHoursID, utcOffset
+}
+
+func (c *Manager) formatRefMarker(ref string) string {
+	return strings.ReplaceAll(c.subjectRefFormat, "{ref}", ref)
 }
