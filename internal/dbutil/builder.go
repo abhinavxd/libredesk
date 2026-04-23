@@ -130,10 +130,22 @@ func buildWhereClause(filters []Filter, existingArgs []interface{}, allowedField
 			args = append(args, f.Value)
 			paramCount++
 		case "greater than":
+			if dateOnlyRe.MatchString(f.Value) {
+				conditions = append(conditions, fmt.Sprintf("%s >= ($%d::DATE + INTERVAL '1 day')", field, paramCount))
+				args = append(args, f.Value)
+				paramCount++
+				break
+			}
 			conditions = append(conditions, field+fmt.Sprintf(" > $%d", paramCount))
 			args = append(args, f.Value)
 			paramCount++
 		case "less than":
+			if dateOnlyRe.MatchString(f.Value) {
+				conditions = append(conditions, fmt.Sprintf("%s < $%d::DATE", field, paramCount))
+				args = append(args, f.Value)
+				paramCount++
+				break
+			}
 			conditions = append(conditions, field+fmt.Sprintf(" < $%d", paramCount))
 			args = append(args, f.Value)
 			paramCount++
