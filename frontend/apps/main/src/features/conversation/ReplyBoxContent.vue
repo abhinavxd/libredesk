@@ -22,6 +22,17 @@
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
+          <!-- The Forward tab is only visible after the user clicks Forward
+               on a specific message. Switching to it from the bare list
+               wouldn't make sense (there's no message to quote). -->
+          <TabsTrigger
+            v-if="messageType === 'forward'"
+            value="forward"
+            class="px-3 py-1 rounded transition-colors duration-200"
+            :class="{ 'bg-background text-foreground': messageType === 'forward' }"
+          >
+            {{ $t('conversation.forward') }}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       <Button class="text-muted-foreground" variant="ghost" @click="toggleFullscreen">
@@ -33,7 +44,7 @@
     <div v-if="conversationStore.current.inbox_channel === 'email'">
       <div
         :class="['space-y-3', isFullscreen ? 'p-4 border-b border-border' : 'mb-4']"
-        v-if="messageType === 'reply'"
+        v-if="messageType === 'reply' || messageType === 'forward'"
       >
         <div class="flex items-center space-x-2">
           <label class="w-12 text-sm font-medium text-muted-foreground">TO:</label>

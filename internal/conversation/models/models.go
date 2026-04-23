@@ -53,6 +53,7 @@ var (
 	ActivityTagRemoved         = "tag_removed"
 	ActivitySLASet             = "sla_set"
 	ActivityParticipantAdded   = "participant_added"
+	ActivityMessageForwarded   = "message_forwarded"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"

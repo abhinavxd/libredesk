@@ -22,6 +22,10 @@ type messageReq struct {
 	SenderType  string                 `json:"sender_type"`
 	Mentions    []cmodels.MentionInput `json:"mentions"`
 	EchoID      string                 `json:"echo_id"`
+	// ForwardedTo, when non-empty, signals "forward this conversation to
+	// the listed addresses". The original recipients (To) are ignored;
+	// CC/BCC pass through unchanged so an agent can loop in teammates.
+	ForwardedTo []string `json:"forwarded_to"`
 }
 
 // handleGetMessages returns messages for a conversation.
@@ -262,10 +266,30 @@ func handleSendMessage(r *fastglue.Request) error {
 	if req.EchoID != "" {
 		meta["echo_id"] = req.EchoID
 	}
-	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, meta)
+
+	// Forward mode: route to the forwarded_to recipients instead of req.To.
+	// CC/BCC pass through unchanged so an agent can loop teammates in.
+	sendTo := req.To
+	if len(req.ForwardedTo) > 0 {
+		meta["forwarded"] = true
+		meta["forwarded_to"] = req.ForwardedTo
+		sendTo = req.ForwardedTo
+	}
+
+	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, sendTo, req.CC, req.BCC, meta)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+
+	// Log a forward activity note so the audit trail captures who forwarded
+	// to whom. Best-effort: a logging failure shouldn't break the send.
+	if len(req.ForwardedTo) > 0 {
+		recipients := strings.Join(req.ForwardedTo, ", ")
+		if err := app.conversation.InsertConversationActivity(cmodels.ActivityMessageForwarded, cuuid, recipients, user); err != nil {
+			app.lo.Warn("failed to insert forward activity note", "error", err, "conversation_uuid", cuuid)
+		}
+	}
+
 	return r.SendEnvelope(message)
 }
 

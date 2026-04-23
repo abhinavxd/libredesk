@@ -857,3 +857,23 @@ WHERE c.assigned_user_id = $1
   AND u.availability_status = 'online'
 ORDER BY c.last_interaction_at DESC
 LIMIT 50;
+
+-- name: is-source-id-from-forward
+-- Returns true if any of the given non-empty message source IDs (from
+-- In-Reply-To / References headers) belongs to a message that was either
+-- sent as a forward (meta.forwarded_to set) or is itself flagged as a
+-- reply-to-forward (meta.from_forward = true). Used to propagate the
+-- from_forward tag through chained replies so internal threads stay
+-- internal.
+--
+-- Empty strings in the input array are filtered out so an empty
+-- In-Reply-To value can't false-match a row whose source_id is also empty.
+-- The from_forward check uses jsonb containment so it never throws on
+-- unexpected meta shapes (a stray string/null wouldn't survive a ::boolean
+-- cast).
+SELECT EXISTS(
+    SELECT 1 FROM conversation_messages
+    WHERE source_id IS NOT NULL AND source_id <> ''
+      AND source_id = ANY(ARRAY(SELECT s FROM unnest($1::text[]) AS s WHERE s <> ''))
+      AND (meta ? 'forwarded_to' OR meta @> '{"from_forward": true}'::jsonb)
+) AS is_from_forward;

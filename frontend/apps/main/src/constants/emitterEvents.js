@@ -6,5 +6,6 @@ export const EMITTER_EVENTS = {
     NEW_MESSAGE: 'new-message',
     SET_NESTED_COMMAND: 'set-nested-command',
     CONVERSATION_SIDEBAR_TOGGLE: 'conversation-sidebar-toggle',
-    SCROLL_TO_MESSAGE: 'scroll-to-message'
+    SCROLL_TO_MESSAGE: 'scroll-to-message',
+    FORWARD_MESSAGE: 'forward-message'
 }
