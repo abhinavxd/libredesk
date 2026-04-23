@@ -162,12 +162,39 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Convert to OutboundMessage for transport
 	outbound := message.ToOutbound()
 
+	// Detect forward via meta. Forwards re-route from a conversation to an
+	// external recipient, and the recipient should see them as a fresh
+	// thread, not as a reply to the originating customer's message.
+	// Unmarshal failure is non-fatal — we just treat the message as a
+	// regular reply.
+	isForward := false
+	if len(message.Meta) > 0 {
+		var meta map[string]any
+		if err := json.Unmarshal(message.Meta, &meta); err != nil {
+			m.lo.Debug("send: meta unmarshal failed, treating as non-forward", "error", err, "message_id", message.ID)
+		} else if _, ok := meta["forwarded_to"]; ok {
+			isForward = true
+		}
+	}
+
 	if inb.Channel() == inbox.ChannelEmail {
 		// Set from address of the inbox
 		outbound.From = inb.FromAddress()
 
-		// Set "In-Reply-To" and "References" headers for email threading.
-		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
+		if isForward {
+			// Strip threading headers so the forward starts a new email
+			// thread for the recipient rather than chaining onto the
+			// original customer conversation.
+			outbound.References = nil
+			outbound.InReplyTo = ""
+			// Conventional "Fwd: " subject prefix (idempotent).
+			if outbound.Subject != "" && !strings.HasPrefix(strings.ToLower(outbound.Subject), "fwd:") {
+				outbound.Subject = "Fwd: " + outbound.Subject
+			}
+		} else {
+			// Set "In-Reply-To" and "References" headers for email threading.
+			outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
+		}
 	}
 
 	// Send message
@@ -698,6 +725,8 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("%s set %s SLA policy", actorName, newValue)
 	case models.ActivityParticipantAdded:
 		content = fmt.Sprintf("%s joined the conversation", newValue)
+	case models.ActivityMessageForwarded:
+		content = fmt.Sprintf("%s forwarded the conversation to %s", actorName, newValue)
 	default:
 		return "", fmt.Errorf("invalid activity type %s", activityType)
 	}
@@ -770,6 +799,44 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			}
 		}
 		return models.Message{}, fmt.Errorf("uploading message attachments: %w", upErr)
+	}
+
+	// If this incoming message is a reply to a previously-forwarded email
+	// (or chained off such a reply), tag it `meta.from_forward = true`. The
+	// reply box's auto-quoted-thread builder filters tagged messages out, so
+	// internal back-and-forth with a forwarded recipient never leaks into a
+	// customer-facing email. Build the source-id set first so we can skip
+	// the DB roundtrip when there's nothing to check.
+	sourceIDs := make([]string, 0, len(in.References)+1)
+	if in.InReplyTo != "" {
+		sourceIDs = append(sourceIDs, in.InReplyTo)
+	}
+	for _, r := range in.References {
+		if r != "" {
+			sourceIDs = append(sourceIDs, r)
+		}
+	}
+	if len(sourceIDs) > 0 {
+		var isFromFwd bool
+		if err := m.q.IsSourceIDFromForward.Get(&isFromFwd, pq.Array(sourceIDs)); err != nil {
+			m.lo.Warn("failed to check from-forward provenance, leaving message untagged", "error", err)
+		} else if isFromFwd {
+			var meta map[string]any
+			if len(msg.Meta) > 0 {
+				if jerr := json.Unmarshal(msg.Meta, &meta); jerr != nil {
+					m.lo.Debug("from_forward: existing meta unmarshal failed, starting fresh", "error", jerr)
+				}
+			}
+			if meta == nil {
+				meta = map[string]any{}
+			}
+			meta["from_forward"] = true
+			if metaBytes, jerr := json.Marshal(meta); jerr == nil {
+				msg.Meta = metaBytes
+			} else {
+				m.lo.Warn("from_forward: meta marshal failed, leaving untagged", "error", jerr)
+			}
+		}
 	}
 
 	// Insert message.

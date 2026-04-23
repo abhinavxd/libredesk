@@ -108,6 +108,28 @@
         </div>
       </div>
 
+      <!-- Forwarded-to badge under outgoing forwards -->
+      <div
+        v-if="forwardedToLabel"
+        class="flex items-center gap-1 mt-1 pr-[47px] justify-end"
+      >
+        <span class="text-xs text-muted-foreground/70 italic flex items-center gap-1">
+          <Forward :size="12" />
+          {{ t('conversation.forwardedTo', { recipients: forwardedToLabel }) }}
+        </span>
+      </div>
+
+      <!-- Reply-to-forward badge under tagged incoming messages -->
+      <div
+        v-if="isFromForward"
+        class="flex items-center gap-1 mt-1 pl-[47px]"
+      >
+        <span class="text-xs text-muted-foreground/70 italic flex items-center gap-1">
+          <Forward :size="12" />
+          {{ t('conversation.internalReplyToForward') }}
+        </span>
+      </div>
+
       <!-- Avatar (right for outgoing) -->
       <router-link
         v-if="isOutgoing && canManageUsers"
@@ -127,6 +149,22 @@
           {{ avatarFallback }}
         </AvatarFallback>
       </Avatar>
+    </div>
+
+    <!-- Forward action — email-channel, non-private, non-activity messages only. -->
+    <div
+      v-if="canForward"
+      class="flex items-center gap-1 mt-1"
+      :class="isOutgoing ? 'pr-[47px] justify-end' : 'pl-[47px]'"
+    >
+      <button
+        type="button"
+        @click="forwardMessage"
+        class="text-xs text-muted-foreground/60 hover:text-foreground transition-colors flex items-center gap-1"
+      >
+        <Forward :size="12" />
+        <span>{{ t('conversation.forward') }}</span>
+      </button>
     </div>
 
     <!-- Timestamp tooltip -->
@@ -149,8 +187,10 @@
 import { computed, ref } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, Forward } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
@@ -207,11 +247,19 @@ const nonInlineAttachments = computed(() =>
   props.message.attachments.filter((attachment) => attachment.disposition !== 'inline')
 )
 
+// Forward-related: outgoing forward (meta.forwarded_to) OR incoming reply
+// to a forward (meta.from_forward, tagged at IMAP intake). Both share the
+// private-note bubble color so the internal forward thread visually groups
+// distinct from customer-facing messages.
+const isForwardRelated = computed(
+  () => Boolean(props.message.meta?.forwarded_to) || Boolean(props.message.meta?.from_forward)
+)
+
 // Bubble classes - conditional based on direction
 const bubbleClasses = computed(() => ({
   // Outgoing-specific: private message styling
-  'bg-private': isOutgoing.value && props.message.private,
-  'border border-border': isOutgoing.value && !props.message.private,
+  'bg-private': (isOutgoing.value && props.message.private) || isForwardRelated.value,
+  'border border-border': isOutgoing.value && !props.message.private && !isForwardRelated.value,
   'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
   'border-destructive': isOutgoing.value && props.message.status === 'failed',
   relative: isOutgoing.value,
@@ -229,6 +277,24 @@ const showRetry = computed(() => isOutgoing.value && props.message.status === 'f
 
 const retryMessage = (msg) => {
   api.retryMessage(convStore.current.uuid, msg.uuid)
+}
+
+// Forward UI: emit a global event so ReplyBox can pick it up and switch
+// into forward mode with the original message pre-quoted.
+const emitter = useEmitter()
+const forwardedToLabel = computed(() => {
+  const fwd = props.message.meta?.forwarded_to
+  if (Array.isArray(fwd) && fwd.length > 0) return fwd.join(', ')
+  return ''
+})
+const isFromForward = computed(() => Boolean(props.message.meta?.from_forward))
+const canForward = computed(
+  () =>
+    convStore.current?.inbox_channel === 'email' &&
+    !props.message.private
+)
+const forwardMessage = () => {
+  emitter.emit(EMITTER_EVENTS.FORWARD_MESSAGE, props.message)
 }
 
 // Incoming-only: quoted text toggle

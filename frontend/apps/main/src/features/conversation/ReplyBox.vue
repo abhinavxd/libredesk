@@ -145,7 +145,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, toRaw } from 'vue'
+import { ref, watch, computed, toRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
@@ -324,6 +324,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   const hasContent = hasTextContent.value > 0 || mediaFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
   const isPrivate = messageType.value === 'private_note'
+  const isForward = messageType.value === 'forward'
 
   const currentInbox = inboxStore.inboxes.find(
     (i) => i.id === conversationStore.current.inbox_id
@@ -348,8 +349,9 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
       return
     }
 
-    // Warn if the contact's email is not in any recipient field.
-    if (!skipContactEmailCheck) {
+    // Warn if the contact's email is not in any recipient field. Skip for
+    // forward mode — by design the customer is NOT a recipient on a forward.
+    if (!skipContactEmailCheck && !isForward) {
       const contactEmail = conversationStore.current.contact?.email?.toLowerCase()
       if (contactEmail) {
         const allRecipients = [to.value, cc.value, bcc.value].join(',').toLowerCase()
@@ -418,7 +420,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
 
     try {
       isSending.value = true
-      const response = await api.sendMessage(convUUID, {
+      const payload = {
         sender_type: UserTypeAgent,
         private: isPrivate,
         message: savedContent,
@@ -428,7 +430,15 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
         bcc: parsedBCC,
         to: parsedTo,
         echo_id: isPrivate ? '' : tempUUID
-      })
+      }
+      // Forward mode routes to the typed addresses via `forwarded_to`; the
+      // backend overrides the conversation's normal recipients with these
+      // and tags meta.forwarded_to. CC/BCC pass through unchanged.
+      if (isForward) {
+        payload.forwarded_to = parsedTo
+        payload.to = []
+      }
+      const response = await api.sendMessage(convUUID, payload)
 
       // Private notes are sent immediately so replace immediately.
       if (isPrivate && response?.data?.data) {
@@ -546,16 +556,89 @@ watch(
   { deep: true, immediate: true }
 )
 
-// Clear media files and reset macro when conversation changes.
+// Clear media files, recipients, and any in-progress forward state when
+// switching conversations. Without the forward reset, an agent who clicked
+// Forward on conv A and then switched to conv B would land in B with
+// messageType=forward, empty recipient fields, and A's message pre-quoted
+// in the editor — easy to accidentally send.
 watch(
   () => conversationStore.current?.uuid,
   () => {
     clearMediaFiles()
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
+    if (messageType.value === 'forward') {
+      messageType.value = 'reply'
+      to.value = ''
+      cc.value = ''
+      bcc.value = ''
+      showBcc.value = false
+      htmlContent.value = ''
+    }
     // Focus editor on conversation change
     setTimeout(() => {
       replyBoxContentRef.value?.focus()
     }, 100)
   }
 )
+
+// Reset the forward-pre-quoted body if the agent switches away from forward
+// mode. Otherwise a stale "---- Forwarded message ----" header would carry
+// into a customer-facing reply.
+watch(messageType, (newType, oldType) => {
+  if (oldType === 'forward' && newType !== 'forward') {
+    htmlContent.value = ''
+    to.value = ''
+    cc.value = ''
+    bcc.value = ''
+    showBcc.value = false
+  }
+})
+
+// Forward mode: triggered from a per-message Forward button on MessageBubble.
+// Switches the reply box into forward mode, clears the recipient fields so
+// the agent enters the external recipient, and pre-populates the editor with
+// a quoted copy of the original message.
+function handleForwardMessage (message) {
+  messageType.value = 'forward'
+  to.value = ''
+  cc.value = ''
+  bcc.value = ''
+  showBcc.value = false
+
+  const author = message.author || {}
+  const authorName = ((author.first_name || '') + ' ' + (author.last_name || '')).trim() || 'Unknown'
+  const date = new Date(message.created_at).toLocaleString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })
+
+  // Strip any nested gmail_quote so we don't double-quote a thread.
+  let body = message.content || ''
+  const quoteIdx = body.indexOf('<div class="gmail_quote">')
+  if (quoteIdx > -1) body = body.substring(0, quoteIdx)
+
+  const header =
+    '<p><br></p>' +
+    '<p style="color:#666;font-size:12px;margin:0 0 8px 0;">' +
+    '---------- Forwarded message ----------<br>' +
+    'From: ' + authorName + '<br>' +
+    'Date: ' + date +
+    '</p>'
+  htmlContent.value = header + body
+}
+
+// Wrap the emitter subscription in lifecycle hooks so each ReplyBox mount
+// registers exactly one handler. Without the matching .off, switching
+// conversations N times stacks N listeners and a single Forward click
+// fires the handler N times.
+onMounted(() => {
+  emitter.on(EMITTER_EVENTS.FORWARD_MESSAGE, handleForwardMessage)
+})
+onBeforeUnmount(() => {
+  emitter.off(EMITTER_EVENTS.FORWARD_MESSAGE, handleForwardMessage)
+})
 </script>
