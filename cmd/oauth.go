@@ -409,10 +409,10 @@ func getProviderDefaults(provider, emailAddr string) (imodels.SMTPConfig, imodel
 	smtp.Username = emailAddr
 	smtp.AuthProtocol = "login"
 	smtp.TLSSkipVerify = false
-	smtp.MaxConns = 10
-	smtp.MaxMessageRetries = 2
+	smtp.MaxConns = 5
+	smtp.MaxMessageRetries = 5
 	smtp.IdleTimeout = "20s"
-	smtp.PoolWaitTimeout = "30s"
+	smtp.PoolWaitTimeout = "120s"
 
 	imap.Username = emailAddr
 	imap.Mailbox = "INBOX"

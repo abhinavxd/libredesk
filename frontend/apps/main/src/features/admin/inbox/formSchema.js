@@ -43,7 +43,7 @@ export const createFormSchema = (t) => z.object({
     idle_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
       message: t('validation.invalidDuration')
     }),
-    wait_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
+    pool_wait_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
       message: t('validation.invalidDuration')
     }),
     tls_type: z.enum(['none', 'starttls', 'tls']),

@@ -254,7 +254,7 @@
         </FormItem>
       </FormField>
 
-      <FormField v-slot="{ componentField }" name="smtp.wait_timeout">
+      <FormField v-slot="{ componentField }" name="smtp.pool_wait_timeout">
         <FormItem>
           <FormLabel>{{ $t('admin.inbox.waitTimeout') }}</FormLabel>
           <FormControl>
@@ -464,7 +464,7 @@
         </FormItem>
       </FormField>
 
-      <FormField v-slot="{ componentField }" name="smtp.wait_timeout">
+      <FormField v-slot="{ componentField }" name="smtp.pool_wait_timeout">
         <FormItem>
           <FormLabel>{{ $t('admin.inbox.waitTimeout') }}</FormLabel>
           <FormControl>
@@ -787,7 +787,7 @@ const form = useForm({
       max_conns: 10,
       max_msg_retries: 3,
       idle_timeout: '25s',
-      wait_timeout: '60s',
+      pool_wait_timeout: '120s',
       auth_protocol: 'login',
       tls_type: 'none',
       hello_hostname: '',
