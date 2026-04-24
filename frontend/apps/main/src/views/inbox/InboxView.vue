@@ -22,7 +22,7 @@ onMounted(() => {
   // Fetch list based on type
   if (type.value) {
     // Set list status if not already set
-    if (!conversationStore.getListStatus) {
+    if (conversationStore.conversations.status.length === 0) {
       conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
     }
     conversationStore.fetchConversationsList(true, type.value)
@@ -30,7 +30,7 @@ onMounted(() => {
   // Fetch team list.
   if (teamID.value) {
     // Set list status if not already set
-    if (!conversationStore.getListStatus) {
+    if (conversationStore.conversations.status.length === 0) {
       conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
     }
     conversationStore.fetchConversationsList(
@@ -42,7 +42,7 @@ onMounted(() => {
   // Fetch view list.
   if (viewID.value) {
     // Empty out list status as views are already filtered.
-    conversationStore.setListStatus('', false)
+    conversationStore.setListStatus([], false)
     conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], viewID.value)
   }
 })
@@ -53,14 +53,14 @@ watch(
   ([newType, newTeamID, newViewID], [oldType, oldTeamID, oldViewID]) => {
     if (newType !== oldType && newType) {
       // Set list status if not already set
-      if (!conversationStore.getListStatus) {
+      if (conversationStore.conversations.status.length === 0) {
         conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
       }
       conversationStore.fetchConversationsList(true, newType)
     }
     if (newTeamID !== oldTeamID && newTeamID) {
       // Set list status if not already set
-      if (!conversationStore.getListStatus) {
+      if (conversationStore.conversations.status.length === 0) {
         conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
       }
       conversationStore.fetchConversationsList(
@@ -71,7 +71,7 @@ watch(
     }
     if (newViewID !== oldViewID && newViewID) {
       // Empty out list status as views are already filtered.
-      conversationStore.setListStatus('', false)
+      conversationStore.setListStatus([], false)
       conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], newViewID)
     }
   }
