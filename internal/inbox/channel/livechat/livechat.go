@@ -278,6 +278,11 @@ func (lc *LiveChat) FromAddress() string {
 	return lc.from
 }
 
+// ReplyToAddress is not applicable to livechat and always returns empty.
+func (lc *LiveChat) ReplyToAddress() string {
+	return ""
+}
+
 // Channel returns the channel name for this inbox.
 func (lc *LiveChat) Channel() string {
 	return ChannelLiveChat

@@ -1,10 +1,16 @@
 import * as z from 'zod'
-import { isGoDuration } from '@shared-ui/utils/string'
+import { isGoDuration, validateEmail } from '@shared-ui/utils/string'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@main/constants/auth.js'
 
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, t('globals.messages.required')),
   from: z.string().min(1, t('globals.messages.required')),
+  reply_to: z
+    .string()
+    .optional()
+    .refine((v) => !v || validateEmail(v), {
+      message: t('validation.invalidEmail')
+    }),
   enabled: z.boolean().optional(),
   csat_enabled: z.boolean().optional(),
   prompt_tags_on_reply: z.boolean().optional(),

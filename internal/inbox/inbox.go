@@ -63,6 +63,7 @@ type Inbox interface {
 	Identifier
 	MessageHandler
 	FromAddress() string
+	ReplyToAddress() string
 	Channel() string
 }
 
@@ -339,6 +340,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			OAuth                map[string]string `json:"oauth"`
 			IMAP                 []map[string]any  `json:"imap"`
 			SMTP                 []map[string]any  `json:"smtp"`
+			ReplyTo              string            `json:"reply_to"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
 		}
 		var updateCfg struct {
@@ -346,6 +348,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			OAuth                map[string]string `json:"oauth"`
 			IMAP                 []map[string]any  `json:"imap"`
 			SMTP                 []map[string]any  `json:"smtp"`
+			ReplyTo              string            `json:"reply_to"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
 		}
 

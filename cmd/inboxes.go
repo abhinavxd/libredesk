@@ -187,6 +187,14 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 		if _, err := mail.ParseAddress(inbox.From); err != nil {
 			return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidFromAddress"), nil)
 		}
+		var cfg imodels.Config
+		if len(inbox.Config) > 0 {
+			if err := json.Unmarshal(inbox.Config, &cfg); err == nil && cfg.ReplyTo != "" {
+				if _, err := mail.ParseAddress(cfg.ReplyTo); err != nil {
+					return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+				}
+			}
+		}
 	}
 	if len(inbox.Config) == 0 {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "config"), nil)

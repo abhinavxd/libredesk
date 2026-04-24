@@ -125,7 +125,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 			newPools, err := NewSmtpPool(e.smtpCfg, oauthConfig)
 			if err != nil {
 				e.smtpPoolsMu.Unlock()
-				e.lo.Error("Failed to recreate SMTP pools after token refresh", "inbox_id", e.Identifier(), "error", err)
+				e.lo.Error("failed to recreate smtp pools after token refresh", "inbox_id", e.Identifier(), "error", err)
 				return fmt.Errorf("failed to recreate SMTP pools: %w", err)
 			}
 			e.smtpPools = newPools
@@ -162,15 +162,14 @@ func (e *Email) Send(m models.OutboundMessage) error {
 	// Set libredesk loop prevention header to from address.
 	emailAddress, err := stringutil.ExtractEmail(m.From)
 	if err != nil {
-		e.lo.Error("Failed to extract email address from the 'From' header", "error", err)
+		e.lo.Error("failed to extract email address from the 'from' header", "error", err)
 		return fmt.Errorf("failed to extract email address from 'From' header: %w", err)
 	}
 	email.Headers.Set(headerLibredeskLoopPrevention, emailAddress)
 
-	if m.ReplyTo != "" {
-		email.Headers.Set("Reply-To", m.ReplyTo)
-	} else if e.enablePlusAddressing && m.ConversationUUID != "" {
-		email.Headers.Set("Reply-To", buildPlusAddress(emailAddress, m.ConversationUUID))
+	if rt := resolveReplyTo(m.ReplyTo, e.replyTo, emailAddress, m.ConversationUUID, e.enablePlusAddressing); rt != "" {
+		email.Headers.Set("Reply-To", rt)
+		e.lo.Debug("reply-to header set", "reply_to", rt)
 	}
 
 	// Attach SMTP level headers
@@ -181,13 +180,13 @@ func (e *Email) Send(m models.OutboundMessage) error {
 	// Set In-Reply-To header
 	if m.InReplyTo != "" {
 		email.Headers.Set(headerInReplyTo, "<"+m.InReplyTo+">")
-		e.lo.Debug("In-Reply-To header set", "message_id", m.InReplyTo)
+		e.lo.Debug("in-reply-to header set", "message_id", m.InReplyTo)
 	}
 
 	// Set message id header
 	if m.SourceID != "" {
 		email.Headers.Set(headerMessageID, fmt.Sprintf("<%s>", m.SourceID))
-		e.lo.Debug("Message-ID header set", "message_id", m.SourceID)
+		e.lo.Debug("message-id header set", "message_id", m.SourceID)
 	}
 
 	// Set references header
@@ -197,12 +196,12 @@ func (e *Email) Send(m models.OutboundMessage) error {
 	}
 	email.Headers.Set(headerReferences, references)
 
-	e.lo.Debug("References header set", "references", references)
+	e.lo.Debug("references header set", "references", references)
 
 	// Set conversation uuid header
 	if m.ConversationUUID != "" {
 		email.Headers.Set(headerLibredeskConversationID, m.ConversationUUID)
-		e.lo.Debug("Conversation UUID header set", "conversation_uuid", m.ConversationUUID)
+		e.lo.Debug("conversation uuid header set", "conversation_uuid", m.ConversationUUID)
 	}
 
 	// Set email content
@@ -232,11 +231,40 @@ func (e *Email) Send(m models.OutboundMessage) error {
 }
 
 // buildPlusAddress creates a plus-addressed email for conversation matching.
-// e.g., support@company.com + uuid → support+conv-{uuid}@company.com
+// e.g., support@company.com + uuid -> support+conv-{uuid}@company.com
 func buildPlusAddress(email, conversationUUID string) string {
 	parts := strings.SplitN(email, "@", 2)
 	if len(parts) != 2 {
-		return email // fallback to original if invalid format
+		return email
 	}
 	return fmt.Sprintf("%s+conv-%s@%s", parts[0], conversationUUID, parts[1])
+}
+
+// resolveReplyTo picks the Reply-To by precedence: per-message override, plus-addressed base (inbox reply_to
+// or From), literal inbox reply_to. Returns "" to omit the header.
+func resolveReplyTo(perMessageReplyTo, inboxReplyTo, fromEmail, conversationUUID string, enablePlusAddressing bool) string {
+	// Respect per msg override.
+	if perMessageReplyTo != "" {
+		return perMessageReplyTo
+	}
+
+	// Base address defaults to From; if inbox reply_to is set, use that instead.
+	base := fromEmail
+	if inboxReplyTo != "" {
+		if addr, err := stringutil.ExtractEmail(inboxReplyTo); err == nil {
+			base = addr
+		}
+	}
+
+	switch {
+	case enablePlusAddressing && conversationUUID != "":
+		// Plus-address the base so customer replies thread back to this conversation.
+		return buildPlusAddress(base, conversationUUID)
+	case inboxReplyTo != "":
+		// No plus-addressing, but route replies to inbox reply_to instead of From.
+		return base
+	default:
+		// Omit header; customer mail client replies to From naturally.
+		return ""
+	}
 }
