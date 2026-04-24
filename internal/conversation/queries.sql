@@ -128,6 +128,7 @@ SELECT
    c.inbox_id,
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
+   COALESCE(inb.config->>'reply_to', '') as inbox_reply_to,
    COALESCE(inb.channel::TEXT, '') as inbox_channel,
    c.status_id,
    c.priority_id,

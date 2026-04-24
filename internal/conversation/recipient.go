@@ -9,7 +9,7 @@ import (
 )
 
 // makeRecipients computes the recipients for a given conversation ID using the last message in the conversation.
-func (m *Manager) makeRecipients(conversationID int, contactEmail, inboxEmail string) (to, cc, bcc []string, err error) {
+func (m *Manager) makeRecipients(conversationID int, contactEmail, inboxEmail, inboxReplyTo string) (to, cc, bcc []string, err error) {
 	lastMessage, err := m.getLatestMessage(conversationID, []string{models.MessageIncoming, models.MessageOutgoing}, []string{models.MessageStatusReceived, models.MessageStatusSent}, true)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("fetching message for makeRecipients: %w", err)
@@ -27,7 +27,7 @@ func (m *Manager) makeRecipients(conversationID int, contactEmail, inboxEmail st
 
 	isIncoming := lastMessage.Type == models.MessageIncoming
 	to, cc, bcc = stringutil.ComputeRecipients(
-		meta.From, meta.To, meta.CC, meta.BCC, contactEmail, inboxEmail, isIncoming,
+		meta.From, meta.To, meta.CC, meta.BCC, contactEmail, inboxEmail, inboxReplyTo, isIncoming,
 	)
 	return
 }

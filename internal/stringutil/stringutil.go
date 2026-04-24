@@ -223,14 +223,21 @@ func ExtractConvUUID(email string) string {
 	return match[6 : len(match)-1]
 }
 
-// DedupAndExcludePlusVariants deduplicates and excludes inbox email and its plus-addressed variants.
-func DedupAndExcludePlusVariants(list []string, inboxEmail string) []string {
+// DedupAndExcludePlusVariants deduplicates and excludes any of the given inbox addresses and their plus-addressed variants.
+func DedupAndExcludePlusVariants(list []string, excludeAddresses ...string) []string {
+	exclude := make(map[string]struct{}, len(excludeAddresses))
+	for _, addr := range excludeAddresses {
+		if addr != "" {
+			exclude[strings.ToLower(addr)] = struct{}{}
+		}
+	}
 	seen := make(map[string]struct{}, len(list))
 	cleaned := make([]string, 0, len(list))
-	inboxNorm := strings.ToLower(inboxEmail)
 	for _, s := range list {
-		// Skip if empty or matches inbox email (after stripping +conv-UUID)
-		if s == "" || strings.EqualFold(StripConvUUID(s), inboxNorm) {
+		if s == "" {
+			continue
+		}
+		if _, skip := exclude[strings.ToLower(StripConvUUID(s))]; skip {
 			continue
 		}
 		if _, ok := seen[s]; !ok {
@@ -244,7 +251,7 @@ func DedupAndExcludePlusVariants(list []string, inboxEmail string) []string {
 // ComputeRecipients computes new recipients using last message's recipients and direction.
 func ComputeRecipients(
 	from, to, cc, bcc []string,
-	contactEmail, inboxEmail string,
+	contactEmail, inboxEmail, inboxReplyTo string,
 	lastMessageIncoming bool,
 ) (finalTo, finalCC, finalBCC []string) {
 	if lastMessageIncoming {
@@ -272,8 +279,8 @@ func ComputeRecipients(
 		}
 	}
 
-	finalTo = DedupAndExcludePlusVariants(finalTo, inboxEmail)
-	finalCC = DedupAndExcludePlusVariants(finalCC, inboxEmail)
+	finalTo = DedupAndExcludePlusVariants(finalTo, inboxEmail, inboxReplyTo)
+	finalCC = DedupAndExcludePlusVariants(finalCC, inboxEmail, inboxReplyTo)
 	// BCC is one-time only, user is supposed to add it manually.
 	finalBCC = []string{}
 

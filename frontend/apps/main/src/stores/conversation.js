@@ -289,7 +289,8 @@ export const useConversationStore = defineStore('conversation', () => {
     const { to, cc, bcc } = computeRecipientsFromMessage(
       latestMessage,
       conv.contact?.email || '',
-      inboxEmail
+      inboxEmail,
+      conv?.inbox_reply_to || ''
     )
     currentTo.value = to
     currentCC.value = cc
