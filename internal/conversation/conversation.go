@@ -120,7 +120,7 @@ type priorityStore interface {
 
 type teamStore interface {
 	Get(int) (tmodels.Team, error)
-	UserBelongsToTeam(userID, teamID int) (bool, error)
+	UserBelongsToTeam(teamID, userID int) (bool, error)
 	GetMembers(int) ([]tmodels.TeamMember, error)
 }
 
@@ -732,8 +732,23 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 
 	// Team changed?
 	if previousAssignedTeamID != teamID {
-		// Remove assigned user if team has changed.
-		c.RemoveConversationAssignee(uuid, models.AssigneeTypeUser, actor)
+		// Keep the agent assigned if they're a member of the new team —
+		// otherwise cross-team reassignment punishes agents who legitimately
+		// sit in both. Membership-check failure falls back to the existing
+		// unassign behaviour so we never silently keep someone who shouldn't
+		// be there.
+		keepUser := false
+		if conversation.AssignedUserID.Valid && conversation.AssignedUserID.Int > 0 {
+			belongs, err := c.teamStore.UserBelongsToTeam(teamID, conversation.AssignedUserID.Int)
+			if err != nil {
+				c.lo.Warn("membership check failed, defaulting to unassign", "user_id", conversation.AssignedUserID.Int, "team_id", teamID, "error", err)
+			} else if belongs {
+				keepUser = true
+			}
+		}
+		if !keepUser {
+			c.RemoveConversationAssignee(uuid, models.AssigneeTypeUser, actor)
+		}
 
 		// Apply SLA policy if this new team has a SLA policy.
 		team, err := c.teamStore.Get(teamID)
