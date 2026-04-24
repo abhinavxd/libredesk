@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/mail"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -82,15 +81,6 @@ func RandomNumeric(n int) (string, error) {
 	return string(bytes), nil
 }
 
-// GetPathFromURL extracts the path from a URL.
-func GetPathFromURL(u string) (string, error) {
-	parsedURL, err := url.Parse(u)
-	if err != nil {
-		return "", err
-	}
-	return parsedURL.Path, nil
-}
-
 // RemoveEmpty removes empty strings from a slice of strings.
 func RemoveEmpty(s []string) []string {
 	var r []string
@@ -103,7 +93,6 @@ func RemoveEmpty(s []string) []string {
 }
 
 // GenerateEmailMessageID generates an RFC-compliant Message-ID for an email without angle brackets.
-// The uuid parameter is a unique identifier, typically a conversation UUID v4.
 func GenerateEmailMessageID(uuid string, fromAddress string) (string, error) {
 	if uuid == "" {
 		return "", fmt.Errorf("uuid cannot be empty")

@@ -430,6 +430,8 @@ func trimInboxFields(inb *imodels.Inbox) error {
 // trimEmailConfig trims whitespace from email configuration fields.
 // Passwords and secrets are intentionally NOT trimmed.
 func trimEmailConfig(cfg *imodels.Config) {
+	cfg.ReplyTo = strings.TrimSpace(cfg.ReplyTo)
+
 	// Trim IMAP configs.
 	for i := range cfg.IMAP {
 		cfg.IMAP[i].Host = strings.TrimSpace(cfg.IMAP[i].Host)
