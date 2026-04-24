@@ -50,6 +50,7 @@ const submitForm = (values) => {
   if (inbox.value.channel === 'email') {
     const config = {
       auth_type: values.auth_type,
+      reply_to: values.reply_to,
       enable_plus_addressing: values.enable_plus_addressing,
       imap: [{ ...values.imap }],
       smtp: [{ ...values.smtp }]
@@ -133,6 +134,7 @@ onMounted(async () => {
     inboxData.auth_type = inboxData?.config?.auth_type || AUTH_TYPE_PASSWORD
     inboxData.oauth = inboxData?.config?.oauth || {}
     inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
+    inboxData.reply_to = inboxData?.config?.reply_to || ''
     inbox.value = inboxData
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

@@ -41,7 +41,8 @@ type Config struct {
 	SMTP                 []SMTPConfig `json:"smtp"`
 	IMAP                 []IMAPConfig `json:"imap"`
 	From                 string       `json:"from"`
-	EnablePlusAddressing bool         `json:"enable_plus_addressing"` // Enable plus-addressing in Reply-To header for conversation matching
+	ReplyTo              string       `json:"reply_to"`
+	EnablePlusAddressing bool         `json:"enable_plus_addressing"`
 }
 
 // OAuthConfig holds OAuth 2.0 authentication details.

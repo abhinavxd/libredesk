@@ -33,6 +33,7 @@ type Email struct {
 	headers              map[string]string
 	lo                   *logf.Logger
 	from                 string
+	replyTo              string
 	enablePlusAddressing bool
 	messageStore         inbox.MessageStore
 	userStore            inbox.UserStore
@@ -69,6 +70,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		id:                   opts.ID,
 		headers:              opts.Headers,
 		from:                 opts.Config.From,
+		replyTo:              opts.Config.ReplyTo,
 		smtpCfg:              opts.Config.SMTP,
 		imapCfg:              opts.Config.IMAP,
 		lo:                   opts.Lo,
@@ -114,6 +116,11 @@ func (e *Email) FromAddress() string {
 	return e.from
 }
 
+// ReplyToAddress returns the reply-to address for this inbox, empty if unset.
+func (e *Email) ReplyToAddress() string {
+	return e.replyTo
+}
+
 // Channel returns the channel name for this inbox.
 func (e *Email) Channel() string {
 	return ChannelEmail
@@ -129,6 +136,7 @@ func (e *Email) getCurrentConfig() models.Config {
 		SMTP:                 e.smtpCfg,
 		IMAP:                 e.imapCfg,
 		From:                 e.from,
+		ReplyTo:              e.replyTo,
 		OAuth:                oauth,
 		AuthType:             e.authType,
 		EnablePlusAddressing: e.enablePlusAddressing,

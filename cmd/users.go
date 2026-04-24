@@ -515,14 +515,7 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 		}
 	}
 
-	// Save file path.
-	path, err := stringutil.GetPathFromURL(media.URL)
-	if err != nil {
-		app.lo.Debug("error getting path from URL", "user_id", user.ID, "url", media.URL, "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorUploadingFile"), nil)
-	}
-
-	if err := app.user.UpdateAvatar(user.ID, path); err != nil {
+	if err := app.user.UpdateAvatar(user.ID, "/uploads/"+media.UUID); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return nil

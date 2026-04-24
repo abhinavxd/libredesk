@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/mail"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -82,15 +81,6 @@ func RandomNumeric(n int) (string, error) {
 	return string(bytes), nil
 }
 
-// GetPathFromURL extracts the path from a URL.
-func GetPathFromURL(u string) (string, error) {
-	parsedURL, err := url.Parse(u)
-	if err != nil {
-		return "", err
-	}
-	return parsedURL.Path, nil
-}
-
 // RemoveEmpty removes empty strings from a slice of strings.
 func RemoveEmpty(s []string) []string {
 	var r []string
@@ -103,7 +93,6 @@ func RemoveEmpty(s []string) []string {
 }
 
 // GenerateEmailMessageID generates an RFC-compliant Message-ID for an email without angle brackets.
-// The uuid parameter is a unique identifier, typically a conversation UUID v4.
 func GenerateEmailMessageID(uuid string, fromAddress string) (string, error) {
 	if uuid == "" {
 		return "", fmt.Errorf("uuid cannot be empty")
@@ -179,6 +168,7 @@ func ValidEmail(email string) bool {
 }
 
 // ExtractEmail extracts the email address from a string.
+// E.g. "Name <john@example.com>" -> "john@example.com", "john@example.com" -> "john@example.com".
 func ExtractEmail(s string) (string, error) {
 	addr, err := mail.ParseAddress(s)
 	if err != nil {
@@ -222,14 +212,21 @@ func ExtractConvUUID(email string) string {
 	return match[6 : len(match)-1]
 }
 
-// DedupAndExcludePlusVariants deduplicates and excludes inbox email and its plus-addressed variants.
-func DedupAndExcludePlusVariants(list []string, inboxEmail string) []string {
+// DedupAndExcludePlusVariants deduplicates and excludes any of the given inbox addresses and their plus-addressed variants.
+func DedupAndExcludePlusVariants(list []string, excludeAddresses ...string) []string {
+	exclude := make(map[string]struct{}, len(excludeAddresses))
+	for _, addr := range excludeAddresses {
+		if addr != "" {
+			exclude[strings.ToLower(addr)] = struct{}{}
+		}
+	}
 	seen := make(map[string]struct{}, len(list))
 	cleaned := make([]string, 0, len(list))
-	inboxNorm := strings.ToLower(inboxEmail)
 	for _, s := range list {
-		// Skip if empty or matches inbox email (after stripping +conv-UUID)
-		if s == "" || strings.EqualFold(StripConvUUID(s), inboxNorm) {
+		if s == "" {
+			continue
+		}
+		if _, skip := exclude[strings.ToLower(StripConvUUID(s))]; skip {
 			continue
 		}
 		if _, ok := seen[s]; !ok {
@@ -243,7 +240,7 @@ func DedupAndExcludePlusVariants(list []string, inboxEmail string) []string {
 // ComputeRecipients computes new recipients using last message's recipients and direction.
 func ComputeRecipients(
 	from, to, cc, bcc []string,
-	contactEmail, inboxEmail string,
+	contactEmail, inboxEmail, inboxReplyTo string,
 	lastMessageIncoming bool,
 ) (finalTo, finalCC, finalBCC []string) {
 	if lastMessageIncoming {
@@ -271,8 +268,8 @@ func ComputeRecipients(
 		}
 	}
 
-	finalTo = DedupAndExcludePlusVariants(finalTo, inboxEmail)
-	finalCC = DedupAndExcludePlusVariants(finalCC, inboxEmail)
+	finalTo = DedupAndExcludePlusVariants(finalTo, inboxEmail, inboxReplyTo)
+	finalCC = DedupAndExcludePlusVariants(finalCC, inboxEmail, inboxReplyTo)
 	// BCC is one-time only, user is supposed to add it manually.
 	finalBCC = []string{}
 

@@ -28,6 +28,23 @@
       </FormItem>
     </FormField>
 
+    <FormField v-if="showFormFields" v-slot="{ componentField }" name="reply_to">
+      <FormItem>
+        <FormLabel>{{ $t('admin.inbox.replyToAddress') }}</FormLabel>
+        <FormControl>
+          <Input
+            type="text"
+            :placeholder="t('admin.inbox.replyToAddress.placeholder')"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          {{ $t('admin.inbox.replyToAddress.description') }}
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <!-- Toggle Fields -->
     <FormField v-if="showFormFields" v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
@@ -65,8 +82,16 @@
           :title="$t('admin.inbox.enablePlusAddressing')"
           :description="$t('admin.inbox.enablePlusAddressing.description')"
           :checked="componentField.modelValue"
+          :disabled="isMicrosoftInbox && componentField.modelValue"
           @update:checked="handleChange"
         />
+        <p
+          v-if="isMicrosoftInbox"
+          class="!mt-2 text-destructive text-xs flex items-start gap-1.5"
+        >
+          <Lightbulb class="size-4" />
+          <span>{{ $t('admin.inbox.enablePlusAddressing.requiredForMicrosoft') }}</span>
+        </p>
       </FormItem>
     </FormField>
 
@@ -173,6 +198,46 @@
     <div v-show="isOAuthInbox" class="box p-4 space-y-4">
       <h3 class="font-semibold">{{ $t('admin.inbox.imapConfig') }}</h3>
 
+      <FormField v-slot="{ componentField }" name="imap.host">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.host') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="imap.gmail.com" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="imap.port">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.port') }}</FormLabel>
+          <FormControl>
+            <Input type="number" placeholder="993" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="imap.tls_type">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.tls') }}</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue :placeholder="t('globals.messages.selectTLS')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{{ $t('globals.terms.off') }}</SelectItem>
+                <SelectItem value="tls">SSL/TLS</SelectItem>
+                <SelectItem value="starttls">STARTTLS</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormDescription>{{ $t('admin.inbox.imap.tls.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
       <FormField v-slot="{ componentField }" name="imap.mailbox">
         <FormItem>
           <FormLabel>{{ $t('admin.inbox.mailbox') }}</FormLabel>
@@ -216,6 +281,46 @@
     <!-- OAuth SMTP Configuration -->
     <div v-show="isOAuthInbox" class="box p-4 space-y-4">
       <h3 class="font-semibold">{{ $t('admin.inbox.smtpConfig') }}</h3>
+
+      <FormField v-slot="{ componentField }" name="smtp.host">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.host') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="smtp.gmail.com" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="smtp.port">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.port') }}</FormLabel>
+          <FormControl>
+            <Input type="number" placeholder="587" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="smtp.tls_type">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.tls') }}</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue :placeholder="t('globals.messages.selectTLS')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{{ $t('globals.terms.off') }}</SelectItem>
+                <SelectItem value="tls">SSL/TLS</SelectItem>
+                <SelectItem value="starttls">STARTTLS</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormDescription>{{ $t('admin.inbox.tls.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
       <FormField v-slot="{ componentField }" name="smtp.max_conns">
         <FormItem>
@@ -763,6 +868,7 @@ const form = useForm({
   initialValues: {
     name: '',
     from: '',
+    reply_to: '',
     enabled: true,
     csat_enabled: false,
     prompt_tags_on_reply: false,
@@ -809,6 +915,8 @@ const oauthEmail = computed(() => {
 const oauthClientId = computed(() => {
   return form.values.oauth?.client_id || ''
 })
+
+const isMicrosoftInbox = computed(() => form.values.oauth?.provider === PROVIDER_MICROSOFT)
 
 const submitLabel = computed(() => {
   return (
