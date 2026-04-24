@@ -14,19 +14,31 @@
           <Button variant="ghost" class="w-30">
             <div>
               <span class="mr-1">{{ conversationStore.conversations.total }}</span>
-              <span>{{ conversationStore.getListStatus }}</span>
+              <span>{{ conversationStore.listStatusLabel }}</span>
             </div>
             <ChevronDown class="w-4 h-4 ml-2 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem
+          <!-- "All" clears every status filter (empty array). Use @select with
+               event.preventDefault() so picking an item doesn't close the
+               menu — agents typically tick a couple of statuses at once. -->
+          <DropdownMenuCheckboxItem
+            :checked="conversationStore.conversations.status.length === 0"
+            @select="(e) => { e.preventDefault(); conversationStore.setListStatus([]) }"
+          >
+            {{ $t('globals.messages.all') }}
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem
             v-for="status in conversationStore.statusOptions"
             :key="status.value"
-            @click="handleStatusChange(status)"
+            :checked="conversationStore.conversations.status.includes(status.label)"
+            :disabled="conversationStore.conversations.status.length === 1
+              && conversationStore.conversations.status[0] === status.label"
+            @select="(e) => { e.preventDefault(); handleStatusToggle(status) }"
           >
             {{ status.label }}
-          </DropdownMenuItem>
+          </DropdownMenuCheckboxItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <div v-else>
@@ -155,6 +167,7 @@ import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2 } fro
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
@@ -180,8 +193,8 @@ const title = computed(() => {
   return t(key, route.meta?.titleCount || 1)
 })
 
-const handleStatusChange = (status) => {
-  conversationStore.setListStatus(status.label)
+const handleStatusToggle = (status) => {
+  conversationStore.toggleListStatus(status.label)
 }
 
 const handleSortChange = (order) => {

@@ -94,7 +94,10 @@ export const useConversationStore = defineStore('conversation', () => {
   const conversations = reactive({
     data: [],
     listType: null,
-    status: 'Open',
+    // Status filter is an array so the dropdown can multi-select
+    // (e.g. "Open + Replied" to see all active conversations). Empty array
+    // means "All" — no status filter applied.
+    status: ['Open'],
     sortField: 'newest',
     listFilters: [],
     viewID: 0,
@@ -128,15 +131,52 @@ export const useConversationStore = defineStore('conversation', () => {
   const incrementMessageVersion = () => setTimeout(() => messages.version++, 0)
 
   function setListStatus (status, fetch = true) {
-    conversations.status = status
+    // Accept a single status name (back-compat) or an array of names; an
+    // empty/null value clears the filter ("All").
+    if (status == null || status === '') {
+      conversations.status = []
+    } else if (Array.isArray(status)) {
+      conversations.status = [...status]
+    } else {
+      conversations.status = [status]
+    }
     if (fetch) {
       resetConversations()
       reFetchConversationsList()
     }
   }
 
-  const getListStatus = computed(() => {
-    return conversations.status
+  function toggleListStatus (status) {
+    const idx = conversations.status.indexOf(status)
+    if (idx >= 0) {
+      // Refuse to deselect the last status — picking zero would silently
+      // become "All", which the All-option button is already there to do
+      // explicitly.
+      if (conversations.status.length > 1) {
+        conversations.status.splice(idx, 1)
+      } else {
+        return
+      }
+    } else {
+      conversations.status.push(status)
+    }
+    resetConversations()
+    reFetchConversationsList()
+  }
+
+  // Display-only label for the dropdown trigger. Callers that need to
+  // ask "is any status filter active?" should read `conversations.status`
+  // directly — relying on this string for control flow is what bit
+  // InboxView when status went from a single string to an array.
+  const listStatusLabel = computed(() => {
+    if (conversations.status.length === 0) {
+      const i18n = getI18n()
+      return i18n?.global?.t?.('globals.messages.all') || 'All'
+    }
+    if (conversations.status.length === 1) return conversations.status[0]
+    const i18n = getI18n()
+    return i18n?.global?.t?.('conversation.nStatuses', { count: conversations.status.length })
+      || (conversations.status.length + ' statuses')
   })
 
   function setListSortField (field) {
@@ -188,12 +228,10 @@ export const useConversationStore = defineStore('conversation', () => {
   const conversationsList = computed(() => {
     if (!conversations.data) return []
     let filteredConversations = conversations.data
-    // Filter by status if set.
-    if (conversations.status !== "") {
+    // Filter by status if any are selected (empty array == "All").
+    if (conversations.status.length > 0) {
       filteredConversations = conversations.data
-        .filter(conv => {
-          return conv.status === conversations.status
-        })
+        .filter(conv => conversations.status.includes(conv.status))
     }
 
     // Sort conversations based on the selected sort field
@@ -421,14 +459,26 @@ export const useConversationStore = defineStore('conversation', () => {
     if (listType) conversations.listType = listType
     if (teamID) conversations.teamID = teamID
     if (viewID) conversations.viewID = viewID
-    if (conversations.status) {
+    if (conversations.status.length > 0) {
       filters = filters.filter(f => f.model !== 'conversation_statuses')
-      filters.push({
-        model: 'conversation_statuses',
-        field: 'name',
-        operator: 'equals',
-        value: conversations.status
-      })
+      // Single status uses `equals` (cheaper plan); multiple uses `in`.
+      // Keeps the SQL builder happy and avoids changing wire format for
+      // the existing single-status case.
+      if (conversations.status.length === 1) {
+        filters.push({
+          model: 'conversation_statuses',
+          field: 'name',
+          operator: 'equals',
+          value: conversations.status[0]
+        })
+      } else {
+        filters.push({
+          model: 'conversation_statuses',
+          field: 'name',
+          operator: 'in',
+          value: JSON.stringify(conversations.status)
+        })
+      }
     }
     if (filters) conversations.listFilters = filters
     if (showLoader) conversations.loading = true
@@ -954,6 +1004,7 @@ export const useConversationStore = defineStore('conversation', () => {
     fetchPriorities,
     setListSortField,
     setListStatus,
+    toggleListStatus,
     removeMacroAction,
     getMacro,
     setMacro,
@@ -961,7 +1012,7 @@ export const useConversationStore = defineStore('conversation', () => {
     setMacroActions,
     removeAssignee,
     getListSortField,
-    getListStatus,
+    listStatusLabel,
     statuses,
     priorities,
     priorityOptions,
