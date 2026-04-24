@@ -34,6 +34,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'events',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.event', 2))
     },
@@ -55,6 +56,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'is_active',
+    enableGlobalFilter: false,
     header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
     cell: ({ row }) => {
       const isActive = row.getValue('is_active')
@@ -72,6 +74,7 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'created_at',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },

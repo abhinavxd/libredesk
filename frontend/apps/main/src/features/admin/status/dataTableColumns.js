@@ -41,6 +41,7 @@ export const createColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'created_at',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },

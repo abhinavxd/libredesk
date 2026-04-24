@@ -23,6 +23,7 @@ export const createOutgoingEmailTableColumns = (t) => [
   },
   {
     accessorKey: 'is_default',
+    enableGlobalFilter: false,
     header: () => h('div', { class: 'text-center' }, t('globals.terms.default')),
     cell: ({ row }) => {
       const isDefault = row.getValue('is_default')
@@ -38,6 +39,7 @@ export const createOutgoingEmailTableColumns = (t) => [
   },
   {
     accessorKey: 'created_at',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },
@@ -84,6 +86,7 @@ export const createEmailNotificationTableColumns = (t) => [
 
   {
     accessorKey: 'created_at',
+    enableGlobalFilter: false,
     header: function () {
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },

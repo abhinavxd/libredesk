@@ -13,7 +13,7 @@
       </div>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="slas" :loading="isLoading" :searchable="false" />
+      <DataTable :columns="createColumns(t)" :data="slas" :loading="isLoading" />
     </div>
   </LoadingOverlay>
 </template>

@@ -10,7 +10,7 @@
       </router-link>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="roles" :loading="isLoading" :searchable="false" />
+      <DataTable :columns="createColumns(t)" :data="roles" :loading="isLoading" />
     </div>
   </LoadingOverlay>
 </template>

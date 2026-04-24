@@ -9,7 +9,7 @@
       </div>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="links" :loading="isLoading" :searchable="false" />
+      <DataTable :columns="createColumns(t)" :data="links" :loading="isLoading" />
     </div>
   </LoadingOverlay>
 </template>

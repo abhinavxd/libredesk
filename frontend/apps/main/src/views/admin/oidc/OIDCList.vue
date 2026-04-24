@@ -11,7 +11,7 @@
       </div>
     </div>
     <div>
-      <DataTable :columns="createColumns(t)" :data="oidc" :loading="isLoading" :searchable="false" />
+      <DataTable :columns="createColumns(t)" :data="oidc" :loading="isLoading" />
     </div>
   </LoadingOverlay>
 </template>

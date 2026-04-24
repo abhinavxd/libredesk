@@ -51,10 +51,10 @@
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="contact">
-                <DataTable :columns="createColumns(t, { onEdit: editCustomAttribute })" :data="customAttributes" :loading="isLoading" :searchable="false" />
+                <DataTable :columns="createColumns(t, { onEdit: editCustomAttribute })" :data="customAttributes" :loading="isLoading" />
               </TabsContent>
               <TabsContent value="conversation">
-                <DataTable :columns="createColumns(t, { onEdit: editCustomAttribute })" :data="customAttributes" :loading="isLoading" :searchable="false" />
+                <DataTable :columns="createColumns(t, { onEdit: editCustomAttribute })" :data="customAttributes" :loading="isLoading" />
               </TabsContent>
             </Tabs>
           </div>

@@ -1,6 +1,6 @@
 <template>
   <div class="w-full space-y-3">
-    <div v-if="searchable" class="relative max-w-sm">
+    <div v-if="searchable" class="relative max-w-xs">
       <Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         v-model="globalFilter"
