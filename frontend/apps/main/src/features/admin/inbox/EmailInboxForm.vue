@@ -73,7 +73,7 @@
     </FormField>
 
     <FormField
-      v-if="showFormFields && showPlusAddressingToggle"
+      v-if="showFormFields"
       v-slot="{ componentField, handleChange }"
       name="enable_plus_addressing"
     >
@@ -82,6 +82,7 @@
           :title="$t('admin.inbox.enablePlusAddressing')"
           :description="$t('admin.inbox.enablePlusAddressing.description')"
           :checked="componentField.modelValue"
+          :disabled="isMicrosoftInbox && componentField.modelValue"
           @update:checked="handleChange"
         />
         <p
@@ -916,10 +917,6 @@ const oauthClientId = computed(() => {
 })
 
 const isMicrosoftInbox = computed(() => form.values.oauth?.provider === PROVIDER_MICROSOFT)
-
-const showPlusAddressingToggle = computed(
-  () => !isMicrosoftInbox.value || !form.values.enable_plus_addressing
-)
 
 const submitLabel = computed(() => {
   return (
