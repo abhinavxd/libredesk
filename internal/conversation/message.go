@@ -18,6 +18,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
@@ -518,6 +519,30 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	if err := m.InsertMessage(&message); err != nil {
 		return models.Message{}, err
 	}
+
+	// Auto-assign on reply: if the inbox has the per-inbox toggle enabled
+	// AND the conversation is currently unassigned, claim it for the agent
+	// who just replied and record a self-assign activity so the audit trail
+	// matches a manual assignment. Best-effort — a failure here shouldn't
+	// block the reply that's already gone out.
+	//
+	// Race window: between the GetConversation/check and the UpdateAssignee,
+	// a concurrent reply could also auto-assign — last write wins, no
+	// corruption since both writes target the same agent in the typical case.
+	var inboxCfg imodels.Config
+	if err := json.Unmarshal(inboxRecord.Config, &inboxCfg); err == nil && inboxCfg.AutoAssignOnReply {
+		conv, cerr := m.GetConversation(0, conversationUUID, "")
+		if cerr == nil && !conv.AssignedUserID.Valid {
+			if aerr := m.UpdateAssignee(conversationUUID, senderID, models.AssigneeTypeUser); aerr != nil {
+				m.lo.Warn("auto-assign on reply failed", "conversation_uuid", conversationUUID, "user_id", senderID, "error", aerr)
+			} else if sender, uerr := m.userStore.GetAgent(senderID, ""); uerr == nil {
+				if rerr := m.RecordAssigneeUserChange(conversationUUID, senderID, sender); rerr != nil {
+					m.lo.Warn("auto-assign activity record failed", "conversation_uuid", conversationUUID, "user_id", senderID, "error", rerr)
+				}
+			}
+		}
+	}
+
 	return message, nil
 }
 
