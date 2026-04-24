@@ -121,6 +121,7 @@ const submitForm = (values) => {
     channel: channelName,
     config: {
       enable_plus_addressing: values.enable_plus_addressing,
+      auto_assign_on_reply: values.auto_assign_on_reply,
       imap: [values.imap],
       smtp: [values.smtp]
     }

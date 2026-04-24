@@ -73,6 +73,21 @@
     <FormField
       v-if="showFormFields"
       v-slot="{ componentField, handleChange }"
+      name="auto_assign_on_reply"
+    >
+      <FormItem>
+        <SwitchField
+          :title="$t('admin.inbox.autoAssignOnReply')"
+          :description="$t('admin.inbox.autoAssignOnReply.description')"
+          :checked="componentField.modelValue"
+          @update:checked="handleChange"
+        />
+      </FormItem>
+    </FormField>
+
+    <FormField
+      v-if="showFormFields"
+      v-slot="{ componentField, handleChange }"
       name="prompt_tags_on_reply"
     >
       <FormItem>
@@ -767,6 +782,7 @@ const form = useForm({
     csat_enabled: false,
     prompt_tags_on_reply: false,
     enable_plus_addressing: true,
+    auto_assign_on_reply: false,
     auth_type: AUTH_TYPE_PASSWORD,
     imap: {
       host: 'imap.gmail.com',

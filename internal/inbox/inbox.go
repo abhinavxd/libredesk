@@ -334,12 +334,17 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	// Preserve existing passwords if update has empty password
 	switch current.Channel {
 	case "email":
+		// NOTE: any field on imodels.Config that should survive an Update
+		// MUST appear in both of these local structs — the function
+		// unmarshals into them, mutates, and marshals back, so anything
+		// missing here is silently dropped on every save.
 		var currentCfg struct {
 			AuthType             string            `json:"auth_type"`
 			OAuth                map[string]string `json:"oauth"`
 			IMAP                 []map[string]any  `json:"imap"`
 			SMTP                 []map[string]any  `json:"smtp"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+			AutoAssignOnReply    bool              `json:"auto_assign_on_reply"`
 		}
 		var updateCfg struct {
 			AuthType             string            `json:"auth_type"`
@@ -347,6 +352,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			IMAP                 []map[string]any  `json:"imap"`
 			SMTP                 []map[string]any  `json:"smtp"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+			AutoAssignOnReply    bool              `json:"auto_assign_on_reply"`
 		}
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
