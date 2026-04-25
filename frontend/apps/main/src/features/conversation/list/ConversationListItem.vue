@@ -75,7 +75,7 @@
                 v-if="conversation.unread_message_count > 0"
                 class="flex items-center justify-center w-5 h-5 bg-green-600 text-white text-xs font-medium rounded-full flex-shrink-0"
               >
-                {{ conversation.unread_message_count }}
+                {{ conversation.unread_message_count > 9 ? '9+' : conversation.unread_message_count }}
               </div>
             </div>
 
