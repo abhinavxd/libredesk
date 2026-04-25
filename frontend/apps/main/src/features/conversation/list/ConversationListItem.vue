@@ -5,10 +5,19 @@
         :to="conversationRoute"
         class="group relative block px-3 py-3 transition-all duration-200 ease-in-out cursor-pointer hover:bg-accent/20 dark:hover:bg-accent/60"
         :class="{
-          'bg-accent/60': conversation.uuid === currentConversation?.uuid
+          'bg-accent/60': conversation.uuid === currentConversation?.uuid,
+          'bg-primary/5': isItemSelected && conversation.uuid !== currentConversation?.uuid
         }"
       >
         <div class="flex items-start gap-2">
+          <!-- Selection checkbox -->
+          <div class="flex items-center pt-2" @click.prevent.stop="handleCheckboxClick">
+            <Checkbox
+              :checked="isItemSelected"
+              :aria-label="t('conversation.bulkActions.selectConversation')"
+            />
+          </div>
+
           <!-- Avatar with channel indicator -->
           <div class="relative flex-shrink-0">
             <Avatar class="w-10 h-10 rounded-full">
@@ -124,7 +133,6 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { Mail, MessageSquare, Reply, MailOpen } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
@@ -135,12 +143,15 @@ import {
   ContextMenuTrigger
 } from '@shared-ui/components/ui/context-menu'
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
+import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'
+import { useConversationRoute } from '@main/composables/useConversationRoute'
+import { useI18n } from 'vue-i18n'
 
 let timer = null
 const now = ref(new Date())
-const route = useRoute()
 const conversationStore = useConversationStore()
+const { t } = useI18n()
 const frdStatus = ref('')
 const rdStatus = ref('')
 const nrdStatus = ref('')
@@ -155,24 +166,8 @@ const handleMarkAsUnread = () => {
   conversationStore.markAsUnread(props.conversation.uuid)
 }
 
-const conversationRoute = computed(() => {
-  const baseRoute = route.name.includes('team')
-    ? 'team-inbox-conversation'
-    : route.name.includes('view')
-      ? 'view-inbox-conversation'
-      : 'inbox-conversation'
-  return {
-    name: baseRoute,
-    params: {
-      uuid: props.conversation.uuid,
-      ...(baseRoute === 'team-inbox-conversation' && { teamID: route.params.teamID }),
-      ...(baseRoute === 'view-inbox-conversation' && { viewID: route.params.viewID })
-    },
-    query: props.conversation.mentioned_message_uuid
-      ? { scrollTo: props.conversation.mentioned_message_uuid }
-      : {}
-  }
-})
+const { buildConversationRoute } = useConversationRoute()
+const conversationRoute = computed(() => buildConversationRoute(props.conversation))
 
 onMounted(() => {
   timer = setInterval(() => {
@@ -210,4 +205,12 @@ const draftPreview = computed(() => {
   const text = draft.content.replace(/<[^>]*>/g, '').trim()
   return text.length > 120 ? text.slice(0, 120) + '...' : text
 })
+
+const isItemSelected = computed(() => {
+  return conversationStore.isSelected(props.conversation.uuid)
+})
+
+const handleCheckboxClick = (event) => {
+  conversationStore.toggleSelect(props.conversation.uuid, event.shiftKey)
+}
 </script>

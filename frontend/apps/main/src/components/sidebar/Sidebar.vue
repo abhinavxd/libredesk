@@ -102,6 +102,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
+import { useViewMode } from '@main/composables/useViewMode'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
@@ -111,6 +112,7 @@ defineProps({
 const userStore = useUserStore()
 const conversationStore = useConversationStore()
 const settingsStore = useAppSettingsStore()
+const { viewMode } = useViewMode()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -145,55 +147,53 @@ const handleDeleteView = () => {
   }
 }
 
-// Navigation methods with conversation retention
+// Navigation methods with conversation retention.
+// In card mode the conversation pane is always visible so retaining the open
+// conversation across inbox switches is fine. In table mode the layout shows
+// either the list or the detail (not both), so retaining the conversation
+// would hide the list the user just clicked toward — drop it.
 const navigateToInbox = (type) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
+  if (
+    viewMode.value === 'card' &&
+    conversationStore.isConversationOpen &&
+    conversationStore.conversation.data?.uuid
+  ) {
     router.push({
       name: 'inbox-conversation',
-      params: {
-        type,
-        uuid: conversationStore.conversation.data.uuid
-      }
+      params: { type, uuid: conversationStore.conversation.data.uuid }
     })
   } else {
-    router.push({
-      name: 'inbox',
-      params: { type }
-    })
+    router.push({ name: 'inbox', params: { type } })
   }
 }
 
 const navigateToTeamInbox = (teamID) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
+  if (
+    viewMode.value === 'card' &&
+    conversationStore.isConversationOpen &&
+    conversationStore.conversation.data?.uuid
+  ) {
     router.push({
       name: 'team-inbox-conversation',
-      params: {
-        teamID,
-        uuid: conversationStore.conversation.data.uuid
-      }
+      params: { teamID, uuid: conversationStore.conversation.data.uuid }
     })
   } else {
-    router.push({
-      name: 'team-inbox',
-      params: { teamID }
-    })
+    router.push({ name: 'team-inbox', params: { teamID } })
   }
 }
 
 const navigateToViewInbox = (viewID) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
+  if (
+    viewMode.value === 'card' &&
+    conversationStore.isConversationOpen &&
+    conversationStore.conversation.data?.uuid
+  ) {
     router.push({
       name: 'view-inbox-conversation',
-      params: {
-        viewID,
-        uuid: conversationStore.conversation.data.uuid
-      }
+      params: { viewID, uuid: conversationStore.conversation.data.uuid }
     })
   } else {
-    router.push({
-      name: 'view-inbox',
-      params: { viewID }
-    })
+    router.push({ name: 'view-inbox', params: { viewID } })
   }
 }
 
