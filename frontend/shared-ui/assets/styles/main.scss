@@ -51,6 +51,14 @@
       margin-bottom: 0.5rem;
     }
 
+    // Stop emails with explicit width/height attributes from forcing a
+    // wider rendered width than the message bubble.
+    img {
+      max-width: 100%;
+      height: auto;
+      cursor: zoom-in;
+    }
+
     ul {
       list-style-type: disc;
       margin-left: 1.5rem;

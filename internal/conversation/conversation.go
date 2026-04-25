@@ -133,6 +133,7 @@ type userStore interface {
 }
 
 type mediaStore interface {
+	Get(id int, uuid string) (mmodels.Media, error)
 	GetBlob(name string) ([]byte, error)
 	GetURL(uuid, contentType, fileName string) string
 	GetSignedURL(name string) string
