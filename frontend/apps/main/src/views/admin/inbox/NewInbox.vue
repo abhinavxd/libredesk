@@ -119,6 +119,7 @@ const submitForm = (values) => {
     name: values.name,
     from: values.from,
     channel: channelName,
+    prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
     config: {
       reply_to: values.reply_to,
       enable_plus_addressing: values.enable_plus_addressing,
