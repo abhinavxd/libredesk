@@ -6,8 +6,8 @@ SELECT id, uuid, created_at, updated_at, "name", deleted_at, channel, enabled, c
 
 -- name: insert-inbox
 INSERT INTO inboxes
-(channel, config, "name", "from", csat_enabled, prompt_tags_on_reply, secret, linked_email_inbox_id)
-VALUES($1, $2, $3, $4, $5, $6, $7, $8)
+(channel, config, "name", "from", enabled, csat_enabled, prompt_tags_on_reply, secret, linked_email_inbox_id)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *
 
 -- name: get-inbox
