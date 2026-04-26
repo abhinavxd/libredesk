@@ -114,8 +114,14 @@ export default class MessageCache {
         const conv = this.cache.get(convId)
         if (!conv) return
         conv.pages.forEach(msgs => {
-            const msg = msgs.find(m => m.uuid === msgId)
-            if (msg) Object.assign(msg, updates)
+            const idx = msgs.findIndex(m => m.uuid === msgId)
+            // Replace the message object instead of mutating in place. The
+            // cache holds plain JS objects (not Vue reactive proxies), so
+            // an in-place Object.assign is invisible to <MessageBubble>'s
+            // computed reads of props.message.content. Swapping the array
+            // entry produces a new object identity, which the parent's
+            // v-for re-projects as a fresh prop.
+            if (idx !== -1) msgs[idx] = { ...msgs[idx], ...updates }
         })
     }
 

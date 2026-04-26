@@ -388,6 +388,40 @@ func (m *Manager) MarkMessageAsPending(uuid string) error {
 	return nil
 }
 
+// UpdatePrivateNote replaces the body of a private note in place. Caller is
+// responsible for authorising (only the author can edit). The SQL guards
+// against accidentally updating a public reply.
+func (m *Manager) UpdatePrivateNote(uuid, content string) error {
+	textContent := stringutil.HTML2Text(content)
+	result, err := m.q.UpdatePrivateNoteContent.Exec(uuid, content, textContent)
+	if err != nil {
+		m.lo.Error("error updating private note", "uuid", uuid, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.message}"), nil)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.message}"), nil)
+	}
+	return nil
+}
+
+// SoftDeletePrivateNote marks a private note as deleted by replacing its
+// content with a tombstone naming the actor and setting `meta.deleted=true`.
+// The row stays in the table so the audit trail is preserved.
+func (m *Manager) SoftDeletePrivateNote(uuid, actorName string) error {
+	tombstone := fmt.Sprintf("This note was deleted by %s", actorName)
+	result, err := m.q.SoftDeletePrivateNote.Exec(uuid, tombstone, tombstone)
+	if err != nil {
+		m.lo.Error("error soft-deleting private note", "uuid", uuid, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.message}"), nil)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.message}"), nil)
+	}
+	return nil
+}
+
 // SendPrivateNote inserts a private message in a conversation.
 func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string, mentions []models.MentionInput) (models.Message, error) {
 	// Best-effort render template variables before saving.

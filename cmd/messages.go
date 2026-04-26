@@ -174,6 +174,86 @@ func handleRetryMessage(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
+// loadOwnedPrivateNote enforces conversation access, fetches the message and
+// confirms that it is a private note authored by `user`. Returns the message on
+// success or an envelope-wrapped error suitable to bubble up from a handler.
+// Centralised so the ownership rule lives in one place across edit/delete.
+func loadOwnedPrivateNote(app *App, cuuid, msgUUID string, user umodels.User) (cmodels.Message, error) {
+	if _, err := enforceConversationAccess(app, cuuid, user); err != nil {
+		return cmodels.Message{}, err
+	}
+	msg, err := app.conversation.GetMessage(msgUUID)
+	if err != nil {
+		return cmodels.Message{}, err
+	}
+	if msg.ConversationUUID != cuuid || !msg.Private || msg.SenderType != cmodels.SenderTypeAgent || msg.SenderID != user.ID {
+		return cmodels.Message{}, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
+	}
+	return msg, nil
+}
+
+// handleUpdatePrivateNote updates the body of a private note. Only the
+// agent who authored the note can edit it.
+func handleUpdatePrivateNote(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		cuuid = r.RequestCtx.UserValue("cuuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   struct {
+			Content string `json:"content"`
+		}
+	)
+
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`content`"), nil, envelope.InputError)
+	}
+
+	if _, err := loadOwnedPrivateNote(app, cuuid, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if err := app.conversation.UpdatePrivateNote(uuid, req.Content); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
+// handleDeletePrivateNote soft-deletes a private note, replacing the body
+// with a tombstone that records who deleted it. Only the original author
+// can delete their own note.
+func handleDeletePrivateNote(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		cuuid = r.RequestCtx.UserValue("cuuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if _, err := loadOwnedPrivateNote(app, cuuid, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	actorName := strings.TrimSpace(user.FirstName + " " + user.LastName)
+	if err := app.conversation.SoftDeletePrivateNote(uuid, actorName); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
 // handleSendMessage sends a message in a conversation.
 func handleSendMessage(r *fastglue.Request) error {
 	var (

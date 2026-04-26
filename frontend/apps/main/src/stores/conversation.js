@@ -214,6 +214,12 @@ export const useConversationStore = defineStore('conversation', () => {
   })
 
   const conversationMessages = computed(() => {
+    // Read version so the computed re-runs whenever the cache mutates in
+    // place (edit/delete private note, etc.). The cache holds plain JS
+    // objects, not reactive ones, so without this trigger an in-place
+    // update stays invisible.
+    // eslint-disable-next-line no-unused-vars
+    const _ = messages.version
     return messages.data.getAllPagesMessages(conversation.data?.uuid)
   })
 
