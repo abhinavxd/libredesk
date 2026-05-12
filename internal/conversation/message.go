@@ -1214,12 +1214,6 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			}
 		}
 
-		// Now that the file is uploaded, swap any cid: reference for the upload URL.
-		// For non-images this turns the broken <img> tag into a download link.
-		if contentID != "" {
-			message.Content = replaceCIDInContent(message.Content, fmt.Sprintf("cid:%s", contentID), "/uploads/"+media.UUID, attachment.Name, attachment.ContentType)
-		}
-
 		message.Media = append(message.Media, media)
 	}
 	return nil

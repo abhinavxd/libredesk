@@ -42,16 +42,16 @@
           :href="currentImage.url"
           download
           class="text-white/70 hover:text-white"
-          :title="t('imageLightbox.download')"
-          :aria-label="t('imageLightbox.download')"
+          :title="t('globals.terms.download')"
+          :aria-label="t('globals.terms.download')"
           @click.stop
         >
           <Download :size="20" />
         </a>
         <button
           class="text-white hover:text-gray-300"
-          :title="t('imageLightbox.close')"
-          :aria-label="t('imageLightbox.close')"
+          :title="t('globals.messages.close')"
+          :aria-label="t('globals.messages.close')"
           @click="close"
         >
           <X :size="24" />

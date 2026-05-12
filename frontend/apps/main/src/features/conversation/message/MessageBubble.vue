@@ -300,3 +300,11 @@ const showEnvelope = computed(() => {
   )
 })
 </script>
+
+<style scoped lang="scss">
+.native-html :deep(img) {
+  max-width: 100%;
+  height: auto;
+  cursor: zoom-in;
+}
+</style>
