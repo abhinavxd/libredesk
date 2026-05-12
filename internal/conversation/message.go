@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -1118,38 +1117,6 @@ func (m *Manager) embedInlineImagesAsCID(message *models.Message) error {
 	return nil
 }
 
-// replaceCIDInContent rewrites a cid: reference inside message HTML.
-// Image content types: just swap the cid: URL for the upload URL (browser renders as <img>).
-// Non-image content types (e.g. PDF): replace the entire <img> tag with a download link, since
-// browsers cannot render non-image files in <img> tags.
-func replaceCIDInContent(content, cidRef, uploadURL, filename, contentType string) string {
-	contentType = strings.ToLower(contentType)
-	if strings.HasPrefix(contentType, "image/") {
-		return strings.ReplaceAll(content, cidRef, uploadURL)
-	}
-
-	if filename == "" {
-		filename = "attachment"
-	}
-
-	// Tolerate XHTML-style self-closing tags (Outlook produces `<img ... />`
-	// with a space before the slash).
-	imgPattern := regexp.MustCompile(`<img[^>]*src=["']?` + regexp.QuoteMeta(cidRef) + `["']?[^>]*\s*/?>`)
-	// Both filename and uploadURL come from upstream sources we don't fully
-	// control (incoming email metadata, media store config). Escape both
-	// before splicing into stored HTML.
-	downloadLink := fmt.Sprintf(
-		`<a href="%s" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#f0f0f0;border-radius:4px;text-decoration:none;color:#333;font-size:13px;border:1px solid #ddd;">[file] %s</a>`,
-		html.EscapeString(uploadURL), html.EscapeString(filename),
-	)
-	replaced := imgPattern.ReplaceAllString(content, downloadLink)
-	if replaced == content {
-		// CID was referenced outside an <img> (uncommon). Fall back to plain URL substitution.
-		return strings.ReplaceAll(content, cidRef, uploadURL)
-	}
-	return replaced
-}
-
 // uploadMessageAttachments uploads all attachments for a message.
 func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 	if len(message.Attachments) == 0 {
@@ -1173,7 +1140,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			// This attachment already exists, replace the cid:content_id with the media relative url, not using absolute path as the root path can change.
 			if exists {
 				m.lo.Debug("attachment with content ID already exists replacing content ID with media relative URL", "content_id", contentID, "media_uuid", uuid)
-				message.Content = replaceCIDInContent(message.Content, fmt.Sprintf("cid:%s", attachment.ContentID), "/uploads/"+uuid, attachment.Name, attachment.ContentType)
+				message.Content = strings.ReplaceAll(message.Content, fmt.Sprintf("cid:%s", attachment.ContentID), "/uploads/"+uuid)
 				continue
 			}
 
