@@ -47,15 +47,13 @@ export const createContactFormSchema = (t) => z.object({
         .max(50, {
             message: t('validation.minmax', { min: 0, max: 50 })
         })
-        .optional()
-        .or(z.literal('')),
+        .optional(),
     last_name: z
         .string()
         .max(50, {
             message: t('validation.minmax', { min: 0, max: 50 })
         })
-        .optional()
-        .or(z.literal('')),
+        .optional(),
     email: z
         .string()
         .email({ message: t('validation.invalidEmail') })
@@ -66,8 +64,7 @@ export const createContactFormSchema = (t) => z.object({
         .refine(val => !val || /^\d{1,15}$/.test(val), {
             message: t('validation.minmax', { min: 1, max: 15 })
         })
-        .optional()
-        .or(z.literal('')),
+        .optional(),
     phone_number_country_code: z.string().optional().nullable(),
     country: z.string().optional().nullable(),
 })
