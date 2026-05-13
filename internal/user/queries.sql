@@ -209,6 +209,11 @@ UPDATE users
 SET enabled = $3, updated_at = NOW()
 WHERE id = $1 AND type = $2;
 
+-- name: insert-contact-manual
+INSERT INTO users (email, type, first_name, last_name, password, avatar_url, phone_number, phone_number_country_code, country, custom_attributes)
+VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7, $8, '{}')
+RETURNING id;
+
 -- name: update-contact
 UPDATE users
 SET first_name = COALESCE($2, first_name),
