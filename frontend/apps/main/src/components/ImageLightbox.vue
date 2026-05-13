@@ -4,14 +4,17 @@
       v-if="modelValue"
       class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
       tabindex="0"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
       ref="rootEl"
-      @click.self="zoomScale === 1 ? close() : resetZoom()"
+      @click.self="onBackdropClick"
       @keydown.escape="close"
       @keydown.left="prev"
       @keydown.right="next"
+      @keydown.tab="trapFocus"
       @wheel.prevent="onWheel"
     >
-      <!-- Top toolbar -->
       <div class="absolute top-4 right-4 flex items-center gap-3 z-10">
         <button
           class="text-white/70 hover:text-white flex items-center gap-1 text-sm"
@@ -40,7 +43,8 @@
         <a
           v-if="currentImage?.url"
           :href="currentImage.url"
-          download
+          target="_blank"
+          rel="noopener"
           class="text-white/70 hover:text-white"
           :title="t('globals.terms.download')"
           :aria-label="t('globals.terms.download')"
@@ -58,7 +62,6 @@
         </button>
       </div>
 
-      <!-- Counter -->
       <div
         v-if="images.length > 1"
         class="absolute top-4 left-4 text-white/70 text-sm z-10"
@@ -66,7 +69,6 @@
         {{ index + 1 }} / {{ images.length }}
       </div>
 
-      <!-- Prev / Next -->
       <button
         v-if="images.length > 1"
         class="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 z-10 p-2"
@@ -84,7 +86,6 @@
         <ChevronRight :size="32" />
       </button>
 
-      <!-- Loading spinner -->
       <div
         v-if="imageLoading"
         class="absolute inset-0 flex items-center justify-center pointer-events-none"
@@ -92,29 +93,24 @@
         <div class="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
       </div>
 
-      <!-- Zoomable image -->
-      <div
-        :class="zoomScale > 1 ? 'overflow-visible' : 'overflow-hidden'"
-        style="max-width: 90vw; max-height: 90vh;"
+      <img
+        v-if="currentImage"
+        :key="currentImage.url"
+        :ref="onImgRef"
+        :src="currentImage.url"
+        :alt="currentImage.name || ''"
+        class="max-w-[90vw] max-h-[90vh] object-contain rounded shadow-2xl select-none transition-opacity duration-150"
+        :class="imageLoading ? 'opacity-0' : 'opacity-100'"
+        :style="imageStyle"
+        draggable="false"
         @pointerdown.prevent="startPan"
         @touchstart.prevent="onTouchStart"
         @touchmove.prevent="onTouchMove"
         @touchend="onTouchEnd"
-      >
-        <img
-          v-if="currentImage"
-          :key="currentImage.url"
-          :src="currentImage.url"
-          :alt="currentImage.name || ''"
-          class="max-w-[90vw] max-h-[90vh] object-contain rounded shadow-2xl select-none transition-opacity duration-150"
-          :class="imageLoading ? 'opacity-0' : 'opacity-100'"
-          :style="imageStyle"
-          draggable="false"
-          @load="imageLoading = false"
-          @click.stop="zoomScale === 1 ? zoomIn() : null"
-          @dblclick.stop="resetZoom"
-        />
-      </div>
+        @load="imageLoading = false"
+        @click.stop="zoomScale === 1 && zoomIn()"
+        @dblclick.stop="resetZoom"
+      />
     </div>
   </Teleport>
 </template>
@@ -124,12 +120,14 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Download, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-vue-next'
 
+const ZOOM_MIN = 1
+const ZOOM_MAX = 8
+const ZOOM_STEP = 1.4
+const WHEEL_STEP = 1.15
+
 const props = defineProps({
-  // v-model:open style controls visibility
   modelValue: { type: Boolean, required: true },
-  // Array of { url, name? } objects to flip through
   images: { type: Array, required: true },
-  // Which image to show first when opened
   startIndex: { type: Number, default: 0 }
 })
 const emit = defineEmits(['update:modelValue'])
@@ -146,6 +144,11 @@ const panY = ref(0)
 const isPanning = ref(false)
 let panStart = { x: 0, y: 0, panX: 0, panY: 0 }
 let lastTouchDist = 0
+let previouslyFocused = null
+// When a pan ends over the backdrop, browsers synthesize a click event
+// in the same gesture. Suppress that one click so the pan doesn't
+// accidentally trigger resetZoom or close.
+let suppressNextClick = false
 
 const currentImage = computed(() => props.images[index.value])
 
@@ -163,35 +166,38 @@ const resetZoom = () => {
   panY.value = 0
 }
 
-const zoomIn = () => {
-  zoomScale.value = Math.min(zoomScale.value * 1.4, 8)
+const applyZoom = (factor) => {
+  const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomScale.value * factor))
+  zoomScale.value = next
+  if (next === ZOOM_MIN) resetZoom()
 }
 
-const zoomOut = () => {
-  zoomScale.value = Math.max(zoomScale.value / 1.4, 1)
-  if (zoomScale.value === 1) resetZoom()
+const zoomIn = () => applyZoom(ZOOM_STEP)
+const zoomOut = () => applyZoom(1 / ZOOM_STEP)
+const onWheel = (e) => applyZoom(e.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP)
+
+const beginPan = (clientX, clientY) => {
+  isPanning.value = true
+  panStart = { x: clientX, y: clientY, panX: panX.value, panY: panY.value }
 }
 
-const onWheel = (e) => {
-  if (e.deltaY < 0) {
-    zoomScale.value = Math.min(zoomScale.value * 1.15, 8)
-  } else {
-    zoomScale.value = Math.max(zoomScale.value / 1.15, 1)
-    if (zoomScale.value === 1) resetZoom()
-  }
+const updatePan = (clientX, clientY) => {
+  panX.value = panStart.panX + (clientX - panStart.x)
+  panY.value = panStart.panY + (clientY - panStart.y)
 }
+
+const touchDistance = (touches) =>
+  Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY)
 
 const startPan = (e) => {
   if (zoomScale.value <= 1) return
-  isPanning.value = true
-  panStart = { x: e.clientX, y: e.clientY, panX: panX.value, panY: panY.value }
+  beginPan(e.clientX, e.clientY)
 
-  const onMove = (ev) => {
-    panX.value = panStart.panX + (ev.clientX - panStart.x)
-    panY.value = panStart.panY + (ev.clientY - panStart.y)
-  }
+  const onMove = (ev) => updatePan(ev.clientX, ev.clientY)
   const onUp = () => {
     isPanning.value = false
+    suppressNextClick = true
+    setTimeout(() => { suppressNextClick = false }, 0)
     window.removeEventListener('pointermove', onMove)
     window.removeEventListener('pointerup', onUp)
   }
@@ -199,33 +205,55 @@ const startPan = (e) => {
   window.addEventListener('pointerup', onUp)
 }
 
+const onBackdropClick = () => {
+  if (suppressNextClick) return
+  if (zoomScale.value === 1) close()
+  else resetZoom()
+}
+
+// `<img>` `@load` can race with Vue's listener attachment when the image
+// is already in cache (preloaded neighbour). Sync state from the element
+// itself once the ref is set.
+const onImgRef = (el) => {
+  if (el?.complete && el.naturalHeight > 0) imageLoading.value = false
+}
+
+const trapFocus = (e) => {
+  const focusables = rootEl.value?.querySelectorAll(
+    'button, [href], [tabindex]:not([tabindex="-1"])'
+  )
+  if (!focusables || focusables.length === 0) return
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  const active = document.activeElement
+  if (e.shiftKey && (active === first || active === rootEl.value)) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && active === last) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
 const onTouchStart = (e) => {
   if (e.touches.length === 2) {
-    lastTouchDist = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    )
-  } else if (e.touches.length === 1 && zoomScale.value > 1) {
-    isPanning.value = true
-    panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, panX: panX.value, panY: panY.value }
+    lastTouchDist = touchDistance(e.touches)
+    return
+  }
+  if (e.touches.length === 1 && zoomScale.value > 1) {
+    beginPan(e.touches[0].clientX, e.touches[0].clientY)
   }
 }
 
 const onTouchMove = (e) => {
   if (e.touches.length === 2) {
-    const dist = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    )
-    if (lastTouchDist > 0) {
-      const delta = dist / lastTouchDist
-      zoomScale.value = Math.max(1, Math.min(8, zoomScale.value * delta))
-      if (zoomScale.value === 1) resetZoom()
-    }
+    const dist = touchDistance(e.touches)
+    if (lastTouchDist > 0) applyZoom(dist / lastTouchDist)
     lastTouchDist = dist
-  } else if (e.touches.length === 1 && isPanning.value) {
-    panX.value = panStart.panX + (e.touches[0].clientX - panStart.x)
-    panY.value = panStart.panY + (e.touches[0].clientY - panStart.y)
+    return
+  }
+  if (e.touches.length === 1 && isPanning.value) {
+    updatePan(e.touches[0].clientX, e.touches[0].clientY)
   }
 }
 
@@ -234,19 +262,16 @@ const onTouchEnd = () => {
   lastTouchDist = 0
 }
 
-const prev = () => {
-  if (props.images.length <= 1) return
+const step = (delta) => {
+  const total = props.images.length
+  if (total <= 1) return
   imageLoading.value = true
   resetZoom()
-  index.value = (index.value - 1 + props.images.length) % props.images.length
+  index.value = (index.value + delta + total) % total
 }
 
-const next = () => {
-  if (props.images.length <= 1) return
-  imageLoading.value = true
-  resetZoom()
-  index.value = (index.value + 1) % props.images.length
-}
+const prev = () => step(-1)
+const next = () => step(1)
 
 // Preload neighbouring images so prev/next feels instant.
 watch(index, () => {
@@ -258,13 +283,17 @@ watch(index, () => {
   if (imgs[n]?.url) new Image().src = imgs[n].url
 })
 
-// On open: jump to startIndex, focus the root for keyboard nav, preload all.
 watch(
   () => props.modelValue,
   (open) => {
-    if (!open) return
+    if (!open) {
+      previouslyFocused?.focus?.()
+      previouslyFocused = null
+      return
+    }
+    previouslyFocused = document.activeElement
     index.value = Math.max(0, Math.min(props.startIndex, props.images.length - 1))
-    imageLoading.value = false
+    imageLoading.value = true
     resetZoom()
     nextTick(() => {
       rootEl.value?.focus()

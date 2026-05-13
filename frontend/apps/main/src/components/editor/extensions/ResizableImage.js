@@ -1,10 +1,9 @@
 import Image from '@tiptap/extension-image'
 import { getI18n } from '@main/i18n'
 
-// Custom Image extension with drag-handle resizing and Gmail-style size presets
-// (Small / Best fit / Original / Remove). Styles for .image-resizer,
-// .image-resize-handle, and .image-size-toolbar live in TextEditor.vue's
-// global <style> block.
+// Styles for `.image-resizer`, `.image-resize-handle*`, `.image-size-toolbar`,
+// and `.image-upload-placeholder*` are in TextEditor.vue's global <style>
+// block because they need to apply inside the tiptap-rendered DOM.
 export const ResizableImage = Image.extend({
   addAttributes () {
     return {
@@ -21,25 +20,60 @@ export const ResizableImage = Image.extend({
         default: null,
         parseHTML: (el) => el.getAttribute('height') || null,
         renderHTML: (attrs) => (attrs.height ? { height: attrs.height } : {})
+      },
+      // Transient placeholder state - never persisted in HTML.
+      uploading: {
+        default: false,
+        parseHTML: () => false,
+        renderHTML: () => ({})
+      },
+      uploadId: {
+        default: null,
+        parseHTML: () => null,
+        renderHTML: () => ({})
+      },
+      uploadName: {
+        default: null,
+        parseHTML: () => null,
+        renderHTML: () => ({})
       }
     }
   },
+  renderHTML (props) {
+    // Don't serialize uploading placeholders - they shouldn't end up in
+    // saved drafts or sent messages.
+    if (props.node.attrs.uploading) {
+      return ['span', { 'data-upload-placeholder': '' }]
+    }
+    return this.parent?.(props) ?? ['img', props.HTMLAttributes]
+  },
   addNodeView () {
     return ({ node, getPos, editor: nodeEditor }) => {
+      const t = getI18n().global.t
+
       const wrapper = document.createElement('div')
       wrapper.classList.add('image-resizer')
       wrapper.style.display = 'inline-block'
       wrapper.style.position = 'relative'
       wrapper.style.lineHeight = '0'
 
+      const placeholder = document.createElement('div')
+      placeholder.classList.add('image-upload-placeholder')
+      const placeholderRow = document.createElement('div')
+      placeholderRow.classList.add('image-upload-placeholder-row')
+      const spinner = document.createElement('div')
+      spinner.className = 'w-7 h-7 border-2 border-muted-foreground border-t-primary rounded-full animate-spin'
+      const nameEl = document.createElement('span')
+      nameEl.classList.add('image-upload-placeholder-name')
+      placeholderRow.appendChild(spinner)
+      placeholderRow.appendChild(nameEl)
+      placeholder.appendChild(placeholderRow)
+      wrapper.appendChild(placeholder)
+
       const img = document.createElement('img')
-      img.src = node.attrs.src
-      img.alt = node.attrs.alt || ''
-      img.title = node.attrs.title || ''
       img.classList.add('inline-image')
       img.style.maxWidth = '100%'
       img.style.height = 'auto'
-      if (node.attrs.width) img.style.width = node.attrs.width + 'px'
       wrapper.appendChild(img)
 
       const toolbar = document.createElement('div')
@@ -51,40 +85,31 @@ export const ResizableImage = Image.extend({
       const commitWidth = (newWidth) => {
         const pos = getPos()
         if (typeof pos !== 'number') return
+        const current = nodeEditor.state.doc.nodeAt(pos)
+        if (!current) return
         nodeEditor.chain().focus().command(({ tr }) => {
-          tr.setNodeMarkup(pos, undefined, { ...node.attrs, width: newWidth || null })
+          tr.setNodeMarkup(pos, undefined, { ...current.attrs, width: newWidth || null })
           return true
         }).run()
       }
 
-      const t = getI18n().global.t
+      const clampToNatural = (w) => (naturalWidth ? Math.min(w, naturalWidth) : w)
       const sizes = [
-        { label: t('globals.terms.small'), value: 400 },
-        { label: t('globals.messages.bestFit'), value: 'fit' },
-        { label: t('globals.terms.original'), value: 'original' }
+        { label: t('globals.terms.small'), getWidth: () => clampToNatural(400) },
+        { label: t('globals.messages.bestFit'), getWidth: () => clampToNatural(nodeEditor.view.dom.clientWidth) }
       ]
       // Toolbar buttons use pointerdown so touch + pen + mouse all work.
       // preventDefault avoids stealing focus from the editor.
-      sizes.forEach(({ label, value }) => {
+      sizes.forEach(({ label, getWidth }) => {
         const btn = document.createElement('button')
         btn.textContent = label
         btn.type = 'button'
         btn.addEventListener('pointerdown', (e) => {
           e.preventDefault()
           e.stopPropagation()
-          if (value === 'original') {
-            img.style.width = naturalWidth ? naturalWidth + 'px' : 'auto'
-            commitWidth(naturalWidth || null)
-          } else if (value === 'fit') {
-            const editorWidth = nodeEditor.view.dom.clientWidth
-            const fitWidth = naturalWidth ? Math.min(naturalWidth, editorWidth) : editorWidth
-            img.style.width = fitWidth + 'px'
-            commitWidth(fitWidth)
-          } else {
-            const w = naturalWidth ? Math.min(value, naturalWidth) : value
-            img.style.width = w + 'px'
-            commitWidth(w)
-          }
+          const w = getWidth()
+          img.style.width = w + 'px'
+          commitWidth(w)
         })
         toolbar.appendChild(btn)
       })
@@ -108,18 +133,21 @@ export const ResizableImage = Image.extend({
       toolbar.appendChild(removeBtn)
       wrapper.appendChild(toolbar)
 
-      // CSS keys off ProseMirror's `.ProseMirror-selectednode` class which
-      // ProseMirror toggles automatically when the image node is selected.
-      // Avoids a global document click listener per image (which would leak
-      // closures across the entire page for every embedded image).
-      const handle = document.createElement('div')
-      handle.classList.add('image-resize-handle')
-      wrapper.appendChild(handle)
+      // Inline images grow rightward in text flow, so width is the only
+      // axis we can actually change. Left-side handles flip the sign so
+      // dragging outward in either direction reads as "grow."
+      const corners = [
+        { className: 'image-resize-handle-tl', direction: -1 },
+        { className: 'image-resize-handle-tr', direction: 1 },
+        { className: 'image-resize-handle-bl', direction: -1 },
+        { className: 'image-resize-handle-br', direction: 1 }
+      ]
 
       let startX = 0
       let startWidth = 0
+      let activeDirection = 1
       const onPointerMove = (e) => {
-        const newWidth = Math.max(50, startWidth + (e.clientX - startX))
+        const newWidth = Math.max(50, startWidth + activeDirection * (e.clientX - startX))
         img.style.width = newWidth + 'px'
       }
       const onPointerUp = () => {
@@ -133,27 +161,48 @@ export const ResizableImage = Image.extend({
           // re-render, paste over selection, etc.). Drop the commit.
         }
       }
-      const onPointerDown = (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        startX = e.clientX
-        startWidth = img.offsetWidth
-        window.addEventListener('pointermove', onPointerMove)
-        window.addEventListener('pointerup', onPointerUp)
-        wrapper.classList.add('resizing')
+
+      corners.forEach(({ className, direction }) => {
+        const handle = document.createElement('div')
+        handle.classList.add('image-resize-handle', className)
+        handle.addEventListener('pointerdown', (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          startX = e.clientX
+          startWidth = img.offsetWidth
+          activeDirection = direction
+          window.addEventListener('pointermove', onPointerMove)
+          window.addEventListener('pointerup', onPointerUp)
+          wrapper.classList.add('resizing')
+        })
+        wrapper.appendChild(handle)
+      })
+
+      const applyState = (n) => {
+        if (n.attrs.uploading) {
+          wrapper.classList.add('uploading')
+          nameEl.textContent = n.attrs.uploadName || ''
+        } else {
+          wrapper.classList.remove('uploading')
+          img.src = n.attrs.src
+          img.alt = n.attrs.alt || ''
+          img.title = n.attrs.title || ''
+          img.style.width = n.attrs.width ? n.attrs.width + 'px' : ''
+        }
       }
-      handle.addEventListener('pointerdown', onPointerDown)
+      applyState(node)
 
       return {
         dom: wrapper,
         update: (updatedNode) => {
           if (updatedNode.type.name !== 'image') return false
-          img.src = updatedNode.attrs.src
-          img.style.width = updatedNode.attrs.width ? updatedNode.attrs.width + 'px' : ''
+          applyState(updatedNode)
           return true
         },
+        // Drag listeners are added on pointerdown and torn down on pointerup,
+        // but if the nodeView is destroyed mid-drag those window listeners
+        // would leak.
         destroy: () => {
-          handle.removeEventListener('pointerdown', onPointerDown)
           window.removeEventListener('pointermove', onPointerMove)
           window.removeEventListener('pointerup', onPointerUp)
         }

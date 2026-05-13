@@ -70,7 +70,8 @@
         </button>
         <a
           :href="attachment.url"
-          download
+          target="_blank"
+          rel="noopener"
           class="absolute top-4 right-14 text-white hover:text-gray-300 z-10"
           :title="t('globals.terms.download')"
           :aria-label="t('globals.terms.download')"

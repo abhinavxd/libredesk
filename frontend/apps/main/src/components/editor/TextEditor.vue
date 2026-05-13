@@ -3,6 +3,7 @@
     <BubbleMenu
       :editor="editor"
       :tippy-options="{ duration: 100 }"
+      :should-show="shouldShowBubble"
       v-if="editor"
       class="bg-background p-1 box will-change-transform"
     >
@@ -150,11 +151,8 @@ import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import { useTypingIndicator } from '@shared-ui/composables'
-import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useConversationStore } from '@main/stores/conversation'
-import { useEmitter } from '@main/composables/useEmitter'
-import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
-import api from '@main/api'
+import { useInlineImageUpload } from '@main/composables/useInlineImageUpload'
 import mentionSuggestion from './mentionSuggestion'
 
 const textContent = defineModel('textContent', { default: '' })
@@ -185,130 +183,32 @@ const props = defineProps({
   getSuggestions: {
     type: Function,
     default: null
+  },
+  enableInlineImages: {
+    type: Boolean,
+    default: false
   }
 })
 
 const emit = defineEmits(['send', 'aiPromptSelected', 'mentionsChanged', 'filesDropped'])
 
 const emitPrompt = (key) => emit('aiPromptSelected', key)
-const emitter = useEmitter()
-const isUploadingImage = ref(false)
 
-// Downscale images larger than MAX_UPLOAD_DIM before upload. Display size is
-// controlled separately by the editor's image toolbar, so there's no point
-// uploading multi-megapixel screenshots in full resolution.
-const MAX_UPLOAD_DIM = 2000
-const resizeImage = (file) => {
-  return new Promise((resolve) => {
-    if (!file.type.startsWith('image/') || file.type === 'image/gif') {
-      resolve(file)
-      return
-    }
-    const img = new window.Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      if (img.width <= MAX_UPLOAD_DIM && img.height <= MAX_UPLOAD_DIM) {
-        resolve(file)
-        return
-      }
-      let w = img.width
-      let h = img.height
-      if (w > MAX_UPLOAD_DIM) {
-        h = Math.round(h * (MAX_UPLOAD_DIM / w))
-        w = MAX_UPLOAD_DIM
-      }
-      if (h > MAX_UPLOAD_DIM) {
-        w = Math.round(w * (MAX_UPLOAD_DIM / h))
-        h = MAX_UPLOAD_DIM
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = w
-      canvas.height = h
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-      canvas.toBlob(
-        (blob) => resolve(blob ? new File([blob], file.name, { type: file.type }) : file),
-        file.type,
-        0.92
-      )
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      resolve(file)
-    }
-    img.src = url
-  })
-}
-
-const uploadImage = async (file) => {
-  file = await resizeImage(file)
-  isUploadingImage.value = true
-  try {
-    const response = await api.uploadMedia({
-      files: file,
-      inline: true,
-      linked_model: 'messages'
-    })
-    return response.data.data.url
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message || 'Failed to upload image'
-    })
-    return null
-  } finally {
-    isUploadingImage.value = false
-  }
-}
-
-const insertImage = (url) => {
-  if (url && editor.value) {
-    editor.value.chain().focus().setImage({ src: url }).run()
-  }
-}
-
-// Paste handler: catch image content from the clipboard, upload, then insert.
-const handlePaste = (view, event) => {
-  const items = event.clipboardData?.items
-  if (!items) return false
-  for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      event.preventDefault()
-      const file = item.getAsFile()
-      if (file) {
-        uploadImage(file).then((url) => {
-          if (url) insertImage(url)
-        })
-      }
-      return true
-    }
-  }
-  return false
-}
-
-// Drop handler: image files go inline, everything else is emitted as
-// `filesDropped` so the parent can attach them as regular attachments.
-const handleDrop = (view, event) => {
-  const files = event.dataTransfer?.files
-  if (!files || files.length === 0) return false
-
-  const imageFiles = []
-  const otherFiles = []
-  for (const file of files) {
-    if (file.type.startsWith('image/')) imageFiles.push(file)
-    else otherFiles.push(file)
-  }
-  if (imageFiles.length === 0 && otherFiles.length === 0) return false
-
-  event.preventDefault()
-  for (const file of imageFiles) {
-    uploadImage(file).then((url) => {
-      if (url) insertImage(url)
-    })
-  }
-  if (otherFiles.length > 0) emit('filesDropped', otherFiles)
+// Suppress the formatting bubble when an image node is selected so it
+// doesn't fight with the image's own size/remove toolbar.
+const shouldShowBubble = ({ editor: e, state }) => {
+  const { selection } = state
+  if (selection.empty) return false
+  if (!e.view.hasFocus()) return false
+  if (selection.node?.type?.name === 'image') return false
   return true
 }
+
+const { handlePaste, handleDrop } = useInlineImageUpload({
+  getEditor: () => editor.value,
+  isInlineEnabled: () => props.enableInlineImages,
+  onOtherFiles: (files) => emit('filesDropped', files)
+})
 
 // Set up typing indicator
 const conversationStore = useConversationStore()
@@ -579,48 +479,84 @@ defineExpose({ focus, extractMentions })
     font-weight: 500;
   }
 
-  // Selected image gets an outline so the user knows what's focused.
-  // Hardcoded brand blue rather than a theme token so it stays visible
-  // against arbitrary email content (light backgrounds, dark images, etc.).
-  .ProseMirror-selectednode .inline-image {
-    outline: 2px solid #0066cc;
-  }
-
-  // Wrapper added by ResizableImage's nodeView.
   .image-resizer {
     display: inline-block;
     position: relative;
-    margin: 4px 0;
+    margin: 4px 5px;
+
+    .image-upload-placeholder {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 32px;
+      min-width: 360px;
+      min-height: 220px;
+      max-width: 100%;
+      background: hsl(var(--muted));
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+      line-height: 1.4;
+      gap: 12px;
+    }
+
+    .image-upload-placeholder-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .image-upload-placeholder-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 320px;
+    }
+
+    &.uploading {
+      .inline-image {
+        display: none;
+      }
+      .image-upload-placeholder {
+        display: inline-flex;
+      }
+    }
 
     .image-resize-handle {
       display: none;
       position: absolute;
-      bottom: 4px;
-      right: 4px;
       width: 12px;
       height: 12px;
-      background: #0066cc;
-      border: 2px solid white;
+      background: hsl(var(--primary));
+      border: 2px solid hsl(var(--background));
       border-radius: 2px;
-      cursor: nwse-resize;
       z-index: 10;
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 0 0 1px hsl(var(--border));
     }
 
-    // Floating size toolbar — sits above image to avoid BubbleMenu overlap.
+    .image-resize-handle-tl { top: -6px; left: -6px; cursor: nwse-resize; }
+    .image-resize-handle-tr { top: -6px; right: -6px; cursor: nesw-resize; }
+    .image-resize-handle-bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .image-resize-handle-br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+    // Anchored to the image's left edge (no centering) so the toolbar
+    // never extends past the image's left side and into adjacent UI when
+    // the image sits near the editor's left edge.
     .image-size-toolbar {
       display: none;
       position: absolute;
       top: 4px;
-      left: 50%;
-      transform: translateX(-50%);
+      left: 0;
       background: hsl(var(--background) / 0.95);
       border: 1px solid hsl(var(--border));
       border-radius: 6px;
       padding: 2px;
       z-index: 10000;
       white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 2px 8px hsl(var(--foreground) / 0.15);
       backdrop-filter: blur(4px);
 
       button {
@@ -658,8 +594,8 @@ defineExpose({ focus, extractMentions })
     }
 
     // ProseMirror toggles `.ProseMirror-selectednode` on the wrapper for us
-    // when the image node is selected, so we don't need to manage selected
-    // state with a document-level click listener.
+    // when the image node is selected, so we don't need a document-level
+    // click listener.
     &.ProseMirror-selectednode .image-resize-handle,
     &.resizing .image-resize-handle {
       display: block;
@@ -669,6 +605,8 @@ defineExpose({ focus, extractMentions })
       display: flex;
     }
 
+    // Hardcoded brand blue rather than a theme token so it stays visible
+    // against arbitrary email content (light backgrounds, dark images, etc.).
     &.ProseMirror-selectednode .inline-image,
     &.resizing .inline-image {
       outline: 2px solid #0066cc;
