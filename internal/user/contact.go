@@ -15,7 +15,7 @@ func (u *Manager) CreateManualContact(user *models.User) error {
 	password, err := u.generatePassword()
 	if err != nil {
 		u.lo.Error("generating password", "error", err)
-		return fmt.Errorf("generating password: %w", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Normalize email.
