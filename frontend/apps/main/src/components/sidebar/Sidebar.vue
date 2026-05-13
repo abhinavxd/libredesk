@@ -236,6 +236,11 @@ const hoveredViewId = ref(null)
 const isDeleteOpen = ref(false)
 const viewToDelete = ref(null)
 const showCreateContactDialog = ref(false)
+
+const handleContactCreated = (contact) => {
+  showCreateContactDialog.value = false
+  router.push({ name: 'contact-detail', params: { id: contact.id } })
+}
 </script>
 
 <template>
@@ -281,7 +286,10 @@ const showCreateContactDialog = ref(false)
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      <CreateContactDialog v-model:open="showCreateContactDialog" />
+      <CreateContactDialog
+        v-model:open="showCreateContactDialog"
+        @created="handleContactCreated"
+      />
     </template>
 
     <!-- Reports sidebar -->
