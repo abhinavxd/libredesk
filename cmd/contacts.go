@@ -22,6 +22,90 @@ type blockContactReq struct {
 	Enabled bool `json:"enabled"`
 }
 
+// handleCreateContact creates a new contact.
+func handleCreateContact(r *fastglue.Request) error {
+	var app = r.Context.(*App)
+
+	form, err := r.RequestCtx.MultipartForm()
+	if err != nil {
+		app.lo.Error("error parsing form data", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
+	}
+
+	firstName := ""
+	if v, ok := form.Value["first_name"]; ok && len(v) > 0 {
+		firstName = string(v[0])
+	}
+	lastName := ""
+	if v, ok := form.Value["last_name"]; ok && len(v) > 0 {
+		lastName = string(v[0])
+	}
+	email := ""
+	if v, ok := form.Value["email"]; ok && len(v) > 0 {
+		email = strings.TrimSpace(string(v[0]))
+	}
+	phoneNumber := ""
+	if v, ok := form.Value["phone_number"]; ok && len(v) > 0 {
+		phoneNumber = string(v[0])
+	}
+	phoneNumberCountryCode := ""
+	if v, ok := form.Value["phone_number_country_code"]; ok && len(v) > 0 {
+		phoneNumberCountryCode = string(v[0])
+	}
+	country := ""
+	if v, ok := form.Value["country"]; ok && len(v) > 0 {
+		country = string(v[0])
+	}
+
+	// Nullify "null" strings.
+	if phoneNumberCountryCode == "null" {
+		phoneNumberCountryCode = ""
+	}
+	if phoneNumber == "null" {
+		phoneNumber = ""
+	}
+	if country == "null" {
+		country = ""
+	}
+
+	// Validate email format if provided.
+	if email != "" && !stringutil.ValidEmail(email) {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidEmail"), nil, envelope.InputError)
+	}
+
+	contact := models.User{
+		FirstName:              firstName,
+		LastName:               lastName,
+		Email:                  null.NewString(email, email != ""),
+		PhoneNumber:            null.NewString(phoneNumber, phoneNumber != ""),
+		PhoneNumberCountryCode: null.NewString(phoneNumberCountryCode, phoneNumberCountryCode != ""),
+		Country:                null.NewString(country, country != ""),
+	}
+
+	if err := app.user.CreateManualContact(&contact); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	createdContact, err := app.user.GetContactOrVisitor(contact.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Upload avatar if provided.
+	files, ok := form.File["files"]
+	if ok && len(files) > 0 {
+		if err := uploadUserAvatar(r, createdContact, files); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		createdContact, err = app.user.GetContactOrVisitor(contact.ID, "")
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
+
+	return r.SendEnvelope(createdContact)
+}
+
 // handleGetContacts returns a list of contacts from the database.
 func handleGetContacts(r *fastglue.Request) error {
 	var (
