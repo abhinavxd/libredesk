@@ -135,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -202,24 +202,33 @@ const initials = computed(() => {
 })
 
 function onAvatarUpload(file) {
+  revokeAvatarPreview()
   avatarFile.value = file
   avatarPreview.value = URL.createObjectURL(file)
 }
 
 function onAvatarRemove() {
   avatarFile.value = null
-  avatarPreview.value = ''
+  revokeAvatarPreview()
 }
 
 function resetForm() {
   form.resetForm()
   avatarFile.value = null
+  revokeAvatarPreview()
+}
+
+function revokeAvatarPreview() {
+  if (!avatarPreview.value) return
+  URL.revokeObjectURL(avatarPreview.value)
   avatarPreview.value = ''
 }
 
 watch(() => props.open, (val) => {
   if (!val) resetForm()
 })
+
+onBeforeUnmount(revokeAvatarPreview)
 
 const onSubmit = form.handleSubmit(async (values) => {
   loading.value = true
