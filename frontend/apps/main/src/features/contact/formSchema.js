@@ -40,3 +40,34 @@ export const createFormSchema = (t) => z.object({
             message: t('validation.invalidEmail'),
         }),
 })
+
+export const createContactFormSchema = (t) => z.object({
+    first_name: z
+        .string()
+        .max(50, {
+            message: t('validation.minmax', { min: 0, max: 50 })
+        })
+        .optional()
+        .or(z.literal('')),
+    last_name: z
+        .string()
+        .max(50, {
+            message: t('validation.minmax', { min: 0, max: 50 })
+        })
+        .optional()
+        .or(z.literal('')),
+    email: z
+        .string()
+        .email({ message: t('validation.invalidEmail') })
+        .optional()
+        .or(z.literal('')),
+    phone_number: z
+        .string()
+        .refine(val => !val || /^\d{1,15}$/.test(val), {
+            message: t('validation.minmax', { min: 1, max: 15 })
+        })
+        .optional()
+        .or(z.literal('')),
+    phone_number_country_code: z.string().optional().nullable(),
+    country: z.string().optional().nullable(),
+})
