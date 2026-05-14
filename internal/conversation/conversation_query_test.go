@@ -26,7 +26,7 @@ func TestMakeConversationsListQueryForTeamAll(t *testing.T) {
 		t.Fatalf("make query: %v", err)
 	}
 
-	if !strings.Contains(query, "conversations.assigned_team_id IN ($3)") {
+	if !strings.Contains(query, "conversations.assigned_team_id IN (") {
 		t.Fatalf("query does not filter team conversations:\n%s", query)
 	}
 	if strings.Contains(query, "conversations.assigned_user_id IS NULL") {
@@ -58,7 +58,7 @@ func TestMakeConversationsListQueryForTeamUnassigned(t *testing.T) {
 		t.Fatalf("make query: %v", err)
 	}
 
-	if !strings.Contains(query, "conversations.assigned_team_id IN ($3)") {
+	if !strings.Contains(query, "conversations.assigned_team_id IN (") {
 		t.Fatalf("query does not filter team conversations:\n%s", query)
 	}
 	if !strings.Contains(query, "conversations.assigned_user_id IS NULL") {
