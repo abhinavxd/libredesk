@@ -544,6 +544,11 @@ func (c *Manager) GetTeamUnassignedConversationsList(viewingUserID, teamID int, 
 	return c.GetConversations(viewingUserID, 0, []int{teamID}, []string{models.TeamUnassignedConversations}, order, orderBy, filters, page, pageSize)
 }
 
+// GetTeamConversationsList retrieves all conversations assigned to a team with optional filtering, ordering, and pagination.
+func (c *Manager) GetTeamConversationsList(viewingUserID, teamID int, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
+	return c.GetConversations(viewingUserID, 0, []int{teamID}, []string{models.TeamAllConversations}, order, orderBy, filters, page, pageSize)
+}
+
 // GetMentionedConversationsList retrieves conversations where the user is mentioned (directly or via team).
 func (c *Manager) GetMentionedConversationsList(viewingUserID int, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
 	return c.GetConversations(viewingUserID, 0, []int{}, []string{models.MentionedConversations}, order, orderBy, filters, page, pageSize)

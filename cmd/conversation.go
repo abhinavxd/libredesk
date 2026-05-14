@@ -305,6 +305,50 @@ func handleGetTeamUnassignedConversations(r *fastglue.Request) error {
 	})
 }
 
+// handleGetTeamConversations returns all conversations assigned to a team.
+func handleGetTeamConversations(r *fastglue.Request) error {
+	var (
+		app       = r.Context.(*App)
+		auser     = r.RequestCtx.UserValue("user").(amodels.User)
+		teamIDStr = r.RequestCtx.UserValue("id").(string)
+		order     = string(r.RequestCtx.QueryArgs().Peek("order"))
+		orderBy   = string(r.RequestCtx.QueryArgs().Peek("order_by"))
+		filters   = string(r.RequestCtx.QueryArgs().Peek("filters"))
+		total     = 0
+	)
+	page, pageSize := getPagination(r)
+	teamID, _ := strconv.Atoi(teamIDStr)
+	if teamID < 1 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+
+	// Check if user belongs to the team.
+	exists, err := app.team.UserBelongsToTeam(teamID, auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if !exists {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("conversation.notMemberOfTeam"), nil))
+	}
+
+	conversations, err := app.conversation.GetTeamConversationsList(auser.ID, teamID, order, orderBy, filters, page, pageSize)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if len(conversations) > 0 {
+		total = conversations[0].Total
+	}
+
+	return r.SendEnvelope(envelope.PageResults{
+		Results:    conversations,
+		Total:      total,
+		PerPage:    pageSize,
+		TotalPages: (total + pageSize - 1) / pageSize,
+		Page:       page,
+	})
+}
+
 // handleGetConversation retrieves a single conversation by it's UUID.
 func handleGetConversation(r *fastglue.Request) error {
 	var (
