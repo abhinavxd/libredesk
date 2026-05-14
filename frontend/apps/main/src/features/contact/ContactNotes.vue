@@ -133,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { format } from 'date-fns'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardHeader, CardContent } from '@shared-ui/components/ui/card'
@@ -187,8 +187,6 @@ const fetchNotes = async () => {
   }
 }
 
-onMounted(fetchNotes)
-
 const formatDate = (date) => format(new Date(date), 'PPP p')
 
 const startAddingNote = () => {
@@ -225,4 +223,12 @@ const deleteNote = async (noteId) => {
     await fetchNotes()
   }
 }
+
+watch(() => props.contactId, (newId) => {
+  if (newId) {
+    cancelAddNote()
+    fetchNotes()
+  }
+}, { immediate: true })
+
 </script>
