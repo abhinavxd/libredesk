@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full space-y-6 pb-8 relative">
+  <div class="w-full space-y-4 relative">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <span class="text-xl font-semibold text-foreground">
