@@ -355,6 +355,8 @@ const applyMacro = (uuid, id, data) =>
   })
 const getTeamUnassignedConversations = (teamID, params) =>
   http.get(`/api/v1/teams/${teamID}/conversations/unassigned`, { params })
+const getTeamConversations = (teamID, params) =>
+  http.get(`/api/v1/teams/${teamID}/conversations`, { params })
 const getAssignedConversations = (params) => http.get('/api/v1/conversations/assigned', { params })
 const getUnassignedConversations = (params) =>
   http.get('/api/v1/conversations/unassigned', { params })
@@ -554,6 +556,7 @@ export default {
   getAllConversations,
   getMentionedConversations,
   getTeamUnassignedConversations,
+  getTeamConversations,
   getViewConversations,
   getOverviewCharts,
   getOverviewCounts,

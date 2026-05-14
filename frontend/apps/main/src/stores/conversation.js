@@ -525,6 +525,14 @@ export const useConversationStore = defineStore('conversation', () => {
           order: sortFieldMap[conversations.sortField].order,
           filters
         })
+      case CONVERSATION_LIST_TYPE.TEAM:
+        return await api.getTeamConversations(teamID, {
+          page: page,
+          page_size: CONV_LIST_PAGE_SIZE,
+          order_by: sortFieldMap[conversations.sortField].model + "." + sortFieldMap[conversations.sortField].field,
+          order: sortFieldMap[conversations.sortField].order,
+          filters
+        })
       case CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED:
         return await api.getTeamUnassignedConversations(teamID, {
           page: page,
