@@ -93,6 +93,16 @@
         </AccordionContent>
       </AccordionItem>
 
+      <!-- Contact notes -->
+      <AccordionItem value="contact_notes" class="accordion-item" v-if="conversationStore.current?.contact?.id">
+        <AccordionTrigger class="accordion-trigger">
+          {{ $t('conversation.sidebar.contactNotes') }}
+        </AccordionTrigger>
+        <AccordionContent class="accordion-content">
+          <ContactNotes :contact-id="conversationStore.current.contact.id" />
+        </AccordionContent>
+      </AccordionItem>
+
       <!-- Previous conversations -->
       <AccordionItem value="previous_conversations" class="accordion-item">
         <AccordionTrigger class="accordion-trigger">
@@ -128,6 +138,7 @@ import { useI18n } from 'vue-i18n'
 import { useStorage } from '@vueuse/core'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
+import ContactNotes from '@/features/contact/ContactNotes.vue'
 import PreviousConversations from '@/features/conversation/sidebar/PreviousConversations.vue'
 import ConversationSideBarPageVisits from '@/features/conversation/sidebar/ConversationSideBarPageVisits.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
