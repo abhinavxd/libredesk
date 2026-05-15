@@ -45,7 +45,7 @@
     <!-- Notes card list -->
     <div class="space-y-4">
       <Card
-        v-for="note in notes"
+        v-for="note in visibleNotes"
         :key="note.id"
         class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow"
       >
@@ -106,6 +106,12 @@
           />
         </CardContent>
       </Card>
+      <!-- Load more notes -->
+      <div v-if="notes.length > NOTES_LIMIT && !showAll" class="flex justify-center pt-2">
+       <Button variant="ghost" size="sm" @click="showAll = true">
+         {{ $t('globals.terms.loadMore') }} ({{ notes.length - NOTES_LIMIT }})
+       </Button>
+      </div>
     </div>
 
     <!-- No notes message -->
@@ -133,7 +139,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { format } from 'date-fns'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardHeader, CardContent } from '@shared-ui/components/ui/card'
@@ -171,6 +177,8 @@ const notes = ref([])
 const isAddingNote = ref(false)
 const newNote = ref('')
 const isLoading = ref(false)
+const NOTES_LIMIT = 10
+const showAll = ref(false)
 
 const fetchNotes = async () => {
   try {
@@ -224,8 +232,11 @@ const deleteNote = async (noteId) => {
   }
 }
 
+const visibleNotes = computed(() => showAll.value ? notes.value : notes.value.slice(0, NOTES_LIMIT))
+
 watch(() => props.contactId, (newId) => {
   if (newId) {
+    showAll.value = false
     cancelAddNote()
     fetchNotes()
   }
