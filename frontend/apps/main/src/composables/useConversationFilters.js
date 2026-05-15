@@ -221,7 +221,7 @@ export function useConversationFilters () {
             options: cStore.priorityOptions
         },
         send_private_note: {
-            label: t('actions.sendPrivateNote'),
+            label: t('actions.addPrivateNote'),
             type: FIELD_TYPE.RICHTEXT
         },
         send_reply: {
