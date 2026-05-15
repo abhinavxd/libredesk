@@ -19,7 +19,7 @@ const setFavicon = (url) => {
 async function initApp () {
   const config = (await api.getConfig()).data.data
   const emitter = mitt()
-  const lang = config['app.lang'] || 'en'
+  const lang = config['app.lang'] || 'en-US'
   const langMessages = await api.getLanguage(lang)
 
   // Set favicon.
@@ -30,7 +30,7 @@ async function initApp () {
   const i18nConfig = {
     legacy: false,
     locale: lang,
-    fallbackLocale: 'en',
+    fallbackLocale: 'en-US',
     messages: {
       [lang]: langMessages.data
     }
