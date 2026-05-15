@@ -1,6 +1,6 @@
 {
-  "_.code": "fr",
-  "_.name": "Français (fr)",
+  "_.code": "fr-FR",
+  "_.name": "Français",
   "account.avatarRemoved": "Avatar supprimé",
   "account.changeAvatar": "Modifiez votre avatar ici.",
   "account.chooseAFile": "Sélectionnez un fichier...",

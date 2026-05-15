@@ -1,6 +1,6 @@
 {
-  "_.code": "en",
-  "_.name": "English (en)",
+  "_.code": "en-US",
+  "_.name": "English (United States)",
   "account.avatarRemoved": "Avatar removed",
   "account.changeAvatar": "Change your avatar here.",
   "account.chooseAFile": "Choose a file...",

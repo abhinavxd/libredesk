@@ -1,6 +1,6 @@
 {
-  "_.code": "it",
-  "_.name": "Italiano (it)",
+  "_.code": "it-IT",
+  "_.name": "Italiano",
   "account.avatarRemoved": "Avatar rimosso",
   "account.changeAvatar": "Cambia il tuo avatar qui.",
   "account.chooseAFile": "Scegli un file...",

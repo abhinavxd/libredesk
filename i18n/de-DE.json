@@ -1,6 +1,6 @@
 {
-  "_.code": "de",
-  "_.name": "Deutsch (de)",
+  "_.code": "de-DE",
+  "_.name": "Deutsch",
   "account.avatarRemoved": "Profilbild entfernt",
   "account.changeAvatar": "Ändere dein Profilbild hier.",
   "account.chooseAFile": "Wähle eine Datei...",

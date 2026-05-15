@@ -1,6 +1,6 @@
 {
-  "_.code": "ja",
-  "_.name": "日本語 (ja)",
+  "_.code": "ja-JP",
+  "_.name": "日本語",
   "account.avatarRemoved": "アバターが削除されました",
   "account.changeAvatar": "ここでアバターを変更できます。",
   "account.chooseAFile": "ファイルを選択…",
