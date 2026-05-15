@@ -39,6 +39,14 @@
           :available-languages="availableLanguages"
         />
       </div>
+      <div v-else-if="selectedChannel === 'telegram'">
+        <TelegramInboxForm
+          :initial-values="{}"
+          :submitForm="submitTelegramForm"
+          :isLoading="isLoading"
+          :isNewForm="true"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -48,10 +56,11 @@ import { ref, onMounted } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
-import { Mail, MessageCircle } from 'lucide-vue-next'
+import { Mail, MessageCircle, Send } from 'lucide-vue-next'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
+import TelegramInboxForm from '@/features/admin/inbox/TelegramInboxForm.vue'
 import api from '../../../api'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
@@ -83,6 +92,10 @@ const selectLiveChatChannel = () => {
   selectChannel('livechat')
 }
 
+const selectTelegramChannel = () => {
+  selectChannel('telegram')
+}
+
 const channels = [
   {
     title: t('globals.terms.email'),
@@ -96,6 +109,12 @@ const channels = [
     onClick: selectLiveChatChannel,
     icon: MessageCircle,
     badge: t('globals.terms.beta')
+  },
+  {
+    title: 'Telegram',
+    subTitle: t('admin.inbox.createTelegramInbox'),
+    onClick: selectTelegramChannel,
+    icon: Send
   }
 ]
 
@@ -142,6 +161,21 @@ const submitLiveChatForm = (values) => {
     secret: values.secret ?? '',
     linked_email_inbox_id: values.linked_email_inbox_id ?? null,
     config: values.config
+  }
+  createInbox(payload)
+}
+
+const submitTelegramForm = (values) => {
+  const payload = {
+    name: values.name,
+    channel: 'telegram',
+    enabled: values.enabled ?? true,
+    csat_enabled: values.csat_enabled ?? false,
+    prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
+    config: {
+      bot_token: values.bot_token,
+      bot_name: values.bot_name || ''
+    }
   }
   createInbox(payload)
 }

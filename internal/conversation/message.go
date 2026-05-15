@@ -302,6 +302,13 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 	case inbox.ChannelLiveChat:
 		// Live chat doesn't use templates for rendering messages.
 		return nil
+	case inbox.ChannelTelegram:
+		// Telegram doesn't use templates for rendering messages.
+		// Strip HTML tags for plain text delivery.
+		if message.ContentType == models.ContentTypeHTML {
+			message.TextContent = stringutil.HTML2Text(message.Content)
+		}
+		return nil
 	default:
 		m.lo.Warn("unknown message channel", "channel", channel)
 		return fmt.Errorf("unknown message channel: %s", channel)
@@ -490,6 +497,15 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			m.lo.Error("error generating source message id", "error", err)
 			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
+	case inbox.ChannelTelegram:
+		// For Telegram, we need to include the chat_id in meta so the sender worker can deliver the message.
+		// Get the telegram_chat_id from the last incoming message in this conversation.
+		chatID, tgErr := m.getTelegramChatID(conversationUUID)
+		if tgErr != nil {
+			m.lo.Error("error getting telegram chat_id for conversation", "conversation_uuid", conversationUUID, "error", tgErr)
+			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		metaMap["telegram_chat_id"] = chatID
 	}
 
 	// Marshal meta.
@@ -740,10 +756,22 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	// Find or create contact.
 	if senderID == 0 {
 		user := umodels.User{
-			FirstName: in.Contact.FirstName,
-			LastName:  in.Contact.LastName,
-			Email:     in.Contact.Email,
-			Type:      umodels.UserTypeContact,
+			FirstName:      in.Contact.FirstName,
+			LastName:       in.Contact.LastName,
+			Email:          in.Contact.Email,
+			ExternalUserID: in.Contact.ExternalUserID,
+			Type:           umodels.UserTypeContact,
+		}
+		// Upload avatar if provided as bytes.
+		if len(in.Contact.AvatarContent) > 0 {
+			avatarPath, err := m.uploadContactAvatar(in.Contact.AvatarContent, in.Contact.AvatarMIME)
+			if err != nil {
+				m.lo.Error("error uploading contact avatar", "error", err)
+			} else {
+				user.AvatarURL = null.StringFrom(avatarPath)
+			}
+		} else if in.Contact.AvatarURL != "" {
+			user.AvatarURL = null.StringFrom(in.Contact.AvatarURL)
 		}
 		if err := m.userStore.CreateContact(&user); err != nil {
 			return models.Message{}, fmt.Errorf("creating contact: %w", err)
@@ -1141,6 +1169,40 @@ func (m *Manager) findOrCreateConversation(in models.IncomingMessage) (int, stri
 		err              error
 	)
 
+	// For Telegram, find an existing open conversation for this contact in this inbox.
+	if in.Channel == inbox.ChannelTelegram && in.Contact.ID > 0 {
+		conversationID, conversationUUID, err = m.findOpenConversationForContact(in.Contact.ID, in.InboxID)
+		if err != nil && err != errConversationNotFound {
+			return 0, "", false, err
+		}
+		if conversationID > 0 {
+			return conversationID, conversationUUID, false, nil
+		}
+		// No open conversation found, create a new one.
+		// Extract Telegram-specific meta for conversation.
+		var convMeta map[string]any
+		if len(in.Meta) > 0 {
+			json.Unmarshal(in.Meta, &convMeta)
+		}
+		lastMessage := stringutil.HTML2Text(in.Content)
+		lastMessageAt := time.Now()
+		conversationID, conversationUUID, err = m.CreateConversation(in.Contact.ID,
+			in.InboxID,
+			lastMessage,
+			lastMessageAt,
+			in.Subject,
+			false,    /**append reference number to subject**/
+			convMeta, /** meta **/
+			nil,      /** customer attributes **/
+			0,        /** max conversation **/
+			0,        /** rate limit window **/
+		)
+		if err != nil || conversationID == 0 {
+			return 0, "", false, err
+		}
+		return conversationID, conversationUUID, true, nil
+	}
+
 	// Search for existing conversation using the in-reply-to and references.
 	m.lo.Debug("searching conversation using in-reply-to and references", "in_reply_to", in.InReplyTo, "references", in.References)
 
@@ -1425,4 +1487,66 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 		m.lo.Error("error checking media existence by content ID", "content_id", storedCID, "error", err)
 	}
 	return storedCID, exists, mediaUUID
+}
+
+// getTelegramChatID retrieves the telegram_chat_id from the meta of the last incoming message in a conversation.
+func (m *Manager) getTelegramChatID(conversationUUID string) (string, error) {
+	// Get the last incoming message meta for this conversation.
+	var metaJSON json.RawMessage
+	err := m.q.GetLastIncomingMessageMeta.QueryRow(conversationUUID).Scan(&metaJSON)
+	if err != nil {
+		return "", fmt.Errorf("fetching last incoming message meta: %w", err)
+	}
+
+	var meta map[string]interface{}
+	if err := json.Unmarshal(metaJSON, &meta); err != nil {
+		return "", fmt.Errorf("unmarshalling message meta: %w", err)
+	}
+
+	if chatID, ok := meta["telegram_chat_id"].(string); ok && chatID != "" {
+		return chatID, nil
+	}
+	if chatID, ok := meta["telegram_chat_id"].(float64); ok {
+		return fmt.Sprintf("%d", int64(chatID)), nil
+	}
+
+	return "", fmt.Errorf("telegram_chat_id not found in message meta")
+}
+
+// findOpenConversationForContact finds an open (non-resolved) conversation for a contact in a specific inbox.
+func (m *Manager) findOpenConversationForContact(contactID, inboxID int) (int, string, error) {
+	var (
+		conversationID   int
+		conversationUUID string
+	)
+	err := m.q.FindOpenConversationForContactInbox.QueryRow(contactID, inboxID).Scan(&conversationID, &conversationUUID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, "", errConversationNotFound
+		}
+		return 0, "", fmt.Errorf("finding open conversation for contact: %w", err)
+	}
+	return conversationID, conversationUUID, nil
+}
+
+// uploadContactAvatar uploads avatar bytes and returns the path (/uploads/{uuid}).
+func (m *Manager) uploadContactAvatar(content []byte, mimeType string) (string, error) {
+	if mimeType == "" {
+		mimeType = "image/jpeg"
+	}
+	ext := "jpg"
+	switch mimeType {
+	case "image/png":
+		ext = "png"
+	case "image/webp":
+		ext = "webp"
+	}
+	fileName := "avatar." + ext
+
+	reader := bytes.NewReader(content)
+	media, err := m.mediaStore.UploadAndInsert(fileName, mimeType, "", null.String{}, null.Int{}, reader, len(content), null.String{}, []byte("{}"))
+	if err != nil {
+		return "", fmt.Errorf("uploading avatar: %w", err)
+	}
+	return "/uploads/" + media.UUID, nil
 }

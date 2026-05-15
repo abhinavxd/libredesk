@@ -79,9 +79,24 @@
         <Skeleton class="w-32 h-4" />
       </span>
       <span v-else class="sidebar-value">
-        {{ conversation.contact.external_user_id }}
+        {{ displayExternalId }}
       </span>
     </div>
+
+    <!-- Telegram info -->
+    <template v-if="isTelegram && !conversationStore.conversation.loading">
+      <div v-if="telegramUsername" class="flex gap-2 items-center">
+        <Send size="16" class="text-muted-foreground flex-shrink-0" />
+        <a
+          :href="'https://t.me/' + telegramUsername"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="sidebar-value hover:underline cursor-pointer"
+        >
+          @{{ telegramUsername }}
+        </a>
+      </div>
+    </template>
 
     <!-- Livechat visitor info -->
     <template v-if="isLivechat && !conversationStore.conversation.loading">
@@ -134,7 +149,8 @@ import {
   Monitor,
   Smartphone,
   ShieldCheck,
-  ShieldQuestion
+  ShieldQuestion,
+  Send
 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import countries from '@/constants/countries.js'
@@ -170,10 +186,27 @@ const countryName = computed(() => {
 })
 
 const isLivechat = computed(() => conversation.value?.inbox_channel === 'livechat')
+const isTelegram = computed(() => conversation.value?.inbox_channel === 'telegram')
 const contactStatus = computed(() => conversation.value?.contact?.availability_status)
 const isVerified = computed(
   () => isLivechat.value && conversation.value?.contact?.type !== 'visitor'
 )
+
+// For Telegram contacts, strip the "telegram_" prefix from external_user_id.
+const displayExternalId = computed(() => {
+  const extId = conversation.value?.contact?.external_user_id || ''
+  if (extId.startsWith('telegram_')) {
+    return extId.replace('telegram_', '')
+  }
+  return extId
+})
+
+// Get Telegram username from conversation meta.
+const telegramUsername = computed(() => {
+  const meta = conversation.value?.meta
+  if (!meta) return ''
+  return meta.telegram_username || ''
+})
 
 const parsedUA = computed(() => {
   const ua = conversation.value?.meta?.user_agent
