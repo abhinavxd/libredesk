@@ -6,7 +6,17 @@ export function stripConvUUID (email) {
     return email.replace(/\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@/i, '@')
 }
 
-export function computeRecipientsFromMessage (message, contactEmail, inboxEmail, inboxReplyTo = '') {
+// Extract bare address from "Name <addr@domain>", else return input trimmed.
+export function extractEmail (email) {
+    if (!email) return email
+    const m = email.match(/<([^>]+)>/)
+    return (m ? m[1] : email).trim()
+}
+
+// inboxAddresses can be a single string or an array of inbox-owned addresses
+// (e.g. every email inbox's from + reply_to) to dedupe against, so a reply
+// never targets any inbox this Libredesk instance owns.
+export function computeRecipientsFromMessage (message, contactEmail, inboxAddresses = []) {
     const meta = message?.meta || {}
     const isIncoming = message.type === 'incoming'
 
@@ -41,13 +51,14 @@ export function computeRecipientsFromMessage (message, contactEmail, inboxEmail,
         }
     }
 
-    const inboxAddresses = [inboxEmail, inboxReplyTo]
-        .filter(Boolean)
-        .map(e => e.toLowerCase())
+    const normalize = e => stripConvUUID(extractEmail(e)).toLowerCase()
+    const dedupeSet = new Set(
+        (Array.isArray(inboxAddresses) ? inboxAddresses : [inboxAddresses])
+            .filter(Boolean)
+            .map(normalize)
+    )
     const clean = list =>
-        Array.from(new Set(list.filter(email =>
-            email && !inboxAddresses.includes(stripConvUUID(email).toLowerCase())
-        )))
+        Array.from(new Set(list.filter(email => email && !dedupeSet.has(normalize(email)))))
 
     return {
         to: clean(toList),

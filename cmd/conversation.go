@@ -795,7 +795,11 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 
-	// Create conversation first.
+	meta := map[string]any{"initiator": req.Initiator}
+	if req.Initiator == umodels.UserTypeAgent {
+		meta["initiator_user_id"] = auser.ID
+	}
+
 	conversationID, conversationUUID, err := app.conversation.CreateConversation(
 		contact.ID,
 		req.InboxID,
@@ -803,7 +807,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		time.Now(), /** last_message_at **/
 		req.Subject,
 		true, /** append reference number to subject? **/
-		nil,
+		meta,
 		req.CustomAttributes,
 		0, 0,
 	)

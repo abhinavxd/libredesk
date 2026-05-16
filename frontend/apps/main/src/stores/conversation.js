@@ -4,6 +4,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { TYPING_RECEIVE_TIMEOUT } from '@shared-ui/composables/useTypingIndicator.js'
 import { deepMerge } from '@shared-ui/utils/object.js'
 import { computeRecipientsFromMessage } from '../utils/email-recipients'
+import { useInboxStore } from './inbox'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
 import { subscribeToConversation, sendTypingIndicator } from '@main/websocket'
@@ -172,6 +173,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   let seenConversationUUIDs = new Map()
   const emitter = useEmitter()
+  const inboxStore = useInboxStore()
 
   const incrementMessageVersion = () => setTimeout(() => messages.version++, 0)
 
@@ -336,11 +338,16 @@ export const useConversationStore = defineStore('conversation', () => {
       return
     }
 
+    // Dedupe against every email inbox this instance owns so a reply never targets one of our own addresses.
+    const ownedInboxAddresses = inboxStore.inboxes
+      .filter(inb => inb.channel === 'email')
+      .flatMap(inb => [inb.from, inb.config?.reply_to])
+      .filter(Boolean)
+
     const { to, cc, bcc } = computeRecipientsFromMessage(
       latestMessage,
       conv.contact?.email || '',
-      inboxEmail,
-      conv?.inbox_reply_to || ''
+      ownedInboxAddresses
     )
     currentTo.value = to
     currentCC.value = cc
