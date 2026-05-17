@@ -3,10 +3,11 @@
     <ContextMenuTrigger asChild>
       <router-link
         :to="conversationRoute"
-        class="group relative block px-3 py-3 transition-all duration-200 ease-in-out cursor-pointer hover:bg-accent/20 dark:hover:bg-accent/60"
+        class="group relative block px-3 py-3 transition-all duration-200 ease-in-out cursor-pointer"
         :class="{
-          'bg-accent/60': conversation.uuid === currentConversation?.uuid,
-          'bg-primary/5': isItemSelected && conversation.uuid !== currentConversation?.uuid
+          'bg-accent': isCurrent,
+          'bg-primary/5 hover:bg-primary/10': isItemSelected && !isCurrent,
+          'hover:bg-accent/40': !isCurrent && !isItemSelected
         }"
       >
         <div class="flex items-start gap-2">
@@ -51,9 +52,14 @@
               <!-- Contact name + inbox + time -->
               <div class="flex items-baseline justify-between gap-2">
                 <div class="flex items-baseline gap-1.5 min-w-0">
-                  <h3 class="text-sm font-semibold truncate text-foreground">
-                    {{ contactFullName }}
-                  </h3>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <h3 class="text-sm font-semibold truncate text-foreground">
+                        {{ contactFullName }}
+                      </h3>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ contactFullName }}</TooltipContent>
+                  </Tooltip>
                   <span class="text-xs text-muted-foreground truncate">
                     {{ conversation.inbox_name }}
                   </span>
@@ -154,6 +160,7 @@ import {
   ContextMenuTrigger
 } from '@shared-ui/components/ui/context-menu'
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'
 import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
@@ -234,6 +241,8 @@ const draftPreview = computed(() => {
   const text = draft.content.replace(/<[^>]*>/g, '').trim()
   return text.length > 120 ? text.slice(0, 120) + '...' : text
 })
+
+const isCurrent = computed(() => props.conversation.uuid === props.currentConversation?.uuid)
 
 const isItemSelected = computed(() => {
   return conversationStore.isSelected(props.conversation.uuid)

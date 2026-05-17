@@ -98,6 +98,9 @@ importers:
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
+      lettersanitizer:
+        specifier: ^1.0.7
+        version: 1.0.7
       lucide-vue-next:
         specifier: ^0.525.0
         version: 0.525.0(vue@3.5.13(typescript@5.7.3))
@@ -132,8 +135,8 @@ importers:
         specifier: '9'
         version: 9.14.5(vue@3.5.13(typescript@5.7.3))
       vue-letter:
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.2.1
+        version: 0.2.1
       vue-picture-cropper:
         specifier: ^0.7.0
         version: 0.7.0(vue@3.5.13(typescript@5.7.3))
@@ -2777,8 +2780,8 @@ packages:
   leaflet@1.7.1:
     resolution: {integrity: sha512-/xwPEBidtg69Q3HlqPdU3DnrXQOvQU/CCHA1tcDQVzOwm91YMYaILjNp7L4Eaw5Z4sOYdbBz6koWyibppd8Zqw==}
 
-  lettersanitizer@1.0.6:
-    resolution: {integrity: sha512-2vj0tUtBRjlmTCFsgVlFmfi04p049Zwv/4eBGWBUOKropEoL+q+jTQQfFyDu50j7gL76pycMvrqD0uV0vxX2zg==}
+  lettersanitizer@1.0.7:
+    resolution: {integrity: sha512-r+P8T0WxmoKmm5F96tPAyYFT4ef5YDXTVmWtZjHD9FA/T8dtYM+Rb2uIxb4IerwrDxG/toYN2SQXFo4RUy4mxQ==}
 
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
@@ -3825,8 +3828,8 @@ packages:
     peerDependencies:
       vue: ^3.0.0
 
-  vue-letter@0.2.0:
-    resolution: {integrity: sha512-p4qHpw89GKidKyGcg4J4IjUcMQuVaTJq83c6UE4616claaLF9rj2Bg/Hq19uDCmokd+SvzEwxq6/ctfaaednkw==}
+  vue-letter@0.2.1:
+    resolution: {integrity: sha512-IYWp47XUikjKfEniWYlFxeJFKABZwAE5IEjz866qCBytBr2dzqVDdjoMDpBP//krxkzN/QZYyHe6C09y/IODYg==}
 
   vue-picture-cropper@0.7.0:
     resolution: {integrity: sha512-NF7+Dgso6d0GB16E5d/BbrcTIHm1VWz8dS3IjLhoBl+ZeC+yDA46CyJphQuO32SisaPmrKHN8VbiE2LgAfhnkQ==}
@@ -6650,7 +6653,7 @@ snapshots:
 
   leaflet@1.7.1: {}
 
-  lettersanitizer@1.0.6: {}
+  lettersanitizer@1.0.7: {}
 
   levn@0.4.1:
     dependencies:
@@ -7757,9 +7760,9 @@ snapshots:
       '@vue/devtools-api': 6.6.4
       vue: 3.5.13(typescript@5.7.3)
 
-  vue-letter@0.2.0:
+  vue-letter@0.2.1:
     dependencies:
-      lettersanitizer: 1.0.6
+      lettersanitizer: 1.0.7
 
   vue-picture-cropper@0.7.0(vue@3.5.13(typescript@5.7.3)):
     dependencies:
