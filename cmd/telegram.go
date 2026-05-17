@@ -30,15 +30,22 @@ func handleTelegramWebhook(r *fastglue.Request) error {
 		return nil
 	}
 
-	var update telegram.Update
-	if err := json.Unmarshal(r.RequestCtx.PostBody(), &update); err != nil {
-		r.RequestCtx.SetStatusCode(fasthttp.StatusBadRequest)
-		return nil
-	}
-
 	tgInbox, ok := inb.(*telegram.Telegram)
 	if !ok {
 		r.RequestCtx.SetStatusCode(fasthttp.StatusInternalServerError)
+		return nil
+	}
+
+	// Verify webhook authenticity using X-Telegram-Bot-Api-Secret-Token header.
+	secretToken := string(r.RequestCtx.Request.Header.Peek("X-Telegram-Bot-Api-Secret-Token"))
+	if !tgInbox.VerifyWebhook(secretToken) {
+		r.RequestCtx.SetStatusCode(fasthttp.StatusUnauthorized)
+		return nil
+	}
+
+	var update telegram.Update
+	if err := json.Unmarshal(r.RequestCtx.PostBody(), &update); err != nil {
+		r.RequestCtx.SetStatusCode(fasthttp.StatusBadRequest)
 		return nil
 	}
 

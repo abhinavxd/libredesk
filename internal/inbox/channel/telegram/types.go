@@ -55,13 +55,15 @@ type PhotoSize struct {
 }
 
 type Sticker struct {
-	FileID       string `json:"file_id"`
-	FileUniqueID string `json:"file_unique_id"`
-	Width        int    `json:"width"`
-	Height       int    `json:"height"`
-	IsAnimated   bool   `json:"is_animated"`
-	Emoji        string `json:"emoji"`
-	FileSize     int64  `json:"file_size"`
+	FileID       string     `json:"file_id"`
+	FileUniqueID string     `json:"file_unique_id"`
+	Width        int        `json:"width"`
+	Height       int        `json:"height"`
+	IsAnimated   bool       `json:"is_animated"`
+	IsVideo      bool       `json:"is_video"`
+	Emoji        string     `json:"emoji"`
+	Thumbnail    *PhotoSize `json:"thumbnail"`
+	FileSize     int64      `json:"file_size"`
 }
 
 type Video struct {

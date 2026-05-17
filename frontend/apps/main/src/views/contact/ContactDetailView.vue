@@ -38,22 +38,7 @@
               class="flex items-center gap-1.5 text-xs text-muted-foreground"
             >
               <IdCardIcon size="14" class="flex-shrink-0" />
-              {{ formatExternalId(contact.external_user_id) }}
-            </div>
-
-            <div
-              v-if="telegramUsername"
-              class="flex items-center gap-1.5 text-xs text-muted-foreground"
-            >
-              <SendIcon size="14" class="flex-shrink-0" />
-              <a
-                :href="'https://t.me/' + telegramUsername"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:underline"
-              >
-                @{{ telegramUsername }}
-              </a>
+              {{ contact.external_user_id }}
             </div>
 
             <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -129,7 +114,7 @@ import {
   DialogDescription
 } from '@shared-ui/components/ui/dialog'
 import { useUserStore } from '../../stores/user'
-import { ShieldOffIcon, ShieldCheckIcon, IdCardIcon, CalendarIcon, SendIcon } from 'lucide-vue-next'
+import { ShieldOffIcon, ShieldCheckIcon, IdCardIcon, CalendarIcon } from 'lucide-vue-next'
 import ContactDetail from '@/layouts/contact/ContactDetail.vue'
 import api from '../../api'
 import ContactForm from '@/features/contact/ContactForm.vue'
@@ -177,22 +162,6 @@ const getInitials = computed(() => {
   if (!contact.value) return ''
   const { first_name = '', last_name = '' } = contact.value
   return `${first_name.charAt(0).toUpperCase()}${last_name.charAt(0).toUpperCase()}`
-})
-
-// Strip "telegram_" prefix from external_user_id for display.
-function formatExternalId(extId) {
-  if (!extId) return ''
-  if (extId.startsWith('telegram_')) return extId.replace('telegram_', '')
-  return extId
-}
-
-// Extract Telegram username from external_user_id pattern.
-const telegramUsername = computed(() => {
-  if (!contact.value?.external_user_id) return ''
-  if (!contact.value.external_user_id.startsWith('telegram_')) return ''
-  // Username is not stored in contact directly, but we can check custom_attributes or meta.
-  // For now, we don't have it here. Will show only if available.
-  return ''
 })
 
 async function confirmToggleBlock() {

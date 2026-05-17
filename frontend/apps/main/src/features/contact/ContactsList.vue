@@ -87,7 +87,7 @@
               </p>
               <div v-if="contact.external_user_id" class="flex items-center gap-1 text-xs text-muted-foreground">
                 <IdCardIcon size="12" class="flex-shrink-0" />
-                <span class="truncate">{{ formatExternalId(contact.external_user_id) }}</span>
+                <span class="truncate">{{ contact.external_user_id }}</span>
               </div>
             </div>
           </div>
@@ -181,12 +181,6 @@ const fetchContacts = async () => {
 
 const getInitials = (firstName, lastName) => {
   return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase()
-}
-
-const formatExternalId = (extId) => {
-  if (!extId) return ''
-  if (extId.startsWith('telegram_')) return extId.replace('telegram_', '')
-  return extId
 }
 
 watch([page, perPage], fetchContacts)

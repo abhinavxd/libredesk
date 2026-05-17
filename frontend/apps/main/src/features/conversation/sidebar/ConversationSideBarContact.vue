@@ -85,6 +85,10 @@
 
     <!-- Telegram info -->
     <template v-if="isTelegram && !conversationStore.conversation.loading">
+      <div v-if="telegramUserId" class="flex gap-2 items-center">
+        <IdCard size="16" class="text-muted-foreground flex-shrink-0" />
+        <span class="sidebar-value">{{ telegramUserId }}</span>
+      </div>
       <div v-if="telegramUsername" class="flex gap-2 items-center">
         <Send size="16" class="text-muted-foreground flex-shrink-0" />
         <a
@@ -199,6 +203,16 @@ const displayExternalId = computed(() => {
     return extId.replace('telegram_', '')
   }
   return extId
+})
+
+// Get Telegram user ID from email (format: {id}@telegram).
+const telegramUserId = computed(() => {
+  if (!isTelegram.value) return ''
+  const email = conversation.value?.contact?.email || ''
+  if (email.endsWith('@telegram')) {
+    return email.replace('@telegram', '')
+  }
+  return ''
 })
 
 // Get Telegram username from conversation meta.
