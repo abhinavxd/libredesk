@@ -13,7 +13,13 @@ import (
 func handleTelegramWebhook(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 
-	inboxID, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	idVal, ok := r.RequestCtx.UserValue("id").(string)
+	if !ok || idVal == "" {
+		r.RequestCtx.SetStatusCode(fasthttp.StatusBadRequest)
+		return nil
+	}
+
+	inboxID, err := strconv.Atoi(idVal)
 	if err != nil || inboxID == 0 {
 		r.RequestCtx.SetStatusCode(fasthttp.StatusBadRequest)
 		return nil

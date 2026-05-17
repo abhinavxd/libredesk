@@ -432,8 +432,8 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			m.lo.Error("error unmarshalling update telegram config", "id", id, "error", err)
 			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
-		// If bot_token is empty in update, preserve existing
-		if botToken, ok := updateCfg["bot_token"].(string); !ok || botToken == "" {
+		// If bot_token is empty or contains password dummy in update, preserve existing
+		if botToken, ok := updateCfg["bot_token"].(string); !ok || botToken == "" || strings.Contains(botToken, stringutil.PasswordDummy) {
 			updateCfg["bot_token"] = currentCfg["bot_token"]
 		}
 		updatedConfig, err := json.Marshal(updateCfg)

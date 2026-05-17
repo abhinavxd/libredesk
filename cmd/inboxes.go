@@ -469,7 +469,7 @@ func validateTelegramConfig(app *App, configJSON json.RawMessage) error {
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	if cfg.BotToken == "" {
+	if strings.TrimSpace(cfg.BotToken) == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "bot_token"), nil)
 	}
 

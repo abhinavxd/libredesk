@@ -745,12 +745,13 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 func initTelegramInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
 	var config telegram.Config
 
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+	// Use an isolated Koanf instance to avoid cross-inbox state bleed.
+	k := koanf.New(".")
+	if err := k.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := k.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 

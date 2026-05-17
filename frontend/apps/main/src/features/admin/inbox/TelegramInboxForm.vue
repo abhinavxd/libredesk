@@ -170,7 +170,7 @@ const copyWebhookUrl = async () => {
   try {
     await navigator.clipboard.writeText(webhookUrl.value)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: t('globals.messages.copied')
     })
   } catch (error) {
     console.error('Failed to copy:', error)

@@ -69,10 +69,6 @@ func (t *Telegram) Receive(ctx context.Context) error {
 }
 
 func (t *Telegram) Send(message models.OutboundMessage) error {
-	if message.MessageReceiverID <= 0 {
-		return nil
-	}
-
 	chatID := t.extractChatID(message.Meta)
 	if chatID == "" {
 		return fmt.Errorf("telegram chat_id not found in message meta for message %s", message.UUID)
@@ -84,6 +80,7 @@ func (t *Telegram) Send(message models.OutboundMessage) error {
 	}
 
 	if len(message.Attachments) > 0 {
+		var lastErr error
 		for i, att := range message.Attachments {
 			caption := ""
 			if i == 0 {
@@ -91,9 +88,10 @@ func (t *Telegram) Send(message models.OutboundMessage) error {
 			}
 			if err := t.sendAttachment(chatID, att, caption); err != nil {
 				t.lo.Error("error sending telegram attachment", "error", err, "attachment", att.Name)
+				lastErr = err
 			}
 		}
-		return nil
+		return lastErr
 	}
 
 	if content != "" {
@@ -164,6 +162,10 @@ func (t *Telegram) SetWebhook(url string) error {
 func (t *Telegram) ProcessWebhookUpdate(update Update) error {
 	msg := update.Message
 	if msg == nil {
+		return nil
+	}
+
+	if msg.From == nil || msg.Chat == nil {
 		return nil
 	}
 
