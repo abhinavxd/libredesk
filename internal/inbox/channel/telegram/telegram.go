@@ -133,7 +133,11 @@ func (t *Telegram) WebhookSecret() string {
 }
 
 // VerifyWebhook checks the X-Telegram-Bot-Api-Secret-Token header.
+// If the header is empty, verification is skipped (webhook was set without secret_token).
 func (t *Telegram) VerifyWebhook(secretToken string) bool {
+	if secretToken == "" {
+		return true
+	}
 	return secretToken == t.WebhookSecret()
 }
 
