@@ -578,9 +578,14 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 			lastMessage = "Please rate your experience with us"
 		}
 
-		// If no text content but has media, set last message preview based on media type.
-		if strings.TrimSpace(lastMessage) == "" && len(message.Media) > 0 {
-			lastMessage = m.getMediaPreview(message.Media[0])
+		// HTML2Text drops <img> tags, so image-only messages have empty text. Fall back to a media-type preview.
+		if strings.TrimSpace(lastMessage) == "" {
+			switch {
+			case len(message.Media) > 0:
+				lastMessage = m.getMediaPreview(message.Media[0])
+			case len(inlineUUIDs) > 0:
+				lastMessage = m.i18n.T("globals.terms.image")
+			}
 		}
 
 		// Update conversation last message details (also conditionally updates last_interaction if not activity/private).
