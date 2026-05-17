@@ -101,7 +101,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 
 	// Generate and upload thumbnail and store image dimensions in the media meta.
 	var meta = []byte("{}")
-	if slices.Contains(image.Exts, srcExt) || image.IsImageByContent(file) {
+	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
 		file.Seek(0, 0)
 		thumbFile, err := image.CreateThumb(image.DefThumbSize, file)
 		if err != nil {
