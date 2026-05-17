@@ -77,7 +77,7 @@
                 :html="sanitizedContent"
                 :allowedSchemas="['cid', 'https', 'http', 'mailto']"
                 :allowed-css-properties="extendedCssProperties"
-                class="mb-1 native-html whitespace-pre-wrap break-words"
+                class="mb-1 native-html break-words"
                 :class="{ 'mb-3': message.attachments.length > 0 }"
               />
             </div>
@@ -205,6 +205,7 @@ import BubbleAttachmentPreview from '@main/features/conversation/message/attachm
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '@main/api'
+import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 
@@ -305,7 +306,7 @@ const retryMessage = (msg) => {
 
 const showQuotedText = ref(false)
 const hasQuotedContent = computed(
-  () => !isOutgoing.value && sanitizedContent.value.includes('<blockquote')
+  () => !isOutgoing.value && containsQuoteMarkers(sanitizedContent.value)
 )
 const toggleQuote = () => {
   showQuotedText.value = !showQuotedText.value

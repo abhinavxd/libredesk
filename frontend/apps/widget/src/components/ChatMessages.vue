@@ -160,6 +160,7 @@ import MessageAttachment from './MessageAttachment.vue'
 import CSATMessageBubble from './CSATMessageBubble.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 
@@ -187,9 +188,7 @@ const getMessageTime = (timestamp) => {
   return useRelativeTime(new Date(timestamp)).value
 }
 
-const hasQuotedContent = (content) => {
-  return content && content.includes('<blockquote')
-}
+const hasQuotedContent = (content) => containsQuoteMarkers(content)
 
 const isQuotedTextVisible = (messageUuid) => {
   return quotedTextState.value[messageUuid] || false

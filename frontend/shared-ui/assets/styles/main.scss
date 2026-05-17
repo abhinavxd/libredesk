@@ -296,7 +296,21 @@
 }
 
 .hide-quoted-text {
-  blockquote {
+  // Selectors below use attribute-suffix matching because vue-letter
+  // prefixes every id/class with a random "msg_XYZ_" at render time, so
+  // raw "#appendonsend" would never match.
+  // Outlook/Hotmail emit a marker with the quoted history as trailing
+  // siblings (no wrapping element), so we hide the marker AND everything
+  // after it. Outlook always top-posts, so trailing siblings are quote.
+  blockquote,
+  [id$="_divRplyFwdMsg"],
+  [id$="_divRplyFwdMsg"] ~ *,
+  [id$="_appendonsend"],
+  [id$="_appendonsend"] ~ *,
+  [id$="_OLK_SRC_BODY_SECTION"],
+  [id$="_OLK_SRC_BODY_SECTION"] ~ *,
+  [class*="_OutlookMessageHeader"],
+  [class*="_OutlookMessageHeader"] ~ * {
     @apply hidden;
   }
 }
