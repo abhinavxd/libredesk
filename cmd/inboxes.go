@@ -13,6 +13,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -340,6 +341,13 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			return err
 		}
 	}
+
+	// Validate telegram channel config.
+	if inbox.Channel == telegram.ChannelTelegram {
+		if err := validateTelegramConfig(app, inbox.Config); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -452,4 +460,18 @@ func trimEmailConfig(cfg *imodels.Config) {
 		cfg.OAuth.ClientID = strings.TrimSpace(cfg.OAuth.ClientID)
 		cfg.OAuth.TenantID = strings.TrimSpace(cfg.OAuth.TenantID)
 	}
+}
+
+// validateTelegramConfig validates the Telegram inbox configuration.
+func validateTelegramConfig(app *App, configJSON json.RawMessage) error {
+	var cfg telegram.Config
+	if err := json.Unmarshal(configJSON, &cfg); err != nil {
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	if strings.TrimSpace(cfg.BotToken) == "" {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "bot_token"), nil)
+	}
+
+	return nil
 }

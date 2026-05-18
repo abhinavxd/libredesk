@@ -198,6 +198,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/webhooks/{id}/toggle", perm(handleToggleWebhook, "webhooks:manage"))
 	g.POST("/api/v1/webhooks/{id}/test", perm(handleTestWebhook, "webhooks:manage"))
 
+	// Telegram webhook (public endpoint, no auth required - Telegram sends updates here).
+	g.POST("/api/v1/inboxes/telegram/{id}/webhook", handleTelegramWebhook)
+
 	// Context Links.
 	g.GET("/api/v1/context-links", perm(handleGetContextLinks, "context_links:manage"))
 	g.GET("/api/v1/context-links/active", auth(handleGetActiveContextLinks))

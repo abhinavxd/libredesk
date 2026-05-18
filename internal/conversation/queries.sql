@@ -838,3 +838,24 @@ WHERE c.assigned_user_id = $1
   AND u.availability_status = 'online'
 ORDER BY c.last_interaction_at DESC
 LIMIT 50;
+
+-- name: get-last-incoming-message-meta
+SELECT cm.meta
+FROM conversation_messages cm
+JOIN conversations c ON c.id = cm.conversation_id
+WHERE c.uuid = $1
+  AND cm.type = 'incoming'
+  AND cm.meta IS NOT NULL
+  AND cm.meta != '{}'::jsonb
+ORDER BY cm.created_at DESC
+LIMIT 1;
+
+-- name: find-open-conversation-for-contact-inbox
+SELECT c.id, c.uuid
+FROM conversations c
+JOIN conversation_statuses cs ON cs.id = c.status_id
+WHERE c.contact_id = $1
+  AND c.inbox_id = $2
+  AND cs.category != 'resolved'
+ORDER BY c.updated_at DESC
+LIMIT 1;

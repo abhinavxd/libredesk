@@ -31,6 +31,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	"github.com/abhinavxd/libredesk/internal/media"
@@ -740,6 +741,35 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 	return inbox, nil
 }
 
+// initTelegramInbox initializes the Telegram bot inbox.
+func initTelegramInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
+	var config telegram.Config
+
+	// Use an isolated Koanf instance to avoid cross-inbox state bleed.
+	k := koanf.New(".")
+	if err := k.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+		return nil, fmt.Errorf("loading config: %w", err)
+	}
+
+	if err := k.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
+	}
+
+	inb, err := telegram.New(msgStore, usrStore, telegram.Opts{
+		ID:     inboxRecord.ID,
+		Config: config,
+		Lo:     initLogger("telegram_inbox"),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("initializing `%s` inbox: `%s` error : %w", inboxRecord.Channel, inboxRecord.Name, err)
+	}
+
+	log.Printf("`%s` inbox successfully initialized", inboxRecord.Name)
+
+	return inb, nil
+}
+
 // makeInboxInitializer creates an inbox initializer function.
 func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String)) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
 	return func(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
@@ -748,6 +778,8 @@ func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String)) 
 			return initEmailInbox(inboxR, msgStore, usrStore, mgr)
 		case inbox.ChannelLiveChat:
 			return initLiveChatInbox(inboxR, msgStore, usrStore, signAvatarURL)
+		case inbox.ChannelTelegram:
+			return initTelegramInbox(inboxR, msgStore, usrStore)
 		default:
 			return nil, fmt.Errorf("unknown inbox channel: %s", inboxR.Channel)
 		}

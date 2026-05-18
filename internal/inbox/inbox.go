@@ -28,6 +28,7 @@ import (
 const (
 	ChannelEmail    = "email"
 	ChannelLiveChat = "livechat"
+	ChannelTelegram = "telegram"
 )
 
 var (
@@ -419,6 +420,28 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			}
 			inbox.Secret = null.StringFrom(encryptedSecret)
 		}
+	case "telegram":
+		// Preserve existing bot_token if update has empty token
+		var currentCfg map[string]interface{}
+		var updateCfg map[string]interface{}
+		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
+			m.lo.Error("error unmarshalling current telegram config", "id", id, "error", err)
+			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		if err := json.Unmarshal(inbox.Config, &updateCfg); err != nil {
+			m.lo.Error("error unmarshalling update telegram config", "id", id, "error", err)
+			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		// If bot_token is empty or contains password dummy in update, preserve existing
+		if botToken, ok := updateCfg["bot_token"].(string); !ok || botToken == "" || strings.Contains(botToken, stringutil.PasswordDummy) {
+			updateCfg["bot_token"] = currentCfg["bot_token"]
+		}
+		updatedConfig, err := json.Marshal(updateCfg)
+		if err != nil {
+			m.lo.Error("error marshalling updated telegram config", "id", id, "error", err)
+			return imodels.Inbox{}, err
+		}
+		inbox.Config = updatedConfig
 	}
 
 	// Encrypt sensitive fields before updating
@@ -633,6 +656,15 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
+	// Encrypt Telegram bot_token if present
+	if botToken, ok := cfg["bot_token"].(string); ok && botToken != "" {
+		encrypted, err := crypto.Encrypt(botToken, m.encryptionKey)
+		if err != nil {
+			return nil, fmt.Errorf("encrypting Telegram bot_token: %w", err)
+		}
+		cfg["bot_token"] = encrypted
+	}
+
 	encrypted, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling encrypted config: %w", err)
@@ -696,6 +728,17 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 				}
 				oauthMap[fieldName] = decrypted
 			}
+		}
+	}
+
+	// Decrypt Telegram bot_token if present
+	if botToken, ok := cfg["bot_token"].(string); ok && botToken != "" {
+		decrypted, err := crypto.Decrypt(botToken, m.encryptionKey)
+		if err != nil {
+			m.lo.Error("error decrypting Telegram bot_token, clearing field", "error", err)
+			cfg["bot_token"] = ""
+		} else {
+			cfg["bot_token"] = decrypted
 		}
 	}
 

@@ -17,6 +17,12 @@
       :available-languages="availableLanguages"
       v-else-if="inbox.channel === 'livechat'"
     />
+    <TelegramInboxForm
+      :initialValues="inbox"
+      :submitForm="submitTelegramForm"
+      :isLoading="isLoading"
+      v-else-if="inbox.channel === 'telegram'"
+    />
   </div>
 </template>
 
@@ -25,6 +31,7 @@ import { onMounted, ref } from 'vue'
 import api from '../../../api'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
+import TelegramInboxForm from '@/features/admin/inbox/TelegramInboxForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -93,6 +100,27 @@ const submitForm = (values) => {
       channel: inbox.value.channel,
       config: values.config
     }
+  }
+
+  updateInbox(payload)
+}
+
+const submitTelegramForm = (values) => {
+  const payload = {
+    name: values.name,
+    channel: 'telegram',
+    enabled: values.enabled ?? true,
+    csat_enabled: values.csat_enabled ?? false,
+    prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
+    config: {
+      bot_token: values.bot_token,
+      bot_name: values.bot_name || ''
+    }
+  }
+
+  // If bot_token contains masked characters, don't send it.
+  if (payload.config.bot_token?.includes('•')) {
+    payload.config.bot_token = ''
   }
 
   updateInbox(payload)

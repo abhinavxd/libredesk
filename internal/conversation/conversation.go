@@ -320,6 +320,10 @@ type queries struct {
 
 	// Broadcast queries.
 	GetActiveLivechatConversationsByAgent *sqlx.Stmt `query:"get-active-livechat-conversations-by-agent"`
+
+	// Telegram queries.
+	GetLastIncomingMessageMeta          *sqlx.Stmt `query:"get-last-incoming-message-meta"`
+	FindOpenConversationForContactInbox *sqlx.Stmt `query:"find-open-conversation-for-contact-inbox"`
 }
 
 // CreateConversation creates a new conversation. If maxConversations > 0, the insert is

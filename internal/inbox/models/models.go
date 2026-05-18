@@ -139,6 +139,20 @@ func (m *Inbox) ClearPasswords() error {
 		if m.Secret.Valid && m.Secret.String != "" {
 			m.Secret = null.StringFrom(strings.Repeat(stringutil.PasswordDummy, 10))
 		}
+	case "telegram":
+		// Mask the bot_token field for telegram
+		var cfg map[string]interface{}
+		if err := json.Unmarshal(m.Config, &cfg); err != nil {
+			return err
+		}
+		if _, ok := cfg["bot_token"]; ok {
+			cfg["bot_token"] = strings.Repeat(stringutil.PasswordDummy, 10)
+		}
+		clearedConfig, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		m.Config = clearedConfig
 	default:
 		return nil
 	}
