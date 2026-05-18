@@ -1,8 +1,6 @@
 package migrations
 
 import (
-	"fmt"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
