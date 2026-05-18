@@ -22,10 +22,10 @@ func V2_2_2(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	}
 
 	for localeCode, localeRegion := range langMap {
-		_, err := db.Exec(fmt.Sprintf(`
-			UPDATE settings SET value = '"%s"'::jsonb, updated_at = now()
-			WHERE key = 'app.lang' AND value = '"%s"'::jsonb;
-		`, localeRegion, localeCode))
+		_, err := db.Exec(`
+			UPDATE settings SET value = to_jsonb($1::text), updated_at = now()
+			WHERE key = 'app.lang' AND value = to_jsonb($2::text);
+		`, localeRegion, localeCode)
 		if err != nil {
 			return err
 		}
