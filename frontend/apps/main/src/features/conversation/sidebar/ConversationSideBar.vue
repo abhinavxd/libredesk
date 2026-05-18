@@ -94,12 +94,16 @@
       </AccordionItem>
 
       <!-- Contact notes -->
-      <AccordionItem value="contact_notes" class="accordion-item" v-if="conversationStore.current?.contact?.id">
+      <AccordionItem
+        value="contact_notes"
+        class="accordion-item"
+        v-if="conversationStore.current?.contact?.id && userStore.can('contact_notes:read')"
+      >
         <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.contactNotes') }}
+          {{ $t('globals.terms.note', 2) }}
         </AccordionTrigger>
         <AccordionContent class="accordion-content">
-          <ContactNotes :contact-id="conversationStore.current.contact.id" />
+          <ContactNotes :contact-id="conversationStore.current.contact.id" compact />
         </AccordionContent>
       </AccordionItem>
 
@@ -122,6 +126,7 @@ import { useConversationStore } from '@/stores/conversation'
 import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
 import { useTagStore } from '@/stores/tag'
+import { useUserStore } from '@/stores/user'
 import {
   Accordion,
   AccordionContent,
@@ -151,6 +156,7 @@ const conversationStore = useConversationStore()
 const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
 const tagStore = useTagStore()
+const userStore = useUserStore()
 const tags = ref([])
 // Save the accordion state in local storage
 const accordionState = useStorage('conversation-sidebar-accordion', [])
