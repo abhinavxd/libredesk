@@ -104,7 +104,7 @@
   "admin.general.businessHours.placeholder": "Seleccionar horario de atención",
   "admin.general.faviconURL": "URL del favicon",
   "admin.general.faviconURL.valid": "La URL del favicon debe ser una URL válida",
-  "admin.general.help": "Estos son los valores predeterminados de tu mesa de soporte. La configuración a nivel de equipo los anulará donde esté configurada.",
+  "admin.general.help": "Estas son las configuraciones predeterminadas para todo el servicio de asistencia. Las configuraciones a nivel de equipo prevalecerán sobre estas siempre que se hayan configurado.",
   "admin.general.language.placeholder": "Seleccionar idioma",
   "admin.general.logoURL.valid": "La URL del logo debe ser una URL válida",
   "admin.general.maxAllowedFileUploadSize": "Tamaño máximo de carga de archivo permitido",

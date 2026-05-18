@@ -478,7 +478,7 @@
   "conversation.bulkActions.failedToast": "Some conversations couldn't be updated",
   "conversation.bulkActions.selectAll": "Select all conversations",
   "conversation.bulkActions.selectConversation": "Select conversation",
-  "conversation.bulkActions.selected": "No conversations selected | {count} selected | {count} selected",
+  "conversation.bulkActions.selected": "No conversations selected | {count} selected",
   "conversation.bulkActions.successToast": "Conversations updated",
   "conversation.bulkActions.toolbar": "Bulk actions toolbar",
   "conversation.couldNotFetch": "Could not fetch conversations",
