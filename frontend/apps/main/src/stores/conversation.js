@@ -15,7 +15,7 @@ import { useDebounceFn, useThrottleFn } from '@vueuse/core'
 import api from '../api'
 
 export const useConversationStore = defineStore('conversation', () => {
-  const CONV_LIST_PAGE_SIZE = 50
+  const CONV_LIST_PAGE_SIZE = 25
   const MESSAGE_LIST_PAGE_SIZE = 30
   const priorities = ref([])
   const statuses = ref([])
@@ -709,8 +709,8 @@ export const useConversationStore = defineStore('conversation', () => {
     pendingNotificationUUIDs.add(uuid)
   }
 
-  const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 2000)
-  const debouncedFetchParticipants = useDebounceFn(fetchParticipants, 400)
+  const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 4000)
+  const debouncedFetchParticipants = useDebounceFn(fetchParticipants, 1000)
 
   function refreshConversationList () {
     throttledFetchFirstPage()
