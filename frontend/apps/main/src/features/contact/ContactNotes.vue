@@ -203,19 +203,20 @@ const latestFetchId = ref(0)
 
 
 const fetchNotes = async (contactId = props.contactId) => {
-  const fetchId = ++latestFetchId.value 
+  const fetchId = ++latestFetchId.value
   try {
     isLoading.value = true
     const { data } = await api.getContactNotes(contactId)
     if (fetchId !== latestFetchId.value) return
     notes.value = data.data
   } catch (error) {
+    if (fetchId !== latestFetchId.value) return
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
   } finally {
-    if (fetchId === latestFetchId.value){
+    if (fetchId === latestFetchId.value) {
       isLoading.value = false
     }
   }
@@ -265,13 +266,15 @@ const visibleNotes = computed(() => {
 })
 
 watch(() => props.contactId, (newId) => {
-    showAll.value = false
-    cancelAddNote()
-    if (!newId){
-      notes.value = []
-      return
-    }
-    fetchNotes(newId)
+  latestFetchId.value++
+  showAll.value = false
+  cancelAddNote()
+  notes.value = []
+  if (!newId) {
+    isLoading.value = false
+    return
+  }
+  fetchNotes(newId)
 }, { immediate: true })
 
 </script>
