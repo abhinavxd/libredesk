@@ -14,29 +14,29 @@ export function useActivityLogFilters () {
             options: uStore.options
         },
         activity_type: {
-            label: t('activityLog.type'),
+            label: t('activityLog.entryType'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: [{
-                label: t('activityLog.type.agentLogin'),
+                label: t('activityLog.entryType.agentLogin'),
                 value: 'agent_login'
             }, {
-                label: t('activityLog.type.agentLogout'),
+                label: t('activityLog.entryType.agentLogout'),
                 value: 'agent_logout'
             }, {
-                label: t('activityLog.type.agentAway'),
+                label: t('activityLog.entryType.agentAway'),
                 value: 'agent_away'
             }, {
-                label: t('activityLog.type.agentAwayReassigned'),
+                label: t('activityLog.entryType.agentAwayReassigned'),
                 value: 'agent_away_reassigned'
             }, {
-                label: t('activityLog.type.agentOnline'),
+                label: t('activityLog.entryType.agentOnline'),
                 value: 'agent_online'
             }, {
-                label: t('activityLog.type.agentPasswordSet'),
+                label: t('activityLog.entryType.agentPasswordSet'),
                 value: 'agent_password_set'
             }, {
-                label: t('activityLog.type.agentRolePermissionsChanged'),
+                label: t('activityLog.entryType.agentRolePermissionsChanged'),
                 value: 'agent_role_permissions_changed'
             }]
         },
