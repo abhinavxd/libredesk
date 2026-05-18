@@ -7,7 +7,7 @@ on:
       # updated.
       - 'i18n/en-US.json'
     # Only watches for changes happening on "main" branch.
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   crowdin:
@@ -30,7 +30,7 @@ jobs:
           upload_translations: false
           download_translations: false
           # Source language file.
-          source: 'i18n/en.json'
+          source: 'i18n/en-US.json'
           # Translations files.
           translation: 'i18n/%locale%.json'
         env:
@@ -44,4 +44,3 @@ jobs:
           #  - Source files & strings -> Read and Write
           #  - Translations -> Read and Write
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
-
