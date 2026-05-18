@@ -115,8 +115,7 @@ onUnmounted(() => {
 const fetchConversation = async (uuid) => {
   await Promise.all([
     conversationStore.fetchConversation(uuid),
-    conversationStore.fetchMessages(uuid),
-    conversationStore.fetchParticipants(uuid)
+    conversationStore.fetchMessages(uuid)
   ])
   await conversationStore.updateAssigneeLastSeen(uuid)
 }

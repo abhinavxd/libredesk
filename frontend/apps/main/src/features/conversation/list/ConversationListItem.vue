@@ -239,6 +239,7 @@ const draftPreview = computed(() => {
   const draft = conversationStore.getDraft(props.conversation.uuid)
   if (!draft?.content) return ''
   const text = draft.content.replace(/<[^>]*>/g, '').trim()
+  if (!text && /<img\b/i.test(draft.content)) return t('globals.terms.image', 1)
   return text.length > 120 ? text.slice(0, 120) + '...' : text
 })
 
