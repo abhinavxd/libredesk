@@ -713,7 +713,7 @@ VALUES
 -- Default settings
 INSERT INTO settings ("key", value)
 VALUES
-    ('app.lang', '"en"'::jsonb),
+    ('app.lang', '"en-US"'::jsonb),
     ('app.root_url', '"http://localhost:9000"'::jsonb),
     ('app.logo_url', '"http://localhost:9000/logo.png"'::jsonb),
     ('app.site_name', '"libredesk"'::jsonb),

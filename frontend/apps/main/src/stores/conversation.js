@@ -11,7 +11,7 @@ import { playNotificationSound } from '@shared-ui/composables/useNotificationSou
 import MessageCache from '../utils/conversation-message-cache'
 import { getI18n } from '../i18n'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@/constants/conversation'
-import { useDebounceFn, useThrottleFn } from '@vueuse/core'
+import { useThrottleFn } from '@vueuse/core'
 import api from '../api'
 
 export const useConversationStore = defineStore('conversation', () => {
@@ -156,7 +156,6 @@ export const useConversationStore = defineStore('conversation', () => {
 
   const conversation = reactive({
     data: null,
-    participants: {},
     loading: false,
     errorMessage: '',
     isTyping: false
@@ -171,6 +170,10 @@ export const useConversationStore = defineStore('conversation', () => {
   })
 
   let seenConversationUUIDs = new Map()
+  // Bumped on resetConversations() so in-flight requests can drop stale responses.
+  let contextSeq = 0
+  // Bumped on every fetchConversation() so an older A response can't overwrite a newer B.
+  let openConvSeq = 0
   const emitter = useEmitter()
 
   const incrementMessageVersion = () => setTimeout(() => messages.version++, 0)
@@ -347,26 +350,12 @@ export const useConversationStore = defineStore('conversation', () => {
     currentBCC.value = bcc
   })
 
-  async function fetchParticipants (uuid) {
-    try {
-      const resp = await api.getConversationParticipants(uuid)
-      const participants = resp.data.data.reduce((acc, p) => {
-        acc[p.id] = p
-        return acc
-      }, {})
-      updateParticipants(participants)
-    } catch (error) {
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-    }
-  }
-
   async function fetchConversation (uuid) {
+    const seq = ++openConvSeq
     conversation.loading = true
     try {
       const resp = await api.getConversation(uuid)
+      if (seq !== openConvSeq) return
       conversation.data = resp.data.data
       conversation.isTyping = false
       if (typingTimeout) {
@@ -376,13 +365,14 @@ export const useConversationStore = defineStore('conversation', () => {
       // Do a websocket subscription to the conversation.
       subscribeToConversation(uuid)
     } catch (error) {
+      if (seq !== openConvSeq) return
       conversation.errorMessage = handleHTTPError(error).message
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
         description: conversation.errorMessage
       })
     } finally {
-      conversation.loading = false
+      if (seq === openConvSeq) conversation.loading = false
     }
   }
 
@@ -452,8 +442,8 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function fetchNextConversations () {
-    conversations.page++
-    fetchConversationsList(true, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page)
+    if (conversations.loading || !conversations.hasMore) return
+    fetchConversationsList(true, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page + 1)
   }
 
   function reFetchConversationsList (showLoader = true) {
@@ -469,7 +459,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (conversations.listType !== listType || conversations.teamID !== teamID || conversations.viewID !== viewID) {
       resetConversations()
     }
-    if (listType) conversations.listType = listType
+    conversations.listType = listType
     if (teamID) conversations.teamID = teamID
     if (viewID) conversations.viewID = viewID
     if (conversations.status) {
@@ -481,22 +471,25 @@ export const useConversationStore = defineStore('conversation', () => {
         value: conversations.status
       })
     }
-    if (filters) conversations.listFilters = filters
+    conversations.listFilters = filters
     if (showLoader) conversations.loading = true
+    if (page === 0) page = conversations.page
+    const seq = contextSeq
     try {
       conversations.errorMessage = ''
-      if (page === 0)
-        page = conversations.page
       const response = await makeConversationListRequest(listType, teamID, viewID, filters, page)
+      // Drop response if list context (type/team/view) switched mid-flight.
+      if (seq !== contextSeq) return
       processConversationListResponse(response)
     } catch (error) {
-      // If list already exists, do not tear it down on errors.
+      if (seq !== contextSeq) return
+      // Keep existing list visible on error; only surface error on empty list.
       if (conversations.data.length === 0) {
         conversations.errorMessage = handleHTTPError(error).message
         conversations.total = 0
       }
     } finally {
-      conversations.loading = false
+      if (seq === contextSeq) conversations.loading = false
     }
   }
 
@@ -563,7 +556,7 @@ export const useConversationStore = defineStore('conversation', () => {
         // Update existing conversation with fresh data.
         const idx = conversations.data.findIndex(c => c.uuid === conv.uuid)
         if (idx !== -1) {
-          Object.assign(conversations.data[idx], conv)
+          deepMerge(conversations.data[idx], conv)
         }
       } else {
         // Add to seen and new conversations list.
@@ -571,13 +564,13 @@ export const useConversationStore = defineStore('conversation', () => {
         newConversations.push(conv)
       }
     }
-    if (apiResponse.total_pages <= conversations.page) conversations.hasMore = false
-    else conversations.hasMore = true
+    conversations.page = Math.max(conversations.page, apiResponse.page)
+    conversations.hasMore = apiResponse.total_pages > conversations.page
     if (!conversations.data) conversations.data = []
     conversations.data.push(...newConversations)
     conversations.total = apiResponse.total
 
-    // Play notification sound for new conversations that were pending.
+    // Re-check document.hidden in case the user returned while the refresh was in flight.
     if (pendingNotificationUUIDs.size > 0) {
       let shouldPlay = false
       for (const uuid of pendingNotificationUUIDs) {
@@ -586,7 +579,7 @@ export const useConversationStore = defineStore('conversation', () => {
         }
       }
       pendingNotificationUUIDs.clear()
-      if (shouldPlay) {
+      if (shouldPlay && document.hidden) {
         playNotificationSound()
       }
     }
@@ -690,13 +683,6 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  function updateParticipants (newParticipants) {
-    conversation.participants = {
-      ...conversation.participants,
-      ...newParticipants
-    }
-  }
-
   function isConversationInList (uuid) {
     return conversations.data?.find(c => c.uuid === uuid) ? true : false
   }
@@ -710,9 +696,10 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 4000)
-  const debouncedFetchParticipants = useDebounceFn(fetchParticipants, 1000)
 
   function refreshConversationList () {
+    // Skip while hidden unless we have a pending notification to verify against the new list.
+    if (document.hidden && pendingNotificationUUIDs.size === 0) return
     throttledFetchFirstPage()
   }
 
@@ -754,7 +741,6 @@ export const useConversationStore = defineStore('conversation', () => {
         return
       }
 
-      debouncedFetchParticipants(message.conversation_uuid)
       const fetchedMessage = await fetchMessage(message.conversation_uuid, message.uuid)
       if (fetchedMessage) {
         updateConversationLastMessage(message.conversation_uuid, fetchedMessage)
@@ -833,8 +819,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function addNewConversation (conversation) {
     if (!isConversationInList(conversation.uuid)) {
-      // Fetch list of conversations again.
-      fetchFirstPageConversations()
+      refreshConversationList()
     }
   }
 
@@ -874,6 +859,8 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations.data = []
     conversations.page = 1
     seenConversationUUIDs = new Map()
+    contextSeq++
+    pendingNotificationUUIDs.clear()
     clearSelection()
   }
 
@@ -1007,7 +994,6 @@ export const useConversationStore = defineStore('conversation', () => {
     mergeContactUpdate,
     addNewConversation,
     getContactFullName,
-    fetchParticipants,
     fetchNextMessages,
     fetchNextConversations,
     mergeMessageUpdate,
