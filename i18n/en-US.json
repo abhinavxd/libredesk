@@ -888,7 +888,7 @@
   "macro.partiallyApplied": "Macro partially applied",
   "macro.permissionDenied": "Permission denied for some macro actions",
   "media.fileEmpty": "This file is 0 bytes, so it will not be attached.",
-  "media.fileSizeTooLarge": "File size too large, Please upload a file less than {size}",
+  "media.fileSizeTooLarge": "File size too large, please upload a file less than {size}",
   "media.fileTypeNotAllowed": "File type not allowed",
   "media.invalidOrExpiredURL": "Invalid or expired media URL",
   "navigation.away": "Away",
