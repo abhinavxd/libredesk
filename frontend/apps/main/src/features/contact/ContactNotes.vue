@@ -179,11 +179,15 @@ const newNote = ref('')
 const isLoading = ref(false)
 const NOTES_LIMIT = 10
 const showAll = ref(false)
+const latestFetchId = ref(0)
 
-const fetchNotes = async () => {
+
+const fetchNotes = async (contactId = props.contactId) => {
+  const fetchId = ++latestFetchId.value 
   try {
     isLoading.value = true
-    const { data } = await api.getContactNotes(props.contactId)
+    const { data } = await api.getContactNotes(contactId)
+    if (fetchId !== latestFetchId.value) return
     notes.value = data.data
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -191,7 +195,9 @@ const fetchNotes = async () => {
       description: handleHTTPError(error).message
     })
   } finally {
-    isLoading.value = false
+    if (fetchId === latestFetchId.value){
+      isLoading.value = false
+    }
   }
 }
 
@@ -235,11 +241,13 @@ const deleteNote = async (noteId) => {
 const visibleNotes = computed(() => showAll.value ? notes.value : notes.value.slice(0, NOTES_LIMIT))
 
 watch(() => props.contactId, (newId) => {
-  if (newId) {
     showAll.value = false
     cancelAddNote()
-    fetchNotes()
-  }
+    if (!newId){
+      notes.value = []
+      return
+    }
+    fetchNotes(newId)
 }, { immediate: true })
 
 </script>
