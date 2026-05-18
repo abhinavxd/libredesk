@@ -6,7 +6,7 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-func V2_2_2(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+func V2_3_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	langMap := map[string]string{
 		"da": "da-DK",
 		"de": "de-DE",
