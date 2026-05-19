@@ -180,10 +180,13 @@ func (m *Manager) SetContentID(id int, contentID string) error {
 	return nil
 }
 
-// ContentIDExists checks if a content_id exists in the database and returns the UUID of the media file.
-func (m *Manager) ContentIDExists(contentID string) (bool, string, error) {
+// ContentIDExists reports whether a media row with the given content_id is linked to a message in the given conversation. Scoped this way so an orphan media row (e.g., from a partial failure) doesn't short-circuit a retry into skipping the upload.
+func (m *Manager) ContentIDExists(contentID, conversationUUID string) (bool, string, error) {
+	if contentID == "" || conversationUUID == "" {
+		return false, "", nil
+	}
 	var uuid string
-	if err := m.queries.ContentIDExists.Get(&uuid, contentID); err != nil {
+	if err := m.queries.ContentIDExists.Get(&uuid, contentID, conversationUUID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, "", nil
 		}
