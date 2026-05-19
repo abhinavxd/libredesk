@@ -478,7 +478,7 @@
   "conversation.bulkActions.failedToast": "Certaines conversations n'ont pas pu être modifiées",
   "conversation.bulkActions.selectAll": "Sélectionner toutes les conversations",
   "conversation.bulkActions.selectConversation": "Sélectionner la conversation",
-  "conversation.bulkActions.selected": "Aucune conversation sélectionnée | {count} sélectionnée(s)",
+  "conversation.bulkActions.selected": "Aucune conversation sélectionnée | 1 sélectionnée | {count} sélectionnées",
   "conversation.bulkActions.successToast": "Conversations modifiées",
   "conversation.bulkActions.toolbar": "Barre d'outils d'actions en masse",
   "conversation.couldNotFetch": "Impossible d'obtenir des conversations",
