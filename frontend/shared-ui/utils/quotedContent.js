@@ -4,13 +4,15 @@
 // attribute-suffix selectors (see .hide-quoted-text in main.scss).
 //
 // Scope: <blockquote> covers Gmail/Apple/Thunderbird. The id/class markers
-// below cover the Microsoft variants (Outlook desktop/web/mac, Hotmail).
+// below cover the Microsoft variants (Outlook desktop/web/mac, Hotmail)
+// and Yahoo Mail.
 export const QUOTE_MARKERS = [
   '<blockquote',
   'id="divRplyFwdMsg"',
   'id="appendonsend"',
   'id="OLK_SRC_BODY_SECTION"',
-  'class="OutlookMessageHeader"'
+  'class="OutlookMessageHeader"',
+  'class="yahoo_quoted"'
 ]
 
 export const containsQuoteMarkers = (html) => {
