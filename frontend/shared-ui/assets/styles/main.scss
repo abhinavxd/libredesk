@@ -311,7 +311,8 @@
   [id$="_OLK_SRC_BODY_SECTION"] ~ *,
   [class*="_OutlookMessageHeader"],
   [class*="_OutlookMessageHeader"] ~ *,
-  [class*="_yahoo_quoted"] {
+  [class*="_yahoo_quoted"],
+  [class*="_gmail_quote_container"] {
     @apply hidden;
   }
 }

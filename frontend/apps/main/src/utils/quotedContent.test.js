@@ -51,6 +51,14 @@ describe('containsQuoteMarkers', () => {
     expect(containsQuoteMarkers(html)).toBe(true)
   })
 
+  test('detects Gmail forward gmail_quote_container', () => {
+    const html = `<div class="gmail_quote gmail_quote_container">
+      <div dir="ltr" class="gmail_attr">---------- Forwarded message ---------</div>
+      <div>Original message body</div>
+    </div>`
+    expect(containsQuoteMarkers(html)).toBe(true)
+  })
+
   test('detects real Hotmail reply payload', () => {
     const html = `<div class="elementToProof">Quoted reply!</div>
       <div id="appendonsend"></div>

@@ -3,16 +3,18 @@
 // render time, so any CSS that needs to match the rendered DOM must use
 // attribute-suffix selectors (see .hide-quoted-text in main.scss).
 //
-// Scope: <blockquote> covers Gmail/Apple/Thunderbird. The id/class markers
-// below cover the Microsoft variants (Outlook desktop/web/mac, Hotmail)
-// and Yahoo Mail.
+// Scope: <blockquote> covers Gmail/Apple/Thunderbird *replies*. Gmail
+// *forwards* wrap content in <div class="gmail_quote gmail_quote_container">
+// instead. The id/class markers below cover the Microsoft variants
+// (Outlook desktop/web/mac, Hotmail) and Yahoo Mail.
 export const QUOTE_MARKERS = [
   '<blockquote',
   'id="divRplyFwdMsg"',
   'id="appendonsend"',
   'id="OLK_SRC_BODY_SECTION"',
   'class="OutlookMessageHeader"',
-  'class="yahoo_quoted"'
+  'class="yahoo_quoted"',
+  'gmail_quote_container'
 ]
 
 export const containsQuoteMarkers = (html) => {
