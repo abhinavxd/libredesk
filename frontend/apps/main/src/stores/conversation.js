@@ -579,7 +579,7 @@ export const useConversationStore = defineStore('conversation', () => {
         }
       }
       pendingNotificationUUIDs.clear()
-      if (shouldPlay && document.hidden) {
+      if (shouldPlay && document.hidden) {        
         playNotificationSound()
       }
     }
@@ -695,11 +695,10 @@ export const useConversationStore = defineStore('conversation', () => {
     pendingNotificationUUIDs.add(uuid)
   }
 
-  const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 4000)
+  // trailing=true: fires one final refresh after a burst so the list converges to latest state.
+  const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 4000, true)
 
   function refreshConversationList () {
-    // Skip while hidden unless we have a pending notification to verify against the new list.
-    if (document.hidden && pendingNotificationUUIDs.size === 0) return
     throttledFetchFirstPage()
   }
 
@@ -717,22 +716,19 @@ export const useConversationStore = defineStore('conversation', () => {
    * @param {object} message - Message object with conversation_uuid field
    */
   async function updateConversationMessage (message) {
+    // Conversation not open, fetch message and update cache and last message preview.
     if (conversation.data?.uuid !== message.conversation_uuid) {
-      // Not the open conversation. If we have cached messages for it,
-      // fetch the new message to keep the cache fresh.
-      if (messages.data.getLastFetchedPage(message.conversation_uuid) > 0) {
-        const fetchedMessage = await fetchMessage(message.conversation_uuid, message.uuid)
-        if (fetchedMessage) {
-          // Update last message in conversation list (preview)
-          updateConversationLastMessage(message.conversation_uuid, fetchedMessage)
-        }
+      const fetchedMessage = await fetchMessage(message.conversation_uuid, message.uuid)
+      if (fetchedMessage) {
+        updateConversationLastMessage(message.conversation_uuid, fetchedMessage)
       }
       return
     }
 
-    // Open conversation and message not in cache? Fetch from server.
+    // Current convo but message not in cache, fetch to update both the open convo and the list preview.
     if (!messages.data.hasMessage(message.conversation_uuid, message.uuid)) {
-      // Match echo_id to pending message and swap its UUID so mergeMessageUpdate can find it.
+
+      // Match echo_id to pending message and swap its UUID.
       const echoId = message.echo_id
       if (echoId && messages.data.hasMessage(message.conversation_uuid, echoId)) {
         messages.data.updateMessage(message.conversation_uuid, echoId, { uuid: message.uuid })
@@ -741,9 +737,13 @@ export const useConversationStore = defineStore('conversation', () => {
         return
       }
 
+      // Message with no echo_id, just fetch.
       const fetchedMessage = await fetchMessage(message.conversation_uuid, message.uuid)
       if (fetchedMessage) {
+        // Update last message in conversation list (preview)
         updateConversationLastMessage(message.conversation_uuid, fetchedMessage)
+
+        // Emit events for auto scroll.
         setTimeout(() => {
           emitter.emit(EMITTER_EVENTS.NEW_MESSAGE, {
             conversation_uuid: message.conversation_uuid,
@@ -752,6 +752,7 @@ export const useConversationStore = defineStore('conversation', () => {
         }, 100)
       }
 
+      // Update last seen.
       if (!document.hidden) {
         updateAssigneeLastSeen(message.conversation_uuid)
       }
