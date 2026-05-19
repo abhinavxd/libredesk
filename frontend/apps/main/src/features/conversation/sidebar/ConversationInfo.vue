@@ -1,5 +1,18 @@
 <template>
   <div class="space-y-3">
+    <!-- Inbox name-->
+    <div v-if="conversation.inbox_name">
+      <p class="sidebar-label">{{ $t('globals.terms.inbox', 1) }}</p>
+      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
+      <div v-else class="flex items-center gap-1.5">
+        <component
+          :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
+          class="size-3.5 text-muted-foreground flex-shrink-0"
+        />
+        <p class="sidebar-value break-all">{{ conversation.inbox_name }}</p>
+      </div>
+    </div>
+
     <div v-if="conversation.subject">
       <p class="sidebar-label">{{ $t('globals.terms.subject') }}</p>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
@@ -107,6 +120,7 @@
 <script setup>
 import { computed } from 'vue'
 import { format } from 'date-fns'
+import { Mail, MessageSquare } from 'lucide-vue-next'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 import { useConversationStore } from '../../../stores/conversation'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
