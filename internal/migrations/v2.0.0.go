@@ -205,7 +205,7 @@ func V2_0_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	// Add built-in CSAT request email template.
 	_, err = db.Exec(`
 		INSERT INTO templates ("type", body, is_default, "name", subject, is_builtin)
-		VALUES (
+		SELECT
 			'email_notification'::template_type,
 			'
 <p style="margin: 0 0 4px; font-size: 15px; color: #374151; text-align: center; line-height: 1.5;">
@@ -255,7 +255,9 @@ func V2_0_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			'CSAT request',
 			'',
 			true
-		) ON CONFLICT DO NOTHING;
+		WHERE NOT EXISTS (
+			SELECT 1 FROM templates WHERE name = 'CSAT request' AND is_builtin = true
+		);
 	`)
 	if err != nil {
 		return err
