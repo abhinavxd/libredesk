@@ -1425,7 +1425,7 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 	if !strings.HasPrefix(rawContentID, "ldsk-") {
 		storedCID = conversationUUID + "_" + rawContentID
 	}
-	exists, mediaUUID, err := m.mediaStore.ContentIDExists(storedCID)
+	exists, mediaUUID, err := m.mediaStore.ContentIDExists(storedCID, conversationUUID)
 	if err != nil {
 		m.lo.Error("error checking media existence by content ID", "content_id", storedCID, "error", err)
 	}

@@ -204,10 +204,10 @@ LEFT JOIN LATERAL (
   ORDER BY se.created_at DESC
   LIMIT 1
 ) nxt_resp_event ON true
-WHERE 
+WHERE
   ($1 > 0 AND c.id = $1)
-  OR 
-  ($2::uuid IS NOT NULL AND c.uuid = $2::uuid)
+  OR
+  (NULLIF($2, '')::uuid IS NOT NULL AND c.uuid = NULLIF($2, '')::uuid)
   OR
   ($3::TEXT != '' AND c.reference_number = $3::TEXT)
 
@@ -799,7 +799,7 @@ ORDER BY cd.updated_at DESC;
 DELETE FROM conversation_drafts
 WHERE conversation_id IN (
   SELECT id FROM conversations
-  WHERE ($1 > 0 AND id = $1) OR ($2::uuid IS NOT NULL AND uuid = $2::uuid)
+  WHERE ($1 > 0 AND id = $1) OR (NULLIF($2, '')::uuid IS NOT NULL AND uuid = NULLIF($2, '')::uuid)
 ) AND user_id = $3;
 
 -- name: delete-stale-drafts
