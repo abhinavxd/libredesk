@@ -64,17 +64,23 @@ export class WebSocketClient {
 
       const data = JSON.parse(event.data)
       const handlers = {
-        // On new message, refresh list and fetch message if it's in current conversation.
         [WS_EVENT.NEW_MESSAGE]: () => {
+          // Ring sound only for contact messages and when doc is hidden.
+          // If not in list, add to pending notifs as later it could be part of this list.
           if (data.data.sender_type === 'contact' && document.hidden) {
             const uuid = data.data.conversation_uuid
-            if (this.convStore.isConversationInList(uuid)) {
+            const isOpen = this.convStore.conversation.data?.uuid === uuid
+            if (isOpen || this.convStore.isConversationInList(uuid)) {
               playNotificationSound()
             } else {
               this.convStore.addPendingNotification(uuid)
             }
           }
+
+          // Refresh 1st page of list as well, this is throttled.
           this.convStore.refreshConversationList()
+
+          // Update this message in its respective conversation.
           this.convStore.updateConversationMessage(data.data)
         },
         // Property updates for conversation and message.
