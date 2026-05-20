@@ -301,7 +301,7 @@ func (lc *LiveChat) AddClient(userID string) (*Client, error) {
 
 	client := &Client{
 		ID:      userID,
-		Channel: make(chan []byte, 64),
+		Channel: make(chan []byte, 128),
 	}
 
 	// Add the client to the clients map.

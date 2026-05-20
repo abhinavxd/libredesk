@@ -384,7 +384,6 @@ export const useConversationStore = defineStore('conversation', () => {
   async function fetchMessages (uuid, fetchNextPage = false) {
     // Silently refetch page 1 for stale-cache conversations; cached messages stay visible, new ones merge in.
     if (staleConversationUUIDs.has(uuid) && messages.data.hasConversation(uuid)) {
-      staleConversationUUIDs.delete(uuid)
       try {
         const response = await api.getConversationMessages(uuid, { page: 1, page_size: MESSAGE_LIST_PAGE_SIZE })
         const newMessages = response.data?.data?.results || []
@@ -395,6 +394,7 @@ export const useConversationStore = defineStore('conversation', () => {
             lastAdded = m
           }
         }
+        staleConversationUUIDs.delete(uuid)
         if (lastAdded) {
           incrementMessageVersion()
           setTimeout(() => {

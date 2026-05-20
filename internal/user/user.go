@@ -354,16 +354,12 @@ func (u *Manager) UpdateAvailability(id int, status string) error {
 
 // UpdateLastActive updates last_active_at and returns true if the user flipped from offline to online.
 func (u *Manager) UpdateLastActive(id int) (wasOffline bool, err error) {
-	cached, cachedOK := u.GetAgentFromCache(id)
-	cachedOffline := cachedOK && cached.AvailabilityStatus == "offline"
+	agent, cachedOK := u.GetAgentFromCache(id)
+	alreadyOnline := cachedOK && agent.AvailabilityStatus == models.Online
 
-	if !cachedOffline {
-		u.lastActiveFlushAtMu.Lock()
-		if last, ok := u.lastActiveFlushAt[id]; ok && time.Since(last) < lastActiveFlushDebounce {
-			u.lastActiveFlushAtMu.Unlock()
-			return false, nil
-		}
-		u.lastActiveFlushAtMu.Unlock()
+	// Already online and within the debounce window - nothing to do.
+	if alreadyOnline && !u.reserveFlush(id) {
+		return false, nil
 	}
 
 	if err := u.q.UpdateLastActiveAt.Get(&wasOffline, id); err != nil {
@@ -371,11 +367,8 @@ func (u *Manager) UpdateLastActive(id int) (wasOffline bool, err error) {
 		return false, fmt.Errorf("updating user last active at: %w", err)
 	}
 
-	u.lastActiveFlushAtMu.Lock()
-	u.lastActiveFlushAt[id] = time.Now()
-	u.lastActiveFlushAtMu.Unlock()
-
-	if cachedOffline {
+	// Offline-or-unknown cache: refresh so callers see the flip to online.
+	if !alreadyOnline {
 		u.InvalidateAgentCache(id)
 	}
 	return wasOffline, nil
@@ -632,4 +625,16 @@ func (u *Manager) generatePassword() ([]byte, error) {
 		return nil, fmt.Errorf("generating bcrypt password: %w", err)
 	}
 	return bytes, nil
+}
+
+// reserveFlush atomically claims the flush slot, returning false if still inside the debounce window.
+func (u *Manager) reserveFlush(id int) bool {
+	u.lastActiveFlushAtMu.Lock()
+	defer u.lastActiveFlushAtMu.Unlock()
+	if last, ok := u.lastActiveFlushAt[id]; ok && time.Since(last) < lastActiveFlushDebounce {
+		return false
+	}
+	// Stamp timestamp.
+	u.lastActiveFlushAt[id] = time.Now()
+	return true
 }
