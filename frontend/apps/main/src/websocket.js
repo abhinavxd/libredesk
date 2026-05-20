@@ -87,7 +87,7 @@ export class WebSocketClient {
 
           this.convStore.mergeConversationUpdate({
             uuid,
-            last_message: data.data.last_message,
+            last_message: data.data.preview,
             last_message_at: data.data.created_at,
             last_message_sender: data.data.sender_type,
           })

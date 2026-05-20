@@ -53,12 +53,12 @@ type Manager struct {
 	agentCache   map[int]cachedAgent
 	agentCacheMu sync.RWMutex
 
-	lastActiveWriteAt   map[int]time.Time
-	lastActiveWriteAtMu sync.Mutex
+	lastActiveFlushAt   map[int]time.Time
+	lastActiveFlushAtMu sync.Mutex
 }
 
 const (
-	lastActiveWriteDebounce = 30 * time.Second
+	lastActiveFlushDebounce = 30 * time.Second
 	agentCacheTTL           = 10 * time.Minute
 )
 
@@ -130,7 +130,7 @@ func New(i18n *i18n.I18n, opts Opts) (*Manager, error) {
 		i18n:              i18n,
 		db:                opts.DB,
 		agentCache:        make(map[int]cachedAgent),
-		lastActiveWriteAt: make(map[int]time.Time),
+		lastActiveFlushAt: make(map[int]time.Time),
 	}, nil
 }
 
@@ -354,18 +354,16 @@ func (u *Manager) UpdateAvailability(id int, status string) error {
 
 // UpdateLastActive updates last_active_at and returns true if the user flipped from offline to online.
 func (u *Manager) UpdateLastActive(id int) (wasOffline bool, err error) {
-	// An offline cached user must bypass the debounce so the next read sees the online flip.
 	cached, cachedOK := u.GetAgentFromCache(id)
-	forceWrite := cachedOK && cached.AvailabilityStatus == "offline"
+	cachedOffline := cachedOK && cached.AvailabilityStatus == "offline"
 
-	if !forceWrite {
-		u.lastActiveWriteAtMu.Lock()
-		if last, ok := u.lastActiveWriteAt[id]; ok && time.Since(last) < lastActiveWriteDebounce {
-			u.lastActiveWriteAtMu.Unlock()
+	if !cachedOffline {
+		u.lastActiveFlushAtMu.Lock()
+		if last, ok := u.lastActiveFlushAt[id]; ok && time.Since(last) < lastActiveFlushDebounce {
+			u.lastActiveFlushAtMu.Unlock()
 			return false, nil
 		}
-		u.lastActiveWriteAt[id] = time.Now()
-		u.lastActiveWriteAtMu.Unlock()
+		u.lastActiveFlushAtMu.Unlock()
 	}
 
 	if err := u.q.UpdateLastActiveAt.Get(&wasOffline, id); err != nil {
@@ -373,10 +371,11 @@ func (u *Manager) UpdateLastActive(id int) (wasOffline bool, err error) {
 		return false, fmt.Errorf("updating user last active at: %w", err)
 	}
 
-	if forceWrite {
-		u.lastActiveWriteAtMu.Lock()
-		u.lastActiveWriteAt[id] = time.Now()
-		u.lastActiveWriteAtMu.Unlock()
+	u.lastActiveFlushAtMu.Lock()
+	u.lastActiveFlushAt[id] = time.Now()
+	u.lastActiveFlushAtMu.Unlock()
+
+	if cachedOffline {
 		u.InvalidateAgentCache(id)
 	}
 	return wasOffline, nil

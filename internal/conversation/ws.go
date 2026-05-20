@@ -22,16 +22,12 @@ func (m *Manager) BroadcastNewConversation(conversationUUID string) {
 }
 
 // BroadcastNewMessage broadcasts a new message to subscribers.
-func (m *Manager) BroadcastNewMessage(message *cmodels.Message, lastMessage string) {
+func (m *Manager) BroadcastNewMessage(message *cmodels.Message, preview string) {
 	data := map[string]any{
 		"conversation_uuid": message.ConversationUUID,
-		"content":           "",
-		"text_content":      message.TextContent,
-		"last_message":      lastMessage,
-		"created_at":        message.CreatedAt.Format(time.RFC3339),
 		"uuid":              message.UUID,
-		"private":           message.Private,
-		"type":              message.Type,
+		"preview":           preview,
+		"created_at":        message.CreatedAt.Format(time.RFC3339),
 		"sender_type":       message.SenderType,
 	}
 

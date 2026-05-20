@@ -92,7 +92,9 @@ func (c *Client) Listen() {
 // processIncomingMessage processes incoming messages from the client.
 func (c *Client) processIncomingMessage(data []byte) {
 	if string(data) == "ping" {
-		_, _ = c.Hub.userStore.UpdateLastActive(c.ID)
+		if _, err := c.Hub.userStore.UpdateLastActive(c.ID); err != nil {
+			log.Printf("ws: UpdateLastActive failed for client %d: %v", c.ID, err)
+		}
 		c.SendMessage([]byte("pong"), websocket.TextMessage)
 		return
 	}
