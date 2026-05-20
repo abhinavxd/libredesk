@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"log"
 
@@ -49,8 +50,21 @@ type Manager struct {
 	i18n         *i18n.I18n
 	q            queries
 	db           *sqlx.DB
-	agentCache   map[int]models.User
+	agentCache   map[int]cachedAgent
 	agentCacheMu sync.RWMutex
+
+	lastActiveWriteAt   map[int]time.Time
+	lastActiveWriteAtMu sync.Mutex
+}
+
+const (
+	lastActiveWriteDebounce = 30 * time.Second
+	agentCacheTTL           = 10 * time.Minute
+)
+
+type cachedAgent struct {
+	user      models.User
+	expiresAt time.Time
 }
 
 // Opts contains options for initializing the Manager.
@@ -111,11 +125,12 @@ func New(i18n *i18n.I18n, opts Opts) (*Manager, error) {
 		return nil, fmt.Errorf("error scanning SQL file: %w", err)
 	}
 	return &Manager{
-		q:          q,
-		lo:         opts.Lo,
-		i18n:       i18n,
-		db:         opts.DB,
-		agentCache: make(map[int]models.User),
+		q:                 q,
+		lo:                opts.Lo,
+		i18n:              i18n,
+		db:                opts.DB,
+		agentCache:        make(map[int]cachedAgent),
+		lastActiveWriteAt: make(map[int]time.Time),
 	}, nil
 }
 
@@ -276,6 +291,7 @@ func (u *Manager) UpdateAvatar(id int, path string) error {
 		u.lo.Error("error updating user avatar", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	u.InvalidateAgentCache(id)
 	return nil
 }
 
@@ -285,6 +301,7 @@ func (u *Manager) UpdateLastLoginAt(id int) error {
 		u.lo.Error("error updating user last login at", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	u.InvalidateAgentCache(id)
 	return nil
 }
 
@@ -331,16 +348,38 @@ func (u *Manager) UpdateAvailability(id int, status string) error {
 		u.lo.Error("error updating user availability", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	u.InvalidateAgentCache(id)
 	return nil
 }
 
-// UpdateLastActive updates the last active timestamp of an user.
-func (u *Manager) UpdateLastActive(id int) error {
-	if _, err := u.q.UpdateLastActiveAt.Exec(id); err != nil {
-		u.lo.Error("error updating user last active at", "error", err)
-		return fmt.Errorf("updating user last active at: %w", err)
+// UpdateLastActive updates last_active_at and returns true if the user flipped from offline to online.
+func (u *Manager) UpdateLastActive(id int) (wasOffline bool, err error) {
+	// An offline cached user must bypass the debounce so the next read sees the online flip.
+	cached, cachedOK := u.GetAgentFromCache(id)
+	forceWrite := cachedOK && cached.AvailabilityStatus == "offline"
+
+	if !forceWrite {
+		u.lastActiveWriteAtMu.Lock()
+		if last, ok := u.lastActiveWriteAt[id]; ok && time.Since(last) < lastActiveWriteDebounce {
+			u.lastActiveWriteAtMu.Unlock()
+			return false, nil
+		}
+		u.lastActiveWriteAt[id] = time.Now()
+		u.lastActiveWriteAtMu.Unlock()
 	}
-	return nil
+
+	if err := u.q.UpdateLastActiveAt.Get(&wasOffline, id); err != nil {
+		u.lo.Error("error updating user last active at", "error", err)
+		return false, fmt.Errorf("updating user last active at: %w", err)
+	}
+
+	if forceWrite {
+		u.lastActiveWriteAtMu.Lock()
+		u.lastActiveWriteAt[id] = time.Now()
+		u.lastActiveWriteAtMu.Unlock()
+		u.InvalidateAgentCache(id)
+	}
+	return wasOffline, nil
 }
 
 // IsOffline returns true if the user's availability status is offline.
@@ -379,6 +418,7 @@ func (u *Manager) ToggleEnabled(id int, typ string, enabled bool) error {
 		u.lo.Error("error toggling user enabled status", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	u.InvalidateAgentCache(id)
 	return nil
 }
 
@@ -411,6 +451,7 @@ func (u *Manager) GenerateAPIKey(userID int) (string, string, error) {
 		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	u.InvalidateAgentCache(userID)
 	return apiKey, apiSecret, nil
 }
 
@@ -445,6 +486,7 @@ func (u *Manager) RevokeAPIKey(userID int) error {
 		u.lo.Error("error revoking API key", "error", err, "user_id", userID)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	u.InvalidateAgentCache(userID)
 	return nil
 }
 

@@ -195,8 +195,8 @@ export class WidgetWebSocketClient {
           this.socket.send(JSON.stringify({
             type: 'ping',
           }))
-          if (Date.now() - this.lastPong > 60000) {
-            console.warn('No pong received in 60 seconds, closing widget connection')
+          if (Date.now() - this.lastPong > 90000) {
+            console.warn('No pong received in 90 seconds, closing widget connection')
             this.socket.close()
           }
         } catch (e) {
@@ -204,7 +204,7 @@ export class WidgetWebSocketClient {
           this.reconnect()
         }
       }
-    }, 5000)
+    }, 30000)
   }
 
   clearPing () {

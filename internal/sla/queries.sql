@@ -50,12 +50,20 @@ WHERE c.id = ns.conversation_id
 RETURNING ns.id;
 
 -- name: get-pending-applied-sla
--- Get all the applied SLAs (applied to a conversation) that are pending
+-- Returns only actionable pending SLAs: a metric is unresolved AND either its deadline has passed
+-- or the conversation has transitioned (first reply / resolve) since the last evaluation.
 SELECT a.id, a.first_response_deadline_at, c.first_reply_at as conversation_first_response_at, a.sla_policy_id,
 a.resolution_deadline_at, c.resolved_at as conversation_resolved_at, c.id as conversation_id, a.first_response_met_at, a.resolution_met_at, a.first_response_breached_at, a.resolution_breached_at
-FROM applied_slas a 
+FROM applied_slas a
 JOIN conversations c ON a.conversation_id = c.id and c.sla_policy_id = a.sla_policy_id
-WHERE a.status = 'pending'::applied_sla_status;
+WHERE a.status = 'pending'::applied_sla_status
+  AND (
+    (a.first_response_met_at IS NULL AND a.first_response_breached_at IS NULL
+     AND (a.first_response_deadline_at <= NOW() OR c.first_reply_at IS NOT NULL))
+    OR
+    (a.resolution_met_at IS NULL AND a.resolution_breached_at IS NULL
+     AND (a.resolution_deadline_at <= NOW() OR c.resolved_at IS NOT NULL))
+  );
 
 -- name: update-applied-sla-breached-at
 UPDATE applied_slas SET
@@ -198,6 +206,9 @@ FROM sla_events
 WHERE id = $1;
 
 -- name: get-pending-sla-events
-SELECT id
+-- Returns full event rows whose deadline has already passed (or that already have a met_at);
+SELECT id, created_at, updated_at, applied_sla_id, sla_policy_id, type, deadline_at, met_at, breached_at
 FROM sla_events
-WHERE status = 'pending' AND deadline_at IS NOT NULL;
+WHERE status = 'pending'
+  AND deadline_at IS NOT NULL
+  AND (deadline_at <= NOW() OR met_at IS NOT NULL);

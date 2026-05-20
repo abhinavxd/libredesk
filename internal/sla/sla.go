@@ -393,18 +393,12 @@ func (m *Manager) evaluatePendingSLAEvents(ctx context.Context) error {
 
 	m.lo.Info("found pending SLA events for evaluation", "count", len(slaEvents))
 
-	// Cache for SLA policies.
 	var slaPolicyCache = make(map[int]models.SLAPolicy)
 	for _, event := range slaEvents {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-		}
-
-		if err := m.q.GetSLAEvent.GetContext(ctx, &event, event.ID); err != nil {
-			m.lo.Error("error fetching SLA event", "error", err)
-			continue
 		}
 
 		if event.DeadlineAt.IsZero() {
@@ -876,6 +870,7 @@ func (m *Manager) evaluatePendingSLAs(ctx context.Context) error {
 // evaluateSLA evaluates an SLA policy on an applied SLA.
 func (m *Manager) evaluateSLA(appliedSLA models.AppliedSLA) error {
 	m.lo.Debug("evaluating SLA", "conversation_id", appliedSLA.ConversationID, "applied_sla_id", appliedSLA.ID)
+	var changed bool
 	checkDeadline := func(deadline time.Time, metAt null.Time, metric string) error {
 		if deadline.IsZero() {
 			m.lo.Warn("deadline zero, skipping checking the deadline", "conversation_id", appliedSLA.ConversationID, "applied_sla_id", appliedSLA.ID, "metric", metric)
@@ -888,6 +883,7 @@ func (m *Manager) evaluateSLA(appliedSLA models.AppliedSLA) error {
 			if err := m.handleSLABreach(appliedSLA.ID, appliedSLA.SLAPolicyID, metric); err != nil {
 				return fmt.Errorf("updating SLA breach timestamp: %w", err)
 			}
+			changed = true
 			return nil
 		}
 
@@ -897,11 +893,13 @@ func (m *Manager) evaluateSLA(appliedSLA models.AppliedSLA) error {
 				if err := m.handleSLABreach(appliedSLA.ID, appliedSLA.SLAPolicyID, metric); err != nil {
 					return fmt.Errorf("updating SLA breach: %w", err)
 				}
+				changed = true
 			} else {
 				m.lo.Debug("SLA type met", "deadline", deadline, "met_at", metAt.Time, "metric", metric)
 				if _, err := m.q.UpdateAppliedSLAMetAt.Exec(appliedSLA.ID, metric); err != nil {
 					return fmt.Errorf("updating SLA met: %w", err)
 				}
+				changed = true
 			}
 		}
 		return nil
@@ -923,12 +921,15 @@ func (m *Manager) evaluateSLA(appliedSLA models.AppliedSLA) error {
 		}
 	}
 
-	// Update the conversation next SLA deadline.
+	// Nothing transitioned; skip the recompute writes that would otherwise run every tick.
+	if !changed {
+		return nil
+	}
+
 	if _, err := m.q.UpdateConversationNextSLADeadline.Exec(appliedSLA.ConversationID, nil); err != nil {
 		return fmt.Errorf("setting conversation next SLA deadline: %w", err)
 	}
 
-	// Update status of applied SLA.
 	if _, err := m.q.UpdateAppliedSLAStatus.Exec(appliedSLA.ID); err != nil {
 		return fmt.Errorf("updating applied SLA status: %w", err)
 	}

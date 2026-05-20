@@ -7,15 +7,27 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/ws"
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
 )
 
-// BroadcastNewMessage broadcasts a new message to all users.
-// lastMessage is the computed preview text (e.g., "Image" for media-only messages).
+// BroadcastNewConversation signals all agents that a new conversation exists.
+func (m *Manager) BroadcastNewConversation(conversationUUID string) {
+	m.broadcastToUsers([]int{}, wsmodels.Message{
+		Type: wsmodels.MessageTypeNewConversation,
+		Data: map[string]any{
+			"conversation_uuid": conversationUUID,
+		},
+	})
+}
+
+// BroadcastNewMessage broadcasts a new message to subscribers.
 func (m *Manager) BroadcastNewMessage(message *cmodels.Message, lastMessage string) {
 	data := map[string]any{
 		"conversation_uuid": message.ConversationUUID,
 		"content":           "",
+		"text_content":      message.TextContent,
+		"last_message":      lastMessage,
 		"created_at":        message.CreatedAt.Format(time.RFC3339),
 		"uuid":              message.UUID,
 		"private":           message.Private,
@@ -33,38 +45,63 @@ func (m *Manager) BroadcastNewMessage(message *cmodels.Message, lastMessage stri
 		}
 	}
 
-	m.broadcastToUsers([]int{}, wsmodels.Message{
+	m.broadcastToConversationListSubs(message.ConversationUUID, wsmodels.Message{
 		Type: wsmodels.MessageTypeNewMessage,
 		Data: data,
 	})
 }
 
-// BroadcastMessageUpdate broadcasts a partial message update to all users.
+// BroadcastMessageUpdate broadcasts a partial message update to list subscribers.
 func (m *Manager) BroadcastMessageUpdate(conversationUUID, messageUUID string, data map[string]any) {
 	data["conversation_uuid"] = conversationUUID
 	data["uuid"] = messageUUID
-	m.broadcastToUsers([]int{}, wsmodels.Message{
+	m.broadcastToConversationListSubs(conversationUUID, wsmodels.Message{
 		Type: wsmodels.MessageTypeMessageUpdate,
 		Data: data,
 	})
 }
 
-// BroadcastConversationUpdate broadcasts a partial conversation update to all agent clients.
+// BroadcastConversationUpdate broadcasts a partial conversation update to list subscribers.
 func (m *Manager) BroadcastConversationUpdate(conversationUUID string, data map[string]any) {
 	data["uuid"] = conversationUUID
-	m.broadcastToUsers([]int{}, wsmodels.Message{
+	m.broadcastToConversationListSubs(conversationUUID, wsmodels.Message{
 		Type: wsmodels.MessageTypeConversationUpdate,
 		Data: data,
 	})
 }
 
-// BroadcastContactUpdate broadcasts a contact update to all agent clients.
 func (m *Manager) BroadcastContactUpdate(contactID int, data map[string]any) {
 	data["contact_id"] = contactID
-	m.broadcastToUsers([]int{}, wsmodels.Message{
+	var uuids []string
+	if err := m.q.GetConversationUUIDsByContact.Select(&uuids, contactID); err != nil {
+		m.lo.Error("error fetching contact's conversations for broadcast", "contact_id", contactID, "error", err)
+		return
+	}
+	if len(uuids) == 0 {
+		return
+	}
+	seen := map[*ws.Client]struct{}{}
+	for _, uuid := range uuids {
+		for _, c := range m.wsHub.ListSubscribers(uuid) {
+			seen[c] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return
+	}
+	clients := make([]*ws.Client, 0, len(seen))
+	for c := range seen {
+		clients = append(clients, c)
+	}
+	messageBytes, err := json.Marshal(wsmodels.Message{
 		Type: "contact_update",
 		Data: data,
 	})
+	if err != nil {
+		m.lo.Error("error marshalling contact_update WS message", "error", err)
+		return
+	}
+	m.wsHub.PushToClients(clients, messageBytes)
 }
 
 // BroadcastTypingToConversation broadcasts typing status to all subscribers of a conversation.
@@ -109,6 +146,20 @@ func (m *Manager) broadcastToUsers(userIDs []int, message wsmodels.Message) {
 		Data:  messageBytes,
 		Users: userIDs,
 	})
+}
+
+// broadcastToConversationListSubs pushes a message to the conversation's list and open subscribers.
+func (m *Manager) broadcastToConversationListSubs(conversationUUID string, message wsmodels.Message) {
+	clients := m.wsHub.ListSubscribers(conversationUUID)
+	if len(clients) == 0 {
+		return
+	}
+	messageBytes, err := json.Marshal(message)
+	if err != nil {
+		m.lo.Error("error marshalling WS message", "error", err)
+		return
+	}
+	m.wsHub.PushToClients(clients, messageBytes)
 }
 
 // broadcastTypingToWidgetClients broadcasts typing status to widget clients (customers) for a conversation.

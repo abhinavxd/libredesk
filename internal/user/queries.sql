@@ -120,10 +120,15 @@ SET availability_status = $2
 WHERE id = $1;
 
 -- name: update-last-active-at
+WITH prev AS (
+    SELECT availability_status AS old_status FROM users WHERE id = $1
+)
 UPDATE users
 SET last_active_at = now(),
 availability_status = CASE WHEN availability_status = 'offline' THEN 'online' ELSE availability_status END
-WHERE id = $1;
+FROM prev
+WHERE users.id = $1
+RETURNING (prev.old_status = 'offline')::boolean AS was_offline;
 
 -- name: update-inactive-offline
 UPDATE users

@@ -47,7 +47,7 @@ func handleGetMessages(r *fastglue.Request) error {
 		msgTypes = append(msgTypes, string(v))
 	}
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -104,7 +104,7 @@ func handleGetMessage(r *fastglue.Request) error {
 		cuuid = r.RequestCtx.UserValue("cuuid").(string)
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -118,6 +118,10 @@ func handleGetMessage(r *fastglue.Request) error {
 	message, err := app.conversation.GetMessage(uuid)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if message.ConversationUUID != cuuid {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, "Permission denied", nil))
 	}
 
 	// Process CSAT status for the message (will only affect CSAT messages)
@@ -150,7 +154,7 @@ func handleRetryMessage(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -185,7 +189,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		req   = messageReq{}
 	)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

@@ -91,9 +91,8 @@ func (c *Client) Listen() {
 
 // processIncomingMessage processes incoming messages from the client.
 func (c *Client) processIncomingMessage(data []byte) {
-	// Handle ping messages, and update last active time for user.
 	if string(data) == "ping" {
-		c.Hub.userStore.UpdateLastActive(c.ID)
+		_, _ = c.Hub.userStore.UpdateLastActive(c.ID)
 		c.SendMessage([]byte("pong"), websocket.TextMessage)
 		return
 	}
@@ -108,6 +107,8 @@ func (c *Client) processIncomingMessage(data []byte) {
 	switch msg.Type {
 	case models.MessageTypeConversationSubscribe:
 		c.handleConversationSubscribe(msg.Data)
+	case models.MessageTypeListSubscribeReplace:
+		c.handleListSubscribe(msg.Data)
 	case models.MessageTypeTyping:
 		c.handleTyping(msg.Data)
 	default:
@@ -115,15 +116,33 @@ func (c *Client) processIncomingMessage(data []byte) {
 	}
 }
 
-// handleConversationSubscribe handles conversation subscription requests.
-//
-// No per-conversation authz check by design. All subscribers are authenticated
-// agents (this hub only serves /ws, which is gated by auth()), and the only
-// data that flows over a subscription is typing indicators - low value on its
-// own. Enforcing authz.EnforceConversationAccess here would add a DB lookup
-// per subscribe/typing frame for every widget visitor's keystroke.
+const maxListSubUUIDs = 500
+
+func (c *Client) handleListSubscribe(data interface{}) {
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		c.SendError("invalid list_subscribe payload")
+		return
+	}
+	var payload struct {
+		UUIDs []string `json:"uuids"`
+	}
+	if err := json.Unmarshal(dataBytes, &payload); err != nil {
+		c.SendError("invalid list_subscribe payload")
+		return
+	}
+	if len(payload.UUIDs) > maxListSubUUIDs {
+		payload.UUIDs = payload.UUIDs[:maxListSubUUIDs]
+	}
+	authorized, err := c.Hub.conversationStore.FilterAuthorizedListUUIDs(c.ID, payload.UUIDs)
+	if err != nil {
+		return
+	}
+	c.Hub.SubscribeListReplace(c, authorized)
+}
+
+// handleConversationSubscribe registers the open-conversation sub; authz is enforced because content (not just typing) flows through it.
 func (c *Client) handleConversationSubscribe(data interface{}) {
-	// Convert the data to JSON and then unmarshal to ConversationSubscribe
 	dataBytes, err := json.Marshal(data)
 	if err != nil {
 		c.SendError("invalid subscription data")
@@ -141,19 +160,13 @@ func (c *Client) handleConversationSubscribe(data interface{}) {
 		return
 	}
 
-	// Subscribe to the conversation using the Hub
-	c.Hub.SubscribeToConversation(c, subscribeMsg.ConversationUUID)
-
-	// Send confirmation back to client
-	response := models.Message{
-		Type: models.MessageTypeConversationSubscribed,
-		Data: map[string]string{
-			"conversation_uuid": subscribeMsg.ConversationUUID,
-		},
+	// Authz: silently reject if the agent can't read this conversation.
+	authorized, err := c.Hub.conversationStore.FilterAuthorizedListUUIDs(c.ID, []string{subscribeMsg.ConversationUUID})
+	if err != nil || len(authorized) == 0 {
+		return
 	}
 
-	responseBytes, _ := json.Marshal(response)
-	c.SendMessage(responseBytes, websocket.TextMessage)
+	c.Hub.SubscribeOpenConv(c, subscribeMsg.ConversationUUID)
 }
 
 // handleTyping handles typing indicator messages.

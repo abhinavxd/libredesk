@@ -838,3 +838,32 @@ WHERE c.assigned_user_id = $1
   AND u.availability_status = 'online'
 ORDER BY c.last_interaction_at DESC
 LIMIT 50;
+
+-- name: filter-authorized-list-uuids
+-- $1: uuids (uuid[])
+-- $2: user_id
+-- $3: team_ids (int[])
+-- $4: has 'conversations:read'
+-- $5: has 'conversations:read_all'
+-- $6: has 'conversations:read_assigned'
+-- $7: has 'conversations:read_team_all'
+-- $8: has 'conversations:read_team_inbox'
+-- $9: has 'conversations:read_unassigned'
+SELECT uuid::text
+FROM conversations
+WHERE uuid = ANY($1::uuid[])
+  AND $4
+  AND (
+       $5
+    OR ($6 AND assigned_user_id = $2)
+    OR ($7 AND assigned_team_id = ANY($3::int[]))
+    OR ($8 AND assigned_team_id = ANY($3::int[]) AND assigned_user_id IS NULL)
+    OR ($9 AND assigned_user_id IS NULL AND assigned_team_id IS NULL)
+  );
+
+-- name: get-conversation-uuids-by-contact
+SELECT uuid::text
+FROM conversations
+WHERE contact_id = $1
+ORDER BY last_message_at DESC NULLS LAST
+LIMIT 200;

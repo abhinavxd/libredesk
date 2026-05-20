@@ -13,9 +13,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// MonitorUserAvailability continuously checks for user activity and sets them offline if inactive for more than 5 minutes.
+// MonitorUserAvailability sweeps inactive users to offline; cadence stays well below the 5-min threshold.
 func (u *Manager) MonitorUserAvailability(ctx context.Context, onUsersOffline func([]models.OfflineUser)) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
@@ -29,7 +29,7 @@ func (u *Manager) MonitorUserAvailability(ctx context.Context, onUsersOffline fu
 	}
 }
 
-// GetAgent retrieves an agent by ID and also caches it for future requests.
+// GetAgent retrieves an agent by ID and caches it.
 func (u *Manager) GetAgent(id int, email string) (models.User, error) {
 	agent, err := u.Get(id, email, []string{models.UserTypeAgent})
 	if err != nil {
@@ -37,24 +37,24 @@ func (u *Manager) GetAgent(id int, email string) (models.User, error) {
 	}
 
 	u.agentCacheMu.Lock()
-	u.agentCache[id] = agent
+	u.agentCache[agent.ID] = cachedAgent{user: agent, expiresAt: time.Now().Add(agentCacheTTL)}
 	u.agentCacheMu.Unlock()
 
 	return agent, nil
 }
 
-// GetAgentFromCache retrieves an agent from the cache by ID.
+// GetAgentFromCache returns a cached agent; expired entries are treated as misses.
 func (u *Manager) GetAgentFromCache(id int) (models.User, bool) {
 	u.agentCacheMu.RLock()
 	defer u.agentCacheMu.RUnlock()
-	agent, exists := u.agentCache[id]
-	if !exists {
+	c, exists := u.agentCache[id]
+	if !exists || time.Now().After(c.expiresAt) {
 		return models.User{}, false
 	}
-	return agent, true
+	return c.user, true
 }
 
-// GetAgentCachedOrLoad retrieves an agent from cache, falling back to DB if not cached.
+// GetAgentCachedOrLoad returns the cached agent or loads from DB.
 func (u *Manager) GetAgentCachedOrLoad(id int) (models.User, error) {
 	if agent, exists := u.GetAgentFromCache(id); exists {
 		return agent, nil
@@ -62,7 +62,7 @@ func (u *Manager) GetAgentCachedOrLoad(id int) (models.User, error) {
 	return u.GetAgent(id, "")
 }
 
-// InvalidateAgentCache invalidates the agent cache for a specific agent ID.
+// InvalidateAgentCache drops a single agent from the cache.
 func (u *Manager) InvalidateAgentCache(id int) {
 	u.agentCacheMu.Lock()
 	defer u.agentCacheMu.Unlock()
@@ -73,7 +73,7 @@ func (u *Manager) InvalidateAgentCache(id int) {
 func (u *Manager) InvalidateAllAgentCache() {
 	u.agentCacheMu.Lock()
 	defer u.agentCacheMu.Unlock()
-	u.agentCache = make(map[int]models.User)
+	u.agentCache = make(map[int]cachedAgent)
 }
 
 // GetAgentsCompact returns a compact list of agents with limited fields.
@@ -153,6 +153,7 @@ func (u *Manager) SoftDeleteAgent(id int) error {
 		u.lo.Error("error deleting user", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	u.InvalidateAgentCache(id)
 	return nil
 }
 
@@ -162,6 +163,9 @@ func (u *Manager) MarkInactiveUsersOffline() []models.OfflineUser {
 	if err := u.q.UpdateInactiveOffline.Select(&users); err != nil {
 		u.lo.Error("error setting users offline", "error", err)
 		return nil
+	}
+	for _, user := range users {
+		u.InvalidateAgentCache(user.ID)
 	}
 	if len(users) > 0 {
 		u.lo.Info("set inactive users offline", "count", len(users))
