@@ -101,7 +101,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 
 	// Generate and upload thumbnail and store image dimensions in the media meta.
 	var meta = []byte("{}")
-	if slices.Contains(image.Exts, srcExt) {
+	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
 		file.Seek(0, 0)
 		thumbFile, err := image.CreateThumb(image.DefThumbSize, file)
 		if err != nil {
@@ -152,8 +152,8 @@ func handleMediaUpload(r *fastglue.Request) error {
 // Supports both authenticated access (with permission checks) and signed URL access (no permission checks).
 func handleServeMedia(r *fastglue.Request) error {
 	var (
-		app  = r.Context.(*App)
-		uuid = r.RequestCtx.UserValue("uuid").(string)
+		app        = r.Context.(*App)
+		uuid       = r.RequestCtx.UserValue("uuid").(string)
 		authMethod = r.RequestCtx.UserValue("auth_method")
 	)
 
@@ -165,7 +165,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	// Session/API key authenticated - perform full permission check.
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -184,7 +184,7 @@ func handleServeMedia(r *fastglue.Request) error {
 
 	// For messages, check access to the conversation this message is part of.
 	// Skip if model_id is not set (media uploaded but not yet attached to a message).
-	if media.Model.String == "messages" && media.ModelID.Int > 0 {
+	if media.Model.String == mmodels.ModelMessages && media.ModelID.Int > 0 {
 		conversation, err := app.conversation.GetConversationByMessageID(media.ModelID.Int)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
@@ -214,13 +214,16 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		media = &m
 	}
 
+	forceDownload := string(r.RequestCtx.QueryArgs().Peek("download")) == "1"
+
 	consts := app.consts.Load().(*constants)
 	switch consts.UploadProvider {
 	case "fs":
 		disposition := "attachment"
 
 		// Inline images/videos/pdfs. SVG excluded.
-		if media.ContentType != "image/svg+xml" &&
+		if !forceDownload &&
+			media.ContentType != "image/svg+xml" &&
 			(strings.HasPrefix(media.ContentType, "image/") ||
 				strings.HasPrefix(media.ContentType, "video/") ||
 				media.ContentType == "application/pdf") {
@@ -233,7 +236,11 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 
 		fasthttp.ServeFile(r.RequestCtx, filepath.Join(ko.String("upload.fs.upload_path"), uuid))
 	case "s3":
-		r.RequestCtx.Redirect(app.media.GetURL(uuid, media.ContentType, media.Filename), http.StatusFound)
+		url := app.media.GetURL(uuid, media.ContentType, media.Filename)
+		if forceDownload {
+			url = app.media.GetURLForDownload(uuid, media.Filename)
+		}
+		r.RequestCtx.Redirect(url, http.StatusFound)
 	}
 	return nil
 }

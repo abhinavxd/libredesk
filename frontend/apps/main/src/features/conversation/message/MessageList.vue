@@ -22,24 +22,31 @@
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" tag="div" class="space-y-4">
+        <TransitionGroup v-else enter-active-class="animate-slide-in" tag="div">
           <div
-            v-for="(message, index) in conversationStore.conversationMessages"
-            :key="message.uuid"
-            :data-message-uuid="message.uuid"
-            :class="{
-              'my-2': message.type === 'activity',
-              'pt-4': index === 0
-            }"
+            v-for="row in messageRows"
+            :key="row.message.uuid"
+            :data-message-uuid="row.message.uuid"
+            :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >
-            <div v-if="!message.private && message.type !== 'activity'">
-              <MessageBubble :message="message" :direction="message.type" />
+            <div v-if="!row.message.private && row.message.type !== 'activity'">
+              <MessageBubble
+                :message="row.message"
+                :direction="row.message.type"
+                :group-with-prev="row.groupWithPrev"
+                :group-with-next="row.groupWithNext"
+              />
             </div>
-            <div v-else-if="isPrivateNote(message)">
-              <MessageBubble :message="message" direction="outgoing" />
+            <div v-else-if="isPrivateNote(row.message)">
+              <MessageBubble
+                :message="row.message"
+                direction="outgoing"
+                :group-with-prev="row.groupWithPrev"
+                :group-with-next="row.groupWithNext"
+              />
             </div>
-            <div v-else-if="message.type === 'activity'">
-              <ActivityMessageBubble :message="message" />
+            <div v-else-if="row.message.type === 'activity'">
+              <ActivityMessageBubble :message="row.message" />
             </div>
           </div>
         </TransitionGroup>
@@ -61,7 +68,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
@@ -219,6 +226,43 @@ watch(
 const isPrivateNote = (message) => {
   return message.type === 'outgoing' && message.private
 }
+
+const GROUP_WINDOW_MS = 60_000
+
+const canGroup = (a, b) => {
+  if (!a || !b) return false
+  if (a.type === 'activity' || b.type === 'activity') return false
+  if (a.type !== b.type) return false
+  if (Boolean(a.private) !== Boolean(b.private)) return false
+  if (a.status === 'failed' || b.status === 'failed') return false
+
+  const aSenderId = a.author?.id ?? a.sender_id
+  const bSenderId = b.author?.id ?? b.sender_id
+  if (!aSenderId || aSenderId !== bSenderId) return false
+
+  const aBucket = Math.floor(new Date(a.created_at).getTime() / GROUP_WINDOW_MS)
+  const bBucket = Math.floor(new Date(b.created_at).getTime() / GROUP_WINDOW_MS)
+  return aBucket === bBucket
+}
+
+const getSpacingClass = (index, groupWithPrev) => {
+  if (index === 0) return 'pt-4'
+  return groupWithPrev ? 'mt-1' : 'mt-4'
+}
+
+const messageRows = computed(() => {
+  const messages = conversationStore.conversationMessages
+  return messages.map((message, index) => {
+    const groupWithPrev = canGroup(messages[index - 1], message)
+    const groupWithNext = canGroup(message, messages[index + 1])
+    return {
+      message,
+      groupWithPrev,
+      groupWithNext,
+      spacingClass: getSpacingClass(index, groupWithPrev)
+    }
+  })
+})
 </script>
 
 <style scoped>

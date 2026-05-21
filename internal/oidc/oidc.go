@@ -77,12 +77,8 @@ func (o *Manager) Get(id int) (models.OIDC, error) {
 		return oidc, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Decrypt sensitive fields
-	if err := o.decryptOIDC(&oidc); err != nil {
-		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
+	o.decryptOIDC(&oidc)
 
-	// Set logo and redirect URL.
 	oidc.SetProviderLogo()
 	rootURL, err := o.setting.GetAppRootURL()
 	if err != nil {
@@ -106,10 +102,7 @@ func (o *Manager) GetAll() ([]models.OIDC, error) {
 		return nil, err
 	}
 
-	// Decrypt sensitive fields
-	if err := o.decryptOIDCSlice(oidc); err != nil {
-		return nil, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
+	o.decryptOIDCSlice(oidc)
 
 	// Set logo and redirect URL for each record
 	for i := range oidc {
@@ -133,10 +126,7 @@ func (o *Manager) Create(oidc models.OIDC) (models.OIDC, error) {
 		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Decrypt fields before returning (ignore errors as these are non-critical for creation response)
-	if err := o.decryptOIDC(&createdOIDC); err != nil {
-		o.lo.Error("error decrypting after creation", "error", err)
-	}
+	o.decryptOIDC(&createdOIDC)
 
 	return createdOIDC, nil
 }
@@ -165,10 +155,7 @@ func (o *Manager) Update(id int, oidc models.OIDC) (models.OIDC, error) {
 		return models.OIDC{}, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Decrypt fields before returning (ignore errors as these are non-critical for update response)
-	if err := o.decryptOIDC(&updatedOIDC); err != nil {
-		o.lo.Error("error decrypting after update", "error", err)
-	}
+	o.decryptOIDC(&updatedOIDC)
 
 	return updatedOIDC, nil
 }
@@ -200,32 +187,31 @@ func (o *Manager) encryptOIDC(clientID, clientSecret string) (encClientID, encCl
 	return encClientID, encClientSecret, nil
 }
 
-// decryptOIDC decrypts sensitive OIDC fields in-place.
-// Returns an error if decryption of any field fails.
-func (o *Manager) decryptOIDC(oidc *models.OIDC) error {
-	var err error
-	oidc.ClientID, err = crypto.Decrypt(oidc.ClientID, o.encryptionKey)
-	if err != nil {
-		o.lo.Error("error decrypting client_id", "error", err, "oidc_id", oidc.ID)
-		return err
-	}
-
-	oidc.ClientSecret, err = crypto.Decrypt(oidc.ClientSecret, o.encryptionKey)
-	if err != nil {
-		o.lo.Error("error decrypting client_secret", "error", err, "oidc_id", oidc.ID)
-		return err
-	}
-
-	return nil
-}
-
-// decryptOIDCSlice decrypts sensitive fields for all OIDC records in a slice.
-// Returns an error if decryption of any record fails.
-func (o *Manager) decryptOIDCSlice(oidcs []models.OIDC) error {
-	for i := range oidcs {
-		if err := o.decryptOIDC(&oidcs[i]); err != nil {
-			return err
+// Decrypt failures clear the field so the app stays usable across encryption_key rotation.
+func (o *Manager) decryptOIDC(oidc *models.OIDC) {
+	if oidc.ClientID != "" {
+		decrypted, err := crypto.Decrypt(oidc.ClientID, o.encryptionKey)
+		if err != nil {
+			o.lo.Error("error decrypting client_id, clearing field", "error", err, "oidc_id", oidc.ID)
+			oidc.ClientID = ""
+		} else {
+			oidc.ClientID = decrypted
 		}
 	}
-	return nil
+
+	if oidc.ClientSecret != "" {
+		decrypted, err := crypto.Decrypt(oidc.ClientSecret, o.encryptionKey)
+		if err != nil {
+			o.lo.Error("error decrypting client_secret, clearing field", "error", err, "oidc_id", oidc.ID)
+			oidc.ClientSecret = ""
+		} else {
+			oidc.ClientSecret = decrypted
+		}
+	}
+}
+
+func (o *Manager) decryptOIDCSlice(oidcs []models.OIDC) {
+	for i := range oidcs {
+		o.decryptOIDC(&oidcs[i])
+	}
 }

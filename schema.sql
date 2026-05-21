@@ -534,6 +534,7 @@ CREATE TABLE applied_slas (
 );
 CREATE INDEX index_applied_slas_on_conversation_id ON applied_slas(conversation_id);
 CREATE INDEX index_applied_slas_on_status ON applied_slas(status);
+CREATE UNIQUE INDEX index_applied_slas_unique_pending_per_conv ON applied_slas(conversation_id) WHERE status = 'pending';
 
 DROP TABLE IF EXISTS sla_events CASCADE;
 CREATE TABLE sla_events (
@@ -713,7 +714,7 @@ VALUES
 -- Default settings
 INSERT INTO settings ("key", value)
 VALUES
-    ('app.lang', '"en"'::jsonb),
+    ('app.lang', '"en-US"'::jsonb),
     ('app.root_url', '"http://localhost:9000"'::jsonb),
     ('app.logo_url', '"http://localhost:9000/logo.png"'::jsonb),
     ('app.site_name', '"libredesk"'::jsonb),

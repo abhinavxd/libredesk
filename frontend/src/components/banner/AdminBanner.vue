@@ -15,7 +15,7 @@
             <a
               :href="appSettingsStore.settings['app.update'].update.url"
               target="_blank"
-              rel="nofollow noreferrer"
+              rel="nofollow noopener noreferrer"
               class="font-semibold text-primary hover:text-primary/80 underline transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
             >
               {{ appSettingsStore.settings['app.update'].update.release_version }}

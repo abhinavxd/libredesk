@@ -6,8 +6,11 @@
       <span class="text-xl font-semibold">{{ title }}</span>
     </div>
 
-    <!-- Filters -->
-    <div class="p-2 flex justify-between items-center">
+    <!-- Bulk Action Toolbar (when items selected) -->
+    <ConversationBulkActionToolbar v-if="hasSelection && canBulkAct" />
+
+    <!-- Filters (hidden when bulk selecting) -->
+    <div v-else class="p-2 flex justify-between items-center">
       <!-- Status dropdown-menu, hidden when a view is selected as views are pre-filtered -->
       <DropdownMenu v-if="!route.params.viewID">
         <DropdownMenuTrigger asChild>
@@ -150,7 +153,8 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useConversationStore } from '../../../stores/conversation'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
@@ -160,15 +164,19 @@ import {
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
 import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
+import { useConversationStore } from '@/stores/conversation'
+import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
 import EmptyList from '@/features/conversation/list/ConversationEmptyList.vue'
+import ConversationBulkActionToolbar from '@/features/conversation/list/ConversationBulkActionToolbar.vue'
 import ConversationListItem from '@/features/conversation/list/ConversationListItem.vue'
-import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import ConversationListItemSkeleton from '@/features/conversation/list/ConversationListItemSkeleton.vue'
 
 const conversationStore = useConversationStore()
+const { canBulkAct } = useBulkActionPermissions()
 const route = useRoute()
 const { t } = useI18n()
+
+const hasSelection = computed(() => conversationStore.selectedCount > 0)
 
 const title = computed(() => {
   const typeKey = route.meta?.typeKey?.(route)

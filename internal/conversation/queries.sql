@@ -64,6 +64,8 @@ SELECT
     conversations.last_interaction_sender,
     conversations.next_sla_deadline_at,
     conversations.priority_id,
+    conversations.assigned_user_id,
+    conversations.assigned_team_id,
     (
     SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
     FROM (
@@ -204,10 +206,10 @@ LEFT JOIN LATERAL (
   ORDER BY se.created_at DESC
   LIMIT 1
 ) nxt_resp_event ON true
-WHERE 
+WHERE
   ($1 > 0 AND c.id = $1)
-  OR 
-  ($2::uuid IS NOT NULL AND c.uuid = $2::uuid)
+  OR
+  (NULLIF($2, '')::uuid IS NOT NULL AND c.uuid = NULLIF($2, '')::uuid)
   OR
   ($3::TEXT != '' AND c.reference_number = $3::TEXT)
 
@@ -702,26 +704,6 @@ WHERE source_id = ANY($1::text []);
 -- name: update-message-status
 update conversation_messages set status = $1, updated_at = NOW() where uuid = $2;
 
--- name: get-latest-message
-SELECT
-    m.created_at,
-    m.updated_at,
-    m.status,
-    m.type, 
-    m.content,
-    m.uuid,
-    m.private,
-    m.sender_id,
-    m.sender_type,
-    m.meta
-FROM conversation_messages m
-WHERE m.conversation_id = $1
-AND m.type = ANY($2)
-AND m.status = ANY($3)
-AND m.private = NOT $4
-ORDER BY m.created_at DESC
-LIMIT 1;
-
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
 
@@ -819,7 +801,7 @@ ORDER BY cd.updated_at DESC;
 DELETE FROM conversation_drafts
 WHERE conversation_id IN (
   SELECT id FROM conversations
-  WHERE ($1 > 0 AND id = $1) OR ($2::uuid IS NOT NULL AND uuid = $2::uuid)
+  WHERE ($1 > 0 AND id = $1) OR (NULLIF($2, '')::uuid IS NOT NULL AND uuid = NULLIF($2, '')::uuid)
 ) AND user_id = $3;
 
 -- name: delete-stale-drafts
@@ -858,3 +840,32 @@ WHERE c.assigned_user_id = $1
   AND u.availability_status = 'online'
 ORDER BY c.last_interaction_at DESC
 LIMIT 50;
+
+-- name: filter-authorized-list-uuids
+-- $1: uuids (uuid[])
+-- $2: user_id
+-- $3: team_ids (int[])
+-- $4: has 'conversations:read'
+-- $5: has 'conversations:read_all'
+-- $6: has 'conversations:read_assigned'
+-- $7: has 'conversations:read_team_all'
+-- $8: has 'conversations:read_team_inbox'
+-- $9: has 'conversations:read_unassigned'
+SELECT uuid::text
+FROM conversations
+WHERE uuid = ANY($1::uuid[])
+  AND $4
+  AND (
+       $5
+    OR ($6 AND assigned_user_id = $2)
+    OR ($7 AND assigned_team_id = ANY($3::int[]))
+    OR ($8 AND assigned_team_id = ANY($3::int[]) AND assigned_user_id IS NULL)
+    OR ($9 AND assigned_user_id IS NULL AND assigned_team_id IS NULL)
+  );
+
+-- name: get-conversation-uuids-by-contact
+SELECT uuid::text
+FROM conversations
+WHERE contact_id = $1
+ORDER BY last_message_at DESC NULLS LAST
+LIMIT 200;

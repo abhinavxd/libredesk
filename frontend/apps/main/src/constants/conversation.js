@@ -20,3 +20,9 @@ export const MACRO_CONTEXT = {
   REPLY: 'reply',
   NEW_CONVERSATION: 'new-conversation'
 }
+
+export const TAG_ACTION = {
+  ADD: 'add_tags',
+  SET: 'set_tags',
+  REMOVE: 'remove_tags'
+}

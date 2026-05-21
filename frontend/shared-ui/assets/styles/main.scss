@@ -103,7 +103,7 @@
     --sidebar-foreground: 240 5.9% 10%;
     --sidebar-primary: 240 5.9% 30%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent: 240 5% 93%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 240 5% 88%;
     --sidebar-ring: 217.2 91.2% 59.8%;
@@ -113,7 +113,7 @@
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 235 86% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent: 240 5% 19%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 5% 14%;
     --sidebar-ring: 235 86% 65%;
@@ -150,7 +150,7 @@
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
 
-    --accent: 240 4.8% 95.9%;
+    --accent: 240 5% 93%;
     --accent-foreground: 240 5.9% 10%;
 
     --destructive: 0 84.2% 60.2%;
@@ -183,7 +183,7 @@
     --muted: 240 5% 16%;
     --muted-foreground: 240 4% 60%;
 
-    --accent: 240 3.7% 15.9%;
+    --accent: 240 5% 19%;
     --accent-foreground: 0 0% 98%;
 
     --destructive: 1 100% 69%;
@@ -296,7 +296,23 @@
 }
 
 .hide-quoted-text {
-  blockquote {
+  // Selectors below use attribute-suffix matching because vue-letter
+  // prefixes every id/class with a random "msg_XYZ_" at render time, so
+  // raw "#appendonsend" would never match.
+  // Outlook/Hotmail emit a marker with the quoted history as trailing
+  // siblings (no wrapping element), so we hide the marker AND everything
+  // after it. Outlook always top-posts, so trailing siblings are quote.
+  blockquote,
+  [id$="_divRplyFwdMsg"],
+  [id$="_divRplyFwdMsg"] ~ *,
+  [id$="_appendonsend"],
+  [id$="_appendonsend"] ~ *,
+  [id$="_OLK_SRC_BODY_SECTION"],
+  [id$="_OLK_SRC_BODY_SECTION"] ~ *,
+  [class*="_OutlookMessageHeader"],
+  [class*="_OutlookMessageHeader"] ~ *,
+  [class*="_yahoo_quoted"],
+  [class*="_gmail_quote_container"] {
     @apply hidden;
   }
 }

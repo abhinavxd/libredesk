@@ -204,7 +204,7 @@ const openContextLink = async (app) => {
   try {
     loadingAppId.value = app.id
     const resp = await api.getContextLinkURL(app.id, uuid)
-    window.open(resp.data.data, '_blank')
+    window.open(resp.data.data, '_blank', 'noopener,noreferrer')
   } catch {
     // Silently ignore.
   } finally {

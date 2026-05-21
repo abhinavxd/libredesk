@@ -1,5 +1,5 @@
 <template>
-  <a :href="announcement.url" target="_blank" class="block no-underline">
+  <a :href="announcement.url" target="_blank" rel="noopener noreferrer" class="block no-underline">
     <Card class="overflow-hidden hover:bg-accent transition-colors cursor-pointer rounded-md">
       <img
         :src="announcement.image_url"

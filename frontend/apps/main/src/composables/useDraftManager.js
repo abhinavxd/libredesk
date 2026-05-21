@@ -40,10 +40,12 @@ const validateAttachments = (attachments) => {
  */
 const isDraftEmpty = (draft) => {
   if (!draft) return true
-  const textContent = getTextFromHTML(draft.content || '')
+  const content = draft.content || ''
+  const textContent = getTextFromHTML(content)
+  const hasInlineImage = /<img\b/i.test(content)
   const hasAttachments = draft.meta?.attachments?.length > 0
   const hasMacroActions = draft.meta?.macro_actions?.length > 0
-  return textContent.length === 0 && !hasAttachments && !hasMacroActions
+  return textContent.length === 0 && !hasInlineImage && !hasAttachments && !hasMacroActions
 }
 
 /**

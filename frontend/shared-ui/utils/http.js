@@ -11,6 +11,11 @@ function handleHTTPError (error) {
     data: null,
     status_code: null
   }
+  // Request was cancelled by an AbortController Return
+  // empty message so toast emitters that read .message show nothing.
+  if (error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') {
+    return { ...resp, message: '', canceled: true }
+  }
   // Response received from the server.
   if (error.response && error.response.data) {
     if (error.response.data.error_type) {

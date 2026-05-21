@@ -25,8 +25,38 @@ export function useFileUpload (options = {}) {
     const isUploading = ref(false)
     const internalMediaFiles = ref([])
 
-    // Use external mediaFiles if provided, otherwise use internal
     const mediaFiles = externalMediaFiles || internalMediaFiles
+
+    /**
+     * Returns the media record or null on failure (toast fires).
+     *
+     * `inline: true` flags `disposition=inline` server-side; without it an
+     * editor-embedded image would also surface as a downloadable attachment
+     * under the message (MessageBubble filters by disposition).
+     *
+     * @param {File} file
+     * @param {{ inline?: boolean }} opts
+     */
+    const upload = async (file, { inline = false } = {}) => {
+        try {
+            const resp = await api.uploadMedia({
+                files: file,
+                inline,
+                linked_model: linkedModel
+            })
+            return resp.data.data
+        } catch (error) {
+            if (onUploadError) {
+                onUploadError(file, error)
+            } else {
+                emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+                    variant: 'destructive',
+                    description: handleHTTPError(error).message
+                })
+            }
+            return null
+        }
+    }
 
     /**
      * Handles the file upload process when files are selected.
@@ -39,53 +69,22 @@ export function useFileUpload (options = {}) {
         isUploading.value = true
 
         for (const file of files) {
-            api
-                .uploadMedia({
-                    files: file,
-                    inline: false,
-                    linked_model: linkedModel
-                })
-                .then((resp) => {
-                    const uploadedFile = resp.data.data
-
-                    // Add to media files array
+            upload(file).then((uploadedFile) => {
+                if (uploadedFile) {
                     if (Array.isArray(mediaFiles.value)) {
                         mediaFiles.value.push(uploadedFile)
                     } else {
                         mediaFiles.push(uploadedFile)
                     }
-
-                    // Remove from uploading list
-                    uploadingFiles.value = uploadingFiles.value.filter((f) => f.name !== file.name)
-
-                    // Call success callback
                     if (onFileUploadSuccess) {
                         onFileUploadSuccess(uploadedFile)
                     }
-
-                    // Update uploading state
-                    if (uploadingFiles.value.length === 0) {
-                        isUploading.value = false
-                    }
-                })
-                .catch((error) => {
-                    uploadingFiles.value = uploadingFiles.value.filter((f) => f.name !== file.name)
-
-                    // Call error callback or show default toast
-                    if (onUploadError) {
-                        onUploadError(file, error)
-                    } else {
-                        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-                            variant: 'destructive',
-                            description: handleHTTPError(error).message
-                        })
-                    }
-
-                    // Update uploading state
-                    if (uploadingFiles.value.length === 0) {
-                        isUploading.value = false
-                    }
-                })
+                }
+                uploadingFiles.value = uploadingFiles.value.filter((f) => f.name !== file.name)
+                if (uploadingFiles.value.length === 0) {
+                    isUploading.value = false
+                }
+            })
         }
     }
 
@@ -147,6 +146,7 @@ export function useFileUpload (options = {}) {
         mediaFiles: externalMediaFiles ? readonly(mediaFiles) : readonly(internalMediaFiles),
 
         // Methods
+        upload,
         handleFileUpload,
         handleFileDelete,
         uploadFiles,

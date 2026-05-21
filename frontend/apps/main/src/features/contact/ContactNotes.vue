@@ -1,15 +1,15 @@
 <template>
-  <div class="w-full space-y-6 pb-8 relative">
+  <div class="w-full space-y-4 relative">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
-      <span class="text-xl font-semibold text-foreground">
+    <div class="flex items-center mb-4" :class="compact ? 'justify-end' : 'justify-between'">
+      <span v-if="!compact" class="text-xl font-semibold text-foreground">
         {{ $t('globals.terms.note', 2) }}
       </span>
       <Button
         variant="outline"
         size="sm"
         @click="startAddingNote"
-        v-if="!isAddingNote && !isLoading && notes.length !== 0"
+        v-if="!isAddingNote && !isLoading && notes.length !== 0 && userStore.can('contact_notes:write')"
         class="transition-all hover:bg-primary/10 hover:border-primary/30"
       >
         <PlusIcon size="18" />
@@ -22,7 +22,7 @@
     </div>
 
     <!-- Note input -->
-    <div v-if="isAddingNote">
+    <div v-if="isAddingNote && userStore.can('contact_notes:write')">
       <form @submit.prevent="addOrUpdateNote" @keydown.ctrl.enter="addOrUpdateNote">
         <div class="space-y-4">
           <div class="box p-2 h-52 min-h-52">
@@ -45,21 +45,30 @@
     <!-- Notes card list -->
     <div class="space-y-4">
       <Card
-        v-for="note in notes"
+        v-for="note in visibleNotes"
         :key="note.id"
         class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow"
       >
         <!-- Header -->
-        <CardHeader class="bg-background border-b p-2">
+        <CardHeader :class="compact ? 'p-3 pb-2' : 'bg-background border-b p-2'">
           <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-              <Avatar class="border shadow-sm">
+            <div class="flex items-center" :class="compact ? 'space-x-2 min-w-0' : 'space-x-3'">
+              <Avatar :class="compact ? 'h-5 w-5' : 'border shadow-sm'">
                 <AvatarImage :src="note.avatar_url" />
-                <AvatarFallback>
+                <AvatarFallback :class="{ 'text-[10px]': compact }">
                   {{ getInitials(note.first_name, note.last_name) }}
                 </AvatarFallback>
               </Avatar>
-              <div>
+              <div v-if="compact" class="flex items-center gap-1.5 min-w-0 text-xs">
+                <span class="font-medium text-foreground truncate">
+                  {{ note.first_name }} {{ note.last_name }}
+                </span>
+                <span class="text-muted-foreground">·</span>
+                <span class="text-muted-foreground truncate" :title="formatDate(note.created_at)">
+                  {{ relativeDate(note.created_at) }}
+                </span>
+              </div>
+              <div v-else>
                 <p class="text-sm font-medium text-foreground">
                   {{ note.first_name }} {{ note.last_name }}
                 </p>
@@ -77,8 +86,13 @@
               "
             >
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" class="h-8 w-8 rounded-full">
-                  <MoreVerticalIcon class="h-4 w-4" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="rounded-full"
+                  :class="compact ? 'h-6 w-6 -mr-1' : 'h-8 w-8'"
+                >
+                  <MoreVerticalIcon :class="compact ? 'h-3.5 w-3.5' : 'h-4 w-4'" />
                   <span class="sr-only">{{ $t('globals.terms.openMenu') }}</span>
                 </Button>
               </DropdownMenuTrigger>
@@ -98,7 +112,7 @@
         </CardHeader>
 
         <!-- Note content -->
-        <CardContent class="pt-4 pb-5">
+        <CardContent :class="compact ? 'px-3 pb-3 pt-0' : 'pt-4 pb-5'">
           <Letter
             :html="note.note"
             :allowedSchemas="['cid', 'https', 'http', 'mailto']"
@@ -106,6 +120,12 @@
           />
         </CardContent>
       </Card>
+      <!-- Load more notes -->
+      <div v-if="compact && notes.length > NOTES_LIMIT && !showAll" class="flex justify-center pt-2">
+       <Button variant="ghost" size="sm" @click="showAll = true">
+         {{ $t('globals.terms.loadMore') }} ({{ notes.length - NOTES_LIMIT }})
+       </Button>
+      </div>
     </div>
 
     <!-- No notes message -->
@@ -123,7 +143,12 @@
         <p class="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
           {{ $t('contact.notes.help') }}
         </p>
-        <Button variant="outline" class="mt-3" @click="startAddingNote">
+        <Button
+          v-if="userStore.can('contact_notes:write')"
+          variant="outline"
+          class="mt-3"
+          @click="startAddingNote"
+        >
           <PlusIcon size="15" />
           {{ $t('contact.addNote') }}
         </Button>
@@ -133,8 +158,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { format } from 'date-fns'
+import { ref, watch, computed } from 'vue'
+import { format, formatDistanceToNow } from 'date-fns'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardHeader, CardContent } from '@shared-ui/components/ui/card'
 import { Avatar, AvatarImage, AvatarFallback } from '@shared-ui/components/ui/avatar'
@@ -162,7 +187,8 @@ import { useUserStore } from '@main/stores/user'
 import { Letter } from 'vue-letter'
 import api from '@main/api'
 
-const props = defineProps({ contactId: Number })
+const props = defineProps({ contactId: Number, compact: { type: Boolean, default: false } })
+
 const { t } = useI18n()
 const emitter = useEmitter()
 const userStore = useUserStore()
@@ -171,25 +197,33 @@ const notes = ref([])
 const isAddingNote = ref(false)
 const newNote = ref('')
 const isLoading = ref(false)
+const NOTES_LIMIT = 10
+const showAll = ref(false)
+const latestFetchId = ref(0)
 
-const fetchNotes = async () => {
+
+const fetchNotes = async (contactId = props.contactId) => {
+  const fetchId = ++latestFetchId.value
   try {
     isLoading.value = true
-    const { data } = await api.getContactNotes(props.contactId)
+    const { data } = await api.getContactNotes(contactId)
+    if (fetchId !== latestFetchId.value) return
     notes.value = data.data
   } catch (error) {
+    if (fetchId !== latestFetchId.value) return
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
   } finally {
-    isLoading.value = false
+    if (fetchId === latestFetchId.value) {
+      isLoading.value = false
+    }
   }
 }
 
-onMounted(fetchNotes)
-
 const formatDate = (date) => format(new Date(date), 'PPP p')
+const relativeDate = (date) => formatDistanceToNow(new Date(date), { addSuffix: true })
 
 const startAddingNote = () => {
   isAddingNote.value = true
@@ -225,4 +259,22 @@ const deleteNote = async (noteId) => {
     await fetchNotes()
   }
 }
+
+const visibleNotes = computed(() => {
+  if (!props.compact || showAll.value) return notes.value
+  return notes.value.slice(0, NOTES_LIMIT)
+})
+
+watch(() => props.contactId, (newId) => {
+  latestFetchId.value++
+  showAll.value = false
+  cancelAddNote()
+  notes.value = []
+  if (!newId) {
+    isLoading.value = false
+    return
+  }
+  fetchNotes(newId)
+}, { immediate: true })
+
 </script>

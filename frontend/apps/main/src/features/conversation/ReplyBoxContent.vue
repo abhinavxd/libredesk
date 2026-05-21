@@ -96,10 +96,12 @@
         :autoFocus="true"
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
+        :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
         @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
+        @filesDropped="handleFilesDropped"
       />
     </div>
 
@@ -112,7 +114,7 @@
     />
 
     <!-- Attachments preview -->
-    <AttachmentsPreview
+    <ReplyBoxAttachmentPreview
       :attachments="uploadedFiles"
       :uploadingFiles="uploadingFiles"
       :onDelete="handleOnFileDelete"
@@ -139,12 +141,13 @@ import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { Maximize2, Minimize2 } from 'lucide-vue-next'
 import Editor from '@main/components/editor/TextEditor.vue'
+import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useEmitter } from '@main/composables/useEmitter'
-import AttachmentsPreview from '@/features/conversation/message/attachment/AttachmentsPreview.vue'
+import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { useI18n } from 'vue-i18n'
@@ -239,6 +242,7 @@ const emit = defineEmits([
   'fileUpload',
   'inlineImageUpload',
   'fileDelete',
+  'filesDropped',
   'aiPromptSelected'
 ])
 
@@ -264,8 +268,11 @@ const toggleFullscreen = () => {
 }
 
 const enableSend = computed(() => {
+  const html = htmlContent.value
   return (
+    !hasPendingInlineUpload(html) &&
     (textContent.value.trim().length > 0 ||
+      hasInlineImage(html) ||
       conversationStore.getMacro('reply')?.actions?.length > 0 ||
       props.uploadedFiles.length > 0) &&
     emailErrors.value.length === 0 &&
@@ -312,6 +319,10 @@ const handleSend = async () => {
 
 const handleFileUpload = (event) => {
   emit('fileUpload', event)
+}
+
+const handleFilesDropped = (files) => {
+  emit('filesDropped', files)
 }
 
 const handleOnFileDelete = (uuid) => {

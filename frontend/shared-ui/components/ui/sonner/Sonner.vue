@@ -1,43 +1,31 @@
 <script setup>
 import { Toaster as Sonner } from 'vue-sonner';
-
-const props = defineProps({
-  invert: { type: Boolean, required: false },
-  theme: { type: String, required: false },
-  position: { type: String, required: false },
-  hotkey: { type: Array, required: false },
-  richColors: { type: Boolean, required: false },
-  expand: { type: Boolean, required: false },
-  duration: { type: Number, required: false },
-  gap: { type: Number, required: false },
-  visibleToasts: { type: Number, required: false },
-  closeButton: { type: Boolean, required: false },
-  toastOptions: { type: Object, required: false },
-  class: { type: String, required: false },
-  style: { type: Object, required: false },
-  offset: { type: [String, Number], required: false },
-  dir: { type: String, required: false },
-  icons: { type: Object, required: false },
-  containerAriaLabel: { type: String, required: false },
-  pauseWhenPageIsHidden: { type: Boolean, required: false },
-  cn: { type: Function, required: false },
-});
 </script>
 
 <template>
   <Sonner
-    class="toaster group"
-    v-bind="props"
+    v-bind="$attrs"
     :toast-options="{
       classes: {
-        toast:
-          'group toast group-[.toaster]:border-border group-[.toaster]:shadow-lg',
-        description: 'group-[.toast]:text-muted-foreground',
-        actionButton:
-          'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
-        cancelButton:
-          'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
+        toast: 'flex items-start gap-3 rounded-md border shadow-lg bg-popover text-popover-foreground border-border',
+        description: 'text-muted-foreground',
+        icon: 'shrink-0',
       },
     }"
   />
 </template>
+
+<style>
+[data-sonner-toast][data-type='success'] [data-icon] {
+  color: var(--success-text);
+}
+[data-sonner-toast][data-type='error'] [data-icon] {
+  color: hsl(var(--destructive));
+}
+[data-sonner-toast][data-type='warning'] [data-icon] {
+  color: var(--warning-text);
+}
+[data-sonner-toast][data-type='info'] [data-icon] {
+  color: var(--info-text);
+}
+</style>

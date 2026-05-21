@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/disintegration/imaging"
+	"github.com/gabriel-vasile/mimetype"
 )
 
 var (
@@ -14,6 +15,26 @@ var (
 	DefThumbSize = 150
 	ThumbPrefix  = "thumb_"
 )
+
+// IsImageByContent returns true when the file's magic bytes identify it as one
+// of the raster formats this package can decode. Used as a fallback when the
+// filename has no extension or an unreliable one (e.g. attachments arriving
+// through email without proper file extensions).
+func IsImageByContent(r io.ReadSeeker) bool {
+	if _, err := r.Seek(0, io.SeekStart); err != nil {
+		return false
+	}
+	defer r.Seek(0, io.SeekStart)
+	mtype, err := mimetype.DetectReader(r)
+	if err != nil {
+		return false
+	}
+	switch mtype.String() {
+	case "image/png", "image/jpeg", "image/gif":
+		return true
+	}
+	return false
+}
 
 // GetDimensions returns the width and height of the image in the provided file.
 // It returns an error if the image cannot be decoded.

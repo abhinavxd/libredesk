@@ -2,9 +2,16 @@
   <ComboBox
     :model-value="normalizedValue"
     @update:model-value="$emit('update:modelValue', $event)"
+    @select="$emit('select', $event)"
     :items="items"
     :placeholder="placeholder"
+    :align="align"
   >
+    <!-- Custom trigger passthrough -->
+    <template v-if="$slots.trigger" #trigger="slotProps">
+      <slot name="trigger" v-bind="slotProps" />
+    </template>
+
     <!-- Items -->
     <template #item="{ item }">
       <div class="flex items-center gap-2">
@@ -63,10 +70,13 @@ const props = defineProps({
   items: Array,
   type: {
     type: String
+  },
+  align: {
+    type: String,
+    default: 'center'
   }
 })
 
-// Convert to str.
 const normalizedValue = computed(() => String(props.modelValue || ''))
 
 const isCurrentUser = (item) => {
@@ -77,5 +87,5 @@ const isCurrentUser = (item) => {
   )
 }
 
-defineEmits(['update:modelValue'])
+defineEmits(['update:modelValue', 'select'])
 </script>

@@ -30,6 +30,7 @@
         <a
           href="https://libredesk.io"
           target="_blank"
+          rel="noopener noreferrer"
           class="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors no-underline"
         >
           Powered by <span class="font-medium">libredesk</span>

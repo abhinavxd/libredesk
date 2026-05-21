@@ -93,6 +93,20 @@
         </AccordionContent>
       </AccordionItem>
 
+      <!-- Contact notes -->
+      <AccordionItem
+        value="contact_notes"
+        class="accordion-item"
+        v-if="conversationStore.current?.contact?.id && userStore.can('contact_notes:read')"
+      >
+        <AccordionTrigger class="accordion-trigger">
+          {{ $t('globals.terms.note', 2) }}
+        </AccordionTrigger>
+        <AccordionContent class="accordion-content">
+          <ContactNotes :contact-id="conversationStore.current.contact.id" compact />
+        </AccordionContent>
+      </AccordionItem>
+
       <!-- Previous conversations -->
       <AccordionItem value="previous_conversations" class="accordion-item">
         <AccordionTrigger class="accordion-trigger">
@@ -112,6 +126,7 @@ import { useConversationStore } from '@/stores/conversation'
 import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
 import { useTagStore } from '@/stores/tag'
+import { useUserStore } from '@/stores/user'
 import {
   Accordion,
   AccordionContent,
@@ -128,9 +143,11 @@ import { useI18n } from 'vue-i18n'
 import { useStorage } from '@vueuse/core'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
+import ContactNotes from '@/features/contact/ContactNotes.vue'
 import PreviousConversations from '@/features/conversation/sidebar/PreviousConversations.vue'
 import ConversationSideBarPageVisits from '@/features/conversation/sidebar/ConversationSideBarPageVisits.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
+import { TAG_ACTION } from '@/constants/conversation'
 import api from '../../../api'
 
 const customAttributeStore = useCustomAttributeStore()
@@ -139,6 +156,7 @@ const conversationStore = useConversationStore()
 const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
 const tagStore = useTagStore()
+const userStore = useUserStore()
 const tags = ref([])
 // Save the accordion state in local storage
 const accordionState = useStorage('conversation-sidebar-accordion', [])
@@ -182,9 +200,11 @@ watch(
       return
     }
 
-    conversationStore.upsertTags({
-      tags: newTags
-    })
+    conversationStore.updateConversationTags(
+      conversationStore.current.uuid,
+      TAG_ACTION.SET,
+      newTags
+    )
   },
   { immediate: false }
 )

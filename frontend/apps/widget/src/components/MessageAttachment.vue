@@ -53,11 +53,11 @@ const getThumbnailUrl = (attachment) => {
 }
 
 const openImage = (url) => {
-  window.open(url, '_blank')
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 const downloadFile = (attachment) => {
-  window.open(attachment.url, '_blank')
+  window.open(attachment.url, '_blank', 'noopener,noreferrer')
 }
 
 const truncateFileName = (name) => {

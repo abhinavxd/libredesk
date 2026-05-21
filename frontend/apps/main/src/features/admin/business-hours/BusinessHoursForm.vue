@@ -238,6 +238,7 @@ watch(openHolidayForm, (isOpen) => {
 const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t)),
   initialValues: {
+    description: '',
     is_always_open: true
   }
 })

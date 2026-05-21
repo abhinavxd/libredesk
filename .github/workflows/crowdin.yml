@@ -5,9 +5,9 @@ on:
     paths:
       # Only trigger a Crowdin update when the source localization file is
       # updated.
-      - 'i18n/en.json'
+      - 'i18n/en-US.json'
     # Only watches for changes happening on "main" branch.
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   crowdin:
@@ -30,9 +30,9 @@ jobs:
           upload_translations: false
           download_translations: false
           # Source language file.
-          source: 'i18n/en.json'
+          source: 'i18n/en-US.json'
           # Translations files.
-          translation: 'i18n/%two_letters_code%.json'
+          translation: 'i18n/%locale%.json'
         env:
           # Crowdin.com > Project > Tools > API > Project ID.
           CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
@@ -44,4 +44,3 @@ jobs:
           #  - Source files & strings -> Read and Write
           #  - Translations -> Read and Write
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
-

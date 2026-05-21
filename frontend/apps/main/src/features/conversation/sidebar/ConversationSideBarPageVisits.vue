@@ -9,7 +9,7 @@
         :key="idx"
         :href="page.url"
         target="_blank"
-        rel="noopener"
+        rel="noopener noreferrer"
         class="block p-2 rounded hover:bg-muted"
       >
         <div class="flex items-start justify-between gap-2">

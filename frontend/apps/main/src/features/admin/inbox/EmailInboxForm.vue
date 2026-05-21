@@ -694,6 +694,7 @@
                   : 'https://entra.microsoft.com/'
               "
               target="_blank"
+              rel="noopener noreferrer"
               class="text-primary underline"
             >
               {{

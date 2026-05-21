@@ -53,6 +53,9 @@ func handleCreateTemplate(r *fastglue.Request) error {
 	if req.Name == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil, envelope.InputError)
 	}
+	if req.Type == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`type`"), nil, envelope.InputError)
+	}
 	template, err := app.tmpl.Create(req)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -76,6 +79,9 @@ func handleUpdateTemplate(r *fastglue.Request) error {
 	}
 	if req.Name == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil, envelope.InputError)
+	}
+	if req.Type == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`type`"), nil, envelope.InputError)
 	}
 	updatedTemplate, err := app.tmpl.Update(id, req)
 	if err != nil {

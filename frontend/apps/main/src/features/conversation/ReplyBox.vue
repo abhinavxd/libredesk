@@ -105,6 +105,7 @@
           @send="processSend"
           @fileUpload="handleFileUpload"
           @fileDelete="handleFileDelete"
+          @filesDropped="uploadFiles"
           @aiPromptSelected="handleAiPromptSelected"
           class="h-full flex-grow"
         />
@@ -138,6 +139,7 @@
         @send="processSend"
         @fileUpload="handleFileUpload"
         @fileDelete="handleFileDelete"
+        @filesDropped="uploadFiles"
         @aiPromptSelected="handleAiPromptSelected"
       />
     </div>
@@ -178,6 +180,7 @@ import {
 import { Input } from '@shared-ui/components/ui/input'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
+import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
 import {
@@ -208,6 +211,7 @@ const {
   uploadingFiles,
   handleFileUpload,
   handleFileDelete,
+  uploadFiles,
   mediaFiles,
   clearMediaFiles,
   setMediaFiles
@@ -321,7 +325,9 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
-  const hasContent = hasTextContent.value > 0 || mediaFiles.value.length > 0
+  const html = htmlContent.value
+  if (hasPendingInlineUpload(html)) return
+  const hasContent = hasTextContent.value || hasInlineImage(html) || mediaFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
   const isPrivate = messageType.value === 'private_note'
 

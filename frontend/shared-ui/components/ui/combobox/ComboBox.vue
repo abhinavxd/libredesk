@@ -1,19 +1,21 @@
 <template>
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
-      <Button
-        variant="outline"
-        role="combobox"
-        :aria-expanded="open"
-        :class="['w-full justify-between', buttonClass]"
-      >
-        <span class="min-w-0 flex-1 truncate text-left">
-          <slot name="selected" :selected="selectedItem">{{ selectedLabel }}</slot>
-        </span>
-        <CaretSortIcon class="h-4 w-4 shrink-0 opacity-50" />
-      </Button>
+      <slot name="trigger" :selected="selectedItem" :open="open">
+        <Button
+          variant="outline"
+          role="combobox"
+          :aria-expanded="open"
+          :class="['w-full justify-between', buttonClass]"
+        >
+          <span class="min-w-0 flex-1 truncate text-left">
+            <slot name="selected" :selected="selectedItem">{{ selectedLabel }}</slot>
+          </span>
+          <CaretSortIcon class="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </slot>
     </PopoverTrigger>
-    <PopoverContent class="p-0">
+    <PopoverContent class="p-0" :align="align">
       <Command v-model:search-term="searchTerm" :filter-function="passThroughFilter">
         <CommandInput class="h-9" :placeholder="placeholder" />
         <CommandEmpty>{{ $t('globals.messages.notFound') }}</CommandEmpty>
@@ -66,6 +68,10 @@ const props = defineProps({
   buttonClass: {
     type: String,
     default: ''
+  },
+  align: {
+    type: String,
+    default: 'center'
   }
 })
 

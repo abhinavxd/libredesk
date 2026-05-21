@@ -21,9 +21,9 @@ async function initWidget () {
 
         // Resolve language: auto-detect from browser or use admin-configured language.
         let lang
-        const fallbackLang = widgetConfig.fallback_language || 'en'
+        const fallbackLang = widgetConfig.fallback_language || 'en-US'
         if (widgetConfig.language === 'auto') {
-            const browserLang = (navigator.language || navigator.languages?.[0] || '').split('-')[0]
+            const browserLang = navigator.language || navigator.languages?.[0] || ''
             const availableResp = await api.getAvailableLanguages()
             const availableCodes = availableResp.data.data.map(l => l.code)
             lang = availableCodes.includes(browserLang) ? browserLang : fallbackLang

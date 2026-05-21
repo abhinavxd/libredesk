@@ -144,7 +144,7 @@ func handleApplyMacro(r *fastglue.Request) error {
 		id, _            = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 		incomingActions  = []autoModels.RuleAction{}
 	)
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

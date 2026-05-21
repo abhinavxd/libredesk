@@ -1,5 +1,5 @@
 <template>
-  <a :href="link.url" target="_blank" class="block no-underline">
+  <a :href="link.url" target="_blank" rel="noopener noreferrer" class="block no-underline">
     <Card class="hover:bg-accent transition-colors cursor-pointer rounded-md">
       <CardContent class="p-4">
         <div class="flex justify-between items-center">

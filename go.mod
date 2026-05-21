@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/abhinavxd/ssrfguard v0.1.0
-	github.com/casbin/casbin/v2 v2.99.0
 	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/emersion/go-imap/v2 v2.0.0-beta.3
@@ -49,8 +48,6 @@ require (
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
-	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
-	github.com/casbin/govaluate v1.2.0 // indirect
 	github.com/cention-sany/utf7 v0.0.0-20170124080048-26cad61bd60a // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

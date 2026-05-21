@@ -292,6 +292,7 @@ const getUserViews = async () => {
 
 const initToaster = () => {
   emitter.on(EMITTER_EVENTS.SHOW_TOAST, (message) => {
+    if (!message.description) return
     if (message.variant === 'destructive') {
       sooner.error(message.description)
     } else if (message.variant === 'warning') {

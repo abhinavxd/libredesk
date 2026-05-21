@@ -126,13 +126,21 @@ func (u *Manager) Update(id int, name, timezone, conversationAssignmentType stri
 	return team, nil
 }
 
-// Delete deletes a team by ID also deletes all the team members and unassigns all the conversations belonging to the team.
-func (u *Manager) Delete(id int) error {
+// Delete deletes a team and returns the affected member IDs so callers can invalidate per-user state.
+func (u *Manager) Delete(id int) ([]int, error) {
+	members, err := u.GetMembers(id)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := u.q.DeleteTeam.Exec(id); err != nil {
 		u.lo.Error("error deleting team", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	return nil
+	ids := make([]int, 0, len(members))
+	for _, m := range members {
+		ids = append(ids, m.ID)
+	}
+	return ids, nil
 }
 
 // GetUserTeams retrieves teams of a user by user ID.

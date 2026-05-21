@@ -3,6 +3,7 @@
     <BubbleMenu
       :editor="editor"
       :tippy-options="{ duration: 100 }"
+      :should-show="shouldShowBubble"
       v-if="editor"
       class="bg-background p-1 box will-change-transform"
     >
@@ -141,7 +142,7 @@ import {
   DialogDescription
 } from '@shared-ui/components/ui/dialog'
 import Placeholder from '@tiptap/extension-placeholder'
-import Image from '@tiptap/extension-image'
+import ResizableImage from './extensions/ResizableImage'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Mention from '@tiptap/extension-mention'
@@ -151,6 +152,7 @@ import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import { useTypingIndicator } from '@shared-ui/composables'
 import { useConversationStore } from '@main/stores/conversation'
+import { useInlineImageUpload } from '@main/composables/useInlineImageUpload'
 import mentionSuggestion from './mentionSuggestion'
 
 const textContent = defineModel('textContent', { default: '' })
@@ -181,12 +183,32 @@ const props = defineProps({
   getSuggestions: {
     type: Function,
     default: null
+  },
+  enableInlineImages: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['send', 'aiPromptSelected', 'mentionsChanged'])
+const emit = defineEmits(['send', 'aiPromptSelected', 'mentionsChanged', 'filesDropped'])
 
 const emitPrompt = (key) => emit('aiPromptSelected', key)
+
+// Suppress the formatting bubble when an image node is selected so it
+// doesn't fight with the image's own size/remove toolbar.
+const shouldShowBubble = ({ editor: e, state }) => {
+  const { selection } = state
+  if (selection.empty) return false
+  if (!e.view.hasFocus()) return false
+  if (selection.node?.type?.name === 'image') return false
+  return true
+}
+
+const { handlePaste, handleDrop } = useInlineImageUpload({
+  getEditor: () => editor.value,
+  isInlineEnabled: () => props.enableInlineImages,
+  onOtherFiles: (files) => emit('filesDropped', files)
+})
 
 // Set up typing indicator
 const conversationStore = useConversationStore()
@@ -257,7 +279,10 @@ const isInternalUpdate = ref(false)
 const buildExtensions = () => {
   const extensions = [
     StarterKit.configure(),
-    Image.configure({ HTMLAttributes: { class: 'inline-image' } }),
+    ResizableImage.configure({
+      HTMLAttributes: { class: 'inline-image', style: 'max-width: 100%; height: auto;' },
+      allowBase64: false
+    }),
     Placeholder.configure({ placeholder: () => props.placeholder }),
     Link,
     CustomTable.configure({ resizable: false }),
@@ -309,6 +334,8 @@ const editor = useEditor({
   editorProps: {
     attributes: { class: 'outline-none' },
     getSuggestions: props.getSuggestions,
+    handlePaste,
+    handleDrop,
     handleKeyDown: (view, event) => {
       if (event.ctrlKey && event.key.toLowerCase() === 'b') {
         event.stopPropagation()
@@ -450,6 +477,139 @@ defineExpose({ focus, extractMentions })
     padding: 0 0.25rem;
     color: hsl(var(--primary));
     font-weight: 500;
+  }
+
+  .image-resizer {
+    display: inline-block;
+    position: relative;
+    margin: 4px 5px;
+
+    .image-upload-placeholder {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 32px;
+      min-width: 360px;
+      min-height: 220px;
+      max-width: 100%;
+      background: hsl(var(--muted));
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+      line-height: 1.4;
+      gap: 12px;
+    }
+
+    .image-upload-placeholder-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .image-upload-placeholder-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 320px;
+    }
+
+    &.uploading {
+      .inline-image {
+        display: none;
+      }
+      .image-upload-placeholder {
+        display: inline-flex;
+      }
+    }
+
+    .image-resize-handle {
+      display: none;
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: hsl(var(--primary));
+      border: 2px solid hsl(var(--background));
+      border-radius: 2px;
+      z-index: 10;
+      box-shadow: 0 0 0 1px hsl(var(--border));
+    }
+
+    .image-resize-handle-tl { top: -6px; left: -6px; cursor: nwse-resize; }
+    .image-resize-handle-tr { top: -6px; right: -6px; cursor: nesw-resize; }
+    .image-resize-handle-bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .image-resize-handle-br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+    // Anchored to the image's left edge (no centering) so the toolbar
+    // never extends past the image's left side and into adjacent UI when
+    // the image sits near the editor's left edge.
+    .image-size-toolbar {
+      display: none;
+      position: absolute;
+      top: 4px;
+      left: 0;
+      background: hsl(var(--background) / 0.95);
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      padding: 2px;
+      z-index: 10000;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px hsl(var(--foreground) / 0.15);
+      backdrop-filter: blur(4px);
+
+      button {
+        padding: 2px 8px;
+        font-size: 11px;
+        color: hsl(var(--muted-foreground));
+        background: none;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        line-height: 1.6;
+
+        &:hover {
+          background: hsl(var(--accent));
+          color: hsl(var(--accent-foreground));
+        }
+      }
+
+      .image-toolbar-sep {
+        width: 1px;
+        height: 14px;
+        background: hsl(var(--border));
+        margin: 0 2px;
+        align-self: center;
+      }
+
+      .image-toolbar-remove {
+        color: hsl(var(--destructive)) !important;
+
+        &:hover {
+          background: hsl(var(--destructive) / 0.1) !important;
+          color: hsl(var(--destructive)) !important;
+        }
+      }
+    }
+
+    &.ProseMirror-selectednode .image-resize-handle,
+    &.resizing .image-resize-handle {
+      display: block;
+    }
+
+    &.ProseMirror-selectednode .image-size-toolbar {
+      display: flex;
+    }
+
+    &.ProseMirror-selectednode .inline-image,
+    &.resizing .inline-image {
+      outline: 2px solid #0066cc;
+    }
+
+    &.resizing .inline-image {
+      opacity: 0.8;
+    }
   }
 }
 </style>
