@@ -189,14 +189,15 @@ export class WidgetWebSocketClient {
 
   setupPing () {
     this.clearPing()
+    // Backend read deadline is 20s; ping every 10s so a single missed ping doesn't trip it.
     this.pingInterval = setInterval(() => {
       if (this.socket?.readyState === WebSocket.OPEN) {
         try {
           this.socket.send(JSON.stringify({
             type: 'ping',
           }))
-          if (Date.now() - this.lastPong > 60000) {
-            console.warn('No pong received in 60 seconds, closing widget connection')
+          if (Date.now() - this.lastPong > 30000) {
+            console.warn('No pong received in 30 seconds, closing widget connection')
             this.socket.close()
           }
         } catch (e) {
@@ -204,7 +205,7 @@ export class WidgetWebSocketClient {
           this.reconnect()
         }
       }
-    }, 5000)
+    }, 10000)
   }
 
   clearPing () {

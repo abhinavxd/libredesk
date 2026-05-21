@@ -534,6 +534,7 @@ CREATE TABLE applied_slas (
 );
 CREATE INDEX index_applied_slas_on_conversation_id ON applied_slas(conversation_id);
 CREATE INDEX index_applied_slas_on_status ON applied_slas(status);
+CREATE UNIQUE INDEX index_applied_slas_unique_pending_per_conv ON applied_slas(conversation_id) WHERE status = 'pending';
 
 DROP TABLE IF EXISTS sla_events CASCADE;
 CREATE TABLE sla_events (

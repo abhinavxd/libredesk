@@ -11,6 +11,7 @@ export class WebSocketClient {
     this.reconnectAttempts = 0
     this.maxReconnectAttempts = 50
     this.isReconnecting = false
+    this.reconnectTimer = null
     this.manualClose = false
     this.pingInterval = null
     this.lastPong = Date.now()
@@ -18,7 +19,6 @@ export class WebSocketClient {
     this.notificationStore = useNotificationStore()
     this.messageQueue = []
     this.maxQueueSize = 50
-    // 30 sec.
     this.queueTimeoutMs = 30000
   }
 
@@ -44,13 +44,16 @@ export class WebSocketClient {
 
   handleOpen () {
     console.log('WebSocket connected')
+    const wasReconnect = this.reconnectAttempts > 0
     this.reconnectInterval = 1000
     this.reconnectAttempts = 0
     this.isReconnecting = false
     this.lastPong = Date.now()
     this.setupPing()
-    // Send any queued messages after connection is established.
     this.flushMessageQueue()
+    if (wasReconnect) {
+      this.convStore.refreshConversationList()
+    }
   }
 
   handleMessage (event) {
@@ -65,11 +68,12 @@ export class WebSocketClient {
       const data = JSON.parse(event.data)
       const handlers = {
         [WS_EVENT.NEW_MESSAGE]: () => {
-          // Ring sound only for contact messages and when doc is hidden.
-          // If not in list, add to pending notifs as later it could be part of this list.
-          if (data.data.sender_type === 'contact' && document.hidden) {
-            const uuid = data.data.conversation_uuid
-            const isOpen = this.convStore.conversation.data?.uuid === uuid
+          const uuid = data.data.conversation_uuid
+          const isOpen = this.convStore.conversation.data?.uuid === uuid
+          const isFromContact = data.data.sender_type === 'contact'
+
+          // Defer the sound if the conversation isn't visible yet so it plays once it joins the list.
+          if (isFromContact && document.hidden) {
             if (isOpen || this.convStore.isConversationInList(uuid)) {
               playNotificationSound()
             } else {
@@ -77,17 +81,24 @@ export class WebSocketClient {
             }
           }
 
-          // Refresh 1st page of list as well, this is throttled.
-          this.convStore.refreshConversationList()
+          // Not open conversation but in the list, increment unread count.
+          if (isFromContact && !isOpen && this.convStore.isConversationInList(uuid)) {
+            this.convStore.incrementUnread(uuid)
+          }
 
-          // Update this message in its respective conversation.
+          this.convStore.mergeConversationUpdate({
+            uuid,
+            last_message: data.data.preview,
+            last_message_at: data.data.created_at,
+            last_message_sender: data.data.sender_type,
+          })
           this.convStore.updateConversationMessage(data.data)
         },
+        [WS_EVENT.NEW_CONVERSATION]: () => this.convStore.refreshConversationList(),
         // Property updates for conversation and message.
         [WS_EVENT.MESSAGE_UPDATE]: () => this.convStore.mergeMessageUpdate(data.data),
         [WS_EVENT.CONVERSATION_UPDATE]: () => this.convStore.mergeConversationUpdate(data.data),
         [WS_EVENT.CONTACT_UPDATE]: () => this.convStore.mergeContactUpdate(data.data),
-        [WS_EVENT.CONVERSATION_SUBSCRIBED]: () => { },
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)
         },
@@ -124,8 +135,9 @@ export class WebSocketClient {
     this.isReconnecting = true
     this.reconnectAttempts++
 
-    setTimeout(() => {
+    this.reconnectTimer = setTimeout(() => {
       this.isReconnecting = false
+      this.reconnectTimer = null
       this.connect()
       this.reconnectInterval = Math.min(this.reconnectInterval * 1.5, this.maxReconnectInterval)
     }, this.reconnectInterval)
@@ -133,10 +145,18 @@ export class WebSocketClient {
 
   setupNetworkListeners () {
     window.addEventListener('online', () => {
-      if (this.socket?.readyState !== WebSocket.OPEN) {
-        this.reconnectInterval = 1000
-        this.reconnect()
+      // Clear any pending reconnect attempts.
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer)
+        this.reconnectTimer = null
       }
+      this.reconnectAttempts = 0
+      this.reconnectInterval = 1000
+      this.isReconnecting = false
+      if (this.socket) {
+        this.socket.close()
+      }
+      this.reconnect()
     })
 
     window.addEventListener('focus', () => {
@@ -152,8 +172,8 @@ export class WebSocketClient {
       if (this.socket?.readyState === WebSocket.OPEN) {
         try {
           this.socket.send('ping')
-          if (Date.now() - this.lastPong > 60000) {
-            console.warn('No pong received in 60 seconds, closing connection')
+          if (Date.now() - this.lastPong > 90000) {
+            console.warn('No pong received in 90 seconds, closing connection')
             this.socket.close()
           }
         } catch (e) {
@@ -161,7 +181,7 @@ export class WebSocketClient {
           this.reconnect()
         }
       }
-    }, 5000)
+    }, 30000)
   }
 
   clearPing () {
@@ -246,6 +266,10 @@ export class WebSocketClient {
     this.send(subscribeMessage)
   }
 
+  subscribeListReplace (uuids) {
+    this.send({ type: WS_EVENT.LIST_SUBSCRIBE_REPLACE, data: { uuids: uuids || [] } })
+  }
+
   sendTypingIndicator (conversationUUID, isTyping, isPrivateMessage) {
     if (!conversationUUID) return
 
@@ -282,5 +306,6 @@ export function initWS () {
 
 export const sendMessage = message => wsClient?.send(message)
 export const subscribeToConversation = conversationUUID => wsClient?.subscribeToConversation(conversationUUID)
+export const subscribeListReplace = uuids => wsClient?.subscribeListReplace(uuids)
 export const sendTypingIndicator = (conversationUUID, isTyping, isPrivateMessage) => wsClient?.sendTypingIndicator(conversationUUID, isTyping, isPrivateMessage)
 export const closeWebSocket = () => wsClient?.close()
