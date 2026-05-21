@@ -93,15 +93,17 @@ func handleCreateContact(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Upload avatar if provided.
+	// Upload avatar if provided. Treat as best-effort: a failure does not
+	// roll back the already-created contact.
 	files, ok := form.File["files"]
 	if ok && len(files) > 0 {
 		if err := uploadUserAvatar(r, createdContact, files); err != nil {
-			return sendErrorEnvelope(r, err)
-		}
-		createdContact, err = app.user.GetContactOrVisitor(contact.ID, "")
-		if err != nil {
-			return sendErrorEnvelope(r, err)
+			app.lo.Error("failed to upload avatar for new contact", "contact_id", contact.ID, "error", err)
+		} else {
+			createdContact, err = app.user.GetContactOrVisitor(contact.ID, "")
+			if err != nil {
+				return sendErrorEnvelope(r, err)
+			}
 		}
 	}
 
