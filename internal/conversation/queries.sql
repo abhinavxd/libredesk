@@ -64,6 +64,8 @@ SELECT
     conversations.last_interaction_sender,
     conversations.next_sla_deadline_at,
     conversations.priority_id,
+    conversations.assigned_user_id,
+    conversations.assigned_team_id,
     (
     SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
     FROM (

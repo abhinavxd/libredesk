@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
+	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/automation"
 	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
-	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	pmodels "github.com/abhinavxd/libredesk/internal/conversation/priority/models"
 	smodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
@@ -367,7 +367,7 @@ func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string,
 		c.lo.Error("error inserting new conversation into the DB", "error", err)
 		return 0, "", err
 	}
-	c.BroadcastNewConversation(uuid)
+	c.BroadcastNewConversation()
 	return id, uuid, nil
 }
 
@@ -1232,10 +1232,7 @@ func (m *Manager) ApplySLA(conversation models.Conversation, policyID int, actor
 	}
 
 	// Record the SLA application as an activity.
-	if err := m.RecordSLASet(conversation.UUID, policy.Name, actor); err != nil {
-		return err
-	}
-	return nil
+	return m.RecordSLASet(conversation.UUID, policy.Name, actor)
 }
 
 // ApplyAction applies an action to a conversation, this can be called from multiple packages across the app to perform actions on conversations.

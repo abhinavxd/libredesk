@@ -31,7 +31,10 @@ RETURNING *;
 DELETE FROM sla_policies WHERE id = $1;
 
 -- name: apply-sla
-WITH new_sla AS (
+WITH deleted AS (
+  DELETE FROM applied_slas WHERE conversation_id = $1 AND status = 'pending'
+),
+new_sla AS (
   INSERT INTO applied_slas (
     conversation_id,
     sla_policy_id,
@@ -42,7 +45,7 @@ WITH new_sla AS (
 )
 -- update the conversation with the new SLA policy and next SLA deadline.
 UPDATE conversations c
-SET 
+SET
    sla_policy_id = $2,
    next_sla_deadline_at = LEAST($3, $4)
 FROM new_sla ns

@@ -271,7 +271,7 @@ func (m *Manager) ApplySLA(startTime time.Time, conversationID, assignedTeamID, 
 	// Next response is not set at this point, next response are stored in SLA events as there can be multiple entries for next response.
 	deadlines.NextResponse = null.Time{}
 
-	// Insert applied SLA entry.
+	// Insert applied SLA entry delete any previous pending applied SLA.
 	var appliedSLAID int
 	if err := m.q.ApplySLA.QueryRowx(
 		conversationID,

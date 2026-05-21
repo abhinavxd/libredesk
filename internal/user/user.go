@@ -44,6 +44,11 @@ var (
 	PasswordHint = fmt.Sprintf("Password must be %d-%d characters long should contain at least one uppercase letter, one lowercase letter, one number, and one special character.", minPassword, maxPassword)
 )
 
+const (
+	lastActiveFlushDebounce = 30 * time.Second
+	agentCacheTTL           = 10 * time.Minute
+)
+
 // Manager handles user-related operations.
 type Manager struct {
 	lo           *logf.Logger
@@ -56,11 +61,6 @@ type Manager struct {
 	lastActiveFlushAt   map[int]time.Time
 	lastActiveFlushAtMu sync.Mutex
 }
-
-const (
-	lastActiveFlushDebounce = 30 * time.Second
-	agentCacheTTL           = 10 * time.Minute
-)
 
 type cachedAgent struct {
 	user      models.User
@@ -291,7 +291,6 @@ func (u *Manager) UpdateAvatar(id int, path string) error {
 		u.lo.Error("error updating user avatar", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	u.InvalidateAgentCache(id)
 	return nil
 }
 
@@ -301,13 +300,11 @@ func (u *Manager) UpdateLastLoginAt(id int) error {
 		u.lo.Error("error updating user last login at", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	u.InvalidateAgentCache(id)
 	return nil
 }
 
 // SetResetPasswordToken sets a reset password token for an user and returns the token.
 func (u *Manager) SetResetPasswordToken(id int) (string, error) {
-	// TODO: column `reset_password_token`, does not have a UNIQUE constraint. Add it in a future migration.
 	token, err := stringutil.RandomAlphanumeric(32)
 	if err != nil {
 		u.lo.Error("error generating reset password token", "error", err)
@@ -320,26 +317,25 @@ func (u *Manager) SetResetPasswordToken(id int) (string, error) {
 	return token, nil
 }
 
-// ResetPassword sets a password for a given user's reset password token.
-func (u *Manager) ResetPassword(token, password string) error {
+// ResetPassword sets a password for a given user's reset password token and returns the user ID.
+func (u *Manager) ResetPassword(token, password string) (int, error) {
 	if !IsStrongPassword(password) {
-		return envelope.NewError(envelope.InputError, "Password is not strong enough, "+PasswordHint, nil)
+		return 0, envelope.NewError(envelope.InputError, "Password is not strong enough, "+PasswordHint, nil)
 	}
-	// Hash password.
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		u.lo.Error("error generating bcrypt password", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	rows, err := u.q.SetPassword.Exec(passwordHash, token)
-	if err != nil {
+	var id int
+	if err := u.q.SetPassword.Get(&id, passwordHash, token); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, envelope.NewError(envelope.InputError, u.i18n.T("user.resetPasswordTokenExpired"), nil)
+		}
 		u.lo.Error("error setting new password", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	if count, _ := rows.RowsAffected(); count == 0 {
-		return envelope.NewError(envelope.InputError, u.i18n.T("user.resetPasswordTokenExpired"), nil)
-	}
-	return nil
+	return id, nil
 }
 
 // UpdateAvailability updates the availability status of an user.
@@ -348,7 +344,6 @@ func (u *Manager) UpdateAvailability(id int, status string) error {
 		u.lo.Error("error updating user availability", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	u.InvalidateAgentCache(id)
 	return nil
 }
 
@@ -367,8 +362,7 @@ func (u *Manager) UpdateLastActive(id int) (wasOffline bool, err error) {
 		return false, fmt.Errorf("updating user last active at: %w", err)
 	}
 
-	// Offline-or-unknown cache: refresh so callers see the flip to online.
-	if !alreadyOnline {
+	if wasOffline {
 		u.InvalidateAgentCache(id)
 	}
 	return wasOffline, nil
@@ -410,7 +404,6 @@ func (u *Manager) ToggleEnabled(id int, typ string, enabled bool) error {
 		u.lo.Error("error toggling user enabled status", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	u.InvalidateAgentCache(id)
 	return nil
 }
 
@@ -443,7 +436,6 @@ func (u *Manager) GenerateAPIKey(userID int) (string, string, error) {
 		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	u.InvalidateAgentCache(userID)
 	return apiKey, apiSecret, nil
 }
 
@@ -478,7 +470,6 @@ func (u *Manager) RevokeAPIKey(userID int) error {
 		u.lo.Error("error revoking API key", "error", err, "user_id", userID)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	u.InvalidateAgentCache(userID)
 	return nil
 }
 

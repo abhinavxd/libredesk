@@ -2,7 +2,9 @@
 package ws
 
 import (
+	"log"
 	"sync"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
@@ -43,6 +45,18 @@ func NewHub(userStore userStore) *Hub {
 		clientOpenSub:     make(map[*Client]string, 64),
 		userStore:         userStore,
 		conversationStore: nil,
+	}
+}
+
+func (h *Hub) KickUser(userID int) {
+	h.clientsMutex.RLock()
+	clients := append([]*Client(nil), h.clients[userID]...)
+	h.clientsMutex.RUnlock()
+	log.Printf("ws: kicking user %d (%d connections)", userID, len(clients))
+	closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "kicked")
+	for _, c := range clients {
+		_ = c.Conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+		_ = c.Conn.Close()
 	}
 }
 

@@ -64,6 +64,7 @@ func (u *Manager) GetAgentCachedOrLoad(id int) (models.User, error) {
 
 // InvalidateAgentCache drops a single agent from the cache.
 func (u *Manager) InvalidateAgentCache(id int) {
+	u.lo.Debug("invalidating agent cache", "agent_id", id)
 	u.agentCacheMu.Lock()
 	defer u.agentCacheMu.Unlock()
 	delete(u.agentCache, id)
@@ -127,7 +128,7 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 		u.lo.Info("setting new password for user", "user_id", id)
 	}
 
-	// Update user in the database and clear cache.
+	// Update user in the database.
 	if _, err := u.q.UpdateAgent.Exec(id, firstName, lastName, email, pq.Array(roles), null.String{}, hashedPassword, enabled, availabilityStatus); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
@@ -135,7 +136,6 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 		u.lo.Error("error updating user", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	u.InvalidateAgentCache(id)
 	return nil
 }
 
@@ -153,7 +153,6 @@ func (u *Manager) SoftDeleteAgent(id int) error {
 		u.lo.Error("error deleting user", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	u.InvalidateAgentCache(id)
 	return nil
 }
 

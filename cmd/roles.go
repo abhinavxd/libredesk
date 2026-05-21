@@ -47,9 +47,7 @@ func handleDeleteRole(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Invalidate all caches when role is deleted.
 	app.user.InvalidateAllAgentCache()
-	app.authz.InvalidateAllCache()
 
 	return r.SendEnvelope(true)
 }
@@ -94,12 +92,9 @@ func handleUpdateRole(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Log permission changes and invalidate caches.
 	added, removed := role.ComparePermissions(oldRole.Permissions, updatedRole.Permissions)
 	if len(added) > 0 || len(removed) > 0 {
-		// Invalidate all caches when role permissions change.
 		app.user.InvalidateAllAgentCache()
-		app.authz.InvalidateAllCache()
 
 		if err := app.activityLog.RolePermissionsChanged(auser.ID, auser.Email, ip, updatedRole.ID, updatedRole.Name, added, removed); err != nil {
 			app.lo.Error("error creating activity log", "error", err)

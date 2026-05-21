@@ -12,6 +12,7 @@ import MessageCache from '../utils/conversation-message-cache'
 import { getI18n } from '../i18n'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@/constants/conversation'
 import { useThrottleFn } from '@vueuse/core'
+import { useUserStore } from '@/stores/user'
 import api from '../api'
 
 export const useConversationStore = defineStore('conversation', () => {
@@ -24,6 +25,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const currentCC = ref([])
   const macros = ref({})
   const drafts = ref(new Map())
+  const userStore = useUserStore()
 
   // Bulk selection state
   const selectedUUIDs = ref(new Set())
@@ -238,18 +240,28 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function belongsToList (conv) {
+    switch (conversations.listType) {
+      case CONVERSATION_LIST_TYPE.ASSIGNED:
+        return conv.assigned_user_id === userStore.userID
+      case CONVERSATION_LIST_TYPE.UNASSIGNED:
+        return !conv.assigned_user_id && !conv.assigned_team_id
+      case CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED:
+        return Number(conv.assigned_team_id) === Number(conversations.teamID) && !conv.assigned_user_id
+      default:
+        return true
+    }
+  }
+
   const conversationsList = computed(() => {
     if (!conversations.data) return []
     let filteredConversations = conversations.data
     // Filter by status if set.
     if (conversations.status !== "") {
-      filteredConversations = conversations.data
-        .filter(conv => {
-          return conv.status === conversations.status
-        })
+      filteredConversations = filteredConversations.filter(conv => conv.status === conversations.status)
     }
+    filteredConversations = filteredConversations.filter(belongsToList)
 
-    // Sort conversations based on the selected sort field
     return [...filteredConversations].sort((a, b) => {
       const field = sortFieldMap[conversations.sortField]?.field
       if (!a[field] && !b[field]) return 0

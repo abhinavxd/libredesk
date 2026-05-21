@@ -12,12 +12,9 @@ import (
 )
 
 // BroadcastNewConversation signals all agents that a new conversation exists.
-func (m *Manager) BroadcastNewConversation(conversationUUID string) {
+func (m *Manager) BroadcastNewConversation() {
 	m.broadcastToUsers([]int{}, wsmodels.Message{
 		Type: wsmodels.MessageTypeNewConversation,
-		Data: map[string]any{
-			"conversation_uuid": conversationUUID,
-		},
 	})
 }
 

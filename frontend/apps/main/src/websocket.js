@@ -81,6 +81,7 @@ export class WebSocketClient {
             }
           }
 
+          // Not open conversation but in the list, increment unread count.
           if (isFromContact && !isOpen && this.convStore.isConversationInList(uuid)) {
             this.convStore.incrementUnread(uuid)
           }
