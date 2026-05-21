@@ -133,6 +133,8 @@ type ConversationListItem struct {
 	LastInteractionSender null.String             `db:"last_interaction_sender" json:"last_interaction_sender"`
 	NextSLADeadlineAt     null.Time               `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	PriorityID            null.Int                `db:"priority_id" json:"priority_id"`
+	AssignedUserID        null.Int                `db:"assigned_user_id" json:"assigned_user_id"`
+	AssignedTeamID        null.Int                `db:"assigned_team_id" json:"assigned_team_id"`
 	UnreadMessageCount    int                     `db:"unread_message_count" json:"unread_message_count"`
 	Status                null.String             `db:"status" json:"status"`
 	Priority              null.String             `db:"priority" json:"priority"`

@@ -6,16 +6,17 @@ import { deepMerge } from '@shared-ui/utils/object.js'
 import { computeRecipientsFromMessage } from '../utils/email-recipients'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
-import { subscribeToConversation, sendTypingIndicator } from '@main/websocket'
+import { subscribeToConversation, sendTypingIndicator, subscribeListReplace } from '@main/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
 import MessageCache from '../utils/conversation-message-cache'
 import { getI18n } from '../i18n'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@/constants/conversation'
-import { useDebounceFn, useThrottleFn } from '@vueuse/core'
+import { useThrottleFn } from '@vueuse/core'
+import { useUserStore } from '@/stores/user'
 import api from '../api'
 
 export const useConversationStore = defineStore('conversation', () => {
-  const CONV_LIST_PAGE_SIZE = 50
+  const CONV_LIST_PAGE_SIZE = 25
   const MESSAGE_LIST_PAGE_SIZE = 30
   const priorities = ref([])
   const statuses = ref([])
@@ -24,6 +25,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const currentCC = ref([])
   const macros = ref({})
   const drafts = ref(new Map())
+  const userStore = useUserStore()
 
   // Bulk selection state
   const selectedUUIDs = ref(new Set())
@@ -138,6 +140,8 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   let typingTimeout = null
+  const typingByUUID = reactive({})
+  const typingTimeoutsByUUID = new Map()
 
   const conversations = reactive({
     data: [],
@@ -156,7 +160,6 @@ export const useConversationStore = defineStore('conversation', () => {
 
   const conversation = reactive({
     data: null,
-    participants: {},
     loading: false,
     errorMessage: '',
     isTyping: false
@@ -171,6 +174,10 @@ export const useConversationStore = defineStore('conversation', () => {
   })
 
   let seenConversationUUIDs = new Map()
+  // Convos whose message cache is stale; drained lazily by fetchMessages on next open.
+  let staleConversationUUIDs = new Set()
+  // Bumped on resetConversations() so in-flight requests can drop stale responses.
+  let contextSeq = 0
   const emitter = useEmitter()
 
   const incrementMessageVersion = () => setTimeout(() => messages.version++, 0)
@@ -233,18 +240,28 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function belongsToList (conv) {
+    switch (conversations.listType) {
+      case CONVERSATION_LIST_TYPE.ASSIGNED:
+        return conv.assigned_user_id === userStore.userID
+      case CONVERSATION_LIST_TYPE.UNASSIGNED:
+        return !conv.assigned_user_id && !conv.assigned_team_id
+      case CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED:
+        return Number(conv.assigned_team_id) === Number(conversations.teamID) && !conv.assigned_user_id
+      default:
+        return true
+    }
+  }
+
   const conversationsList = computed(() => {
     if (!conversations.data) return []
     let filteredConversations = conversations.data
     // Filter by status if set.
     if (conversations.status !== "") {
-      filteredConversations = conversations.data
-        .filter(conv => {
-          return conv.status === conversations.status
-        })
+      filteredConversations = filteredConversations.filter(conv => conv.status === conversations.status)
     }
+    filteredConversations = filteredConversations.filter(belongsToList)
 
-    // Sort conversations based on the selected sort field
     return [...filteredConversations].sort((a, b) => {
       const field = sortFieldMap[conversations.sortField]?.field
       if (!a[field] && !b[field]) return 0
@@ -288,6 +305,12 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function incrementUnread (uuid) {
+    const row = conversations.data.find(c => c.uuid === uuid)
+    if (!row) return
+    row.unread_message_count = Math.min((row.unread_message_count || 0) + 1, 10)
+  }
+
   const currentContactName = computed(() => {
     if (!conversation.data?.contact) return ''
     return conversation.data?.contact.first_name + ' ' + conversation.data?.contact.last_name
@@ -325,7 +348,9 @@ export const useConversationStore = defineStore('conversation', () => {
 
     if (!conv || !msgData || !inboxEmail) return
 
-    const latestMessage = msgData.getLatestMessage(conv.uuid, ['incoming', 'outgoing'], true)
+    // Skip automated messages (auto-replies, CSAT) so the reply-box prefill
+    // reflects the last human-driven recipients, not a system-generated one.
+    const latestMessage = msgData.getLatestMessage(conv.uuid, ['incoming', 'outgoing'], true, true)
     if (!latestMessage) {
       // Reset recipients if no latest message is found.
       currentTo.value = []
@@ -345,22 +370,6 @@ export const useConversationStore = defineStore('conversation', () => {
     currentBCC.value = bcc
   })
 
-  async function fetchParticipants (uuid) {
-    try {
-      const resp = await api.getConversationParticipants(uuid)
-      const participants = resp.data.data.reduce((acc, p) => {
-        acc[p.id] = p
-        return acc
-      }, {})
-      updateParticipants(participants)
-    } catch (error) {
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-    }
-  }
-
   async function fetchConversation (uuid) {
     conversation.loading = true
     try {
@@ -371,7 +380,6 @@ export const useConversationStore = defineStore('conversation', () => {
         clearTimeout(typingTimeout)
         typingTimeout = null
       }
-      // Do a websocket subscription to the conversation.
       subscribeToConversation(uuid)
     } catch (error) {
       conversation.errorMessage = handleHTTPError(error).message
@@ -384,30 +392,51 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  /**
-   * Fetches messages for a conversation if not already present in the cache.
-   * 
-   * @param {string} uuid
-   * @returns 
-   */
+  // Fetches messages for a conversation if not already cached.
   async function fetchMessages (uuid, fetchNextPage = false) {
-    // Messages are already cached?
+    // Silently refetch page 1 for stale-cache conversations; cached messages stay visible, new ones merge in.
+    if (staleConversationUUIDs.has(uuid) && messages.data.hasConversation(uuid)) {
+      try {
+        const response = await api.getConversationMessages(uuid, { page: 1, page_size: MESSAGE_LIST_PAGE_SIZE })
+        const newMessages = response.data?.data?.results || []
+        let lastAdded = null
+        for (const m of newMessages) {
+          if (!messages.data.hasMessage(uuid, m.uuid)) {
+            messages.data.addMessage(uuid, m)
+            lastAdded = m
+          }
+        }
+        staleConversationUUIDs.delete(uuid)
+        if (lastAdded) {
+          incrementMessageVersion()
+          setTimeout(() => {
+            emitter.emit(EMITTER_EVENTS.NEW_MESSAGE, {
+              conversation_uuid: uuid,
+              message: lastAdded
+            })
+          }, 100)
+        }
+      } catch (error) {
+        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+          variant: 'destructive',
+          description: handleHTTPError(error).message
+        })
+      }
+    }
+
     let hasMessages = messages.data.getAllPagesMessages(uuid)
     if (hasMessages.length > 0 && !fetchNextPage) {
       markConversationAsRead(uuid)
       return
     }
 
-    // Fetch messages from server.
     messages.loading = true
-    // Increment page number
     let page = messages.data.getLastFetchedPage(uuid) + 1
     try {
       const response = await api.getConversationMessages(uuid, { page: page, page_size: MESSAGE_LIST_PAGE_SIZE })
       const result = response.data?.data || {}
       const newMessages = result.results || []
       markConversationAsRead(uuid)
-      // Cache messages
       messages.data.addMessages(uuid, newMessages, result.page, result.total_pages)
       incrementMessageVersion()
     } catch (error) {
@@ -450,8 +479,8 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function fetchNextConversations () {
-    conversations.page++
-    fetchConversationsList(true, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page)
+    if (conversations.loading || !conversations.hasMore) return
+    fetchConversationsList(true, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page + 1)
   }
 
   function reFetchConversationsList (showLoader = true) {
@@ -467,7 +496,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (conversations.listType !== listType || conversations.teamID !== teamID || conversations.viewID !== viewID) {
       resetConversations()
     }
-    if (listType) conversations.listType = listType
+    conversations.listType = listType
     if (teamID) conversations.teamID = teamID
     if (viewID) conversations.viewID = viewID
     if (conversations.status) {
@@ -479,22 +508,25 @@ export const useConversationStore = defineStore('conversation', () => {
         value: conversations.status
       })
     }
-    if (filters) conversations.listFilters = filters
+    conversations.listFilters = filters
     if (showLoader) conversations.loading = true
+    if (page === 0) page = conversations.page
+    const seq = contextSeq
     try {
       conversations.errorMessage = ''
-      if (page === 0)
-        page = conversations.page
       const response = await makeConversationListRequest(listType, teamID, viewID, filters, page)
+      // Drop response if list context (type/team/view) switched mid-flight.
+      if (seq !== contextSeq) return
       processConversationListResponse(response)
     } catch (error) {
-      // If list already exists, do not tear it down on errors.
+      if (seq !== contextSeq) return
+      // Keep existing list visible on error; only surface error on empty list.
       if (conversations.data.length === 0) {
         conversations.errorMessage = handleHTTPError(error).message
         conversations.total = 0
       }
     } finally {
-      conversations.loading = false
+      if (seq === contextSeq) conversations.loading = false
     }
   }
 
@@ -569,7 +601,7 @@ export const useConversationStore = defineStore('conversation', () => {
         // Update existing conversation with fresh data.
         const idx = conversations.data.findIndex(c => c.uuid === conv.uuid)
         if (idx !== -1) {
-          Object.assign(conversations.data[idx], conv)
+          deepMerge(conversations.data[idx], conv)
         }
       } else {
         // Add to seen and new conversations list.
@@ -577,13 +609,28 @@ export const useConversationStore = defineStore('conversation', () => {
         newConversations.push(conv)
       }
     }
-    if (apiResponse.total_pages <= conversations.page) conversations.hasMore = false
-    else conversations.hasMore = true
+    conversations.page = Math.max(conversations.page, apiResponse.page)
+    conversations.hasMore = apiResponse.total_pages > conversations.page
     if (!conversations.data) conversations.data = []
-    conversations.data.push(...newConversations)
+    if (apiResponse.page === 1) {
+      conversations.data.unshift(...newConversations)
+    } else {
+      conversations.data.push(...newConversations)
+    }
     conversations.total = apiResponse.total
 
-    // Play notification sound for new conversations that were pending.
+    // Cap the visible list at currentPage * pageSize.
+    const maxLen = conversations.page * CONV_LIST_PAGE_SIZE
+    if (conversations.data.length > maxLen) {
+      const dropped = conversations.data.splice(maxLen)
+      for (const c of dropped) {
+        seenConversationUUIDs.delete(c.uuid)
+      }
+    }
+
+    subscribeListReplace(conversations.data.map(c => c.uuid))
+
+    // Re-check document.hidden in case the user returned while the refresh was in flight.
     if (pendingNotificationUUIDs.size > 0) {
       let shouldPlay = false
       for (const uuid of pendingNotificationUUIDs) {
@@ -592,7 +639,7 @@ export const useConversationStore = defineStore('conversation', () => {
         }
       }
       pendingNotificationUUIDs.clear()
-      if (shouldPlay) {
+      if (shouldPlay && document.hidden) {
         playNotificationSound()
       }
     }
@@ -689,18 +736,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   async function updateAssigneeLastSeen (uuid) {
     markConversationAsRead(uuid)
-    try {
-      await api.updateAssigneeLastSeen(uuid)
-    } catch (error) {
-      // pass
-    }
-  }
-
-  function updateParticipants (newParticipants) {
-    conversation.participants = {
-      ...conversation.participants,
-      ...newParticipants
-    }
+    api.updateAssigneeLastSeen(uuid).catch(() => {})
   }
 
   function isConversationInList (uuid) {
@@ -715,8 +751,8 @@ export const useConversationStore = defineStore('conversation', () => {
     pendingNotificationUUIDs.add(uuid)
   }
 
-  const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 2000)
-  const debouncedFetchParticipants = useDebounceFn(fetchParticipants, 400)
+  // trailing=true: fires one final refresh after a burst so the list converges to latest state.
+  const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 30000, true)
 
   function refreshConversationList () {
     throttledFetchFirstPage()
@@ -737,21 +773,18 @@ export const useConversationStore = defineStore('conversation', () => {
    */
   async function updateConversationMessage (message) {
     if (conversation.data?.uuid !== message.conversation_uuid) {
-      // Not the open conversation. If we have cached messages for it,
-      // fetch the new message to keep the cache fresh.
-      if (messages.data.getLastFetchedPage(message.conversation_uuid) > 0) {
-        const fetchedMessage = await fetchMessage(message.conversation_uuid, message.uuid)
-        if (fetchedMessage) {
-          // Update last message in conversation list (preview)
-          updateConversationLastMessage(message.conversation_uuid, fetchedMessage)
-        }
+      // Lazy invalidation: refresh the cache when the user next opens this convo,
+      // not on every WS event.
+      if (messages.data.hasConversation(message.conversation_uuid)) {
+        staleConversationUUIDs.add(message.conversation_uuid)
       }
       return
     }
 
-    // Open conversation and message not in cache? Fetch from server.
+    // Current convo but message not in cache, fetch to update both the open convo and the list preview.
     if (!messages.data.hasMessage(message.conversation_uuid, message.uuid)) {
-      // Match echo_id to pending message and swap its UUID so mergeMessageUpdate can find it.
+
+      // Match echo_id to pending message and swap its UUID.
       const echoId = message.echo_id
       if (echoId && messages.data.hasMessage(message.conversation_uuid, echoId)) {
         messages.data.updateMessage(message.conversation_uuid, echoId, { uuid: message.uuid })
@@ -760,10 +793,13 @@ export const useConversationStore = defineStore('conversation', () => {
         return
       }
 
-      debouncedFetchParticipants(message.conversation_uuid)
+      // Message with no echo_id, just fetch.
       const fetchedMessage = await fetchMessage(message.conversation_uuid, message.uuid)
       if (fetchedMessage) {
+        // Update last message in conversation list (preview)
         updateConversationLastMessage(message.conversation_uuid, fetchedMessage)
+
+        // Emit events for auto scroll.
         setTimeout(() => {
           emitter.emit(EMITTER_EVENTS.NEW_MESSAGE, {
             conversation_uuid: message.conversation_uuid,
@@ -772,6 +808,7 @@ export const useConversationStore = defineStore('conversation', () => {
         }, 100)
       }
 
+      // Update last seen.
       if (!document.hidden) {
         updateAssigneeLastSeen(message.conversation_uuid)
       }
@@ -839,8 +876,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function addNewConversation (conversation) {
     if (!isConversationInList(conversation.uuid)) {
-      // Fetch list of conversations again.
-      fetchFirstPageConversations()
+      refreshConversationList()
     }
   }
 
@@ -880,6 +916,8 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations.data = []
     conversations.page = 1
     seenConversationUUIDs = new Map()
+    contextSeq++
+    pendingNotificationUUIDs.clear()
     clearSelection()
   }
 
@@ -908,25 +946,34 @@ export const useConversationStore = defineStore('conversation', () => {
     macros.value = { ...macros.value, [context]: {} }
   }
 
-  // Typing indicators
   function updateTypingStatus (typingData) {
-    const { conversation_uuid, is_typing } = typingData
+    const { conversation_uuid: uuid, is_typing } = typingData
 
-    // Only update typing status for the current conversation
-    if (conversation.data?.uuid !== conversation_uuid) return
-
-    if (typingTimeout) {
-      clearTimeout(typingTimeout)
-      typingTimeout = null
+    if (conversation.data?.uuid === uuid) {
+      if (typingTimeout) {
+        clearTimeout(typingTimeout)
+        typingTimeout = null
+      }
+      conversation.isTyping = is_typing
+      if (is_typing) {
+        typingTimeout = setTimeout(() => {
+          conversation.isTyping = false
+          typingTimeout = null
+        }, TYPING_RECEIVE_TIMEOUT)
+      }
     }
 
-    conversation.isTyping = is_typing
-
+    const prev = typingTimeoutsByUUID.get(uuid)
+    if (prev) clearTimeout(prev)
     if (is_typing) {
-      typingTimeout = setTimeout(() => {
-        conversation.isTyping = false
-        typingTimeout = null
-      }, TYPING_RECEIVE_TIMEOUT)
+      typingByUUID[uuid] = true
+      typingTimeoutsByUUID.set(uuid, setTimeout(() => {
+        delete typingByUUID[uuid]
+        typingTimeoutsByUUID.delete(uuid)
+      }, TYPING_RECEIVE_TIMEOUT))
+    } else {
+      delete typingByUUID[uuid]
+      typingTimeoutsByUUID.delete(uuid)
     }
   }
 
@@ -1013,12 +1060,12 @@ export const useConversationStore = defineStore('conversation', () => {
     mergeContactUpdate,
     addNewConversation,
     getContactFullName,
-    fetchParticipants,
     fetchNextMessages,
     fetchNextConversations,
     mergeMessageUpdate,
     updateAssigneeLastSeen,
     markAsUnread,
+    incrementUnread,
     updateConversationMessage,
     snoozeConversation,
     fetchConversation,
@@ -1050,6 +1097,7 @@ export const useConversationStore = defineStore('conversation', () => {
     statusOptionsNoSnooze,
     statusOptions,
     updateTypingStatus,
+    typingByUUID,
     sendTyping,
     drafts,
     fetchAllDrafts,

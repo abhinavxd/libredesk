@@ -7,7 +7,6 @@ import (
 	"net/mail"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -193,13 +192,6 @@ func DedupAndExcludeString(list []string, exclude string) []string {
 	return cleaned
 }
 
-// StripConvUUID removes +conv-{uuid-v4} from an email address if present.
-// Only matches strict UUID v4 format (36 chars).
-// e.g., support+conv-13216cf7-6626-4b0d-a938-46ce65a20701@domain.com -> support@domain.com
-func StripConvUUID(email string) string {
-	return regexpConvUUID.ReplaceAllString(email, "@")
-}
-
 // ExtractConvUUID extracts the conversation UUID from a plus-addressed email.
 // e.g., support+conv-abc12345-1234-4123-1234-123456789abc@domain.com -> abc12345-1234-4123-1234-123456789abc
 // Returns empty string if no valid UUIDv4 found.
@@ -210,70 +202,6 @@ func ExtractConvUUID(email string) string {
 	}
 	// match is "+conv-{uuid}@", extract just the UUID (skip "+conv-" prefix and "@" suffix)
 	return match[6 : len(match)-1]
-}
-
-// DedupAndExcludePlusVariants deduplicates and excludes any of the given inbox addresses and their plus-addressed variants.
-func DedupAndExcludePlusVariants(list []string, excludeAddresses ...string) []string {
-	exclude := make(map[string]struct{}, len(excludeAddresses))
-	for _, addr := range excludeAddresses {
-		if addr != "" {
-			exclude[strings.ToLower(addr)] = struct{}{}
-		}
-	}
-	seen := make(map[string]struct{}, len(list))
-	cleaned := make([]string, 0, len(list))
-	for _, s := range list {
-		if s == "" {
-			continue
-		}
-		if _, skip := exclude[strings.ToLower(StripConvUUID(s))]; skip {
-			continue
-		}
-		if _, ok := seen[s]; !ok {
-			seen[s] = struct{}{}
-			cleaned = append(cleaned, s)
-		}
-	}
-	return cleaned
-}
-
-// ComputeRecipients computes new recipients using last message's recipients and direction.
-func ComputeRecipients(
-	from, to, cc, bcc []string,
-	contactEmail, inboxEmail, inboxReplyTo string,
-	lastMessageIncoming bool,
-) (finalTo, finalCC, finalBCC []string) {
-	if lastMessageIncoming {
-		if len(from) > 0 {
-			finalTo = from
-		} else if contactEmail != "" {
-			finalTo = []string{contactEmail}
-		}
-	} else {
-		if len(to) > 0 {
-			finalTo = to
-		} else if contactEmail != "" {
-			finalTo = []string{contactEmail}
-		}
-	}
-
-	finalCC = append([]string{}, cc...)
-
-	if lastMessageIncoming {
-		if len(to) > 0 {
-			finalCC = append(finalCC, to...)
-		}
-		if contactEmail != "" && !slices.Contains(finalTo, contactEmail) && !slices.Contains(finalCC, contactEmail) {
-			finalCC = append(finalCC, contactEmail)
-		}
-	}
-
-	finalTo = DedupAndExcludePlusVariants(finalTo, inboxEmail, inboxReplyTo)
-	finalCC = DedupAndExcludePlusVariants(finalCC, inboxEmail, inboxReplyTo)
-	// BCC is one-time only, user is supposed to add it manually.
-	finalBCC = []string{}
-
-	return
 }
 
 // ExtractUUID finds and returns the first valid UUID v4 in the given text.

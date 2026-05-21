@@ -7,7 +7,7 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 )
 
-func TestResolveContentCIDs(t *testing.T) {
+func TestResolveAttachmentCIDs(t *testing.T) {
 	tests := []struct {
 		name    string
 		msg     cmodels.Message
@@ -270,9 +270,9 @@ func TestResolveContentCIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resolveContentCIDs(&tt.msg, tt.rootURL)
+			resolveAttachmentCIDs(&tt.msg, tt.rootURL)
 			if tt.msg.Content != tt.want {
-				t.Errorf("resolveContentCIDs()\n got  = %s\n want = %s", tt.msg.Content, tt.want)
+				t.Errorf("resolveAttachmentCIDs()\n got  = %s\n want = %s", tt.msg.Content, tt.want)
 			}
 		})
 	}

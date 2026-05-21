@@ -641,7 +641,7 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	return encrypted, nil
 }
 
-// decryptInboxConfig decrypts sensitive fields in the inbox config JSON.
+// Decrypt failures clear the field so the app stays usable across encryption_key rotation.
 func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, error) {
 	if len(config) == 0 {
 		return config, nil
@@ -652,14 +652,15 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		return nil, fmt.Errorf("unmarshalling config: %w", err)
 	}
 
-	// Decrypt SMTP passwords
 	if smtpSlice, ok := cfg["smtp"].([]any); ok {
 		for i, smtpItem := range smtpSlice {
 			if smtpMap, ok := smtpItem.(map[string]any); ok {
 				if password, ok := smtpMap["password"].(string); ok && password != "" {
 					decrypted, err := crypto.Decrypt(password, m.encryptionKey)
 					if err != nil {
-						return nil, fmt.Errorf("decrypting SMTP password at index %d: %w", i, err)
+						m.lo.Error("error decrypting SMTP password, clearing field", "index", i, "error", err)
+						smtpMap["password"] = ""
+						continue
 					}
 					smtpMap["password"] = decrypted
 				}
@@ -667,14 +668,15 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
-	// Decrypt IMAP passwords
 	if imapSlice, ok := cfg["imap"].([]any); ok {
 		for i, imapItem := range imapSlice {
 			if imapMap, ok := imapItem.(map[string]any); ok {
 				if password, ok := imapMap["password"].(string); ok && password != "" {
 					decrypted, err := crypto.Decrypt(password, m.encryptionKey)
 					if err != nil {
-						return nil, fmt.Errorf("decrypting IMAP password at index %d: %w", i, err)
+						m.lo.Error("error decrypting IMAP password, clearing field", "index", i, "error", err)
+						imapMap["password"] = ""
+						continue
 					}
 					imapMap["password"] = decrypted
 				}
@@ -682,14 +684,15 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
-	// Decrypt OAuth fields if present
 	if oauthMap, ok := cfg["oauth"].(map[string]any); ok {
 		fields := []string{"client_secret", "access_token", "refresh_token"}
 		for _, fieldName := range fields {
 			if fieldValue, ok := oauthMap[fieldName].(string); ok && fieldValue != "" {
 				decrypted, err := crypto.Decrypt(fieldValue, m.encryptionKey)
 				if err != nil {
-					return nil, fmt.Errorf("decrypting OAuth %s: %w", fieldName, err)
+					m.lo.Error("error decrypting OAuth field, clearing field", "field", fieldName, "error", err)
+					oauthMap[fieldName] = ""
+					continue
 				}
 				oauthMap[fieldName] = decrypted
 			}

@@ -1,7 +1,11 @@
 <template>
   <div class="flex flex-col text-left" :class="isOutgoing ? 'items-end' : 'items-start'">
     <!-- Sender Name -->
-    <div class="mb-1 flex items-center gap-1" :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
+    <div
+      v-if="!groupWithPrev"
+      class="mb-1 flex items-center gap-1"
+      :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'"
+    >
       <router-link
         v-if="!isOutgoing"
         :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
@@ -24,18 +28,21 @@
     <!-- Message Bubble -->
     <div class="flex flex-row gap-2 w-full" :class="{ 'justify-end': isOutgoing }">
       <!-- Avatar (left for incoming) -->
-      <router-link
-        v-if="!isOutgoing"
-        :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
-        class="flex-shrink-0"
-      >
-        <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
-          <AvatarImage :src="getAvatar" />
-          <AvatarFallback class="font-medium">
-            {{ avatarFallback }}
-          </AvatarFallback>
-        </Avatar>
-      </router-link>
+      <template v-if="!isOutgoing">
+        <router-link
+          v-if="!groupWithPrev"
+          :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
+          class="flex-shrink-0"
+        >
+          <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
+            <AvatarImage :src="getAvatar" />
+            <AvatarFallback class="font-medium">
+              {{ avatarFallback }}
+            </AvatarFallback>
+          </Avatar>
+        </router-link>
+        <div v-else class="w-8 flex-shrink-0" />
+      </template>
 
       <!-- Bubble Wrapper with max 80% width -->
       <div
@@ -54,19 +61,45 @@
 
           <!-- Message Content -->
           <div
-            v-if="message.content_type === 'text'"
-            class="mb-1 native-html whitespace-pre-wrap"
-            :class="{ 'mb-3': message.attachments.length > 0 }"
+            ref="contentWrapperEl"
+            class="relative"
+            :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
           >
-            {{ sanitizedContent }}
-          </div>
-          <div v-else ref="messageContentEl" @click="onMessageContentClick">
-            <Letter
-              :html="sanitizedContent"
-              :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-              class="mb-1 native-html whitespace-pre-wrap break-words"
+            <div
+              v-if="message.content_type === 'text'"
+              class="mb-1 native-html whitespace-pre-wrap"
               :class="{ 'mb-3': message.attachments.length > 0 }"
-            />
+            >
+              {{ sanitizedContent }}
+            </div>
+            <div v-else ref="messageContentEl" @click="onMessageContentClick">
+              <Letter
+                :html="sanitizedContent"
+                :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+                :allowed-css-properties="extendedCssProperties"
+                class="mb-1 native-html break-words"
+                :class="{ 'mb-3': message.attachments.length > 0 }"
+              />
+            </div>
+
+            <div
+              v-if="isExpandable && !isExpanded"
+              class="absolute left-0 right-0 bottom-0 h-24 flex items-end justify-center pointer-events-none"
+              :class="
+                message.private
+                  ? 'bg-gradient-to-t from-private via-private/90 to-transparent'
+                  : 'bg-gradient-to-t from-background via-background/90 to-transparent'
+              "
+            >
+              <button
+                type="button"
+                @click="isExpanded = true"
+                class="pointer-events-auto flex items-center gap-1.5 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border rounded-full px-3 py-1 mb-1 transition-colors duration-200"
+              >
+                <Maximize2 :size="12" />
+                {{ t('globals.terms.expand') }}
+              </button>
+            </div>
           </div>
 
           <ImageLightbox
@@ -116,28 +149,31 @@
       </div>
 
       <!-- Avatar (right for outgoing) -->
-      <router-link
-        v-if="isOutgoing && canManageUsers"
-        :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
-        class="flex-shrink-0"
-      >
-        <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
+      <template v-if="isOutgoing">
+        <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
+        <router-link
+          v-else-if="canManageUsers"
+          :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
+          class="flex-shrink-0"
+        >
+          <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
+            <AvatarImage :src="getAvatar" />
+            <AvatarFallback class="font-medium">
+              {{ avatarFallback }}
+            </AvatarFallback>
+          </Avatar>
+        </router-link>
+        <Avatar v-else class="w-8 h-8">
           <AvatarImage :src="getAvatar" />
           <AvatarFallback class="font-medium">
             {{ avatarFallback }}
           </AvatarFallback>
         </Avatar>
-      </router-link>
-      <Avatar v-else-if="isOutgoing" class="w-8 h-8">
-        <AvatarImage :src="getAvatar" />
-        <AvatarFallback class="font-medium">
-          {{ avatarFallback }}
-        </AvatarFallback>
-      </Avatar>
+      </template>
     </div>
 
     <!-- Timestamp tooltip -->
-    <div :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
+    <div v-if="!groupWithNext" :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
       <Tooltip>
         <TooltipTrigger>
           <span class="text-muted-foreground text-xs mt-1">
@@ -153,27 +189,62 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, Maximize2 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Letter } from 'vue-letter'
+import { allowedCssProperties } from 'lettersanitizer'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import BubbleAttachmentPreview from '@main/features/conversation/message/attachment/BubbleAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '@main/api'
+import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
+
+const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
+
+const COLLAPSE_THRESHOLD_PX = 400
+
+const contentWrapperEl = ref(null)
+const isExpandable = ref(false)
+const isExpanded = ref(false)
+
+const measureExpandable = () => {
+  const el = contentWrapperEl.value
+  if (!el) return
+  isExpandable.value = el.scrollHeight > COLLAPSE_THRESHOLD_PX
+}
+
+onMounted(async () => {
+  await nextTick()
+  measureExpandable()
+
+  // Email HTML images change height after initial paint - re-measure on load.
+  const imgs = contentWrapperEl.value?.querySelectorAll?.('img') ?? []
+  imgs.forEach((img) => {
+    if (!img.complete) img.addEventListener('load', measureExpandable, { once: true })
+  })
+})
 
 const props = defineProps({
   message: Object,
   direction: {
     type: String,
     validator: (v) => ['incoming', 'outgoing'].includes(v)
+  },
+  groupWithPrev: {
+    type: Boolean,
+    default: false
+  },
+  groupWithNext: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -235,7 +306,7 @@ const retryMessage = (msg) => {
 
 const showQuotedText = ref(false)
 const hasQuotedContent = computed(
-  () => !isOutgoing.value && sanitizedContent.value.includes('<blockquote')
+  () => !isOutgoing.value && containsQuoteMarkers(sanitizedContent.value)
 )
 const toggleQuote = () => {
   showQuotedText.value = !showQuotedText.value

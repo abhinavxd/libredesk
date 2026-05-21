@@ -84,10 +84,11 @@ export default class MessageCache {
      * @param {string} convId - Conversation ID
      * @param {string[]} type - Array of message types to filter - outgoing, incoming, etc.
      * @param {boolean} excludePrivate - Exclude private messages
-     * 
+     * @param {boolean} excludeAutomated - Exclude automated messages (like CSAT surveys, system messages, etc.)
+     *
      * @returns {object} - Latest message object or null if not found
      */
-    getLatestMessage (convId, type = [], excludePrivate = false) {
+    getLatestMessage (convId, type = [], excludePrivate = false, excludeAutomated = false) {
         const conv = this.cache.get(convId)
         if (!conv) return null
 
@@ -100,6 +101,9 @@ export default class MessageCache {
         }
         if (excludePrivate) {
             allMessages = allMessages.filter(msg => !msg.private)
+        }
+        if (excludeAutomated) {
+            allMessages = allMessages.filter(msg => !msg.meta?.is_automated)
         }
 
         // Sort messages by created_at in descending order (newest first)

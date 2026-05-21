@@ -47,7 +47,7 @@ func handleGetMessages(r *fastglue.Request) error {
 		msgTypes = append(msgTypes, string(v))
 	}
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -71,7 +71,8 @@ func handleGetMessages(r *fastglue.Request) error {
 			att := messages[i].Attachments[j]
 			messages[i].Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
 		}
-		resolveContentCIDs(&messages[i], rootURL)
+		resolveQuotedCIDs(app, &messages[i])
+		resolveAttachmentCIDs(&messages[i], rootURL)
 	}
 
 	// Process CSAT status for all messages (will only affect CSAT messages)
@@ -103,7 +104,7 @@ func handleGetMessage(r *fastglue.Request) error {
 		cuuid = r.RequestCtx.UserValue("cuuid").(string)
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -117,6 +118,10 @@ func handleGetMessage(r *fastglue.Request) error {
 	message, err := app.conversation.GetMessage(uuid)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if message.ConversationUUID != cuuid {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, "Permission denied", nil))
 	}
 
 	// Process CSAT status for the message (will only affect CSAT messages)
@@ -134,7 +139,8 @@ func handleGetMessage(r *fastglue.Request) error {
 		att := message.Attachments[j]
 		message.Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
 	}
-	resolveContentCIDs(&message, rootURL)
+	resolveQuotedCIDs(app, &message)
+	resolveAttachmentCIDs(&message, rootURL)
 
 	return r.SendEnvelope(message)
 }
@@ -148,7 +154,7 @@ func handleRetryMessage(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -183,7 +189,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		req   = messageReq{}
 	)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -240,12 +246,16 @@ func handleSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	rootURL, _ := app.setting.GetAppRootURL()
+
 	// Create contact message.
 	if req.SenderType == umodels.UserTypeContact {
 		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
+		resolveQuotedCIDs(app, &message)
+		resolveAttachmentCIDs(&message, rootURL)
 		return r.SendEnvelope(message)
 	}
 
@@ -255,9 +265,11 @@ func handleSendMessage(r *fastglue.Request) error {
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
+		resolveAttachmentCIDs(&message, rootURL)
 		return r.SendEnvelope(message)
 	}
 
+	// Queue outgoing reply.
 	meta := map[string]any{}
 	if req.EchoID != "" {
 		meta["echo_id"] = req.EchoID
@@ -266,12 +278,14 @@ func handleSendMessage(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	resolveQuotedCIDs(app, &message)
+	resolveAttachmentCIDs(&message, rootURL)
 	return r.SendEnvelope(message)
 }
 
-// resolveContentCIDs replaces inline image cid: references in email message content
+// resolveAttachmentCIDs replaces inline image cid: references in email message content
 // with actual attachment URLs and resolves relative /uploads/ paths to absolute URLs.
-func resolveContentCIDs(msg *cmodels.Message, rootURL string) {
+func resolveAttachmentCIDs(msg *cmodels.Message, rootURL string) {
 	for _, att := range msg.Attachments {
 		if att.ContentID != "" && att.URL != "" {
 			msg.Content = strings.ReplaceAll(msg.Content, "cid:"+att.ContentID, att.URL)
@@ -280,5 +294,18 @@ func resolveContentCIDs(msg *cmodels.Message, rootURL string) {
 	if rootURL != "" {
 		msg.Content = strings.ReplaceAll(msg.Content, `src="/uploads/`, `src="`+rootURL+`/uploads/`)
 		msg.Content = strings.ReplaceAll(msg.Content, `src='/uploads/`, `src='`+rootURL+`/uploads/`)
+	}
+}
+
+// resolveQuotedCIDs replaces cid: refs to media on other messages with signed URLs.
+func resolveQuotedCIDs(app *App, msg *cmodels.Message) {
+	refs, err := app.conversation.GetInlineMediaRefs(msg)
+	if err != nil {
+		app.lo.Error("error fetching inline media refs", "conversation_uuid", msg.ConversationUUID, "error", err)
+		return
+	}
+	for _, ref := range refs {
+		url := app.media.GetURL(ref.UUID, ref.ContentType, ref.Filename)
+		msg.Content = strings.ReplaceAll(msg.Content, "cid:"+ref.ContentID, url)
 	}
 }

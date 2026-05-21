@@ -397,6 +397,74 @@ func TestExtractInlineImageUUIDs(t *testing.T) {
 	}
 }
 
+func TestExtractInlineContentIDs(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want []string
+	}{
+		{
+			name: "empty_body",
+			body: "",
+			want: []string{},
+		},
+		{
+			name: "ignores_non_cid_src",
+			body: `<img src="/uploads/` + testUUID + `">`,
+			want: []string{},
+		},
+		{
+			name: "single_cid_extracted",
+			body: `<img src="cid:ldsk-` + testUUID + `">`,
+			want: []string{"ldsk-" + testUUID},
+		},
+		{
+			name: "mixed_cid_and_url_returns_only_cids",
+			body: `<img src="/uploads/` + testUUID + `"><img src="cid:ldsk-` + testUUID2 + `">`,
+			want: []string{"ldsk-" + testUUID2},
+		},
+		{
+			name: "single_quotes_around_src",
+			body: `<img src='cid:ldsk-` + testUUID + `'>`,
+			want: []string{"ldsk-" + testUUID},
+		},
+		{
+			name: "empty_cid_skipped",
+			body: `<img src="cid:">`,
+			want: []string{},
+		},
+		{
+			name: "multi_with_dedup_and_order",
+			body: `<img src="cid:ldsk-` + testUUID2 + `"><img src="cid:ldsk-` + testUUID + `"><img src="cid:ldsk-` + testUUID2 + `">`,
+			want: []string{"ldsk-" + testUUID2, "ldsk-" + testUUID},
+		},
+		{
+			name: "src_after_other_attributes",
+			body: `<img class="inline" alt="x" src="cid:ldsk-` + testUUID + `">`,
+			want: []string{"ldsk-" + testUUID},
+		},
+		{
+			name: "uppercase_cid_prefix_not_matched",
+			body: `<img src="CID:ldsk-` + testUUID + `">`,
+			want: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractInlineContentIDs(tt.body)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("index %d: got %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestRewriteInlineImagesToCID(t *testing.T) {
 	tests := []struct {
 		name string

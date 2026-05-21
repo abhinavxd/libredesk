@@ -10,8 +10,10 @@ export const createFormSchema = (t) =>
                 .max(255, { message: t('admin.sla.name.valid') }),
             description: z
                 .string()
-                .min(1, { message: t('admin.sla.description.valid') })
-                .max(255, { message: t('admin.sla.description.valid') }),
+                .max(255, { message: t('admin.sla.description.valid') })
+                .nullable()
+                .optional()
+                .transform(v => v ?? ''),
             first_response_time: z.string().nullable().optional().refine(val => !val || isGoHourMinuteDuration(val), {
                 message: t('validation.invalidDuration'),
             }),

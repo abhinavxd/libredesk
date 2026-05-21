@@ -26,7 +26,7 @@ func handleUpsertConversationDraft(r *fastglue.Request) error {
 		req   = draftReq{}
 	)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -66,7 +66,7 @@ func handleGetAllDrafts(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -87,7 +87,7 @@ func handleDeleteConversationDraft(r *fastglue.Request) error {
 		uuid  = r.RequestCtx.UserValue("uuid").(string)
 	)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

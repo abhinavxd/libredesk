@@ -16,7 +16,7 @@ func handleGetUserViews(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -37,7 +37,7 @@ func handleCreateUserView(r *fastglue.Request) error {
 	if err := r.Decode(&view, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -64,7 +64,7 @@ func handleDeleteUserView(r *fastglue.Request) error {
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -96,7 +96,7 @@ func handleUpdateUserView(r *fastglue.Request) error {
 	if err := r.Decode(&view, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -127,7 +127,7 @@ func handleGetSharedViews(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

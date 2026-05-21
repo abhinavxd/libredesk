@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/context_link/models"
+	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -141,12 +141,11 @@ func handleGetContextLinkURL(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
-	// Verify agent has access to this conversation.
-	user, err := app.user.GetAgent(auser.ID, "")
+	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	conv, err := enforceConversationAccess(app, conversationUUID, user)
+	conv, err := enforceConversationAccess(app, conversationUUID, agent)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

@@ -8,17 +8,19 @@
       >
         <div class="flex items-center space-x-2">
           <RadioGroupItem value="OR" />
-          <Label
-            >{{ $t('admin.automation.match') }} <b>{{ $t('admin.automation.any') }}</b>
-            {{ $t('admin.automation.below') }}.</Label
-          >
+          <Label>
+            <i18n-t keypath="admin.automation.matchBelow">
+              <template #any_or_all><b>{{ $t('admin.automation.any') }}</b></template>
+            </i18n-t>
+          </Label>
         </div>
         <div class="flex items-center space-x-2">
           <RadioGroupItem value="AND" />
-          <Label
-            >{{ $t('admin.automation.match') }} <b>{{ $t('admin.automation.all') }}</b>
-            {{ $t('admin.automation.below') }}.</Label
-          >
+          <Label>
+            <i18n-t keypath="admin.automation.matchBelow">
+              <template #any_or_all><b>{{ $t('admin.automation.all') }}</b></template>
+            </i18n-t>
+          </Label>
         </div>
       </RadioGroup>
     </div>

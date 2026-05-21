@@ -65,6 +65,7 @@
             v-else
             :html="message.content"
             :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+            :allowed-css-properties="extendedCssProperties"
             class="mb-1 native-html"
           />
           <div
@@ -151,6 +152,7 @@ import { useChatStore } from '../store/chat.js'
 import { useRelativeTime } from '@widget/composables/useRelativeTime.js'
 import { useI18n } from 'vue-i18n'
 import { Letter } from 'vue-letter'
+import { allowedCssProperties } from 'lettersanitizer'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import ChatIntro from './ChatIntro.vue'
 import NoticeBanner from './NoticeBanner.vue'
@@ -158,6 +160,9 @@ import MessageAttachment from './MessageAttachment.vue'
 import CSATMessageBubble from './CSATMessageBubble.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
+
+const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 
 const props = defineProps({
   showPreChatForm: {
@@ -183,9 +188,7 @@ const getMessageTime = (timestamp) => {
   return useRelativeTime(new Date(timestamp)).value
 }
 
-const hasQuotedContent = (content) => {
-  return content && content.includes('<blockquote')
-}
+const hasQuotedContent = (content) => containsQuoteMarkers(content)
 
 const isQuotedTextVisible = (messageUuid) => {
   return quotedTextState.value[messageUuid] || false

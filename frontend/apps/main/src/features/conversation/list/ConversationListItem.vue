@@ -3,10 +3,11 @@
     <ContextMenuTrigger asChild>
       <router-link
         :to="conversationRoute"
-        class="group relative block px-3 py-3 transition-all duration-200 ease-in-out cursor-pointer hover:bg-accent/20 dark:hover:bg-accent/60"
+        class="group relative block px-3 py-3 transition-all duration-200 ease-in-out cursor-pointer"
         :class="{
-          'bg-accent/60': conversation.uuid === currentConversation?.uuid,
-          'bg-primary/5': isItemSelected && conversation.uuid !== currentConversation?.uuid
+          'bg-accent': isCurrent,
+          'bg-primary/5 hover:bg-primary/10': isItemSelected && !isCurrent,
+          'hover:bg-accent/40': !isCurrent && !isItemSelected
         }"
       >
         <div class="flex items-start gap-2">
@@ -51,9 +52,14 @@
               <!-- Contact name + inbox + time -->
               <div class="flex items-baseline justify-between gap-2">
                 <div class="flex items-baseline gap-1.5 min-w-0">
-                  <h3 class="text-sm font-semibold truncate text-foreground">
-                    {{ contactFullName }}
-                  </h3>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <h3 class="text-sm font-semibold truncate text-foreground">
+                        {{ contactFullName }}
+                      </h3>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ contactFullName }}</TooltipContent>
+                  </Tooltip>
                   <span class="text-xs text-muted-foreground truncate">
                     {{ conversation.inbox_name }}
                   </span>
@@ -78,7 +84,10 @@
             <!-- Message preview + unread count -->
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm flex-1 min-w-0 truncate text-muted-foreground">
-                <template v-if="hasDraftForConversation">
+                <template v-if="isTyping">
+                  <span class="italic text-primary">{{ $t('globals.terms.typing') }}...</span>
+                </template>
+                <template v-else-if="hasDraftForConversation">
                   <span class="font-medium text-primary">{{ $t('globals.terms.draft') }}:</span>
                   {{ draftPreview }}
                 </template>
@@ -154,6 +163,7 @@ import {
   ContextMenuTrigger
 } from '@shared-ui/components/ui/context-menu'
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'
 import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
@@ -228,12 +238,17 @@ const hasDraftForConversation = computed(() => {
   return conversationStore.hasDraft(props.conversation.uuid)
 })
 
+const isTyping = computed(() => conversationStore.typingByUUID[props.conversation.uuid] === true)
+
 const draftPreview = computed(() => {
   const draft = conversationStore.getDraft(props.conversation.uuid)
   if (!draft?.content) return ''
   const text = draft.content.replace(/<[^>]*>/g, '').trim()
+  if (!text && /<img\b/i.test(draft.content)) return t('globals.terms.image', 1)
   return text.length > 120 ? text.slice(0, 120) + '...' : text
 })
+
+const isCurrent = computed(() => props.conversation.uuid === props.currentConversation?.uuid)
 
 const isItemSelected = computed(() => {
   return conversationStore.isSelected(props.conversation.uuid)

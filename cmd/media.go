@@ -101,7 +101,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 
 	// Generate and upload thumbnail and store image dimensions in the media meta.
 	var meta = []byte("{}")
-	if slices.Contains(image.Exts, srcExt) || image.IsImageByContent(file) {
+	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
 		file.Seek(0, 0)
 		thumbFile, err := image.CreateThumb(image.DefThumbSize, file)
 		if err != nil {
@@ -165,7 +165,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	// Session/API key authenticated - perform full permission check.
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

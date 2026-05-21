@@ -170,8 +170,8 @@ func handleWidgetWS(r *fastglue.Request) error {
 					continue
 				}
 				if userID > 0 {
-					wasOffline := app.user.IsOffline(userID)
-					if err := app.user.UpdateLastActive(userID); err != nil {
+					wasOffline, err := app.user.UpdateLastActive(userID)
+					if err != nil {
 						app.lo.Error("error updating user last active timestamp", "user_id", userID, "error", err)
 					} else if wasOffline {
 						app.conversation.BroadcastContactUpdate(userID, map[string]any{"availability_status": "online"})
