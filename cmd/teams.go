@@ -88,7 +88,9 @@ func handleUpdateTeam(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	members, err := app.team.GetMembers(id)
-	if err == nil {
+	if err != nil {
+		app.lo.Error("error fetching team members for cache invalidation", "team_id", id, "error", err)
+	} else {
 		for _, m := range members {
 			app.user.InvalidateAgentCache(m.ID)
 		}
