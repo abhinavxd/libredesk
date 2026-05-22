@@ -1,8 +1,8 @@
 <template>
   <div
     v-if="
-      conversationStore.current?.previous_conversations?.length === 0 ||
-      conversationStore.conversation?.loading
+      !conversationStore.conversation?.loading &&
+      conversationStore.current?.previous_conversations?.length === 0
     "
     class="text-center text-sm text-muted-foreground py-4"
   >

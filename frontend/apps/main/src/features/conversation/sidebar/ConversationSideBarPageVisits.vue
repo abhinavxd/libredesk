@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="pageVisits.length === 0" class="text-center text-sm text-muted-foreground py-4">
+    <div v-if="loaded && pageVisits.length === 0" class="text-center text-sm text-muted-foreground py-4">
       {{ t('globals.messages.noResultsFound') }}
     </div>
     <div v-else class="space-y-1">
@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useI18n } from 'vue-i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
@@ -53,6 +53,7 @@ import api from '../../../api'
 const conversationStore = useConversationStore()
 const conversation = computed(() => conversationStore.current)
 const { t } = useI18n()
+const loaded = ref(false)
 
 const pageVisits = computed(() => {
   const visits = conversation.value?.contact?.page_visits || []
@@ -68,18 +69,23 @@ const pageVisits = computed(() => {
 watch(
   () => conversation.value?.uuid,
   async (uuid) => {
-    if (uuid && conversation.value?.inbox_channel === 'livechat') {
-      try {
-        const resp = await api.getContactPageVisits(uuid)
-        if (resp.data?.data) {
-          conversationStore.mergeContactUpdate({
-            contact_id: conversation.value?.contact_id,
-            page_visits: resp.data.data
-          })
-        }
-      } catch {
-        // Page visits are optional.
+    loaded.value = false
+    if (!uuid || conversation.value?.inbox_channel !== 'livechat') {
+      loaded.value = true
+      return
+    }
+    try {
+      const resp = await api.getContactPageVisits(uuid)
+      if (resp.data?.data) {
+        conversationStore.mergeContactUpdate({
+          contact_id: conversation.value?.contact_id,
+          page_visits: resp.data.data
+        })
       }
+    } catch {
+      // Page visits are optional.
+    } finally {
+      loaded.value = true
     }
   },
   { immediate: true }

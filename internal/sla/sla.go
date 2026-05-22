@@ -514,7 +514,6 @@ func (m *Manager) SendNotifications(ctx context.Context) error {
 						m.lo.Error("error sending notification", "error", err)
 					}
 				}
-				m.lo.Info("sent SLA notifications", "count", len(notifications))
 			}
 			<-ticker.C
 		}

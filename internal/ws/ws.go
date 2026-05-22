@@ -168,6 +168,18 @@ func (h *Hub) RemoveClient(client *Client) {
 	h.ClearClientSubs(client)
 }
 
+func (h *Hub) ConnectedUserIDs() []int {
+	h.clientsMutex.RLock()
+	defer h.clientsMutex.RUnlock()
+	out := make([]int, 0, len(h.clients))
+	for id, clients := range h.clients {
+		if len(clients) > 0 {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // PushToClients sends a raw payload directly to the given client connections.
 func (h *Hub) PushToClients(clients []*Client, data []byte) {
 	for _, c := range clients {

@@ -3,19 +3,22 @@
     <div ref="threadEl" class="flex-1 overflow-y-auto" @scroll="handleScroll">
       <div class="min-h-full px-4 pb-10">
         <div
+          v-if="showLoadMore"
           class="text-center mt-3"
-          v-if="
-            conversationStore.currentConversationHasMoreMessages &&
-            !conversationStore.messages.loading
-          "
         >
           <Button
             size="sm"
             variant="outline"
-            @click="conversationStore.fetchNextMessages"
-            class="transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-105 active:scale-95"
+            @click="loadMore"
+            :disabled="conversationStore.messages.fetching"
+            class="transition-all duration-200 hover:bg-accent hover:scale-105 active:scale-95"
           >
-            <RefreshCw size="17" class="mr-2" />
+            <Loader2
+              v-if="conversationStore.messages.fetching"
+              size="17"
+              class="mr-2 animate-spin"
+            />
+            <RefreshCw v-else size="17" class="mr-2" />
             {{ $t('globals.terms.loadMore') }}
           </Button>
         </div>
@@ -68,14 +71,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
-import { RefreshCw, ChevronDown } from 'lucide-vue-next'
+import { RefreshCw, Loader2 } from 'lucide-vue-next'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
@@ -248,6 +251,20 @@ const canGroup = (a, b) => {
 const getSpacingClass = (index, groupWithPrev) => {
   if (index === 0) return 'pt-4'
   return groupWithPrev ? 'mt-1' : 'mt-4'
+}
+
+const showLoadMore = computed(
+  () => conversationStore.currentConversationHasMoreMessages && !conversationStore.messages.loading
+)
+
+const loadMore = async () => {
+  const thread = threadEl.value
+  if (!thread) return
+  const prevHeight = thread.scrollHeight
+  const prevTop = thread.scrollTop
+  await conversationStore.fetchNextMessages()
+  await nextTick()
+  thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
 }
 
 const messageRows = computed(() => {

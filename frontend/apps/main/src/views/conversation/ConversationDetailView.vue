@@ -1,9 +1,15 @@
 <template>
   <div class="relative h-full">
+    <div
+      v-if="isLoading"
+      class="conv-progress absolute inset-x-0 top-0 h-0.5 z-50 pointer-events-none"
+    />
     <ResizablePanelGroup
       v-if="showContent"
       direction="horizontal"
-      class="h-full"
+      class="h-full transition-opacity duration-200"
+      :class="{ 'opacity-60': isDimmed }"
+      :inert="isDimmed"
       @layout="onLayoutChange"
     >
       <!-- Conversation Content Panel -->
@@ -67,6 +73,12 @@ const showContent = computed(
   () => conversationStore.current || conversationStore.conversation.loading
 )
 
+const isLoading = computed(
+  () => conversationStore.conversation.loading || conversationStore.messages.loading
+)
+
+const isDimmed = computed(() => conversationStore.conversation.loading)
+
 const toggleSidebar = () => {
   if (sidebarOpen.value) {
     sidebarPanelRef.value?.collapse()
@@ -125,13 +137,31 @@ onMounted(() => {
   if (props.uuid) fetchConversation(props.uuid)
 })
 
-// Watcher for UUID changes
 watch(
   () => props.uuid,
   (newUUID, oldUUID) => {
-    if (newUUID && newUUID !== oldUUID) {
+    if (!newUUID || newUUID === oldUUID) return
+    const canTransition = oldUUID && typeof document.startViewTransition === 'function'
+    if (!canTransition) {
       fetchConversation(newUUID)
+      return
     }
+    document.startViewTransition(async () => {
+      fetchConversation(newUUID)
+      await nextTick()
+    })
   }
 )
 </script>
+
+<style scoped>
+.conv-progress {
+  background-color: hsl(var(--primary) / 0.4);
+  animation: conv-progress-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes conv-progress-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+</style>

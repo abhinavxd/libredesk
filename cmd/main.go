@@ -356,6 +356,7 @@ func onUsersOffline(conv *conversation.Manager) func([]umodels.OfflineUser) {
 			switch u.Type {
 			case umodels.UserTypeAgent:
 				conv.BroadcastAgentStatusToWidget(u.ID, umodels.Offline)
+				conv.BroadcastAgentAvailability(u.ID, umodels.Offline)
 			case umodels.UserTypeContact, umodels.UserTypeVisitor:
 				conv.BroadcastContactUpdate(u.ID, map[string]any{"availability_status": umodels.Offline})
 			}

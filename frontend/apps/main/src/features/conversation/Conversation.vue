@@ -3,23 +3,19 @@
     <!-- Header -->
     <div class="h-12 flex-shrink-0 px-2 border-b flex items-center justify-between">
       <div>
-        <span v-if="!conversationStore.conversation.loading">
-          {{ conversationStore.currentContactName }}
-        </span>
-        <Skeleton class="w-[130px] h-6" v-else />
+        <span>{{ conversationStore.currentContactName }}</span>
       </div>
       <div>
         <DropdownMenu>
           <DropdownMenuTrigger>
             <div
+              v-if="conversationStore.current?.status"
               class="flex items-center space-x-1 cursor-pointer bg-primary px-2 py-1 rounded text-sm"
-              v-if="!conversationStore.conversation.loading"
             >
               <span class="text-secondary font-medium inline-block">
                 {{ conversationStore.current?.status }}
               </span>
             </div>
-            <Skeleton class="w-[70px] h-6 rounded-full" v-else />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuItem
@@ -55,7 +51,6 @@ import ReplyBox from './ReplyBox.vue'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
-import { Skeleton } from '@shared-ui/components/ui/skeleton'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
 
