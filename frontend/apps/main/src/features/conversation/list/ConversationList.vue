@@ -101,7 +101,7 @@
         leave-to-class="opacity-0 transform translate-y-4"
       >
         <div
-          v-if="!hasErrored"
+          v-if="!hasErrored && !conversationStore.conversations.loading"
           key="list"
           class="divide-y divide-border"
           :class="{ 'border-b border-border': hasConversations }"
