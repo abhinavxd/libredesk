@@ -139,15 +139,15 @@ onMounted(() => {
 
 watch(
   () => props.uuid,
-  async (newUUID, oldUUID) => {
+  (newUUID, oldUUID) => {
     if (!newUUID || newUUID === oldUUID) return
     const canTransition = oldUUID && typeof document.startViewTransition === 'function'
     if (!canTransition) {
-      await fetchConversation(newUUID)
+      fetchConversation(newUUID)
       return
     }
     document.startViewTransition(async () => {
-      await fetchConversation(newUUID)
+      fetchConversation(newUUID)
       await nextTick()
     })
   }
