@@ -1,6 +1,6 @@
 const pendingHides = new WeakMap()
 
-export function delayedLoading (target, key, delayMs = 300, minVisibleMs = 300) {
+export function delayedLoading (target, key, delayMs = 300, minVisibleMs = 500) {
   const prevHide = pendingHides.get(target)?.get(key)
   if (prevHide !== undefined) {
     clearTimeout(prevHide)
