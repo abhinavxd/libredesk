@@ -253,8 +253,11 @@ const cancelAddNote = () => {
 }
 
 const addOrUpdateNote = async () => {
+  const targetId = props.contactId
+  if (!targetId) return
   try {
-    await api.createContactNote(props.contactId, { note: newNote.value })
+    await api.createContactNote(targetId, { note: newNote.value })
+    notesCache.delete(targetId)
     await fetchNotes(props.contactId, { useCache: false })
     cancelAddNote()
   } catch (error) {
@@ -266,14 +269,17 @@ const addOrUpdateNote = async () => {
 }
 
 const deleteNote = async (noteId) => {
+  const targetId = props.contactId
+  if (!targetId) return
   try {
-    await api.deleteContactNote(props.contactId, noteId)
+    await api.deleteContactNote(targetId, noteId)
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
   } finally {
+    notesCache.delete(targetId)
     await fetchNotes(props.contactId, { useCache: false })
   }
 }

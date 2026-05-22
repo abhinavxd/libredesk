@@ -31,7 +31,7 @@ export default class MessageCache {
     }
 
     hasMessage (convId, msgId) {
-        return this.#allMessages(convId).some(m => m.uuid === msgId)
+        return this._allMessages(convId).some(m => m.uuid === msgId)
     }
 
     addMessage (convId, message) {
@@ -45,12 +45,12 @@ export default class MessageCache {
     }
 
     getAllPagesMessages (convId) {
-        return this.#allMessages(convId)
+        return this._allMessages(convId)
             .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
     }
 
     getLatestMessage (convId, type = [], excludePrivate = false, excludeAutomated = false) {
-        const filtered = this.#allMessages(convId).filter(msg => {
+        const filtered = this._allMessages(convId).filter(msg => {
             if (type.length > 0 && !type.includes(msg.type)) return false
             if (excludePrivate && msg.private) return false
             if (excludeAutomated && msg.meta?.is_automated) return false
@@ -61,11 +61,11 @@ export default class MessageCache {
     }
 
     updateMessage (convId, msgId, updates) {
-        this.#updateMessageBy(convId, msgId, msg => Object.assign(msg, updates))
+        this._updateMessageBy(convId, msgId, msg => Object.assign(msg, updates))
     }
 
     updateMessageField (convId, msgId, field, value) {
-        this.#updateMessageBy(convId, msgId, msg => { msg[field] = value })
+        this._updateMessageBy(convId, msgId, msg => { msg[field] = value })
     }
 
     removeMessage (convId, msgId) {
@@ -99,13 +99,13 @@ export default class MessageCache {
         return this.cache.has(convId)
     }
 
-    #allMessages (convId) {
+    _allMessages (convId) {
         const conv = this.cache.get(convId)
         if (!conv) return []
         return Array.from(conv.pages.values()).flat()
     }
 
-    #updateMessageBy (convId, msgId, mutate) {
+    _updateMessageBy (convId, msgId, mutate) {
         const conv = this.cache.get(convId)
         if (!conv) return
         conv.pages.forEach(msgs => {

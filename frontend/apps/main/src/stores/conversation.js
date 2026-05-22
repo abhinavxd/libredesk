@@ -788,7 +788,7 @@ export const useConversationStore = defineStore('conversation', () => {
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) refreshConversationList()
     })
-    setInterval(refreshConversationList, 30000)
+    setInterval(refreshConversationList, 60000)
   }
 
   function updateConversationLastMessage (uuid, message) {
@@ -945,6 +945,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (conversations.status !== '' && payload.status !== conversations.status) return
     if (!conversations.data) conversations.data = []
     conversations.data.unshift(payload)
+    conversations.total += 1
     trimListToCurrentPage()
   }
 

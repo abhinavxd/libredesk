@@ -783,6 +783,7 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 
 // UpdateAssignee updates the assignee of a conversation.
 func (c *Manager) UpdateAssignee(uuid string, assigneeID int, assigneeType string) error {
+	prev, prevErr := c.GetConversationListItem(uuid)
 	switch assigneeType {
 	case models.AssigneeTypeUser:
 		if _, err := c.q.UpdateConversationAssignedUser.Exec(uuid, assigneeID); err != nil {
@@ -797,11 +798,16 @@ func (c *Manager) UpdateAssignee(uuid string, assigneeID int, assigneeType strin
 	default:
 		return fmt.Errorf("invalid assignee type: %s", assigneeType)
 	}
-	if item, err := c.GetConversationListItem(uuid); err == nil {
-		c.BroadcastNewConversation(&item)
-	} else {
-		c.lo.Error("error fetching conversation list item for assignee broadcast", "uuid", uuid, "error", err)
+	next, nextErr := c.GetConversationListItem(uuid)
+	if nextErr != nil {
+		c.lo.Error("error fetching conversation list item for assignee broadcast", "uuid", uuid, "error", nextErr)
+		return nil
 	}
+	var prevPtr *models.ConversationListItem
+	if prevErr == nil {
+		prevPtr = &prev
+	}
+	c.BroadcastConvReassignment(prevPtr, &next)
 	return nil
 }
 
@@ -1353,6 +1359,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 
 // RemoveConversationAssignee removes assigned user from a conversation.
 func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.User) error {
+	prev, prevErr := m.GetConversationListItem(uuid)
 	if _, err := m.q.RemoveConversationAssignee.Exec(uuid, typ); err != nil {
 		m.lo.Error("error removing conversation assignee", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
@@ -1378,11 +1385,16 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 		}
 	}
 
-	if item, err := m.GetConversationListItem(uuid); err == nil {
-		m.BroadcastNewConversation(&item)
-	} else {
-		m.lo.Error("error fetching conversation list item for unassign broadcast", "uuid", uuid, "error", err)
+	next, nextErr := m.GetConversationListItem(uuid)
+	if nextErr != nil {
+		m.lo.Error("error fetching conversation list item for unassign broadcast", "uuid", uuid, "error", nextErr)
+		return nil
 	}
+	var prevPtr *models.ConversationListItem
+	if prevErr == nil {
+		prevPtr = &prev
+	}
+	m.BroadcastConvReassignment(prevPtr, &next)
 
 	return nil
 }

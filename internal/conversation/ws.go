@@ -12,7 +12,23 @@ import (
 )
 
 func (m *Manager) BroadcastNewConversation(conv *cmodels.ConversationListItem) {
+	m.broadcastConvToAuthorized(conv, nil)
+}
+
+// BroadcastConvReassignment notifies the union of agents authorized under old and new assignee state, so agents losing access receive the updated payload and their frontend can filter the conv out.
+func (m *Manager) BroadcastConvReassignment(oldConv, newConv *cmodels.ConversationListItem) {
+	m.broadcastConvToAuthorized(newConv, oldConv)
+}
+
+func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationListItem) {
+	if conv == nil {
+		return
+	}
 	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID)
+	if oldConv != nil {
+		prevIDs := m.AuthorizedConnectedAgentIDs(oldConv.AssignedUserID, oldConv.AssignedTeamID)
+		userIDs = unionIntSlices(userIDs, prevIDs)
+	}
 	if len(userIDs) == 0 {
 		return
 	}
@@ -245,5 +261,25 @@ func convToBroadcastMap(conv *cmodels.ConversationListItem) map[string]any {
 	}
 	delete(out, "unread_message_count")
 	delete(out, "mentioned_message_uuid")
+	return out
+}
+
+func unionIntSlices(a, b []int) []int {
+	seen := make(map[int]struct{}, len(a)+len(b))
+	out := make([]int, 0, len(a)+len(b))
+	for _, id := range a {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	for _, id := range b {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
 	return out
 }

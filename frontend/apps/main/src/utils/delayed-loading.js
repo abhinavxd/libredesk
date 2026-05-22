@@ -41,6 +41,12 @@ export function delayedLoading (target, key, delayMs = 300, minVisibleMs = 300) 
     },
     cancel () {
       if (showTimer) clearTimeout(showTimer)
+      const pendingHide = pendingHides.get(target)?.get(key)
+      if (pendingHide !== undefined) {
+        clearTimeout(pendingHide)
+        pendingHides.get(target).delete(key)
+      }
+      target[key] = false
     }
   }
 }
