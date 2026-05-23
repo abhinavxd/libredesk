@@ -35,7 +35,7 @@ onMounted(() => {
     }
     conversationStore.fetchConversationsList(
       true,
-      CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED,
+      CONVERSATION_LIST_TYPE.TEAM,
       teamID.value
     )
   }
@@ -65,7 +65,7 @@ watch(
       }
       conversationStore.fetchConversationsList(
         true,
-        CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED,
+        CONVERSATION_LIST_TYPE.TEAM,
         newTeamID
       )
     }
