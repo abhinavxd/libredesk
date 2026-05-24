@@ -872,19 +872,21 @@ INSERT INTO conversation_mentions (conversation_id, message_id, mentioned_user_i
 VALUES ($1, $2, $3, $4, $5);
 
 -- name: mark-conversation-unread
-INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
-VALUES (
-    $1,
-    (SELECT id FROM conversations WHERE uuid = $2),
-    (SELECT created_at - INTERVAL '1 second' FROM conversation_messages
-     WHERE conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
-     ORDER BY created_at DESC LIMIT 1)
+WITH target AS (
+    SELECT id FROM conversations WHERE uuid = $2
+),
+last_msg AS (
+    SELECT created_at - INTERVAL '1 second' AS ts
+    FROM conversation_messages
+    WHERE conversation_id = (SELECT id FROM target)
+      AND (meta IS NULL OR NOT COALESCE((meta->>'continuity_email')::boolean, false))
+    ORDER BY created_at DESC LIMIT 1
 )
+INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
+SELECT $1, (SELECT id FROM target), ts FROM last_msg
 ON CONFLICT (conversation_id, user_id)
 DO UPDATE SET
-    last_seen_at = (SELECT created_at - INTERVAL '1 second' FROM conversation_messages
-                    WHERE conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
-                    ORDER BY created_at DESC LIMIT 1),
+    last_seen_at = EXCLUDED.last_seen_at,
     updated_at = NOW();
 
 -- name: get-active-livechat-conversations-by-agent
