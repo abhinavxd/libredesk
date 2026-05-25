@@ -209,11 +209,8 @@ func (m *Manager) BroadcastAgentAvailability(agentID int, status string) {
 			"availability_status": status,
 		},
 	})
-}
 
-// BroadcastAgentStatusToWidget sends a lightweight assignee availability update
-// to widget clients for all active livechat conversations assigned to the given agent.
-func (m *Manager) BroadcastAgentStatusToWidget(agentID int, status string) {
+	// Get all recent live chat conversations for this agent and broadcast the availability update to online widgets.
 	var conversations []struct {
 		UUID      string `db:"uuid"`
 		ContactID int    `db:"contact_id"`

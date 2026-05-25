@@ -121,8 +121,7 @@ func handleUpdateAgentAvailability(r *fastglue.Request) error {
 	}
 	app.user.InvalidateAgentCache(auser.ID)
 
-	go app.conversation.BroadcastAgentStatusToWidget(auser.ID, availReq.Status)
-	go app.conversation.BroadcastAgentAvailability(auser.ID, availReq.Status)
+	app.conversation.BroadcastAgentAvailability(auser.ID, availReq.Status)
 
 	// Skip activity log when returning online from idle-away to avoid log spam.
 	if !(agent.AvailabilityStatus == models.Away && availReq.Status == models.Online) {
