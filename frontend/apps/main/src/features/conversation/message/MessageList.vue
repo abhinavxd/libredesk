@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col relative h-full">
-    <div ref="threadEl" class="flex-1 overflow-y-auto" @scroll="handleScroll">
-      <div class="min-h-full px-4 pb-10">
+    <div ref="threadEl" class="flex-1 overflow-y-auto [overflow-anchor:none]" @scroll="handleScroll">
+      <div ref="contentEl" class="min-h-full px-4 pb-10">
         <div
           v-if="showLoadMore"
           class="text-center mt-3"
@@ -40,7 +40,7 @@
                 :group-with-next="row.groupWithNext"
               />
             </div>
-            <div v-else-if="isPrivateNote(row.message)">
+            <div v-else-if="row.message.type === 'outgoing' && row.message.private">
               <MessageBubble
                 :message="row.message"
                 direction="outgoing"
@@ -63,7 +63,7 @@
 
     <!-- Sticky container for the scroll arrow -->
     <ScrollToBottomButton
-      :is-at-bottom="isAtBottom"
+      :is-at-bottom="!hasUserScrolled"
       :unread-count="unReadMessages"
       @scroll-to-bottom="handleScrollToBottom"
     />
@@ -84,124 +84,83 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import MessagesSkeleton from './MessagesSkeleton.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
+import { useStickyScroll } from '@shared-ui/composables'
 
 const route = useRoute()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const threadEl = ref(null)
+const contentEl = ref(null)
 const emitter = useEmitter()
-const isAtBottom = ref(true)
 const unReadMessages = ref(0)
-const currentConversationUUID = ref('')
+let currentConversationUUID = ''
+let pendingScrollTo = null
 
-const checkIfAtBottom = () => {
-  const thread = threadEl.value
-  if (thread) {
-    const tolerance = 100
-    const isBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight <= tolerance
-    isAtBottom.value = isBottom
-  }
-}
-
-const handleScroll = () => {
-  checkIfAtBottom()
-}
+const { hasUserScrolled, scrollToBottom, handleScroll } = useStickyScroll(threadEl, contentEl, {
+  skipAutoScroll: () => !!pendingScrollTo,
+  onArriveBottom: () => { unReadMessages.value = 0 }
+})
 
 const handleScrollToBottom = () => {
+  hasUserScrolled.value = false
   scrollToBottom()
 }
 
-const scrollToBottom = () => {
-  setTimeout(() => {
-    const thread = threadEl.value
-    if (thread) {
-      thread.scrollTop = thread.scrollHeight
-      checkIfAtBottom()
-    }
-  }, 50)
-}
-
 const scrollToMessage = (messageUUID) => {
-  if (!messageUUID) {
+  if (!messageUUID) return scrollToBottom()
+  const thread = threadEl.value
+  const messageEl = thread?.querySelector(`[data-message-uuid="${messageUUID}"]`)
+  if (!messageEl || !thread) {
     scrollToBottom()
     return
   }
+  // Position message at ~1/3 from top of viewport for better visibility
+  thread.scrollTop = Math.max(0, messageEl.offsetTop - thread.clientHeight / 3 + messageEl.offsetHeight / 2)
+  messageEl.classList.add('highlight-mention')
+  setTimeout(() => messageEl.classList.remove('highlight-mention'), 2500)
+}
 
-  setTimeout(() => {
-    const thread = threadEl.value
-    const messageEl = thread?.querySelector(`[data-message-uuid="${messageUUID}"]`)
-    if (messageEl && thread) {
-      // Manual scroll calculation for reliability with variable-height messages
-      const messageTop = messageEl.offsetTop
-      const threadHeight = thread.clientHeight
-      const messageHeight = messageEl.offsetHeight
-      // Position message at ~1/3 from top of viewport for better visibility
-      const targetScroll = messageTop - threadHeight / 3 + messageHeight / 2
-      thread.scrollTop = Math.max(0, targetScroll)
-
-      // Highlight the message briefly
-      messageEl.classList.add('highlight-mention')
-      setTimeout(() => messageEl.classList.remove('highlight-mention'), 2500)
-    } else {
-      // Message not found, scroll to bottom instead
-      scrollToBottom()
-    }
-  }, 150)
+const newMessageHandler = (data) => {
+  if (data.conversation_uuid !== conversationStore.current.uuid) return
+  if (data.message?.sender_id === userStore.userID) {
+    hasUserScrolled.value = false
+    return
+  }
+  if (hasUserScrolled.value) unReadMessages.value++
 }
 
 onMounted(() => {
-  checkIfAtBottom()
-  handleNewMessage()
-})
-
-const newMessageHandler = (data) => {
-  if (data.conversation_uuid === conversationStore.current.uuid) {
-    // Agent's own message - always scroll to bottom
-    if (data.message?.sender_id === userStore.userID) {
-      scrollToBottom()
-    }
-    // Customer message - only scroll if already at bottom
-    else if (isAtBottom.value) {
-      scrollToBottom()
-    }
-    // Customer message but not at bottom - don't scroll, increment unread
-    else {
-      unReadMessages.value++
-    }
-  }
-}
-
-const handleNewMessage = () => {
   emitter.on(EMITTER_EVENTS.NEW_MESSAGE, newMessageHandler)
-}
+})
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.NEW_MESSAGE, newMessageHandler)
 })
 
 watch(
-  () => conversationStore.conversationMessages,
-  (messages) => {
-    // Scroll to bottom when conversation changes and there are new messages.
-    // New messages on next db page should not scroll to bottom.
-    if (
-      messages.length > 0 &&
-      conversationStore?.current?.uuid &&
-      currentConversationUUID.value !== conversationStore.current.uuid
-    ) {
-      currentConversationUUID.value = conversationStore.current.uuid
-      unReadMessages.value = 0
+  () => conversationStore.current?.uuid,
+  (newUUID) => {
+    if (!newUUID || newUUID === currentConversationUUID) return
+    currentConversationUUID = newUUID
+    unReadMessages.value = 0
+    pendingScrollTo = route.query.scrollTo || null
+    hasUserScrolled.value = !!pendingScrollTo
+  }
+)
 
-      // Check if this is a mentioned conversation
-      const scrollToUUID = route.query.scrollTo
-      if (scrollToUUID) {
-        // Mentioned conversation - only scroll to message, NOT to bottom
-        scrollToMessage(scrollToUUID)
-      } else {
-        // Normal conversation - scroll to bottom
-        scrollToBottom()
-      }
+watch(
+  () => conversationStore.conversationMessages.length,
+  (newLen, oldLen) => {
+    if (pendingScrollTo && newLen > 0) {
+      const target = pendingScrollTo
+      pendingScrollTo = null
+      nextTick(() => scrollToMessage(target))
+      return
+    }
+    if (oldLen === 0 && newLen > 0) {
+      hasUserScrolled.value = false
+      nextTick(scrollToBottom)
     }
   }
 )
@@ -210,25 +169,9 @@ watch(
 watch(
   () => conversationStore.conversation.isTyping,
   (isTyping) => {
-    if (isTyping && isAtBottom.value) {
-      scrollToBottom()
-    }
+    if (isTyping && !hasUserScrolled.value) scrollToBottom()
   }
 )
-
-// Watch for isAtButtom and set unReadMessages to 0
-watch(
-  () => isAtBottom.value,
-  (atBottom) => {
-    if (atBottom) {
-      unReadMessages.value = 0
-    }
-  }
-)
-
-const isPrivateNote = (message) => {
-  return message.type === 'outgoing' && message.private
-}
 
 const GROUP_WINDOW_MS = 60_000
 
