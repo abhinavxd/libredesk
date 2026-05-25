@@ -18,37 +18,33 @@ const viewID = computed(() => route.params.viewID)
 
 const conversationStore = useConversationStore()
 
-// Init conversations list based on route params
-onMounted(() => {
-  // Fetch list based on type
-  if (type.value) {
-    // Set list status if not already set
-    if (!conversationStore.getListStatus) {
-      conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
-    }
-    conversationStore.fetchConversationsList(true, type.value)
-  }
-  // Fetch team list.
-  if (teamID.value) {
-    // Set list status if not already set
-    if (!conversationStore.getListStatus) {
-      conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
-    }
-    conversationStore.fetchConversationsList(
-      true,
-      CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED,
-      teamID.value
-    )
-  }
-  // Fetch view list.
+let lastFetchedKey = ''
+
+const fetchForCurrentRoute = () => {
+  if (!type.value && !teamID.value && !viewID.value) return
+
+  const key = `${type.value || ''}|${teamID.value || ''}|${viewID.value || ''}`
+  if (key === lastFetchedKey) return
+  lastFetchedKey = key
+
   if (viewID.value) {
-    // Empty out list status as views are already filtered.
     conversationStore.setListStatus('', false)
     conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], viewID.value)
+    return
   }
-})
 
-// Drift recovery for missed WS updates; paused while tab is hidden.
+  if (!conversationStore.getListStatus) {
+    conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
+  }
+  if (type.value) {
+    conversationStore.fetchConversationsList(true, type.value)
+  } else {
+    conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED, teamID.value)
+  }
+}
+
+onMounted(fetchForCurrentRoute)
+
 const visibility = useDocumentVisibility()
 const { pause, resume } = useIntervalFn(
   () => conversationStore.refreshConversationList(),
@@ -63,33 +59,5 @@ watch(visibility, v => {
   }
 })
 
-// Refetch when route params change
-watch(
-  [type, teamID, viewID],
-  ([newType, newTeamID, newViewID], [oldType, oldTeamID, oldViewID]) => {
-    if (newType !== oldType && newType) {
-      // Set list status if not already set
-      if (!conversationStore.getListStatus) {
-        conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
-      }
-      conversationStore.fetchConversationsList(true, newType)
-    }
-    if (newTeamID !== oldTeamID && newTeamID) {
-      // Set list status if not already set
-      if (!conversationStore.getListStatus) {
-        conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
-      }
-      conversationStore.fetchConversationsList(
-        true,
-        CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED,
-        newTeamID
-      )
-    }
-    if (newViewID !== oldViewID && newViewID) {
-      // Empty out list status as views are already filtered.
-      conversationStore.setListStatus('', false)
-      conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], newViewID)
-    }
-  }
-)
+watch([type, teamID, viewID], fetchForCurrentRoute)
 </script>
