@@ -197,7 +197,8 @@ watch(
     if (path.startsWith('/inboxes') && path !== '/inboxes/search') {
       lastInboxPath.value = path
     }
-  }
+  },
+  { immediate: true }
 )
 const userStore = useUserStore()
 const conversationStore = useConversationStore()

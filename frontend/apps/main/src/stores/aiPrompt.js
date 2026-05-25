@@ -9,22 +9,18 @@ export const useAiPromptStore = defineStore('aiPrompt', () => {
     const prompts = ref([])
     const emitter = useEmitter()
     let inflight = null
-    const fetchPrompts = async () => {
-        if (prompts.value.length) return
+    const fetchPrompts = () => {
+        if (prompts.value.length) return Promise.resolve()
         if (inflight) return inflight
-        inflight = (async () => {
-            try {
-                const response = await api.getAiPrompts()
-                prompts.value = response?.data?.data || []
-            } catch (error) {
+        inflight = api.getAiPrompts()
+            .then(response => { prompts.value = response?.data?.data || [] })
+            .catch(error => {
                 emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
                     variant: 'destructive',
                     description: handleHTTPError(error).message
                 })
-            } finally {
-                inflight = null
-            }
-        })()
+            })
+            .finally(() => { inflight = null })
         return inflight
     }
     return {

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, reactive, ref, watchEffect } from 'vue'
+import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { TYPING_RECEIVE_TIMEOUT } from '@shared-ui/composables/useTypingIndicator.js'
 import { deepMerge } from '@shared-ui/utils/object.js'
@@ -27,6 +28,8 @@ export const useConversationStore = defineStore('conversation', () => {
   const macros = ref({})
   const drafts = ref(new Map())
   const userStore = useUserStore()
+  const router = useRouter()
+  const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
 
   const selectedUUIDs = ref(new Set())
 
@@ -763,6 +766,7 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   async function updateAssigneeLastSeen (uuid) {
+    if (!isViewingConversation(uuid)) return
     markConversationAsRead(uuid)
     api.updateAssigneeLastSeen(uuid).catch(() => { })
   }
