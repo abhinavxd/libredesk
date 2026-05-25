@@ -158,6 +158,7 @@ import api from '@main/api'
 import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
+import { useAiPromptStore } from '@main/stores/aiPrompt'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -241,28 +242,14 @@ const cc = ref('')
 const bcc = ref('')
 const showBcc = ref(false)
 const emailErrors = ref([])
-const aiPrompts = ref([])
+const aiPromptStore = useAiPromptStore()
+const aiPrompts = computed(() => aiPromptStore.prompts)
 const replyBoxContentRef = ref(null)
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
 const mentions = ref([])
 
-/**
- * Fetches AI prompts from the server.
- */
-const fetchAiPrompts = async () => {
-  try {
-    const resp = await api.getAiPrompts()
-    aiPrompts.value = resp.data.data
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  }
-}
-
-fetchAiPrompts()
+aiPromptStore.fetchPrompts()
 
 /**
  * Handles the AI prompt selection event.
