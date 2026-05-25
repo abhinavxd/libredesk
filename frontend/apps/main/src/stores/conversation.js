@@ -784,13 +784,6 @@ export const useConversationStore = defineStore('conversation', () => {
     throttledFetchFirstPage()
   }
 
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) refreshConversationList()
-    })
-    setInterval(refreshConversationList, 60000)
-  }
-
   function updateConversationLastMessage (uuid, message) {
     const conv = conversations.data?.find(c => c.uuid === uuid)
     if (!conv) return

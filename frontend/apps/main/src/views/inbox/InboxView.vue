@@ -6,6 +6,7 @@
 <script setup>
 import { computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useIntervalFn, useDocumentVisibility } from '@vueuse/core'
 import { useConversationStore } from '../../stores/conversation'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import ConversationPlaceholder from '@/features/conversation/ConversationPlaceholder.vue'
@@ -44,6 +45,21 @@ onMounted(() => {
     // Empty out list status as views are already filtered.
     conversationStore.setListStatus('', false)
     conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], viewID.value)
+  }
+})
+
+// Drift recovery for missed WS updates; paused while tab is hidden.
+const visibility = useDocumentVisibility()
+const { pause, resume } = useIntervalFn(
+  () => conversationStore.refreshConversationList(),
+  120000
+)
+watch(visibility, v => {
+  if (v === 'visible') {
+    conversationStore.refreshConversationList()
+    resume()
+  } else {
+    pause()
   }
 })
 
