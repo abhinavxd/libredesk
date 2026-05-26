@@ -29,7 +29,7 @@
           <div
             v-for="row in messageRows"
             :key="row.message.uuid"
-            :data-message-uuid="row.message.uuid"
+            v-scroll-target="row.message.uuid"
             :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >
             <div v-if="!row.message.private && row.message.type !== 'activity'">
@@ -95,10 +95,8 @@ const contentEl = ref(null)
 const emitter = useEmitter()
 const unReadMessages = ref(0)
 let currentConversationUUID = ''
-let pendingScrollTo = null
 
-const { hasUserScrolled, scrollToBottom, handleScroll } = useStickyScroll(threadEl, contentEl, {
-  skipAutoScroll: () => !!pendingScrollTo,
+const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(threadEl, contentEl, {
   onArriveBottom: () => { unReadMessages.value = 0 }
 })
 
@@ -107,18 +105,14 @@ const handleScrollToBottom = () => {
   scrollToBottom()
 }
 
-const scrollToMessage = (messageUUID) => {
-  if (!messageUUID) return scrollToBottom()
-  const thread = threadEl.value
-  const messageEl = thread?.querySelector(`[data-message-uuid="${messageUUID}"]`)
-  if (!messageEl || !thread) {
-    scrollToBottom()
-    return
+const vScrollTarget = {
+  mounted (el, binding) {
+    if (binding.value !== route.query.scrollTo || !threadEl.value) return
+    hasUserScrolled.value = true
+    scrollToOffset(Math.max(0, el.offsetTop - threadEl.value.clientHeight / 3 + el.offsetHeight / 2))
+    el.classList.add('highlight-mention')
+    setTimeout(() => el.classList.remove('highlight-mention'), 2500)
   }
-  // Position message at ~1/3 from top of viewport for better visibility
-  thread.scrollTop = Math.max(0, messageEl.offsetTop - thread.clientHeight / 3 + messageEl.offsetHeight / 2)
-  messageEl.classList.add('highlight-mention')
-  setTimeout(() => messageEl.classList.remove('highlight-mention'), 2500)
 }
 
 const newMessageHandler = (data) => {
@@ -144,21 +138,14 @@ watch(
     if (!newUUID || newUUID === currentConversationUUID) return
     currentConversationUUID = newUUID
     unReadMessages.value = 0
-    pendingScrollTo = route.query.scrollTo || null
-    hasUserScrolled.value = !!pendingScrollTo
+    hasUserScrolled.value = !!route.query.scrollTo
   }
 )
 
 watch(
   () => conversationStore.conversationMessages.length,
   (newLen, oldLen) => {
-    if (pendingScrollTo && newLen > 0) {
-      const target = pendingScrollTo
-      pendingScrollTo = null
-      nextTick(() => scrollToMessage(target))
-      return
-    }
-    if (oldLen === 0 && newLen > 0) {
+    if (oldLen === 0 && newLen > 0 && !route.query.scrollTo) {
       hasUserScrolled.value = false
       nextTick(scrollToBottom)
     }
