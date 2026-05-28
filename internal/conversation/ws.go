@@ -20,32 +20,6 @@ func (m *Manager) BroadcastConvReassignment(oldConv, newConv *cmodels.Conversati
 	m.broadcastConvToAuthorized(newConv, oldConv)
 }
 
-func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationListItem) {
-	if conv == nil {
-		return
-	}
-	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID)
-	if oldConv != nil {
-		seen := make(map[int]struct{}, len(userIDs))
-		for _, id := range userIDs {
-			seen[id] = struct{}{}
-		}
-		for _, id := range m.AuthorizedConnectedAgentIDs(oldConv.AssignedUserID, oldConv.AssignedTeamID) {
-			if _, ok := seen[id]; !ok {
-				seen[id] = struct{}{}
-				userIDs = append(userIDs, id)
-			}
-		}
-	}
-	if len(userIDs) == 0 {
-		return
-	}
-	m.broadcastToUsers(userIDs, wsmodels.Message{
-		Type: wsmodels.MessageTypeNewConversation,
-		Data: convToBroadcastMap(conv),
-	})
-}
-
 func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.ConversationListItem, preview string) {
 	if conv == nil {
 		return
@@ -163,6 +137,32 @@ func (m *Manager) BroadcastTypingToWidgetClientsOnly(conversationUUID string, is
 	m.broadcastTypingToWidgetClients(conversationUUID, isTyping)
 }
 
+func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationListItem) {
+	if conv == nil {
+		return
+	}
+	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID)
+	if oldConv != nil {
+		seen := make(map[int]struct{}, len(userIDs))
+		for _, id := range userIDs {
+			seen[id] = struct{}{}
+		}
+		for _, id := range m.AuthorizedConnectedAgentIDs(oldConv.AssignedUserID, oldConv.AssignedTeamID) {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				userIDs = append(userIDs, id)
+			}
+		}
+	}
+	if len(userIDs) == 0 {
+		return
+	}
+	m.broadcastToUsers(userIDs, wsmodels.Message{
+		Type: wsmodels.MessageTypeNewConversation,
+		Data: convToBroadcastMap(conv),
+	})
+}
+
 // broadcastToUsers broadcasts a message to a list of users, if the list is empty it broadcasts to all users.
 func (m *Manager) broadcastToUsers(userIDs []int, message wsmodels.Message) {
 	messageBytes, err := json.Marshal(message)
@@ -268,4 +268,3 @@ func convToBroadcastMap(conv *cmodels.ConversationListItem) map[string]any {
 	delete(out, "mentioned_message_uuid")
 	return out
 }
-
