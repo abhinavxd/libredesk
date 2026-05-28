@@ -831,7 +831,7 @@
   "globals.terms.tryAgain": "Try again",
   "globals.terms.type": "Type | Types",
   "globals.terms.typeMessage": "Type your message...",
-  "globals.terms.typing": "Typing",
+  "globals.terms.typing": "Typing...",
   "globals.terms.unAuthorized": "Unauthorized",
   "globals.terms.unassigned": "Unassigned",
   "globals.terms.updatedAt": "Updated at",

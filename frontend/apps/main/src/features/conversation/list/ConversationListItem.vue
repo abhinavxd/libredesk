@@ -85,7 +85,7 @@
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm flex-1 min-w-0 truncate text-muted-foreground">
                 <template v-if="isTyping">
-                  <span class="italic text-primary">{{ $t('globals.terms.typing') }}...</span>
+                  <span class="italic text-primary">{{ $t('globals.terms.typing') }}</span>
                 </template>
                 <template v-else-if="hasDraftForConversation">
                   <span class="font-medium text-primary">{{ $t('globals.terms.draft') }}:</span>
