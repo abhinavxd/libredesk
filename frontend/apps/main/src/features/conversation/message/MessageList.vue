@@ -156,7 +156,7 @@ watch(
 watch(
   () => conversationStore.conversation.isTyping,
   (isTyping) => {
-    if (isTyping && !hasUserScrolled.value) scrollToBottom()
+    if (isTyping && !hasUserScrolled.value) nextTick(scrollToBottom)
   }
 )
 
