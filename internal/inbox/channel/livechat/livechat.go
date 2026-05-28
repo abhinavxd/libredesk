@@ -118,11 +118,26 @@ type Config struct {
 	ShowOfficeHoursAfterAssignment bool             `json:"show_office_hours_after_assignment"`
 	ChatReplyExpectationMessage    string           `json:"chat_reply_expectation_message"`
 	SessionDuration                string           `json:"session_duration"`
-	PreChatForm                    struct {
+	PreChatForm struct {
 		Enabled bool               `json:"enabled"`
 		Title   string             `json:"title"`
 		Fields  []PreChatFormField `json:"fields"`
 	} `json:"prechat_form"`
+	AIBot struct {
+		Enabled        bool   `json:"enabled"`
+		APIKey         string `json:"api_key"`
+		Model          string `json:"model"`
+		ResponseLength string `json:"response_length"`
+		OnlyQuestions  bool   `json:"only_questions"`
+		Tone           string `json:"tone"`
+		ToneCustom     string `json:"tone_custom"`
+		EnableMarkdown bool   `json:"enable_markdown"`
+		EnableEmoji    bool   `json:"enable_emoji"`
+		EnableLinks    bool   `json:"enable_links"`
+		FAQData        string `json:"faq_data"`
+		CustomRules    string `json:"custom_rules"`
+		TrainingData   string `json:"training_data"`
+	} `json:"ai_bot"`
 }
 
 // Client represents a connected chat client
@@ -287,6 +302,11 @@ func (lc *LiveChat) ReplyToAddress() string {
 // Channel returns the channel name for this inbox.
 func (lc *LiveChat) Channel() string {
 	return ChannelLiveChat
+}
+
+// GetConfig returns the livechat inbox config.
+func (lc *LiveChat) GetConfig() Config {
+	return lc.config
 }
 
 // AddClient adds a new client to the live chat session.

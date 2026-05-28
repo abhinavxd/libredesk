@@ -19,6 +19,7 @@
   "actions.removeLink": "حذف لینک",
   "actions.removeTags": "حذف برچسب‌ها",
   "actions.sendCsat": "ارسال CSAT",
+  "actions.sendAiReply": "پاسخ هوش مصنوعی",
   "actions.sendPrivateNote": "ارسال یادداشت خصوصی",
   "actions.sendReply": "ارسال پاسخ",
   "actions.setPriority": "تنظیم اولویت",

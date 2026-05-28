@@ -231,6 +231,9 @@ export function useConversationFilters () {
         send_csat: {
             label: t('actions.sendCsat'),
         },
+        send_ai_reply: {
+            label: t('actions.sendAiReply'),
+        },
         set_sla: {
             label: t('actions.setSla'),
             type: FIELD_TYPE.SELECT,

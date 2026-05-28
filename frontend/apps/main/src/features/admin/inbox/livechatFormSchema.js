@@ -106,6 +106,21 @@ export const createFormSchema = (t) => z.object({
         is_default: z.boolean(),
         custom_attribute_id: z.number().optional()
       }))
-    })
+    }),
+    ai_bot: z.object({
+      enabled: z.boolean(),
+      api_key: z.string().optional(),
+      model: z.string().optional(),
+      response_length: z.enum(['short', 'medium', 'long']).optional(),
+      only_questions: z.boolean().optional(),
+      tone: z.enum(['friendly', 'formal', 'casual', 'professional']).optional(),
+      tone_custom: z.string().optional(),
+      enable_markdown: z.boolean().optional(),
+      enable_emoji: z.boolean().optional(),
+      enable_links: z.boolean().optional(),
+      faq_data: z.string().optional(),
+      custom_rules: z.string().optional(),
+      training_data: z.string().optional(),
+    }).optional()
   })
 })

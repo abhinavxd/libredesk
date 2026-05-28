@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/ai"
 	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/automation"
 	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
@@ -26,6 +27,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
@@ -1238,8 +1240,8 @@ func (m *Manager) ApplySLA(conversation models.Conversation, policyID int, actor
 // ApplyAction applies an action to a conversation, this can be called from multiple packages across the app to perform actions on conversations.
 // all actions are executed on behalf of the provided user if the user is not provided, system user is used.
 func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversation, user umodels.User) error {
-	// CSAT action does not require a value.
-	if len(action.Value) == 0 && action.Type != amodels.ActionSendCSAT {
+	// CSAT and AI reply actions do not require a value.
+	if len(action.Value) == 0 && action.Type != amodels.ActionSendCSAT && action.Type != amodels.ActionSendAIReply {
 		return fmt.Errorf("empty value for action %s", action.Type)
 	}
 
@@ -1319,10 +1321,94 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 		return m.SetConversationTags(conv.UUID, action.Type, action.Value, user)
 	case amodels.ActionSendCSAT:
 		return m.SendCSATReply(user.ID, conv)
+	case amodels.ActionSendAIReply:
+		return m.handleAIBotReply(conv, user)
 	default:
 		return fmt.Errorf("unknown action: %s", action.Type)
 	}
 	return nil
+}
+
+func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) error {
+	inboxInstance, err := m.inboxStore.Get(conv.InboxID)
+	if err != nil {
+		return fmt.Errorf("get inbox: %w", err)
+	}
+	lc, ok := inboxInstance.(*livechat.LiveChat)
+	if !ok {
+		return nil
+	}
+	config := lc.GetConfig()
+	if !config.AIBot.Enabled || config.AIBot.APIKey == "" {
+		return nil
+	}
+
+	messages, _, err := m.GetConversationMessages(conv.UUID, 1, 20, toPtr(false), nil)
+	if err != nil {
+		return fmt.Errorf("get conversation messages: %w", err)
+	}
+
+	var chatMessages []ai.ChatMessage
+	chatMessages = append(chatMessages, ai.ChatMessage{
+		Role:    "system",
+		Content: ai.BuildSystemPrompt(ai.PromptConfig{
+			ResponseLength: config.AIBot.ResponseLength,
+			OnlyQuestions:  config.AIBot.OnlyQuestions,
+			Tone:           config.AIBot.Tone,
+			ToneCustom:     config.AIBot.ToneCustom,
+			EnableMarkdown: config.AIBot.EnableMarkdown,
+			EnableEmoji:    config.AIBot.EnableEmoji,
+			EnableLinks:    config.AIBot.EnableLinks,
+			FAQData:        config.AIBot.FAQData,
+			CustomRules:    config.AIBot.CustomRules,
+			TrainingData:   config.AIBot.TrainingData,
+		}),
+	})
+
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		if msg.Content == "" {
+			continue
+		}
+		role := "assistant"
+		if msg.SenderType == models.SenderTypeContact {
+			role = "user"
+		}
+		chatMessages = append(chatMessages, ai.ChatMessage{
+			Role:    role,
+			Content: msg.TextContent,
+		})
+	}
+
+	svc := ai.New(config.AIBot.APIKey, config.AIBot.Model)
+	reply, err := svc.Chat(chatMessages)
+	if err != nil {
+		return fmt.Errorf("ai reply: %w", err)
+	}
+	if reply == "" {
+		return nil
+	}
+
+	_, err = m.QueueReply(
+		[]mmodels.Media{},
+		conv.InboxID,
+		user.ID,
+		conv.ContactID,
+		conv.UUID,
+		reply,
+		[]string{},
+		nil,
+		nil,
+		map[string]any{"is_ai_bot": true},
+	)
+	if err != nil {
+		return fmt.Errorf("queue ai reply: %w", err)
+	}
+	return nil
+}
+
+func toPtr[T any](v T) *T {
+	return &v
 }
 
 // RemoveConversationAssignee removes assigned user from a conversation.

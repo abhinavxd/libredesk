@@ -20,6 +20,7 @@
   "actions.removeLink": "Remove link",
   "actions.removeTags": "Remove tags",
   "actions.sendCsat": "Send CSAT",
+  "actions.sendAiReply": "AI Reply",
   "actions.sendReply": "Send reply",
   "actions.setPriority": "Set priority",
   "actions.setSla": "Set SLA",

@@ -402,6 +402,11 @@ const getRulesValidationError = () => {
       action.value = ['0']
     }
 
+    // AI reply action does not require value, set dummy value.
+    if (action.type === 'send_ai_reply') {
+      action.value = ['0']
+    }
+
     // Empty array, no value selected.
     if (action.value.length === 0) {
       return t('admin.automation.validation.setActionValue')

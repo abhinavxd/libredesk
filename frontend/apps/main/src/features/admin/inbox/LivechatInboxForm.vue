@@ -15,6 +15,7 @@
         <TabsTrigger value="installation">{{
           $t('admin.inbox.livechat.tabs.installation')
         }}</TabsTrigger>
+        <TabsTrigger value="ai">🤖 AI</TabsTrigger>
       </TabsList>
 
       <div class="mt-8">
@@ -986,6 +987,10 @@
             </div>
           </div>
         </div>
+
+        <div v-show="activeTab === 'ai'" class="space-y-8">
+          <AiBotSettings />
+        </div>
       </div>
     </Tabs>
 
@@ -1027,6 +1032,7 @@ import { Plus, X, TriangleAlert, GripVertical, Lightbulb } from 'lucide-vue-next
 import Draggable from 'vuedraggable'
 import { useI18n } from 'vue-i18n'
 import PreChatFormConfig, { getDefaultPrechatFields } from './PreChatFormConfig.vue'
+import AiBotSettings from './AiBotSettings.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import CopyButton from '@/components/button/CopyButton.vue'
 import CodeEditor from '@/components/editor/CodeEditor.vue'
