@@ -93,6 +93,14 @@
 
         <!-- Message metadata -->
         <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
+          <!-- AI badge -->
+          <span
+            v-if="message.meta?.is_ai_bot"
+            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 font-medium"
+          >
+            🤖 AI
+          </span>
+
           <!-- Agent name and time for agent messages -->
           <span v-if="message.author.type === 'agent'">
             {{ message.author.first_name }} {{ message.author.last_name }}

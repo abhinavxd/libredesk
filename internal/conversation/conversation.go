@@ -1330,6 +1330,8 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 }
 
 func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) error {
+	m.lo.Info("AI bot: handling reply", "conversation_uuid", conv.UUID)
+
 	inboxInstance, err := m.inboxStore.Get(conv.InboxID)
 	if err != nil {
 		return fmt.Errorf("get inbox: %w", err)
@@ -1343,10 +1345,12 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 		return nil
 	}
 
+	m.lo.Info("AI bot: fetching conversation messages", "conversation_uuid", conv.UUID)
 	messages, _, err := m.GetConversationMessages(conv.UUID, 1, 20, toPtr(false), nil)
 	if err != nil {
 		return fmt.Errorf("get conversation messages: %w", err)
 	}
+	m.lo.Info("AI bot: fetched messages", "conversation_uuid", conv.UUID, "count", len(messages))
 
 	var chatMessages []ai.ChatMessage
 	chatMessages = append(chatMessages, ai.ChatMessage{
@@ -1380,15 +1384,22 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 		})
 	}
 
+	m.lo.Info("AI bot: calling AI API", "conversation_uuid", conv.UUID, "model", config.AIBot.Model, "base_url", config.AIBot.BaseURL)
+	lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, true)
 	reply, err := ai.ChatCompletion(config.AIBot.BaseURL, config.AIBot.APIKey, config.AIBot.Model, chatMessages)
 	if err != nil {
+		lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, false)
+		m.lo.Error("AI bot: API call failed", "conversation_uuid", conv.UUID, "error", err)
 		return fmt.Errorf("ai reply: %w", err)
 	}
 	if reply == "" {
+		m.lo.Warn("AI bot: empty reply from AI", "conversation_uuid", conv.UUID)
 		return nil
 	}
 
-	_, err = m.QueueReply(
+	m.lo.Info("AI bot: got reply from AI", "conversation_uuid", conv.UUID, "reply_len", len(reply))
+
+	msg, err := m.QueueReply(
 		[]mmodels.Media{},
 		conv.InboxID,
 		user.ID,
@@ -1401,13 +1412,56 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 		map[string]any{"is_ai_bot": true},
 	)
 	if err != nil {
+		m.lo.Error("AI bot: failed to queue reply", "conversation_uuid", conv.UUID, "error", err)
 		return fmt.Errorf("queue ai reply: %w", err)
 	}
+
+	m.lo.Info("AI bot: reply queued, broadcasting to widget", "conversation_uuid", conv.UUID, "message_uuid", msg.UUID)
+	m.broadcastMessageToWidgetClients(&msg)
 	return nil
 }
 
 func toPtr[T any](v T) *T {
 	return &v
+}
+
+// autoAIReply automatically replies using the AI bot if enabled in the inbox config
+// and the conversation is not yet assigned to an agent.
+func (m *Manager) autoAIReply(conv models.Conversation, user umodels.User) error {
+	m.lo.Info("AI bot: autoAIReply triggered", "conversation_uuid", conv.UUID)
+
+	inboxInstance, err := m.inboxStore.Get(conv.InboxID)
+	if err != nil {
+		m.lo.Error("AI bot: failed to get inbox", "conversation_uuid", conv.UUID, "error", err)
+		return fmt.Errorf("get inbox: %w", err)
+	}
+	lc, ok := inboxInstance.(*livechat.LiveChat)
+	if !ok {
+		m.lo.Info("AI bot: not a livechat inbox, skipping", "conversation_uuid", conv.UUID)
+		return nil
+	}
+	config := lc.GetConfig()
+	if !config.AIBot.Enabled {
+		m.lo.Info("AI bot: not enabled in config", "conversation_uuid", conv.UUID)
+		return nil
+	}
+	if config.AIBot.APIKey == "" {
+		m.lo.Info("AI bot: no API key configured", "conversation_uuid", conv.UUID)
+		return nil
+	}
+
+	freshConv, err := m.GetConversation(0, conv.UUID, "")
+	if err != nil {
+		m.lo.Error("AI bot: failed to refetch conversation", "conversation_uuid", conv.UUID, "error", err)
+		return fmt.Errorf("refetch conversation: %w", err)
+	}
+	if freshConv.AssignedUserID.Valid {
+		m.lo.Info("AI bot: conversation already assigned, skipping", "conversation_uuid", conv.UUID, "assignee", freshConv.AssignedUserID.Int)
+		return nil
+	}
+
+	m.lo.Info("AI bot: proceeding with AI reply", "conversation_uuid", conv.UUID)
+	return m.handleAIBotReply(freshConv, user)
 }
 
 // RemoveConversationAssignee removes assigned user from a conversation.
