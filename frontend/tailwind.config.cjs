@@ -207,5 +207,11 @@ module.exports = {
       }
     }
   },
-  plugins: [animate, typography],
+  plugins: [
+    animate,
+    typography,
+    function ({ addVariant }) {
+      addVariant('rtl', 'html[dir="rtl"] &')
+    },
+  ],
 }

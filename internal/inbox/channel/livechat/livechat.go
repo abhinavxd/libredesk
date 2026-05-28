@@ -54,6 +54,7 @@ type Config struct {
 	ShowPoweredBy    bool   `json:"show_powered_by"`
 	Language         string `json:"language"`
 	FallbackLanguage string `json:"fallback_language"`
+	LayoutDirection  string `json:"layout_direction"`
 	Users            struct {
 		AllowStartConversation           bool   `json:"allow_start_conversation"`
 		PreventMultipleConversations     bool   `json:"prevent_multiple_conversations"`

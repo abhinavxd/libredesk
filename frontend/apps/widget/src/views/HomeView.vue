@@ -11,7 +11,8 @@
           <div v-else-if="canStartConversation">
             <Button @click="startConversation" class="w-full flex items-center justify-center">
               {{ startButtonText }}
-              <ArrowRight size="16" />
+              <ArrowRight v-if="!widgetStore.isRtl" size="16" />
+              <ArrowLeft v-else size="16" />
             </Button>
           </div>
         </HomeHeader>
@@ -32,7 +33,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, ArrowLeft } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'

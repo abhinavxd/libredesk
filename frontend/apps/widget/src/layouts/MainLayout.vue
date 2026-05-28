@@ -1,9 +1,9 @@
 <template>
   <div class="flex flex-col h-full relative">
-    <div class="absolute top-2 right-2 z-20">
+    <div class="absolute top-2 right-2 rtl:right-auto rtl:left-2 z-20">
       <CloseWidgetButton />
     </div>
-    <Tabs :modelValue="widgetStore.currentView" @update:modelValue="handleTabChange" class="flex flex-col h-full">
+    <Tabs :modelValue="widgetStore.currentView" @update:modelValue="handleTabChange" :dir="widgetStore.isRtl ? 'rtl' : 'ltr'" class="flex flex-col h-full">
       <div class="flex-1 min-h-0">
         <TabsContent value="home" class="h-full mt-0">
           <HomeView />

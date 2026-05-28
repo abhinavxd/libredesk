@@ -22,7 +22,8 @@
               <span>{{ getRelativeTime(new Date(conversation.last_message.created_at)) }}</span>
             </div>
           </div>
-          <ArrowRight class="w-4 h-4 text-muted-foreground ml-2 flex-shrink-0 self-center" />
+          <ArrowRight v-if="!widgetStore.isRtl" class="w-4 h-4 text-muted-foreground ml-2 flex-shrink-0 self-center" />
+          <ArrowLeft v-else class="w-4 h-4 text-muted-foreground ml-2 flex-shrink-0 self-center" />
         </div>
       </CardContent>
     </Card>
@@ -31,7 +32,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, ArrowLeft } from 'lucide-vue-next'
 import { Card, CardContent } from '@shared-ui/components/ui/card'
 import UnreadCountBadge from '@widget/components/UnreadCountBadge.vue'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'

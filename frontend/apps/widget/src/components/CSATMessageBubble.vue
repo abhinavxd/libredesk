@@ -28,7 +28,7 @@
           rows="2"
           maxlength="500"
         ></textarea>
-        <div class="text-xs text-muted-foreground text-right mt-1">{{ feedback.length }}/500</div>
+        <div class="text-xs text-muted-foreground text-right rtl:text-left mt-1">{{ feedback.length }}/500</div>
       </div>
 
       <button
@@ -48,7 +48,7 @@
       <!-- Show submitted rating if provided -->
       <div v-if="csatMeta.submitted_rating" class="mb-2">
         <span class="text-lg">{{ getRatingEmoji(csatMeta.submitted_rating) }}</span>
-        <span class="text-xs text-muted-foreground ml-2">{{ getRatingText(csatMeta.submitted_rating) }}</span>
+        <span class="text-xs text-muted-foreground ml-2 rtl:ml-0 rtl:mr-2">{{ getRatingText(csatMeta.submitted_rating) }}</span>
       </div>
       
       <!-- Show submitted feedback if provided -->

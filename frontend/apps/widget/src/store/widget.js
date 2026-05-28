@@ -14,6 +14,12 @@ export const useWidgetStore = defineStore('widget', () => {
 
     // Getters
     const isChatView = computed(() => isInChatView.value)
+    const isRtl = computed(() => {
+      const direction = config.value?.layout_direction
+      if (direction === 'rtl') return true
+      if (direction === 'ltr') return false
+      return document.documentElement.dir === 'rtl'
+    })
 
     // Actions
     const setOpen = (open) => {
@@ -117,6 +123,7 @@ export const useWidgetStore = defineStore('widget', () => {
 
         // Getters
         isChatView,
+        isRtl,
 
         // Actions
         setOpen,

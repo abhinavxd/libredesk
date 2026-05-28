@@ -19,7 +19,7 @@
           "
         >
           <span
-            class="inline-block w-2 h-2 rounded-full mr-1"
+            class="inline-block w-2 h-2 rounded-full mr-1 rtl:mr-0 rtl:ml-1"
             :class="{
               'bg-green-500': chatTitle.availability_status === 'online',
               'bg-amber-500': chatTitle.availability_status === 'away'

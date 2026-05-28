@@ -367,3 +367,14 @@
 [data-state="collapsed"][data-collapsible="offcanvas"] .sidebar-secondary {
   left: calc((var(--sidebar-width) + 3.5rem) * -1.4) !important;
 }
+
+/* ---- RTL global overrides ---- */
+[dir="rtl"] {
+  .native-html {
+    text-align: right;
+  }
+
+  .v3-emoji-picker {
+    direction: rtl;
+  }
+}

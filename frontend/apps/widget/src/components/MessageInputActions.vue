@@ -44,7 +44,7 @@
         ref="emojiPickerRef"
         :native="true"
         @select="onSelectEmoji"
-        class="absolute bottom-12 left-0 z-50"
+        class="absolute bottom-12 left-0 rtl:left-auto rtl:right-0 z-50"
       />
     </div>
   </div>

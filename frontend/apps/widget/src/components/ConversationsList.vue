@@ -24,7 +24,7 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between mb-0.5">
               <span class="text-sm font-medium text-foreground">{{ getSenderLabel(conversation.last_message.author) }}</span>
-              <span class="text-xs text-muted-foreground flex-shrink-0 ml-2">{{ getRelativeTime(new Date(conversation.last_message.created_at)) }}</span>
+              <span class="text-xs text-muted-foreground flex-shrink-0 ml-2 rtl:ml-0 rtl:mr-2">{{ getRelativeTime(new Date(conversation.last_message.created_at)) }}</span>
             </div>
             <div class="flex items-center gap-2">
               <p class="text-sm text-muted-foreground truncate flex-1 min-w-0">
@@ -33,7 +33,8 @@
               <UnreadCountBadge :count="conversation.unread_message_count" class="flex-shrink-0" />
             </div>
           </div>
-          <ChevronRight class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <ChevronRight v-if="!widgetStore.isRtl" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <ChevronLeft v-else class="w-4 h-4 text-muted-foreground flex-shrink-0" />
         </div>
       </div>
     </div>
@@ -42,7 +43,7 @@
 
 <script setup>
 import { onMounted } from 'vue'
-import { MessageCircleDashed, ChevronRight } from 'lucide-vue-next'
+import { MessageCircleDashed, ChevronRight, ChevronLeft } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@widget/store/chat.js'
 import { useWidgetStore } from '@widget/store/widget.js'
