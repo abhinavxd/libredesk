@@ -417,3 +417,6 @@ SELECT
     (SELECT COUNT(*) FROM transfer_conversations) as conversations_transferred,
     (SELECT COUNT(*) FROM transfer_messages) as messages_transferred,
     (SELECT COUNT(*) FROM delete_visitor) as visitor_deleted;
+
+-- name: get-user-ids-by-role
+SELECT user_id FROM user_roles WHERE role_id = $1;

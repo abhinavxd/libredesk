@@ -402,7 +402,7 @@ func initCSAT(db *sqlx.DB, i18n *i18n.I18n) *csat.Manager {
 
 // initWS inits websocket hub.
 func initWS(user *user.Manager) *ws.Hub {
-	return ws.NewHub(user)
+	return ws.NewHub(initLogger("ws"), user)
 }
 
 // getCustomStaticDir returns the custom static directory path from CLI flag or config.

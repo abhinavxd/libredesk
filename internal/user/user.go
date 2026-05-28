@@ -78,6 +78,7 @@ type queries struct {
 	GetUser                       *sqlx.Stmt `query:"get-user"`
 	GetNotes                      *sqlx.Stmt `query:"get-notes"`
 	GetNote                       *sqlx.Stmt `query:"get-note"`
+	GetUserIDsByRole              *sqlx.Stmt `query:"get-user-ids-by-role"`
 	GetUserByExternalID           *sqlx.Stmt `query:"get-user-by-external-id"`
 	GetUsersCompact               string     `query:"get-users-compact"`
 	UpdateContact                 *sqlx.Stmt `query:"update-contact"`
@@ -200,7 +201,6 @@ func (u *Manager) GetContactOrVisitor(id int, email string) (models.User, error)
 	return u.Get(id, email, []string{models.UserTypeContact, models.UserTypeVisitor})
 }
 
-// GetSystemUser retrieves the system user.
 func (u *Manager) GetSystemUser() (models.User, error) {
 	return u.Get(0, models.SystemUserEmail, []string{models.UserTypeAgent})
 }
@@ -480,6 +480,15 @@ func (u *Manager) MergeVisitorToContact(visitorID, contactID int) error {
 		return fmt.Errorf("merging visitor to contact: %w", err)
 	}
 	return nil
+}
+
+func (u *Manager) GetUserIDsByRole(roleID int) ([]int, error) {
+	var ids []int
+	if err := u.q.GetUserIDsByRole.Select(&ids, roleID); err != nil {
+		u.lo.Error("error fetching user ids by role", "role_id", roleID, "error", err)
+		return nil, err
+	}
+	return ids, nil
 }
 
 // ChangeSystemUserPassword updates the system user's password with a newly prompted one.

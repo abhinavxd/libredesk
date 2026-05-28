@@ -54,7 +54,11 @@ export class WebSocketClient {
     this.setupPing()
     this.flushMessageQueue()
     if (wasReconnect) {
-      this.convStore.refreshConversationList()
+      // RESUB!
+      const uuids = this.convStore.conversations.data?.map(c => c.uuid) || []
+      this.subscribeListReplace(uuids)
+      const openUUID = this.convStore.conversation.data?.uuid
+      if (openUUID) this.subscribeToConversation(openUUID)
     }
   }
 

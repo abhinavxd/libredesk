@@ -1943,6 +1943,9 @@ func (c *Manager) FilterAuthorizedListUUIDs(agentID int, uuids []string) ([]stri
 	if err != nil {
 		return nil, err
 	}
+	if !user.Enabled {
+		return nil, nil
+	}
 	var authorized []string
 	err = c.q.FilterAuthorizedListUUIDs.Select(&authorized,
 		pq.Array(uuids),
