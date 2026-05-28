@@ -6,11 +6,7 @@
     @layout="onLayoutChange"
   >
     <!-- Conversation List Panel -->
-    <ResizablePanel
-      :default-size="panelSizes[0]"
-      :min-size="20"
-      :max-size="45"
-    >
+    <ResizablePanel :default-size="panelSizes[0]" :min-size="20" :max-size="45">
       <ConversationList />
     </ResizablePanel>
 
@@ -19,7 +15,9 @@
     <!-- Conversation Detail Panel -->
     <ResizablePanel :default-size="panelSizes[1]" :min-size="30">
       <router-view v-slot="{ Component }">
-        <component :is="Component" />
+        <keep-alive>
+          <component :is="Component" />
+        </keep-alive>
       </router-view>
     </ResizablePanel>
   </ResizablePanelGroup>
@@ -35,6 +33,8 @@ import {
   ResizablePanel,
   ResizableHandle
 } from '@shared-ui/components/ui/resizable'
+
+defineOptions({ name: 'InboxLayout' })
 
 const route = useRoute()
 const isSearchRoute = computed(() => route.name === 'search')

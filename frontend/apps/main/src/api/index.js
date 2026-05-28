@@ -339,7 +339,7 @@ const sendMessage = (uuid, data) =>
     }
   })
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
-const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`)
+const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
 const getAllMacros = () => http.get('/api/v1/macros')
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
 const createMacro = (data) =>

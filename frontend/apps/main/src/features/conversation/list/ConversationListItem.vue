@@ -190,9 +190,9 @@ const handleMarkAsUnread = () => {
 }
 
 const conversationRoute = computed(() => {
-  const baseRoute = route.name.includes('team')
+  const baseRoute = route.params.teamID
     ? 'team-inbox-conversation'
-    : route.name.includes('view')
+    : route.params.viewID
       ? 'view-inbox-conversation'
       : 'inbox-conversation'
   return {

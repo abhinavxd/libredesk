@@ -44,10 +44,8 @@
         </Tooltip>
       </div>
 
-      <Skeleton v-if="loading" class="w-32 h-4" />
-
       <!-- Value -->
-      <template v-else-if="attribute.data_type !== 'checkbox'">
+      <template v-if="attribute.data_type !== 'checkbox'">
         <div
           v-if="!editingAttributeKey || editingAttributeKey !== attribute.key"
           class="flex items-center justify-between gap-1"
@@ -134,7 +132,6 @@
 <script setup>
 import { ref } from 'vue'
 import * as z from 'zod'
-import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { Input } from '@shared-ui/components/ui/input'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import {

@@ -112,7 +112,11 @@
           <PageHeader />
 
           <!-- Main content -->
-          <RouterView class="flex-grow" />
+          <RouterView v-slot="{ Component }">
+            <keep-alive include="InboxLayout">
+              <component :is="Component" class="flex-grow" />
+            </keep-alive>
+          </RouterView>
         </div>
         <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
       </Sidebar>
@@ -191,9 +195,10 @@ watch(
   () => route.path,
   (path) => {
     if (path.startsWith('/inboxes') && path !== '/inboxes/search') {
-      lastInboxPath.value = path.replace(/\/conversation\/[^/]+$/, '')
+      lastInboxPath.value = path
     }
-  }
+  },
+  { immediate: true }
 )
 const userStore = useUserStore()
 const conversationStore = useConversationStore()

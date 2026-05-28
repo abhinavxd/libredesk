@@ -4,8 +4,8 @@ import { useStorage, useDebounceFn, useThrottleFn } from '@vueuse/core'
 
 export function useIdleDetection () {
     const userStore = useUserStore()
-    const AWAY_THRESHOLD = 4 * 60 * 1000
-    const CHECK_INTERVAL = 30 * 1000
+    const AWAY_THRESHOLD = 5 * 60 * 1000 // 5 min
+    const CHECK_INTERVAL = 30 * 1000 // 30 sec
 
     const lastActivity = useStorage('last_active', Date.now())
     const timer = ref(null)
