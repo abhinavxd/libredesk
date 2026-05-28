@@ -1,10 +1,8 @@
 <template>
   <div class="space-y-3">
-    <!-- Inbox name-->
     <div v-if="conversation.inbox_name">
       <p class="sidebar-label">{{ $t('globals.terms.inbox', 1) }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <div v-else class="flex items-center gap-1.5">
+      <div class="flex items-center gap-1.5">
         <component
           :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
           class="size-3.5 text-muted-foreground flex-shrink-0"
@@ -15,22 +13,20 @@
 
     <div v-if="conversation.subject">
       <p class="sidebar-label">{{ $t('globals.terms.subject') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <p v-else class="sidebar-value break-all">
+      <p class="sidebar-value break-all">
         {{ conversation.subject }}
       </p>
     </div>
 
     <div>
       <p class="sidebar-label">{{ $t('globals.terms.referenceNumber') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <p v-else class="sidebar-value">
+      <p class="sidebar-value">
         {{ conversation.reference_number }}
       </p>
     </div>
+
     <div>
       <p class="sidebar-label">{{ $t('globals.terms.initiatedAt') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <p v-if="conversation.created_at" class="sidebar-value">
         {{ format(conversation.created_at, 'PPpp') }}
       </p>
@@ -47,13 +43,10 @@
           :key="`${conversation.uuid}-${conversation.first_response_deadline_at}-${conversation.first_reply_at}`"
         />
       </div>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <div v-else>
-        <p v-if="conversation.first_reply_at" class="sidebar-value">
-          {{ format(conversation.first_reply_at, 'PPpp') }}
-        </p>
-        <p v-else class="sidebar-value">-</p>
-      </div>
+      <p v-if="conversation.first_reply_at" class="sidebar-value">
+        {{ format(conversation.first_reply_at, 'PPpp') }}
+      </p>
+      <p v-else class="sidebar-value">-</p>
     </div>
 
     <div>
@@ -66,13 +59,10 @@
           :key="`${conversation.uuid}-${conversation.resolution_deadline_at}-${conversation.resolved_at}`"
         />
       </div>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <div v-else>
-        <p v-if="conversation.resolved_at" class="sidebar-value">
-          {{ format(conversation.resolved_at, 'PPpp') }}
-        </p>
-        <p v-else class="sidebar-value">-</p>
-      </div>
+      <p v-if="conversation.resolved_at" class="sidebar-value">
+        {{ format(conversation.resolved_at, 'PPpp') }}
+      </p>
+      <p v-else class="sidebar-value">-</p>
     </div>
 
     <div>
@@ -85,7 +75,6 @@
           :key="`${conversation.uuid}-${conversation.next_response_deadline_at}-${conversation.next_response_met_at}`"
         />
       </div>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <p v-if="conversation.last_reply_at" class="sidebar-value">
         {{ format(conversation.last_reply_at, 'PPpp') }}
       </p>
@@ -94,8 +83,7 @@
 
     <div v-if="conversation.closed_at">
       <p class="sidebar-label">{{ $t('globals.terms.closedAt') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <p v-else class="sidebar-value">
+      <p class="sidebar-value">
         {{ format(conversation.closed_at, 'PPpp') }}
       </p>
     </div>
@@ -123,7 +111,6 @@ import { format } from 'date-fns'
 import { Mail, MessageSquare } from 'lucide-vue-next'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 import { useConversationStore } from '../../../stores/conversation'
-import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'

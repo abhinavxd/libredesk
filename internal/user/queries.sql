@@ -1,5 +1,5 @@
 -- name: get-users-compact
-SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id
+SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
 WHERE users.email != 'System' AND users.deleted_at IS NULL AND type = ANY($1)
 
@@ -417,3 +417,6 @@ SELECT
     (SELECT COUNT(*) FROM transfer_conversations) as conversations_transferred,
     (SELECT COUNT(*) FROM transfer_messages) as messages_transferred,
     (SELECT COUNT(*) FROM delete_visitor) as visitor_deleted;
+
+-- name: get-user-ids-by-role
+SELECT user_id FROM user_roles WHERE role_id = $1;

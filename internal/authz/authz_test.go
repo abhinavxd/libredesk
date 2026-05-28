@@ -188,6 +188,33 @@ func TestEnforceConversationAccess(t *testing.T) {
 	}
 }
 
+func TestCanReadAssignment(t *testing.T) {
+	for _, tt := range convAccessCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CanReadAssignment(tt.user, tt.conv.AssignedUserID, tt.conv.AssignedTeamID)
+			if got != tt.want {
+				t.Errorf("got %v want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCanReadAssignmentMatchesEnforceConversationAccess(t *testing.T) {
+	e := newTestEnforcer(t)
+	for _, tt := range convAccessCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			helper := CanReadAssignment(tt.user, tt.conv.AssignedUserID, tt.conv.AssignedTeamID)
+			method, err := e.EnforceConversationAccess(tt.user, tt.conv)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if helper != method {
+				t.Errorf("helper=%v method=%v (must stay in sync)", helper, method)
+			}
+		})
+	}
+}
+
 func TestEnforceMediaAccess(t *testing.T) {
 	e := newTestEnforcer(t)
 	for _, tt := range mediaAccessCases() {

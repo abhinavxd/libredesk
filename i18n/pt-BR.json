@@ -1,6 +1,6 @@
 {
   "_.code": "pt-BR",
-  "_.name": "Português",
+  "_.name": "Português (Brasil)",
   "account.avatarRemoved": "Avatar removido",
   "account.changeAvatar": "Mude seu avatar aqui.",
   "account.chooseAFile": "Escolha um arquivo...",
@@ -18,8 +18,8 @@
   "actions.noActions": "Nenhuma ação",
   "actions.removeLink": "Remover link",
   "actions.removeTags": "Remover etiquetas",
-  "actions.sendCsat": "Enviar CSAT",
   "actions.sendAiReply": "Resposta IA",
+  "actions.sendCsat": "Enviar CSAT",
   "actions.sendPrivateNote": "Enviar nota privada",
   "actions.sendReply": "Enviar resposta",
   "actions.setPriority": "Definir prioridade",

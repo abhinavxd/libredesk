@@ -43,11 +43,16 @@ func handleDeleteRole(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
+	userIDs, _ := app.user.GetUserIDsByRole(id)
 	if err := app.role.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
 	app.user.InvalidateAllAgentCache()
+
+	for _, uid := range userIDs {
+		app.wsHub.KickUser(uid)
+	}
 
 	return r.SendEnvelope(true)
 }
@@ -95,6 +100,15 @@ func handleUpdateRole(r *fastglue.Request) error {
 	added, removed := role.ComparePermissions(oldRole.Permissions, updatedRole.Permissions)
 	if len(added) > 0 || len(removed) > 0 {
 		app.user.InvalidateAllAgentCache()
+
+		if len(removed) > 0 {
+			userIDs, err := app.user.GetUserIDsByRole(updatedRole.ID)
+			if err == nil {
+				for _, id := range userIDs {
+					app.wsHub.KickUser(id)
+				}
+			}
+		}
 
 		if err := app.activityLog.RolePermissionsChanged(auser.ID, auser.Email, ip, updatedRole.ID, updatedRole.Name, added, removed); err != nil {
 			app.lo.Error("error creating activity log", "error", err)

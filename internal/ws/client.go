@@ -2,7 +2,6 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
@@ -93,7 +92,7 @@ func (c *Client) Listen() {
 func (c *Client) processIncomingMessage(data []byte) {
 	if string(data) == "ping" {
 		if _, err := c.Hub.userStore.UpdateLastActive(c.ID); err != nil {
-			log.Printf("ws: UpdateLastActive failed for client %d: %v", c.ID, err)
+			c.Hub.lo.Error("UpdateLastActive failed", "client_id", c.ID, "error", err)
 		}
 		c.SendMessage([]byte("pong"), websocket.TextMessage)
 		return
@@ -216,7 +215,7 @@ func (c *Client) SendError(msg string) {
 	select {
 	case c.Send <- models.WSMessage{Data: b, MessageType: websocket.TextMessage}:
 	default:
-		log.Println("Client send channel is full. Could not send error message.")
+		c.Hub.lo.Warn("client send channel full, could not send error message", "client_id", c.ID)
 		c.Hub.RemoveClient(c)
 		c.close()
 	}
@@ -225,7 +224,7 @@ func (c *Client) SendError(msg string) {
 // SendMessage sends a message to client.
 func (c *Client) SendMessage(b []byte, typ byte) {
 	if c.Closed.Get() {
-		log.Println("Attempted to send message to closed client")
+		c.Hub.lo.Warn("attempted to send message to closed client", "client_id", c.ID)
 		return
 	}
 	select {

@@ -35,7 +35,7 @@
           <div class="flex-1 box p-5">
             <div class="flex justify-between items-center mb-4">
               <p class="card-title">{{ $t('report.csat.cardTitle', { days: csatDays }) }}</p>
-              <DateFilter @filter-change="handleCSATFilterChange" :label="''" />
+              <DateFilter @filter-change="(d) => handleFilterChange('csat', d)" :label="''" />
             </div>
             <div class="grid grid-cols-3 gap-6">
               <div class="metric-item">
@@ -61,7 +61,10 @@
               <p class="card-title">
                 {{ $t('report.messages.cardTitle', { days: messageVolumeDays }) }}
               </p>
-              <DateFilter @filter-change="handleMessageVolumeFilterChange" :label="''" />
+              <DateFilter
+                @filter-change="(d) => handleFilterChange('messageVolume', d)"
+                :label="''"
+              />
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div class="metric-item">
@@ -96,7 +99,7 @@
         <div class="w-full rounded box p-5">
           <div class="flex justify-between items-center mb-6">
             <p class="card-title">{{ slaCardTitle }}</p>
-            <DateFilter @filter-change="handleSlaFilterChange" :label="''" />
+            <DateFilter @filter-change="(d) => handleFilterChange('sla', d)" :label="''" />
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -201,7 +204,10 @@
             <p class="card-title">
               {{ $t('report.tags.cardTitle', { days: tagDistributionDays }) }}
             </p>
-            <DateFilter @filter-change="handleTagDistributionFilterChange" :label="''" />
+            <DateFilter
+              @filter-change="(d) => handleFilterChange('tagDistribution', d)"
+              :label="''"
+            />
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -240,7 +246,7 @@
         <div class="rounded box w-full p-5">
           <div class="flex justify-between items-center mb-4">
             <p class="card-title">{{ $t('report.chart.title') }}</p>
-            <DateFilter @filter-change="handleChartFilterChange" :label="''" />
+            <DateFilter @filter-change="(d) => handleFilterChange('chart', d)" :label="''" />
           </div>
           <LineChart :data="processedLineData" />
         </div>
@@ -265,6 +271,7 @@ import api from '../../api'
 const emitter = useEmitter()
 const { t } = useI18n()
 const isLoading = ref(false)
+const initialized = ref(false)
 const lastUpdate = ref(new Date())
 const cardCounts = ref({})
 const chartData = ref({ status_summary: [] })
@@ -292,7 +299,6 @@ const slaCounts = ref({
   resolution_compliance_percent: 0
 })
 
-// New data refs
 const csatData = ref({
   average_rating: 0,
   response_rate: 0,
@@ -314,14 +320,53 @@ const tagDistributionData = ref({
   tagged_percentage: 0
 })
 
-// Date filter state
-const slaDays = ref(30)
-const chartDays = ref(90)
-const csatDays = ref(30)
-const messageVolumeDays = ref(30)
-const tagDistributionDays = ref(30)
+const sections = {
+  sla: {
+    days: ref(30),
+    fetch: async (days) => {
+      const { data } = await api.getOverviewSLA({ days })
+      slaCounts.value = { ...slaCounts.value, ...data.data }
+    }
+  },
+  chart: {
+    days: ref(90),
+    fetch: async (days) => {
+      const { data } = await api.getOverviewCharts({ days })
+      chartData.value = {
+        new_conversations: data.data.new_conversations || [],
+        resolved_conversations: data.data.resolved_conversations || [],
+        messages_sent: data.data.messages_sent || []
+      }
+    }
+  },
+  csat: {
+    days: ref(30),
+    fetch: async (days) => {
+      const { data } = await api.getOverviewCSAT({ days })
+      csatData.value = { ...csatData.value, ...data.data }
+    }
+  },
+  messageVolume: {
+    days: ref(30),
+    fetch: async (days) => {
+      const { data } = await api.getOverviewMessageVolume({ days })
+      messageVolumeData.value = { ...messageVolumeData.value, ...data.data }
+    }
+  },
+  tagDistribution: {
+    days: ref(30),
+    fetch: async (days) => {
+      const { data } = await api.getOverviewTagDistribution({ days })
+      tagDistributionData.value = { ...tagDistributionData.value, ...data.data }
+    }
+  }
+}
 
-// Format helpers
+const slaDays = sections.sla.days
+const csatDays = sections.csat.days
+const messageVolumeDays = sections.messageVolume.days
+const tagDistributionDays = sections.tagDistribution.days
+
 const formatRating = (value) => {
   if (!value) return '0.0'
   return Number(value).toFixed(1)
@@ -346,7 +391,6 @@ const formattedSlaCounts = computed(() => ({
   avg_resolution_time_sec: formatDuration(slaCounts.value.avg_resolution_time_sec, false)
 }))
 
-// Dynamic SLA card title based on selected days
 const slaCardTitle = computed(() => t('report.sla.cardTitle', { days: slaDays.value }))
 
 const lastUpdateFormatted = computed(() => lastUpdate.value.toLocaleTimeString())
@@ -415,105 +459,20 @@ const fetchCardStats = async () => {
   }
 }
 
-const fetchSLAStats = async (days = slaDays.value) => {
+const runSectionFetch = async (key, days) => {
   try {
-    const { data } = await api.getOverviewSLA({ days })
-    slaCounts.value = { ...slaCounts.value, ...data.data }
+    await sections[key].fetch(days)
   } catch (error) {
     showError(error)
   }
 }
 
-const fetchChartData = async (days = chartDays.value) => {
-  try {
-    const { data } = await api.getOverviewCharts({ days })
-    chartData.value = {
-      new_conversations: data.data.new_conversations || [],
-      resolved_conversations: data.data.resolved_conversations || [],
-      messages_sent: data.data.messages_sent || []
-    }
-  } catch (error) {
-    showError(error)
-  }
-}
-
-const fetchCSATStats = async (days = csatDays.value) => {
-  try {
-    const { data } = await api.getOverviewCSAT({ days })
-    csatData.value = { ...csatData.value, ...data.data }
-  } catch (error) {
-    showError(error)
-  }
-}
-
-const fetchMessageVolumeStats = async (days = messageVolumeDays.value) => {
-  try {
-    const { data } = await api.getOverviewMessageVolume({ days })
-    messageVolumeData.value = { ...messageVolumeData.value, ...data.data }
-  } catch (error) {
-    showError(error)
-  }
-}
-
-const fetchTagDistributionStats = async (days = tagDistributionDays.value) => {
-  try {
-    const { data } = await api.getOverviewTagDistribution({ days })
-    tagDistributionData.value = { ...tagDistributionData.value, ...data.data }
-  } catch (error) {
-    showError(error)
-  }
-}
-
-// Date filter handlers
-const handleSlaFilterChange = async (days) => {
-  slaDays.value = days
+const handleFilterChange = async (key, days) => {
+  if (!initialized.value) return
+  sections[key].days.value = days
   isLoading.value = true
   try {
-    await fetchSLAStats(days)
-  } finally {
-    isLoading.value = false
-    lastUpdate.value = new Date()
-  }
-}
-
-const handleChartFilterChange = async (days) => {
-  chartDays.value = days
-  isLoading.value = true
-  try {
-    await fetchChartData(days)
-  } finally {
-    isLoading.value = false
-    lastUpdate.value = new Date()
-  }
-}
-
-const handleCSATFilterChange = async (days) => {
-  csatDays.value = days
-  isLoading.value = true
-  try {
-    await fetchCSATStats(days)
-  } finally {
-    isLoading.value = false
-    lastUpdate.value = new Date()
-  }
-}
-
-const handleMessageVolumeFilterChange = async (days) => {
-  messageVolumeDays.value = days
-  isLoading.value = true
-  try {
-    await fetchMessageVolumeStats(days)
-  } finally {
-    isLoading.value = false
-    lastUpdate.value = new Date()
-  }
-}
-
-const handleTagDistributionFilterChange = async (days) => {
-  tagDistributionDays.value = days
-  isLoading.value = true
-  try {
-    await fetchTagDistributionStats(days)
+    await runSectionFetch(key, days)
   } finally {
     isLoading.value = false
     lastUpdate.value = new Date()
@@ -525,15 +484,12 @@ const loadDashboardData = async () => {
   try {
     await Promise.allSettled([
       fetchCardStats(),
-      fetchSLAStats(),
-      fetchChartData(),
-      fetchCSATStats(),
-      fetchMessageVolumeStats(),
-      fetchTagDistributionStats()
+      ...Object.keys(sections).map((key) => runSectionFetch(key, sections[key].days.value))
     ])
   } finally {
     isLoading.value = false
     lastUpdate.value = new Date()
+    initialized.value = true
   }
 }
 
@@ -560,10 +516,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.metric-value {
-  @apply text-3xl font-bold tracking-tight;
-}
-
 .metric-value {
   @apply text-3xl font-bold tracking-tight;
 }

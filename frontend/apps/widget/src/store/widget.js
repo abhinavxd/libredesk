@@ -10,6 +10,9 @@ export const useWidgetStore = defineStore('widget', () => {
     const isMobileFullScreen = ref(false)
     const isExpanded = ref(false)
     const wasExpandedBeforeLeaving = ref(false)
+    const connectionFailed = ref(false)
+    const connecting = ref(false)
+    const connected = ref(false)
 
 
     // Getters
@@ -111,6 +114,18 @@ export const useWidgetStore = defineStore('widget', () => {
         isExpanded.value = expanded
     }
 
+    const setConnectionFailed = (failed) => {
+        connectionFailed.value = failed
+    }
+
+    const setConnecting = (value) => {
+        connecting.value = value
+    }
+
+    const setConnected = (value) => {
+        connected.value = value
+    }
+
     return {
         // State
         isOpen,
@@ -120,6 +135,9 @@ export const useWidgetStore = defineStore('widget', () => {
         isMobileFullScreen,
         isExpanded,
         wasExpandedBeforeLeaving,
+        connectionFailed,
+        connecting,
+        connected,
 
         // Getters
         isChatView,
@@ -137,5 +155,8 @@ export const useWidgetStore = defineStore('widget', () => {
         expandWidget,
         collapseWidget,
         setExpanded,
+        setConnectionFailed,
+        setConnecting,
+        setConnected,
     }
 })

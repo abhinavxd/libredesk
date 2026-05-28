@@ -5,11 +5,12 @@
       <Spinner size="md" :text="$t('globals.terms.loading')" absolute />
     </div>
     <div
-      class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
+      class="flex-1 min-h-0 overflow-y-auto [overflow-anchor:none] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
       ref="messagesContainer"
       @scroll="handleScroll"
     >
-      <!-- Chat Intro -->
+      <div ref="contentEl" class="p-4 flex flex-col gap-4">
+        <!-- Chat Intro -->
       <ChatIntro v-if="!props.showPreChatForm" :introText="config.chat_introduction" />
 
       <!-- Notice -->
@@ -139,6 +140,8 @@
         </div>
       </div>
 
+      </div>
+
       <!-- Typing Indicator -->
       <div v-if="isTyping" class="flex flex-col items-start">
         <div
@@ -151,7 +154,7 @@
 
     <!-- Sticky scroll to bottom button -->
     <ScrollToBottomButton
-      :is-at-bottom="isAtBottom"
+      :is-at-bottom="!hasUserScrolled.value"
       :unread-count="unreadMessages"
       @scroll-to-bottom="handleScrollToBottom"
     />
@@ -160,6 +163,7 @@
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useStickyScroll } from '@shared-ui/composables'
 import { useDocumentVisibility, useDebounceFn } from '@vueuse/core'
 import { useWidgetStore } from '../store/widget.js'
 import { useChatStore } from '../store/chat.js'
@@ -175,6 +179,7 @@ import CSATMessageBubble from './CSATMessageBubble.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
+import CSATMessageBubble from './CSATMessageBubble.vue'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 
@@ -188,7 +193,11 @@ const props = defineProps({
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const messagesContainer = ref(null)
-const isAtBottom = ref(true)
+const contentEl = ref(null)
+const { hasUserScrolled, scrollToBottom, handleScroll } = useStickyScroll(messagesContainer, contentEl, {
+  onArriveBottom: () => { unreadMessages.value = 0 }
+})
+const isAtBottom = computed(() => !hasUserScrolled.value)
 const unreadMessages = ref(0)
 const currentConversationUUID = ref('')
 const quotedTextState = ref({})
@@ -236,6 +245,31 @@ const isQuotedTextVisible = (messageUuid) => {
   return quotedTextState.value[messageUuid] || false
 }
 
+
+// handleCSATSubmitted updates the local message state when CSAT feedback is submitted.
+const handleCSATSubmitted = ({ message_uuid, rating, feedback }) => {
+  const currentMessage = chatStore.getCurrentConversationMessages.find(
+    (m) => m.uuid === message_uuid
+  )
+  const updatedMeta = {
+    ...currentMessage.meta,
+    csat_submitted: true,
+    is_csat: true
+  }
+
+  if (rating > 0) {
+    updatedMeta.submitted_rating = rating
+  }
+  if (feedback && feedback.trim()) {
+    updatedMeta.submitted_feedback = feedback.trim()
+  }
+
+  chatStore.replaceMessage(chatStore.currentConversation.uuid, message_uuid, {
+    ...currentMessage,
+    meta: updatedMeta
+  })
+}
+
 const toggleQuote = (messageUuid) => {
   quotedTextState.value[messageUuid] = !quotedTextState.value[messageUuid]
 }
@@ -265,32 +299,9 @@ const handleCSATSubmitted = ({ message_uuid, rating, feedback }) => {
   })
 }
 
-const checkIfAtBottom = () => {
-  const container = messagesContainer.value
-  if (container) {
-    const tolerance = 100
-    const isBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight <= tolerance
-    isAtBottom.value = isBottom
-  }
-}
-
-const handleScroll = () => {
-  checkIfAtBottom()
-}
-
 const handleScrollToBottom = () => {
-  unreadMessages.value = 0
+  hasUserScrolled.value = false
   scrollToBottom()
-}
-
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-      checkIfAtBottom()
-    }
-  })
 }
 
 // Debounced version for tab-switch and widget-open triggers only.
@@ -311,7 +322,7 @@ watch(visibility, (state) => {
 
 onMounted(() => {
   // Check initial scroll position
-  checkIfAtBottom()
+  
 
   // Register all existing messages as seen
   chatStore.getCurrentConversationMessages.forEach((m) => {

@@ -9,7 +9,7 @@
         variant="outline"
         size="sm"
         @click="startAddingNote"
-        v-if="!isAddingNote && !isLoading && notes.length !== 0 && userStore.can('contact_notes:write')"
+        v-if="!isAddingNote && !isLoading && (notes.length !== 0 || compact) && userStore.can('contact_notes:write')"
         class="transition-all hover:bg-primary/10 hover:border-primary/30"
       >
         <PlusIcon size="18" />
@@ -17,8 +17,12 @@
       </Button>
     </div>
 
-    <div class="h-52" v-if="isLoading">
-      <Spinner />
+    <div
+      v-if="isLoading"
+      class="flex items-center justify-center"
+      :class="compact ? 'py-4' : 'h-52'"
+    >
+      <Spinner :absolute="false" />
     </div>
 
     <!-- Note input -->
@@ -129,33 +133,39 @@
     </div>
 
     <!-- No notes message -->
-    <div
-      v-if="notes.length === 0 && !isAddingNote && !isLoading"
-      class="box border-dashed p-10 text-center bg-muted/50 mt-6"
-    >
-      <div class="flex flex-col items-center">
-        <div class="rounded-full bg-muted p-4 mb-2">
-          <MessageSquareIcon class="text-muted-foreground" size="25" />
-        </div>
-        <h3 class="mt-2 text-base font-medium text-foreground">
-          {{ $t('contact.notes.empty') }}
-        </h3>
-        <p class="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
-          {{ $t('contact.notes.help') }}
-        </p>
-        <Button
-          v-if="userStore.can('contact_notes:write')"
-          variant="outline"
-          class="mt-3"
-          @click="startAddingNote"
-        >
-          <PlusIcon size="15" />
-          {{ $t('contact.addNote') }}
-        </Button>
+    <template v-if="showEmpty">
+      <div v-if="compact" class="text-center text-sm text-muted-foreground py-4">
+        {{ $t('contact.notes.empty') }}
       </div>
-    </div>
+      <div v-else class="box border-dashed p-10 text-center bg-muted/50 mt-6">
+        <div class="flex flex-col items-center">
+          <div class="rounded-full bg-muted p-4 mb-2">
+            <MessageSquareIcon class="text-muted-foreground" size="25" />
+          </div>
+          <h3 class="mt-2 text-base font-medium text-foreground">
+            {{ $t('contact.notes.empty') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
+            {{ $t('contact.notes.help') }}
+          </p>
+          <Button
+            v-if="userStore.can('contact_notes:write')"
+            variant="outline"
+            class="mt-3"
+            @click="startAddingNote"
+          >
+            <PlusIcon size="15" />
+            {{ $t('contact.addNote') }}
+          </Button>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
+
+<script>
+const notesCache = new Map()
+</script>
 
 <script setup>
 import { ref, watch, computed } from 'vue'
@@ -201,14 +211,22 @@ const NOTES_LIMIT = 10
 const showAll = ref(false)
 const latestFetchId = ref(0)
 
-
-const fetchNotes = async (contactId = props.contactId) => {
+const fetchNotes = async (contactId = props.contactId, { useCache = true } = {}) => {
+  if (!contactId) return
   const fetchId = ++latestFetchId.value
+
+  if (useCache && notesCache.has(contactId)) {
+    notes.value = notesCache.get(contactId)
+    isLoading.value = false
+    return
+  }
+
   try {
     isLoading.value = true
     const { data } = await api.getContactNotes(contactId)
     if (fetchId !== latestFetchId.value) return
     notes.value = data.data
+    notesCache.set(contactId, data.data)
   } catch (error) {
     if (fetchId !== latestFetchId.value) return
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -235,9 +253,12 @@ const cancelAddNote = () => {
 }
 
 const addOrUpdateNote = async () => {
+  const targetId = props.contactId
+  if (!targetId) return
   try {
-    await api.createContactNote(props.contactId, { note: newNote.value })
-    await fetchNotes()
+    await api.createContactNote(targetId, { note: newNote.value })
+    notesCache.delete(targetId)
+    await fetchNotes(props.contactId, { useCache: false })
     cancelAddNote()
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -248,15 +269,18 @@ const addOrUpdateNote = async () => {
 }
 
 const deleteNote = async (noteId) => {
+  const targetId = props.contactId
+  if (!targetId) return
   try {
-    await api.deleteContactNote(props.contactId, noteId)
+    await api.deleteContactNote(targetId, noteId)
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
   } finally {
-    await fetchNotes()
+    notesCache.delete(targetId)
+    await fetchNotes(props.contactId, { useCache: false })
   }
 }
 
@@ -265,16 +289,18 @@ const visibleNotes = computed(() => {
   return notes.value.slice(0, NOTES_LIMIT)
 })
 
+const showEmpty = computed(() => notes.value.length === 0 && !isAddingNote.value && !isLoading.value)
+
 watch(() => props.contactId, (newId) => {
   latestFetchId.value++
   showAll.value = false
   cancelAddNote()
-  notes.value = []
   if (!newId) {
+    notes.value = []
     isLoading.value = false
     return
   }
+  if (!notesCache.has(newId)) notes.value = []
   fetchNotes(newId)
 }, { immediate: true })
-
 </script>
