@@ -28,12 +28,12 @@
         class="flex items-center justify-center pb-1.5"
       >
         <a
-          href="https://libredesk.io"
+          href="https://sibbank.ir"
           target="_blank"
           rel="noopener noreferrer"
           class="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors no-underline"
         >
-          Powered by <span class="font-medium">libredesk</span>
+          Powered by <span class="font-medium">Sibbank</span>
         </a>
       </div>
 

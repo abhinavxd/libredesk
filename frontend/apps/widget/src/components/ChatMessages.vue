@@ -25,8 +25,8 @@
         :class="[
           'flex flex-col animate-slide-in',
           message.author.type === 'contact' || message.author.type === 'visitor'
-            ? (widgetStore.isRtl ? 'items-start' : 'items-end')
-            : (widgetStore.isRtl ? 'items-end' : 'items-start')
+            ? 'items-end'
+            : 'items-start'
         ]"
       >
         <!-- CSAT Message Bubble -->
@@ -44,14 +44,14 @@
             message.author.type === 'contact' || message.author.type === 'visitor'
               ? [
                   'text-primary-foreground',
-                  widgetStore.isRtl ? 'rounded-bl-sm' : 'rounded-br-sm',
+                  'rounded-br-sm',
                   message.status === 'sending' || message.status === 'uploading'
                     ? 'bg-primary/60'
                     : message.status === 'failed'
                       ? 'bg-destructive/60'
                       : 'bg-primary'
                 ]
-              : ['bg-muted text-foreground', widgetStore.isRtl ? 'rounded-br-sm' : 'rounded-bl-sm'],
+              : ['bg-muted text-foreground', 'rounded-bl-sm'],
             {
               'show-quoted-text': isQuotedTextVisible(message.uuid),
               'hide-quoted-text': !isQuotedTextVisible(message.uuid)
@@ -140,12 +140,9 @@
       </div>
 
       <!-- Typing Indicator -->
-      <div v-if="isTyping" :class="['flex flex-col', widgetStore.isRtl ? 'items-end' : 'items-start']">
+      <div v-if="isTyping" class="flex flex-col items-start">
         <div
-          :class="[
-            'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 bg-muted text-foreground',
-            widgetStore.isRtl ? 'rounded-br-sm' : 'rounded-bl-sm'
-          ]"
+          class="max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 bg-muted text-foreground rounded-bl-sm"
         >
           <TypingIndicator />
         </div>
