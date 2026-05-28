@@ -3,8 +3,8 @@
     <!-- Sender Name -->
     <div
       v-if="!groupWithPrev"
-      class="mb-1 flex items-center gap-1"
-      :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'"
+      class="mb-1 flex items-center gap-1.5"
+      :class="isOutgoing ? 'pr-[47px] flex-row-reverse' : 'pl-[47px]'"
     >
       <router-link
         v-if="!isOutgoing"
@@ -23,6 +23,14 @@
       <p v-else class="text-muted-foreground text-sm font-medium">
         {{ getFullName }}
       </p>
+
+      <!-- AI badge -->
+      <span
+        v-if="message.meta?.is_ai_bot"
+        class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 font-medium"
+      >
+        🤖 چت بات
+      </span>
     </div>
 
     <!-- Message Bubble -->
@@ -63,7 +71,7 @@
           <div
             ref="contentWrapperEl"
             class="relative"
-            :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
+            :class="[{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }, textClasses]"
           >
             <div
               v-if="message.content_type === 'text'"
@@ -286,13 +294,21 @@ const nonInlineAttachments = computed(() =>
 
 const bubbleClasses = computed(() => ({
   'bg-private': isOutgoing.value && props.message.private,
-  'border border-border': isOutgoing.value && !props.message.private,
+  'bg-violet-50/40 dark:bg-violet-950/20 border-violet-200/80 dark:border-violet-900/50': isOutgoing.value && props.message.meta?.is_ai_bot && !props.message.private,
+  'border border-border': isOutgoing.value && !props.message.private && !props.message.meta?.is_ai_bot,
   'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
   'border-destructive': isOutgoing.value && props.message.status === 'failed',
   relative: isOutgoing.value,
   'show-quoted-text': !isOutgoing.value && showQuotedText.value,
   'hide-quoted-text': !isOutgoing.value && !showQuotedText.value
 }))
+
+const textClasses = computed(() => {
+  if (props.message.meta?.is_ai_bot) {
+    return 'text-violet-950 dark:text-violet-100'
+  }
+  return ''
+})
 
 const isPrivateMessage = computed(() => isOutgoing.value && props.message.private)
 const showCheckCheck = computed(
