@@ -10,7 +10,7 @@
   </div>
   <div v-else class="space-y-1">
     <router-link
-      v-for="conversation in conversationStore.current.previous_conversations"
+      v-for="conversation in conversationStore.current?.previous_conversations || []"
       :key="conversation.uuid"
       :to="{
         name: 'inbox-conversation',
