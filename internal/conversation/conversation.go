@@ -1349,12 +1349,32 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 		return nil
 	}
 
+	// 1. Acquire Redis lock for the conversation to prevent concurrent AI completions.
+	if m.rdb != nil {
+		lockKey := fmt.Sprintf("ai_bot_lock:conv:%s", conv.UUID)
+		ctx := context.Background()
+		set, err := m.rdb.SetNX(ctx, lockKey, "in_progress", 30*time.Second).Result()
+		if err != nil {
+			m.lo.Warn("AI bot: failed to acquire lock in Redis", "conversation_uuid", conv.UUID, "error", err)
+		} else if !set {
+			m.lo.Info("AI bot: reply already in progress for this conversation, skipping", "conversation_uuid", conv.UUID)
+			return nil
+		}
+		defer m.rdb.Del(ctx, lockKey)
+	}
+
 	m.lo.Info("AI bot: fetching conversation messages", "conversation_uuid", conv.UUID)
 	messages, _, err := m.GetConversationMessages(conv.UUID, 1, 20, toPtr(false), nil)
 	if err != nil {
 		return fmt.Errorf("get conversation messages: %w", err)
 	}
 	m.lo.Info("AI bot: fetched messages", "conversation_uuid", conv.UUID, "count", len(messages))
+
+	// 2. Prevent duplicate AI replies by ensuring the latest message in the conversation is from the contact.
+	if len(messages) == 0 || messages[0].SenderType != models.SenderTypeContact {
+		m.lo.Info("AI bot: last message is not from contact, skipping reply", "conversation_uuid", conv.UUID)
+		return nil
+	}
 
 	var chatMessages []ai.ChatMessage
 	chatMessages = append(chatMessages, ai.ChatMessage{
@@ -1384,7 +1404,7 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 		}
 		chatMessages = append(chatMessages, ai.ChatMessage{
 			Role:    role,
-			Content: msg.TextContent,
+			Content: strings.TrimSpace(msg.TextContent),
 		})
 	}
 

@@ -16,8 +16,9 @@ type ChatMessage struct {
 }
 
 type chatRequest struct {
-	Model    string        `json:"model"`
-	Messages []ChatMessage `json:"messages"`
+	Model       string        `json:"model"`
+	Messages    []ChatMessage `json:"messages"`
+	Temperature float64       `json:"temperature"`
 }
 
 type chatResponse struct {
@@ -38,8 +39,9 @@ func ChatCompletion(baseURL, apiKey, model string, messages []ChatMessage) (stri
 	}
 
 	reqBody := chatRequest{
-		Model:    model,
-		Messages: messages,
+		Model:       model,
+		Messages:    messages,
+		Temperature: 0.2, // Low temperature for high precision and deterministic FAQ replies.
 	}
 
 	body, err := json.Marshal(reqBody)
