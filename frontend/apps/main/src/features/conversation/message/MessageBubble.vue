@@ -1,10 +1,10 @@
 <template>
-  <div class="flex flex-col text-left" :class="isOutgoing ? 'items-end' : 'items-start'">
+  <div class="flex flex-col text-left" :class="isOutgoing ? 'items-start' : 'items-end'">
     <!-- Sender Name -->
     <div
       v-if="!groupWithPrev"
       class="mb-1 flex items-center gap-1.5"
-      :class="isOutgoing ? 'pr-[47px] flex-row-reverse' : 'pl-[47px]'"
+      :class="isOutgoing ? 'pl-[47px]' : 'pr-[47px] flex-row-reverse'"
     >
       <router-link
         v-if="!isOutgoing"
@@ -34,12 +34,13 @@
     </div>
 
     <!-- Message Bubble -->
-    <div class="flex flex-row gap-2 w-full" :class="{ 'justify-end': isOutgoing }">
-      <!-- Avatar (left for incoming) -->
-      <template v-if="!isOutgoing">
+    <div class="flex flex-row gap-2 w-full" :class="{ 'justify-end': !isOutgoing }">
+      <!-- Avatar (left for outgoing) -->
+      <template v-if="isOutgoing">
+        <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
         <router-link
-          v-if="!groupWithPrev"
-          :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
+          v-else-if="canManageUsers"
+          :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
           class="flex-shrink-0"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
@@ -49,13 +50,18 @@
             </AvatarFallback>
           </Avatar>
         </router-link>
-        <div v-else class="w-8 flex-shrink-0" />
+        <Avatar v-else class="w-8 h-8 flex-shrink-0">
+          <AvatarImage :src="getAvatar" />
+          <AvatarFallback class="font-medium">
+            {{ avatarFallback }}
+          </AvatarFallback>
+        </Avatar>
       </template>
 
       <!-- Bubble Wrapper with max 80% width -->
       <div
         class="w-4/5"
-        :class="{ 'flex justify-end': isOutgoing }"
+        :class="{ 'flex justify-end': !isOutgoing }"
         style="contain: inline-size"
       >
         <div
@@ -74,7 +80,7 @@
             :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
           >
             <div
-              v-if="message.content_type === 'text'"
+              v-if="message.content_type === 'text' || message.meta?.is_ai_bot"
               class="mb-1 native-html whitespace-pre-wrap"
               :class="{ 'mb-3': message.attachments.length > 0 }"
             >
@@ -156,12 +162,11 @@
         </div>
       </div>
 
-      <!-- Avatar (right for outgoing) -->
-      <template v-if="isOutgoing">
-        <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
+      <!-- Avatar (right for incoming) -->
+      <template v-if="!isOutgoing">
         <router-link
-          v-else-if="canManageUsers"
-          :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
+          v-if="!groupWithPrev"
+          :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
           class="flex-shrink-0"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
@@ -171,17 +176,12 @@
             </AvatarFallback>
           </Avatar>
         </router-link>
-        <Avatar v-else class="w-8 h-8">
-          <AvatarImage :src="getAvatar" />
-          <AvatarFallback class="font-medium">
-            {{ avatarFallback }}
-          </AvatarFallback>
-        </Avatar>
+        <div v-else class="w-8 flex-shrink-0" />
       </template>
     </div>
 
     <!-- Timestamp tooltip -->
-    <div v-if="!groupWithNext" :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
+    <div v-if="!groupWithNext" :class="isOutgoing ? 'pl-[47px]' : 'pr-[47px]'">
       <Tooltip>
         <TooltipTrigger>
           <span class="text-muted-foreground text-xs mt-1">
@@ -197,7 +197,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, nextTick } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
@@ -229,6 +229,9 @@ const measureExpandable = () => {
   isExpandable.value = el.scrollHeight > COLLAPSE_THRESHOLD_PX
 }
 
+const animatedContent = ref(props.message.content || '')
+let typewriterInterval = null
+
 onMounted(async () => {
   await nextTick()
   measureExpandable()
@@ -238,6 +241,28 @@ onMounted(async () => {
   imgs.forEach((img) => {
     if (!img.complete) img.addEventListener('load', measureExpandable, { once: true })
   })
+
+  // Start typewriter animation if AI message is very recent
+  const isRecent = new Date().getTime() - new Date(props.message.created_at).getTime() < 5000
+  if (props.message.meta?.is_ai_bot && isRecent) {
+    const fullText = props.message.content || ''
+    animatedContent.value = ''
+    let index = 0
+    typewriterInterval = setInterval(() => {
+      if (index < fullText.length) {
+        animatedContent.value += fullText.charAt(index)
+        index++
+      } else {
+        clearInterval(typewriterInterval)
+      }
+    }, 15)
+  }
+})
+
+onUnmounted(() => {
+  if (typewriterInterval) {
+    clearInterval(typewriterInterval)
+  }
 })
 
 const props = defineProps({
@@ -285,7 +310,7 @@ const sanitizedContent = computed(() => {
   if (props.message.meta?.is_csat) {
     return t('globals.messages.pleaseRateConversation')
   }
-  return props.message.content || ''
+  return animatedContent.value
 })
 
 const nonInlineAttachments = computed(() =>

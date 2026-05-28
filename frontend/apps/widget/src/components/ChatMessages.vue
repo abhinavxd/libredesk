@@ -59,7 +59,7 @@
           ]"
         >
           <!-- Message content -->
-          <template v-if="message.content_type === 'text'">
+          <template v-if="message.content_type === 'text' || message.meta?.is_ai_bot">
             <span v-if="typingMessages[message.uuid] !== undefined" class="mb-1 whitespace-pre-wrap">{{
               typingMessages[message.uuid]
             }}</span>
