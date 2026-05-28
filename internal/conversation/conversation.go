@@ -1897,6 +1897,9 @@ func (c *Manager) AuthorizedConnectedAgentIDs(assignedUserID, assignedTeamID nul
 		if err != nil {
 			continue
 		}
+		if !agent.Enabled {
+			continue
+		}
 		if !slices.Contains(agent.Permissions, authzmodels.PermConversationsRead) {
 			continue
 		}
