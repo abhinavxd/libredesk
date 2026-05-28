@@ -146,10 +146,12 @@ watch(
       fetchConversation(newUUID)
       return
     }
-    document.startViewTransition(async () => {
+    const transition = document.startViewTransition(async () => {
       fetchConversation(newUUID)
       await nextTick()
     })
+    transition.ready.catch(() => {})
+    transition.finished.catch(() => {})
   }
 )
 </script>
