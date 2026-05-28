@@ -110,6 +110,7 @@ export const createFormSchema = (t) => z.object({
     ai_bot: z.object({
       enabled: z.boolean(),
       api_key: z.string().optional(),
+      base_url: z.string().optional(),
       model: z.string().optional(),
       response_length: z.enum(['short', 'medium', 'long']).optional(),
       only_questions: z.boolean().optional(),

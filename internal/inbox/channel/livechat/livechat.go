@@ -126,6 +126,7 @@ type Config struct {
 	AIBot struct {
 		Enabled        bool   `json:"enabled"`
 		APIKey         string `json:"api_key"`
+		BaseURL        string `json:"base_url"`
 		Model          string `json:"model"`
 		ResponseLength string `json:"response_length"`
 		OnlyQuestions  bool   `json:"only_questions"`

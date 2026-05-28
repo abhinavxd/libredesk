@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -28,7 +29,10 @@ type chatResponse struct {
 	} `json:"error,omitempty"`
 }
 
-func ChatCompletion(apiKey, model string, messages []ChatMessage) (string, error) {
+func ChatCompletion(baseURL, apiKey, model string, messages []ChatMessage) (string, error) {
+	if baseURL == "" {
+		baseURL = "https://api.deepseek.com"
+	}
 	if model == "" {
 		model = "deepseek-chat"
 	}
@@ -43,7 +47,8 @@ func ChatCompletion(apiKey, model string, messages []ChatMessage) (string, error
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "https://api.deepseek.com/v1/chat/completions", bytes.NewReader(body))
+	url := strings.TrimRight(baseURL, "/") + "/chat/completions"
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
 	}

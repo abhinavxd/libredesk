@@ -2,7 +2,7 @@
   <div class="space-y-6">
     <div class="flex items-center gap-2">
       <span class="text-lg">🤖</span>
-      <h3 class="text-base font-semibold">AI Chatbot (DeepSeek)</h3>
+      <h3 class="text-base font-semibold">AI Chatbot</h3>
     </div>
 
     <FormField v-slot="{ componentField, handleChange }" name="config.ai_bot.enabled">
@@ -16,31 +16,38 @@
       </FormItem>
     </FormField>
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="space-y-4">
       <FormField v-slot="{ componentField }" name="config.ai_bot.api_key">
         <FormItem>
           <FormLabel>API Key</FormLabel>
           <FormControl>
             <Input type="password" v-bind="componentField" placeholder="sk-..." />
           </FormControl>
-          <FormDescription>کلید API از DeepSeek (https://platform.deepseek.com)</FormDescription>
+          <FormDescription>کلید API (DeepSeek, OpenAI, یا هر سرویس سازگار)</FormDescription>
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="config.ai_bot.base_url">
+        <FormItem>
+          <FormLabel>Base URL</FormLabel>
+          <FormControl>
+            <Input v-bind="componentField" placeholder="https://api.deepseek.com" />
+          </FormControl>
+          <FormDescription>
+            آدرس API سرویس AI. برای DeepSeek: https://api.deepseek.com — برای OpenAI: https://api.openai.com
+          </FormDescription>
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="config.ai_bot.model">
         <FormItem>
-          <FormLabel>مدل</FormLabel>
+          <FormLabel>Model</FormLabel>
           <FormControl>
-            <Select v-bind="componentField">
-              <SelectTrigger>
-                <SelectValue placeholder="انتخاب مدل" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="deepseek-chat">DeepSeek Chat</SelectItem>
-                <SelectItem value="deepseek-reasoner">DeepSeek Reasoner</SelectItem>
-              </SelectContent>
-            </Select>
+            <Input v-bind="componentField" placeholder="deepseek-chat" />
           </FormControl>
+          <FormDescription>
+            نام مدل. مثال‌ها: deepseek-chat, gpt-4o, gpt-3.5-turbo, deepseek-v4-flash
+          </FormDescription>
         </FormItem>
       </FormField>
     </div>
@@ -224,12 +231,8 @@ import { Input } from '@shared-ui/components/ui/input'
 import { Textarea } from '@shared-ui/components/ui/textarea'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared-ui/components/ui/select'
-import { RadioGroup, RadioGroupItem } from '@shared-ui/components/ui/radio-group'
+  RadioGroup,
+  RadioGroupItem,
+} from '@shared-ui/components/ui/radio-group'
 import { Label } from '@shared-ui/components/ui/label'
 </script>
