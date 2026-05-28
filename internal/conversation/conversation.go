@@ -1356,31 +1356,6 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 	}
 	m.lo.Info("AI bot: fetched messages", "conversation_uuid", conv.UUID, "count", len(messages))
 
-	lastUserMsg := ""
-	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].SenderType == models.SenderTypeContact && messages[i].TextContent != "" {
-			lastUserMsg = messages[i].TextContent
-			break
-		}
-	}
-
-	if lastUserMsg != "" {
-		if cached, ok := ai.GetCachedReply(m.rdb, config.AIBot.Model, config.AIBot.FAQData, lastUserMsg); ok {
-			m.lo.Info("AI bot: using cached reply", "conversation_uuid", conv.UUID)
-			lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, true)
-			return m.sendAIMessage(conv, user, cached, lc)
-		}
-	}
-
-	limited, err := ai.AIRateLimited(m.rdb, conv.InboxID)
-	if err != nil {
-		m.lo.Warn("AI bot: rate limit check failed", "error", err)
-	}
-	if limited {
-		m.lo.Warn("AI bot: rate limited", "conversation_uuid", conv.UUID, "inbox_id", conv.InboxID)
-		return nil
-	}
-
 	var chatMessages []ai.ChatMessage
 	chatMessages = append(chatMessages, ai.ChatMessage{
 		Role:    "system",
@@ -1413,6 +1388,21 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 		})
 	}
 
+	if cached, ok := ai.GetCachedReply(m.rdb, config.AIBot.Model, chatMessages); ok {
+		m.lo.Info("AI bot: using cached reply", "conversation_uuid", conv.UUID)
+		lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, true)
+		return m.sendAIMessage(conv, user, cached, lc)
+	}
+
+	limited, err := ai.AIRateLimited(m.rdb, conv.InboxID)
+	if err != nil {
+		m.lo.Warn("AI bot: rate limit check failed", "error", err)
+	}
+	if limited {
+		m.lo.Warn("AI bot: rate limited", "conversation_uuid", conv.UUID, "inbox_id", conv.InboxID)
+		return nil
+	}
+
 	m.lo.Info("AI bot: calling AI API", "conversation_uuid", conv.UUID, "model", config.AIBot.Model, "base_url", config.AIBot.BaseURL)
 	lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, true)
 	reply, err := ai.ChatCompletion(config.AIBot.BaseURL, config.AIBot.APIKey, config.AIBot.Model, chatMessages)
@@ -1428,9 +1418,7 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 
 	m.lo.Info("AI bot: got reply from AI", "conversation_uuid", conv.UUID, "reply_len", len(reply))
 
-	if lastUserMsg != "" {
-		ai.SetCachedReply(m.rdb, config.AIBot.Model, config.AIBot.FAQData, lastUserMsg, reply)
-	}
+	ai.SetCachedReply(m.rdb, config.AIBot.Model, chatMessages, reply)
 
 	return m.sendAIMessage(conv, user, reply, lc)
 }

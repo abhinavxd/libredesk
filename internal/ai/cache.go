@@ -15,30 +15,33 @@ const (
 	cacheTTL       = 30 * time.Minute
 )
 
-func cacheKey(model, faqData, lastUserMessage string) string {
+func cacheKey(model string, messages []ChatMessage) string {
 	h := sha256.New()
-	h.Write([]byte(model + "|" + faqData + "|" + lastUserMessage))
+	h.Write([]byte(model))
+	for _, msg := range messages {
+		h.Write([]byte("|" + msg.Role + "|" + msg.Content))
+	}
 	return cacheKeyPrefix + hex.EncodeToString(h.Sum(nil))
 }
 
-func GetCachedReply(rdb *redis.Client, model, faqData, lastUserMessage string) (string, bool) {
-	if rdb == nil {
+func GetCachedReply(rdb *redis.Client, model string, messages []ChatMessage) (string, bool) {
+	if rdb == nil || len(messages) == 0 {
 		return "", false
 	}
 	ctx := context.Background()
-	reply, err := rdb.Get(ctx, cacheKey(model, faqData, lastUserMessage)).Result()
+	reply, err := rdb.Get(ctx, cacheKey(model, messages)).Result()
 	if err != nil {
 		return "", false
 	}
 	return reply, true
 }
 
-func SetCachedReply(rdb *redis.Client, model, faqData, lastUserMessage, reply string) {
-	if rdb == nil {
+func SetCachedReply(rdb *redis.Client, model string, messages []ChatMessage, reply string) {
+	if rdb == nil || len(messages) == 0 {
 		return
 	}
 	ctx := context.Background()
-	key := cacheKey(model, faqData, lastUserMessage)
+	key := cacheKey(model, messages)
 	rdb.Set(ctx, key, reply, cacheTTL)
 }
 
