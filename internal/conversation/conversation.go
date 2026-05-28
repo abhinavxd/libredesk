@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/authz"
 	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/automation"
 	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
@@ -1900,35 +1901,8 @@ func (c *Manager) AuthorizedConnectedAgentIDs(assignedUserID, assignedTeamID nul
 		if !agent.Enabled {
 			continue
 		}
-		if !slices.Contains(agent.Permissions, authzmodels.PermConversationsRead) {
-			continue
-		}
-		if slices.Contains(agent.Permissions, authzmodels.PermConversationsReadAll) {
+		if authz.CanReadAssignment(agent, assignedUserID, assignedTeamID) {
 			out = append(out, id)
-			continue
-		}
-		if slices.Contains(agent.Permissions, authzmodels.PermConversationsReadAssigned) &&
-			assignedUserID.Valid && assignedUserID.Int == agent.ID {
-			out = append(out, id)
-			continue
-		}
-		if assignedTeamID.Valid {
-			tid := assignedTeamID.Int
-			if slices.Contains(agent.Permissions, authzmodels.PermConversationsReadTeamAll) &&
-				slices.Contains(agent.Teams.IDs(), tid) {
-				out = append(out, id)
-				continue
-			}
-			if slices.Contains(agent.Permissions, authzmodels.PermConversationsReadTeamInbox) &&
-				slices.Contains(agent.Teams.IDs(), tid) && !assignedUserID.Valid {
-				out = append(out, id)
-				continue
-			}
-		}
-		if slices.Contains(agent.Permissions, authzmodels.PermConversationsReadUnassigned) &&
-			!assignedUserID.Valid && !assignedTeamID.Valid {
-			out = append(out, id)
-			continue
 		}
 	}
 	return out
