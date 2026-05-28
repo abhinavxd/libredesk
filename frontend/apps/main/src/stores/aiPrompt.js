@@ -9,11 +9,15 @@ export const useAiPromptStore = defineStore('aiPrompt', () => {
     const prompts = ref([])
     const emitter = useEmitter()
     let inflight = null
+    let hasFetched = false
     const fetchPrompts = () => {
-        if (prompts.value.length) return Promise.resolve()
+        if (hasFetched) return Promise.resolve()
         if (inflight) return inflight
         inflight = api.getAiPrompts()
-            .then(response => { prompts.value = response?.data?.data || [] })
+            .then(response => {
+                prompts.value = response?.data?.data || []
+                hasFetched = true
+            })
             .catch(error => {
                 emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
                     variant: 'destructive',

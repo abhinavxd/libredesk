@@ -26,8 +26,16 @@ func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationL
 	}
 	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID)
 	if oldConv != nil {
-		prevIDs := m.AuthorizedConnectedAgentIDs(oldConv.AssignedUserID, oldConv.AssignedTeamID)
-		userIDs = unionIntSlices(userIDs, prevIDs)
+		seen := make(map[int]struct{}, len(userIDs))
+		for _, id := range userIDs {
+			seen[id] = struct{}{}
+		}
+		for _, id := range m.AuthorizedConnectedAgentIDs(oldConv.AssignedUserID, oldConv.AssignedTeamID) {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				userIDs = append(userIDs, id)
+			}
+		}
 	}
 	if len(userIDs) == 0 {
 		return
@@ -261,22 +269,3 @@ func convToBroadcastMap(conv *cmodels.ConversationListItem) map[string]any {
 	return out
 }
 
-func unionIntSlices(a, b []int) []int {
-	seen := make(map[int]struct{}, len(a)+len(b))
-	out := make([]int, 0, len(a)+len(b))
-	for _, id := range a {
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		out = append(out, id)
-	}
-	for _, id := range b {
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		out = append(out, id)
-	}
-	return out
-}

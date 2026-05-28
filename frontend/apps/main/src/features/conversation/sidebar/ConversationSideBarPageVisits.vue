@@ -54,6 +54,7 @@ const conversationStore = useConversationStore()
 const conversation = computed(() => conversationStore.current)
 const { t } = useI18n()
 const loaded = ref(false)
+let requestSeq = 0
 
 const pageVisits = computed(() => {
   const visits = conversation.value?.contact?.page_visits || []
@@ -69,6 +70,7 @@ const pageVisits = computed(() => {
 watch(
   () => conversation.value?.uuid,
   async (uuid) => {
+    const mySeq = ++requestSeq
     loaded.value = false
     if (!uuid || conversation.value?.inbox_channel !== 'livechat') {
       loaded.value = true
@@ -76,6 +78,7 @@ watch(
     }
     try {
       const resp = await api.getContactPageVisits(uuid)
+      if (mySeq !== requestSeq) return
       if (resp.data?.data) {
         conversationStore.mergeContactUpdate({
           contact_id: conversation.value?.contact_id,
@@ -85,7 +88,7 @@ watch(
     } catch {
       // Page visits are optional.
     } finally {
-      loaded.value = true
+      if (mySeq === requestSeq) loaded.value = true
     }
   },
   { immediate: true }

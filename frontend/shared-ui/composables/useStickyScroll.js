@@ -20,6 +20,7 @@ export function useStickyScroll (scrollEl, contentEl, options = {}) {
     if (!el) return
     isProgrammaticScroll = true
     el.scrollTop = el.scrollHeight
+    requestAnimationFrame(() => { isProgrammaticScroll = false })
   }
 
   const scrollToOffset = (top) => {
@@ -27,13 +28,11 @@ export function useStickyScroll (scrollEl, contentEl, options = {}) {
     if (!el) return
     isProgrammaticScroll = true
     el.scrollTop = top
+    requestAnimationFrame(() => { isProgrammaticScroll = false })
   }
 
   const handleScroll = () => {
-    if (isProgrammaticScroll) {
-      isProgrammaticScroll = false
-      return
-    }
+    if (isProgrammaticScroll) return
     const el = scrollEl.value
     if (!el) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= tolerance
