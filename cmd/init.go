@@ -286,6 +286,7 @@ func initConversations(
 	priority *priority.Manager,
 	hub *ws.Hub,
 	db *sqlx.DB,
+	rdb *redis.Client,
 	inboxStore *inbox.Manager,
 	userStore *user.Manager,
 	teamStore *team.Manager,
@@ -304,6 +305,7 @@ func initConversations(
 
 	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, dispatcher, conversation.Opts{
 		DB:                       db,
+		RDB:                      rdb,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
 		IncomingMessageQueueSize: ko.MustInt("message.incoming_queue_size"),
@@ -1143,6 +1145,7 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 		{"widget", 100},
 		{"auth", 30},
 		{"public", 100},
+		{"ai", 20},
 	}
 
 	for _, d := range defaults {

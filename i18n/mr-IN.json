@@ -19,6 +19,7 @@
   "actions.removeLink": "लिंक काढा",
   "actions.removeTags": "टॅग्ज काढा",
   "actions.sendCsat": "CSAT पाठवा",
+  "actions.sendAiReply": "AI उत्तर",
   "actions.sendPrivateNote": "खाजगी टीप पाठवा",
   "actions.sendReply": "उत्तर पाठवा",
   "actions.setPriority": "प्राधान्य सेट करा",

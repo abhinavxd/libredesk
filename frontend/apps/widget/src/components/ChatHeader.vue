@@ -2,12 +2,12 @@
   <div class="flex items-center p-2 border-b border-border bg-background gap-3 relative">
     <div class="flex items-center gap-2 justify-start">
       <Button @click="$emit('goBack')" variant="ghost" size="sm" :aria-label="$t('globals.messages.goBack')">
-        <ArrowLeft />
+        <ArrowLeft v-if="!widgetStore.isRtl" class="w-4 h-4" />
+        <ArrowRight v-else class="w-4 h-4" />
       </Button>
       <ChatTitle />
     </div>
-    <div class="flex items-center gap-2 ml-auto">
-      <!-- Expand/Collapse Button - only visible on desktop -->
+    <div class="flex items-center gap-2 ml-auto rtl:ml-0 rtl:mr-auto">
       <Button 
         v-if="!widgetStore.isMobileFullScreen" 
         @click="widgetStore.toggleExpand" 
@@ -25,7 +25,7 @@
 
 <script setup>
 import { Button } from '@shared-ui/components/ui/button'
-import { ArrowLeft, Maximize2, Minimize2 } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Maximize2, Minimize2 } from 'lucide-vue-next'
 import ChatTitle from './ChatTitle.vue'
 import { useWidgetStore } from '@widget/store/widget.js'
 

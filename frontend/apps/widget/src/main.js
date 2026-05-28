@@ -5,6 +5,50 @@ import App from './App.vue'
 import api from './api/index.js'
 import '@shared-ui/assets/styles/main.scss'
 
+const isRtlLanguage = (lang) => {
+    const normalized = (lang || '').toLowerCase()
+    const base = normalized.split('-')[0]
+    return ['fa', 'ar', 'he', 'ur', 'ps', 'ku'].includes(base)
+}
+
+const applyLocaleDirection = (lang, layoutDirection) => {
+    const normalizedDirection = (layoutDirection || '').toLowerCase()
+    const dir =
+        normalizedDirection === 'rtl' || normalizedDirection === 'ltr'
+            ? normalizedDirection
+            : isRtlLanguage(lang) ? 'rtl' : 'ltr'
+
+    document.documentElement.dir = dir
+    if (lang) document.documentElement.lang = lang
+}
+
+const applyLocaleFont = async (lang) => {
+    const normalized = (lang || '').toLowerCase()
+    const isPersian = normalized === 'fa' || normalized.startsWith('fa-')
+    document.documentElement.classList.toggle('is-fa', isPersian)
+    if (isPersian) {
+        const links = [
+            {
+                id: 'libredesk-font-vazir-400',
+                href: 'https://cdn.jsdelivr.net/npm/@fontsource/vazir@4.5.4/farsi-digits-400.css'
+            },
+            {
+                id: 'libredesk-font-vazir-700',
+                href: 'https://cdn.jsdelivr.net/npm/@fontsource/vazir@4.5.4/farsi-digits-700.css'
+            }
+        ]
+
+        links.forEach(({ id, href }) => {
+            if (document.getElementById(id)) return
+            const link = document.createElement('link')
+            link.id = id
+            link.rel = 'stylesheet'
+            link.href = href
+            document.head.appendChild(link)
+        })
+    }
+}
+
 async function initWidget () {
     try {
         // Get `inbox_id` from URL params
@@ -30,6 +74,9 @@ async function initWidget () {
         } else {
             lang = widgetConfig.language || fallbackLang
         }
+
+        applyLocaleDirection(lang, widgetConfig.layout_direction)
+        await applyLocaleFont(lang)
 
         // Fetch language messages
         const langMessages = await api.getLanguage(lang)

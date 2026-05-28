@@ -19,6 +19,7 @@
   "actions.removeLink": "Link entfernen",
   "actions.removeTags": "Tags entfernen",
   "actions.sendCsat": "CSAT senden",
+  "actions.sendAiReply": "KI-Antwort",
   "actions.sendPrivateNote": "Private Notiz senden",
   "actions.sendReply": "Antwort senden",
   "actions.setPriority": "Priorität setzen",

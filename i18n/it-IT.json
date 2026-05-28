@@ -19,6 +19,7 @@
   "actions.removeLink": "Rimuovi link",
   "actions.removeTags": "Rimuovi tag",
   "actions.sendCsat": "Invia CSAT",
+  "actions.sendAiReply": "Risposta IA",
   "actions.sendPrivateNote": "Invia nota privata",
   "actions.sendReply": "Invia risposta",
   "actions.setPriority": "Imposta priorità",

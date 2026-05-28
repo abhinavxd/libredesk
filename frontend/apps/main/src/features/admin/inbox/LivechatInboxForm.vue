@@ -15,6 +15,7 @@
         <TabsTrigger value="installation">{{
           $t('admin.inbox.livechat.tabs.installation')
         }}</TabsTrigger>
+        <TabsTrigger value="ai">🤖 AI</TabsTrigger>
       </TabsList>
 
       <div class="mt-8">
@@ -126,6 +127,25 @@
               </FormItem>
             </FormField>
           </div>
+
+          <FormField v-slot="{ componentField }" name="config.layout_direction">
+            <FormItem>
+              <FormLabel>Layout direction</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select direction" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto (based on language)</SelectItem>
+                    <SelectItem value="ltr">LTR</SelectItem>
+                    <SelectItem value="rtl">RTL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormDescription>Controls the widget layout direction. Auto uses the resolved language direction.</FormDescription>
+            </FormItem>
+          </FormField>
 
           <div class="grid grid-cols-2 gap-4">
             <!-- Email Fallback Inbox -->
@@ -967,6 +987,10 @@
             </div>
           </div>
         </div>
+
+        <div v-show="activeTab === 'ai'" class="space-y-8">
+          <AiBotSettings />
+        </div>
       </div>
     </Tabs>
 
@@ -1008,6 +1032,7 @@ import { Plus, X, TriangleAlert, GripVertical, Lightbulb } from 'lucide-vue-next
 import Draggable from 'vuedraggable'
 import { useI18n } from 'vue-i18n'
 import PreChatFormConfig, { getDefaultPrechatFields } from './PreChatFormConfig.vue'
+import AiBotSettings from './AiBotSettings.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import CopyButton from '@/components/button/CopyButton.vue'
 import CodeEditor from '@/components/editor/CodeEditor.vue'
@@ -1132,6 +1157,7 @@ const form = useForm({
       show_powered_by: true,
       language: 'en-US',
       fallback_language: 'en-US',
+      layout_direction: 'auto',
       logo_url: '',
       launcher: {
         position: 'right',

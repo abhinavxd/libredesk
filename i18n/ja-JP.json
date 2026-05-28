@@ -19,6 +19,7 @@
   "actions.removeLink": "リンクを削除",
   "actions.removeTags": "タグを削除",
   "actions.sendCsat": "CSATを送信",
+  "actions.sendAiReply": "AI返信",
   "actions.sendPrivateNote": "非公開ノートを送信",
   "actions.sendReply": "返信を送信",
   "actions.setPriority": "優先度を設定",

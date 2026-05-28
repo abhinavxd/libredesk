@@ -9,6 +9,33 @@ import '@shared-ui/assets/styles/main.scss'
 import '@shared-ui/utils/string.js'
 import Root from './Root.vue'
 
+const applyLocaleFont = async (lang) => {
+  const normalized = (lang || '').toLowerCase()
+  const isPersian = normalized === 'fa' || normalized.startsWith('fa-')
+  document.documentElement.classList.toggle('is-fa', isPersian)
+  if (isPersian) {
+    const links = [
+      {
+        id: 'libredesk-font-vazir-400',
+        href: 'https://cdn.jsdelivr.net/npm/@fontsource/vazir@4.5.4/farsi-digits-400.css'
+      },
+      {
+        id: 'libredesk-font-vazir-700',
+        href: 'https://cdn.jsdelivr.net/npm/@fontsource/vazir@4.5.4/farsi-digits-700.css'
+      }
+    ]
+
+    links.forEach(({ id, href }) => {
+      if (document.getElementById(id)) return
+      const link = document.createElement('link')
+      link.id = id
+      link.rel = 'stylesheet'
+      link.href = href
+      document.head.appendChild(link)
+    })
+  }
+}
+
 const setFavicon = (url) => {
   let link = document.createElement("link")
   link.rel = "icon"
@@ -21,6 +48,8 @@ async function initApp () {
   const emitter = mitt()
   const lang = config['app.lang'] || 'en-US'
   const langMessages = await api.getLanguage(lang)
+
+  await applyLocaleFont(lang)
 
   // Set favicon.
   if (config['app.favicon_url'])

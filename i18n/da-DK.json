@@ -19,6 +19,7 @@
   "actions.removeLink": "Fjern link",
   "actions.removeTags": "Fjern tags",
   "actions.sendCsat": "Send CSAT-undersøgelse",
+  "actions.sendAiReply": "AI-svar",
   "actions.sendPrivateNote": "Send privat note",
   "actions.sendReply": "Send svar",
   "actions.setPriority": "Angiv prioritet",

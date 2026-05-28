@@ -278,7 +278,38 @@ const isInternalUpdate = ref(false)
 
 const buildExtensions = () => {
   const extensions = [
-    StarterKit.configure(),
+    StarterKit.configure({
+      paragraph: {
+        HTMLAttributes: {
+          dir: 'auto'
+        }
+      },
+      heading: {
+        HTMLAttributes: {
+          dir: 'auto'
+        }
+      },
+      blockquote: {
+        HTMLAttributes: {
+          dir: 'auto'
+        }
+      },
+      bulletList: {
+        HTMLAttributes: {
+          dir: 'auto'
+        }
+      },
+      orderedList: {
+        HTMLAttributes: {
+          dir: 'auto'
+        }
+      },
+      listItem: {
+        HTMLAttributes: {
+          dir: 'auto'
+        }
+      }
+    }),
     ResizableImage.configure({
       HTMLAttributes: { class: 'inline-image', style: 'max-width: 100%; height: auto;' },
       allowBase64: false
@@ -332,7 +363,7 @@ const editor = useEditor({
   autofocus: props.autoFocus,
   content: htmlContent.value,
   editorProps: {
-    attributes: { class: 'outline-none' },
+    attributes: { class: 'outline-none', dir: 'auto' },
     getSuggestions: props.getSuggestions,
     handlePaste,
     handleDrop,
@@ -427,11 +458,15 @@ defineExpose({ focus, extractMentions })
 // Moving placeholder to the top.
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  float: left;
+  float: right;
   color: #adb5bd;
   pointer-events: none;
   height: 0;
   font-size: 0.875rem;
+}
+
+[dir="ltr"] .tiptap p.is-editor-empty:first-child::before {
+  float: left;
 }
 
 // Ensure the parent div has a proper height

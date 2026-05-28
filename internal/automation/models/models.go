@@ -20,6 +20,7 @@ const (
 	ActionSetTags         = "set_tags"
 	ActionRemoveTags      = "remove_tags"
 	ActionSendCSAT        = "send_csat"
+	ActionSendAIReply     = "send_ai_reply"
 
 	OperatorAnd = "AND"
 	OperatorOR  = "OR"

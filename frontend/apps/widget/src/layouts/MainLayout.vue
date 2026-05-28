@@ -1,9 +1,9 @@
 <template>
   <div class="flex flex-col h-full relative">
-    <div class="absolute top-2 right-2 z-20">
+    <div class="absolute top-2 right-2 rtl:right-auto rtl:left-2 z-20">
       <CloseWidgetButton />
     </div>
-    <Tabs :modelValue="widgetStore.currentView" @update:modelValue="handleTabChange" class="flex flex-col h-full">
+    <Tabs :modelValue="widgetStore.currentView" @update:modelValue="handleTabChange" :dir="widgetStore.isRtl ? 'rtl' : 'ltr'" class="flex flex-col h-full">
       <div class="flex-1 min-h-0">
         <TabsContent value="home" class="h-full mt-0">
           <HomeView />
@@ -28,12 +28,12 @@
         class="flex items-center justify-center pb-1.5"
       >
         <a
-          href="https://libredesk.io"
+          href="https://sibbank.ir"
           target="_blank"
           rel="noopener noreferrer"
           class="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors no-underline"
         >
-          Powered by <span class="font-medium">libredesk</span>
+          Powered by <span class="font-medium">Sibbank</span>
         </a>
       </div>
 

@@ -19,7 +19,7 @@
         </div>
 
         <!-- Actions and Send Button -->
-        <div class="flex justify-between items-center px-2 pb-2">
+        <div class="flex justify-between items-center px-2 pb-2 rtl:flex-row-reverse">
           <!-- Message Input Actions (file upload + emoji) -->
           <MessageInputActions
             :fileUploadEnabled="config.features?.file_upload || false"

@@ -19,6 +19,7 @@
   "actions.removeLink": "Supprimer le lien",
   "actions.removeTags": "Supprimer les étiquettes",
   "actions.sendCsat": "Envoyer le questionnaire de satisfaction utilisateur (CSAT)",
+  "actions.sendAiReply": "Réponse IA",
   "actions.sendPrivateNote": "Envoyer une note privée",
   "actions.sendReply": "Envoyer une réponse",
   "actions.setPriority": "Définir la priorité",

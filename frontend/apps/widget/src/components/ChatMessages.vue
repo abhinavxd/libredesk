@@ -43,14 +43,15 @@
             'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words transition-all duration-200',
             message.author.type === 'contact' || message.author.type === 'visitor'
               ? [
-                  'text-primary-foreground rounded-br-sm',
+                  'text-primary-foreground',
+                  'rounded-br-sm',
                   message.status === 'sending' || message.status === 'uploading'
                     ? 'bg-primary/60'
                     : message.status === 'failed'
                       ? 'bg-destructive/60'
                       : 'bg-primary'
                 ]
-              : 'bg-muted text-foreground rounded-bl-sm',
+              : ['bg-muted text-foreground', 'rounded-bl-sm'],
             {
               'show-quoted-text': isQuotedTextVisible(message.uuid),
               'hide-quoted-text': !isQuotedTextVisible(message.uuid)
@@ -58,9 +59,14 @@
           ]"
         >
           <!-- Message content -->
-          <span v-if="message.content_type === 'text'" class="mb-1 whitespace-pre-wrap">{{
-            message.content
-          }}</span>
+          <template v-if="message.content_type === 'text' || message.meta?.is_ai_bot">
+            <span v-if="typingMessages[message.uuid] !== undefined" class="mb-1 whitespace-pre-wrap">{{
+              typingMessages[message.uuid]
+            }}</span>
+            <span v-else class="mb-1 whitespace-pre-wrap">{{
+              message.content
+            }}</span>
+          </template>
           <Letter
             v-else
             :html="message.content"
@@ -92,6 +98,14 @@
 
         <!-- Message metadata -->
         <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
+          <!-- AI badge -->
+          <span
+            v-if="message.meta?.is_ai_bot"
+            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 font-medium"
+          >
+            🤖 چت بات
+          </span>
+
           <!-- Agent name and time for agent messages -->
           <span v-if="message.author.type === 'agent'">
             {{ message.author.first_name }} {{ message.author.last_name }}
@@ -145,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useDocumentVisibility, useDebounceFn } from '@vueuse/core'
 import { useWidgetStore } from '../store/widget.js'
 import { useChatStore } from '../store/chat.js'
@@ -179,6 +193,34 @@ const unreadMessages = ref(0)
 const currentConversationUUID = ref('')
 const quotedTextState = ref({})
 const { t } = useI18n()
+
+const seenMessageUUIDs = ref(new Set())
+const typingMessages = ref({})
+const activeIntervals = new Map()
+
+const startTypewriter = (message) => {
+  const text = message.content
+  const uuid = message.uuid
+  typingMessages.value[uuid] = ""
+  let index = 0
+  
+  const interval = setInterval(() => {
+    if (index < text.length) {
+      typingMessages.value[uuid] += text.charAt(index)
+      index++
+      if (isAtBottom.value) {
+        scrollToBottom()
+      }
+    } else {
+      clearInterval(interval)
+      activeIntervals.delete(uuid)
+      seenMessageUUIDs.value.add(uuid)
+      delete typingMessages.value[uuid]
+    }
+  }, 15) // 15ms per character typing animation speed
+  
+  activeIntervals.set(uuid, interval)
+}
 
 const config = computed(() => widgetStore.config)
 const isTyping = computed(() => chatStore.isTyping)
@@ -271,10 +313,21 @@ onMounted(() => {
   // Check initial scroll position
   checkIfAtBottom()
 
+  // Register all existing messages as seen
+  chatStore.getCurrentConversationMessages.forEach((m) => {
+    seenMessageUUIDs.value.add(m.uuid)
+  })
+
   // Scroll to bottom on mount
   setTimeout(() => {
     scrollToBottom()
   }, 200)
+})
+
+onUnmounted(() => {
+  // Clear any active typewriter intervals to prevent leaks
+  activeIntervals.forEach((interval) => clearInterval(interval))
+  activeIntervals.clear()
 })
 
 // Auto-scroll for user's own messages or when already at bottom
@@ -289,6 +342,13 @@ watch(
     if (currentConvUUID && currentConversationUUID.value !== currentConvUUID) {
       currentConversationUUID.value = currentConvUUID
       unreadMessages.value = 0
+      // Clear active typewriter animations
+      activeIntervals.forEach((interval) => clearInterval(interval))
+      activeIntervals.clear()
+      typingMessages.value = {}
+
+      seenMessageUUIDs.value.clear()
+      newMessages.forEach((m) => seenMessageUUIDs.value.add(m.uuid))
       scrollToBottom()
       if (widgetStore.isOpen && !chatStore.isLoadingConversation) {
         chatStore.updateCurrentConversationLastSeen()
@@ -308,6 +368,13 @@ watch(
       // Skip updating last seen if it's own message as backend advances last seen timestamp.
       if (!isOwnMessage && !document.hidden) {
         chatStore.updateCurrentConversationLastSeen()
+      }
+
+      // Typewriter animation trigger for new AI chatbot messages
+      if (newMessage.meta?.is_ai_bot && !seenMessageUUIDs.value.has(newMessage.uuid)) {
+        startTypewriter(newMessage)
+      } else {
+        seenMessageUUIDs.value.add(newMessage.uuid)
       }
 
       // Auto-scroll if:
@@ -344,6 +411,10 @@ watch(
   (isOpen) => {
     if (isOpen && chatStore.currentConversation?.uuid) {
       chatStore.updateCurrentConversationLastSeen()
+      // Mark all current messages as seen when widget is opened
+      chatStore.getCurrentConversationMessages.forEach((m) => {
+        seenMessageUUIDs.value.add(m.uuid)
+      })
       setTimeout(() => {
         scrollToBottom()
       }, 50)

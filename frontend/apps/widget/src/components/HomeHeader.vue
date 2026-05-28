@@ -9,9 +9,9 @@
         class="max-h-8 max-w-full"
       />
       <!-- Greeting and introduction -->
-      <div class="mt-24 font-bold text-4xl" :class="textColorClass">
-        <h2 class="break-all">{{ parsedGreeting }}</h2>
-        <p class="mt-2 font-semibold" :class="subTextColorClass">
+      <div class="mt-24" :class="textColorClass">
+        <h2 class="break-all font-bold" :class="widgetStore.isRtl ? 'text-2xl' : 'text-4xl'">{{ parsedGreeting }}</h2>
+        <p class="mt-2 font-semibold" :class="[subTextColorClass, widgetStore.isRtl ? 'text-sm' : 'text-lg']">
           {{ parsedIntroduction }}
         </p>
       </div>
@@ -32,7 +32,10 @@
 <script setup>
 import { computed } from 'vue'
 import { useUserStore } from '@widget/store/user.js'
+import { useWidgetStore } from '@widget/store/widget.js'
 import { renderTemplate } from '@shared-ui/utils/string.js'
+
+const widgetStore = useWidgetStore()
 
 const props = defineProps({
   config: {

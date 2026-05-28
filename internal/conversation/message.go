@@ -1351,6 +1351,15 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming)
 
+		// Auto AI reply: if ai_bot is enabled in inbox config, reply automatically.
+		if systemUser.ID > 0 {
+			go func() {
+				if err := m.autoAIReply(conversation, systemUser); err != nil {
+					m.lo.Error("auto ai reply error", "conversation_uuid", conversationUUID, "error", err)
+				}
+			}()
+		}
+
 		if conversation.SLAPolicyID.Int == 0 {
 			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
 			return nil

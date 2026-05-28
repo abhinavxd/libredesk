@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/ai"
 	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/automation"
 	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
@@ -26,6 +27,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
@@ -41,6 +43,7 @@ import (
 	"github.com/jmoiron/sqlx/types"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -74,6 +77,7 @@ type Manager struct {
 	dispatcher                 *notifier.Dispatcher
 	lo                         *logf.Logger
 	db                         *sqlx.DB
+	rdb                        *redis.Client
 	i18n                       *i18n.I18n
 	automation                 *automation.Engine
 	wsHub                      *ws.Hub
@@ -178,6 +182,7 @@ type ContinuityConfig struct {
 // Opts holds the options for creating a new Manager.
 type Opts struct {
 	DB                       *sqlx.DB
+	RDB                      *redis.Client
 	Lo                       *logf.Logger
 	OutgoingMessageQueueSize int
 	IncomingMessageQueueSize int
@@ -246,6 +251,7 @@ func New(
 		automation:                 automation,
 		template:                   template,
 		db:                         opts.DB,
+		rdb:                        opts.RDB,
 		lo:                         opts.Lo,
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
@@ -1238,8 +1244,8 @@ func (m *Manager) ApplySLA(conversation models.Conversation, policyID int, actor
 // ApplyAction applies an action to a conversation, this can be called from multiple packages across the app to perform actions on conversations.
 // all actions are executed on behalf of the provided user if the user is not provided, system user is used.
 func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversation, user umodels.User) error {
-	// CSAT action does not require a value.
-	if len(action.Value) == 0 && action.Type != amodels.ActionSendCSAT {
+	// CSAT and AI reply actions do not require a value.
+	if len(action.Value) == 0 && action.Type != amodels.ActionSendCSAT && action.Type != amodels.ActionSendAIReply {
 		return fmt.Errorf("empty value for action %s", action.Type)
 	}
 
@@ -1319,10 +1325,188 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 		return m.SetConversationTags(conv.UUID, action.Type, action.Value, user)
 	case amodels.ActionSendCSAT:
 		return m.SendCSATReply(user.ID, conv)
+	case amodels.ActionSendAIReply:
+		return m.handleAIBotReply(conv, user)
 	default:
 		return fmt.Errorf("unknown action: %s", action.Type)
 	}
 	return nil
+}
+
+func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) error {
+	m.lo.Info("AI bot: handling reply", "conversation_uuid", conv.UUID)
+
+	inboxInstance, err := m.inboxStore.Get(conv.InboxID)
+	if err != nil {
+		return fmt.Errorf("get inbox: %w", err)
+	}
+	lc, ok := inboxInstance.(*livechat.LiveChat)
+	if !ok {
+		return nil
+	}
+	config := lc.GetConfig()
+	if !config.AIBot.Enabled || config.AIBot.APIKey == "" {
+		return nil
+	}
+
+	// 1. Acquire Redis lock for the conversation to prevent concurrent AI completions.
+	if m.rdb != nil {
+		lockKey := fmt.Sprintf("ai_bot_lock:conv:%s", conv.UUID)
+		ctx := context.Background()
+		set, err := m.rdb.SetNX(ctx, lockKey, "in_progress", 30*time.Second).Result()
+		if err != nil {
+			m.lo.Warn("AI bot: failed to acquire lock in Redis", "conversation_uuid", conv.UUID, "error", err)
+		} else if !set {
+			m.lo.Info("AI bot: reply already in progress for this conversation, skipping", "conversation_uuid", conv.UUID)
+			return nil
+		}
+		defer m.rdb.Del(ctx, lockKey)
+	}
+
+	m.lo.Info("AI bot: fetching conversation messages", "conversation_uuid", conv.UUID)
+	messages, _, err := m.GetConversationMessages(conv.UUID, 1, 20, toPtr(false), nil)
+	if err != nil {
+		return fmt.Errorf("get conversation messages: %w", err)
+	}
+	m.lo.Info("AI bot: fetched messages", "conversation_uuid", conv.UUID, "count", len(messages))
+
+	// 2. Prevent duplicate AI replies by ensuring the latest message in the conversation is from the contact.
+	if len(messages) == 0 || messages[0].SenderType != models.SenderTypeContact {
+		m.lo.Info("AI bot: last message is not from contact, skipping reply", "conversation_uuid", conv.UUID)
+		return nil
+	}
+
+	var chatMessages []ai.ChatMessage
+	chatMessages = append(chatMessages, ai.ChatMessage{
+		Role:    "system",
+		Content: ai.BuildSystemPrompt(ai.PromptConfig{
+			ResponseLength: config.AIBot.ResponseLength,
+			OnlyQuestions:  config.AIBot.OnlyQuestions,
+			Tone:           config.AIBot.Tone,
+			ToneCustom:     config.AIBot.ToneCustom,
+			EnableMarkdown: config.AIBot.EnableMarkdown,
+			EnableEmoji:    config.AIBot.EnableEmoji,
+			EnableLinks:    config.AIBot.EnableLinks,
+			FAQData:        config.AIBot.FAQData,
+			CustomRules:    config.AIBot.CustomRules,
+			TrainingData:   config.AIBot.TrainingData,
+		}),
+	})
+
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		if msg.Content == "" {
+			continue
+		}
+		role := "assistant"
+		if msg.SenderType == models.SenderTypeContact {
+			role = "user"
+		}
+		chatMessages = append(chatMessages, ai.ChatMessage{
+			Role:    role,
+			Content: strings.TrimSpace(msg.TextContent),
+		})
+	}
+
+	if cached, ok := ai.GetCachedReply(m.rdb, config.AIBot.Model, chatMessages); ok {
+		m.lo.Info("AI bot: using cached reply", "conversation_uuid", conv.UUID)
+		lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, true)
+		return m.sendAIMessage(conv, user, cached, lc)
+	}
+
+	limited, err := ai.AIRateLimited(m.rdb, conv.InboxID)
+	if err != nil {
+		m.lo.Warn("AI bot: rate limit check failed", "error", err)
+	}
+	if limited {
+		m.lo.Warn("AI bot: rate limited", "conversation_uuid", conv.UUID, "inbox_id", conv.InboxID)
+		return nil
+	}
+
+	m.lo.Info("AI bot: calling AI API", "conversation_uuid", conv.UUID, "model", config.AIBot.Model, "base_url", config.AIBot.BaseURL)
+	lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, true)
+	reply, err := ai.ChatCompletion(config.AIBot.BaseURL, config.AIBot.APIKey, config.AIBot.Model, chatMessages)
+	if err != nil {
+		lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, false)
+		m.lo.Error("AI bot: API call failed", "conversation_uuid", conv.UUID, "error", err)
+		return fmt.Errorf("ai reply: %w", err)
+	}
+	if reply == "" {
+		m.lo.Warn("AI bot: empty reply from AI", "conversation_uuid", conv.UUID)
+		return nil
+	}
+
+	m.lo.Info("AI bot: got reply from AI", "conversation_uuid", conv.UUID, "reply_len", len(reply))
+
+	ai.SetCachedReply(m.rdb, config.AIBot.Model, chatMessages, reply)
+
+	return m.sendAIMessage(conv, user, reply, lc)
+}
+
+func (m *Manager) sendAIMessage(conv models.Conversation, user umodels.User, reply string, lc *livechat.LiveChat) error {
+	msg, err := m.QueueReply(
+		[]mmodels.Media{},
+		conv.InboxID,
+		user.ID,
+		conv.ContactID,
+		conv.UUID,
+		reply,
+		[]string{},
+		nil,
+		nil,
+		map[string]any{"is_ai_bot": true},
+	)
+	if err != nil {
+		m.lo.Error("AI bot: failed to queue reply", "conversation_uuid", conv.UUID, "error", err)
+		return fmt.Errorf("queue ai reply: %w", err)
+	}
+
+	m.lo.Info("AI bot: reply queued, broadcasting to widget", "conversation_uuid", conv.UUID, "message_uuid", msg.UUID)
+	m.broadcastMessageToWidgetClients(&msg)
+	return nil
+}
+
+func toPtr[T any](v T) *T {
+	return &v
+}
+
+// autoAIReply automatically replies using the AI bot if enabled in the inbox config
+// and the conversation is not yet assigned to an agent.
+func (m *Manager) autoAIReply(conv models.Conversation, user umodels.User) error {
+	m.lo.Info("AI bot: autoAIReply triggered", "conversation_uuid", conv.UUID)
+
+	inboxInstance, err := m.inboxStore.Get(conv.InboxID)
+	if err != nil {
+		m.lo.Error("AI bot: failed to get inbox", "conversation_uuid", conv.UUID, "error", err)
+		return fmt.Errorf("get inbox: %w", err)
+	}
+	lc, ok := inboxInstance.(*livechat.LiveChat)
+	if !ok {
+		m.lo.Info("AI bot: not a livechat inbox, skipping", "conversation_uuid", conv.UUID)
+		return nil
+	}
+	config := lc.GetConfig()
+	if !config.AIBot.Enabled {
+		m.lo.Info("AI bot: not enabled in config", "conversation_uuid", conv.UUID)
+		return nil
+	}
+	if config.AIBot.APIKey == "" {
+		m.lo.Info("AI bot: no API key configured", "conversation_uuid", conv.UUID)
+		return nil
+	}
+
+	freshConv, err := m.GetConversation(0, conv.UUID, "")
+	if err != nil {
+		m.lo.Error("AI bot: failed to refetch conversation", "conversation_uuid", conv.UUID, "error", err)
+		return fmt.Errorf("refetch conversation: %w", err)
+	}
+	if freshConv.AssignedUserID.Valid {
+		m.lo.Info("AI bot: conversation already assigned, skipping", "conversation_uuid", conv.UUID, "assignee", freshConv.AssignedUserID.Int)
+		return nil
+	}
+
+	m.lo.Info("AI bot: proceeding with AI reply", "conversation_uuid", conv.UUID)
+	return m.handleAIBotReply(freshConv, user)
 }
 
 // RemoveConversationAssignee removes assigned user from a conversation.
