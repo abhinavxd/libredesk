@@ -203,6 +203,7 @@ export class WidgetWebSocketClient {
     this.networkListenersSetup = true
 
     window.addEventListener('online', () => {
+      if (this.manualClose) return
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer)
         this.reconnectTimer = null
@@ -220,6 +221,7 @@ export class WidgetWebSocketClient {
 
     // On tab return, if WS is not connected, sync data immediately and reconnect in parallel.
     document.addEventListener('visibilitychange', () => {
+      if (this.manualClose) return
       if (document.visibilityState === 'visible' && this.socket?.readyState !== WebSocket.OPEN) {
         this.syncMissedMessages()
         this.reconnect()
@@ -314,9 +316,17 @@ export class WidgetWebSocketClient {
     this.manualClose = true
     this.clearPing()
     clearTimeout(this.syncRetryTimer)
+    this.syncRetryTimer = null
     clearTimeout(this.connectedBannerTimer)
+    this.connectedBannerTimer = null
+    clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = null
+    this.isReconnecting = false
+    this.reconnectAttempts = 0
     this.recovering = false
+    this.lastSyncAt = 0
     const widgetStore = useWidgetStore()
+    widgetStore.setConnectionFailed(false)
     widgetStore.setConnecting(false)
     widgetStore.setConnected(false)
     if (this.socket) {
