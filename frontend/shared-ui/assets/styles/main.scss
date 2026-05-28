@@ -18,6 +18,11 @@
     @apply bg-background text-foreground;
   }
 
+  html.is-fa,
+  html.is-fa body {
+    font-family: 'Vazir', 'Plus Jakarta Sans', sans-serif;
+  }
+
   ::selection {
     background: hsl(var(--foreground) / 0.15);
     color: hsl(var(--foreground));
