@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, reactive, ref, watchEffect } from 'vue'
+import { computed, reactive, ref, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { TYPING_RECEIVE_TIMEOUT } from '@shared-ui/composables/useTypingIndicator.js'
@@ -650,8 +650,6 @@ export const useConversationStore = defineStore('conversation', () => {
 
     trimListToCurrentPage()
 
-    subscribeListReplace(conversations.data.map(c => c.uuid))
-
     // Re-check document.hidden in case the user returned while the refresh was in flight.
     if (pendingNotificationUUIDs.size > 0) {
       let shouldPlay = false
@@ -1087,6 +1085,12 @@ export const useConversationStore = defineStore('conversation', () => {
     if (contentType.startsWith('audio/')) return t('globals.terms.audio')
     return t('globals.terms.file')
   }
+
+  // On new conversation uuids, subscribere user to those conversations.
+  watch(
+    () => conversations.data?.map(c => c.uuid).sort().join(',') ?? '',
+    () => subscribeListReplace(conversations.data?.map(c => c.uuid) || [])
+  )
 
   return {
     macros,
