@@ -43,6 +43,7 @@ import (
 	"github.com/jmoiron/sqlx/types"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -76,6 +77,7 @@ type Manager struct {
 	dispatcher                 *notifier.Dispatcher
 	lo                         *logf.Logger
 	db                         *sqlx.DB
+	rdb                        *redis.Client
 	i18n                       *i18n.I18n
 	automation                 *automation.Engine
 	wsHub                      *ws.Hub
@@ -180,6 +182,7 @@ type ContinuityConfig struct {
 // Opts holds the options for creating a new Manager.
 type Opts struct {
 	DB                       *sqlx.DB
+	RDB                      *redis.Client
 	Lo                       *logf.Logger
 	OutgoingMessageQueueSize int
 	IncomingMessageQueueSize int
@@ -248,6 +251,7 @@ func New(
 		automation:                 automation,
 		template:                   template,
 		db:                         opts.DB,
+		rdb:                        opts.RDB,
 		lo:                         opts.Lo,
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
@@ -1352,6 +1356,31 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 	}
 	m.lo.Info("AI bot: fetched messages", "conversation_uuid", conv.UUID, "count", len(messages))
 
+	lastUserMsg := ""
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].SenderType == models.SenderTypeContact && messages[i].TextContent != "" {
+			lastUserMsg = messages[i].TextContent
+			break
+		}
+	}
+
+	if lastUserMsg != "" {
+		if cached, ok := ai.GetCachedReply(m.rdb, config.AIBot.Model, config.AIBot.FAQData, lastUserMsg); ok {
+			m.lo.Info("AI bot: using cached reply", "conversation_uuid", conv.UUID)
+			lc.BroadcastTypingToClients(conv.UUID, conv.ContactID, true)
+			return m.sendAIMessage(conv, user, cached, lc)
+		}
+	}
+
+	limited, err := ai.AIRateLimited(m.rdb, conv.InboxID)
+	if err != nil {
+		m.lo.Warn("AI bot: rate limit check failed", "error", err)
+	}
+	if limited {
+		m.lo.Warn("AI bot: rate limited", "conversation_uuid", conv.UUID, "inbox_id", conv.InboxID)
+		return nil
+	}
+
 	var chatMessages []ai.ChatMessage
 	chatMessages = append(chatMessages, ai.ChatMessage{
 		Role:    "system",
@@ -1399,6 +1428,14 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 
 	m.lo.Info("AI bot: got reply from AI", "conversation_uuid", conv.UUID, "reply_len", len(reply))
 
+	if lastUserMsg != "" {
+		ai.SetCachedReply(m.rdb, config.AIBot.Model, config.AIBot.FAQData, lastUserMsg, reply)
+	}
+
+	return m.sendAIMessage(conv, user, reply, lc)
+}
+
+func (m *Manager) sendAIMessage(conv models.Conversation, user umodels.User, reply string, lc *livechat.LiveChat) error {
 	msg, err := m.QueueReply(
 		[]mmodels.Media{},
 		conv.InboxID,
