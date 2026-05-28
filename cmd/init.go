@@ -286,6 +286,7 @@ func initConversations(
 	priority *priority.Manager,
 	hub *ws.Hub,
 	db *sqlx.DB,
+	rdb *redis.Client,
 	inboxStore *inbox.Manager,
 	userStore *user.Manager,
 	teamStore *team.Manager,
