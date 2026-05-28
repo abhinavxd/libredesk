@@ -127,6 +127,25 @@
             </FormField>
           </div>
 
+          <FormField v-slot="{ componentField }" name="config.layout_direction">
+            <FormItem>
+              <FormLabel>Layout direction</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select direction" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto (based on language)</SelectItem>
+                    <SelectItem value="ltr">LTR</SelectItem>
+                    <SelectItem value="rtl">RTL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormDescription>Controls the widget layout direction. Auto uses the resolved language direction.</FormDescription>
+            </FormItem>
+          </FormField>
+
           <div class="grid grid-cols-2 gap-4">
             <!-- Email Fallback Inbox -->
             <FormField v-slot="{ componentField }" name="linked_email_inbox_id">
@@ -1132,6 +1151,7 @@ const form = useForm({
       show_powered_by: true,
       language: 'en-US',
       fallback_language: 'en-US',
+      layout_direction: 'auto',
       logo_url: '',
       launcher: {
         position: 'right',

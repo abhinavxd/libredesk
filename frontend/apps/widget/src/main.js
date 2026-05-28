@@ -5,6 +5,23 @@ import App from './App.vue'
 import api from './api/index.js'
 import '@shared-ui/assets/styles/main.scss'
 
+const isRtlLanguage = (lang) => {
+    const normalized = (lang || '').toLowerCase()
+    const base = normalized.split('-')[0]
+    return ['fa', 'ar', 'he', 'ur', 'ps', 'ku'].includes(base)
+}
+
+const applyLocaleDirection = (lang, layoutDirection) => {
+    const normalizedDirection = (layoutDirection || '').toLowerCase()
+    const dir =
+        normalizedDirection === 'rtl' || normalizedDirection === 'ltr'
+            ? normalizedDirection
+            : isRtlLanguage(lang) ? 'rtl' : 'ltr'
+
+    document.documentElement.dir = dir
+    if (lang) document.documentElement.lang = lang
+}
+
 const applyLocaleFont = async (lang) => {
     const normalized = (lang || '').toLowerCase()
     const isPersian = normalized === 'fa' || normalized.startsWith('fa-')
@@ -58,6 +75,7 @@ async function initWidget () {
             lang = widgetConfig.language || fallbackLang
         }
 
+        applyLocaleDirection(lang, widgetConfig.layout_direction)
         await applyLocaleFont(lang)
 
         // Fetch language messages
