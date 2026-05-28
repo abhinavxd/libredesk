@@ -1380,8 +1380,7 @@ func (m *Manager) handleAIBotReply(conv models.Conversation, user umodels.User) 
 		})
 	}
 
-	svc := ai.New(config.AIBot.APIKey, config.AIBot.Model)
-	reply, err := svc.Chat(chatMessages)
+	reply, err := ai.ChatCompletion(config.AIBot.APIKey, config.AIBot.Model, chatMessages)
 	if err != nil {
 		return fmt.Errorf("ai reply: %w", err)
 	}

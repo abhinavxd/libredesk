@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-const deepseekChatURL = "https://api.deepseek.com/v1/chat/completions"
-
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -30,28 +28,13 @@ type chatResponse struct {
 	} `json:"error,omitempty"`
 }
 
-type Service struct {
-	apiKey     string
-	model      string
-	httpClient *http.Client
-}
-
-func New(apiKey, model string) *Service {
+func ChatCompletion(apiKey, model string, messages []ChatMessage) (string, error) {
 	if model == "" {
 		model = "deepseek-chat"
 	}
-	return &Service{
-		apiKey: apiKey,
-		model:  model,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-	}
-}
 
-func (s *Service) Chat(messages []ChatMessage) (string, error) {
 	reqBody := chatRequest{
-		Model:    s.model,
+		Model:    model,
 		Messages: messages,
 	}
 
@@ -60,14 +43,15 @@ func (s *Service) Chat(messages []ChatMessage) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", deepseekChatURL, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "https://api.deepseek.com/v1/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+s.apiKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := s.httpClient.Do(req)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("API call: %w", err)
 	}

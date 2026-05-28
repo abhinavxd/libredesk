@@ -25,8 +25,8 @@
         :class="[
           'flex flex-col animate-slide-in',
           message.author.type === 'contact' || message.author.type === 'visitor'
-            ? 'items-end'
-            : 'items-start'
+            ? (widgetStore.isRtl ? 'items-start' : 'items-end')
+            : (widgetStore.isRtl ? 'items-end' : 'items-start')
         ]"
       >
         <!-- CSAT Message Bubble -->
@@ -43,14 +43,15 @@
             'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words transition-all duration-200',
             message.author.type === 'contact' || message.author.type === 'visitor'
               ? [
-                  'text-primary-foreground rounded-br-sm',
+                  'text-primary-foreground',
+                  widgetStore.isRtl ? 'rounded-bl-sm' : 'rounded-br-sm',
                   message.status === 'sending' || message.status === 'uploading'
                     ? 'bg-primary/60'
                     : message.status === 'failed'
                       ? 'bg-destructive/60'
                       : 'bg-primary'
                 ]
-              : 'bg-muted text-foreground rounded-bl-sm',
+              : ['bg-muted text-foreground', widgetStore.isRtl ? 'rounded-br-sm' : 'rounded-bl-sm'],
             {
               'show-quoted-text': isQuotedTextVisible(message.uuid),
               'hide-quoted-text': !isQuotedTextVisible(message.uuid)
