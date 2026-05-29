@@ -50,6 +50,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { useStorage, useDocumentVisibility } from '@vueuse/core'
 import { ChevronLeft } from 'lucide-vue-next'
 import { useConversationStore } from '@main/stores/conversation'
@@ -64,6 +65,7 @@ const props = defineProps({
 })
 
 const conversationStore = useConversationStore()
+const route = useRoute()
 const emitter = useEmitter()
 const sidebarPanelRef = ref(null)
 const sidebarOpen = useStorage('conversationSidebarOpen', true)
@@ -141,7 +143,7 @@ watch(
   () => props.uuid,
   (newUUID, oldUUID) => {
     if (!newUUID || newUUID === oldUUID) return
-    const canTransition = oldUUID && typeof document.startViewTransition === 'function'
+    const canTransition = oldUUID && !route.query.scrollTo && typeof document.startViewTransition === 'function'
     if (!canTransition) {
       fetchConversation(newUUID)
       return
