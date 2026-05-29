@@ -45,7 +45,7 @@
     "@unovis/vue": "^1.6.5",
     "@vee-validate/zod": "^4.15.0",
     "@vueuse/core": "^12.4.0",
-    "axios": "^1.15.2",
+    "axios": "^1.16.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "codemirror": "^6.0.2",
