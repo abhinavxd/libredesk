@@ -42,13 +42,13 @@ func (c *Client) Put(filename string, cType string, src io.ReadSeeker) (string, 
 	dir := getDir(c.opts.UploadPath)
 	o, err := os.OpenFile(filepath.Join(dir, filename), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0664)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("opening file for write %q: %w", filepath.Join(dir, filename), err)
 	}
 	out = o
 	defer out.Close()
 
-	if _, err := io.Copy(out, src); err != nil {
-		return "", err
+	if n, err := io.Copy(out, src); err != nil {
+		return "", fmt.Errorf("writing file %q after %d bytes: %w", filepath.Join(dir, filename), n, err)
 	}
 	return filename, nil
 }

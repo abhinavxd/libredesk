@@ -175,7 +175,6 @@ func TestExtractConvUUID(t *testing.T) {
 	}
 }
 
-
 func TestExtractReferenceNumber(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -229,6 +228,44 @@ func TestExtractReferenceNumber(t *testing.T) {
 			result := ExtractReferenceNumber(tt.subject)
 			if result != tt.expected {
 				t.Errorf("ExtractReferenceNumber(%q) = %q, want %q", tt.subject, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSanitizeUTF8(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"empty", "", ""},
+		{"plain ascii unchanged", "Hello, world!", "Hello, world!"},
+		{"valid copyright unchanged", "© 2026", "© 2026"},
+		{"orphan 0xa9 replaced", "\xa9 2026 Upstox", "� 2026 Upstox"},
+		{"nul stripped", "a\x00b", "ab"},
+		{"chinese unchanged", "你好世界", "你好世界"},
+		{"devanagari unchanged", "नमस्ते", "नमस्ते"},
+		{"arabic unchanged", "مرحبا", "مرحبا"},
+		{"emoji unchanged", "ok 😀👍", "ok 😀👍"},
+		{"accented latin unchanged", "café résumé", "café résumé"},
+		{"run of invalid bytes collapses to one replacement", "x\xa9\xa9y", "x�y"},
+		{"truncated 3-byte char replaced", "\xe4\xbd", "�"},
+		{"lead byte at end replaced", "abc\xc3", "abc�"},
+		{"overlong encoding replaced", "x\xc0\x80y", "x�y"},
+		{"cp1252 smart quotes replaced", "\x93hi\x94", "�hi�"},
+		{"multiple embedded nuls stripped", "a\x00\x00b\x00c", "abc"},
+		{"nul and invalid byte combined", "a\x00\xa9b", "a�b"},
+		{"valid multibyte preserved around invalid byte", "a你\xa9好b", "a你�好b"},
+		{"bom preserved", "\ufeffhi", "\ufeffhi"},
+		{"existing replacement char preserved", "a�b", "a�b"},
+		{"crlf and tab preserved", "l1\r\nl2\t", "l1\r\nl2\t"},
+		{"paired continuation kept, orphan replaced", "é\xa9", "é�"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SanitizeUTF8(tt.input); got != tt.expected {
+				t.Errorf("SanitizeUTF8(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
 	}
