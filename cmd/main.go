@@ -308,10 +308,10 @@ func main() {
 
 	go func() {
 		colorlog.Green("Server started at %s", ko.String("app.server.address"))
-		if ko.String("server.socket") != "" {
-			colorlog.Green("Unix socket created at %s", ko.String("server.socket"))
+		if ko.String("app.server.socket") != "" {
+			colorlog.Green("Unix socket created at %s", ko.String("app.server.socket"))
 		}
-		if err := g.ListenAndServe(ko.String("app.server.address"), ko.String("server.socket"), s); err != nil {
+		if err := g.ListenAndServe(ko.String("app.server.address"), ko.String("app.server.socket"), s); err != nil {
 			log.Fatalf("error starting server: %v", err)
 		}
 	}()
