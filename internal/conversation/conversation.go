@@ -1450,11 +1450,13 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 
 // DeleteConversation deletes a conversation.
 func (m *Manager) DeleteConversation(uuid string) error {
-	m.lo.Info("deleting conversation", "uuid", uuid)
-	if _, err := m.q.DeleteConversation.Exec(uuid); err != nil {
-		m.lo.Error("error deleting conversation", "error", err)
+	res, err := m.q.DeleteConversation.Exec(uuid)
+	if err != nil {
+		m.lo.Error("error deleting conversation", "uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	rows, _ := res.RowsAffected()
+	m.lo.Info("deleted conversation", "uuid", uuid, "rows_affected", rows)
 	return nil
 }
 

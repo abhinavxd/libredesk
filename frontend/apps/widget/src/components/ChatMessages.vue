@@ -20,11 +20,12 @@
         />
 
         <!-- Messages -->
+        <TransitionGroup tag="div" enter-active-class="animate-slide-in" class="flex flex-col gap-4">
         <div
           v-for="message in chatStore.getCurrentConversationMessages"
           :key="message.uuid"
           :class="[
-            'flex flex-col animate-slide-in',
+            'flex flex-col',
             message.author.type === 'contact' || message.author.type === 'visitor'
               ? 'items-end'
               : 'items-start'
@@ -125,6 +126,7 @@
             </span>
           </div>
         </div>
+        </TransitionGroup>
 
         <!-- Typing Indicator -->
         <div v-if="isTyping" class="flex flex-col items-start">
@@ -257,6 +259,7 @@ watch(
     currentConversationUUID.value = newUUID
     unreadMessages.value = 0
     hasUserScrolled.value = false
+    nextTick(scrollToBottom)
     if (widgetStore.isOpen && !chatStore.isLoadingConversation) {
       chatStore.updateCurrentConversationLastSeen()
     }

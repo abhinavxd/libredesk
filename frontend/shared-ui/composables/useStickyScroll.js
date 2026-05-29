@@ -42,7 +42,7 @@ export function useStickyScroll (scrollEl, contentEl, options = {}) {
 
   const onContentResize = () => {
     if (skipAutoScroll() || hasUserScrolled.value) return
-    requestAnimationFrame(scrollToBottom)
+    scrollToBottom()
   }
 
   onMounted(() => {
