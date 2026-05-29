@@ -42,6 +42,8 @@ provider = "fs"
 [upload.fs]
 # Directory where uploaded files are stored, make sure this directory exists and is writable by the application.
 upload_path = 'uploads'
+# Signed URL expiry duration (e.g., "30m", "1h"). Defaults to 1h if unset.
+expiry = "1h"
 
 # S3 provider.
 [upload.s3]
