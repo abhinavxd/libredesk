@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col relative h-full">
     <div ref="threadEl" class="flex-1 overflow-y-auto [overflow-anchor:none]" @scroll="handleScroll">
-      <div ref="contentEl" class="min-h-full px-4 pb-10">
+      <div ref="contentEl" class="min-h-full px-4 pb-10 relative">
         <div
           v-if="showLoadMore"
           class="text-center mt-3"
@@ -25,11 +25,11 @@
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" tag="div">
+        <TransitionGroup v-else enter-active-class="animate-slide-in" leave-active-class="message-leaving" tag="div">
           <div
             v-for="row in messageRows"
             :key="row.message.uuid"
-            v-scroll-target="row.message.uuid"
+            :data-message-uuid="row.message.uuid"
             :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >
             <div v-if="!row.message.private && row.message.type !== 'activity'">
@@ -86,6 +86,11 @@ import MessagesSkeleton from './MessagesSkeleton.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { useStickyScroll } from '@shared-ui/composables'
 
+const MENTION_TOP_OFFSET_RATIO = 0.25
+const MENTION_SETTLE_FRAMES = 3
+const MENTION_MAX_ANCHOR_FRAMES = 90
+const HIGHLIGHT_MS = 2500
+
 const route = useRoute()
 
 const conversationStore = useConversationStore()
@@ -95,6 +100,7 @@ const contentEl = ref(null)
 const emitter = useEmitter()
 const unReadMessages = ref(0)
 let currentConversationUUID = ''
+let openScrollDone = false
 
 const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(threadEl, contentEl, {
   onArriveBottom: () => { unReadMessages.value = 0 }
@@ -105,13 +111,31 @@ const handleScrollToBottom = () => {
   scrollToBottom()
 }
 
-const vScrollTarget = {
-  mounted (el, binding) {
-    if (binding.value !== route.query.scrollTo || !threadEl.value) return
+const applyOpenScroll = () => {
+  const thread = threadEl.value
+  if (!thread) return
+  const targetUUID = route.query.scrollTo
+  const targetEl = targetUUID ? thread.querySelector(`[data-message-uuid="${targetUUID}"]`) : null
+  if (targetEl) {
     hasUserScrolled.value = true
-    scrollToOffset(Math.max(0, el.offsetTop - threadEl.value.clientHeight / 3 + el.offsetHeight / 2))
-    el.classList.add('highlight-mention')
-    setTimeout(() => el.classList.remove('highlight-mention'), 2500)
+    // Messages above the target collapse to max-h after mount, so re-pin until offsetTop stops moving.
+    let lastOffset = -1
+    let stableFrames = 0
+    let frames = 0
+    const anchorToTarget = () => {
+      if (!threadEl.value || !targetEl.isConnected) return
+      const offset = targetEl.offsetTop
+      scrollToOffset(Math.max(0, offset - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
+      stableFrames = offset === lastOffset ? stableFrames + 1 : 0
+      lastOffset = offset
+      if (stableFrames < MENTION_SETTLE_FRAMES && ++frames < MENTION_MAX_ANCHOR_FRAMES) requestAnimationFrame(anchorToTarget)
+    }
+    anchorToTarget()
+    targetEl.classList.add('highlight-mention')
+    setTimeout(() => targetEl.classList.remove('highlight-mention'), HIGHLIGHT_MS)
+  } else {
+    hasUserScrolled.value = false
+    scrollToBottom()
   }
 }
 
@@ -138,18 +162,19 @@ watch(
     if (!newUUID || newUUID === currentConversationUUID) return
     currentConversationUUID = newUUID
     unReadMessages.value = 0
-    hasUserScrolled.value = !!route.query.scrollTo
+    openScrollDone = false
   }
 )
 
 watch(
-  () => conversationStore.conversationMessages.length,
-  (newLen, oldLen) => {
-    if (oldLen === 0 && newLen > 0 && !route.query.scrollTo) {
-      hasUserScrolled.value = false
-      nextTick(scrollToBottom)
-    }
-  }
+  () => [conversationStore.conversationMessages.length, conversationStore.messages.loading],
+  ([len, loading]) => {
+    if (openScrollDone || loading || !len) return
+    openScrollDone = true
+    hasUserScrolled.value = !!route.query.scrollTo
+    nextTick(applyOpenScroll)
+  },
+  { immediate: true }
 )
 
 // Watch for typing indicator and auto-scroll if user is at bottom
@@ -213,32 +238,38 @@ const messageRows = computed(() => {
 </script>
 
 <style scoped>
+/* Leaving messages must be out of flow during a conversation swap, else they shift the target's offsetTop mid-scroll. */
+.message-leaving {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Highlight via an opacity-faded overlay, not the element's own background, to avoid a text repaint flicker when it ends. */
 .highlight-mention {
-  animation: highlightPulse 2.5s ease-out;
+  position: relative;
 }
 
-@keyframes highlightPulse {
-  0% {
-    background-color: rgb(251 191 36 / 0.35);
-    border-radius: 0.5rem;
-  }
-  100% {
-    background-color: transparent;
-  }
+.highlight-mention::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+  background-color: rgb(251 191 36 / 0.35);
+  pointer-events: none;
+  animation: highlightFade 2.5s ease-out forwards;
 }
 
-/* Dark mode highlight - softer yellow */
-:global(.dark) .highlight-mention {
-  animation: highlightPulseDark 2.5s ease-out;
+:global(.dark) .highlight-mention::after {
+  background-color: rgb(250 204 21 / 0.2);
 }
 
-@keyframes highlightPulseDark {
-  0% {
-    background-color: rgb(250 204 21 / 0.2);
-    border-radius: 0.5rem;
+@keyframes highlightFade {
+  from {
+    opacity: 1;
   }
-  100% {
-    background-color: transparent;
+  to {
+    opacity: 0;
   }
 }
 </style>
