@@ -756,7 +756,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			Type:      umodels.UserTypeContact,
 		}
 		if err := m.userStore.CreateContact(&user); err != nil {
-			m.lo.Error("error creating contact for incoming message", "message_source_id", in.SourceID.String, "email", in.Contact.Email.String, "error", err)
+			m.lo.Error("error creating contact for incoming message", "message_source_id", in.SourceID.String, "error", err)
 			return models.Message{}, fmt.Errorf("creating contact: %w", err)
 		}
 		senderID = user.ID
