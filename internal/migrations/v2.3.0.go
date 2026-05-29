@@ -20,11 +20,26 @@ func V2_3_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	}
 
 	for localeCode, localeRegion := range langMap {
-		_, err := db.Exec(`
+		if _, err := db.Exec(`
 			UPDATE settings SET value = to_jsonb($1::text), updated_at = now()
 			WHERE key = 'app.lang' AND value = to_jsonb($2::text);
-		`, localeRegion, localeCode)
-		if err != nil {
+		`, localeRegion, localeCode); err != nil {
+			return err
+		}
+
+		if _, err := db.Exec(`
+			UPDATE inboxes
+			SET config = jsonb_set(config, '{language}', to_jsonb($1::text)), updated_at = now()
+			WHERE channel = 'livechat' AND config->>'language' = $2;
+		`, localeRegion, localeCode); err != nil {
+			return err
+		}
+
+		if _, err := db.Exec(`
+			UPDATE inboxes
+			SET config = jsonb_set(config, '{fallback_language}', to_jsonb($1::text)), updated_at = now()
+			WHERE channel = 'livechat' AND config->>'fallback_language' = $2;
+		`, localeRegion, localeCode); err != nil {
 			return err
 		}
 	}
