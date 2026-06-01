@@ -20,6 +20,15 @@ const conversationStore = useConversationStore()
 
 let lastFetchedKey = ''
 
+const storeHasCurrentList = () => {
+  const c = conversationStore.conversations
+  if (!c.initialized) return false
+  if (viewID.value) return c.listType === CONVERSATION_LIST_TYPE.VIEW && String(c.viewID) === String(viewID.value)
+  if (type.value) return c.listType === type.value
+  if (teamID.value) return c.listType === CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED && String(c.teamID) === String(teamID.value)
+  return false
+}
+
 const fetchForCurrentRoute = () => {
   if (!type.value && !teamID.value && !viewID.value) return
 
@@ -27,9 +36,11 @@ const fetchForCurrentRoute = () => {
   if (key === lastFetchedKey) return
   lastFetchedKey = key
 
+  const showLoader = !storeHasCurrentList()
+
   if (viewID.value) {
     conversationStore.setListStatus('', false)
-    conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], viewID.value)
+    conversationStore.fetchConversationsList(showLoader, CONVERSATION_LIST_TYPE.VIEW, 0, [], viewID.value)
     return
   }
 
@@ -37,9 +48,9 @@ const fetchForCurrentRoute = () => {
     conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
   }
   if (type.value) {
-    conversationStore.fetchConversationsList(true, type.value)
+    conversationStore.fetchConversationsList(showLoader, type.value)
   } else {
-    conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED, teamID.value)
+    conversationStore.fetchConversationsList(showLoader, CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED, teamID.value)
   }
 }
 

@@ -112,11 +112,7 @@
           <PageHeader />
 
           <!-- Main content -->
-          <RouterView v-slot="{ Component }">
-            <keep-alive include="InboxLayout">
-              <component :is="Component" class="flex-grow" />
-            </keep-alive>
-          </RouterView>
+          <RouterView class="flex-grow" />
         </div>
         <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
       </Sidebar>
