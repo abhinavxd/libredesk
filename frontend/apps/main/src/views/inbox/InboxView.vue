@@ -36,11 +36,15 @@ const fetchForCurrentRoute = () => {
   if (key === lastFetchedKey) return
   lastFetchedKey = key
 
-  const showLoader = !storeHasCurrentList()
+  // List already loaded: soft-refresh in place. A full fetch resets the list first and blanks it.
+  if (storeHasCurrentList()) {
+    conversationStore.refreshConversationList()
+    return
+  }
 
   if (viewID.value) {
     conversationStore.setListStatus('', false)
-    conversationStore.fetchConversationsList(showLoader, CONVERSATION_LIST_TYPE.VIEW, 0, [], viewID.value)
+    conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], viewID.value)
     return
   }
 
@@ -48,9 +52,9 @@ const fetchForCurrentRoute = () => {
     conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
   }
   if (type.value) {
-    conversationStore.fetchConversationsList(showLoader, type.value)
+    conversationStore.fetchConversationsList(true, type.value)
   } else {
-    conversationStore.fetchConversationsList(showLoader, CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED, teamID.value)
+    conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED, teamID.value)
   }
 }
 
