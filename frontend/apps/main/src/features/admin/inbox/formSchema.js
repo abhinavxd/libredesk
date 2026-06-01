@@ -32,6 +32,7 @@ export const createFormSchema = (t) => z.object({
     password: z.string().min(1, t('globals.messages.required')),
     tls_type: z.enum(['none', 'starttls', 'tls']),
     tls_skip_verify: z.boolean().optional(),
+    expunge_inbox: z.boolean().optional(),
     scan_inbox_since: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
       message: t('validation.invalidDuration')
     }),
