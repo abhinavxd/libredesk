@@ -243,10 +243,20 @@ SELECT
    as_latest.id as applied_sla_id,
    nxt_resp_event.deadline_at AS next_response_deadline_at,
    nxt_resp_event.met_at as next_response_met_at,
-   c.last_continuity_email_sent_at
+   c.last_continuity_email_sent_at,
+   csat.rating as csat_rating,
+   csat.feedback as csat_feedback,
+   csat.response_timestamp as csat_responded_at
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
+LEFT JOIN LATERAL (
+    SELECT rating, feedback, response_timestamp
+    FROM csat_responses
+    WHERE conversation_id = c.id
+    ORDER BY response_timestamp DESC NULLS LAST, created_at DESC
+    LIMIT 1
+) csat ON true
 LEFT JOIN sla_policies sla ON c.sla_policy_id = sla.id
 LEFT JOIN teams at ON at.id = c.assigned_team_id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id

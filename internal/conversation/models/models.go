@@ -198,6 +198,9 @@ type Conversation struct {
 	NextResponseDueAt         null.Time              `db:"next_response_deadline_at" json:"next_response_deadline_at"`
 	NextResponseMetAt         null.Time              `db:"next_response_met_at" json:"next_response_met_at"`
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
+	CSATRating                null.Int               `db:"csat_rating" json:"csat_rating"`
+	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
+	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
 }
 
@@ -261,6 +264,13 @@ type MessageAuthor struct {
 	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
 	Type               string      `db:"type" json:"type"`
 	LastActiveAt       null.Time   `db:"last_active_at" json:"last_active_at"`
+}
+
+func (a *MessageAuthor) FullName() string {
+	if a.LastName == "" {
+		return a.FirstName
+	}
+	return a.FirstName + " " + a.LastName
 }
 
 type ConversationCounts struct {
