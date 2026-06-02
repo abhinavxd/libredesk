@@ -179,6 +179,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 
 	// Set In-Reply-To header
 	if m.InReplyTo != "" {
+		email.Subject = "RE: " + email.Subject
 		email.Headers.Set(headerInReplyTo, "<"+m.InReplyTo+">")
 		e.lo.Debug("in-reply-to header set", "message_id", m.InReplyTo)
 	}
