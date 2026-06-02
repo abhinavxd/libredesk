@@ -419,6 +419,7 @@ func getProviderDefaults(provider, emailAddr string) (imodels.SMTPConfig, imodel
 	imap.ReadInterval = "5m"
 	imap.ScanInboxSince = "24h"
 	imap.TLSSkipVerify = false
+	imap.ExpungeInbox = false
 
 	// Provider-specific settings
 	switch provider {

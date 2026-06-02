@@ -90,6 +90,7 @@ type IMAPConfig struct {
 	ScanInboxSince string `json:"scan_inbox_since"`
 	TLSType        string `json:"tls_type"`
 	TLSSkipVerify  bool   `json:"tls_skip_verify"`
+	ExpungeInbox   bool   `json:"expunge_inbox"`
 }
 
 // ClearPasswords masks all config passwords

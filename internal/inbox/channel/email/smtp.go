@@ -179,6 +179,8 @@ func (e *Email) Send(m models.OutboundMessage) error {
 
 	// Set In-Reply-To header
 	if m.InReplyTo != "" {
+		// Add reply prefix to subject line, debatable whether or not this is a good thing, but lots of email clients do this
+		email.Subject = "RE: " + email.Subject
 		email.Headers.Set(headerInReplyTo, "<"+m.InReplyTo+">")
 		e.lo.Debug("in-reply-to header set", "message_id", m.InReplyTo)
 	}

@@ -130,6 +130,7 @@
       :isSending="isSending"
       :enableSend="enableSend"
       :handleSend="handleSend"
+      :messageType="messageType"
       @emojiSelect="handleEmojiSelect"
     />
   </div>
