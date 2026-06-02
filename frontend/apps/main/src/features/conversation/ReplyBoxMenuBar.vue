@@ -39,7 +39,9 @@
       </Toggle>
     </div>
     <Button class="h-8 w-6 px-8" @click="handleSend" :disabled="!enableSend" :isLoading="isSending" v-if="showSendButton">
-      {{ $t('globals.messages.send') }}
+
+        {{ messageType === 'reply' ? $t('globals.messages.send') : $t('globals.messages.save')}}
+      
     </Button>
   </div>
 </template>
@@ -76,7 +78,8 @@ defineProps({
     default: true
   },
   handleFileUpload: Function,
-  handleInlineImageUpload: Function
+  handleInlineImageUpload: Function,
+  messageType: String
 })
 
 onClickOutside(emojiPickerRef, () => {
