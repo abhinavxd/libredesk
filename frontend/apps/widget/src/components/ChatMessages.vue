@@ -5,139 +5,143 @@
       <Spinner size="md" :text="$t('globals.terms.loading')" absolute />
     </div>
     <div
-      class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
+      class="flex-1 min-h-0 overflow-y-auto [overflow-anchor:none] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
       ref="messagesContainer"
       @scroll="handleScroll"
     >
-      <!-- Chat Intro -->
-      <ChatIntro v-if="!props.showPreChatForm" :introText="config.chat_introduction" />
+      <div ref="contentEl" class="p-4 flex flex-col gap-4">
+        <!-- Chat Intro -->
+        <ChatIntro v-if="!props.showPreChatForm" :introText="config.chat_introduction" />
 
-      <!-- Notice -->
-      <NoticeBanner
-        v-if="config.notice_banner.enabled === true && !props.showPreChatForm"
-        :noticeText="config.notice_banner.text"
-      />
-
-      <!-- Messages -->
-      <div
-        v-for="message in chatStore.getCurrentConversationMessages"
-        :key="message.uuid"
-        :class="[
-          'flex flex-col animate-slide-in',
-          message.author.type === 'contact' || message.author.type === 'visitor'
-            ? 'items-end'
-            : 'items-start'
-        ]"
-      >
-        <!-- CSAT Message Bubble -->
-        <CSATMessageBubble
-          v-if="message.meta?.is_csat"
-          :message="message"
-          @submitted="handleCSATSubmitted"
+        <!-- Notice -->
+        <NoticeBanner
+          v-if="config.notice_banner.enabled === true && !props.showPreChatForm"
+          :noticeText="config.notice_banner.text"
         />
 
-        <!-- Regular Message Bubble -->
+        <!-- Messages -->
+        <TransitionGroup tag="div" enter-active-class="animate-slide-in" class="flex flex-col gap-4">
         <div
-          v-else
+          v-for="message in chatStore.getCurrentConversationMessages"
+          :key="message.uuid"
           :class="[
-            'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words transition-all duration-200',
+            'flex flex-col',
             message.author.type === 'contact' || message.author.type === 'visitor'
-              ? [
-                  'text-primary-foreground rounded-br-sm',
-                  message.status === 'sending' || message.status === 'uploading'
-                    ? 'bg-primary/60'
-                    : message.status === 'failed'
-                      ? 'bg-destructive/60'
-                      : 'bg-primary'
-                ]
-              : 'bg-muted text-foreground rounded-bl-sm',
-            {
-              'show-quoted-text': isQuotedTextVisible(message.uuid),
-              'hide-quoted-text': !isQuotedTextVisible(message.uuid)
-            }
+              ? 'items-end'
+              : 'items-start'
           ]"
         >
-          <!-- Message content -->
-          <span v-if="message.content_type === 'text'" class="mb-1 whitespace-pre-wrap">{{
-            message.content
-          }}</span>
-          <Letter
-            v-else
-            :html="message.content"
-            :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-            :allowed-css-properties="extendedCssProperties"
-            class="mb-1 native-html"
+          <!-- CSAT Message Bubble -->
+          <CSATMessageBubble
+            v-if="message.meta?.is_csat"
+            :message="message"
+            @submitted="handleCSATSubmitted"
           />
+
+          <!-- Regular Message Bubble -->
           <div
-            v-if="hasQuotedContent(message.content)"
-            @click="toggleQuote(message.uuid)"
-            role="button"
-            :aria-expanded="isQuotedTextVisible(message.uuid)"
+            v-else
             :class="[
-              'text-xs cursor-pointer px-2 py-1 w-max rounded transition-all',
+              'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words transition-all duration-200',
               message.author.type === 'contact' || message.author.type === 'visitor'
-                ? 'text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-primary'
+                ? [
+                    'text-primary-foreground rounded-br-sm',
+                    message.status === 'sending' || message.status === 'uploading'
+                      ? 'bg-primary/60'
+                      : message.status === 'failed'
+                        ? 'bg-destructive/60'
+                        : 'bg-primary'
+                  ]
+                : 'bg-muted text-foreground rounded-bl-sm',
+              {
+                'show-quoted-text': isQuotedTextVisible(message.uuid),
+                'hide-quoted-text': !isQuotedTextVisible(message.uuid)
+              }
             ]"
           >
-            {{
-              isQuotedTextVisible(message.uuid)
-                ? t('conversation.hideQuotedText')
-                : t('conversation.showQuotedText')
-            }}
-          </div>
-          <!-- Show attachments if available -->
-          <MessageAttachment :attachments="message.attachments" />
-        </div>
-
-        <!-- Message metadata -->
-        <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
-          <!-- Agent name and time for agent messages -->
-          <span v-if="message.author.type === 'agent'">
-            {{ message.author.first_name }} {{ message.author.last_name }}
-            •
-            {{ getMessageTime(message.created_at) }}
-          </span>
-
-          <!-- Delivery status for user messages -->
-          <span
-            v-else-if="message.author.type === 'contact' || message.author.type === 'visitor'"
-            class="flex items-center gap-1"
-          >
-            <span
-              v-if="message.status === 'sending' || message.status === 'uploading'"
-              class="flex items-center gap-1"
+            <!-- Message content -->
+            <span v-if="message.content_type === 'text'" class="mb-1 whitespace-pre-wrap">{{
+              message.content
+            }}</span>
+            <Letter
+              v-else
+              :html="message.content"
+              :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+              :allowed-css-properties="extendedCssProperties"
+              class="mb-1 native-html"
+            />
+            <div
+              v-if="containsQuoteMarkers(message.content)"
+              @click="toggleQuote(message.uuid)"
+              role="button"
+              :aria-expanded="isQuotedTextVisible(message.uuid)"
+              :class="[
+                'text-xs cursor-pointer px-2 py-1 w-max rounded transition-all',
+                message.author.type === 'contact' || message.author.type === 'visitor'
+                  ? 'text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-primary'
+              ]"
             >
-              <div
-                class="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"
-              ></div>
-              <span v-if="message.status === 'sending'">
-                {{ $t('globals.messages.sending') }}
-              </span>
-              <span v-if="message.status === 'uploading'">
-                {{ $t('globals.messages.uploading') }}
-              </span>
-            </span>
-            <span v-else>
+              {{
+                isQuotedTextVisible(message.uuid)
+                  ? t('conversation.hideQuotedText')
+                  : t('conversation.showQuotedText')
+              }}
+            </div>
+            <!-- Show attachments if available -->
+            <MessageAttachment :attachments="message.attachments" />
+          </div>
+
+          <!-- Message metadata -->
+          <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
+            <!-- Agent name and time for agent messages -->
+            <span v-if="message.author.type === 'agent'">
+              {{ message.author.first_name }} {{ message.author.last_name }}
+              •
               {{ getMessageTime(message.created_at) }}
             </span>
-          </span>
-        </div>
-      </div>
 
-      <!-- Typing Indicator -->
-      <div v-if="isTyping" class="flex flex-col items-start">
-        <div
-          class="max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 bg-muted text-foreground rounded-bl-sm"
-        >
-          <TypingIndicator />
+            <!-- Delivery status for user messages -->
+            <span
+              v-else-if="message.author.type === 'contact' || message.author.type === 'visitor'"
+              class="flex items-center gap-1"
+            >
+              <span
+                v-if="message.status === 'sending' || message.status === 'uploading'"
+                class="flex items-center gap-1"
+              >
+                <div
+                  class="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"
+                ></div>
+                <span v-if="message.status === 'sending'">
+                  {{ $t('globals.messages.sending') }}
+                </span>
+                <span v-if="message.status === 'uploading'">
+                  {{ $t('globals.messages.uploading') }}
+                </span>
+              </span>
+              <span v-else>
+                {{ getMessageTime(message.created_at) }}
+              </span>
+            </span>
+          </div>
+        </div>
+        </TransitionGroup>
+
+        <!-- Typing Indicator -->
+        <div v-if="isTyping" class="flex flex-col items-start">
+          <div
+            class="max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 bg-muted text-foreground rounded-bl-sm"
+          >
+            <TypingIndicator />
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Sticky scroll to bottom button -->
     <ScrollToBottomButton
-      :is-at-bottom="isAtBottom"
+      :is-at-bottom="!hasUserScrolled"
       :unread-count="unreadMessages"
       @scroll-to-bottom="handleScrollToBottom"
     />
@@ -145,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useDocumentVisibility, useDebounceFn } from '@vueuse/core'
 import { useWidgetStore } from '../store/widget.js'
 import { useChatStore } from '../store/chat.js'
@@ -161,6 +165,7 @@ import CSATMessageBubble from './CSATMessageBubble.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
+import { useStickyScroll } from '@shared-ui/composables'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 
@@ -174,11 +179,15 @@ const props = defineProps({
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const messagesContainer = ref(null)
-const isAtBottom = ref(true)
+const contentEl = ref(null)
 const unreadMessages = ref(0)
 const currentConversationUUID = ref('')
 const quotedTextState = ref({})
 const { t } = useI18n()
+
+const { hasUserScrolled, scrollToBottom, handleScroll } = useStickyScroll(messagesContainer, contentEl, {
+  onArriveBottom: () => { unreadMessages.value = 0 }
+})
 
 const config = computed(() => widgetStore.config)
 const isTyping = computed(() => chatStore.isTyping)
@@ -187,8 +196,6 @@ const isLoadingConversation = computed(() => chatStore.isLoadingConversation)
 const getMessageTime = (timestamp) => {
   return useRelativeTime(new Date(timestamp)).value
 }
-
-const hasQuotedContent = (content) => containsQuoteMarkers(content)
 
 const isQuotedTextVisible = (messageUuid) => {
   return quotedTextState.value[messageUuid] || false
@@ -223,32 +230,9 @@ const handleCSATSubmitted = ({ message_uuid, rating, feedback }) => {
   })
 }
 
-const checkIfAtBottom = () => {
-  const container = messagesContainer.value
-  if (container) {
-    const tolerance = 100
-    const isBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight <= tolerance
-    isAtBottom.value = isBottom
-  }
-}
-
-const handleScroll = () => {
-  checkIfAtBottom()
-}
-
 const handleScrollToBottom = () => {
-  unreadMessages.value = 0
+  hasUserScrolled.value = false
   scrollToBottom()
-}
-
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-      checkIfAtBottom()
-    }
-  })
 }
 
 // Debounced version for tab-switch and widget-open triggers only.
@@ -267,86 +251,57 @@ watch(visibility, (state) => {
   }
 })
 
-onMounted(() => {
-  // Check initial scroll position
-  checkIfAtBottom()
-
-  // Scroll to bottom on mount
-  setTimeout(() => {
-    scrollToBottom()
-  }, 200)
-})
-
-// Auto-scroll for user's own messages or when already at bottom
-// On any new message addition, update last seen timestamp for this conversation
+// Conversation switch - reset scroll state and update last seen.
 watch(
-  () => chatStore.getCurrentConversationMessages,
-  (newMessages, oldMessages) => {
-    if (!newMessages || newMessages.length === 0) return
-
-    // New conversation?
-    const currentConvUUID = chatStore.currentConversation?.uuid
-    if (currentConvUUID && currentConversationUUID.value !== currentConvUUID) {
-      currentConversationUUID.value = currentConvUUID
-      unreadMessages.value = 0
-      scrollToBottom()
-      if (widgetStore.isOpen && !chatStore.isLoadingConversation) {
-        chatStore.updateCurrentConversationLastSeen()
-      }
-      return
-    }
-
-    // Skip on initial watch run (no prior state) or when widget is collapsed
-    // (no viewport to manage and visitor isn't seeing anything).
-    if (!oldMessages || !widgetStore.isOpen) return
-
-    if (newMessages.length > oldMessages.length) {
-      const newMessage = newMessages[newMessages.length - 1]
-      const isOwnMessage =
-        newMessage.author?.type === 'contact' || newMessage.author?.type === 'visitor'
-
-      // Skip updating last seen if it's own message as backend advances last seen timestamp.
-      if (!isOwnMessage && !document.hidden) {
-        chatStore.updateCurrentConversationLastSeen()
-      }
-
-      // Auto-scroll if:
-      // 1. Message is from current user (contact/visitor), OR
-      // 2. User is already at the bottom
-      if (isOwnMessage || isAtBottom.value) {
-        scrollToBottom()
-      } else {
-        // User is scrolled up and agent sent message - show unread count
-        unreadMessages.value++
-      }
-    } else if (isAtBottom.value) {
-      // Message content changed (e.g. pending replaced with attachment) — keep user at bottom.
-      scrollToBottom()
+  () => chatStore.currentConversation?.uuid,
+  (newUUID) => {
+    if (!newUUID || currentConversationUUID.value === newUUID) return
+    currentConversationUUID.value = newUUID
+    unreadMessages.value = 0
+    hasUserScrolled.value = false
+    nextTick(scrollToBottom)
+    if (widgetStore.isOpen && !chatStore.isLoadingConversation) {
+      chatStore.updateCurrentConversationLastSeen()
     }
   },
-  { deep: true, immediate: true }
+  { immediate: true }
 )
 
-// Watch for typing indicator and auto-scroll if user is at bottom
+// New message arrival - update last seen for agent messages, increment unread if user scrolled up, force-stick for own messages.
 watch(
-  () => chatStore.isTyping,
-  (isTyping) => {
-    if (isTyping && isAtBottom.value) {
-      scrollToBottom()
+  () => chatStore.getCurrentConversationMessages.length,
+  (newLen, oldLen) => {
+    if (oldLen === 0 && newLen > 0) {
+      hasUserScrolled.value = false
+      nextTick(scrollToBottom)
+      return
+    }
+    if (!oldLen || !widgetStore.isOpen) return
+    if (newLen <= oldLen) return
+    const messages = chatStore.getCurrentConversationMessages
+    const newMessage = messages[messages.length - 1]
+    const isOwnMessage =
+      newMessage.author?.type === 'contact' || newMessage.author?.type === 'visitor'
+
+    if (!isOwnMessage && !document.hidden) {
+      chatStore.updateCurrentConversationLastSeen()
+    }
+
+    if (isOwnMessage) {
+      hasUserScrolled.value = false
+    } else if (hasUserScrolled.value) {
+      unreadMessages.value++
     }
   }
 )
 
-// Watch for widget becoming visible - scroll to bottom and update last seen
-// This handles the direct_to_conversation case where messages load while widget is hidden
+// Widget opening - direct_to_conversation case where messages load while widget is hidden.
 watch(
   () => widgetStore.isOpen,
   (isOpen) => {
     if (isOpen && chatStore.currentConversation?.uuid) {
       chatStore.updateCurrentConversationLastSeen()
-      setTimeout(() => {
-        scrollToBottom()
-      }, 50)
+      if (!hasUserScrolled.value) scrollToBottom()
     }
   }
 )

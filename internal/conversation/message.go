@@ -591,7 +591,13 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		// Update conversation last message details (also conditionally updates last_interaction if not activity/private).
 		m.UpdateConversationLastMessage(message.ConversationID, message.ConversationUUID, lastMessage, message.SenderType, message.Type, message.Private, message.CreatedAt, message.SenderID)
 
-		m.BroadcastNewMessage(message, lastMessage)
+		var convItem *models.ConversationListItem
+		if item, err := m.GetConversationListItem(message.ConversationUUID); err == nil {
+			convItem = &item
+		} else {
+			m.lo.Error("error fetching conversation list item for broadcast", "uuid", message.ConversationUUID, "error", err)
+		}
+		m.BroadcastNewMessage(message, convItem, lastMessage)
 	}
 
 	// Refetch the message to get all fields populated (e.g., author, media URLs).
@@ -750,6 +756,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			Type:      umodels.UserTypeContact,
 		}
 		if err := m.userStore.CreateContact(&user); err != nil {
+			m.lo.Error("error creating contact for incoming message", "message_source_id", in.SourceID.String, "error", err)
 			return models.Message{}, fmt.Errorf("creating contact: %w", err)
 		}
 		senderID = user.ID
@@ -761,6 +768,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	if conversationID == 0 {
 		conversationID, conversationUUID, isNewConversation, err = m.findOrCreateConversation(in)
 		if err != nil {
+			m.lo.Error("error finding or creating conversation for incoming message", "message_source_id", in.SourceID.String, "error", err)
 			return models.Message{}, err
 		}
 	}
@@ -779,9 +787,9 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Upload message attachments. On failure, delete the conversation if it was just created for this message.
 	if upErr := m.uploadMessageAttachments(&msg); upErr != nil {
-		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID, "error", upErr)
+		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID.String, "error", upErr)
 		if isNewConversation && conversationUUID != "" {
-			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID)
+			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID.String)
 			if err := m.DeleteConversation(conversationUUID); err != nil {
 				return models.Message{}, fmt.Errorf("deleting conversation after message attachment upload failure: %w", err)
 			}
@@ -789,9 +797,15 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 		return models.Message{}, fmt.Errorf("uploading message attachments: %w", upErr)
 	}
 
-	// Insert message.
+	// Insert message. On failure, delete the conversation if it was just created for this message.
 	if err = m.InsertMessage(&msg); err != nil {
-		return models.Message{}, err
+		m.lo.Error("error inserting incoming message", "message_source_id", in.SourceID.String, "conversation_uuid", conversationUUID, "is_new", isNewConversation, "error", err)
+		if isNewConversation && conversationUUID != "" {
+			if delErr := m.DeleteConversation(conversationUUID); delErr != nil {
+				return models.Message{}, fmt.Errorf("deleting conversation after message insert failure: %w", delErr)
+			}
+		}
+		return models.Message{}, fmt.Errorf("inserting message: %w", err)
 	}
 
 	// When a customer replies to a continuity emailsync the message to their live chat widget via WebSocket.
@@ -1100,8 +1114,12 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			contentID = storedCID
 		}
 
-		// Sanitize filename.
 		attachment.Name = stringutil.SanitizeFilename(attachment.Name)
+
+		if len(attachment.Content) == 0 {
+			m.lo.Warn("skipping empty attachment", "name", attachment.Name, "content_id", contentID, "content_type", attachment.ContentType, "disposition", attachment.Disposition, "message_source_id", message.SourceID.String, "conversation_uuid", message.ConversationUUID)
+			continue
+		}
 
 		m.lo.Debug("uploading message attachment", "name", attachment.Name, "content_id", contentID, "size", attachment.Size, "content_type", attachment.ContentType, "disposition", attachment.Disposition)
 
@@ -1120,7 +1138,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			[]byte("{}"), /** meta **/
 		)
 		if err != nil {
-			m.lo.Error("failed to upload attachment", "name", attachment.Name, "error", err)
+			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
 			return fmt.Errorf("failed to upload media %s: %w", attachment.Name, err)
 		}
 

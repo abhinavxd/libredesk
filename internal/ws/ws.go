@@ -2,16 +2,18 @@
 package ws
 
 import (
-	"log"
 	"sync"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
+	"github.com/zerodha/logf"
 )
 
 // Hub maintains the set of registered websockets clients.
 type Hub struct {
+	lo *logf.Logger
+
 	clients      map[int][]*Client
 	clientsMutex sync.RWMutex
 
@@ -35,8 +37,9 @@ type conversationStore interface {
 }
 
 // NewHub creates a new websocket hub.
-func NewHub(userStore userStore) *Hub {
+func NewHub(lo *logf.Logger, userStore userStore) *Hub {
 	return &Hub{
+		lo:                lo,
 		clients:           make(map[int][]*Client, 64),
 		clientsMutex:      sync.RWMutex{},
 		convSubsList:      make(map[string]map[*Client]struct{}, 1024),
@@ -52,7 +55,10 @@ func (h *Hub) KickUser(userID int) {
 	h.clientsMutex.RLock()
 	clients := append([]*Client(nil), h.clients[userID]...)
 	h.clientsMutex.RUnlock()
-	log.Printf("ws: kicking user %d (%d connections)", userID, len(clients))
+	if len(clients) == 0 {
+		return
+	}
+	h.lo.Debug("kicking user ws connections", "user_id", userID, "connections", len(clients))
 	closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "kicked")
 	for _, c := range clients {
 		_ = c.Conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
@@ -166,6 +172,18 @@ func (h *Hub) RemoveClient(client *Client) {
 		}
 	}
 	h.ClearClientSubs(client)
+}
+
+func (h *Hub) ConnectedUserIDs() []int {
+	h.clientsMutex.RLock()
+	defer h.clientsMutex.RUnlock()
+	out := make([]int, 0, len(h.clients))
+	for id, clients := range h.clients {
+		if len(clients) > 0 {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // PushToClients sends a raw payload directly to the given client connections.

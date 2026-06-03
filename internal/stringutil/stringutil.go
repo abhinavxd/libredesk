@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/k3a/html2text"
+	"github.com/jaytaylor/html2text"
 )
 
 const (
@@ -25,9 +25,22 @@ var (
 	regexpConvUUID  = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
 )
 
+// SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.
+func SanitizeUTF8(s string) string {
+	if s == "" {
+		return s
+	}
+	s = strings.ReplaceAll(s, "\x00", "")
+	return strings.ToValidUTF8(s, "�")
+}
+
 // HTML2Text converts HTML to text.
 func HTML2Text(html string) string {
-	return strings.TrimSpace(html2text.HTML2Text(html))
+	out, err := html2text.FromString(html, html2text.Options{TextOnly: true})
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
 }
 
 // SanitizeFilename sanitizes the provided filename.

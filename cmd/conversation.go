@@ -833,6 +833,14 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	// Assign team first, it clears any assigned agent.
+	if req.AssignedTeamID > 0 {
+		app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
+	}
+	if req.AssignedAgentID > 0 {
+		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
+	}
+
 	// Send initial message based on the initiator of conversation.
 	switch req.Initiator {
 	case umodels.UserTypeAgent:
@@ -860,14 +868,6 @@ func handleCreateConversation(r *fastglue.Request) error {
 	default:
 		// Guard anyway.
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
-	}
-
-	// Assign the conversation to team/agent if provided, always assign team first as it clears assigned agent.
-	if req.AssignedTeamID > 0 {
-		app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
-	}
-	if req.AssignedAgentID > 0 {
-		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
 	}
 
 	conversation, _ := app.conversation.GetConversation(conversationID, "", "")

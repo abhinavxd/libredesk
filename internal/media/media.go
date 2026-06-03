@@ -122,13 +122,13 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 	// Detect content type and override if needed.
 	contentType, err := m.detectContentType(contentType, content)
 	if err != nil {
-		m.lo.Error("error detecting content type", "error", err)
+		m.lo.Error("error detecting content type", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return "", "", err
 	}
 
 	fName, err := m.store.Put(fileName, contentType, content)
 	if err != nil {
-		m.lo.Error("error uploading media", "error", err)
+		m.lo.Error("error uploading media to store", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return "", "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUploadingFile"), nil)
 	}
 	return fName, contentType, nil
@@ -138,7 +138,7 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte) (models.Media, error) {
 	var id int
 	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid).Scan(&id); err != nil {
-		m.lo.Error("error inserting media", "error", err)
+		m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return m.Get(id, "")

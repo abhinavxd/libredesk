@@ -191,9 +191,10 @@ watch(
   () => route.path,
   (path) => {
     if (path.startsWith('/inboxes') && path !== '/inboxes/search') {
-      lastInboxPath.value = path.replace(/\/conversation\/[^/]+$/, '')
+      lastInboxPath.value = path
     }
-  }
+  },
+  { immediate: true }
 )
 const userStore = useUserStore()
 const conversationStore = useConversationStore()

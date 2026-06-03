@@ -15,16 +15,19 @@ export const WS_EVENT = {
   CONVERSATION_UPDATE: 'conversation_update',
 }
 
+// sync retries ~5 min (100 × 3s); WS reconnects every 2s up to ~5 min (150 attempts).
+const SYNC_MAX_RETRIES = 100
+const SYNC_RETRY_DELAY_MS = 3000
+const RECONNECT_INTERVAL_MS = 2000
+
 let widgetWSClient
 let _syncOnFirstConnect = true
 
 export class WidgetWebSocketClient {
   constructor() {
     this.socket = null
-    this.reconnectInterval = 1000
-    this.maxReconnectInterval = 30000
     this.reconnectAttempts = 0
-    this.maxReconnectAttempts = 50
+    this.maxReconnectAttempts = 150
     this.isReconnecting = false
     this.reconnectTimer = null
     this.manualClose = false
@@ -34,6 +37,10 @@ export class WidgetWebSocketClient {
     this.wsInitiated = false
     this.token = null
     this.inboxId = null
+    this.syncRetryTimer = null
+    this.networkListenersSetup = false
+    this.recovering = false
+    this.connectedBannerTimer = null
   }
 
   init (token, inboxId) {
@@ -60,10 +67,10 @@ export class WidgetWebSocketClient {
   }
 
   handleOpen () {
-    this.reconnectInterval = 1000
     this.reconnectAttempts = 0
     this.isReconnecting = false
     this.lastPong = Date.now()
+    useWidgetStore().setConnectionFailed(false)
     this.setupPing()
 
     // Auto-join inbox after connection if inbox_id is set.
@@ -77,6 +84,8 @@ export class WidgetWebSocketClient {
     if (this.wsInitiated || _syncOnFirstConnect) {
       this.syncMissedMessages()
     }
+
+    this.finishRecovery()
     this.wsInitiated = true
   }
 
@@ -144,12 +153,21 @@ export class WidgetWebSocketClient {
   handleClose () {
     this.clearPing()
     if (!this.manualClose) {
+      this.beginRecovery()
       this.reconnect()
     }
   }
 
   reconnect () {
-    if (this.isReconnecting || this.reconnectAttempts >= this.maxReconnectAttempts) return
+    if (this.isReconnecting) return
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      const widgetStore = useWidgetStore()
+      widgetStore.setConnectionFailed(true)
+      widgetStore.setConnecting(false)
+      widgetStore.setConnected(false)
+      this.recovering = false
+      return
+    }
 
     this.isReconnecting = true
     this.reconnectAttempts++
@@ -158,28 +176,52 @@ export class WidgetWebSocketClient {
       this.isReconnecting = false
       this.reconnectTimer = null
       this.connect()
-      this.reconnectInterval = Math.min(this.reconnectInterval * 1.5, this.maxReconnectInterval)
-    }, this.reconnectInterval)
+    }, RECONNECT_INTERVAL_MS)
+  }
+
+  beginRecovery () {
+    if (!this.wsInitiated || this.recovering) return
+    this.recovering = true
+    clearTimeout(this.connectedBannerTimer)
+    const widgetStore = useWidgetStore()
+    widgetStore.setConnected(false)
+    widgetStore.setConnecting(true)
+  }
+
+  finishRecovery () {
+    if (!this.recovering) return
+    this.recovering = false
+    const widgetStore = useWidgetStore()
+    widgetStore.setConnecting(false)
+    widgetStore.setConnected(true)
+    clearTimeout(this.connectedBannerTimer)
+    this.connectedBannerTimer = setTimeout(() => widgetStore.setConnected(false), 2000)
   }
 
   setupNetworkListeners () {
+    if (this.networkListenersSetup) return
+    this.networkListenersSetup = true
+
     window.addEventListener('online', () => {
-      // Cancel any pending backoff timer and reconnect immediately.
+      if (this.manualClose) return
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer)
         this.reconnectTimer = null
       }
       this.reconnectAttempts = 0
-      this.reconnectInterval = 1000
       this.isReconnecting = false
+      useWidgetStore().setConnectionFailed(false)
       if (this.socket) {
         this.socket.close()
       }
+      this.beginRecovery()
+      this.syncMissedMessages()
       this.reconnect()
     })
 
     // On tab return, if WS is not connected, sync data immediately and reconnect in parallel.
     document.addEventListener('visibilitychange', () => {
+      if (this.manualClose) return
       if (document.visibilityState === 'visible' && this.socket?.readyState !== WebSocket.OPEN) {
         this.syncMissedMessages()
         this.reconnect()
@@ -232,17 +274,22 @@ export class WidgetWebSocketClient {
     this.send(joinMessage)
   }
 
-  // Silently refresh conversation list and current conversation to catch messages missed while WS was disconnected.
-  syncMissedMessages () {
+  async syncMissedMessages (attempt = 0) {
     const now = Date.now()
-    if (now - this.lastSyncAt < 2000) return
+    if (attempt === 0 && now - this.lastSyncAt < 2000) return
     this.lastSyncAt = now
+    clearTimeout(this.syncRetryTimer)
 
     const chatStore = useChatStore()
-    chatStore.fetchConversations(true, true)
+    const conversationsOk = await chatStore.fetchConversations(true, true)
     const currentConversationUUID = chatStore.currentConversation?.uuid
+    let conversationOk = true
     if (currentConversationUUID) {
-      chatStore.loadConversation(currentConversationUUID, true, true)
+      conversationOk = await chatStore.loadConversation(currentConversationUUID, true, true)
+    }
+
+    if ((!conversationsOk || !conversationOk) && attempt < SYNC_MAX_RETRIES) {
+      this.syncRetryTimer = setTimeout(() => this.syncMissedMessages(attempt + 1), SYNC_RETRY_DELAY_MS)
     }
   }
 
@@ -268,6 +315,20 @@ export class WidgetWebSocketClient {
   close () {
     this.manualClose = true
     this.clearPing()
+    clearTimeout(this.syncRetryTimer)
+    this.syncRetryTimer = null
+    clearTimeout(this.connectedBannerTimer)
+    this.connectedBannerTimer = null
+    clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = null
+    this.isReconnecting = false
+    this.reconnectAttempts = 0
+    this.recovering = false
+    this.lastSyncAt = 0
+    const widgetStore = useWidgetStore()
+    widgetStore.setConnectionFailed(false)
+    widgetStore.setConnecting(false)
+    widgetStore.setConnected(false)
     if (this.socket) {
       this.socket.close()
     }

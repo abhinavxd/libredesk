@@ -1,28 +1,31 @@
 <template>
   <div class="flex flex-col relative h-full">
-    <div ref="threadEl" class="flex-1 overflow-y-auto" @scroll="handleScroll">
-      <div class="min-h-full px-4 pb-10">
+    <div ref="threadEl" class="flex-1 overflow-y-auto [overflow-anchor:none]" @scroll="handleScroll">
+      <div ref="contentEl" class="min-h-full px-4 pb-10 relative">
         <div
+          v-if="showLoadMore"
           class="text-center mt-3"
-          v-if="
-            conversationStore.currentConversationHasMoreMessages &&
-            !conversationStore.messages.loading
-          "
         >
           <Button
             size="sm"
             variant="outline"
-            @click="conversationStore.fetchNextMessages"
-            class="transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-105 active:scale-95"
+            @click="loadMore"
+            :disabled="conversationStore.messages.fetching"
+            class="transition-all duration-200 hover:bg-accent hover:scale-105 active:scale-95"
           >
-            <RefreshCw size="17" class="mr-2" />
+            <Loader2
+              v-if="conversationStore.messages.fetching"
+              size="17"
+              class="mr-2 animate-spin"
+            />
+            <RefreshCw v-else size="17" class="mr-2" />
             {{ $t('globals.terms.loadMore') }}
           </Button>
         </div>
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" tag="div">
+        <TransitionGroup v-else enter-active-class="animate-slide-in" leave-active-class="message-leaving" tag="div">
           <div
             v-for="row in messageRows"
             :key="row.message.uuid"
@@ -37,7 +40,7 @@
                 :group-with-next="row.groupWithNext"
               />
             </div>
-            <div v-else-if="isPrivateNote(row.message)">
+            <div v-else-if="row.message.type === 'outgoing' && row.message.private">
               <MessageBubble
                 :message="row.message"
                 direction="outgoing"
@@ -60,7 +63,7 @@
 
     <!-- Sticky container for the scroll arrow -->
     <ScrollToBottomButton
-      :is-at-bottom="isAtBottom"
+      :is-at-bottom="!hasUserScrolled"
       :unread-count="unReadMessages"
       @scroll-to-bottom="handleScrollToBottom"
     />
@@ -68,164 +71,119 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
-import { RefreshCw, ChevronDown } from 'lucide-vue-next'
+import { RefreshCw, Loader2 } from 'lucide-vue-next'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import MessagesSkeleton from './MessagesSkeleton.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
+import { useStickyScroll } from '@shared-ui/composables'
+
+const MENTION_TOP_OFFSET_RATIO = 0.25
+const MENTION_SETTLE_FRAMES = 3
+const MENTION_MAX_ANCHOR_FRAMES = 90
+const HIGHLIGHT_MS = 2500
 
 const route = useRoute()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const threadEl = ref(null)
+const contentEl = ref(null)
 const emitter = useEmitter()
-const isAtBottom = ref(true)
 const unReadMessages = ref(0)
-const currentConversationUUID = ref('')
+let currentConversationUUID = ''
+let openScrollDone = false
 
-const checkIfAtBottom = () => {
-  const thread = threadEl.value
-  if (thread) {
-    const tolerance = 100
-    const isBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight <= tolerance
-    isAtBottom.value = isBottom
-  }
-}
-
-const handleScroll = () => {
-  checkIfAtBottom()
-}
+const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(threadEl, contentEl, {
+  onArriveBottom: () => { unReadMessages.value = 0 }
+})
 
 const handleScrollToBottom = () => {
+  hasUserScrolled.value = false
   scrollToBottom()
 }
 
-const scrollToBottom = () => {
-  setTimeout(() => {
-    const thread = threadEl.value
-    if (thread) {
-      thread.scrollTop = thread.scrollHeight
-      checkIfAtBottom()
+const applyOpenScroll = () => {
+  const thread = threadEl.value
+  if (!thread) return
+  const targetUUID = route.query.scrollTo
+  const targetEl = targetUUID ? thread.querySelector(`[data-message-uuid="${targetUUID}"]`) : null
+  if (targetEl) {
+    hasUserScrolled.value = true
+    // Messages above the target collapse to max-h after mount, so re-pin until offsetTop stops moving.
+    let lastOffset = -1
+    let stableFrames = 0
+    let frames = 0
+    const anchorToTarget = () => {
+      if (!threadEl.value || !targetEl.isConnected) return
+      const offset = targetEl.offsetTop
+      scrollToOffset(Math.max(0, offset - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
+      stableFrames = offset === lastOffset ? stableFrames + 1 : 0
+      lastOffset = offset
+      if (stableFrames < MENTION_SETTLE_FRAMES && ++frames < MENTION_MAX_ANCHOR_FRAMES) requestAnimationFrame(anchorToTarget)
     }
-  }, 50)
+    anchorToTarget()
+    targetEl.classList.add('highlight-mention')
+    setTimeout(() => targetEl.classList.remove('highlight-mention'), HIGHLIGHT_MS)
+  } else {
+    hasUserScrolled.value = false
+    scrollToBottom()
+  }
 }
 
-const scrollToMessage = (messageUUID) => {
-  if (!messageUUID) {
-    scrollToBottom()
+const newMessageHandler = (data) => {
+  if (data.conversation_uuid !== conversationStore.current.uuid) return
+  if (data.message?.sender_id === userStore.userID) {
+    hasUserScrolled.value = false
     return
   }
-
-  setTimeout(() => {
-    const thread = threadEl.value
-    const messageEl = thread?.querySelector(`[data-message-uuid="${messageUUID}"]`)
-    if (messageEl && thread) {
-      // Manual scroll calculation for reliability with variable-height messages
-      const messageTop = messageEl.offsetTop
-      const threadHeight = thread.clientHeight
-      const messageHeight = messageEl.offsetHeight
-      // Position message at ~1/3 from top of viewport for better visibility
-      const targetScroll = messageTop - threadHeight / 3 + messageHeight / 2
-      thread.scrollTop = Math.max(0, targetScroll)
-
-      // Highlight the message briefly
-      messageEl.classList.add('highlight-mention')
-      setTimeout(() => messageEl.classList.remove('highlight-mention'), 2500)
-    } else {
-      // Message not found, scroll to bottom instead
-      scrollToBottom()
-    }
-  }, 150)
+  if (hasUserScrolled.value) unReadMessages.value++
 }
 
 onMounted(() => {
-  checkIfAtBottom()
-  handleNewMessage()
-})
-
-const newMessageHandler = (data) => {
-  if (data.conversation_uuid === conversationStore.current.uuid) {
-    // Agent's own message - always scroll to bottom
-    if (data.message?.sender_id === userStore.userID) {
-      scrollToBottom()
-    }
-    // Customer message - only scroll if already at bottom
-    else if (isAtBottom.value) {
-      scrollToBottom()
-    }
-    // Customer message but not at bottom - don't scroll, increment unread
-    else {
-      unReadMessages.value++
-    }
-  }
-}
-
-const handleNewMessage = () => {
   emitter.on(EMITTER_EVENTS.NEW_MESSAGE, newMessageHandler)
-}
+})
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.NEW_MESSAGE, newMessageHandler)
 })
 
 watch(
-  () => conversationStore.conversationMessages,
-  (messages) => {
-    // Scroll to bottom when conversation changes and there are new messages.
-    // New messages on next db page should not scroll to bottom.
-    if (
-      messages.length > 0 &&
-      conversationStore?.current?.uuid &&
-      currentConversationUUID.value !== conversationStore.current.uuid
-    ) {
-      currentConversationUUID.value = conversationStore.current.uuid
-      unReadMessages.value = 0
-
-      // Check if this is a mentioned conversation
-      const scrollToUUID = route.query.scrollTo
-      if (scrollToUUID) {
-        // Mentioned conversation - only scroll to message, NOT to bottom
-        scrollToMessage(scrollToUUID)
-      } else {
-        // Normal conversation - scroll to bottom
-        scrollToBottom()
-      }
-    }
+  () => conversationStore.current?.uuid,
+  (newUUID) => {
+    if (!newUUID || newUUID === currentConversationUUID) return
+    currentConversationUUID = newUUID
+    unReadMessages.value = 0
+    openScrollDone = false
   }
+)
+
+watch(
+  () => [conversationStore.conversationMessages.length, conversationStore.messages.loading],
+  ([len, loading]) => {
+    if (openScrollDone || loading || !len) return
+    openScrollDone = true
+    hasUserScrolled.value = !!route.query.scrollTo
+    nextTick(applyOpenScroll)
+  },
+  { immediate: true }
 )
 
 // Watch for typing indicator and auto-scroll if user is at bottom
 watch(
   () => conversationStore.conversation.isTyping,
   (isTyping) => {
-    if (isTyping && isAtBottom.value) {
-      scrollToBottom()
-    }
+    if (isTyping && !hasUserScrolled.value) nextTick(scrollToBottom)
   }
 )
-
-// Watch for isAtButtom and set unReadMessages to 0
-watch(
-  () => isAtBottom.value,
-  (atBottom) => {
-    if (atBottom) {
-      unReadMessages.value = 0
-    }
-  }
-)
-
-const isPrivateNote = (message) => {
-  return message.type === 'outgoing' && message.private
-}
 
 const GROUP_WINDOW_MS = 60_000
 
@@ -250,6 +208,20 @@ const getSpacingClass = (index, groupWithPrev) => {
   return groupWithPrev ? 'mt-1' : 'mt-4'
 }
 
+const showLoadMore = computed(
+  () => conversationStore.currentConversationHasMoreMessages && !conversationStore.messages.loading
+)
+
+const loadMore = async () => {
+  const thread = threadEl.value
+  if (!thread) return
+  const prevHeight = thread.scrollHeight
+  const prevTop = thread.scrollTop
+  await conversationStore.fetchNextMessages()
+  await nextTick()
+  thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
+}
+
 const messageRows = computed(() => {
   const messages = conversationStore.conversationMessages
   return messages.map((message, index) => {
@@ -266,32 +238,38 @@ const messageRows = computed(() => {
 </script>
 
 <style scoped>
+/* Leaving messages must be out of flow during a conversation swap, else they shift the target's offsetTop mid-scroll. */
+.message-leaving {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Highlight via an opacity-faded overlay, not the element's own background, to avoid a text repaint flicker when it ends. */
 .highlight-mention {
-  animation: highlightPulse 2.5s ease-out;
+  position: relative;
 }
 
-@keyframes highlightPulse {
-  0% {
-    background-color: rgb(251 191 36 / 0.35);
-    border-radius: 0.5rem;
-  }
-  100% {
-    background-color: transparent;
-  }
+.highlight-mention::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+  background-color: rgb(251 191 36 / 0.35);
+  pointer-events: none;
+  animation: highlightFade 2.5s ease-out forwards;
 }
 
-/* Dark mode highlight - softer yellow */
-:global(.dark) .highlight-mention {
-  animation: highlightPulseDark 2.5s ease-out;
+:global(.dark) .highlight-mention::after {
+  background-color: rgb(250 204 21 / 0.2);
 }
 
-@keyframes highlightPulseDark {
-  0% {
-    background-color: rgb(250 204 21 / 0.2);
-    border-radius: 0.5rem;
+@keyframes highlightFade {
+  from {
+    opacity: 1;
   }
-  100% {
-    background-color: transparent;
+  to {
+    opacity: 0;
   }
 }
 </style>
