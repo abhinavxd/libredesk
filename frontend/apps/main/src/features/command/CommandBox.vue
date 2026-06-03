@@ -299,6 +299,23 @@ const { Meta_K, Ctrl_K } = useMagicKeys({
 })
 
 watch([Meta_K, Ctrl_K], ([mac, win]) => {
+  setNestedCommand(null)
+  if (mac || win) toggleOpen()
+})
+
+const { Meta_M, Ctrl_M } = useMagicKeys({
+  passive: false,
+  onEventFired(e) {
+    if (e.key === 'm' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+    }
+  }
+})
+
+watch([Meta_M, Ctrl_M], ([mac, win]) => {
+  if (nestedCommand.value != 'apply-macro-to-new-conversation') {
+    setNestedCommand('apply-macro-to-existing-conversation')
+  }
   if (mac || win) toggleOpen()
 })
 
@@ -338,9 +355,10 @@ const otherActions = computed(
 )
 
 function toggleOpen() {
-  if (nestedCommand.value != 'apply-macro-to-new-conversation' && !open.value) {
-    nestedCommand.value = null
-  }
+  // Allow it to be set from the outside
+  // if (nestedCommand.value != 'apply-macro-to-new-conversation' && !open.value) {
+  //   nestedCommand.value = null
+  // }
   open.value = !open.value
 }
 
