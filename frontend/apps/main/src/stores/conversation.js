@@ -682,6 +682,7 @@ export const useConversationStore = defineStore('conversation', () => {
     conversation.data.status = v
     try {
       await api.updateConversationStatus(conversation.data.uuid, { status: v })
+      await fetchSidebarCounts()
     } catch (error) {
       if (conversation.data) conversation.data.status = previous
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -743,6 +744,7 @@ export const useConversationStore = defineStore('conversation', () => {
   async function updateAssignee (type, v) {
     try {
       await api.updateAssignee(conversation.data.uuid, type, v)
+      await fetchSidebarCounts()
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -1085,6 +1087,38 @@ export const useConversationStore = defineStore('conversation', () => {
     if (contentType.startsWith('audio/')) return t('globals.terms.audio')
     return t('globals.terms.file')
   }
+  
+  const sidebarCounts = reactive({
+    unassigned: 0,
+    assigned: 0,
+    all: 0,
+    mentioned: 0
+  })
+  
+  // 2. Fetch counts concurrently on page boot without breaking the main viewport
+  async function fetchSidebarCounts() {
+    const openFilter = [{
+      model: 'conversation_statuses',
+      field: 'name',
+      operator: 'equals',
+      value: 'Open'
+    }]
+    const filters = JSON.stringify(openFilter)
+    // Fire all requests simultaneously. page_size: 1 keeps payload sizes tiny.
+    const [unassignedRes, assignedRes, allRes, mentionedRes] = await Promise.all([
+      api.getUnassignedConversations({ page: 1, page_size: 1, filters: filters }),
+      api.getAssignedConversations({ page: 1, page_size: 1, filters: filters }),
+      api.getAllConversations({ page: 1, page_size: 1, filters: filters }),
+      api.getMentionedConversations({ page: 1, page_size: 1, filters: filters })
+    ])
+    console.debug(unassignedRes)
+    // Extract the raw database total row counts from the Go API response
+    sidebarCounts.unassigned = unassignedRes?.data?.data?.total || 0
+    sidebarCounts.assigned = assignedRes?.data?.data?.total || 0
+    sidebarCounts.all = allRes?.data?.data?.total || 0
+    sidebarCounts.mentioned = mentionedRes?.data?.data?.total || 0
+    console.debug(sidebarCounts)
+  }
 
   // On new conversation uuids, subscribere user to those conversations.
   watch(
@@ -1167,6 +1201,8 @@ export const useConversationStore = defineStore('conversation', () => {
     toggleSelect,
     selectAll,
     clearSelection,
-    isSelected
+    isSelected,
+    fetchSidebarCounts,
+    sidebarCounts,
   }
 })

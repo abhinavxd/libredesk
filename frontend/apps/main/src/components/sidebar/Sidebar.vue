@@ -1,4 +1,5 @@
 <script setup>
+import { onMounted } from 'vue'
 import {
   adminNavItems,
   reportsNavItems,
@@ -233,6 +234,9 @@ const hoveredViewId = ref(null)
 // Track delete confirmation dialog state
 const isDeleteOpen = ref(false)
 const viewToDelete = ref(null)
+onMounted(() => {
+  conversationStore.fetchSidebarCounts()
+})
 </script>
 
 <template>
@@ -443,6 +447,9 @@ const viewToDelete = ref(null)
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/assigned')" @click="navigateToInbox('assigned')">
                     <User />
                     <span>{{ t('globals.terms.myInbox') }}</span>
+                    <span class="ml-auto bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                      {{ conversationStore.sidebarCounts.assigned }}
+                    </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -452,6 +459,9 @@ const viewToDelete = ref(null)
                     <span>
                       {{ t('globals.terms.mention', 2) }}
                     </span>
+                    <span class="ml-auto bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                      {{ conversationStore.sidebarCounts.mentioned }}
+                    </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -460,6 +470,10 @@ const viewToDelete = ref(null)
                     <CircleDashed />
                     <span>
                       {{ t('globals.terms.unassigned') }}
+                    </span>
+
+                    <span class="ml-auto bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                      {{ conversationStore.sidebarCounts.unassigned }}
                     </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
