@@ -10,6 +10,9 @@ import (
 
 var dateOnlyRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
+// maxFilterDepth bounds group nesting (root group + one nested level).
+const maxFilterDepth = 2
+
 // PaginationOptions represents the options for paginating a query.
 type PaginationOptions struct {
 	Page     int
@@ -24,19 +27,48 @@ const (
 	DESC = "DESC"
 )
 
-// Filter represents a filter to be applied to a query.
-type Filter struct {
-	Model    string `json:"model"`
-	Field    string `json:"field"`
-	Operator string `json:"operator"`
-	Value    string `json:"value"`
+// FilterNode is either a group (Logic + Rules) or a leaf (Model/Field/Operator/Value).
+type FilterNode struct {
+	Logic    string       `json:"logic,omitempty"`
+	Rules    []FilterNode `json:"rules,omitempty"`
+	Model    string       `json:"model,omitempty"`
+	Field    string       `json:"field,omitempty"`
+	Operator string       `json:"operator,omitempty"`
+	Value    string       `json:"value,omitempty"`
+}
+
+func (n FilterNode) isGroup() bool {
+	return n.Logic != "" || len(n.Rules) > 0
+}
+
+func (n FilterNode) isEmpty() bool {
+	return !n.isGroup() && n.Field == ""
 }
 
 // AllowedFields is a map of model names to a list of allowed fields for that model.
 type AllowedFields map[string][]string
 
-// BuildPaginatedQuery builds a paginated query from the given base query, existing arguments, pagination options, filters JSON, and allowed fields.
-func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOptions, filtersJSON string, allowedFields AllowedFields) (string, []any, error) {
+// FieldRenderer renders a leaf condition for a field that does not map to a plain column,
+// e.g. conversation tags rendered as a subquery. paramIndex is the next positional placeholder.
+type FieldRenderer func(operator, value string, paramIndex int) (string, []any, error)
+
+// FieldRenderers maps model -> field -> renderer.
+type FieldRenderers map[string]map[string]FieldRenderer
+
+func (r FieldRenderers) get(model, field string) (FieldRenderer, bool) {
+	if r == nil {
+		return nil, false
+	}
+	fields, ok := r[model]
+	if !ok {
+		return nil, false
+	}
+	fn, ok := fields[field]
+	return fn, ok
+}
+
+// BuildPaginatedQuery builds a paginated query from the given base query, existing arguments, pagination options, filters JSON, allowed fields, and optional custom field renderers.
+func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOptions, filtersJSON string, allowedFields AllowedFields, renderers FieldRenderers) (string, []any, error) {
 	if opts.Page <= 0 {
 		return "", nil, fmt.Errorf("invalid page number: %d", opts.Page)
 	}
@@ -44,14 +76,12 @@ func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOp
 		return "", nil, fmt.Errorf("invalid page size: %d", opts.PageSize)
 	}
 
-	var filters []Filter
-	if filtersJSON != "" {
-		if err := json.Unmarshal([]byte(filtersJSON), &filters); err != nil {
-			return "", nil, fmt.Errorf("invalid filters JSON: %w", err)
-		}
+	root, err := parseFilters(filtersJSON)
+	if err != nil {
+		return "", nil, err
 	}
 
-	whereClause, filterArgs, err := buildWhereClause(filters, existingArgs, allowedFields)
+	whereClause, filterArgs, err := buildWhereClause(root, existingArgs, allowedFields, renderers)
 	if err != nil {
 		return "", nil, err
 	}
@@ -65,7 +95,6 @@ func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOp
 	}
 
 	if opts.OrderBy != "" {
-		// Validate OrderBy.
 		parts := strings.Split(opts.OrderBy, ".")
 		if len(parts) != 2 {
 			return "", nil, fmt.Errorf("invalid OrderBy format: %s", opts.OrderBy)
@@ -91,106 +120,202 @@ func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOp
 	return query, args, nil
 }
 
-// buildWhereClause builds a WHERE clause from the given filters and returns the WHERE clause and the arguments to be passed to the query.
-func buildWhereClause(filters []Filter, existingArgs []interface{}, allowedFields AllowedFields) (string, []interface{}, error) {
-	conditions := []string{}
-	args := []interface{}{}
-	paramCount := len(existingArgs) + 1
+// ValidateFilters parses and structurally validates a filters payload without running a query.
+func ValidateFilters(filtersJSON string, allowedFields AllowedFields, renderers FieldRenderers) error {
+	root, err := parseFilters(filtersJSON)
+	if err != nil {
+		return err
+	}
+	args := []any{}
+	next := 1
+	_, err = buildNode(root, &args, &next, allowedFields, renderers, 0)
+	return err
+}
 
-	for _, f := range filters {
-		modelFields, ok := allowedFields[f.Model]
-		if !ok {
-			return "", nil, fmt.Errorf("invalid model: %s", f.Model)
+// parseFilters accepts either a legacy flat array of leaves or a {logic, rules} group object.
+func parseFilters(filtersJSON string) (FilterNode, error) {
+	trimmed := strings.TrimSpace(filtersJSON)
+	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
+		return FilterNode{}, nil
+	}
+	switch trimmed[0] {
+	case '[':
+		var leaves []FilterNode
+		if err := json.Unmarshal([]byte(trimmed), &leaves); err != nil {
+			return FilterNode{}, fmt.Errorf("invalid filters JSON: %w", err)
 		}
-		if !slices.Contains(modelFields, f.Field) {
-			return "", nil, fmt.Errorf("invalid field: %s for model: %s", f.Field, f.Model)
+		return FilterNode{Logic: "AND", Rules: leaves}, nil
+	case '{':
+		var node FilterNode
+		if err := json.Unmarshal([]byte(trimmed), &node); err != nil {
+			return FilterNode{}, fmt.Errorf("invalid filters JSON: %w", err)
 		}
+		return node, nil
+	default:
+		return FilterNode{}, fmt.Errorf("invalid filters JSON: expected array or object")
+	}
+}
 
-		field := fmt.Sprintf("%s.%s", f.Model, f.Field)
+func buildWhereClause(root FilterNode, existingArgs []any, allowedFields AllowedFields, renderers FieldRenderers) (string, []any, error) {
+	args := []any{}
+	next := len(existingArgs) + 1
+	clause, err := buildNode(root, &args, &next, allowedFields, renderers, 0)
+	if err != nil {
+		return "", nil, err
+	}
+	return clause, args, nil
+}
 
-		switch f.Operator {
-		case "equals":
-			if dateOnlyRe.MatchString(f.Value) {
-				conditions = append(conditions, fmt.Sprintf("%s >= $%d::DATE AND %s < ($%d::DATE + INTERVAL '1 day')", field, paramCount, field, paramCount))
-				args = append(args, f.Value)
-				paramCount++
-				break
-			}
-			conditions = append(conditions, field+fmt.Sprintf(" = $%d", paramCount))
-			args = append(args, f.Value)
-			paramCount++
-		case "not equals":
-			if dateOnlyRe.MatchString(f.Value) {
-				conditions = append(conditions, fmt.Sprintf("(%s < $%d::DATE OR %s >= ($%d::DATE + INTERVAL '1 day'))", field, paramCount, field, paramCount))
-				args = append(args, f.Value)
-				paramCount++
-				break
-			}
-			conditions = append(conditions, field+fmt.Sprintf(" != $%d", paramCount))
-			args = append(args, f.Value)
-			paramCount++
-		case "greater than":
-			if dateOnlyRe.MatchString(f.Value) {
-				conditions = append(conditions, fmt.Sprintf("%s >= ($%d::DATE + INTERVAL '1 day')", field, paramCount))
-				args = append(args, f.Value)
-				paramCount++
-				break
-			}
-			conditions = append(conditions, field+fmt.Sprintf(" > $%d", paramCount))
-			args = append(args, f.Value)
-			paramCount++
-		case "less than":
-			if dateOnlyRe.MatchString(f.Value) {
-				conditions = append(conditions, fmt.Sprintf("%s < $%d::DATE", field, paramCount))
-				args = append(args, f.Value)
-				paramCount++
-				break
-			}
-			conditions = append(conditions, field+fmt.Sprintf(" < $%d", paramCount))
-			args = append(args, f.Value)
-			paramCount++
-		case "set":
-			conditions = append(conditions, field+" IS NOT NULL")
-		case "not set":
-			conditions = append(conditions, field+" IS NULL")
-		case "in":
-			var arr []string
-			if err := json.Unmarshal([]byte(f.Value), &arr); err != nil {
-				return "", nil, fmt.Errorf("invalid array format for 'in' operator: %v", err)
-			}
-			placeholders := make([]string, len(arr))
-			for i, v := range arr {
-				placeholders[i] = fmt.Sprintf("$%d", paramCount)
-				args = append(args, v)
-				paramCount++
-			}
-			conditions = append(conditions, field+" IN ("+strings.Join(placeholders, ",")+")")
-		case "between":
-			values := strings.Split(f.Value, ",")
-			if len(values) != 2 {
-				return "", nil, fmt.Errorf("between requires 2 values")
-			}
-			start := strings.TrimSpace(values[0])
-			end := strings.TrimSpace(values[1])
-			if dateOnlyRe.MatchString(start) && dateOnlyRe.MatchString(end) {
-				conditions = append(conditions, fmt.Sprintf("%s >= $%d::DATE AND %s < ($%d::DATE + INTERVAL '1 day')", field, paramCount, field, paramCount+1))
-			} else {
-				conditions = append(conditions, fmt.Sprintf("%s BETWEEN $%d AND $%d", field, paramCount, paramCount+1))
-			}
-			args = append(args, start, end)
-			paramCount += 2
-		case "ilike":
-			conditions = append(conditions, field+fmt.Sprintf(" ILIKE $%d", paramCount))
-			args = append(args, "%"+f.Value+"%")
-			paramCount++
-		default:
-			return "", nil, fmt.Errorf("invalid operator: %s", f.Operator)
+func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFields, renderers FieldRenderers, depth int) (string, error) {
+	if depth > maxFilterDepth {
+		return "", fmt.Errorf("filter nesting too deep")
+	}
+
+	if node.isEmpty() {
+		return "", nil
+	}
+
+	if !node.isGroup() {
+		return buildLeaf(node, args, next, allowedFields, renderers)
+	}
+
+	logic := strings.ToUpper(strings.TrimSpace(node.Logic))
+	if logic == "" {
+		logic = "AND"
+	}
+	if logic != "AND" && logic != "OR" {
+		return "", fmt.Errorf("invalid filter logic: %s", node.Logic)
+	}
+
+	parts := []string{}
+	for _, child := range node.Rules {
+		if child.isEmpty() {
+			continue
+		}
+		clause, err := buildNode(child, args, next, allowedFields, renderers, depth+1)
+		if err != nil {
+			return "", err
+		}
+		if clause != "" {
+			parts = append(parts, clause)
 		}
 	}
 
-	if len(conditions) == 0 {
-		return "", nil, nil
+	if len(parts) == 0 {
+		return "", nil
+	}
+	return "(" + strings.Join(parts, " "+logic+" ") + ")", nil
+}
+
+func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields, renderers FieldRenderers) (string, error) {
+	if render, ok := renderers.get(f.Model, f.Field); ok {
+		sql, rArgs, err := render(f.Operator, f.Value, *next)
+		if err != nil {
+			return "", err
+		}
+		*args = append(*args, rArgs...)
+		*next += len(rArgs)
+		return sql, nil
 	}
 
-	return strings.Join(conditions, " AND "), args, nil
+	modelFields, ok := allowedFields[f.Model]
+	if !ok {
+		return "", fmt.Errorf("invalid model: %s", f.Model)
+	}
+	if !slices.Contains(modelFields, f.Field) {
+		return "", fmt.Errorf("invalid field: %s for model: %s", f.Field, f.Model)
+	}
+
+	field := fmt.Sprintf("%s.%s", f.Model, f.Field)
+
+	switch f.Operator {
+	case "equals":
+		if dateOnlyRe.MatchString(f.Value) {
+			cond := fmt.Sprintf("(%s >= $%d::DATE AND %s < ($%d::DATE + INTERVAL '1 day'))", field, *next, field, *next)
+			*args = append(*args, f.Value)
+			*next++
+			return cond, nil
+		}
+		cond := fmt.Sprintf("%s = $%d", field, *next)
+		*args = append(*args, f.Value)
+		*next++
+		return cond, nil
+	case "not equals":
+		if dateOnlyRe.MatchString(f.Value) {
+			cond := fmt.Sprintf("(%s < $%d::DATE OR %s >= ($%d::DATE + INTERVAL '1 day'))", field, *next, field, *next)
+			*args = append(*args, f.Value)
+			*next++
+			return cond, nil
+		}
+		cond := fmt.Sprintf("%s != $%d", field, *next)
+		*args = append(*args, f.Value)
+		*next++
+		return cond, nil
+	case "greater than":
+		if dateOnlyRe.MatchString(f.Value) {
+			cond := fmt.Sprintf("%s >= ($%d::DATE + INTERVAL '1 day')", field, *next)
+			*args = append(*args, f.Value)
+			*next++
+			return cond, nil
+		}
+		cond := fmt.Sprintf("%s > $%d", field, *next)
+		*args = append(*args, f.Value)
+		*next++
+		return cond, nil
+	case "less than":
+		if dateOnlyRe.MatchString(f.Value) {
+			cond := fmt.Sprintf("%s < $%d::DATE", field, *next)
+			*args = append(*args, f.Value)
+			*next++
+			return cond, nil
+		}
+		cond := fmt.Sprintf("%s < $%d", field, *next)
+		*args = append(*args, f.Value)
+		*next++
+		return cond, nil
+	case "set":
+		return field + " IS NOT NULL", nil
+	case "not set":
+		return field + " IS NULL", nil
+	case "in":
+		var arr []string
+		if err := json.Unmarshal([]byte(f.Value), &arr); err != nil {
+			return "", fmt.Errorf("invalid array format for 'in' operator: %v", err)
+		}
+		placeholders := make([]string, len(arr))
+		for i, v := range arr {
+			placeholders[i] = fmt.Sprintf("$%d", *next)
+			*args = append(*args, v)
+			*next++
+		}
+		return field + " IN (" + strings.Join(placeholders, ",") + ")", nil
+	case "between":
+		values := strings.Split(f.Value, ",")
+		if len(values) != 2 {
+			return "", fmt.Errorf("between requires 2 values")
+		}
+		start := strings.TrimSpace(values[0])
+		end := strings.TrimSpace(values[1])
+		var cond string
+		if dateOnlyRe.MatchString(start) && dateOnlyRe.MatchString(end) {
+			cond = fmt.Sprintf("(%s >= $%d::DATE AND %s < ($%d::DATE + INTERVAL '1 day'))", field, *next, field, *next+1)
+		} else {
+			cond = fmt.Sprintf("%s BETWEEN $%d AND $%d", field, *next, *next+1)
+		}
+		*args = append(*args, start, end)
+		*next += 2
+		return cond, nil
+	case "contains", "ilike":
+		cond := fmt.Sprintf("%s ILIKE $%d", field, *next)
+		*args = append(*args, "%"+f.Value+"%")
+		*next++
+		return cond, nil
+	case "not contains":
+		cond := fmt.Sprintf("%s NOT ILIKE $%d", field, *next)
+		*args = append(*args, "%"+f.Value+"%")
+		*next++
+		return cond, nil
+	default:
+		return "", fmt.Errorf("invalid operator: %s", f.Operator)
+	}
 }

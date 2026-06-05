@@ -283,5 +283,5 @@ func (m *Manager) makeQuery(page, pageSize int, order, orderBy, filtersJSON stri
 		PageSize: pageSize,
 	}, filtersJSON, dbutil.AllowedFields{
 		"activity_logs": {"activity_type", "actor_id", "ip", "created_at"},
-	})
+	}, nil)
 }

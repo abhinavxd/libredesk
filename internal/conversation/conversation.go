@@ -50,14 +50,28 @@ var (
 	//go:embed queries.sql
 	efs                             embed.FS
 	errConversationNotFound         = errors.New("conversation not found")
-	conversationsAllowedFields      = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "last_interaction_at", "created_at", "waiting_since", "next_sla_deadline_at", "priority_id"}
+	conversationsAllowedFields      = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since", "next_sla_deadline_at", "snoozed_until", "sla_policy_id"}
 	conversationStatusAllowedFields = []string{"id", "name"}
-	usersAllowedFields              = []string{"email"}
+	usersAllowedFields              = []string{"email", "external_user_id"}
+	inboxesAllowedFields            = []string{"channel"}
 )
 
 const (
 	conversationsListMaxPageSize = 500
 )
+
+var conversationFilterRenderers = dbutil.FieldRenderers{
+	"conversations": {
+		"tags": renderTagFilter,
+	},
+}
+
+var conversationListAllowedFields = dbutil.AllowedFields{
+	"conversations":         conversationsAllowedFields,
+	"conversation_statuses": conversationStatusAllowedFields,
+	"users":                 usersAllowedFields,
+	"inboxes":               inboxesAllowedFields,
+}
 
 // Manager handles the operations related to conversations
 type Manager struct {
@@ -1547,35 +1561,6 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		return "", nil, fmt.Errorf("no conversation list types specified")
 	}
 
-	// Parse filters to extract tag filters
-	var (
-		filters          []dbutil.Filter
-		tagFilters       []dbutil.Filter
-		remainingFilters []dbutil.Filter
-	)
-	if filtersJSON != "" && filtersJSON != "[]" {
-		if err := json.Unmarshal([]byte(filtersJSON), &filters); err != nil {
-			return "", nil, fmt.Errorf("invalid filters JSON: %w", err)
-		}
-
-		// Separate tag filters from other filters
-		for _, f := range filters {
-			if f.Field == "tags" && (f.Operator == "contains" || f.Operator == "not contains" || f.Operator == "set" || f.Operator == "not set") {
-				tagFilters = append(tagFilters, f)
-			} else {
-				remainingFilters = append(remainingFilters, f)
-			}
-		}
-
-		// Update filtersJSON with remaining filters for the generic builder
-		if len(remainingFilters) > 0 {
-			b, _ := json.Marshal(remainingFilters)
-			filtersJSON = string(b)
-		} else {
-			filtersJSON = "[]"
-		}
-	}
-
 	// Prepare the conditions based on the list types.
 	conditions := []string{}
 	for _, lt := range listTypes {
@@ -1627,52 +1612,6 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		whereClause = "AND (" + strings.Join(conditions, " OR ") + ")"
 	}
 
-	// Add tag filter conditions
-	// TODO: Evaluate - https://github.com/Masterminds/squirrel when required.
-	for _, tf := range tagFilters {
-		switch tf.Operator {
-		case "contains", "not contains":
-			var tagIDs []int
-			if err := json.Unmarshal([]byte(tf.Value), &tagIDs); err != nil {
-				return "", nil, fmt.Errorf("invalid tag IDs in filter: %w", err)
-			}
-			if len(tagIDs) > 0 {
-				paramIdx := len(qArgs) + 1
-				switch tf.Operator {
-				case "contains":
-					// Has any of the tags
-					tagCondition := fmt.Sprintf(` AND conversations.id IN (
-						SELECT DISTINCT conversation_id 
-						FROM conversation_tags 
-						WHERE tag_id = ANY($%d::int[])
-					)`, paramIdx)
-					whereClause += tagCondition
-				case "not contains":
-					// Doesn't have any of the tags
-					tagCondition := fmt.Sprintf(` AND conversations.id NOT IN (
-						SELECT DISTINCT conversation_id 
-						FROM conversation_tags 
-						WHERE tag_id = ANY($%d::int[])
-					)`, paramIdx)
-					whereClause += tagCondition
-				}
-				qArgs = append(qArgs, pq.Array(tagIDs))
-			}
-		case "set":
-			// Has any tags at all
-			whereClause += ` AND EXISTS (
-				SELECT 1 FROM conversation_tags 
-				WHERE conversation_id = conversations.id
-			)`
-		case "not set":
-			// Has no tags at all
-			whereClause += ` AND NOT EXISTS (
-				SELECT 1 FROM conversation_tags 
-				WHERE conversation_id = conversations.id
-			)`
-		}
-	}
-
 	baseQuery = fmt.Sprintf(baseQuery, whereClause)
 
 	return dbutil.BuildPaginatedQuery(baseQuery, qArgs, dbutil.PaginationOptions{
@@ -1680,11 +1619,41 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		OrderBy:  orderBy,
 		Page:     page,
 		PageSize: pageSize,
-	}, filtersJSON, dbutil.AllowedFields{
-		"conversations":         conversationsAllowedFields,
-		"conversation_statuses": conversationStatusAllowedFields,
-		"users":                 usersAllowedFields,
-	})
+	}, filtersJSON, conversationListAllowedFields, conversationFilterRenderers)
+}
+
+// ValidateListFilters structurally validates a conversation view's filters payload.
+func (c *Manager) ValidateListFilters(filtersJSON string) error {
+	if err := dbutil.ValidateFilters(filtersJSON, conversationListAllowedFields, conversationFilterRenderers); err != nil {
+		c.lo.Error("error validating view filters", "error", err)
+		return envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.invalidFilters"), nil)
+	}
+	return nil
+}
+
+func renderTagFilter(operator, value string, paramIndex int) (string, []any, error) {
+	switch operator {
+	case "contains", "not contains":
+		var tagIDs []int
+		if err := json.Unmarshal([]byte(value), &tagIDs); err != nil {
+			return "", nil, fmt.Errorf("invalid tag IDs in filter: %w", err)
+		}
+		if len(tagIDs) == 0 {
+			return "", nil, nil
+		}
+		op := "IN"
+		if operator == "not contains" {
+			op = "NOT IN"
+		}
+		sql := fmt.Sprintf("conversations.id %s (SELECT DISTINCT conversation_id FROM conversation_tags WHERE tag_id = ANY($%d::int[]))", op, paramIndex)
+		return sql, []any{pq.Array(tagIDs)}, nil
+	case "set":
+		return "EXISTS (SELECT 1 FROM conversation_tags WHERE conversation_id = conversations.id)", nil, nil
+	case "not set":
+		return "NOT EXISTS (SELECT 1 FROM conversation_tags WHERE conversation_id = conversations.id)", nil, nil
+	default:
+		return "", nil, fmt.Errorf("invalid operator for tags: %s", operator)
+	}
 }
 
 // ProcessCSATStatus processes messages and adds CSAT submission status for CSAT messages.
