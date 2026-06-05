@@ -1,3 +1,8 @@
+export const LOGIC = {
+    AND: 'AND',
+    OR: 'OR'
+}
+
 export const FIELD_TYPE = {
     SELECT: 'select',
     TAG: 'tag',
@@ -19,6 +24,17 @@ export const OPERATOR = {
     GREATER_THAN: 'greater than',
     LESS_THAN: 'less than',
     BETWEEN: 'between'
+}
+
+// operatorLabel returns a clearer display label for operators whose meaning is ambiguous with
+// multiple values (contains = matches ANY of the values). Other operators display as-is.
+const OPERATOR_LABEL_KEYS = {
+    [OPERATOR.CONTAINS]: 'filter.containsAnyOf',
+    [OPERATOR.NOT_CONTAINS]: 'filter.containsNoneOf'
+}
+export const operatorLabel = (op, t) => {
+    const key = OPERATOR_LABEL_KEYS[op]
+    return key ? t(key) : op
 }
 
 export const FIELD_OPERATORS = {
