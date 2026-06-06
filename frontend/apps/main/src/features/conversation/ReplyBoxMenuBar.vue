@@ -38,9 +38,37 @@
         <Smile class="h-4 w-4" />
       </Toggle>
     </div>
-    <Button class="h-8 w-6 px-8" @click="handleSend" :disabled="!enableSend" :isLoading="isSending" v-if="showSendButton">
-      {{ $t('globals.messages.send') }}
-    </Button>
+    <div class="flex items-center">
+      <Button
+        class="h-8 w-6 px-8 rounded-r-none"
+        @click="handleSend"
+        :disabled="!enableSend"
+        :isLoading="isSending"
+        v-if="showSendButton"
+      >
+        {{ $t('globals.messages.send') }}
+      </Button>
+      <DropdownMenu v-if="showSendButton">
+        <DropdownMenuTrigger as-child>
+          <Button
+            class="h-8 px-2 rounded-l-none border-l border-primary-foreground/30 [&[data-state=open]>svg]:rotate-180"
+            :disabled="!enableSend"
+          >
+            <ChevronDownIcon class="text-white transition-transform" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuLabel>{{ $t('replyBox.sendAndSetAs') }}</DropdownMenuLabel>
+          <DropdownMenuItem
+            v-for="status in conversationStore.statusOptionsNoSnooze"
+            :key="status.value"
+            @click="handleSendAndSetStatus(status.label)"
+          >
+            {{ status.label }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   </div>
 </template>
 
@@ -49,7 +77,14 @@ import { ref, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
-import { Paperclip, Smile } from 'lucide-vue-next'
+import { Paperclip, Smile, ChevronDownIcon } from 'lucide-vue-next'
+import DropdownMenu from '@shared-ui/components/ui/dropdown-menu/DropdownMenu.vue'
+import DropdownMenuTrigger from '@shared-ui/components/ui/dropdown-menu/DropdownMenuTrigger.vue'
+import DropdownMenuItem from '@shared-ui/components/ui/dropdown-menu/DropdownMenuItem.vue'
+import DropdownMenuContent from '@shared-ui/components/ui/dropdown-menu/DropdownMenuContent.vue'
+import DropdownMenuLabel from '@shared-ui/components/ui/dropdown-menu/DropdownMenuLabel.vue'
+import { useConversationStore } from '@main/stores/conversation'
+const conversationStore = useConversationStore()
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([
@@ -71,6 +106,7 @@ defineProps({
   isSending: Boolean,
   enableSend: Boolean,
   handleSend: Function,
+  handleSendAndSetStatus: Function,
   showSendButton: {
     type: Boolean,
     default: true

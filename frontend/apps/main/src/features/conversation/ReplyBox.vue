@@ -103,6 +103,7 @@
           v-model:mentions="mentions"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
           @send="processSend"
+          @sendAndSetStatus="processSendAndSetStatus"
           @fileUpload="handleFileUpload"
           @fileDelete="handleFileDelete"
           @filesDropped="uploadFiles"
@@ -137,6 +138,7 @@
         v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
         @send="processSend"
+        @sendAndSetStatus="processSendAndSetStatus"
         @fileUpload="handleFileUpload"
         @fileDelete="handleFileDelete"
         @filesDropped="uploadFiles"
@@ -464,6 +466,20 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     mentions.value = []
   }
   isSending.value = false
+
+  // Return whether the message was sent successfully.
+  return !hasMessageSendingErrored
+}
+
+/**
+ * Processes the send action and update conversation status. 
+ * The status is only updated if the message is sent successfully.
+ */
+const processSendAndSetStatus = async (status) => {
+  const success = await processSend()
+  if (success) {
+    conversationStore.updateStatus(status)
+  }
 }
 
 /**

@@ -940,6 +940,7 @@
   "replyBox.missingTagsTitle": "No tags on this conversation",
   "replyBox.removeBCC": "Remove BCC",
   "replyBox.sendAnyway": "Send anyway",
+  "replyBox.sendAndSetAs": "Send and set as",
   "replyBox.toRequired": "At least one recipient is required in the To field.",
   "report.agentStatus": "Agent Status",
   "report.chart.newConversations": "New conversations",
