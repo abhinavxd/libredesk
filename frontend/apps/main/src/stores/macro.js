@@ -81,6 +81,7 @@ export const useMacroStore = defineStore('macroStore', () => {
     return {
         macroList,
         macroOptions,
+        currentView,
         loadMacros,
         setCurrentView
     }

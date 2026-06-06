@@ -289,17 +289,38 @@ const visibleMacros = computed(() => {
   return matched
 })
 
-const { Meta_K, Ctrl_K } = useMagicKeys({
-  passive: false,
-  onEventFired(e) {
-    if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+function preventDefaultOnHotkey(key) {
+  return (e) => {
+    if (e.key === key && (e.metaKey || e.ctrlKey)) {
       e.preventDefault()
     }
   }
+}
+
+const { Meta_K, Ctrl_K } = useMagicKeys({
+  passive: false,
+  onEventFired: preventDefaultOnHotkey('k')
 })
 
 watch([Meta_K, Ctrl_K], ([mac, win]) => {
-  if (mac || win) toggleOpen()
+  if (mac || win) {
+    if (nestedCommand.value !== 'apply-macro-to-new-conversation') setNestedCommand(null)
+    toggleOpen()
+  }
+})
+
+const { Meta_M, Ctrl_M } = useMagicKeys({
+  passive: false,
+  onEventFired: preventDefaultOnHotkey('m')
+})
+
+watch([Meta_M, Ctrl_M], ([mac, win]) => {
+  if (mac || win) {
+    if (nestedCommand.value !== 'apply-macro-to-new-conversation') {
+      setNestedCommand('apply-macro-to-existing-conversation')
+    }
+    toggleOpen()
+  }
 })
 
 const highlightedMacro = ref(null)
@@ -338,9 +359,6 @@ const otherActions = computed(
 )
 
 function toggleOpen() {
-  if (nestedCommand.value != 'apply-macro-to-new-conversation' && !open.value) {
-    nestedCommand.value = null
-  }
   open.value = !open.value
 }
 
