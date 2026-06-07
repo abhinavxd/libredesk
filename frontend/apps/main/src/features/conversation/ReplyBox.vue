@@ -467,7 +467,6 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     if (statusToSet) conversationStore.updateStatus(statusToSet)
   }
   isSending.value = false
-  return !hasMessageSendingErrored
 }
 
 const processSendAndSetStatus = (status) => processSend(false, false, status)

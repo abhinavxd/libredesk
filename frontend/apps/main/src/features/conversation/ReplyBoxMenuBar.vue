@@ -78,11 +78,13 @@ import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
 import { Paperclip, Smile, ChevronDownIcon } from 'lucide-vue-next'
-import DropdownMenu from '@shared-ui/components/ui/dropdown-menu/DropdownMenu.vue'
-import DropdownMenuTrigger from '@shared-ui/components/ui/dropdown-menu/DropdownMenuTrigger.vue'
-import DropdownMenuItem from '@shared-ui/components/ui/dropdown-menu/DropdownMenuItem.vue'
-import DropdownMenuContent from '@shared-ui/components/ui/dropdown-menu/DropdownMenuContent.vue'
-import DropdownMenuLabel from '@shared-ui/components/ui/dropdown-menu/DropdownMenuLabel.vue'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuContent,
+  DropdownMenuLabel
+} from '@shared-ui/components/ui/dropdown-menu'
 import { useConversationStore } from '@main/stores/conversation'
 const conversationStore = useConversationStore()
 
