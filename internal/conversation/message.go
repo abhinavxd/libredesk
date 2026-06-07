@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
@@ -37,6 +39,16 @@ const (
 
 // Matches <img ... src="URL"> and captures the URL for downstream parsing.
 var imgSrcPattern = regexp.MustCompile(`(?i)<img\b[^>]*?\bsrc=["']([^"']*)["']`)
+
+// fromNameVars is the template context for an inbox's from-name template.
+type fromNameVars struct {
+	Agent fromNameAgent
+	Inbox fromNameInbox
+}
+
+type fromNameAgent struct{ FirstName, LastName, FullName string }
+
+type fromNameInbox struct{ Name string }
 
 // Run starts a pool of worker goroutines to handle message dispatching via inbox's channel and processes incoming messages. It scans for
 // pending outgoing messages at the specified read interval and pushes them to the outgoing queue to be sent.
@@ -167,8 +179,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	outbound := message.ToOutbound()
 
 	if inb.Channel() == inbox.ChannelEmail {
-		// Set from address of the inbox
-		outbound.From = inb.FromAddress()
+		outbound.From = m.emailFromAddress(inb, message)
 
 		// Set "In-Reply-To" and "References" headers for email threading.
 		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
@@ -1447,4 +1458,59 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 		m.lo.Error("error checking media existence by content ID", "content_id", storedCID, "error", err)
 	}
 	return storedCID, exists, mediaUUID
+}
+
+// emailFromAddress returns the From header, applying the inbox from-name template for agent senders.
+func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) string {
+	from := inb.FromAddress()
+
+	tpl := inb.FromNameTemplate()
+	if tpl == "" || message.SenderType != models.SenderTypeAgent {
+		return from
+	}
+
+	agent, err := m.userStore.GetAgentCachedOrLoad(message.SenderID)
+	if err != nil {
+		m.lo.Error("error fetching agent for from name template", "error", err, "sender_id", message.SenderID)
+		return from
+	}
+	if agent.IsSystemUser() {
+		return from
+	}
+
+	addr, err := mail.ParseAddress(from)
+	if err != nil {
+		m.lo.Error("error parsing inbox from address for name template", "error", err, "from", from)
+		return from
+	}
+
+	firstName := strings.TrimSpace(agent.FirstName)
+	lastName := strings.TrimSpace(agent.LastName)
+	data := fromNameVars{
+		Agent: fromNameAgent{
+			FirstName: firstName,
+			LastName:  lastName,
+			FullName:  strings.TrimSpace(firstName + " " + lastName),
+		},
+		Inbox: fromNameInbox{Name: inb.Name()},
+	}
+
+	t, err := template.New("from").Parse(tpl)
+	if err != nil {
+		m.lo.Error("error parsing from name template", "error", err, "template", tpl)
+		return from
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		m.lo.Error("error executing from name template", "error", err, "template", tpl)
+		return from
+	}
+
+	name := strings.TrimSpace(buf.String())
+	if name == "" {
+		return from
+	}
+	addr.Name = name
+	return addr.String()
 }

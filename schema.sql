@@ -88,6 +88,7 @@ CREATE TABLE inboxes (
 	prompt_tags_on_reply bool DEFAULT false NOT NULL,
 	config jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"from" TEXT NULL,
+	from_name_template TEXT NOT NULL DEFAULT '',
 	secret TEXT NULL,
 	linked_email_inbox_id INT REFERENCES inboxes(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_inboxes_on_name CHECK (length("name") <= 140)
