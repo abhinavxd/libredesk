@@ -8,7 +8,6 @@
         class="text-muted-foreground hover:text-foreground h-7 px-2"
         @click.stop="emit('remove')"
       >
-        <Trash2 class="w-3 h-3 mr-1" />
         {{ t('filter.removeGroup') }}
       </Button>
     </div>
@@ -33,7 +32,7 @@
 
 <script setup>
 import { Button } from '@shared-ui/components/ui/button'
-import { Plus, Trash2 } from 'lucide-vue-next'
+import { Plus } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import FilterRow from '@/components/filter/FilterRow.vue'
 import ConnectorToggle from '@/components/filter/ConnectorToggle.vue'
