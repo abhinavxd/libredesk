@@ -27,7 +27,7 @@ export const isPartialLeaf = (leaf) =>
 const keyed = (node) => ({ __id: node.__id || uid(), ...node })
 
 const toStringIdArray = (value) => {
-  if (Array.isArray(value)) return value
+  if (Array.isArray(value)) return value.map((v) => String(v))
   if (typeof value === 'string') {
     try {
       const parsed = JSON.parse(value)

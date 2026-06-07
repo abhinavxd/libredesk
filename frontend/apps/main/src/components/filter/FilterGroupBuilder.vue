@@ -37,7 +37,12 @@ const { t } = useI18n()
 onMounted(() => {
   const v = modelValue.value
   const isStrictTwoLevel =
-    v && typeof v === 'object' && !Array.isArray(v) && Array.isArray(v.rules) && v.rules.length > 0 && v.rules.every(isGroupNode)
+    v &&
+    typeof v === 'object' &&
+    !Array.isArray(v) &&
+    Array.isArray(v.rules) &&
+    v.rules.length > 0 &&
+    v.rules.every((g) => isGroupNode(g) && Array.isArray(g.rules) && g.rules.every((r) => !isGroupNode(r)))
   if (!isStrictTwoLevel) modelValue.value = normalizeToTwoLevel(v)
 })
 

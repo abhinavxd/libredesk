@@ -10,6 +10,18 @@ import (
 
 var dateOnlyRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
+var valueRequiredOperators = map[string]bool{
+	"equals":       true,
+	"not equals":   true,
+	"greater than": true,
+	"less than":    true,
+	"in":           true,
+	"between":      true,
+	"contains":     true,
+	"ilike":        true,
+	"not contains": true,
+}
+
 // maxFilterDepth bounds group nesting (root group + one nested level).
 const maxFilterDepth = 2
 
@@ -226,6 +238,10 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 		return "", fmt.Errorf("invalid field: %s for model: %s", f.Field, f.Model)
 	}
 
+	if valueRequiredOperators[f.Operator] && strings.TrimSpace(f.Value) == "" {
+		return "", fmt.Errorf("operator %q requires a value", f.Operator)
+	}
+
 	field := fmt.Sprintf("%s.%s", f.Model, f.Field)
 
 	switch f.Operator {
@@ -281,6 +297,9 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 		var arr []string
 		if err := json.Unmarshal([]byte(f.Value), &arr); err != nil {
 			return "", fmt.Errorf("invalid array format for 'in' operator: %v", err)
+		}
+		if len(arr) == 0 {
+			return "", fmt.Errorf("operator \"in\" requires at least one value")
 		}
 		placeholders := make([]string, len(arr))
 		for i, v := range arr {

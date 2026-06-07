@@ -1097,7 +1097,6 @@
   "validation.subjectCannotBeEmpty": "Subject cannot be empty",
   "validation.tooLongStatus": "Status is too long, should be at most {max} characters",
   "view.form.description": "Create and save custom filter views for quick access to your conversations.",
-  "view.form.filter.partiallyFilled": "Please make sure you've filled the filter fields correctly.",
   "view.form.filter.selectAtLeastOne": "Select at least one filter.",
   "view.form.filters.description": "Set one or more filters to customize view.",
   "view.form.name.description": "Enter an unique name for your view.",
