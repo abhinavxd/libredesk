@@ -40,7 +40,7 @@ export const useConversationStore = defineStore('conversation', () => {
     return statuses.value.map(s => ({ label: s.name, value: s.id }))
   })
   const statusOptionsNoSnooze = computed(() =>
-    statuses.value.filter(s => s.name !== 'Snoozed').map(s => ({
+    statuses.value.filter(s => s.name !== CONVERSATION_DEFAULT_STATUSES.SNOOZED).map(s => ({
       label: s.name,
       value: s.id
     }))

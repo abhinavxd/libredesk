@@ -13,7 +13,7 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="processSend(true, true)">{{
+        <AlertDialogAction @click="processSend(true, true, deferredStatus)">{{
           $t('replyBox.sendAnyway')
         }}</AlertDialogAction>
       </AlertDialogFooter>
@@ -30,7 +30,7 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="processSend(false, true)">{{
+        <AlertDialogAction @click="processSend(false, true, deferredStatus)">{{
           $t('replyBox.sendAnyway')
         }}</AlertDialogAction>
       </AlertDialogFooter>
@@ -103,6 +103,7 @@
           v-model:mentions="mentions"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
           @send="processSend"
+          @sendAndSetStatus="processSendAndSetStatus"
           @fileUpload="handleFileUpload"
           @fileDelete="handleFileDelete"
           @filesDropped="uploadFiles"
@@ -137,6 +138,7 @@
         v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
         @send="processSend"
+        @sendAndSetStatus="processSendAndSetStatus"
         @fileUpload="handleFileUpload"
         @fileDelete="handleFileDelete"
         @filesDropped="uploadFiles"
@@ -247,6 +249,7 @@ const aiPrompts = computed(() => aiPromptStore.prompts)
 const replyBoxContentRef = ref(null)
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
+const deferredStatus = ref(null)
 const mentions = ref([])
 
 aiPromptStore.fetchPrompts()
@@ -305,10 +308,7 @@ const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
 
-/**
- * Processes the send action.
- */
-const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false) => {
+const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
@@ -327,6 +327,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     currentInbox?.prompt_tags_on_reply &&
     !(conversationStore.current.tags?.length > 0)
   ) {
+    deferredStatus.value = statusToSet
     showMissingTagsWarning.value = true
     return
   }
@@ -352,6 +353,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
             .map((e) => e.trim())
             .includes(contactEmail)
         ) {
+          deferredStatus.value = statusToSet
           showContactEmailWarning.value = true
           return
         }
@@ -462,9 +464,12 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     clearMediaFiles()
     emailErrors.value = []
     mentions.value = []
+    if (statusToSet) conversationStore.updateStatus(statusToSet)
   }
   isSending.value = false
 }
+
+const processSendAndSetStatus = (status) => processSend(false, false, status)
 
 /**
  * Watches for changes in the conversation's macro id and update message content.
