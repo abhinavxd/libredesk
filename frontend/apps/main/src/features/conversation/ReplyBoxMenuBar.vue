@@ -40,7 +40,7 @@
     </div>
     <div class="flex items-center">
       <Button
-        class="h-8 w-6 px-8 rounded-r-none"
+        class="h-8 px-4 rounded-r-none"
         @click="handleSend"
         :disabled="!enableSend"
         :isLoading="isSending"
@@ -54,7 +54,7 @@
             class="h-8 px-2 rounded-l-none border-l border-primary-foreground/30 [&[data-state=open]>svg]:rotate-180"
             :disabled="!enableSend"
           >
-            <ChevronDownIcon class="text-white transition-transform" />
+            <ChevronDownIcon class="text-primary-foreground transition-transform" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
