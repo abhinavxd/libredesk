@@ -126,6 +126,21 @@ func TestContainsOnPlainColumnIsILike(t *testing.T) {
 	}
 }
 
+func TestEmptyInRejected(t *testing.T) {
+	if _, _, err := build(t, `[{"model":"conversations","field":"status_id","operator":"in","value":"[]"}]`); err == nil {
+		t.Fatal("expected error for empty 'in' array")
+	}
+}
+
+func TestEmptyValueRejected(t *testing.T) {
+	if _, _, err := build(t, `[{"model":"conversations","field":"status_id","operator":"equals","value":""}]`); err == nil {
+		t.Fatal("expected error for empty value on 'equals'")
+	}
+	if _, _, err := build(t, `[{"model":"conversations","field":"status_id","operator":"set","value":""}]`); err != nil {
+		t.Fatalf("'set' should not require a value: %v", err)
+	}
+}
+
 func TestValidateFilters(t *testing.T) {
 	if err := ValidateFilters(`{"logic":"AND","rules":[{"model":"conversations","field":"status_id","operator":"equals","value":"1"}]}`, testAllowed, testRenderers); err != nil {
 		t.Fatalf("unexpected error: %v", err)

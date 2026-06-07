@@ -113,7 +113,7 @@ export function useConversationFilters () {
         external_user_id: {
             label: t('globals.terms.contactExternalId'),
             type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.SELECT,
+            operators: FIELD_OPERATORS.TEXT,
             model: 'users'
         },
         last_interaction_sender: {
