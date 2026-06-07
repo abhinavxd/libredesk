@@ -43,7 +43,7 @@ func (m *Manager) BuildTranscript(conversation models.Conversation, messages []m
 			for _, attachment := range message.Attachments {
 				names = append(names, attachment.Name)
 			}
-			fmt.Fprintf(&b, "%s: %s\n", m.i18n.P("globals.terms.attachment"), strings.Join(names, ", "))
+			fmt.Fprintf(&b, "%s: %s\n", m.i18n.Tc("globals.terms.attachment", len(message.Attachments)), strings.Join(names, ", "))
 		}
 	}
 	return []byte(b.String())

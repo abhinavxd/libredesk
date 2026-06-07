@@ -81,8 +81,10 @@ const downloadTranscript = async () => {
     const link = document.createElement('a')
     link.href = url
     link.download = `transcript-${conversation.reference_number}.txt`
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(url)
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
   } catch (error) {
     if (error.response?.data instanceof Blob) {
       try {

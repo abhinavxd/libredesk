@@ -75,7 +75,7 @@ func TestBuildTranscript(t *testing.T) {
 		"[May 11, 2026 10:01 AM UTC] John Doe (Contact):",
 		"Hi, I need a refund for order #555",
 		"[May 11, 2026 10:05 AM UTC] Priya (Agent):",
-		"Attachments: invoice.pdf",
+		"Attachment: invoice.pdf",
 		"Falls back to HTML",
 	}
 	for _, want := range wantContains {
