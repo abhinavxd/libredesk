@@ -27,6 +27,11 @@ jobs:
         image: redis
         ports:
           - 6379:6379
+      mailhog:
+        image: mailhog/mailhog
+        ports:
+          - 1025:1025
+          - 8025:8025
 
     steps:
       - uses: actions/checkout@v3
@@ -62,6 +67,11 @@ jobs:
       - name: Install db schema and run tests
         env:
           LIBREDESK_SYSTEM_USER_PASSWORD: "StrongPass!123"
+          # E2E runs over plain HTTP, so the Secure session/csrf cookies must be off
+          # or real login + writes would be rejected.
+          LIBREDESK_APP__SERVER__DISABLE_SECURE_COOKIES: "true"
+          CYPRESS_SYSTEM_PASSWORD: "StrongPass!123"
+          CYPRESS_MAILHOG_URL: "http://localhost:8025"
         run: |
           ./libredesk --install --idempotent-install --yes --config ./config.toml
           ./libredesk --upgrade --yes --config ./config.toml
