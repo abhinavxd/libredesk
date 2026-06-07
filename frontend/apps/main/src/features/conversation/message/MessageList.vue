@@ -69,29 +69,11 @@
     />
 
     <!-- Nudge to self-assign after replying to an unassigned conversation -->
-    <Transition
-      enter-active-class="transition ease-out duration-200"
-      enter-from-class="opacity-0 translate-y-2"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition ease-in duration-150"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 translate-y-2"
-    >
-      <div v-if="showAssignNudge" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-md">
-        <div class="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 shadow-lg">
-          <span class="flex-1 text-sm text-foreground">{{ $t('conversation.assignSelfPrompt') }}</span>
-          <Button size="sm" @click="assignToSelf">{{ $t('conversation.assignSelfAction') }}</Button>
-          <button
-            type="button"
-            class="text-muted-foreground hover:text-foreground"
-            :aria-label="$t('globals.messages.close')"
-            @click="showAssignNudge = false"
-          >
-            <X class="size-4" />
-          </button>
-        </div>
-      </div>
-    </Transition>
+    <AssignSelfNudge
+      :show="showAssignNudge"
+      @assign="assignToSelf"
+      @dismiss="showAssignNudge = false"
+    />
   </div>
 </template>
 
@@ -103,8 +85,9 @@ import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
-import { RefreshCw, Loader2, X } from 'lucide-vue-next'
+import { RefreshCw, Loader2 } from 'lucide-vue-next'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
+import AssignSelfNudge from './AssignSelfNudge.vue'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import MessagesSkeleton from './MessagesSkeleton.vue'
@@ -129,10 +112,7 @@ let currentConversationUUID = ''
 let openScrollDone = false
 
 const assignToSelf = () => {
-  const id = userStore.userID
-  conversationStore.current.assigned_user_id = id
-  conversationStore.updateAssignee('user', { assignee_id: id })
-  showAssignNudge.value = false
+  conversationStore.updateAssignee('user', { assignee_id: userStore.userID })
 }
 
 const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(threadEl, contentEl, {
