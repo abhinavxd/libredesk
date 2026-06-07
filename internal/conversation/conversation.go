@@ -1624,11 +1624,15 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 
 // ValidateListFilters structurally validates a conversation view's filters payload.
 func (c *Manager) ValidateListFilters(filtersJSON string) error {
-	if err := dbutil.ValidateFilters(filtersJSON, conversationListAllowedFields, conversationFilterRenderers); err != nil {
-		c.lo.Error("error validating view filters", "error", err)
-		return envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.invalidFilters"), nil)
+	err := dbutil.ValidateFilters(filtersJSON, conversationListAllowedFields, conversationFilterRenderers)
+	if err == nil {
+		return nil
 	}
-	return nil
+	c.lo.Error("error validating view filters", "error", err)
+	if errors.Is(err, dbutil.ErrTooManyGroups) {
+		return envelope.NewError(envelope.InputError, c.i18n.Ts("conversation.filters.tooManyGroups", "max", fmt.Sprintf("%d", dbutil.MaxFilterGroups)), nil)
+	}
+	return envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.invalidFilters"), nil)
 }
 
 func renderTagFilter(operator, value string, paramIndex int) (string, []any, error) {

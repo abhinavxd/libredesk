@@ -2,11 +2,15 @@ package dbutil
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
 	"strings"
 )
+
+// ErrTooManyGroups is returned when a filter exceeds MaxFilterGroups. Callers map it to a user-facing error.
+var ErrTooManyGroups = errors.New("too many filter groups")
 
 var dateOnlyRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
@@ -24,6 +28,9 @@ var valueRequiredOperators = map[string]bool{
 
 // maxFilterDepth bounds group nesting (root group + one nested level).
 const maxFilterDepth = 2
+
+// MaxFilterGroups bounds how many groups a filter may contain (excluding the root).
+const MaxFilterGroups = 10
 
 // PaginationOptions represents the options for paginating a query.
 type PaginationOptions struct {
@@ -178,9 +185,30 @@ func buildWhereClause(root FilterNode, existingArgs []any, allowedFields Allowed
 	return clause, args, nil
 }
 
+func countGroups(node FilterNode) int {
+	if !node.isGroup() {
+		return 0
+	}
+	n := 1
+	for _, child := range node.Rules {
+		n += countGroups(child)
+	}
+	return n
+}
+
 func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFields, renderers FieldRenderers, depth int) (string, error) {
 	if depth > maxFilterDepth {
 		return "", fmt.Errorf("filter nesting too deep")
+	}
+
+	if depth == 0 {
+		groups := 0
+		for _, child := range node.Rules {
+			groups += countGroups(child)
+		}
+		if groups > MaxFilterGroups {
+			return "", ErrTooManyGroups
+		}
 	}
 
 	if node.isEmpty() {

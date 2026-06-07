@@ -489,6 +489,7 @@
   "conversation.bulkActions.toolbar": "Bulk actions toolbar",
   "conversation.couldNotFetch": "Could not fetch conversations",
   "conversation.downloadTranscript": "Download transcript",
+  "conversation.filters.tooManyGroups": "Too many filter groups. A view can have at most {max}. Remove the extra groups and save again.",
   "conversation.hideQuotedText": "Hide quoted text",
   "conversation.mentions": "Mentions",
   "conversation.myInbox": "My inbox",
