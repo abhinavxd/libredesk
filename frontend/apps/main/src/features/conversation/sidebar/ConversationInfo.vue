@@ -102,11 +102,38 @@
       :custom-attributes="conversation.custom_attributes || {}"
       @update:setattributes="updateCustomAttributes"
     />
+
+    <div v-if="conversation.csat_responded_at && conversation.csat_rating">
+      <p class="sidebar-label">{{ $t('globals.terms.csatRating') }}</p>
+      <div class="flex items-center gap-2">
+        <span class="text-lg">{{ csatRatingEmoji(conversation.csat_rating) }}</span>
+        <span class="sidebar-value">{{ $t(csatRatingTextKey(conversation.csat_rating)) }}</span>
+        <span class="text-xs text-muted-foreground">{{ conversation.csat_rating }}/5</span>
+      </div>
+    </div>
+
+    <div v-if="conversation.csat_responded_at && conversation.csat_feedback">
+      <p class="sidebar-label">{{ $t('globals.terms.csatFeedback') }}</p>
+      <p
+        class="sidebar-value italic whitespace-pre-wrap"
+        :class="{ 'line-clamp-3': isFeedbackLong && !feedbackExpanded }"
+      >
+        {{ conversation.csat_feedback }}
+      </p>
+      <button
+        v-if="isFeedbackLong"
+        type="button"
+        class="text-xs text-muted-foreground hover:text-foreground mt-1"
+        @click="feedbackExpanded = !feedbackExpanded"
+      >
+        {{ feedbackExpanded ? $t('globals.messages.showLess') : $t('globals.messages.showMore') }}
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { format } from 'date-fns'
 import { Mail, MessageSquare } from 'lucide-vue-next'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
@@ -116,6 +143,7 @@ import { useCustomAttributeStore } from '../../../stores/customAttributes'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { csatRatingEmoji, csatRatingTextKey } from '@shared-ui/utils/csat.js'
 import api from '../../../api'
 import { useI18n } from 'vue-i18n'
 
@@ -125,6 +153,9 @@ const customAttributeStore = useCustomAttributeStore()
 const conversationStore = useConversationStore()
 const conversation = computed(() => conversationStore.current)
 customAttributeStore.fetchCustomAttributes()
+
+const feedbackExpanded = ref(false)
+const isFeedbackLong = computed(() => (conversation.value?.csat_feedback?.length || 0) > 160)
 
 const updateCustomAttributes = async (attributes) => {
   let previousAttributes = conversationStore.current.custom_attributes

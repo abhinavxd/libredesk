@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strconv"
 	"time"
@@ -326,6 +327,40 @@ func handleGetConversation(r *fastglue.Request) error {
 	prev, _ := app.conversation.GetContactPreviousConversations(conv.ContactID, 10)
 	conv.PreviousConversations = filterCurrentPreviousConv(prev, conv.UUID)
 	return r.SendEnvelope(conv)
+}
+
+// handleDownloadConversationTranscript sends the conversation transcript as a text file download.
+func handleDownloadConversationTranscript(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	conversation, err := enforceConversationAccess(app, uuid, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	private := false
+	messages, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	transcript := app.conversation.BuildTranscript(*conversation, messages, time.Now())
+	safeRef := stringutil.SanitizeFilename(conversation.ReferenceNumber)
+	filename := fmt.Sprintf("transcript-%s.txt", safeRef)
+	r.RequestCtx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+	r.RequestCtx.SetContentType("text/plain; charset=utf-8")
+	r.RequestCtx.SetBody(transcript)
+	return nil
 }
 
 // handleGetContactPageVisits returns the recent page visits for the contact of a conversation.

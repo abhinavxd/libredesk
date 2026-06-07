@@ -357,6 +357,23 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	return messages, pageSize, nil
 }
 
+// GetAllConversationMessages returns all messages in a conversation in chronological order.
+func (m *Manager) GetAllConversationMessages(conversationUUID string, private *bool, msgTypes []string) ([]models.Message, error) {
+	var all []models.Message
+	for page := 1; ; page++ {
+		messages, _, err := m.GetConversationMessages(conversationUUID, page, maxMessagesPerPage, private, msgTypes)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, messages...)
+		if len(messages) == 0 || len(all) >= messages[0].Total {
+			break
+		}
+	}
+	slices.Reverse(all)
+	return all, nil
+}
+
 // GetMessage retrieves a message by UUID.
 func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 	var message models.Message
