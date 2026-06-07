@@ -1,6 +1,7 @@
 package dbutil
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -123,6 +124,19 @@ func TestContainsOnPlainColumnIsILike(t *testing.T) {
 	}
 	if !strings.Contains(q, "users.email NOT ILIKE $1") {
 		t.Fatalf("expected NOT ILIKE for not contains, got: %s", q)
+	}
+}
+
+func TestTooManyGroupsRejected(t *testing.T) {
+	group := `{"logic":"AND","rules":[{"model":"conversations","field":"status_id","operator":"equals","value":"1"}]}`
+	groups := make([]string, MaxFilterGroups+1)
+	for i := range groups {
+		groups[i] = group
+	}
+	j := `{"logic":"OR","rules":[` + strings.Join(groups, ",") + `]}`
+	_, _, err := build(t, j)
+	if !errors.Is(err, ErrTooManyGroups) {
+		t.Fatalf("expected ErrTooManyGroups for more than %d groups, got: %v", MaxFilterGroups, err)
 	}
 }
 
