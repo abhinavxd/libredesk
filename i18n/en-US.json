@@ -544,6 +544,7 @@
   "filter.addGroup": "Add group",
   "filter.containsAnyOf": "contains any of",
   "filter.containsNoneOf": "contains none of",
+  "filter.removeGroup": "Remove group",
   "filter.toggleConnector": "Click to switch between and / or",
   "globals.messages.add": "Add",
   "globals.messages.addAnnouncement": "Add announcement",
