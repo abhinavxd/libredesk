@@ -743,6 +743,7 @@ export const useConversationStore = defineStore('conversation', () => {
   async function updateAssignee (type, v) {
     try {
       await api.updateAssignee(conversation.data.uuid, type, v)
+      conversation.data[`assigned_${type}_id`] = v.assignee_id
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
