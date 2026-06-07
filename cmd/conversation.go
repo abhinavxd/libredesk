@@ -354,7 +354,8 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	}
 
 	transcript := app.conversation.BuildTranscript(*conversation, messages, time.Now())
-	filename := stringutil.SanitizeFilename(fmt.Sprintf("transcript-%s.txt", conversation.ReferenceNumber))
+	safeRef := stringutil.SanitizeFilename(conversation.ReferenceNumber)
+	filename := fmt.Sprintf("transcript-%s.txt", safeRef)
 	r.RequestCtx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
 	r.RequestCtx.SetContentType("text/plain; charset=utf-8")
