@@ -283,6 +283,11 @@ func (lc *LiveChat) ReplyToAddress() string {
 	return ""
 }
 
+// FromNameTemplate is not applicable to livechat and always returns empty.
+func (lc *LiveChat) FromNameTemplate() string {
+	return ""
+}
+
 // Channel returns the channel name for this inbox.
 func (lc *LiveChat) Channel() string {
 	return ChannelLiveChat

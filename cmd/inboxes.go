@@ -410,6 +410,7 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 func trimInboxFields(inb *imodels.Inbox) error {
 	inb.Name = strings.TrimSpace(inb.Name)
 	inb.From = strings.TrimSpace(inb.From)
+	inb.FromNameTemplate = strings.TrimSpace(inb.FromNameTemplate)
 
 	// Trim email config fields if this is an email channel.
 	if inb.Channel == inbox.ChannelEmail && len(inb.Config) > 0 {

@@ -28,6 +28,25 @@
       </FormItem>
     </FormField>
 
+    <FormField v-if="showFormFields" v-slot="{ componentField }" name="from_name_template">
+      <FormItem>
+        <FormLabel>{{ $t('admin.inbox.fromNameTemplate') }}</FormLabel>
+        <FormControl>
+          <Input
+            type="text"
+            :placeholder="t('admin.inbox.fromNameTemplate.placeholder')"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          {{ $t('admin.inbox.fromNameTemplate.description') }}
+          <br />
+          {{ $t('admin.inbox.fromNameTemplate.variables') }}
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <FormField v-if="showFormFields" v-slot="{ componentField }" name="reply_to">
       <FormItem>
         <FormLabel>{{ $t('admin.inbox.replyToAddress') }}</FormLabel>
@@ -869,6 +888,7 @@ const form = useForm({
   initialValues: {
     name: '',
     from: '',
+    from_name_template: '',
     reply_to: '',
     enabled: true,
     csat_enabled: false,
