@@ -22,6 +22,7 @@ const (
 // Email represents the email inbox with multiple SMTP servers and IMAP clients.
 type Email struct {
 	id                   int
+	name                 string
 	smtpPools            []*smtppool.Pool
 	smtpPoolsMu          sync.RWMutex
 	smtpPoolsToken       string
@@ -49,6 +50,7 @@ type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
 // Opts holds the options required for the email inbox.
 type Opts struct {
 	ID                   int
+	Name                 string
 	Headers              map[string]string
 	Config               models.Config
 	Lo                   *logf.Logger
@@ -69,6 +71,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 
 	e := &Email{
 		id:                   opts.ID,
+		name:                 opts.Name,
 		headers:              opts.Headers,
 		from:                 opts.Config.From,
 		fromNameTemplate:     opts.Config.FromNameTemplate,
@@ -111,6 +114,11 @@ func (e *Email) Receive(ctx context.Context) error {
 // Close cloes email channel by closing the smtp pool
 func (e *Email) Close() error {
 	return e.closeSMTPPool()
+}
+
+// Name returns the inbox name.
+func (e *Email) Name() string {
+	return e.name
 }
 
 // FromAddress returns the from address for this inbox.

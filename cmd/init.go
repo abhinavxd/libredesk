@@ -698,6 +698,7 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 
 	inbox, err := email.New(msgStore, usrStore, email.Opts{
 		ID:                   inboxRecord.ID,
+		Name:                 inboxRecord.Name,
 		Config:               config,
 		Lo:                   initLogger("email_inbox"),
 		TokenRefreshCallback: tokenRefreshCallback,
@@ -727,6 +728,7 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 
 	inbox, err := livechat.New(msgStore, usrStore, livechat.Opts{
 		ID:            inboxRecord.ID,
+		Name:          inboxRecord.Name,
 		Config:        config,
 		Lo:            initLogger("livechat_inbox"),
 		SignAvatarURL: signAvatarURL,

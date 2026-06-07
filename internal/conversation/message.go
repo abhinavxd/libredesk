@@ -1469,7 +1469,7 @@ func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) stri
 		return from
 	}
 
-	agent, err := m.userStore.GetAgent(message.SenderID, "")
+	agent, err := m.userStore.GetAgentCachedOrLoad(message.SenderID)
 	if err != nil {
 		m.lo.Error("error fetching agent for from name template", "error", err, "sender_id", message.SenderID)
 		return from
@@ -1492,13 +1492,8 @@ func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) stri
 			LastName:  lastName,
 			FullName:  strings.TrimSpace(firstName + " " + lastName),
 		},
+		Inbox: fromNameInbox{Name: inb.Name()},
 	}
-	rec, err := m.inboxStore.GetDBRecord(message.InboxID)
-	if err != nil {
-		m.lo.Error("error fetching inbox record for from name template", "error", err, "inbox_id", message.InboxID)
-		return from
-	}
-	data.Inbox.Name = rec.Name
 
 	t, err := template.New("from").Parse(tpl)
 	if err != nil {

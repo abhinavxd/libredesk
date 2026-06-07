@@ -62,6 +62,7 @@ type Inbox interface {
 	Closer
 	Identifier
 	MessageHandler
+	Name() string
 	FromAddress() string
 	FromNameTemplate() string
 	ReplyToAddress() string
