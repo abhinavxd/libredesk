@@ -32,6 +32,11 @@
             :data-message-uuid="row.message.uuid"
             :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >
+            <DaySeparator
+              v-if="row.showDaySeparator"
+              :date="row.message.created_at"
+              class="mb-4"
+            />
             <div v-if="!row.message.private && row.message.type !== 'activity'">
               <MessageBubble
                 :message="row.message"
@@ -87,6 +92,8 @@ import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
 import { RefreshCw, Loader2 } from 'lucide-vue-next'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
+import DaySeparator from '@shared-ui/components/DaySeparator'
+import { isSameDay } from 'date-fns'
 import AssignSelfNudge from './AssignSelfNudge.vue'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
@@ -256,7 +263,10 @@ const messageRows = computed(() => {
       message,
       groupWithPrev,
       groupWithNext,
-      spacingClass: getSpacingClass(index, groupWithPrev)
+      spacingClass: getSpacingClass(index, groupWithPrev),
+      showDaySeparator:
+        index === 0 ||
+        !isSameDay(new Date(messages[index - 1].created_at), new Date(message.created_at))
     }
   })
 })
