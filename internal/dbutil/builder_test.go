@@ -140,6 +140,27 @@ func TestTooManyGroupsRejected(t *testing.T) {
 	}
 }
 
+func TestTooManyConditionsRejected(t *testing.T) {
+	leaf := `{"model":"conversations","field":"status_id","operator":"equals","value":"1"}`
+	leaves := make([]string, maxFilterConditions+1)
+	for i := range leaves {
+		leaves[i] = leaf
+	}
+	if _, _, err := build(t, `[`+strings.Join(leaves, ",")+`]`); err == nil {
+		t.Fatalf("expected error for more than %d conditions", maxFilterConditions)
+	}
+}
+
+func TestTooManyInValuesRejected(t *testing.T) {
+	vals := make([]string, maxInValues+1)
+	for i := range vals {
+		vals[i] = `"1"`
+	}
+	if _, _, err := build(t, `[{"model":"conversations","field":"status_id","operator":"in","value":"[`+strings.ReplaceAll(strings.Join(vals, ","), `"`, `\"`)+`]"}]`); err == nil {
+		t.Fatal("expected error for oversized 'in' array")
+	}
+}
+
 func TestEmptyInRejected(t *testing.T) {
 	if _, _, err := build(t, `[{"model":"conversations","field":"status_id","operator":"in","value":"[]"}]`); err == nil {
 		t.Fatal("expected error for empty 'in' array")

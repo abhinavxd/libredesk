@@ -32,6 +32,12 @@ const maxFilterDepth = 2
 // MaxFilterGroups bounds how many groups a filter may contain (excluding the root).
 const MaxFilterGroups = 10
 
+// maxFilterConditions bounds how many leaf conditions a filter may contain in total.
+const maxFilterConditions = 50
+
+// maxInValues bounds how many values an "in" condition may carry.
+const maxInValues = 100
+
 // PaginationOptions represents the options for paginating a query.
 type PaginationOptions struct {
 	Page     int
@@ -196,6 +202,20 @@ func countGroups(node FilterNode) int {
 	return n
 }
 
+func countConditions(node FilterNode) int {
+	if !node.isGroup() {
+		if node.isEmpty() {
+			return 0
+		}
+		return 1
+	}
+	n := 0
+	for _, child := range node.Rules {
+		n += countConditions(child)
+	}
+	return n
+}
+
 func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFields, renderers FieldRenderers, depth int) (string, error) {
 	if depth > maxFilterDepth {
 		return "", fmt.Errorf("filter nesting too deep")
@@ -208,6 +228,9 @@ func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFie
 		}
 		if groups > MaxFilterGroups {
 			return "", ErrTooManyGroups
+		}
+		if countConditions(node) > maxFilterConditions {
+			return "", fmt.Errorf("filter has too many conditions (max %d)", maxFilterConditions)
 		}
 	}
 
@@ -328,6 +351,9 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 		}
 		if len(arr) == 0 {
 			return "", fmt.Errorf("operator \"in\" requires at least one value")
+		}
+		if len(arr) > maxInValues {
+			return "", fmt.Errorf("operator \"in\" allows at most %d values", maxInValues)
 		}
 		placeholders := make([]string, len(arr))
 		for i, v := range arr {
