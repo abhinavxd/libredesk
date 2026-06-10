@@ -1643,31 +1643,6 @@ func (c *Manager) ValidateListFilters(filtersJSON string) error {
 	return envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.invalidFilters"), nil)
 }
 
-func renderTagFilter(operator, value string, paramIndex int) (string, []any, error) {
-	switch operator {
-	case "contains", "not contains":
-		var tagIDs []int
-		if err := json.Unmarshal([]byte(value), &tagIDs); err != nil {
-			return "", nil, fmt.Errorf("invalid tag IDs in filter: %w", err)
-		}
-		if len(tagIDs) == 0 {
-			return "", nil, nil
-		}
-		op := "IN"
-		if operator == "not contains" {
-			op = "NOT IN"
-		}
-		sql := fmt.Sprintf("conversations.id %s (SELECT DISTINCT conversation_id FROM conversation_tags WHERE tag_id = ANY($%d::int[]))", op, paramIndex)
-		return sql, []any{pq.Array(tagIDs)}, nil
-	case "set":
-		return "EXISTS (SELECT 1 FROM conversation_tags WHERE conversation_id = conversations.id)", nil, nil
-	case "not set":
-		return "NOT EXISTS (SELECT 1 FROM conversation_tags WHERE conversation_id = conversations.id)", nil, nil
-	default:
-		return "", nil, fmt.Errorf("invalid operator for tags: %s", operator)
-	}
-}
-
 // ProcessCSATStatus processes messages and adds CSAT submission status for CSAT messages.
 func (m *Manager) ProcessCSATStatus(messages []models.Message) {
 	for i := range messages {
@@ -1948,4 +1923,29 @@ func nullTimeOrNil(t null.Time) any {
 		return nil
 	}
 	return t.Time.Format(time.RFC3339)
+}
+
+func renderTagFilter(operator, value string, paramIndex int) (string, []any, error) {
+	switch operator {
+	case "contains", "not contains":
+		var tagIDs []int
+		if err := json.Unmarshal([]byte(value), &tagIDs); err != nil {
+			return "", nil, fmt.Errorf("invalid tag IDs in filter: %w", err)
+		}
+		if len(tagIDs) == 0 {
+			return "", nil, nil
+		}
+		op := "IN"
+		if operator == "not contains" {
+			op = "NOT IN"
+		}
+		sql := fmt.Sprintf("conversations.id %s (SELECT DISTINCT conversation_id FROM conversation_tags WHERE tag_id = ANY($%d::int[]))", op, paramIndex)
+		return sql, []any{pq.Array(tagIDs)}, nil
+	case "set":
+		return "EXISTS (SELECT 1 FROM conversation_tags WHERE conversation_id = conversations.id)", nil, nil
+	case "not set":
+		return "NOT EXISTS (SELECT 1 FROM conversation_tags WHERE conversation_id = conversations.id)", nil, nil
+	default:
+		return "", nil, fmt.Errorf("invalid operator for tags: %s", operator)
+	}
 }
