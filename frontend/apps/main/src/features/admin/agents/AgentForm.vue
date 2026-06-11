@@ -384,9 +384,9 @@ const isAPIKeyLoading = ref(false)
 
 onMounted(async () => {
   try {
-    const [teamsResp, rolesResp] = await Promise.allSettled([api.getTeams(), api.getRoles()])
-    teams.value = teamsResp.value.data.data
-    roles.value = rolesResp.value.data.data
+    const [teamsResp, rolesResp] = await Promise.allSettled([api.getTeamsCompact(), api.getRoles()])
+    if (teamsResp.status === 'fulfilled') teams.value = teamsResp.value.data.data
+    if (rolesResp.status === 'fulfilled') roles.value = rolesResp.value.data.data
   } catch (err) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

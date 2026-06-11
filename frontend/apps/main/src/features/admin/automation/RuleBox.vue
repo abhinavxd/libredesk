@@ -76,7 +76,7 @@
                     :key="key"
                     :value="op"
                   >
-                    {{ op }}
+                    {{ operatorLabel(op, t) }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -221,6 +221,7 @@ import { Input } from '@shared-ui/components/ui/input'
 import { useI18n } from 'vue-i18n'
 import { useConversationFilters } from '../../../composables/useConversationFilters'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
+import { operatorLabel } from '@/constants/filterConfig'
 
 const props = defineProps({
   ruleGroup: {

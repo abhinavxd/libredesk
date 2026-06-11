@@ -604,7 +604,7 @@ func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, orde
 		PageSize: pageSize,
 	}, filtersJSON, dbutil.AllowedFields{
 		"users": {"email", "created_at", "updated_at"},
-	})
+	}, nil)
 }
 
 // verifyPassword compares the provided password with the stored password hash.

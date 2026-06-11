@@ -12,7 +12,7 @@
       </DialogHeader>
       <form @submit.prevent="onSubmit">
         <div class="grid gap-4 py-4">
-          <FormField v-slot="{ componentField }" name="name">
+          <FormField v-slot="{ componentField }" name="name" :validate-on-blur="false">
             <FormItem>
               <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
               <FormControl>
@@ -33,11 +33,9 @@
             <FormItem>
               <FormLabel>{{ $t('globals.terms.filter', 2) }}</FormLabel>
               <FormControl>
-                <FilterBuilder
-                  :fields="filterFields"
-                  :showButtons="false"
-                  v-bind="componentField"
-                />
+                <div class="max-h-[50vh] overflow-y-auto pr-1">
+                  <FilterGroupBuilder :fields="filterFields" v-bind="componentField" />
+                </div>
               </FormControl>
               <FormDescription> {{ $t('view.form.filters.description') }}</FormDescription>
               <FormMessage />
@@ -55,7 +53,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, provide } from 'vue'
 import { useForm } from 'vee-validate'
 import {
   Dialog,
@@ -75,16 +73,22 @@ import {
   FormMessage
 } from '@shared-ui/components/ui/form'
 import { Input } from '@shared-ui/components/ui/input'
-import FilterBuilder from '@main/components/filter/FilterBuilder.vue'
+import FilterGroupBuilder from '@main/components/filter/FilterGroupBuilder.vue'
+import {
+  normalizeToTwoLevel,
+  serializeFilterTree,
+  deserializeFilterTree,
+  collectLeaves,
+  isPartialLeaf,
+  createRoot
+} from '@main/components/filter/filterTree'
 import { useConversationFilters } from '../../composables/useConversationFilters'
 import { toTypedSchema } from '@vee-validate/zod'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { useEmitter } from '../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { OPERATOR } from '../../constants/filterConfig.js'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'
-import { FIELD_TYPE } from '@/constants/filterConfig'
 import api from '@/api'
 
 const emitter = useEmitter()
@@ -93,6 +97,8 @@ const nameInputRef = ref(null)
 const openDialog = defineModel('openDialog', { required: false, default: false })
 watch(openDialog, (isOpen) => {
   if (isOpen) {
+    // A cancelled edit leaves the previous view in the form; reset before a fresh create.
+    if (!view.value?.id) form.resetForm()
     nextTick(() => {
       nameInputRef.value?.$el?.focus()
     })
@@ -100,11 +106,13 @@ watch(openDialog, (isOpen) => {
 })
 const view = defineModel('view', { required: false, default: {} })
 const isSubmitting = ref(false)
+const validateTick = ref(0)
+provide('filterValidateTick', validateTick)
 const { conversationsListFilters } = useConversationFilters()
 
 const filterFields = computed(() =>
   Object.entries(conversationsListFilters.value).map(([field, value]) => ({
-    model: 'conversations',
+    model: value.model || 'conversations',
     label: value.label,
     field,
     type: value.type,
@@ -120,78 +128,49 @@ const formSchema = toTypedSchema(
         required_error: t('globals.messages.required')
       })
       .min(2, { message: t('view.form.name.length') })
-      .max(30, { message: t('view.form.name.length') }),
+      .max(140, { message: t('view.form.name.length') }),
     filters: z
-      .array(
-        z.object({
-          model: z.string().optional(),
-          field: z.string().optional(),
-          operator: z.string().optional(),
-          value: z
-            .union([
-              z.string(),
-              z.number(),
-              z.boolean(),
-              z.array(z.union([z.string(), z.number()]))
-            ])
-            .optional()
-        })
-      )
-      .default([])
+      .object({
+        logic: z.string().optional(),
+        rules: z.array(z.any()).optional()
+      })
+      .passthrough()
+      .default(() => createRoot())
   })
 )
 
 const form = useForm({
-  validationSchema: formSchema
+  validationSchema: formSchema,
+  initialValues: {
+    filters: createRoot()
+  }
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
   if (isSubmitting.value) return
 
-  // Make sure at least one filter is selected
-  if (!values.filters || values.filters.length === 0) {
+  const leaves = collectLeaves(values.filters)
+  if (leaves.length === 0) {
     form.setFieldError('filters', t('view.form.filter.selectAtLeastOne'))
     return
   }
-
-  // Check for partial filters
-  const hasPartialFilters = values.filters.some(
-    (f) =>
-      !f.field ||
-      !f.operator ||
-      (![OPERATOR.SET, OPERATOR.NOT_SET].includes(f.operator) &&
-        (!f.value || (Array.isArray(f.value) && f.value.length === 0)))
-  )
-  if (hasPartialFilters) {
-    form.setFieldError('filters', t('view.form.filter.partiallyFilled'))
+  if (leaves.some(isPartialLeaf)) {
+    validateTick.value++
     return
   }
 
   isSubmitting.value = true
 
   try {
-    // Serialize array values to JSON strings for backend
-    if (values.filters) {
-      values.filters = values.filters.map((filter) => {
-        if (Array.isArray(filter.value)) {
-          // Convert string IDs to numbers for backend (tags use string IDs in frontend)
-          const numericValues = filter.value.map((v) => {
-            const num = Number(v)
-            return isNaN(num) ? v : num
-          })
-          return { ...filter, value: JSON.stringify(numericValues) }
-        }
-        return filter
-      })
-    }
+    const payload = { ...values, filters: serializeFilterTree(values.filters) }
 
-    if (values.id) {
-      await api.updateView(values.id, values)
+    if (payload.id) {
+      await api.updateView(payload.id, payload)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         description: t('globals.messages.savedSuccessfully')
       })
     } else {
-      await api.createView(values)
+      await api.createView(payload)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         description: t('globals.messages.savedSuccessfully')
       })
@@ -209,33 +188,15 @@ const onSubmit = form.handleSubmit(async (values) => {
   }
 })
 
-// Set form values when view prop changes
 watch(
   () => view.value,
   (newVal) => {
     if (newVal && Object.keys(newVal).length) {
-      // Deserialize multi-select filter values from JSON strings to arrays
       const processedVal = { ...newVal }
-      if (processedVal.filters) {
-        processedVal.filters = processedVal.filters.map((filter) => {
-          // Multi-select fields need to be deserialized from JSON strings
-          const field = filterFields.value.find((f) => f.field === filter.field)
-          const isMultiSelectField = field?.type === FIELD_TYPE.MULTI_SELECT
-
-          if (isMultiSelectField && typeof filter.value === 'string') {
-            try {
-              const parsed = JSON.parse(filter.value)
-              // Convert numbers back to strings (frontend uses string IDs)
-              const stringValues = Array.isArray(parsed) ? parsed.map((v) => String(v)) : parsed
-              return { ...filter, value: stringValues }
-            } catch (e) {
-              // If parsing fails, return as-is
-              return filter
-            }
-          }
-          return filter
-        })
-      }
+      processedVal.filters = deserializeFilterTree(
+        normalizeToTwoLevel(newVal.filters),
+        filterFields.value
+      )
       form.setValues(processedVal)
     }
   },
