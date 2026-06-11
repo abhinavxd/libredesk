@@ -3,6 +3,9 @@ export const LOGIC = {
     OR: 'OR'
 }
 
+// Mirrors dbutil.MaxFilterGroups on the backend.
+export const MAX_FILTER_GROUPS = 10
+
 export const FIELD_TYPE = {
     SELECT: 'select',
     TAG: 'tag',
