@@ -49,14 +49,14 @@
           <template v-if="modelValue.operator !== OPERATOR.SET && modelValue.operator !== OPERATOR.NOT_SET">
             <SelectTag
               v-if="fieldType === FIELD_TYPE.MULTI_SELECT"
-              v-model="modelValue.value"
+              v-model="leafValue"
               :items="fieldOptions"
               :placeholder="t('placeholders.selectTags')"
             />
 
             <SelectComboBox
               v-else-if="fieldOptions.length > 0 && modelValue.field === 'assigned_user_id'"
-              v-model="modelValue.value"
+              v-model="leafValue"
               :items="fieldOptions"
               :placeholder="t('placeholders.selectValue')"
               type="user"
@@ -64,7 +64,7 @@
 
             <SelectComboBox
               v-else-if="fieldOptions.length > 0 && modelValue.field === 'assigned_team_id'"
-              v-model="modelValue.value"
+              v-model="leafValue"
               :items="fieldOptions"
               :placeholder="t('placeholders.selectValue')"
               type="team"
@@ -72,18 +72,18 @@
 
             <SelectComboBox
               v-else-if="fieldOptions.length > 0"
-              v-model="modelValue.value"
+              v-model="leafValue"
               :items="fieldOptions"
               :placeholder="t('placeholders.selectValue')"
             />
 
             <DateFilterValue
               v-else-if="fieldType === FIELD_TYPE.DATE"
-              v-model="modelValue.value"
+              v-model="leafValue"
               :range="modelValue.operator === OPERATOR.BETWEEN"
             />
 
-            <Input v-else v-model="modelValue.value" :placeholder="t('globals.terms.value')" type="text" />
+            <Input v-else v-model="leafValue" :placeholder="t('globals.terms.value')" type="text" />
           </template>
         </div>
       </div>
@@ -157,19 +157,32 @@ watch(validateTick, async () => {
 })
 onUnmounted(() => clearTimeout(shakeTimer))
 
+// All edits emit a fresh leaf; the tree is never mutated in place.
+const patch = (changes) => {
+  modelValue.value = { ...modelValue.value, ...changes }
+}
+
+const leafValue = computed({
+  get: () => modelValue.value.value,
+  set: (value) => patch({ value })
+})
+
 const onFieldChange = (field) => {
   const config = props.fields.find((f) => f.field === field)
-  modelValue.value.field = field
-  modelValue.value.model = config?.model || ''
-  modelValue.value.operator = ''
-  modelValue.value.value = config?.type === FIELD_TYPE.MULTI_SELECT ? [] : ''
+  patch({
+    field,
+    model: config?.model || '',
+    operator: '',
+    value: config?.type === FIELD_TYPE.MULTI_SELECT ? [] : ''
+  })
 }
 
 const onOperatorChange = (operator) => {
   if (modelValue.value.operator === operator) return
   if (modelValue.value.operator === OPERATOR.BETWEEN || operator === OPERATOR.BETWEEN) {
-    modelValue.value.value = ''
+    patch({ operator, value: '' })
+    return
   }
-  modelValue.value.operator = operator
+  patch({ operator })
 }
 </script>

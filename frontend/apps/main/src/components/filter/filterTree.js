@@ -12,6 +12,17 @@ export const createRoot = (logic = LOGIC.AND) => ({ __id: uid(), logic, rules: [
 export const isGroupNode = (node) =>
   !!node && (Array.isArray(node.rules) || typeof node.logic === 'string')
 
+// Strict two-level shape: an object root holding only groups, each group holding only leaves.
+export const isStrictTwoLevel = (node) =>
+  !!node &&
+  typeof node === 'object' &&
+  !Array.isArray(node) &&
+  Array.isArray(node.rules) &&
+  node.rules.length > 0 &&
+  node.rules.every(
+    (g) => isGroupNode(g) && Array.isArray(g.rules) && g.rules.every((r) => !isGroupNode(r))
+  )
+
 export const collectLeaves = (node) =>
   isGroupNode(node) ? (node.rules || []).flatMap(collectLeaves) : [node]
 
