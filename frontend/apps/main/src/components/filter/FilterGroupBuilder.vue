@@ -13,7 +13,13 @@
       />
     </template>
 
-    <Button type="button" variant="outline" size="sm" @click.stop="addGroup">
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      :disabled="modelValue.rules.length >= MAX_FILTER_GROUPS"
+      @click.stop="addGroup"
+    >
       <Plus class="w-3 h-3 mr-1" />
       {{ t('filter.addGroup') }}
     </Button>
@@ -33,6 +39,7 @@ import {
   normalizeToTwoLevel,
   isStrictTwoLevel
 } from '@/components/filter/filterTree'
+import { MAX_FILTER_GROUPS } from '@/constants/filterConfig'
 
 // vee-validate's componentField carries onInput/onChange listeners; without this they fall
 // through to the root div and bubbled keystrokes overwrite the whole filters value.
@@ -63,6 +70,7 @@ const updateGroup = (index, group) => {
 }
 
 const addGroup = () => {
+  if (modelValue.value.rules.length >= MAX_FILTER_GROUPS) return
   modelValue.value = { ...modelValue.value, rules: [...modelValue.value.rules, createGroup()] }
 }
 
