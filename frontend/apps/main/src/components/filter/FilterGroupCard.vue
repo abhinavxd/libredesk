@@ -13,8 +13,17 @@
     </div>
 
     <template v-for="(rule, index) in group.rules" :key="rule.__id">
-      <ConnectorToggle v-if="index > 0" v-model:modelValue="group.logic" />
-      <FilterRow v-model:modelValue="group.rules[index]" :fields="fields" @remove="removeRule(index)" />
+      <ConnectorToggle
+        v-if="index > 0"
+        :modelValue="group.logic"
+        @update:modelValue="setLogic"
+      />
+      <FilterRow
+        :modelValue="rule"
+        :fields="fields"
+        @update:modelValue="updateRule(index, $event)"
+        @remove="removeRule(index)"
+      />
     </template>
 
     <Button
@@ -46,9 +55,24 @@ const emit = defineEmits(['remove'])
 const group = defineModel('modelValue', { required: true })
 const { t } = useI18n()
 
-const addCondition = () => group.value.rules.push(createLeaf())
+const setLogic = (logic) => {
+  group.value = { ...group.value, logic }
+}
+
+const updateRule = (index, rule) => {
+  group.value = { ...group.value, rules: group.value.rules.map((r, i) => (i === index ? rule : r)) }
+}
+
+const addCondition = () => {
+  group.value = { ...group.value, rules: [...group.value.rules, createLeaf()] }
+}
+
 const removeRule = (index) => {
-  group.value.rules.splice(index, 1)
-  if (group.value.rules.length === 0) emit('remove')
+  const rules = group.value.rules.filter((_, i) => i !== index)
+  if (rules.length === 0) {
+    emit('remove')
+    return
+  }
+  group.value = { ...group.value, rules }
 }
 </script>

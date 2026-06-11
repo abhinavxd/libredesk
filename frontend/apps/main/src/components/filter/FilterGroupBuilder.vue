@@ -2,12 +2,13 @@
   <div class="space-y-2">
     <template v-for="(grp, gi) in modelValue.rules" :key="grp.__id">
       <div v-if="gi > 0" class="flex justify-center">
-        <ConnectorToggle v-model:modelValue="modelValue.logic" />
+        <ConnectorToggle :modelValue="modelValue.logic" @update:modelValue="setLogic" />
       </div>
       <FilterGroupCard
-        v-model:modelValue="modelValue.rules[gi]"
+        :modelValue="grp"
         :fields="fields"
         :canRemove="modelValue.rules.length > 1"
+        @update:modelValue="updateGroup(gi, $event)"
         @remove="removeGroup(gi)"
       />
     </template>
@@ -20,35 +21,54 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { watch } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Plus } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import FilterGroupCard from '@/components/filter/FilterGroupCard.vue'
 import ConnectorToggle from '@/components/filter/ConnectorToggle.vue'
-import { createRoot, createGroup, normalizeToTwoLevel, isGroupNode } from '@/components/filter/filterTree'
+import {
+  createRoot,
+  createGroup,
+  normalizeToTwoLevel,
+  isStrictTwoLevel
+} from '@/components/filter/filterTree'
 
+// vee-validate's componentField carries onInput/onChange listeners; without this they fall
+// through to the root div and bubbled keystrokes overwrite the whole filters value.
+defineOptions({ inheritAttrs: false })
 defineProps({
   fields: { type: Array, required: true }
 })
 const modelValue = defineModel('modelValue', { default: () => createRoot() })
 const { t } = useI18n()
 
-onMounted(() => {
-  const v = modelValue.value
-  const isStrictTwoLevel =
-    v &&
-    typeof v === 'object' &&
-    !Array.isArray(v) &&
-    Array.isArray(v.rules) &&
-    v.rules.length > 0 &&
-    v.rules.every((g) => isGroupNode(g) && Array.isArray(g.rules) && g.rules.every((r) => !isGroupNode(r)))
-  if (!isStrictTwoLevel) modelValue.value = normalizeToTwoLevel(v)
-})
+watch(
+  modelValue,
+  (v) => {
+    if (!isStrictTwoLevel(v)) modelValue.value = normalizeToTwoLevel(v)
+  },
+  { immediate: true }
+)
 
-const addGroup = () => modelValue.value.rules.push(createGroup())
+const setLogic = (logic) => {
+  modelValue.value = { ...modelValue.value, logic }
+}
+
+const updateGroup = (index, group) => {
+  modelValue.value = {
+    ...modelValue.value,
+    rules: modelValue.value.rules.map((g, i) => (i === index ? group : g))
+  }
+}
+
+const addGroup = () => {
+  modelValue.value = { ...modelValue.value, rules: [...modelValue.value.rules, createGroup()] }
+}
+
 const removeGroup = (index) => {
-  modelValue.value.rules.splice(index, 1)
-  if (modelValue.value.rules.length === 0) modelValue.value.rules.push(createGroup())
+  let rules = modelValue.value.rules.filter((_, i) => i !== index)
+  if (rules.length === 0) rules = [createGroup()]
+  modelValue.value = { ...modelValue.value, rules }
 }
 </script>

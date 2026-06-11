@@ -97,6 +97,8 @@ const nameInputRef = ref(null)
 const openDialog = defineModel('openDialog', { required: false, default: false })
 watch(openDialog, (isOpen) => {
   if (isOpen) {
+    // A cancelled edit leaves the previous view in the form; reset before a fresh create.
+    if (!view.value?.id) form.resetForm()
     nextTick(() => {
       nameInputRef.value?.$el?.focus()
     })
