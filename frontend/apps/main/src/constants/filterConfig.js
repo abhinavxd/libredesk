@@ -48,6 +48,8 @@ export const FIELD_OPERATORS = {
         OPERATOR.CONTAINS,
         OPERATOR.NOT_CONTAINS
     ],
+    // For text columns that do not support partial matching, only allow exact match operators.
+    TEXT_EXACT: [OPERATOR.EQUALS, OPERATOR.NOT_EQUALS, OPERATOR.SET, OPERATOR.NOT_SET],
     DATE: [
         OPERATOR.EQUALS,
         OPERATOR.NOT_EQUALS,
