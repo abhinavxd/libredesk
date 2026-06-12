@@ -4,8 +4,7 @@ The open-source customer support platform you actually own. One inbox for email,
 
 ## Near Term
 - WhatsApp channel - WIP
-- Conversation transcript download - WIP
-- Extend view filters (https://github.com/abhinavxd/libredesk/issues/344) - WIP
+- Telegram channel - WIP
 - Contact merging - TODO
 - Deletable private notes - TODO
 - Help center with articles - TODO
