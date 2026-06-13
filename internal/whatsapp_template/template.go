@@ -160,7 +160,9 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 	if err != nil {
 		m.lo.Error("error resolving whatsapp account for template submit", "inbox_id", stored.InboxID, "error", err)
 		reason := "could not resolve WhatsApp account for submission"
-		_, _ = m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, reason)
+		if _, err := m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, reason); err != nil {
+			m.lo.Error("error persisting template rejected status", "id", stored.ID, "error", err)
+		}
 		stored.Status = models.StatusRejected
 		stored.RejectionReason = null.StringFrom(reason)
 		return stored, nil
@@ -170,7 +172,9 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 	if err != nil {
 		m.lo.Error("error building template submission", "id", stored.ID, "error", err)
 		reason := "could not build template submission: " + err.Error()
-		_, _ = m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, reason)
+		if _, err := m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, reason); err != nil {
+			m.lo.Error("error persisting template rejected status", "id", stored.ID, "error", err)
+		}
 		stored.Status = models.StatusRejected
 		stored.RejectionReason = null.StringFrom(reason)
 		return stored, nil
@@ -179,7 +183,9 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 	metaID, submitErr := m.client.SubmitTemplate(ctx, acc, submission)
 	if submitErr != nil {
 		m.lo.Error("error submitting template to meta", "id", stored.ID, "error", submitErr)
-		_, _ = m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, submitErrReason(submitErr))
+		if _, err := m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, submitErrReason(submitErr)); err != nil {
+			m.lo.Error("error persisting template rejected status", "id", stored.ID, "error", err)
+		}
 		stored.Status = models.StatusRejected
 		stored.RejectionReason = null.StringFrom(submitErrReason(submitErr))
 		return stored, nil

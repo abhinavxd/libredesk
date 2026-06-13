@@ -62,7 +62,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 import DownloadLink from '@/components/DownloadLink.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
@@ -83,6 +83,13 @@ const emit = defineEmits(['preview'])
 
 const showAudio = ref(false)
 const thumbFailed = ref(false)
+
+watch(
+  () => props.attachment.url,
+  () => {
+    thumbFailed.value = false
+  }
+)
 
 const shortName = (name) => (name || '').substring(0, 40)
 

@@ -173,14 +173,17 @@ const columns = [
   }
 ]
 
+let fetchToken = 0
 const fetchTemplates = async () => {
   if (!selectedInboxID.value) {
     templates.value = []
     return
   }
+  const token = ++fetchToken
   try {
     isLoading.value = true
     const resp = await api.getWhatsAppTemplates(selectedInboxID.value)
+    if (token !== fetchToken) return
     templates.value = resp.data.data
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -188,7 +191,7 @@ const fetchTemplates = async () => {
       description: handleHTTPError(error).message
     })
   } finally {
-    isLoading.value = false
+    if (token === fetchToken) isLoading.value = false
   }
 }
 

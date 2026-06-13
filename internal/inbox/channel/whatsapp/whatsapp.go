@@ -93,6 +93,9 @@ func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 	if opts.Config.PhoneNumberID == "" || opts.Config.AccessToken == "" {
 		return nil, fmt.Errorf("phone_number_id and access_token are required")
 	}
+	if opts.Lo == nil {
+		return nil, fmt.Errorf("logger is required")
+	}
 	return &WhatsApp{
 		id:            opts.ID,
 		config:        opts.Config,
