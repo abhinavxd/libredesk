@@ -39,6 +39,14 @@
           :available-languages="availableLanguages"
         />
       </div>
+      <div v-else-if="selectedChannel === 'twitter'">
+        <TwitterInboxForm
+          :initial-values="{}"
+          :submitForm="submitTwitterForm"
+          :isLoading="isLoading"
+          :isNewForm="true"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -48,10 +56,15 @@ import { ref, onMounted } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
-import { Mail, MessageCircle } from 'lucide-vue-next'
+import { AtSign, Mail, MessageCircle } from 'lucide-vue-next'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
+import TwitterInboxForm from '@/features/admin/inbox/TwitterInboxForm.vue'
+import {
+  parseTwitterActivityEventTypes,
+  parseTwitterStreamRules
+} from '@/features/admin/inbox/twitterFormSchema.js'
 import api from '../../../api'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
@@ -83,6 +96,10 @@ const selectLiveChatChannel = () => {
   selectChannel('livechat')
 }
 
+const selectTwitterChannel = () => {
+  selectChannel('twitter')
+}
+
 const channels = [
   {
     title: t('globals.terms.email'),
@@ -95,6 +112,13 @@ const channels = [
     subTitle: t('admin.inbox.createLiveChatInbox'),
     onClick: selectLiveChatChannel,
     icon: MessageCircle,
+    badge: t('globals.terms.beta')
+  },
+  {
+    title: 'X (Twitter)',
+    subTitle: 'Receive and reply to DMs and public mentions.',
+    onClick: selectTwitterChannel,
+    icon: AtSign,
     badge: t('globals.terms.beta')
   }
 ]
@@ -143,6 +167,45 @@ const submitLiveChatForm = (values) => {
     secret: values.secret ?? '',
     linked_email_inbox_id: values.linked_email_inbox_id ?? null,
     config: values.config
+  }
+  createInbox(payload)
+}
+
+const submitTwitterForm = (values) => {
+  const payload = {
+    name: values.name,
+    from: values.screen_name,
+    channel: 'twitter',
+    enabled: values.enabled ?? true,
+    csat_enabled: values.csat_enabled ?? false,
+    prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
+    config: {
+      account_user_id: values.account_user_id,
+      screen_name: values.screen_name,
+      auth_type: values.auth_type,
+      oauth: values.oauth,
+      provider: values.provider,
+      base_url: values.base_url,
+      delivery_mode: values.delivery_mode,
+      filtered_stream: {
+        rules: parseTwitterStreamRules(values.filtered_stream_rules_json)
+      },
+      webhook: {
+        id: values.webhook_id,
+        url: values.webhook_url,
+        consumer_secret: values.webhook_consumer_secret
+      },
+      activity: {
+        subscription_id: values.activity_subscription_id,
+        event_types: parseTwitterActivityEventTypes(values.activity_event_types)
+      },
+      ingest_dms: values.ingest_dms,
+      ingest_mentions: values.ingest_mentions,
+      poll_interval: values.poll_interval,
+      scan_since: values.scan_since,
+      dm_cursor: values.dm_cursor,
+      mentions_cursor: values.mentions_cursor
+    }
   }
   createInbox(payload)
 }

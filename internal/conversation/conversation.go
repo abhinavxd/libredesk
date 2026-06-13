@@ -261,6 +261,7 @@ func New(
 type queries struct {
 	// Conversation queries.
 	GetConversationUUID                *sqlx.Stmt `query:"get-conversation-uuid"`
+	GetConversationByTwitterThread     *sqlx.Stmt `query:"get-conversation-by-twitter-thread"`
 	GetConversation                    *sqlx.Stmt `query:"get-conversation"`
 	GetConversationListItem            *sqlx.Stmt `query:"get-conversation-list-item"`
 	GetConversationsCreatedAfter       *sqlx.Stmt `query:"get-conversations-created-after"`

@@ -4,7 +4,7 @@
       <p class="sidebar-label">{{ $t('globals.terms.inbox', 1) }}</p>
       <div class="flex items-center gap-1.5">
         <component
-          :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
+          :is="channelIcon"
           class="size-3.5 text-muted-foreground flex-shrink-0"
         />
         <p class="sidebar-value break-all">{{ conversation.inbox_name }}</p>
@@ -135,7 +135,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { format } from 'date-fns'
-import { Mail, MessageSquare } from 'lucide-vue-next'
+import { AtSign, Mail, MessageSquare } from 'lucide-vue-next'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 import { useConversationStore } from '../../../stores/conversation'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
@@ -156,6 +156,11 @@ customAttributeStore.fetchCustomAttributes()
 
 const feedbackExpanded = ref(false)
 const isFeedbackLong = computed(() => (conversation.value?.csat_feedback?.length || 0) > 160)
+const channelIcon = computed(() => {
+  if (conversation.value?.inbox_channel === 'livechat') return MessageSquare
+  if (conversation.value?.inbox_channel === 'twitter') return AtSign
+  return Mail
+})
 
 const updateCustomAttributes = async (attributes) => {
   let previousAttributes = conversationStore.current.custom_attributes

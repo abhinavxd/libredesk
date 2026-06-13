@@ -81,6 +81,16 @@ func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email stri
 	return nil
 }
 
+// GetContactExternalID returns a contact's external user ID.
+func (u *Manager) GetContactExternalID(id int) (string, error) {
+	var externalID string
+	if err := u.q.GetContactExternalID.Get(&externalID, id); err != nil {
+		u.lo.Error("error fetching contact external user ID", "id", id, "error", err)
+		return "", fmt.Errorf("fetching contact external user ID: %w", err)
+	}
+	return externalID, nil
+}
+
 func (u *Manager) UpdateContact(id int, user models.User) error {
 	if _, err := u.q.UpdateContact.Exec(id, user.FirstName, user.LastName, user.Email, user.AvatarURL, user.PhoneNumber, user.PhoneNumberCountryCode, user.Country); err != nil {
 		if dbutil.IsUniqueViolationError(err) {

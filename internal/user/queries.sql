@@ -189,6 +189,11 @@ SELECT id FROM users
 WHERE email = $1 AND type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL
 LIMIT 1;
 
+-- name: get-contact-external-id
+SELECT COALESCE(external_user_id, '') FROM users
+WHERE id = $1 AND type = 'contact' AND deleted_at IS NULL
+LIMIT 1;
+
 -- name: is-email-blocked
 SELECT EXISTS(
     SELECT 1 FROM users
