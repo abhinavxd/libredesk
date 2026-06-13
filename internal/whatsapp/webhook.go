@@ -1,6 +1,7 @@
 package whatsapp
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -128,7 +129,9 @@ type WebhookError struct {
 // ParsePayload deserializes the webhook body.
 func ParsePayload(body []byte) (*WebhookPayload, error) {
 	var p WebhookPayload
-	if err := json.Unmarshal(body, &p); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if err := dec.Decode(&p); err != nil {
 		return nil, fmt.Errorf("decoding webhook payload: %w", err)
 	}
 	return &p, nil

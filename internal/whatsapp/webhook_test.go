@@ -135,6 +135,31 @@ func TestExtractTemplateStatusUpdate(t *testing.T) {
 	}
 }
 
+func TestExtractTemplateStatusUpdate_LargeID(t *testing.T) {
+	body := []byte(`{
+		"entry": [{
+			"id": "WABA-1",
+			"changes": [{
+				"field": "message_template_status_update",
+				"value": {
+					"event": "APPROVED",
+					"message_template_id": 123456789012345678,
+					"message_template_name": "order_status",
+					"message_template_language": "en_US"
+				}
+			}]
+		}]
+	}`)
+	p, err := ParsePayload(body)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	ts := p.ExtractTemplateStatusUpdates()
+	if len(ts) != 1 || ts[0].MetaTemplateID != "123456789012345678" {
+		t.Fatalf("large template id lost precision: %+v", ts)
+	}
+}
+
 // wrapValue wraps a single change "value" object in the full webhook envelope and parses it.
 func wrapValue(t *testing.T, valueJSON string) *WebhookPayload {
 	t.Helper()
