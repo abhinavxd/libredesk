@@ -743,7 +743,9 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		if value, ok := cfg[fieldName].(string); ok && crypto.IsEncrypted(value) {
 			decrypted, err := crypto.Decrypt(value, m.encryptionKey)
 			if err != nil {
-				return nil, fmt.Errorf("decrypting whatsapp %s: %w", fieldName, err)
+				m.lo.Error("error decrypting whatsapp credential, clearing field", "field", fieldName, "error", err)
+				cfg[fieldName] = ""
+				continue
 			}
 			cfg[fieldName] = decrypted
 		}

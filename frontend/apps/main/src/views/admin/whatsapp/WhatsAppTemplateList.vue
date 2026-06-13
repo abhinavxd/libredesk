@@ -150,7 +150,11 @@ const columns = [
   {
     accessorKey: 'updated_at',
     header: () => h('div', t('globals.terms.updatedAt')),
-    cell: ({ row }) => format(new Date(row.getValue('updated_at')), 'PPpp')
+    cell: ({ row }) => {
+      const value = row.getValue('updated_at')
+      const date = value ? new Date(value) : null
+      return date && !isNaN(date.getTime()) ? format(date, 'PPpp') : ''
+    }
   },
   {
     id: 'actions',

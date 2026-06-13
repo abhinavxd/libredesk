@@ -403,7 +403,7 @@ const createWhatsAppTemplate = (data) =>
   })
 const deleteWhatsAppTemplate = (id) => http.delete(`/api/v1/whatsapp/templates/${id}`)
 const syncWhatsAppTemplates = (inboxId) =>
-  http.post(`/api/v1/whatsapp/templates/sync?inbox_id=${inboxId}`)
+  http.post(`/api/v1/whatsapp/templates/sync?inbox_id=${inboxId}`, {})
 const saveDraft = (uuid, data) =>
   http.post(`/api/v1/conversations/${uuid}/draft`, data, {
     headers: {

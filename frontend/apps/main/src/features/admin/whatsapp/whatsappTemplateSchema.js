@@ -31,3 +31,12 @@ export const createFormSchema = (t) =>
       .optional(),
     sample_values: z.record(z.string(), z.string()).optional()
   })
+    .superRefine((data, ctx) => {
+      if (data.header_type === 'TEXT' && !data.header_content?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['header_content'],
+          message: t('globals.messages.required')
+        })
+      }
+    })

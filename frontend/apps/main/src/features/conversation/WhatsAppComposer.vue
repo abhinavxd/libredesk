@@ -254,6 +254,7 @@ const renderedPreview = computed(() => {
 const openTemplatePicker = async () => {
   pickerOpen.value = true
   selectedTemplate.value = null
+  templates.value = []
   Object.keys(templateParams).forEach((k) => delete templateParams[k])
 
   const inboxID = conversationStore.current?.inbox_id
