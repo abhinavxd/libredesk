@@ -161,7 +161,7 @@
                 var g = parseInt(hex.substring(2, 4), 16) / 255;
                 var b = parseInt(hex.substring(4, 6), 16) / 255;
                 var L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-                return L > 0.179 ? '#000000' : '#ffffff';
+                return L > 0.5 ? '#000000' : '#ffffff';
             } catch (e) {
                 return '#ffffff';
             }
@@ -206,7 +206,33 @@
                     border-radius: 50%;
                     object-fit: cover;
                 `;
-                this.iconContainer.appendChild(this.defaultIcon);
+              this.iconContainer.appendChild(this.defaultIcon);
+            } else {
+              this.defaultIcon = document.createElement('div');
+              this.defaultIcon.style.cssText = `
+                  display: flex;
+                  width: 100%;
+                  height: 100%;
+                  border-radius: 50%;
+                  justify-content: center;
+                  align-items: center;
+              `;
+              const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              svg.setAttribute('width', '24');
+              svg.setAttribute('height', '24');
+              svg.setAttribute('viewBox', '0 0 24 24');
+              svg.setAttribute('fill', 'none');
+              const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+              // New path drawing a standard chat bubble icon
+              path.setAttribute('d', 'M12 3c5.523 0 10 3.582 10 8s-4.477 8-10 8c-1.164 0-2.277-.16-3.303-.454L4 21l.592-3.55C2.983 15.897 2 13.557 2 11c0-4.418 4.477-8 10-8z');
+
+              path.setAttribute('stroke', this.contrastColor(launcher.color || colors.primary));
+              path.setAttribute('stroke-width', '2');
+              path.setAttribute('stroke-linecap', 'round');
+              path.setAttribute('stroke-linejoin', 'round');
+              svg.appendChild(path);
+              this.defaultIcon.appendChild(svg);
+              this.iconContainer.appendChild(this.defaultIcon);
             }
 
             this.arrowIcon = document.createElement('div');

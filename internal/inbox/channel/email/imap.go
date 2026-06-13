@@ -110,7 +110,7 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		}
 	}
 
-	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: true}).Wait(); err != nil {
+	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: false}).Wait(); err != nil {
 		return fmt.Errorf("error selecting mailbox: %w", err)
 	}
 
@@ -125,7 +125,7 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		return fmt.Errorf("error searching messages: %w", err)
 	}
 
-	return e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier())
+	return e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier(), cfg.ExpungeInbox)
 }
 
 // searchMessages searches for messages in the specified time range.
@@ -133,6 +133,7 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*imap.SearchData, error) {
 	criteria := &imap.SearchCriteria{
 		Since: since,
+		NotFlag: []imap.Flag{imap.FlagDeleted},
 	}
 
 	// Attempt ESEARCH if server supports it
@@ -156,7 +157,7 @@ func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*ima
 }
 
 // fetchAndProcessMessages fetches and processes messages based on the search results.
-func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.Client, searchResults *imap.SearchData, inboxID int) error {
+func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.Client, searchResults *imap.SearchData, inboxID int, expungeOption bool) error {
 	seqSet := imap.SeqSet{}
 	if searchResults.Min > 0 && searchResults.Max > 0 {
 		e.lo.Debug("using ESEARCH range", "min", searchResults.Min, "max", searchResults.Max, "inbox_id", inboxID)
@@ -173,6 +174,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 	// Fetch envelope and headers needed for auto-reply detection.
 	fetchOptions := &imap.FetchOptions{
 		Envelope: true,
+		UID: true,
 		BodySection: []*imap.FetchItemBodySection{
 			{
 				Specifier: imap.PartSpecifierHeader,
@@ -184,6 +186,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 				},
 			},
 		},
+		Flags: true,
 	}
 
 	// Collect messages to process later.
@@ -193,6 +196,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		autoReply          bool
 		isLoop             bool
 		extractedMessageID string
+		uid                imap.UID
 	}
 	var messages []msgData
 
@@ -228,6 +232,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			autoReply          bool
 			isLoop             bool
 			extractedMessageID string
+			currentUID		   imap.UID
 		)
 		// Process all fetch items for the current message.
 		for {
@@ -245,6 +250,13 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 				break
 			}
 
+			// getting the UID for Expunge operation
+			if uidData, ok := item.(imapclient.FetchItemDataUID); ok {
+				// uidData.UID holds the exact ID you need!
+				// Save it to a local variable to append to your messages slice later
+				currentUID = uidData.UID 
+			}
+			
 			// Body section.
 			if bs, ok := item.(imapclient.FetchItemDataBodySection); ok && bs.Literal != nil {
 				envelope, err := enmime.ReadEnvelope(bs.Literal)
@@ -275,8 +287,10 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			continue
 		}
 
-		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID})
+		messages = append(messages, msgData{uid: currentUID, env: env, seqNum: msg.SeqNum, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID})
 	}
+
+	var uidsToDelete imap.UIDSet
 
 	// Now process each collected message.
 	for _, msgData := range messages {
@@ -302,6 +316,31 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		// Process the envelope.
 		if err := e.processEnvelope(ctx, client, msgData.env, msgData.seqNum, inboxID, msgData.extractedMessageID); err != nil && err != context.Canceled {
 			e.lo.Error("error processing envelope", "error", err)
+		} else {
+			if expungeOption {
+				// If deletion is enabled, add the message to the delete list
+				fmt.Printf("Add UID to Expunge %d\n", msgData.uid)
+				uidsToDelete.AddNum(msgData.uid)
+			}
+		}
+
+	}
+	fmt.Printf("UIDs to delete: %s\n", uidsToDelete.String())
+	// Batch delete messages from server
+	if len(uidsToDelete) > 0 && expungeOption {
+		numSet := imap.NumSet(uidsToDelete)
+		storeCmd := client.Store(numSet, &imap.StoreFlags{
+			Op: imap.StoreFlagsAdd,
+			Flags: []imap.Flag{imap.FlagDeleted},
+		}, nil)
+		if err := storeCmd.Close(); err == nil {
+			e.lo.Info("EXPUNGE", "email", "Expunging email")
+			expungeCmd := client.Expunge()
+			if err := expungeCmd.Close(); err != nil {
+				e.lo.Error("error expunging messages", "error", err)
+			}
+		} else {
+			e.lo.Error("error marking messages as deleted", "error", err)
 		}
 	}
 

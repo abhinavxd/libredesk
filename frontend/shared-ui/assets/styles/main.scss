@@ -211,7 +211,7 @@
 }
 
 .message-bubble {
-  @apply flex flex-col px-4 pt-2 pb-3 w-fit min-w-[30%] max-w-full border overflow-x-auto rounded shadow-sm;
+  @apply flex flex-col px-4 pt-2 pb-3 w-full min-w-[30%] max-w-full border overflow-x-auto rounded shadow-sm;
   overflow-wrap: break-all;
 
   * {
@@ -374,4 +374,15 @@
  */
 [data-state="collapsed"][data-collapsible="offcanvas"] .sidebar-secondary {
   left: calc((var(--sidebar-width) + 3.5rem) * -1.4) !important;
+}
+
+.message-outgoing{
+    background: inherit;
+}
+.message-incoming{
+    border: 4px solid #a0b8c8;
+}
+
+.dark .message-incoming{
+    background: #323a48;
 }

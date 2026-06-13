@@ -275,6 +275,8 @@
   "admin.inbox.fromNameTemplate.invalidTemplate": "Invalid template. Use only the supported variables and balanced braces.",
   "admin.inbox.skipTLSVerification": "Skip TLS Verification",
   "admin.inbox.skipTLSVerification.description": "Skip hostname check on the TLS certificate.",
+  "admin.inbox.expungeInbox": "Expunge Server after Importing",
+  "admin.inbox.expungeInbox.description": "Delete emails from server after importing into Libredesk",
   "admin.inbox.smtpConfig": "SMTP Configuration",
   "admin.inbox.tls.description": "TLS/SSL encryption, STARTTLS is commonly used.",
   "admin.inbox.waitTimeout": "Wait Timeout",
