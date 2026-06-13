@@ -159,12 +159,20 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 	acc, err := m.resolver.WhatsAppAccount(stored.InboxID)
 	if err != nil {
 		m.lo.Error("error resolving whatsapp account for template submit", "inbox_id", stored.InboxID, "error", err)
+		reason := "could not resolve WhatsApp account for submission"
+		_, _ = m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, reason)
+		stored.Status = models.StatusRejected
+		stored.RejectionReason = null.StringFrom(reason)
 		return stored, nil
 	}
 
 	submission, err := buildSubmission(stored)
 	if err != nil {
 		m.lo.Error("error building template submission", "id", stored.ID, "error", err)
+		reason := "could not build template submission: " + err.Error()
+		_, _ = m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, reason)
+		stored.Status = models.StatusRejected
+		stored.RejectionReason = null.StringFrom(reason)
 		return stored, nil
 	}
 

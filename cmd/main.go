@@ -244,9 +244,6 @@ func main() {
 	waTemplates := initWhatsAppTemplates(db, i18n, waClient, inbox)
 	conversation.SetWhatsAppTemplateStore(waTemplates)
 
-	// Start inboxes.
-	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, conversation)
-
 	go automation.Run(ctx, automationWorkers)
 	go autoassigner.Run(ctx, autoAssignInterval)
 	go conversation.Run(ctx, messageIncomingQWorkers, messageOutgoingQWorkers, messageOutgoingScanInterval)
@@ -306,6 +303,10 @@ func main() {
 	app.whatsappIngester = newWhatsAppIngester(app, 0, 0)
 	go app.whatsappIngester.Run(ctx)
 	waClient.SetAuthErrorHook(makeWhatsAppAuthErrorHook(app))
+
+	// Start inboxes.
+	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, conversation)
+
 	go whatsappTemplateSyncWorker(ctx, app)
 
 	g := fastglue.NewGlue()

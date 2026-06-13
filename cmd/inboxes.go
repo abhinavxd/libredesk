@@ -103,7 +103,7 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	}
 	var cfg whatsappChannel.Config
 	if err := json.Unmarshal(inb.Config, &cfg); err != nil {
-		return nil
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid whatsapp config format", nil, envelope.InputError)
 	}
 	if err := app.whatsappClient.ValidateCredentials(r.RequestCtx, cfg.Account()); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, fmt.Sprintf("meta credential check failed: %s", err.Error()), nil, envelope.InputError)

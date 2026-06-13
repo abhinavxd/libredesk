@@ -113,7 +113,7 @@ func (u *Manager) GetContactIDByChannelIdentity(channel, identifier string) (int
 		if err == sql.ErrNoRows {
 			return 0, envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundUser"), nil)
 		}
-		u.lo.Error("error fetching contact by channel identity", "channel", channel, "identifier", identifier, "error", err)
+		u.lo.Error("error fetching contact by channel identity", "channel", channel, "error", err)
 		return 0, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return id, nil

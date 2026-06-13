@@ -349,7 +349,10 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, body an
 func parseMetaError(statusCode int, respBody []byte) error {
 	var env metaErrorEnvelope
 	if err := json.Unmarshal(respBody, &env); err != nil || env.Error.Message == "" {
-		return fmt.Errorf("meta api returned status %d: %s", statusCode, string(respBody))
+		return &MetaAPIError{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("meta api returned status %d: %s", statusCode, string(respBody)),
+		}
 	}
 	return &MetaAPIError{
 		StatusCode: statusCode,

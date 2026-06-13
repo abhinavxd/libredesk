@@ -51,9 +51,9 @@ func TestDialCodeForISO(t *testing.T) {
 		{iso: "AE", want: "971"},
 		{iso: "AS", want: "1684"},
 		{iso: "RU", want: "7"},
-		// Secondaries that share a dial code are collapsed out, so they have no reverse mapping.
-		{iso: "CA", want: ""},
-		{iso: "KZ", want: ""},
+		// Secondaries that share a dial code still resolve to that dial code.
+		{iso: "CA", want: "1"},
+		{iso: "KZ", want: "7"},
 		{iso: "ZZ", want: ""},
 		{iso: "", want: ""},
 	}

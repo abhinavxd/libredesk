@@ -89,7 +89,7 @@ func (k *keyedLock) lock(key string) func() {
 
 // Run starts the worker goroutines and blocks until ctx is cancelled or Close is called.
 func (i *WhatsAppIngester) Run(ctx context.Context) {
-	for w := 0; w < i.workers; w++ {
+	for range i.workers {
 		i.wg.Add(1)
 		go func() {
 			defer i.wg.Done()
@@ -101,7 +101,14 @@ func (i *WhatsAppIngester) Run(ctx context.Context) {
 					if !ok {
 						return
 					}
-					processWhatsAppPayload(i.app, job.inboxID, job.payload)
+					func() {
+						defer func() {
+							if rec := recover(); rec != nil {
+								i.app.lo.Error("recovered from panic in whatsapp ingest worker", "inbox_id", job.inboxID, "panic", rec)
+							}
+						}()
+						processWhatsAppPayload(i.app, job.inboxID, job.payload)
+					}()
 				}
 			}
 		}()

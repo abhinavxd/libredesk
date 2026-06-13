@@ -18,7 +18,8 @@ var sharedDialCodePrimary = map[string]string{
 
 var dialDigitsReplacer = strings.NewReplacer("+", "", "-", "")
 
-var phoneCountryCodes = buildPhoneCountryCodes()
+// phoneCountryCodes (longest prefix first, shared codes collapsed to one ISO) drives SplitPhoneCountryCode; dialCodeByISO keeps every ISO's dial code for DialCodeForISO.
+var phoneCountryCodes, dialCodeByISO = buildPhoneTables()
 
 type phoneCode struct{ prefix, iso string }
 
@@ -39,16 +40,10 @@ func SplitPhoneCountryCode(full string) (string, string) {
 
 // DialCodeForISO returns the dialing-code digits for an ISO-2 country, "" when unknown.
 func DialCodeForISO(iso string) string {
-	out := ""
-	for _, c := range phoneCountryCodes {
-		if c.iso == iso && (out == "" || len(c.prefix) < len(out)) {
-			out = c.prefix
-		}
-	}
-	return out
+	return dialCodeByISO[iso]
 }
 
-func buildPhoneCountryCodes() []phoneCode {
+func buildPhoneTables() ([]phoneCode, map[string]string) {
 	var list []struct {
 		CallingCode string `json:"calling_code"`
 		ISO2        string `json:"iso_2"`
@@ -58,10 +53,14 @@ func buildPhoneCountryCodes() []phoneCode {
 	}
 
 	byPrefix := map[string]string{}
+	dialByISO := map[string]string{}
 	for _, c := range list {
 		prefix := dialDigitsReplacer.Replace(c.CallingCode)
 		if prefix == "" || c.ISO2 == "" {
 			continue
+		}
+		if existing, ok := dialByISO[c.ISO2]; !ok || len(prefix) < len(existing) {
+			dialByISO[c.ISO2] = prefix
 		}
 		if primary, ok := sharedDialCodePrimary[prefix]; ok {
 			byPrefix[prefix] = primary
@@ -82,5 +81,5 @@ func buildPhoneCountryCodes() []phoneCode {
 		}
 		return out[i].prefix < out[j].prefix
 	})
-	return out
+	return out, dialByISO
 }

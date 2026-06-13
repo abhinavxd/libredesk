@@ -166,6 +166,7 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 
 	actor, err := m.userStore.GetSystemUser()
 	if err != nil {
+		m.lo.Error("error fetching system user for whatsapp CSAT activity", "conversation_uuid", conversation.UUID, "error", err)
 		return nil
 	}
 	return m.InsertConversationActivity(models.ActivityCSATNotSent, conversation.UUID, "", actor)
