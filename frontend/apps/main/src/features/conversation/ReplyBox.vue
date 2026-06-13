@@ -344,6 +344,19 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     return
   }
 
+  if (!isPrivate && conversationStore.current.inbox_channel === 'whatsapp') {
+    const lastInboundAt = conversationStore.current.last_inbound_at
+    const windowOpen =
+      lastInboundAt && Date.now() - new Date(lastInboundAt).getTime() < 24 * 60 * 60 * 1000
+    if (!windowOpen) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: t('conversation.whatsapp.windowClosed.description')
+      })
+      return
+    }
+  }
+
   if (!isPrivate && conversationStore.current.inbox_channel === 'email') {
     // Require at least one recipient in `to`.
     if (!to.value.trim()) {

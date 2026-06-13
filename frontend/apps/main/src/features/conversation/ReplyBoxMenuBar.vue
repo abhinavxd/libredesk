@@ -37,6 +37,16 @@
       >
         <Smile class="h-4 w-4" />
       </Toggle>
+      <Toggle
+        v-if="isWhatsAppConversation"
+        class="px-2 py-2 border-0"
+        variant="outline"
+        :title="$t('conversation.whatsapp.sendTemplate')"
+        @click="openTemplatePicker"
+        :pressed="false"
+      >
+        <WhatsAppIcon class="h-4 w-4" />
+      </Toggle>
     </div>
     <Button class="h-8 w-6 px-8" @click="handleSend" :disabled="!enableSend" :isLoading="isSending" v-if="showSendButton">
       {{ $t('globals.messages.send') }}
@@ -45,11 +55,15 @@
 </template>
 
 <script setup>
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
 import { Paperclip, Smile } from 'lucide-vue-next'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
+import { useConversationStore } from '@main/stores/conversation'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([
@@ -93,6 +107,17 @@ const triggerFileUpload = () => {
 
 const toggleEmojiPicker = () => {
   isEmojiPickerVisible.value = !isEmojiPickerVisible.value
+}
+
+const conversationStore = useConversationStore()
+const emitter = useEmitter()
+
+const isWhatsAppConversation = computed(
+  () => conversationStore.current?.inbox_channel === 'whatsapp'
+)
+
+const openTemplatePicker = () => {
+  emitter.emit(EMITTER_EVENTS.WHATSAPP_TEMPLATE_PICKER_OPEN)
 }
 
 function onSelectEmoji(emoji) {

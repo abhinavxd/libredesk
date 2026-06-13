@@ -271,6 +271,23 @@ const routes = [
             ]
           },
           {
+            path: 'whatsapp/templates',
+            meta: { titleKey: 'admin.whatsappTemplates.title' },
+            children: [
+              {
+                path: '',
+                name: 'whatsapp-templates',
+                component: () => import('@main/views/admin/whatsapp/WhatsAppTemplateList.vue')
+              },
+              {
+                path: 'new',
+                name: 'whatsapp-template-new',
+                component: () => import('@main/views/admin/whatsapp/NewWhatsAppTemplate.vue'),
+                meta: { titleKey: 'admin.whatsappTemplates.newTemplate' }
+              }
+            ]
+          },
+          {
             path: 'notification',
             component: () => import('@main/features/admin/notification/NotificationSetting.vue'),
             meta: { titleKey: 'globals.terms.notification', titleCount: 2 }

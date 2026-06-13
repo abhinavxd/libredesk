@@ -89,6 +89,12 @@ type queries struct {
 	GetContactByEmailWithoutExtID *sqlx.Stmt `query:"get-contact-by-email-without-ext-id"`
 	IsEmailBlocked                *sqlx.Stmt `query:"is-email-blocked"`
 	SetExternalUserID             *sqlx.Stmt `query:"set-external-user-id"`
+	SetContactPhoneIfMissing      *sqlx.Stmt `query:"set-contact-phone-if-missing"`
+	UpdateContactNameIfDefault    *sqlx.Stmt `query:"update-contact-name-if-default"`
+	GetContactIDByChannelIdentity *sqlx.Stmt `query:"get-contact-id-by-channel-identity"`
+	GetChannelIdentitiesByContact *sqlx.Stmt `query:"get-channel-identities-by-contact"`
+	GetChannelIdentity            *sqlx.Stmt `query:"get-channel-identity"`
+	InsertChannelIdentity         *sqlx.Stmt `query:"insert-channel-identity"`
 	InsertNote                    *sqlx.Stmt `query:"insert-note"`
 	InsertVisitor                 *sqlx.Stmt `query:"insert-visitor"`
 	GetVisitorByEmail             *sqlx.Stmt `query:"get-visitor-by-email"`

@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email', 'livechat');
+DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email', 'livechat', 'whatsapp');
 DROP TYPE IF EXISTS "message_type" CASCADE; CREATE TYPE "message_type" AS ENUM ('incoming','outgoing','activity');
 DROP TYPE IF EXISTS "message_sender_type" CASCADE; CREATE TYPE "message_sender_type" AS ENUM ('agent','contact');
 DROP TYPE IF EXISTS "message_status" CASCADE; CREATE TYPE "message_status" AS ENUM ('received','sent','failed','pending');
@@ -248,7 +248,8 @@ CREATE TABLE conversations (
 	last_interaction_at TIMESTAMPTZ NULL,
 	next_sla_deadline_at TIMESTAMPTZ NULL,
 	snoozed_until TIMESTAMPTZ NULL,
-	last_continuity_email_sent_at TIMESTAMPTZ NULL
+	last_continuity_email_sent_at TIMESTAMPTZ NULL,
+	last_inbound_at TIMESTAMPTZ NULL
 );
 CREATE INDEX index_conversations_on_assigned_user_id ON conversations (assigned_user_id);
 CREATE INDEX index_conversations_on_assigned_team_id ON conversations (assigned_team_id);
@@ -263,6 +264,7 @@ CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_i
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
 CREATE INDEX index_conversations_on_waiting_since ON conversations (waiting_since);
 CREATE INDEX index_conversations_on_last_continuity_email_sent_at ON conversations (last_continuity_email_sent_at);
+CREATE INDEX index_conversations_on_last_inbound_at ON conversations (last_inbound_at);
 
 DROP TABLE IF EXISTS conversation_messages CASCADE;
 CREATE TABLE conversation_messages (
@@ -463,6 +465,34 @@ CREATE TABLE templates (
 CREATE UNIQUE INDEX index_unique_templates_on_is_default_when_is_default_is_true ON templates USING btree (is_default)
 WHERE (is_default = true);
 
+DROP TABLE IF EXISTS whatsapp_templates CASCADE;
+CREATE TABLE whatsapp_templates (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+	updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+	inbox_id INT REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	meta_template_id TEXT NULL,
+	name TEXT NOT NULL,
+	language TEXT NOT NULL,
+	category TEXT NOT NULL,
+	status TEXT DEFAULT 'PENDING' NOT NULL,
+	header_type TEXT NULL,
+	header_content TEXT NULL,
+	body_content TEXT NOT NULL,
+	footer_content TEXT NULL,
+	buttons JSONB DEFAULT '[]'::jsonb NOT NULL,
+	sample_values JSONB DEFAULT '{}'::jsonb NOT NULL,
+	rejection_reason TEXT NULL,
+	CONSTRAINT constraint_whatsapp_templates_on_name CHECK (length(name) <= 512),
+	CONSTRAINT constraint_whatsapp_templates_on_language CHECK (length(language) <= 20),
+	CONSTRAINT constraint_whatsapp_templates_on_category CHECK (length(category) <= 32),
+	CONSTRAINT constraint_whatsapp_templates_on_status CHECK (length(status) <= 32),
+	CONSTRAINT constraint_whatsapp_templates_on_header_type CHECK (length(header_type) <= 32)
+);
+CREATE UNIQUE INDEX index_unique_whatsapp_templates_on_inbox_name_language ON whatsapp_templates (inbox_id, name, language);
+CREATE INDEX index_whatsapp_templates_on_inbox_id ON whatsapp_templates (inbox_id);
+CREATE INDEX index_whatsapp_templates_on_meta_template_id ON whatsapp_templates (meta_template_id);
+
 DROP TABLE IF EXISTS conversation_tags CASCADE;
 CREATE TABLE conversation_tags (
 	id BIGSERIAL PRIMARY KEY,
@@ -627,6 +657,19 @@ CREATE TABLE contact_notes (
 	user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE INDEX index_contact_notes_on_contact_id_created_at ON contact_notes (contact_id, created_at);
+
+DROP TABLE IF EXISTS contact_channel_identities CASCADE;
+CREATE TABLE contact_channel_identities (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	contact_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	channel channels NOT NULL,
+	identifier TEXT NOT NULL,
+	CONSTRAINT constraint_contact_channel_identities_on_identifier CHECK (length(identifier) <= 1000)
+);
+CREATE UNIQUE INDEX index_unique_contact_channel_identities_on_channel_identifier ON contact_channel_identities (channel, identifier);
+CREATE INDEX index_contact_channel_identities_on_contact_id ON contact_channel_identities (contact_id);
 
 DROP TABLE IF EXISTS activity_logs CASCADE;
 CREATE TABLE activity_logs (

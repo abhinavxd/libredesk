@@ -43,7 +43,17 @@ func SanitizeFilename(fName string) string {
 
 	// Convert to lowercase
 	name = strings.ToLower(name)
-	return filepath.Base(name)
+	name = filepath.Base(name)
+
+	// Fully non-latin names sanitize down to nothing (or just the extension) and break media upload.
+	ext := filepath.Ext(name)
+	if strings.Trim(ext, ".") == "" {
+		ext = ""
+	}
+	if strings.Trim(strings.TrimSuffix(name, ext), ".-_ ") == "" {
+		name = "file" + ext
+	}
+	return name
 }
 
 // RandomAlphanumeric generates a random alphanumeric string of length n.

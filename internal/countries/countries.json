@@ -1,0 +1,1430 @@
+[
+  {
+    "calling_code": "+93",
+    "name": "Afghanistan",
+    "emoji": "🇦🇫",
+    "iso_2": "AF"
+  },
+  {
+    "calling_code": "+355",
+    "name": "Albania",
+    "emoji": "🇦🇱",
+    "iso_2": "AL"
+  },
+  {
+    "calling_code": "+213",
+    "name": "Algeria",
+    "emoji": "🇩🇿",
+    "iso_2": "DZ"
+  },
+  {
+    "calling_code": "+1-684",
+    "name": "American Samoa",
+    "emoji": "🇦🇸",
+    "iso_2": "AS"
+  },
+  {
+    "calling_code": "+376",
+    "name": "Andorra",
+    "emoji": "🇦🇩",
+    "iso_2": "AD"
+  },
+  {
+    "calling_code": "+244",
+    "name": "Angola",
+    "emoji": "🇦🇴",
+    "iso_2": "AO"
+  },
+  {
+    "calling_code": "+1-264",
+    "name": "Anguilla",
+    "emoji": "🇦🇮",
+    "iso_2": "AI"
+  },
+  {
+    "calling_code": "+1-268",
+    "name": "Antigua and Barbuda",
+    "emoji": "🇦🇬",
+    "iso_2": "AG"
+  },
+  {
+    "calling_code": "+54",
+    "name": "Argentina",
+    "emoji": "🇦🇷",
+    "iso_2": "AR"
+  },
+  {
+    "calling_code": "+374",
+    "name": "Armenia",
+    "emoji": "🇦🇲",
+    "iso_2": "AM"
+  },
+  {
+    "calling_code": "+297",
+    "name": "Aruba",
+    "emoji": "🇦🇼",
+    "iso_2": "AW"
+  },
+  {
+    "calling_code": "+61",
+    "name": "Australia",
+    "emoji": "🇦🇺",
+    "iso_2": "AU"
+  },
+  {
+    "calling_code": "+43",
+    "name": "Austria",
+    "emoji": "🇦🇹",
+    "iso_2": "AT"
+  },
+  {
+    "calling_code": "+994",
+    "name": "Azerbaijan",
+    "emoji": "🇦🇿",
+    "iso_2": "AZ"
+  },
+  {
+    "calling_code": "+1-242",
+    "name": "Bahamas",
+    "emoji": "🇧🇸",
+    "iso_2": "BS"
+  },
+  {
+    "calling_code": "+973",
+    "name": "Bahrain",
+    "emoji": "🇧🇭",
+    "iso_2": "BH"
+  },
+  {
+    "calling_code": "+880",
+    "name": "Bangladesh",
+    "emoji": "🇧🇩",
+    "iso_2": "BD"
+  },
+  {
+    "calling_code": "+1-246",
+    "name": "Barbados",
+    "emoji": "🇧🇧",
+    "iso_2": "BB"
+  },
+  {
+    "calling_code": "+375",
+    "name": "Belarus",
+    "emoji": "🇧🇾",
+    "iso_2": "BY"
+  },
+  {
+    "calling_code": "+32",
+    "name": "Belgium",
+    "emoji": "🇧🇪",
+    "iso_2": "BE"
+  },
+  {
+    "calling_code": "+501",
+    "name": "Belize",
+    "emoji": "🇧🇿",
+    "iso_2": "BZ"
+  },
+  {
+    "calling_code": "+229",
+    "name": "Benin",
+    "emoji": "🇧🇯",
+    "iso_2": "BJ"
+  },
+  {
+    "calling_code": "+1-441",
+    "name": "Bermuda",
+    "emoji": "🇧🇲",
+    "iso_2": "BM"
+  },
+  {
+    "calling_code": "+975",
+    "name": "Bhutan",
+    "emoji": "🇧🇹",
+    "iso_2": "BT"
+  },
+  {
+    "calling_code": "+591",
+    "name": "Bolivia",
+    "emoji": "🇧🇴",
+    "iso_2": "BO"
+  },
+  {
+    "calling_code": "+387",
+    "name": "Bosnia and Herzegovina",
+    "emoji": "🇧🇦",
+    "iso_2": "BA"
+  },
+  {
+    "calling_code": "+267",
+    "name": "Botswana",
+    "emoji": "🇧🇼",
+    "iso_2": "BW"
+  },
+  {
+    "calling_code": "+55",
+    "name": "Brazil",
+    "emoji": "🇧🇷",
+    "iso_2": "BR"
+  },
+  {
+    "calling_code": "+246",
+    "name": "British Indian Ocean Territory",
+    "emoji": "🇮🇴",
+    "iso_2": "IO"
+  },
+  {
+    "calling_code": "+673",
+    "name": "Brunei",
+    "emoji": "🇧🇳",
+    "iso_2": "BN"
+  },
+  {
+    "calling_code": "+359",
+    "name": "Bulgaria",
+    "emoji": "🇧🇬",
+    "iso_2": "BG"
+  },
+  {
+    "calling_code": "+226",
+    "name": "Burkina Faso",
+    "emoji": "🇧🇫",
+    "iso_2": "BF"
+  },
+  {
+    "calling_code": "+257",
+    "name": "Burundi",
+    "emoji": "🇧🇮",
+    "iso_2": "BI"
+  },
+  {
+    "calling_code": "+855",
+    "name": "Cambodia",
+    "emoji": "🇰🇭",
+    "iso_2": "KH"
+  },
+  {
+    "calling_code": "+237",
+    "name": "Cameroon",
+    "emoji": "🇨🇲",
+    "iso_2": "CM"
+  },
+  {
+    "calling_code": "+1",
+    "name": "Canada",
+    "emoji": "🇨🇦",
+    "iso_2": "CA"
+  },
+  {
+    "calling_code": "+238",
+    "name": "Cape Verde",
+    "emoji": "🇨🇻",
+    "iso_2": "CV"
+  },
+  {
+    "calling_code": "+1-345",
+    "name": "Cayman Islands",
+    "emoji": "🇰🇾",
+    "iso_2": "KY"
+  },
+  {
+    "calling_code": "+236",
+    "name": "Central African Republic",
+    "emoji": "🇨🇫",
+    "iso_2": "CF"
+  },
+  {
+    "calling_code": "+235",
+    "name": "Chad",
+    "emoji": "🇹🇩",
+    "iso_2": "TD"
+  },
+  {
+    "calling_code": "+56",
+    "name": "Chile",
+    "emoji": "🇨🇱",
+    "iso_2": "CL"
+  },
+  {
+    "calling_code": "+86",
+    "name": "China",
+    "emoji": "🇨🇳",
+    "iso_2": "CN"
+  },
+  {
+    "calling_code": "+61",
+    "name": "Christmas Island",
+    "emoji": "🇨🇽",
+    "iso_2": "CX"
+  },
+  {
+    "calling_code": "+61",
+    "name": "Cocos (Keeling) Islands",
+    "emoji": "🇨🇨",
+    "iso_2": "CC"
+  },
+  {
+    "calling_code": "+57",
+    "name": "Colombia",
+    "emoji": "🇨🇴",
+    "iso_2": "CO"
+  },
+  {
+    "calling_code": "+269",
+    "name": "Comoros",
+    "emoji": "🇰🇲",
+    "iso_2": "KM"
+  },
+  {
+    "calling_code": "+242",
+    "name": "Congo",
+    "emoji": "🇨🇬",
+    "iso_2": "CG"
+  },
+  {
+    "calling_code": "+243",
+    "name": "Congo, Democratic Republic of the",
+    "emoji": "🇨🇩",
+    "iso_2": "CD"
+  },
+  {
+    "calling_code": "+682",
+    "name": "Cook Islands",
+    "emoji": "🇨🇰",
+    "iso_2": "CK"
+  },
+  {
+    "calling_code": "+506",
+    "name": "Costa Rica",
+    "emoji": "🇨🇷",
+    "iso_2": "CR"
+  },
+  {
+    "calling_code": "+225",
+    "name": "Côte d'Ivoire",
+    "emoji": "🇨🇮",
+    "iso_2": "CI"
+  },
+  {
+    "calling_code": "+385",
+    "name": "Croatia",
+    "emoji": "🇭🇷",
+    "iso_2": "HR"
+  },
+  {
+    "calling_code": "+53",
+    "name": "Cuba",
+    "emoji": "🇨🇺",
+    "iso_2": "CU"
+  },
+  {
+    "calling_code": "+599",
+    "name": "Curaçao",
+    "emoji": "🇨🇼",
+    "iso_2": "CW"
+  },
+  {
+    "calling_code": "+357",
+    "name": "Cyprus",
+    "emoji": "🇨🇾",
+    "iso_2": "CY"
+  },
+  {
+    "calling_code": "+420",
+    "name": "Czech Republic",
+    "emoji": "🇨🇿",
+    "iso_2": "CZ"
+  },
+  {
+    "calling_code": "+45",
+    "name": "Denmark",
+    "emoji": "🇩🇰",
+    "iso_2": "DK"
+  },
+  {
+    "calling_code": "+253",
+    "name": "Djibouti",
+    "emoji": "🇩🇯",
+    "iso_2": "DJ"
+  },
+  {
+    "calling_code": "+1-767",
+    "name": "Dominica",
+    "emoji": "🇩🇲",
+    "iso_2": "DM"
+  },
+  {
+    "calling_code": "+1-809",
+    "name": "Dominican Republic",
+    "emoji": "🇩🇴",
+    "iso_2": "DO"
+  },
+  {
+    "calling_code": "+593",
+    "name": "Ecuador",
+    "emoji": "🇪🇨",
+    "iso_2": "EC"
+  },
+  {
+    "calling_code": "+20",
+    "name": "Egypt",
+    "emoji": "🇪🇬",
+    "iso_2": "EG"
+  },
+  {
+    "calling_code": "+503",
+    "name": "El Salvador",
+    "emoji": "🇸🇻",
+    "iso_2": "SV"
+  },
+  {
+    "calling_code": "+240",
+    "name": "Equatorial Guinea",
+    "emoji": "🇬🇶",
+    "iso_2": "GQ"
+  },
+  {
+    "calling_code": "+291",
+    "name": "Eritrea",
+    "emoji": "🇪🇷",
+    "iso_2": "ER"
+  },
+  {
+    "calling_code": "+372",
+    "name": "Estonia",
+    "emoji": "🇪🇪",
+    "iso_2": "EE"
+  },
+  {
+    "calling_code": "+268",
+    "name": "Eswatini",
+    "emoji": "🇸🇿",
+    "iso_2": "SZ"
+  },
+  {
+    "calling_code": "+251",
+    "name": "Ethiopia",
+    "emoji": "🇪🇹",
+    "iso_2": "ET"
+  },
+  {
+    "calling_code": "+500",
+    "name": "Falkland Islands",
+    "emoji": "🇫🇰",
+    "iso_2": "FK"
+  },
+  {
+    "calling_code": "+298",
+    "name": "Faroe Islands",
+    "emoji": "🇫🇴",
+    "iso_2": "FO"
+  },
+  {
+    "calling_code": "+679",
+    "name": "Fiji",
+    "emoji": "🇫🇯",
+    "iso_2": "FJ"
+  },
+  {
+    "calling_code": "+358",
+    "name": "Finland",
+    "emoji": "🇫🇮",
+    "iso_2": "FI"
+  },
+  {
+    "calling_code": "+33",
+    "name": "France",
+    "emoji": "🇫🇷",
+    "iso_2": "FR"
+  },
+  {
+    "calling_code": "+594",
+    "name": "French Guiana",
+    "emoji": "🇬🇫",
+    "iso_2": "GF"
+  },
+  {
+    "calling_code": "+689",
+    "name": "French Polynesia",
+    "emoji": "🇵🇫",
+    "iso_2": "PF"
+  },
+  {
+    "calling_code": "+241",
+    "name": "Gabon",
+    "emoji": "🇬🇦",
+    "iso_2": "GA"
+  },
+  {
+    "calling_code": "+220",
+    "name": "Gambia",
+    "emoji": "🇬🇲",
+    "iso_2": "GM"
+  },
+  {
+    "calling_code": "+995",
+    "name": "Georgia",
+    "emoji": "🇬🇪",
+    "iso_2": "GE"
+  },
+  {
+    "calling_code": "+49",
+    "name": "Germany",
+    "emoji": "🇩🇪",
+    "iso_2": "DE"
+  },
+  {
+    "calling_code": "+233",
+    "name": "Ghana",
+    "emoji": "🇬🇭",
+    "iso_2": "GH"
+  },
+  {
+    "calling_code": "+350",
+    "name": "Gibraltar",
+    "emoji": "🇬🇮",
+    "iso_2": "GI"
+  },
+  {
+    "calling_code": "+30",
+    "name": "Greece",
+    "emoji": "🇬🇷",
+    "iso_2": "GR"
+  },
+  {
+    "calling_code": "+299",
+    "name": "Greenland",
+    "emoji": "🇬🇱",
+    "iso_2": "GL"
+  },
+  {
+    "calling_code": "+1-473",
+    "name": "Grenada",
+    "emoji": "🇬🇩",
+    "iso_2": "GD"
+  },
+  {
+    "calling_code": "+590",
+    "name": "Guadeloupe",
+    "emoji": "🇬🇵",
+    "iso_2": "GP"
+  },
+  {
+    "calling_code": "+1-671",
+    "name": "Guam",
+    "emoji": "🇬🇺",
+    "iso_2": "GU"
+  },
+  {
+    "calling_code": "+502",
+    "name": "Guatemala",
+    "emoji": "🇬🇹",
+    "iso_2": "GT"
+  },
+  {
+    "calling_code": "+44-1481",
+    "name": "Guernsey",
+    "emoji": "🇬🇬",
+    "iso_2": "GG"
+  },
+  {
+    "calling_code": "+224",
+    "name": "Guinea",
+    "emoji": "🇬🇳",
+    "iso_2": "GN"
+  },
+  {
+    "calling_code": "+245",
+    "name": "Guinea-Bissau",
+    "emoji": "🇬🇼",
+    "iso_2": "GW"
+  },
+  {
+    "calling_code": "+592",
+    "name": "Guyana",
+    "emoji": "🇬🇾",
+    "iso_2": "GY"
+  },
+  {
+    "calling_code": "+509",
+    "name": "Haiti",
+    "emoji": "🇭🇹",
+    "iso_2": "HT"
+  },
+  {
+    "calling_code": "+379",
+    "name": "Vatican City",
+    "emoji": "🇻🇦",
+    "iso_2": "VA"
+  },
+  {
+    "calling_code": "+504",
+    "name": "Honduras",
+    "emoji": "🇭🇳",
+    "iso_2": "HN"
+  },
+  {
+    "calling_code": "+852",
+    "name": "Hong Kong",
+    "emoji": "🇭🇰",
+    "iso_2": "HK"
+  },
+  {
+    "calling_code": "+36",
+    "name": "Hungary",
+    "emoji": "🇭🇺",
+    "iso_2": "HU"
+  },
+  {
+    "calling_code": "+354",
+    "name": "Iceland",
+    "emoji": "🇮🇸",
+    "iso_2": "IS"
+  },
+  {
+    "calling_code": "+91",
+    "name": "India",
+    "emoji": "🇮🇳",
+    "iso_2": "IN"
+  },
+  {
+    "calling_code": "+62",
+    "name": "Indonesia",
+    "emoji": "🇮🇩",
+    "iso_2": "ID"
+  },
+  {
+    "calling_code": "+98",
+    "name": "Iran",
+    "emoji": "🇮🇷",
+    "iso_2": "IR"
+  },
+  {
+    "calling_code": "+964",
+    "name": "Iraq",
+    "emoji": "🇮🇶",
+    "iso_2": "IQ"
+  },
+  {
+    "calling_code": "+353",
+    "name": "Ireland",
+    "emoji": "🇮🇪",
+    "iso_2": "IE"
+  },
+  {
+    "calling_code": "+44-1624",
+    "name": "Isle of Man",
+    "emoji": "🇮🇲",
+    "iso_2": "IM"
+  },
+  {
+    "calling_code": "+972",
+    "name": "Israel",
+    "emoji": "🇮🇱",
+    "iso_2": "IL"
+  },
+  {
+    "calling_code": "+39",
+    "name": "Italy",
+    "emoji": "🇮🇹",
+    "iso_2": "IT"
+  },
+  {
+    "calling_code": "+1-876",
+    "name": "Jamaica",
+    "emoji": "🇯🇲",
+    "iso_2": "JM"
+  },
+  {
+    "calling_code": "+81",
+    "name": "Japan",
+    "emoji": "🇯🇵",
+    "iso_2": "JP"
+  },
+  {
+    "calling_code": "+44-1534",
+    "name": "Jersey",
+    "emoji": "🇯🇪",
+    "iso_2": "JE"
+  },
+  {
+    "calling_code": "+962",
+    "name": "Jordan",
+    "emoji": "🇯🇴",
+    "iso_2": "JO"
+  },
+  {
+    "calling_code": "+7",
+    "name": "Kazakhstan",
+    "emoji": "🇰🇿",
+    "iso_2": "KZ"
+  },
+  {
+    "calling_code": "+254",
+    "name": "Kenya",
+    "emoji": "🇰🇪",
+    "iso_2": "KE"
+  },
+  {
+    "calling_code": "+686",
+    "name": "Kiribati",
+    "emoji": "🇰🇮",
+    "iso_2": "KI"
+  },
+  {
+    "calling_code": "+383",
+    "name": "Kosovo",
+    "emoji": "🇽🇰",
+    "iso_2": "XK"
+  },
+  {
+    "calling_code": "+965",
+    "name": "Kuwait",
+    "emoji": "🇰🇼",
+    "iso_2": "KW"
+  },
+  {
+    "calling_code": "+996",
+    "name": "Kyrgyzstan",
+    "emoji": "🇰🇬",
+    "iso_2": "KG"
+  },
+  {
+    "calling_code": "+856",
+    "name": "Laos",
+    "emoji": "🇱🇦",
+    "iso_2": "LA"
+  },
+  {
+    "calling_code": "+371",
+    "name": "Latvia",
+    "emoji": "🇱🇻",
+    "iso_2": "LV"
+  },
+  {
+    "calling_code": "+961",
+    "name": "Lebanon",
+    "emoji": "🇱🇧",
+    "iso_2": "LB"
+  },
+  {
+    "calling_code": "+266",
+    "name": "Lesotho",
+    "emoji": "🇱🇸",
+    "iso_2": "LS"
+  },
+  {
+    "calling_code": "+231",
+    "name": "Liberia",
+    "emoji": "🇱🇷",
+    "iso_2": "LR"
+  },
+  {
+    "calling_code": "+218",
+    "name": "Libya",
+    "emoji": "🇱🇾",
+    "iso_2": "LY"
+  },
+  {
+    "calling_code": "+423",
+    "name": "Liechtenstein",
+    "emoji": "🇱🇮",
+    "iso_2": "LI"
+  },
+  {
+    "calling_code": "+370",
+    "name": "Lithuania",
+    "emoji": "🇱🇹",
+    "iso_2": "LT"
+  },
+  {
+    "calling_code": "+352",
+    "name": "Luxembourg",
+    "emoji": "🇱🇺",
+    "iso_2": "LU"
+  },
+  {
+    "calling_code": "+853",
+    "name": "Macao",
+    "emoji": "🇲🇴",
+    "iso_2": "MO"
+  },
+  {
+    "calling_code": "+389",
+    "name": "North Macedonia",
+    "emoji": "🇲🇰",
+    "iso_2": "MK"
+  },
+  {
+    "calling_code": "+261",
+    "name": "Madagascar",
+    "emoji": "🇲🇬",
+    "iso_2": "MG"
+  },
+  {
+    "calling_code": "+265",
+    "name": "Malawi",
+    "emoji": "🇲🇼",
+    "iso_2": "MW"
+  },
+  {
+    "calling_code": "+60",
+    "name": "Malaysia",
+    "emoji": "🇲🇾",
+    "iso_2": "MY"
+  },
+  {
+    "calling_code": "+960",
+    "name": "Maldives",
+    "emoji": "🇲🇻",
+    "iso_2": "MV"
+  },
+  {
+    "calling_code": "+223",
+    "name": "Mali",
+    "emoji": "🇲🇱",
+    "iso_2": "ML"
+  },
+  {
+    "calling_code": "+356",
+    "name": "Malta",
+    "emoji": "🇲🇹",
+    "iso_2": "MT"
+  },
+  {
+    "calling_code": "+692",
+    "name": "Marshall Islands",
+    "emoji": "🇲🇭",
+    "iso_2": "MH"
+  },
+  {
+    "calling_code": "+596",
+    "name": "Martinique",
+    "emoji": "🇲🇶",
+    "iso_2": "MQ"
+  },
+  {
+    "calling_code": "+222",
+    "name": "Mauritania",
+    "emoji": "🇲🇷",
+    "iso_2": "MR"
+  },
+  {
+    "calling_code": "+230",
+    "name": "Mauritius",
+    "emoji": "🇲🇺",
+    "iso_2": "MU"
+  },
+  {
+    "calling_code": "+262",
+    "name": "Mayotte",
+    "emoji": "🇾🇹",
+    "iso_2": "YT"
+  },
+  {
+    "calling_code": "+52",
+    "name": "Mexico",
+    "emoji": "🇲🇽",
+    "iso_2": "MX"
+  },
+  {
+    "calling_code": "+691",
+    "name": "Micronesia",
+    "emoji": "🇫🇲",
+    "iso_2": "FM"
+  },
+  {
+    "calling_code": "+373",
+    "name": "Moldova",
+    "emoji": "🇲🇩",
+    "iso_2": "MD"
+  },
+  {
+    "calling_code": "+377",
+    "name": "Monaco",
+    "emoji": "🇲🇨",
+    "iso_2": "MC"
+  },
+  {
+    "calling_code": "+976",
+    "name": "Mongolia",
+    "emoji": "🇲🇳",
+    "iso_2": "MN"
+  },
+  {
+    "calling_code": "+382",
+    "name": "Montenegro",
+    "emoji": "🇲🇪",
+    "iso_2": "ME"
+  },
+  {
+    "calling_code": "+1-664",
+    "name": "Montserrat",
+    "emoji": "🇲🇸",
+    "iso_2": "MS"
+  },
+  {
+    "calling_code": "+212",
+    "name": "Morocco",
+    "emoji": "🇲🇦",
+    "iso_2": "MA"
+  },
+  {
+    "calling_code": "+258",
+    "name": "Mozambique",
+    "emoji": "🇲🇿",
+    "iso_2": "MZ"
+  },
+  {
+    "calling_code": "+95",
+    "name": "Myanmar",
+    "emoji": "🇲🇲",
+    "iso_2": "MM"
+  },
+  {
+    "calling_code": "+264",
+    "name": "Namibia",
+    "emoji": "🇳🇦",
+    "iso_2": "NA"
+  },
+  {
+    "calling_code": "+674",
+    "name": "Nauru",
+    "emoji": "🇳🇷",
+    "iso_2": "NR"
+  },
+  {
+    "calling_code": "+977",
+    "name": "Nepal",
+    "emoji": "🇳🇵",
+    "iso_2": "NP"
+  },
+  {
+    "calling_code": "+31",
+    "name": "Netherlands",
+    "emoji": "🇳🇱",
+    "iso_2": "NL"
+  },
+  {
+    "calling_code": "+687",
+    "name": "New Caledonia",
+    "emoji": "🇳🇨",
+    "iso_2": "NC"
+  },
+  {
+    "calling_code": "+64",
+    "name": "New Zealand",
+    "emoji": "🇳🇿",
+    "iso_2": "NZ"
+  },
+  {
+    "calling_code": "+505",
+    "name": "Nicaragua",
+    "emoji": "🇳🇮",
+    "iso_2": "NI"
+  },
+  {
+    "calling_code": "+227",
+    "name": "Niger",
+    "emoji": "🇳🇪",
+    "iso_2": "NE"
+  },
+  {
+    "calling_code": "+234",
+    "name": "Nigeria",
+    "emoji": "🇳🇬",
+    "iso_2": "NG"
+  },
+  {
+    "calling_code": "+683",
+    "name": "Niue",
+    "emoji": "🇳🇺",
+    "iso_2": "NU"
+  },
+  {
+    "calling_code": "+672",
+    "name": "Norfolk Island",
+    "emoji": "🇳🇫",
+    "iso_2": "NF"
+  },
+  {
+    "calling_code": "+850",
+    "name": "North Korea",
+    "emoji": "🇰🇵",
+    "iso_2": "KP"
+  },
+  {
+    "calling_code": "+47",
+    "name": "Norway",
+    "emoji": "🇳🇴",
+    "iso_2": "NO"
+  },
+  {
+    "calling_code": "+968",
+    "name": "Oman",
+    "emoji": "🇴🇲",
+    "iso_2": "OM"
+  },
+  {
+    "calling_code": "+92",
+    "name": "Pakistan",
+    "emoji": "🇵🇰",
+    "iso_2": "PK"
+  },
+  {
+    "calling_code": "+680",
+    "name": "Palau",
+    "emoji": "🇵🇼",
+    "iso_2": "PW"
+  },
+  {
+    "calling_code": "+970",
+    "name": "Palestine",
+    "emoji": "🇵🇸",
+    "iso_2": "PS"
+  },
+  {
+    "calling_code": "+507",
+    "name": "Panama",
+    "emoji": "🇵🇦",
+    "iso_2": "PA"
+  },
+  {
+    "calling_code": "+675",
+    "name": "Papua New Guinea",
+    "emoji": "🇵🇬",
+    "iso_2": "PG"
+  },
+  {
+    "calling_code": "+595",
+    "name": "Paraguay",
+    "emoji": "🇵🇾",
+    "iso_2": "PY"
+  },
+  {
+    "calling_code": "+51",
+    "name": "Peru",
+    "emoji": "🇵🇪",
+    "iso_2": "PE"
+  },
+  {
+    "calling_code": "+63",
+    "name": "Philippines",
+    "emoji": "🇵🇭",
+    "iso_2": "PH"
+  },
+  {
+    "calling_code": "+64",
+    "name": "Pitcairn Islands",
+    "emoji": "🇵🇳",
+    "iso_2": "PN"
+  },
+  {
+    "calling_code": "+48",
+    "name": "Poland",
+    "emoji": "🇵🇱",
+    "iso_2": "PL"
+  },
+  {
+    "calling_code": "+351",
+    "name": "Portugal",
+    "emoji": "🇵🇹",
+    "iso_2": "PT"
+  },
+  {
+    "calling_code": "+1-787",
+    "name": "Puerto Rico",
+    "emoji": "🇵🇷",
+    "iso_2": "PR"
+  },
+  {
+    "calling_code": "+974",
+    "name": "Qatar",
+    "emoji": "🇶🇦",
+    "iso_2": "QA"
+  },
+  {
+    "calling_code": "+40",
+    "name": "Romania",
+    "emoji": "🇷🇴",
+    "iso_2": "RO"
+  },
+  {
+    "calling_code": "+7",
+    "name": "Russia",
+    "emoji": "🇷🇺",
+    "iso_2": "RU"
+  },
+  {
+    "calling_code": "+250",
+    "name": "Rwanda",
+    "emoji": "🇷🇼",
+    "iso_2": "RW"
+  },
+  {
+    "calling_code": "+590",
+    "name": "Saint Barthélemy",
+    "emoji": "🇧🇱",
+    "iso_2": "BL"
+  },
+  {
+    "calling_code": "+290",
+    "name": "Saint Helena, Ascension and Tristan da Cunha",
+    "emoji": "🇸🇭",
+    "iso_2": "SH"
+  },
+  {
+    "calling_code": "+1-869",
+    "name": "Saint Kitts and Nevis",
+    "emoji": "🇰🇳",
+    "iso_2": "KN"
+  },
+  {
+    "calling_code": "+1-758",
+    "name": "Saint Lucia",
+    "emoji": "🇱🇨",
+    "iso_2": "LC"
+  },
+  {
+    "calling_code": "+590",
+    "name": "Saint Martin",
+    "emoji": "🇲🇫",
+    "iso_2": "MF"
+  },
+  {
+    "calling_code": "+508",
+    "name": "Saint Pierre and Miquelon",
+    "emoji": "🇵🇲",
+    "iso_2": "PM"
+  },
+  {
+    "calling_code": "+1-784",
+    "name": "Saint Vincent and the Grenadines",
+    "emoji": "🇻🇨",
+    "iso_2": "VC"
+  },
+  {
+    "calling_code": "+685",
+    "name": "Samoa",
+    "emoji": "🇼🇸",
+    "iso_2": "WS"
+  },
+  {
+    "calling_code": "+378",
+    "name": "San Marino",
+    "emoji": "🇸🇲",
+    "iso_2": "SM"
+  },
+  {
+    "calling_code": "+239",
+    "name": "Sao Tome and Principe",
+    "emoji": "🇸🇹",
+    "iso_2": "ST"
+  },
+  {
+    "calling_code": "+966",
+    "name": "Saudi Arabia",
+    "emoji": "🇸🇦",
+    "iso_2": "SA"
+  },
+  {
+    "calling_code": "+221",
+    "name": "Senegal",
+    "emoji": "🇸🇳",
+    "iso_2": "SN"
+  },
+  {
+    "calling_code": "+381",
+    "name": "Serbia",
+    "emoji": "🇷🇸",
+    "iso_2": "RS"
+  },
+  {
+    "calling_code": "+248",
+    "name": "Seychelles",
+    "emoji": "🇸🇨",
+    "iso_2": "SC"
+  },
+  {
+    "calling_code": "+232",
+    "name": "Sierra Leone",
+    "emoji": "🇸🇱",
+    "iso_2": "SL"
+  },
+  {
+    "calling_code": "+65",
+    "name": "Singapore",
+    "emoji": "🇸🇬",
+    "iso_2": "SG"
+  },
+  {
+    "calling_code": "+1-721",
+    "name": "Sint Maarten",
+    "emoji": "🇸🇽",
+    "iso_2": "SX"
+  },
+  {
+    "calling_code": "+421",
+    "name": "Slovakia",
+    "emoji": "🇸🇰",
+    "iso_2": "SK"
+  },
+  {
+    "calling_code": "+386",
+    "name": "Slovenia",
+    "emoji": "🇸🇮",
+    "iso_2": "SI"
+  },
+  {
+    "calling_code": "+677",
+    "name": "Solomon Islands",
+    "emoji": "🇸🇧",
+    "iso_2": "SB"
+  },
+  {
+    "calling_code": "+252",
+    "name": "Somalia",
+    "emoji": "🇸🇴",
+    "iso_2": "SO"
+  },
+  {
+    "calling_code": "+27",
+    "name": "South Africa",
+    "emoji": "🇿🇦",
+    "iso_2": "ZA"
+  },
+  {
+    "calling_code": "+82",
+    "name": "South Korea",
+    "emoji": "🇰🇷",
+    "iso_2": "KR"
+  },
+  {
+    "calling_code": "+211",
+    "name": "South Sudan",
+    "emoji": "🇸🇸",
+    "iso_2": "SS"
+  },
+  {
+    "calling_code": "+34",
+    "name": "Spain",
+    "emoji": "🇪🇸",
+    "iso_2": "ES"
+  },
+  {
+    "calling_code": "+94",
+    "name": "Sri Lanka",
+    "emoji": "🇱🇰",
+    "iso_2": "LK"
+  },
+  {
+    "calling_code": "+249",
+    "name": "Sudan",
+    "emoji": "🇸🇩",
+    "iso_2": "SD"
+  },
+  {
+    "calling_code": "+597",
+    "name": "Suriname",
+    "emoji": "🇸🇷",
+    "iso_2": "SR"
+  },
+  {
+    "calling_code": "+47",
+    "name": "Svalbard and Jan Mayen",
+    "emoji": "🇸🇯",
+    "iso_2": "SJ"
+  },
+  {
+    "calling_code": "+46",
+    "name": "Sweden",
+    "emoji": "🇸🇪",
+    "iso_2": "SE"
+  },
+  {
+    "calling_code": "+41",
+    "name": "Switzerland",
+    "emoji": "🇨🇭",
+    "iso_2": "CH"
+  },
+  {
+    "calling_code": "+963",
+    "name": "Syria",
+    "emoji": "🇸🇾",
+    "iso_2": "SY"
+  },
+  {
+    "calling_code": "+886",
+    "name": "Taiwan",
+    "emoji": "🇹🇼",
+    "iso_2": "TW"
+  },
+  {
+    "calling_code": "+992",
+    "name": "Tajikistan",
+    "emoji": "🇹🇯",
+    "iso_2": "TJ"
+  },
+  {
+    "calling_code": "+255",
+    "name": "Tanzania",
+    "emoji": "🇹🇿",
+    "iso_2": "TZ"
+  },
+  {
+    "calling_code": "+66",
+    "name": "Thailand",
+    "emoji": "🇹🇭",
+    "iso_2": "TH"
+  },
+  {
+    "calling_code": "+670",
+    "name": "Timor-Leste",
+    "emoji": "🇹🇱",
+    "iso_2": "TL"
+  },
+  {
+    "calling_code": "+228",
+    "name": "Togo",
+    "emoji": "🇹🇬",
+    "iso_2": "TG"
+  },
+  {
+    "calling_code": "+690",
+    "name": "Tokelau",
+    "emoji": "🇹🇰",
+    "iso_2": "TK"
+  },
+  {
+    "calling_code": "+676",
+    "name": "Tonga",
+    "emoji": "🇹🇴",
+    "iso_2": "TO"
+  },
+  {
+    "calling_code": "+1-868",
+    "name": "Trinidad and Tobago",
+    "emoji": "🇹🇹",
+    "iso_2": "TT"
+  },
+  {
+    "calling_code": "+216",
+    "name": "Tunisia",
+    "emoji": "🇹🇳",
+    "iso_2": "TN"
+  },
+  {
+    "calling_code": "+90",
+    "name": "Turkey",
+    "emoji": "🇹🇷",
+    "iso_2": "TR"
+  },
+  {
+    "calling_code": "+993",
+    "name": "Turkmenistan",
+    "emoji": "🇹🇲",
+    "iso_2": "TM"
+  },
+  {
+    "calling_code": "+1-649",
+    "name": "Turks and Caicos Islands",
+    "emoji": "🇹🇨",
+    "iso_2": "TC"
+  },
+  {
+    "calling_code": "+688",
+    "name": "Tuvalu",
+    "emoji": "🇹🇻",
+    "iso_2": "TV"
+  },
+  {
+    "calling_code": "+256",
+    "name": "Uganda",
+    "emoji": "🇺🇬",
+    "iso_2": "UG"
+  },
+  {
+    "calling_code": "+380",
+    "name": "Ukraine",
+    "emoji": "🇺🇦",
+    "iso_2": "UA"
+  },
+  {
+    "calling_code": "+971",
+    "name": "United Arab Emirates",
+    "emoji": "🇦🇪",
+    "iso_2": "AE"
+  },
+  {
+    "calling_code": "+44",
+    "name": "United Kingdom",
+    "emoji": "🇬🇧",
+    "iso_2": "GB"
+  },
+  {
+    "calling_code": "+1",
+    "name": "United States",
+    "emoji": "🇺🇸",
+    "iso_2": "US"
+  },
+  {
+    "calling_code": "+598",
+    "name": "Uruguay",
+    "emoji": "🇺🇾",
+    "iso_2": "UY"
+  },
+  {
+    "calling_code": "+998",
+    "name": "Uzbekistan",
+    "emoji": "🇺🇿",
+    "iso_2": "UZ"
+  },
+  {
+    "calling_code": "+678",
+    "name": "Vanuatu",
+    "emoji": "🇻🇺",
+    "iso_2": "VU"
+  },
+  {
+    "calling_code": "+58",
+    "name": "Venezuela",
+    "emoji": "🇻🇪",
+    "iso_2": "VE"
+  },
+  {
+    "calling_code": "+84",
+    "name": "Vietnam",
+    "emoji": "🇻🇳",
+    "iso_2": "VN"
+  },
+  {
+    "calling_code": "+681",
+    "name": "Wallis and Futuna",
+    "emoji": "🇼🇫",
+    "iso_2": "WF"
+  },
+  {
+    "calling_code": "+212",
+    "name": "Western Sahara",
+    "emoji": "🇪🇭",
+    "iso_2": "EH"
+  },
+  {
+    "calling_code": "+967",
+    "name": "Yemen",
+    "emoji": "🇾🇪",
+    "iso_2": "YE"
+  },
+  {
+    "calling_code": "+260",
+    "name": "Zambia",
+    "emoji": "🇿🇲",
+    "iso_2": "ZM"
+  },
+  {
+    "calling_code": "+263",
+    "name": "Zimbabwe",
+    "emoji": "🇿🇼",
+    "iso_2": "ZW"
+  }
+]

@@ -13,9 +13,10 @@
         >
           <template v-if="isImage">
             <img
-              :src="getThumbFilepath(attachment.url)"
+              :src="thumbFailed ? attachment.url : getThumbFilepath(attachment.url)"
               :alt="attachment.name"
               class="w-full h-full object-cover"
+              @error="thumbFailed = true"
             />
             <div
               class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
@@ -81,6 +82,7 @@ const props = defineProps({
 const emit = defineEmits(['preview'])
 
 const showAudio = ref(false)
+const thumbFailed = ref(false)
 
 const shortName = (name) => (name || '').substring(0, 40)
 

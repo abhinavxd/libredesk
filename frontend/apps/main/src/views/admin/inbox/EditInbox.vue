@@ -17,6 +17,12 @@
       :available-languages="availableLanguages"
       v-else-if="inbox.channel === 'livechat'"
     />
+    <WhatsAppInboxForm
+      :initialValues="inbox"
+      :submitForm="submitForm"
+      :isLoading="isLoading"
+      v-else-if="inbox.channel === 'whatsapp'"
+    />
   </div>
 </template>
 
@@ -25,6 +31,7 @@ import { onMounted, ref } from 'vue'
 import api from '../../../api'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
+import WhatsAppInboxForm from '@/features/admin/inbox/WhatsAppInboxForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -92,6 +99,24 @@ const submitForm = (values) => {
       ...values,
       channel: inbox.value.channel,
       config: values.config
+    }
+  } else if (inbox.value.channel === 'whatsapp') {
+    payload = {
+      name: values.name,
+      from: values.from,
+      channel: inbox.value.channel,
+      enabled: values.enabled,
+      csat_enabled: values.csat_enabled,
+      prompt_tags_on_reply: values.prompt_tags_on_reply,
+      config: { ...values.config }
+    }
+    // Match the password-dummy preservation pattern email uses: empty out
+    // masked secrets so the backend keeps the existing encrypted value.
+    if (payload.config.access_token?.includes('•')) {
+      payload.config.access_token = ''
+    }
+    if (payload.config.app_secret?.includes('•')) {
+      payload.config.app_secret = ''
     }
   }
 

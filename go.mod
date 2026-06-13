@@ -42,6 +42,7 @@ require (
 	github.com/zerodha/simplesessions/stores/redis/v3 v3.0.0
 	github.com/zerodha/simplesessions/v3 v3.0.0
 	golang.org/x/crypto v0.45.0
+	golang.org/x/image v0.38.0
 	golang.org/x/mod v0.33.0
 	golang.org/x/oauth2 v0.27.0
 )
@@ -76,7 +77,6 @@ require (
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.35.0 // indirect

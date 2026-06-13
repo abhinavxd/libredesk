@@ -32,6 +32,11 @@ type Inbox struct {
 	Config             json.RawMessage `db:"config" json:"config"`
 	Secret             null.String     `db:"secret" json:"secret"`
 	LinkedEmailInboxID null.Int        `db:"linked_email_inbox_id" json:"linked_email_inbox_id"`
+	// Computed, not persisted. The frontend uses this to display the URL the
+	// admin pastes into Meta's webhook config.
+	WebhookURL string `db:"-" json:"webhook_url,omitempty"`
+	// Computed, not persisted. True when Meta recently rejected this inbox's access token.
+	TokenInvalid bool `db:"-" json:"token_invalid,omitempty"`
 }
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.
@@ -139,6 +144,22 @@ func (m *Inbox) ClearPasswords() error {
 		if m.Secret.Valid && m.Secret.String != "" {
 			m.Secret = null.StringFrom(strings.Repeat(stringutil.PasswordDummy, 10))
 		}
+	case "whatsapp":
+		var cfg map[string]any
+		if err := json.Unmarshal(m.Config, &cfg); err != nil {
+			return err
+		}
+		dummy := strings.Repeat(stringutil.PasswordDummy, 10)
+		for _, field := range []string{"access_token", "app_secret"} {
+			if v, ok := cfg[field].(string); ok && v != "" {
+				cfg[field] = dummy
+			}
+		}
+		cleared, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		m.Config = cleared
 	default:
 		return nil
 	}

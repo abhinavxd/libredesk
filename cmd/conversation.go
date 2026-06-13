@@ -366,8 +366,17 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	readInboxID, readSourceID, err := app.conversation.WhatsAppReadReceiptTarget(uuid, auser.ID)
+	if err != nil {
+		app.lo.Error("error resolving whatsapp read receipt target", "conversation_uuid", uuid, "error", err)
+	}
+
 	if err = app.conversation.UpdateUserLastSeen(uuid, auser.ID); err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if readSourceID != "" {
+		go markWhatsAppMessageRead(app, readInboxID, readSourceID)
 	}
 	return r.SendEnvelope(true)
 }

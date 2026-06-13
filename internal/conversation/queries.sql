@@ -177,12 +177,15 @@ SELECT
    ct.last_active_at as "contact.last_active_at",
    ct.last_login_at as "contact.last_login_at",
    ct.external_user_id as "contact.external_user_id",
+   (SELECT json_agg(json_build_object('channel', cci.channel, 'identifier', cci.identifier))
+      FROM contact_channel_identities cci WHERE cci.contact_id = ct.id) as "contact.channel_identities",
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
    as_latest.id as applied_sla_id,
    nxt_resp_event.deadline_at AS next_response_deadline_at,
    nxt_resp_event.met_at as next_response_met_at,
-   c.last_continuity_email_sent_at
+   c.last_continuity_email_sent_at,
+   c.last_inbound_at
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
@@ -704,6 +707,68 @@ update conversation_messages set status = $1, updated_at = NOW() where uuid = $2
 
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
+
+-- name: update-message-source-id-by-uuid
+UPDATE conversation_messages SET source_id = $2, updated_at = NOW() WHERE uuid = $1;
+
+-- name: update-message-status-by-source-id
+UPDATE conversation_messages m
+SET status = $2, updated_at = NOW()
+FROM conversations c
+WHERE m.source_id = $1
+  AND m.status != 'failed'
+  AND m.status != $2
+  AND c.id = m.conversation_id
+RETURNING m.uuid, c.uuid AS conversation_uuid;
+
+-- name: merge-message-meta-by-uuid
+UPDATE conversation_messages m
+SET meta = COALESCE(m.meta, '{}'::jsonb) || $2::jsonb,
+    updated_at = NOW()
+FROM conversations c
+WHERE m.uuid = $1
+  AND c.id = m.conversation_id
+RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
+
+-- name: merge-message-meta-by-source-id
+UPDATE conversation_messages m
+SET meta = COALESCE(m.meta, '{}'::jsonb) || $2::jsonb,
+    updated_at = NOW()
+FROM conversations c
+WHERE m.source_id = $1
+  AND c.id = m.conversation_id
+RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
+
+-- name: get-message-uuid-by-source-id
+SELECT uuid FROM conversation_messages WHERE source_id = $1 LIMIT 1;
+
+-- name: get-whatsapp-read-receipt-target
+SELECT cm.source_id, c.inbox_id
+FROM conversation_messages cm
+JOIN conversations c ON c.id = cm.conversation_id
+JOIN inboxes i ON i.id = c.inbox_id
+WHERE c.uuid = $1
+  AND i.channel = 'whatsapp'
+  AND cm.type = 'incoming'
+  AND COALESCE(cm.source_id, '') != ''
+  AND cm.created_at > COALESCE(
+        (SELECT last_seen_at FROM conversation_last_seen ls
+         WHERE ls.conversation_id = c.id AND ls.user_id = $2),
+        'epoch'::timestamptz)
+ORDER BY cm.created_at DESC
+LIMIT 1;
+
+-- name: update-conversation-last-inbound-at
+UPDATE conversations SET last_inbound_at = NOW(), updated_at = NOW() WHERE id = $1;
+
+-- name: get-latest-open-conversation-by-contact-inbox
+SELECT id, uuid
+FROM conversations
+WHERE contact_id = $1
+  AND inbox_id = $2
+  AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved')
+ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+LIMIT 1;
 
 -- name: get-offline-livechat-conversations
 SELECT

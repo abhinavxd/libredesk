@@ -61,7 +61,7 @@ LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
 WHERE u.deleted_at IS NULL
     AND ($1 = 0 OR u.id = $1)
     AND ($2 = '' OR u.email = $2)
-    AND (cardinality($3::text[]) = 0 OR u.type::text = ANY($3::text[]))
+    AND (COALESCE(cardinality($3::text[]), 0) = 0 OR u.type::text = ANY($3::text[]))
 GROUP BY u.id
 ORDER BY u.id ASC
 LIMIT 1;
@@ -163,7 +163,11 @@ RETURNING user_id;
 INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes)
 VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7)
 ON CONFLICT (external_user_id) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL
-DO UPDATE SET email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = now()
+DO UPDATE SET
+    email = COALESCE(EXCLUDED.email, users.email),
+    first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
+    last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
+    updated_at = now()
 RETURNING id;
 
 -- name: insert-contact-without-external-id
@@ -192,6 +196,36 @@ SELECT EXISTS(
 -- name: set-external-user-id
 UPDATE users SET external_user_id = $2, updated_at = now()
 WHERE id = $1 AND type = 'contact' AND deleted_at IS NULL;
+
+-- name: set-contact-phone-if-missing
+UPDATE users SET phone_number = $2, phone_number_country_code = NULLIF($3, ''), updated_at = now()
+WHERE id = $1
+  AND type IN ('contact', 'visitor')
+  AND deleted_at IS NULL
+  AND (phone_number IS NULL OR phone_number = '');
+
+-- name: update-contact-name-if-default
+UPDATE users SET first_name = $2, last_name = $3, updated_at = now()
+WHERE id = $1
+  AND type = 'contact'
+  AND deleted_at IS NULL
+  AND first_name = $4
+  AND COALESCE(last_name, '') = '';
+
+-- name: get-contact-id-by-channel-identity
+SELECT contact_id FROM contact_channel_identities WHERE channel = $1::channels AND identifier = $2;
+
+-- name: get-channel-identities-by-contact
+SELECT channel, identifier FROM contact_channel_identities WHERE contact_id = $1 ORDER BY id;
+
+-- name: get-channel-identity
+SELECT identifier FROM contact_channel_identities WHERE contact_id = $1 AND channel = $2::channels ORDER BY id LIMIT 1;
+
+-- name: insert-channel-identity
+INSERT INTO contact_channel_identities (contact_id, channel, identifier)
+VALUES ($1, $2::channels, $3)
+ON CONFLICT (channel, identifier) DO UPDATE SET updated_at = now()
+RETURNING contact_id;
 
 -- name: insert-visitor
 INSERT INTO users (email, type, first_name, last_name, custom_attributes)

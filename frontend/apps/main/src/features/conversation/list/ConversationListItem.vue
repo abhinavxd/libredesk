@@ -28,7 +28,7 @@
                 </AvatarFallback>
               </Avatar>
               <span class="absolute -bottom-0.5 -right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-background border border-border">
-                <component :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail" class="w-2.5 h-2.5 text-muted-foreground" />
+                <component :is="channelIcon" class="w-2.5 h-2.5 text-muted-foreground" />
               </span>
             </div>
             <div
@@ -152,6 +152,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { Mail, MessageSquare, Reply, MailOpen } from 'lucide-vue-next'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,
@@ -185,6 +186,13 @@ const props = defineProps({
 const handleMarkAsUnread = () => {
   conversationStore.markAsUnread(props.conversation.uuid)
 }
+
+const CHANNEL_ICONS = {
+  livechat: MessageSquare,
+  whatsapp: WhatsAppIcon
+}
+
+const channelIcon = computed(() => CHANNEL_ICONS[props.conversation.inbox_channel] || Mail)
 
 const conversationRoute = computed(() => {
   const baseRoute = route.name.includes('team')

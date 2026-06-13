@@ -177,6 +177,9 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Send message
 	err = inb.Send(outbound)
 	if err != nil && err != livechat.ErrClientNotConnected {
+		if inb.Channel() == inbox.ChannelWhatsApp {
+			m.RecordWhatsAppSendFailure(message.UUID, err.Error())
+		}
 		handleError(err, "error sending message")
 		return
 	}
@@ -299,8 +302,7 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 			m.lo.Error("could not render email content using template", "id", message.ID, "error", err)
 			return fmt.Errorf("could not render email content using template: %w", err)
 		}
-	case inbox.ChannelLiveChat:
-		// Live chat doesn't use templates for rendering messages.
+	case inbox.ChannelLiveChat, inbox.ChannelWhatsApp:
 		return nil
 	default:
 		m.lo.Warn("unknown message channel", "channel", channel)
@@ -381,6 +383,64 @@ func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
 	}
 
 	return nil
+}
+
+// UpdateMessageSourceID sets the source_id on a message identified by UUID.
+func (m *Manager) UpdateMessageSourceID(messageUUID, sourceID string) error {
+	if messageUUID == "" || sourceID == "" {
+		return nil
+	}
+	if _, err := m.q.UpdateMessageSourceIDByUUID.Exec(messageUUID, sourceID); err != nil {
+		m.lo.Error("error updating message source id", "message_uuid", messageUUID, "error", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateMessageStatusBySourceID updates a message status keyed by transport source_id.
+func (m *Manager) UpdateMessageStatusBySourceID(sourceID, status string) error {
+	if sourceID == "" {
+		return nil
+	}
+	var row struct {
+		UUID             string `db:"uuid"`
+		ConversationUUID string `db:"conversation_uuid"`
+	}
+	if err := m.q.UpdateMessageStatusBySourceID.Get(&row, sourceID, status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		m.lo.Error("error updating message status by source id", "source_id", sourceID, "error", err)
+		return err
+	}
+	m.BroadcastMessageUpdate(row.ConversationUUID, row.UUID, map[string]any{"status": status})
+	return nil
+}
+
+// UpdateConversationLastInboundAt advances the clock gating business-initiated messages (WhatsApp 24h window).
+func (m *Manager) UpdateConversationLastInboundAt(conversationID int) error {
+	now := time.Now()
+	if _, err := m.q.UpdateConversationLastInboundAt.Exec(conversationID); err != nil {
+		m.lo.Error("error updating conversation last_inbound_at", "conversation_id", conversationID, "error", err)
+		return err
+	}
+	uuid, err := m.GetConversationUUID(conversationID)
+	if err == nil && uuid != "" {
+		m.BroadcastConversationUpdate(uuid, map[string]any{"last_inbound_at": now.Format(time.RFC3339)})
+	}
+	return nil
+}
+
+// GetLatestOpenConversationForContact returns the most recent non-resolved conversation for a (contact, inbox) pair, or sql.ErrNoRows.
+func (m *Manager) GetLatestOpenConversationForContact(contactID, inboxID int) (int, string, error) {
+	var row struct {
+		ID   int    `db:"id"`
+		UUID string `db:"uuid"`
+	}
+	if err := m.q.GetLatestOpenConversationByContact.Get(&row, contactID, inboxID); err != nil {
+		return 0, "", err
+	}
+	return row.ID, row.UUID, nil
 }
 
 // MarkMessageAsPending updates message status to `Pending`, enqueuing it for sending.
@@ -490,6 +550,12 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			m.lo.Error("error generating source message id", "error", err)
 			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
+	case inbox.ChannelWhatsApp:
+		rendered, err := m.prepareWhatsAppOutbound(inboxRecord, contactID, conversationUUID, content, len(media) > 0, metaMap)
+		if err != nil {
+			return models.Message{}, err
+		}
+		content = rendered
 	}
 
 	// Marshal meta.
@@ -515,7 +581,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		ContentType:       models.ContentTypeHTML,
 		Private:           false,
 		Media:             media,
-		SourceID:          null.StringFrom(sourceID),
+		SourceID:          null.NewString(sourceID, sourceID != ""),
 		MessageReceiverID: contactID,
 		Meta:              metaJSON,
 	}
@@ -716,6 +782,8 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("%s set %s SLA policy", actorName, newValue)
 	case models.ActivityParticipantAdded:
 		content = fmt.Sprintf("%s joined the conversation", newValue)
+	case models.ActivityCSATNotSent:
+		content = m.i18n.T("conversation.whatsapp.csatNotSent")
 	default:
 		return "", fmt.Errorf("invalid activity type %s", activityType)
 	}
@@ -779,7 +847,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	msg := in.ToMessage(senderID, conversationID, conversationUUID)
 
 	// Upload message attachments. On failure, delete the conversation if it was just created for this message.
-	if upErr := m.uploadMessageAttachments(&msg); upErr != nil {
+	if upErr := m.UploadMessageAttachments(&msg); upErr != nil {
 		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID, "error", upErr)
 		if isNewConversation && conversationUUID != "" {
 			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID)
@@ -906,7 +974,7 @@ func (m *Manager) isVisitorUpgradeSafe(conversation models.Conversation) bool {
 // ProcessIncomingLiveChatMessage handles incoming live chat messages.
 func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Message, error) {
 	// Upload message attachments.
-	if err := m.uploadMessageAttachments(&msg); err != nil {
+	if err := m.UploadMessageAttachments(&msg); err != nil {
 		return models.Message{}, fmt.Errorf("uploading message attachments: %w", err)
 	}
 
@@ -923,6 +991,27 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
 	// isNewConversation = false since conversation always exists for live chat.
 	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, false); err != nil {
+		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
+	}
+
+	return msg, nil
+}
+
+// ProcessIncomingWhatsAppMessage uploads attachments, inserts the message, advances the 24h window clock and runs the shared incoming hooks.
+func (m *Manager) ProcessIncomingWhatsAppMessage(msg models.Message, isNewConversation bool) (models.Message, error) {
+	if err := m.UploadMessageAttachments(&msg); err != nil {
+		return models.Message{}, fmt.Errorf("uploading whatsapp attachments: %w", err)
+	}
+
+	if err := m.InsertMessage(&msg); err != nil {
+		return models.Message{}, err
+	}
+
+	if err := m.UpdateConversationLastInboundAt(msg.ConversationID); err != nil {
+		m.lo.Error("error updating last_inbound_at", "conversation_id", msg.ConversationID, "error", err)
+	}
+
+	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 	}
 
@@ -1078,8 +1167,8 @@ func (m *Manager) linkInlineMediaToMessage(uuids []string, messageID int) {
 	}
 }
 
-// uploadMessageAttachments uploads all attachments for a message.
-func (m *Manager) uploadMessageAttachments(message *models.Message) error {
+// UploadMessageAttachments uploads all attachments for a message.
+func (m *Manager) UploadMessageAttachments(message *models.Message) error {
 	if len(message.Attachments) == 0 {
 		return nil
 	}

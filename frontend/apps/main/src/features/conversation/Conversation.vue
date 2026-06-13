@@ -37,12 +37,14 @@
     <!-- Messages & reply box -->
     <div class="flex flex-col flex-grow overflow-hidden">
       <MessageList class="flex-1 overflow-y-auto" />
-      <ReplyBox />
+      <WhatsAppComposer v-if="isWhatsAppChannel" />
+      <ReplyBox v-else />
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useConversationStore } from '../../stores/conversation'
 import {
   DropdownMenu,
@@ -52,12 +54,17 @@ import {
 } from '@shared-ui/components/ui/dropdown-menu'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
+import WhatsAppComposer from './WhatsAppComposer.vue'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
+
+const isWhatsAppChannel = computed(
+  () => conversationStore.current?.inbox_channel === 'whatsapp'
+)
 
 const handleUpdateStatus = (status) => {
   if (status === CONVERSATION_DEFAULT_STATUSES.SNOOZED) {

@@ -48,6 +48,8 @@ import (
 	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/webhook"
+	whatsappapi "github.com/abhinavxd/libredesk/internal/whatsapp"
+	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp_template"
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -111,6 +113,11 @@ type App struct {
 	rateLimit        *ratelimit.Limiter
 	redis            *redis.Client
 	importer         *importer.Importer
+	whatsappTemplate *whatsappTemplate.Manager
+	whatsappClient   *whatsappapi.Client
+	whatsappIngester *WhatsAppIngester
+	// WhatsApp inbox IDs whose Meta token was recently rejected, keyed to the last error time.
+	whatsappAuthErrors sync.Map
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -233,8 +240,12 @@ func main() {
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
 
+	waClient := initWhatsAppClient()
+	waTemplates := initWhatsAppTemplates(db, i18n, waClient, inbox)
+	conversation.SetWhatsAppTemplateStore(waTemplates)
+
 	// Start inboxes.
-	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL)
+	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, conversation)
 
 	go automation.Run(ctx, automationWorkers)
 	go autoassigner.Run(ctx, autoAssignInterval)
@@ -288,8 +299,14 @@ func main() {
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		userNotification: userNotification,
+		whatsappClient:   waClient,
+		whatsappTemplate: waTemplates,
 	}
 	app.consts.Store(constants)
+	app.whatsappIngester = newWhatsAppIngester(app, 0, 0)
+	go app.whatsappIngester.Run(ctx)
+	waClient.SetAuthErrorHook(makeWhatsAppAuthErrorHook(app))
+	go whatsappTemplateSyncWorker(ctx, app)
 
 	g := fastglue.NewGlue()
 	g.SetContext(app)
@@ -333,6 +350,10 @@ func main() {
 	notifier.Close()
 	colorlog.Red("Shutting down webhook...")
 	webhook.Close()
+	if app.whatsappIngester != nil {
+		colorlog.Red("Shutting down whatsapp ingester...")
+		app.whatsappIngester.Close()
+	}
 	colorlog.Red("Shutting down conversation...")
 	conversation.Close()
 	colorlog.Red("Shutting down SLA...")

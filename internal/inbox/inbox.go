@@ -28,6 +28,7 @@ import (
 const (
 	ChannelEmail    = "email"
 	ChannelLiveChat = "livechat"
+	ChannelWhatsApp = "whatsapp"
 )
 
 var (
@@ -419,6 +420,33 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			}
 			inbox.Secret = null.StringFrom(encryptedSecret)
 		}
+	case ChannelWhatsApp:
+		var currentCfg, updateCfg map[string]any
+		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
+			m.lo.Error("error unmarshalling current whatsapp config", "id", id, "error", err)
+			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		if len(inbox.Config) == 0 {
+			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "{globals.terms.config}"), nil)
+		}
+		if err := json.Unmarshal(inbox.Config, &updateCfg); err != nil {
+			m.lo.Error("error unmarshalling whatsapp update config", "id", id, "error", err)
+			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		for _, fieldName := range []string{"access_token", "app_secret"} {
+			val, _ := updateCfg[fieldName].(string)
+			if val == "" || strings.Contains(val, stringutil.PasswordDummy) {
+				if existing, ok := currentCfg[fieldName].(string); ok {
+					updateCfg[fieldName] = existing
+				}
+			}
+		}
+		merged, err := json.Marshal(updateCfg)
+		if err != nil {
+			m.lo.Error("error marshalling whatsapp updated config", "id", id, "error", err)
+			return imodels.Inbox{}, err
+		}
+		inbox.Config = merged
 	}
 
 	// Encrypt sensitive fields before updating
@@ -633,6 +661,17 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
+	// Encrypt WhatsApp credentials.
+	for _, fieldName := range []string{"access_token", "app_secret"} {
+		if value, ok := cfg[fieldName].(string); ok && value != "" && !crypto.IsEncrypted(value) {
+			encrypted, err := crypto.Encrypt(value, m.encryptionKey)
+			if err != nil {
+				return nil, fmt.Errorf("encrypting whatsapp %s: %w", fieldName, err)
+			}
+			cfg[fieldName] = encrypted
+		}
+	}
+
 	encrypted, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling encrypted config: %w", err)
@@ -696,6 +735,17 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 				}
 				oauthMap[fieldName] = decrypted
 			}
+		}
+	}
+
+	// Decrypt WhatsApp credentials.
+	for _, fieldName := range []string{"access_token", "app_secret"} {
+		if value, ok := cfg[fieldName].(string); ok && crypto.IsEncrypted(value) {
+			decrypted, err := crypto.Decrypt(value, m.encryptionKey)
+			if err != nil {
+				return nil, fmt.Errorf("decrypting whatsapp %s: %w", fieldName, err)
+			}
+			cfg[fieldName] = decrypted
 		}
 	}
 
