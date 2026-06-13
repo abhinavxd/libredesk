@@ -52,7 +52,8 @@ import {
   Link,
   BarChart3,
   CircleUser,
-  Contact
+  Contact,
+  UserPlus
 } from 'lucide-vue-next'
 
 const navIconMap = {
@@ -102,6 +103,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
+import CreateContactDialog from '@main/features/contact/CreateContactDialog.vue'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
@@ -233,6 +235,12 @@ const hoveredViewId = ref(null)
 // Track delete confirmation dialog state
 const isDeleteOpen = ref(false)
 const viewToDelete = ref(null)
+const showCreateContactDialog = ref(false)
+
+const handleContactCreated = (contact) => {
+  showCreateContactDialog.value = false
+  router.push({ name: 'contact-detail', params: { id: contact.id } })
+}
 </script>
 
 <template>
@@ -268,10 +276,20 @@ const viewToDelete = ref(null)
                   </router-link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem v-if="userStore.can('contacts:write')">
+                <SidebarMenuButton @click="showCreateContactDialog = true">
+                  <UserPlus />
+                  <span>{{ t('contact.newContact') }}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
+      <CreateContactDialog
+        v-model:open="showCreateContactDialog"
+        @created="handleContactCreated"
+      />
     </template>
 
     <!-- Reports sidebar -->
