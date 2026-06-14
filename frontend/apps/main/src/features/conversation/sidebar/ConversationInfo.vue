@@ -62,14 +62,6 @@
       </div>
     </div>
 
-    <div v-if="conversation.last_resolved_at && conversation.last_resolved_at !== conversation.resolved_at">
-      <p class="sidebar-label">{{ $t('globals.terms.lastResolvedAt') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <p v-else class="sidebar-value">
-        {{ format(conversation.last_resolved_at, 'PPpp') }}
-      </p>
-    </div>
-
     <div>
       <div class="flex items-center gap-2">
         <p class="sidebar-label">{{ $t('globals.terms.lastReplyAt') }}</p>

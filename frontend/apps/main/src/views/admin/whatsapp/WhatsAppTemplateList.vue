@@ -1,56 +1,81 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
-
-  <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-      <div class="flex items-center gap-3">
-        <label class="text-sm text-muted-foreground">{{ $t('globals.terms.inbox') }}</label>
-        <Select v-model="selectedInboxID" @update:model-value="onInboxChange">
-          <SelectTrigger class="w-72">
-            <SelectValue :placeholder="$t('placeholders.selectInbox')" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="inb in whatsappInboxes" :key="inb.id" :value="inb.id">
-              {{ inb.name }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+  <AdminSplitLayout>
+    <template #content>
+      <div class="mb-5">
+        <CustomBreadcrumb :links="breadcrumbLinks" />
       </div>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" :disabled="!selectedInboxID || isSyncing" @click="onSync">
-          <RefreshCw class="size-4" :class="{ 'animate-spin': isSyncing }" />
-          {{ $t('admin.whatsappTemplates.syncFromMeta') }}
-        </Button>
-        <Button :disabled="!selectedInboxID" @click="onNew">
-          {{ $t('admin.whatsappTemplates.newTemplate') }}
-        </Button>
+
+      <LoadingOverlay :loading="isLoading" reserve-height>
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div class="flex items-center gap-3">
+            <label class="text-sm text-muted-foreground">{{ $t('globals.terms.inbox') }}</label>
+            <Select v-model="selectedInboxID" @update:model-value="onInboxChange">
+              <SelectTrigger class="w-72">
+                <SelectValue :placeholder="$t('placeholders.selectInbox')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="inb in whatsappInboxes" :key="inb.id" :value="inb.id">
+                  {{ inb.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex items-center gap-2">
+            <Button variant="outline" :disabled="!selectedInboxID || isSyncing" @click="onSync">
+              <RefreshCw class="size-4" :class="{ 'animate-spin': isSyncing }" />
+              {{ $t('admin.whatsappTemplates.syncFromMeta') }}
+            </Button>
+            <Button :disabled="!selectedInboxID" @click="onNew">
+              {{ $t('admin.whatsappTemplates.newTemplate') }}
+            </Button>
+          </div>
+        </div>
+
+        <div v-if="!whatsappInboxes.length" class="box p-6 text-sm text-muted-foreground">
+          {{ $t('admin.whatsappTemplates.noInboxes') }}
+        </div>
+        <DataTable v-else :columns="columns" :data="templates" :loading="isLoading" />
+      </LoadingOverlay>
+
+      <AlertDialog :open="deleteAlertOpen" @update:open="deleteAlertOpen = $event">
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {{ $t('admin.whatsappTemplates.confirmDelete') }}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+            <AlertDialogAction @click="handleDelete">
+              {{ $t('globals.messages.delete') }}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </template>
+
+    <template #help>
+      <div class="space-y-4">
+        <div class="space-y-1">
+          <p class="text-sm font-medium text-foreground">
+            {{ $t('admin.whatsappTemplates.title') }}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            {{ $t('admin.whatsappTemplates.help.overview') }}
+          </p>
+          <a
+            href="https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link-style text-sm"
+          >
+            {{ $t('globals.terms.learnMore') }}
+          </a>
+        </div>
       </div>
-    </div>
-
-    <div v-if="!whatsappInboxes.length" class="box p-6 text-sm text-muted-foreground">
-      {{ $t('admin.whatsappTemplates.noInboxes') }}
-    </div>
-    <DataTable v-else :columns="columns" :data="templates" :loading="isLoading" />
-  </LoadingOverlay>
-
-  <AlertDialog :open="deleteAlertOpen" @update:open="deleteAlertOpen = $event">
-    <AlertDialogContent>
-      <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
-        <AlertDialogDescription>
-          {{ $t('admin.whatsappTemplates.confirmDelete') }}
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <AlertDialogFooter>
-        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="handleDelete">
-          {{ $t('globals.messages.delete') }}
-        </AlertDialogAction>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
+    </template>
+  </AdminSplitLayout>
 </template>
 
 <script setup>
@@ -81,6 +106,7 @@ import {
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
+import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useInboxStore } from '@main/stores/inbox'

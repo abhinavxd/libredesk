@@ -47,7 +47,6 @@ const (
 	ConversationHoursSinceFirstReply   = "hours_since_first_reply"
 	ConversationHoursSinceLastReply    = "hours_since_last_reply"
 	ConversationHoursSinceResolved     = "hours_since_resolved"
-	ConversationHoursSinceLastResolved = "hours_since_last_resolved"
 	ConversationInbox                  = "inbox"
 	ContactEmail                       = "contact_email"
 

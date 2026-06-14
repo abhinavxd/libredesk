@@ -19,23 +19,6 @@
       </FormItem>
     </FormField>
 
-    <FormField v-slot="{ componentField }" name="from">
-      <FormItem>
-        <FormLabel>{{ $t('admin.inbox.whatsapp.displayName') }}</FormLabel>
-        <FormControl>
-          <Input
-            type="text"
-            :placeholder="t('admin.inbox.whatsapp.displayName.placeholder')"
-            v-bind="componentField"
-          />
-        </FormControl>
-        <FormDescription>
-          {{ $t('admin.inbox.whatsapp.displayName.description') }}
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
     <!-- Toggle Fields -->
     <FormField v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
@@ -82,91 +65,97 @@
         <span>{{ $t('admin.inbox.whatsapp.metaCredentials.description') }}</span>
       </p>
 
-      <FormField v-slot="{ componentField }" name="config.phone_number_id">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.phoneNumberID') }}</FormLabel>
-          <FormControl>
-            <Input
-              type="text"
-              :placeholder="t('admin.inbox.whatsapp.phoneNumberID.placeholder')"
-              v-bind="componentField"
-            />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.whatsapp.phoneNumberID.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
+      <div class="grid grid-cols-2 gap-4">
+        <FormField v-slot="{ componentField }" name="config.phone_number_id">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.phoneNumberID') }}</FormLabel>
+            <FormControl>
+              <Input
+                type="text"
+                :placeholder="t('admin.inbox.whatsapp.phoneNumberID.placeholder')"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormDescription>
+              {{ $t('admin.inbox.whatsapp.phoneNumberID.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-      <FormField v-slot="{ componentField }" name="config.waba_id">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.wabaID') }}</FormLabel>
-          <FormControl>
-            <Input
-              type="text"
-              :placeholder="t('admin.inbox.whatsapp.wabaID.placeholder')"
-              v-bind="componentField"
-            />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.whatsapp.wabaID.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
+        <FormField v-slot="{ componentField }" name="config.waba_id">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.wabaID') }}</FormLabel>
+            <FormControl>
+              <Input
+                type="text"
+                :placeholder="t('admin.inbox.whatsapp.wabaID.placeholder')"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormDescription>
+              {{ $t('admin.inbox.whatsapp.wabaID.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
 
-      <FormField v-slot="{ componentField }" name="config.access_token">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.accessToken') }}</FormLabel>
-          <FormControl>
-            <Input type="password" placeholder="••••••••" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.whatsapp.accessToken.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
+      <div class="grid grid-cols-2 gap-4">
+        <FormField v-slot="{ componentField }" name="config.access_token">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.accessToken') }}</FormLabel>
+            <FormControl>
+              <Input type="password" placeholder="••••••••" v-bind="componentField" />
+            </FormControl>
+            <FormDescription>
+              {{ $t('admin.inbox.whatsapp.accessToken.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-      <FormField v-slot="{ componentField }" name="config.app_secret">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.appSecret') }}</FormLabel>
-          <FormControl>
-            <Input type="password" placeholder="••••••••" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.whatsapp.appSecret.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
+        <FormField v-slot="{ componentField }" name="config.app_secret">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.appSecret') }}</FormLabel>
+            <FormControl>
+              <Input type="password" placeholder="••••••••" v-bind="componentField" />
+            </FormControl>
+            <FormDescription>
+              {{ $t('admin.inbox.whatsapp.appSecret.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
 
-      <FormField v-slot="{ componentField }" name="config.api_version">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.apiVersion') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="v21.0" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.whatsapp.apiVersion.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
+      <div class="grid grid-cols-2 gap-4">
+        <FormField v-slot="{ componentField }" name="config.api_version">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.apiVersion') }}</FormLabel>
+            <FormControl>
+              <Input type="text" placeholder="v21.0" v-bind="componentField" />
+            </FormControl>
+            <FormDescription>
+              {{ $t('admin.inbox.whatsapp.apiVersion.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-      <FormField v-slot="{ componentField }" name="config.reopen_window_hours">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
-          <FormControl>
-            <Input type="number" min="0" placeholder="48" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.whatsapp.reopenWindow.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
+        <FormField v-slot="{ componentField }" name="config.reopen_window_hours">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
+            <FormControl>
+              <Input type="number" min="0" placeholder="48" v-bind="componentField" />
+            </FormControl>
+            <FormDescription>
+              {{ $t('admin.inbox.whatsapp.reopenWindow.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
     </div>
 
     <!-- Webhook Configuration -->
@@ -278,7 +267,6 @@ const form = useForm({
   validationSchema: computed(() => toTypedSchema(createFormSchema(t))),
   initialValues: {
     name: '',
-    from: '',
     enabled: true,
     csat_enabled: false,
     prompt_tags_on_reply: false,
@@ -318,7 +306,14 @@ watch(
     if (Object.keys(newValues).length === 0) {
       return
     }
-    form.setValues(newValues)
+    // An unset reopen window is off (0), not the new-inbox default of 48.
+    form.setValues({
+      ...newValues,
+      config: {
+        ...(newValues.config || {}),
+        reopen_window_hours: newValues.config?.reopen_window_hours ?? 0
+      }
+    })
   },
   { deep: true, immediate: true }
 )

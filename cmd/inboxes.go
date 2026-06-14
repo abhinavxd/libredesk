@@ -593,6 +593,11 @@ func trimInboxFields(inb *imodels.Inbox) error {
 	inb.Name = strings.TrimSpace(inb.Name)
 	inb.From = strings.TrimSpace(inb.From)
 
+	// WhatsApp has no separate display-name field; the inbox name is the message From.
+	if inb.Channel == whatsappChannel.ChannelWhatsApp && inb.From == "" {
+		inb.From = inb.Name
+	}
+
 	// Trim email config fields if this is an email channel.
 	if inb.Channel == inbox.ChannelEmail && len(inb.Config) > 0 {
 		var cfg imodels.Config

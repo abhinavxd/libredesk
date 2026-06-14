@@ -191,11 +191,6 @@ export function useConversationFilters () {
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
         },
-        hours_since_last_resolved: {
-            label: t('globals.messages.hoursSinceLastResolved'),
-            type: FIELD_TYPE.NUMBER,
-            operators: FIELD_OPERATORS.NUMBER
-        },
         inbox: {
             label: t('globals.terms.inbox'),
             type: FIELD_TYPE.SELECT,
