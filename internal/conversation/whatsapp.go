@@ -28,10 +28,6 @@ const WhatsAppWindowDuration = 24 * time.Hour
 // whatsAppMaxTextLength is Meta's cap on a text message body.
 const whatsAppMaxTextLength = 4096
 
-var phoneDigitsReplacer = strings.NewReplacer("+", "", "-", "", " ", "", "(", "", ")", "")
-
-var templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z0-9_]+\}\}`)
-
 // WhatsAppStatus values mirror Meta's delivery lifecycle, kept in message.meta since the message_status enum collapses delivered/read into sent.
 const (
 	WhatsAppStatusSent      = "sent"
@@ -39,6 +35,8 @@ const (
 	WhatsAppStatusRead      = "read"
 	WhatsAppStatusFailed    = "failed"
 )
+
+var templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z0-9_]+\}\}`)
 
 // MessageUUIDBySourceID resolves a transport-side message ID to a local message UUID, "" with nil error when no match.
 func (m *Manager) MessageUUIDBySourceID(sourceID string) (string, error) {
@@ -136,7 +134,7 @@ func (m *Manager) mergeWhatsAppMeta(stmt *sqlx.Stmt, key string, patch map[strin
 	return nil
 }
 
-// sendWhatsAppCSAT delivers CSAT via the inbox's reserved Meta template (window-proof), falls back to a plain link inside the 24h window, and otherwise records an activity line so agents see why nothing was sent.
+// sendWhatsAppCSAT sends CSAT via the reserved template, falls back to a link inside the 24h window, else records a not-sent activity.
 func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversation, csatUUID, csatURL string) error {
 	meta := map[string]any{
 		"is_csat":      true,
@@ -157,8 +155,7 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 		}
 	}
 
-	windowOpen := conversation.LastInboundAt.Valid && time.Since(conversation.LastInboundAt.Time) < WhatsAppWindowDuration
-	if windowOpen {
+	if m.whatsAppWindowOpen(conversation.ContactID, conversation.InboxID) {
 		content := m.i18n.Ts("conversation.whatsapp.csatMessage", "link", csatURL)
 		if _, err := m.QueueReply(nil, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, content, nil, nil, nil, meta); err != nil {
 			m.lo.Error("error sending whatsapp CSAT link", "conversation_uuid", conversation.UUID, "error", err)
@@ -175,7 +172,17 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 	return m.InsertConversationActivity(models.ActivityCSATNotSent, conversation.UUID, "", actor)
 }
 
-// prepareWhatsAppOutbound validates an outbound WhatsApp message, writes the channel fields into metaMap, and returns the rendered template body (template sends) or content unchanged (free-form sends).
+// whatsAppWindowOpen reports whether the contact is inside Meta's 24h window. Scoped to (contact, inbox), not a single conversation.
+func (m *Manager) whatsAppWindowOpen(contactID, inboxID int) bool {
+	var ts sql.NullTime
+	if err := m.q.GetContactWindowInboundAt.Get(&ts, contactID, inboxID); err != nil {
+		m.lo.Error("error getting contact whatsapp window", "contact_id", contactID, "inbox_id", inboxID, "error", err)
+		return false
+	}
+	return ts.Valid && time.Since(ts.Time) < WhatsAppWindowDuration
+}
+
+// prepareWhatsAppOutbound validates the send, writes channel fields into metaMap, and returns the rendered template body or unchanged free-form content.
 func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID int, conversationUUID string, content string, hasAttachments bool, metaMap map[string]any) (string, error) {
 	conv, err := m.GetConversation(0, conversationUUID, "")
 	if err != nil {
@@ -202,7 +209,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 		if dialCode == "" {
 			return content, envelope.NewError(envelope.InputError, "contact's phone country code is missing or invalid", nil)
 		}
-		toPhone = phoneDigitsReplacer.Replace(dialCode + contact.PhoneNumber.String)
+		toPhone = stringutil.NormalizeWhatsAppPhone(dialCode + contact.PhoneNumber.String)
 	}
 	if toPhone == "" {
 		return content, envelope.NewError(envelope.InputError, "contact has no phone number", nil)
@@ -211,8 +218,6 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 	templateID := extractInt(metaMap, "whatsapp_template_id")
 	headerMediaID, _ := metaMap["whatsapp_header_media_id"].(string)
 	templateParams := extractStringMap(metaMap, "whatsapp_template_params")
-
-	windowOpen := conv.LastInboundAt.Valid && time.Since(conv.LastInboundAt.Time) < WhatsAppWindowDuration
 
 	send := whatsappChannel.SendMeta{
 		ToPhone: toPhone,
@@ -253,7 +258,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 		}
 		rendered = renderTemplateBody(t.BodyContent, templateParams)
 	} else {
-		if !windowOpen {
+		if !m.whatsAppWindowOpen(conv.ContactID, conv.InboxID) {
 			return content, envelope.NewError(envelope.InputError, "24h customer service window has expired; reply with an approved template", nil)
 		}
 		if strings.TrimSpace(content) == "" && !hasAttachments {

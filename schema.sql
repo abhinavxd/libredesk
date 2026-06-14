@@ -161,6 +161,7 @@ CREATE TABLE users (
     CONSTRAINT constraint_users_on_last_name CHECK (LENGTH(last_name) <= 140)
 );
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
+CREATE INDEX index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
 CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
 	ON users(email)

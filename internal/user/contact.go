@@ -143,7 +143,7 @@ func (u *Manager) UpsertContactByChannelIdentity(channel, identifier string, con
 	return u.LinkChannelIdentity(contact.ID, channel, identifier)
 }
 
-// SetContactPhoneIfMissing sets phone_number and its country code on a contact only when the phone is empty, never clobbering an agent-curated value.
+// SetContactPhoneIfMissing sets phone_number only when it is empty, never clobbering an agent-curated value.
 func (u *Manager) SetContactPhoneIfMissing(id int, phone, countryCode string) error {
 	if id == 0 || phone == "" {
 		return nil

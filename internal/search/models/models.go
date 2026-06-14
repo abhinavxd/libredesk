@@ -24,9 +24,12 @@ type MessageResult struct {
 }
 
 type ContactResult struct {
-	CreatedAt      time.Time   `db:"created_at" json:"created_at"`
-	FirstName      string      `db:"first_name" json:"first_name"`
-	LastName       string      `db:"last_name" json:"last_name"`
-	Email          string      `db:"email" json:"email"`
-	ExternalUserID null.String `db:"external_user_id" json:"external_user_id"`
+	ID                     int         `db:"id" json:"id"`
+	CreatedAt              time.Time   `db:"created_at" json:"created_at"`
+	FirstName              string      `db:"first_name" json:"first_name"`
+	LastName               string      `db:"last_name" json:"last_name"`
+	Email                  null.String `db:"email" json:"email"`
+	PhoneNumber            null.String `db:"phone_number" json:"phone_number"`
+	PhoneNumberCountryCode null.String `db:"phone_number_country_code" json:"phone_number_country_code"`
+	ExternalUserID         null.String `db:"external_user_id" json:"external_user_id"`
 }

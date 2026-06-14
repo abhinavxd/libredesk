@@ -18,12 +18,18 @@ const (
 )
 
 var (
-	regexpNonAlNum  = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
-	regexpSpaces    = regexp.MustCompile(`[\s]+`)
-	uuidV4Regex     = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
-	regexpRefNumber = regexp.MustCompile(`#(\d+)`)
-	regexpConvUUID  = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+	regexpNonAlNum    = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
+	regexpSpaces      = regexp.MustCompile(`[\s]+`)
+	uuidV4Regex       = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
+	regexpRefNumber   = regexp.MustCompile(`#(\d+)`)
+	regexpConvUUID    = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+	waPhoneFormatting = strings.NewReplacer("+", "", "-", "", " ", "", "(", "", ")", "")
 )
+
+// NormalizeWhatsAppPhone strips formatting to the bare digit string Meta uses as the wa_id.
+func NormalizeWhatsAppPhone(s string) string {
+	return waPhoneFormatting.Replace(s)
+}
 
 // HTML2Text converts HTML to text.
 func HTML2Text(html string) string {

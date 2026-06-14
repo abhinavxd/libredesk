@@ -12,7 +12,6 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/countries"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -366,18 +365,15 @@ func defaultMediaFilename(messageType, mime string) string {
 func upsertWhatsAppContact(app *App, m whatsapp.ParsedMessage) (int, error) {
 	first, last := splitName(m.ContactName)
 	contact := umodels.User{
-		Type:        umodels.UserTypeContact,
-		FirstName:   first,
-		LastName:    last,
-		PhoneNumber: null.StringFrom(m.From),
+		Type:      umodels.UserTypeContact,
+		FirstName: first,
+		LastName:  last,
 	}
 	id, err := app.user.UpsertContactByChannelIdentity(whatsappChannel.ChannelWhatsApp, m.From, &contact)
 	if err != nil {
 		return 0, err
 	}
-	// CreateContact's insert doesn't persist phone_number; backfill without clobbering an agent-edited value.
-	countryCode, nationalNumber := countries.SplitPhoneCountryCode(m.From)
-	if err := app.user.SetContactPhoneIfMissing(id, nationalNumber, countryCode); err != nil {
+	if err := app.user.SetContactPhoneIfMissing(id, m.From, ""); err != nil {
 		app.lo.Error("error setting whatsapp contact phone", "user_id", id, "error", err)
 	}
 	// A contact created from a message without a profile name picks the real name up later.

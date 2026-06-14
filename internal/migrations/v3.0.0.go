@@ -101,5 +101,10 @@ func V3_0_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops);`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

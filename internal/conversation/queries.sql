@@ -187,7 +187,8 @@ SELECT
    nxt_resp_event.deadline_at AS next_response_deadline_at,
    nxt_resp_event.met_at as next_response_met_at,
    c.last_continuity_email_sent_at,
-   c.last_inbound_at
+   c.last_inbound_at,
+   (SELECT MAX(c2.last_inbound_at) FROM conversations c2 WHERE c2.contact_id = c.contact_id AND c2.inbox_id = c.inbox_id) AS contact_last_inbound_at
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
@@ -777,13 +778,16 @@ LIMIT 1;
 UPDATE conversations SET last_inbound_at = GREATEST(last_inbound_at, $2), updated_at = NOW() WHERE id = $1
 RETURNING last_inbound_at;
 
+-- name: get-contact-window-inbound-at
+SELECT MAX(last_inbound_at) FROM conversations WHERE contact_id = $1 AND inbox_id = $2;
+
 -- name: get-latest-open-conversation-by-contact-inbox
 SELECT id, uuid
 FROM conversations
 WHERE contact_id = $1
   AND inbox_id = $2
   AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved')
-ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+ORDER BY last_interaction_at DESC NULLS LAST, created_at DESC
 LIMIT 1;
 
 -- name: get-latest-reopenable-conversation-by-contact-inbox

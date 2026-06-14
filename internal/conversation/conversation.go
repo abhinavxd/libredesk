@@ -328,6 +328,7 @@ type queries struct {
 	GetMessageUUIDBySourceID           *sqlx.Stmt `query:"get-message-uuid-by-source-id"`
 	GetWhatsAppReadReceiptTarget       *sqlx.Stmt `query:"get-whatsapp-read-receipt-target"`
 	UpdateConversationLastInboundAt    *sqlx.Stmt `query:"update-conversation-last-inbound-at"`
+	GetContactWindowInboundAt          *sqlx.Stmt `query:"get-contact-window-inbound-at"`
 	GetLatestOpenConversationByContact *sqlx.Stmt `query:"get-latest-open-conversation-by-contact-inbox"`
 	GetReopenableConversationByContact *sqlx.Stmt `query:"get-latest-reopenable-conversation-by-contact-inbox"`
 	DeleteMessage                      *sqlx.Stmt `query:"delete-message"`
