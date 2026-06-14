@@ -36,65 +36,18 @@
           </DialogDescription>
         </DialogHeader>
 
-        <div v-if="isFetchingTemplates" class="py-6 text-sm text-muted-foreground">
-          {{ $t('globals.messages.loading') }}
-        </div>
-        <div v-else-if="!approvedTemplates.length" class="py-6 text-sm text-muted-foreground">
-          {{ $t('conversation.whatsapp.noApprovedTemplates') }}
-        </div>
-
-        <div v-else-if="!selectedTemplate" class="space-y-2 max-h-80 overflow-y-auto">
-          <button
-            v-for="tmpl in approvedTemplates"
-            :key="tmpl.id"
-            type="button"
-            class="w-full text-left box p-3 hover:bg-accent transition-colors"
-            @click="pickTemplate(tmpl)"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <div class="font-mono text-sm">{{ tmpl.name }}</div>
-              <Badge variant="outline">{{ tmpl.language }}</Badge>
-            </div>
-            <div class="text-xs text-muted-foreground mt-1 line-clamp-2">
-              {{ tmpl.body_content }}
-            </div>
-          </button>
-        </div>
-
-        <div v-else class="space-y-4">
-          <div class="box p-3">
-            <div class="flex items-center justify-between gap-2 mb-2">
-              <div class="font-mono text-sm">{{ selectedTemplate.name }}</div>
-              <Button variant="ghost" size="sm" @click="selectedTemplate = null">
-                {{ $t('globals.messages.back') }}
-              </Button>
-            </div>
-            <div class="text-sm whitespace-pre-wrap text-muted-foreground">
-              {{ renderedPreview }}
-            </div>
-          </div>
-
-          <div
-            v-for="ph in placeholders"
-            :key="ph.key"
-            class="grid grid-cols-3 gap-3 items-center"
-          >
-            <label class="text-sm font-mono flex items-center gap-2">
-              {{ placeholderLabel(ph.name) }}
-              <span class="text-xs text-muted-foreground font-sans">{{ ph.partLabel }}</span>
-            </label>
-            <Input v-model="templateParams[ph.key]" class="col-span-2" />
-          </div>
-
-          <div
-            v-for="btn in urlButtonParams"
-            :key="btn.key"
-            class="grid grid-cols-3 gap-3 items-center"
-          >
-            <label class="text-sm truncate" :title="btn.url">{{ btn.label }}</label>
-            <Input v-model="templateParams[btn.key]" class="col-span-2" :placeholder="btn.url" />
-          </div>
-        </div>
+        <WhatsAppTemplatePicker
+          :approved-templates="approvedTemplates"
+          :selected-template="selectedTemplate"
+          :template-params="templateParams"
+          :placeholders="placeholders"
+          :url-button-params="urlButtonParams"
+          :rendered-preview="renderedPreview"
+          :is-fetching="isFetchingTemplates"
+          @pick="pickTemplate"
+          @back="selectedTemplate = null"
+          @update:param="(key, v) => (templateParams[key] = v)"
+        />
 
         <DialogFooter v-if="selectedTemplate">
           <Button variant="outline" @click="pickerOpen = false" :disabled="isSending">
@@ -110,12 +63,10 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Lightbulb, TriangleAlert } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
-import { Badge } from '@shared-ui/components/ui/badge'
-import { Input } from '@shared-ui/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -125,17 +76,14 @@ import {
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
 import ReplyBox from './ReplyBox.vue'
+import WhatsAppTemplatePicker from './WhatsAppTemplatePicker.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
-import {
-  WHATSAPP_WINDOW_MS as WINDOW_MS,
-  PLACEHOLDER_PATTERN,
-  extractPlaceholders,
-  placeholderLabel
-} from './whatsappTemplate.js'
+import { WHATSAPP_WINDOW_MS as WINDOW_MS } from './whatsappTemplate.js'
+import { useWhatsAppTemplatePicker } from './useWhatsAppTemplatePicker.js'
 
 const CLOSING_SOON_MS = 4 * 60 * 60 * 1000
 
@@ -154,7 +102,7 @@ onBeforeUnmount(() => {
   }
 })
 
-const lastInboundAt = computed(() => conversationStore.current?.last_inbound_at)
+const lastInboundAt = computed(() => conversationStore.current?.contact_last_inbound_at)
 
 const windowRemainingMs = computed(() => {
   const ts = lastInboundAt.value
@@ -176,11 +124,21 @@ const windowExpiresIn = computed(() => {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 })
 
+const {
+  templates,
+  selectedTemplate,
+  templateParams,
+  approvedTemplates,
+  placeholders,
+  urlButtonParams,
+  allParamsFilled,
+  renderedPreview,
+  pickTemplate,
+  reset
+} = useWhatsAppTemplatePicker()
+
 const pickerOpen = ref(false)
 const isFetchingTemplates = ref(false)
-const templates = ref([])
-const selectedTemplate = ref(null)
-const templateParams = reactive({})
 const isSending = ref(false)
 
 watch(
@@ -191,71 +149,9 @@ watch(
   }
 )
 
-// Media-header templates need a media ID the dashboard can't supply, AUTHENTICATION templates need OTP button params, and libredesk_csat_* names are reserved for surveys.
-const SENDABLE_HEADER_TYPES = ['', 'NONE', 'TEXT']
-const RESERVED_NAME_PREFIX = 'libredesk_csat_'
-
-const approvedTemplates = computed(() =>
-  templates.value.filter(
-    (tmpl) =>
-      tmpl.status === 'APPROVED' &&
-      tmpl.category !== 'AUTHENTICATION' &&
-      !tmpl.name.startsWith(RESERVED_NAME_PREFIX) &&
-      SENDABLE_HEADER_TYPES.includes(tmpl.header_type || '')
-  )
-)
-
-const placeholders = computed(() => {
-  if (!selectedTemplate.value) return []
-  const out = []
-  for (const name of extractPlaceholders([selectedTemplate.value.body_content])) {
-    out.push({ key: `body:${name}`, name, partLabel: t('globals.terms.body') })
-  }
-  if (selectedTemplate.value.header_type === 'TEXT' && selectedTemplate.value.header_content) {
-    for (const name of extractPlaceholders([selectedTemplate.value.header_content])) {
-      out.push({ key: `header:${name}`, name, partLabel: t('admin.whatsappTemplates.header') })
-    }
-  }
-  return out
-})
-
-const urlButtonParams = computed(() => {
-  const buttons = selectedTemplate.value?.buttons || []
-  const out = []
-  buttons.forEach((btn, idx) => {
-    if ((btn.type || '').toUpperCase() !== 'URL') return
-    if (!(btn.url || '').match(PLACEHOLDER_PATTERN)) return
-    out.push({ key: `button_url_${idx}`, label: btn.text || btn.url, url: btn.url })
-  })
-  return out
-})
-
-const allParamKeys = computed(() => [
-  ...placeholders.value.map((ph) => ph.key),
-  ...urlButtonParams.value.map((btn) => btn.key)
-])
-
-const allParamsFilled = computed(() =>
-  allParamKeys.value.every((key) => (templateParams[key] || '').trim() !== '')
-)
-
-const renderedPreview = computed(() => {
-  if (!selectedTemplate.value) return ''
-  let body = selectedTemplate.value.body_content || ''
-  for (const ph of placeholders.value) {
-    if (ph.key.startsWith('body:')) {
-      const v = templateParams[ph.key]
-      if (v) body = body.split(`{{${ph.name}}}`).join(v)
-    }
-  }
-  return body
-})
-
 const openTemplatePicker = async () => {
   pickerOpen.value = true
-  selectedTemplate.value = null
-  templates.value = []
-  Object.keys(templateParams).forEach((k) => delete templateParams[k])
+  reset()
 
   const inboxID = conversationStore.current?.inbox_id
   if (!inboxID) return
@@ -277,20 +173,6 @@ const openTemplatePicker = async () => {
 emitter.on(EMITTER_EVENTS.WHATSAPP_TEMPLATE_PICKER_OPEN, openTemplatePicker)
 onBeforeUnmount(() => {
   emitter.off(EMITTER_EVENTS.WHATSAPP_TEMPLATE_PICKER_OPEN, openTemplatePicker)
-})
-
-const pickTemplate = (tmpl) => {
-  selectedTemplate.value = tmpl
-  for (const key of allParamKeys.value) {
-    if (templateParams[key] === undefined) templateParams[key] = ''
-  }
-}
-
-watch(selectedTemplate, () => {
-  const valid = new Set(allParamKeys.value)
-  for (const k of Object.keys(templateParams)) {
-    if (!valid.has(k)) delete templateParams[k]
-  }
 })
 
 const sendTemplate = async () => {
