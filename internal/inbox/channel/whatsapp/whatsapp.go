@@ -110,6 +110,9 @@ func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 // Identifier returns the inbox database ID.
 func (w *WhatsApp) Identifier() int { return w.id }
 
+// AppSecret returns the Meta app secret.
+func (w *WhatsApp) AppSecret() string { return w.config.AppSecret }
+
 // Receive is a no-op; inbound messages arrive via the webhook handler.
 func (w *WhatsApp) Receive(ctx context.Context) error { return nil }
 

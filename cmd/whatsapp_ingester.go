@@ -2,33 +2,32 @@ package main
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"sync"
+	"time"
 
+	"github.com/abhinavxd/libredesk/internal/streamqueue"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 )
 
 const (
-	whatsAppQueueSize   = 1000
-	whatsAppWorkerCount = 4
+	whatsAppStream      = "libredesk:whatsapp:inbound"
+	whatsAppStreamGroup = "libredesk"
+	whatsAppConsumer    = "ingester"
+
+	// Must exceed the worst-case media-download budget so the reclaimer never re-runs a still-in-flight delivery.
+	whatsAppReclaimMinIdle = 5 * time.Minute
 )
 
-var ErrWhatsAppQueueFull = errors.New("whatsapp ingest queue is full")
-
-// whatsAppJob is one Meta webhook delivery scheduled for processing.
+// whatsAppJob is the durable envelope persisted to the stream; Body is the raw Meta POST body, parsed in the worker.
 type whatsAppJob struct {
-	inboxID int
-	payload *whatsapp.WebhookPayload
+	InboxID int             `json:"inbox_id"`
+	Body    json.RawMessage `json:"body"`
 }
 
-// WhatsAppIngester drains webhook payloads through a bounded worker pool.
+// WhatsAppIngester is the durable inbound pipeline: a Redis-stream work queue plus per-sender serialization.
 type WhatsAppIngester struct {
-	queue       chan whatsAppJob
-	workers     int
-	app         *App
-	wg          sync.WaitGroup
-	closed      bool
-	closedMu    sync.RWMutex
+	queue       *streamqueue.Queue
 	sourceLocks *keyedLock
 }
 
@@ -43,25 +42,61 @@ type keyedLockEntry struct {
 	refs int
 }
 
-// newWhatsAppIngester returns an ingester; zero values fall back to the package defaults.
-func newWhatsAppIngester(app *App, queueSize, workers int) *WhatsAppIngester {
-	if queueSize <= 0 {
-		queueSize = whatsAppQueueSize
-	}
-	if workers <= 0 {
-		workers = whatsAppWorkerCount
-	}
-	return &WhatsAppIngester{
-		queue:       make(chan whatsAppJob, queueSize),
-		workers:     workers,
-		app:         app,
+func newWhatsAppIngester(app *App) (*WhatsAppIngester, error) {
+	ing := &WhatsAppIngester{
 		sourceLocks: &keyedLock{entries: make(map[string]*keyedLockEntry)},
 	}
+	q, err := streamqueue.New(streamqueue.Opts{
+		Redis:        app.redis,
+		Logger:       app.lo,
+		Stream:       whatsAppStream,
+		Group:        whatsAppStreamGroup,
+		Consumer:     whatsAppConsumer,
+		Handler:      ing.handle(app),
+		ClaimMinIdle: whatsAppReclaimMinIdle,
+	})
+	if err != nil {
+		return nil, err
+	}
+	ing.queue = q
+	return ing, nil
+}
+
+// Run consumes the stream until Close is called.
+func (i *WhatsAppIngester) Run() { i.queue.Run() }
+
+// Close stops the queue and waits for in-flight work; un-acked deliveries stay durable for the next start.
+func (i *WhatsAppIngester) Close() { i.queue.Close() }
+
+// Enqueue durably stores a raw webhook body for the inbox.
+func (i *WhatsAppIngester) Enqueue(inboxID int, body []byte) error {
+	data, err := json.Marshal(whatsAppJob{InboxID: inboxID, Body: json.RawMessage(body)})
+	if err != nil {
+		return err
+	}
+	return i.queue.Enqueue(context.Background(), data)
 }
 
 // lockSender blocks until the per-sender-phone lock is held, returning the release func.
 func (i *WhatsAppIngester) lockSender(from string) func() {
 	return i.sourceLocks.lock(from)
+}
+
+// handle returns nil for an unparseable job so it is dropped rather than retried forever; a processing error keeps the entry pending for retry.
+func (i *WhatsAppIngester) handle(app *App) streamqueue.Handler {
+	return func(ctx context.Context, payload []byte) error {
+		var job whatsAppJob
+		if err := json.Unmarshal(payload, &job); err != nil {
+			app.lo.Error("error decoding whatsapp stream job, dropping", "error", err)
+			return nil
+		}
+		parsed, err := whatsapp.ParsePayload(job.Body)
+		if err != nil {
+			app.lo.Error("error parsing whatsapp webhook payload from stream, dropping", "inbox_id", job.InboxID, "error", err)
+			return nil
+		}
+		return processWhatsAppPayload(ctx, app, job.InboxID, parsed)
+	}
 }
 
 func (k *keyedLock) lock(key string) func() {
@@ -84,62 +119,5 @@ func (k *keyedLock) lock(key string) func() {
 			delete(k.entries, key)
 		}
 		k.mu.Unlock()
-	}
-}
-
-// Run starts the worker goroutines and blocks until ctx is cancelled or Close is called.
-func (i *WhatsAppIngester) Run(ctx context.Context) {
-	for range i.workers {
-		i.wg.Add(1)
-		go func() {
-			defer i.wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case job, ok := <-i.queue:
-					if !ok {
-						return
-					}
-					func() {
-						defer func() {
-							if rec := recover(); rec != nil {
-								i.app.lo.Error("recovered from panic in whatsapp ingest worker", "inbox_id", job.inboxID, "panic", rec)
-							}
-						}()
-						processWhatsAppPayload(i.app, job.inboxID, job.payload)
-					}()
-				}
-			}
-		}()
-	}
-	i.wg.Wait()
-}
-
-// Close signals the workers to drain and stops accepting new jobs.
-func (i *WhatsAppIngester) Close() {
-	i.closedMu.Lock()
-	if i.closed {
-		i.closedMu.Unlock()
-		return
-	}
-	i.closed = true
-	close(i.queue)
-	i.closedMu.Unlock()
-	i.wg.Wait()
-}
-
-// Enqueue adds a job to the pool, returning ErrWhatsAppQueueFull when saturated.
-func (i *WhatsAppIngester) Enqueue(inboxID int, payload *whatsapp.WebhookPayload) error {
-	i.closedMu.RLock()
-	defer i.closedMu.RUnlock()
-	if i.closed {
-		return ErrWhatsAppQueueFull
-	}
-	select {
-	case i.queue <- whatsAppJob{inboxID: inboxID, payload: payload}:
-		return nil
-	default:
-		return ErrWhatsAppQueueFull
 	}
 }

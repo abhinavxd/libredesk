@@ -300,8 +300,12 @@ func main() {
 		whatsappTemplate: waTemplates,
 	}
 	app.consts.Store(constants)
-	app.whatsappIngester = newWhatsAppIngester(app, 0, 0)
-	go app.whatsappIngester.Run(ctx)
+	whatsappIngester, err := newWhatsAppIngester(app)
+	if err != nil {
+		log.Fatalf("error initializing whatsapp ingester: %v", err)
+	}
+	app.whatsappIngester = whatsappIngester
+	go app.whatsappIngester.Run()
 	waClient.SetAuthErrorHook(makeWhatsAppAuthErrorHook(app))
 
 	// Start inboxes.
