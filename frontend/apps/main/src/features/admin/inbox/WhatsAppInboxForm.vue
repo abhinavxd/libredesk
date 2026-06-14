@@ -154,6 +154,19 @@
           <FormMessage />
         </FormItem>
       </FormField>
+
+      <FormField v-slot="{ componentField }" name="config.reopen_window_hours">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
+          <FormControl>
+            <Input type="number" min="0" placeholder="48" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>
+            {{ $t('admin.inbox.whatsapp.reopenWindow.description') }}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </div>
 
     <!-- Webhook Configuration -->
@@ -275,7 +288,8 @@ const form = useForm({
       access_token: '',
       app_secret: '',
       webhook_verify_token: '',
-      api_version: 'v21.0'
+      api_version: 'v21.0',
+      reopen_window_hours: 48
     }
   }
 })

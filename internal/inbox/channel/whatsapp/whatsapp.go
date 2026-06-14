@@ -32,6 +32,7 @@ type Config struct {
 	AppSecret          string `json:"app_secret"`
 	WebhookVerifyToken string `json:"webhook_verify_token"`
 	APIVersion         string `json:"api_version"`
+	ReopenWindowHours  int    `json:"reopen_window_hours"`
 }
 
 // Account converts the on-disk Config into the shape the API client wants.

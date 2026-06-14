@@ -125,6 +125,7 @@ type ConversationListItem struct {
 	FirstReplyAt          null.Time               `db:"first_reply_at" json:"first_reply_at"`
 	LastReplyAt           null.Time               `db:"last_reply_at" json:"last_reply_at"`
 	ResolvedAt            null.Time               `db:"resolved_at" json:"resolved_at"`
+	LastResolvedAt        null.Time               `db:"last_resolved_at" json:"last_resolved_at"`
 	Subject               null.String             `db:"subject" json:"subject"`
 	LastMessage           null.String             `db:"last_message" json:"last_message"`
 	LastMessageAt         null.Time               `db:"last_message_at" json:"last_message_at"`
@@ -164,6 +165,7 @@ type Conversation struct {
 	InboxID                   int                    `db:"inbox_id" json:"inbox_id"`
 	ClosedAt                  null.Time              `db:"closed_at" json:"closed_at"`
 	ResolvedAt                null.Time              `db:"resolved_at" json:"resolved_at"`
+	LastResolvedAt            null.Time              `db:"last_resolved_at" json:"last_resolved_at"`
 	ReferenceNumber           string                 `db:"reference_number" json:"reference_number"`
 	Priority                  null.String            `db:"priority" json:"priority"`
 	PriorityID                null.Int               `db:"priority_id" json:"priority_id"`

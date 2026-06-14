@@ -13,6 +13,7 @@ export const createFormSchema = (t) =>
       access_token: z.string().min(1, t('globals.messages.required')),
       app_secret: z.string().min(1, t('globals.messages.required')),
       webhook_verify_token: z.string().min(1, t('globals.messages.required')),
-      api_version: z.string().optional()
+      api_version: z.string().optional(),
+      reopen_window_hours: z.coerce.number().int().min(0).optional()
     })
   })

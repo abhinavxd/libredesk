@@ -192,6 +192,10 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 
 	isNewConversation := false
 	conversationID, conversationUUID, err := app.conversation.GetLatestOpenConversationForContact(contactID, inboxID)
+	if errors.Is(err, sql.ErrNoRows) && cfg.ReopenWindowHours > 0 {
+		// Reuse a recently-resolved conversation; the message insert hook reopens it.
+		conversationID, conversationUUID, err = app.conversation.GetReopenableConversationForContact(contactID, inboxID, cfg.ReopenWindowHours)
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		conversationID, conversationUUID, err = app.conversation.CreateConversation(
 			contactID,

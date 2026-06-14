@@ -55,6 +55,7 @@ SELECT
     conversations.first_reply_at,
     conversations.last_reply_at,
     conversations.resolved_at,
+    conversations.last_resolved_at,
     conversations.subject,
     conversations.last_message,
     conversations.last_message_at,
@@ -125,6 +126,7 @@ SELECT
    c.updated_at,
    c.closed_at,
    c.resolved_at,
+   c.last_resolved_at,
    c.inbox_id,
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
@@ -341,11 +343,12 @@ WITH new_status AS (
     SELECT id, category FROM conversation_statuses WHERE name = $2
 )
 UPDATE conversations
-SET status_id     = (SELECT id FROM new_status),
-    resolved_at   = COALESCE(resolved_at, CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() END),
-    closed_at     = COALESCE(closed_at,   CASE WHEN $2 = 'Closed'                                  THEN NOW() END),
-    snoozed_until = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE NULL END,
-    updated_at    = NOW()
+SET status_id        = (SELECT id FROM new_status),
+    resolved_at      = COALESCE(resolved_at, CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() END),
+    last_resolved_at = CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() ELSE last_resolved_at END,
+    closed_at        = COALESCE(closed_at,   CASE WHEN $2 = 'Closed'                                  THEN NOW() END),
+    snoozed_until    = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE NULL END,
+    updated_at       = NOW()
 WHERE uuid = $1;
 
 -- name: get-user-active-conversations-count
@@ -780,6 +783,17 @@ WHERE contact_id = $1
   AND inbox_id = $2
   AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved')
 ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+LIMIT 1;
+
+-- name: get-latest-reopenable-conversation-by-contact-inbox
+SELECT id, uuid
+FROM conversations
+WHERE contact_id = $1
+  AND inbox_id = $2
+  AND status_id IN (SELECT id FROM conversation_statuses WHERE category = 'resolved')
+  AND last_resolved_at IS NOT NULL
+  AND last_resolved_at >= NOW() - make_interval(hours => $3)
+ORDER BY last_resolved_at DESC
 LIMIT 1;
 
 -- name: get-offline-livechat-conversations

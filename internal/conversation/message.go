@@ -443,6 +443,18 @@ func (m *Manager) GetLatestOpenConversationForContact(contactID, inboxID int) (i
 	return row.ID, row.UUID, nil
 }
 
+// GetReopenableConversationForContact returns the most recent resolved conversation for a (contact, inbox) pair last resolved within windowHours, or sql.ErrNoRows.
+func (m *Manager) GetReopenableConversationForContact(contactID, inboxID, windowHours int) (int, string, error) {
+	var row struct {
+		ID   int    `db:"id"`
+		UUID string `db:"uuid"`
+	}
+	if err := m.q.GetReopenableConversationByContact.Get(&row, contactID, inboxID, windowHours); err != nil {
+		return 0, "", err
+	}
+	return row.ID, row.UUID, nil
+}
+
 // MarkMessageAsPending updates message status to `Pending`, enqueuing it for sending.
 func (m *Manager) MarkMessageAsPending(uuid string) error {
 	if err := m.UpdateMessageStatus(uuid, models.MessageStatusPending); err != nil {

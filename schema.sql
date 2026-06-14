@@ -235,6 +235,7 @@ CREATE TABLE conversations (
     last_reply_at TIMESTAMPTZ NULL,
     closed_at TIMESTAMPTZ NULL,
     resolved_at TIMESTAMPTZ NULL,
+    last_resolved_at TIMESTAMPTZ NULL,
 
 	"subject" TEXT NULL,
 	waiting_since TIMESTAMPTZ NULL,
