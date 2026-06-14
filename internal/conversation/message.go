@@ -418,15 +418,18 @@ func (m *Manager) UpdateMessageStatusBySourceID(sourceID, status string) error {
 }
 
 // UpdateConversationLastInboundAt advances the clock gating business-initiated messages (WhatsApp 24h window).
-func (m *Manager) UpdateConversationLastInboundAt(conversationID int) error {
-	now := time.Now()
-	if _, err := m.q.UpdateConversationLastInboundAt.Exec(conversationID); err != nil {
+func (m *Manager) UpdateConversationLastInboundAt(conversationID int, at time.Time) error {
+	if at.IsZero() {
+		at = time.Now()
+	}
+	var stored time.Time
+	if err := m.q.UpdateConversationLastInboundAt.QueryRow(conversationID, at).Scan(&stored); err != nil {
 		m.lo.Error("error updating conversation last_inbound_at", "conversation_id", conversationID, "error", err)
 		return err
 	}
 	uuid, err := m.GetConversationUUID(conversationID)
 	if err == nil && uuid != "" {
-		m.BroadcastConversationUpdate(uuid, map[string]any{"last_inbound_at": now.Format(time.RFC3339)})
+		m.BroadcastConversationUpdate(uuid, map[string]any{"last_inbound_at": stored.Format(time.RFC3339)})
 	}
 	return nil
 }
@@ -1012,7 +1015,7 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 }
 
 // ProcessIncomingWhatsAppMessage uploads attachments, inserts the message, advances the 24h window clock and runs the shared incoming hooks.
-func (m *Manager) ProcessIncomingWhatsAppMessage(msg models.Message, isNewConversation bool) (models.Message, error) {
+func (m *Manager) ProcessIncomingWhatsAppMessage(msg models.Message, isNewConversation bool, inboundAt time.Time) (models.Message, error) {
 	if err := m.UploadMessageAttachments(&msg); err != nil {
 		return models.Message{}, fmt.Errorf("uploading whatsapp attachments: %w", err)
 	}
@@ -1021,7 +1024,7 @@ func (m *Manager) ProcessIncomingWhatsAppMessage(msg models.Message, isNewConver
 		return models.Message{}, err
 	}
 
-	if err := m.UpdateConversationLastInboundAt(msg.ConversationID); err != nil {
+	if err := m.UpdateConversationLastInboundAt(msg.ConversationID, inboundAt); err != nil {
 		m.lo.Error("error updating last_inbound_at", "conversation_id", msg.ConversationID, "error", err)
 	}
 

@@ -240,7 +240,7 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		Meta:             buildInboundMeta(app, m),
 	}
 
-	if _, err := app.conversation.ProcessIncomingWhatsAppMessage(msg, isNewConversation); err != nil {
+	if _, err := app.conversation.ProcessIncomingWhatsAppMessage(msg, isNewConversation, m.Timestamp); err != nil {
 		return fmt.Errorf("processing whatsapp message: %w", err)
 	}
 	return nil
