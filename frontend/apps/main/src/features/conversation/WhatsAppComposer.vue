@@ -75,12 +75,15 @@
           </div>
 
           <div
-            v-for="key in placeholders"
-            :key="key"
+            v-for="ph in placeholders"
+            :key="ph.key"
             class="grid grid-cols-3 gap-3 items-center"
           >
-            <label class="text-sm font-mono">{{ placeholderLabel(key) }}</label>
-            <Input v-model="templateParams[key]" class="col-span-2" />
+            <label class="text-sm font-mono flex items-center gap-2">
+              {{ placeholderLabel(ph.name) }}
+              <span class="text-xs text-muted-foreground font-sans">{{ ph.partLabel }}</span>
+            </label>
+            <Input v-model="templateParams[ph.key]" class="col-span-2" />
           </div>
 
           <div
@@ -97,7 +100,7 @@
           <Button variant="outline" @click="pickerOpen = false" :disabled="isSending">
             {{ $t('globals.messages.cancel') }}
           </Button>
-          <Button :is-loading="isSending" :disabled="isSending" @click="sendTemplate">
+          <Button :is-loading="isSending" :disabled="isSending || !allParamsFilled" @click="sendTemplate">
             {{ $t('conversation.whatsapp.send') }}
           </Button>
         </DialogFooter>
@@ -127,10 +130,14 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
+import {
+  WHATSAPP_WINDOW_MS as WINDOW_MS,
+  PLACEHOLDER_PATTERN,
+  extractPlaceholders,
+  placeholderLabel
+} from './whatsappTemplate.js'
 
-const WINDOW_MS = 24 * 60 * 60 * 1000
 const CLOSING_SOON_MS = 4 * 60 * 60 * 1000
-const PLACEHOLDER_PATTERN = /\{\{([A-Za-z0-9_]+)\}\}/g
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
@@ -198,34 +205,20 @@ const approvedTemplates = computed(() =>
   )
 )
 
-const extractPlaceholders = (sources) => {
-  const seen = new Set()
+const placeholders = computed(() => {
+  if (!selectedTemplate.value) return []
   const out = []
-  for (const src of sources) {
-    if (!src) continue
-    for (const match of src.matchAll(PLACEHOLDER_PATTERN)) {
-      const key = match[1]
-      if (!seen.has(key)) {
-        seen.add(key)
-        out.push(key)
-      }
+  for (const name of extractPlaceholders([selectedTemplate.value.body_content])) {
+    out.push({ key: `body:${name}`, name, partLabel: t('globals.terms.body') })
+  }
+  if (selectedTemplate.value.header_type === 'TEXT' && selectedTemplate.value.header_content) {
+    for (const name of extractPlaceholders([selectedTemplate.value.header_content])) {
+      out.push({ key: `header:${name}`, name, partLabel: t('admin.whatsappTemplates.header') })
     }
   }
   return out
-}
-
-const placeholders = computed(() => {
-  if (!selectedTemplate.value) return []
-  const sources = [selectedTemplate.value.body_content]
-  if (selectedTemplate.value.header_type === 'TEXT' && selectedTemplate.value.header_content) {
-    sources.push(selectedTemplate.value.header_content)
-  }
-  return extractPlaceholders(sources)
 })
 
-const placeholderLabel = (key) => `{{${key}}}`
-
-// URL button placeholders are keyed button_url_<index> as the backend component builder expects.
 const urlButtonParams = computed(() => {
   const buttons = selectedTemplate.value?.buttons || []
   const out = []
@@ -238,15 +231,22 @@ const urlButtonParams = computed(() => {
 })
 
 const allParamKeys = computed(() => [
-  ...placeholders.value,
+  ...placeholders.value.map((ph) => ph.key),
   ...urlButtonParams.value.map((btn) => btn.key)
 ])
+
+const allParamsFilled = computed(() =>
+  allParamKeys.value.every((key) => (templateParams[key] || '').trim() !== '')
+)
 
 const renderedPreview = computed(() => {
   if (!selectedTemplate.value) return ''
   let body = selectedTemplate.value.body_content || ''
-  for (const [k, v] of Object.entries(templateParams)) {
-    if (v) body = body.split(`{{${k}}}`).join(v)
+  for (const ph of placeholders.value) {
+    if (ph.key.startsWith('body:')) {
+      const v = templateParams[ph.key]
+      if (v) body = body.split(`{{${ph.name}}}`).join(v)
+    }
   }
   return body
 })

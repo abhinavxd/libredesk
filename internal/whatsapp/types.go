@@ -112,10 +112,11 @@ type TemplateButton struct {
 
 // TemplateSubmission is the payload sent to Meta when creating a template.
 type TemplateSubmission struct {
-	Name       string              `json:"name"`
-	Language   string              `json:"language"`
-	Category   string              `json:"category"`
-	Components []TemplateComponent `json:"components"`
+	Name            string              `json:"name"`
+	Language        string              `json:"language"`
+	Category        string              `json:"category"`
+	ParameterFormat string              `json:"parameter_format,omitempty"`
+	Components      []TemplateComponent `json:"components"`
 }
 
 // templateListResponse is the paginated response from list templates.
@@ -150,14 +151,10 @@ type ParsedMessage struct {
 
 // ParsedStatus is the flat shape used internally for a status webhook event.
 type ParsedStatus struct {
-	MessageID   string
-	Status      string
-	Timestamp   time.Time
-	RecipientID string
-	ErrorCode   int
-	Subcode     int
-	UserMsg     string
-	FBTraceID   string
+	MessageID string
+	Status    string
+	Timestamp time.Time
+	UserMsg   string
 }
 
 // ParsedTemplateStatus is the flat shape for a template status update event.

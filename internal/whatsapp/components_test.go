@@ -10,7 +10,7 @@ func TestBuildSendComponents_StaticHeaderOmitted(t *testing.T) {
 		HeaderType:    "TEXT",
 		HeaderContent: "Order update",
 		BodyContent:   "Hi {{1}}, your order {{2}} is now {{3}}",
-		Params:        map[string]string{"1": "John", "2": "ORD-12345", "3": "shipped"},
+		Params:        map[string]string{"body:1": "John", "body:2": "ORD-12345", "body:3": "shipped"},
 	}
 	out := BuildSendComponents(parts)
 	if len(out) != 1 {
@@ -33,8 +33,8 @@ func TestBuildSendComponents_ParameterizedTextHeader(t *testing.T) {
 	parts := TemplateSendParts{
 		HeaderType:    "TEXT",
 		HeaderContent: "Order {{1}}",
-		BodyContent:   "ETA {{2}}",
-		Params:        map[string]string{"1": "12345", "2": "tomorrow"},
+		BodyContent:   "ETA {{1}}",
+		Params:        map[string]string{"header:1": "12345", "body:1": "tomorrow"},
 	}
 	out := BuildSendComponents(parts)
 	if len(out) != 2 {
@@ -78,7 +78,7 @@ func TestBuildSendComponents_MediaHeader(t *testing.T) {
 func TestBuildSendComponents_NamedParameters(t *testing.T) {
 	parts := TemplateSendParts{
 		BodyContent: "Hi {{name}}, order {{order_id}}",
-		Params:      map[string]string{"name": "John", "order_id": "12345"},
+		Params:      map[string]string{"body:name": "John", "body:order_id": "12345"},
 	}
 	out := BuildSendComponents(parts)
 	if len(out) != 1 {

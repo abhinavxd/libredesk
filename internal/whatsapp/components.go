@@ -81,7 +81,7 @@ func buildHeaderComponent(p TemplateSendParts) map[string]any {
 		return nil
 	case "TEXT":
 		// Meta rejects parameters sent for a static header.
-		params := positionalParams(p.HeaderContent, p.Params)
+		params := positionalParams(p.HeaderContent, p.Params, "header")
 		if len(params) == 0 {
 			return nil
 		}
@@ -105,7 +105,7 @@ func buildHeaderComponent(p TemplateSendParts) map[string]any {
 }
 
 func buildBodyComponent(bodyContent string, params map[string]string) map[string]any {
-	parameters := positionalParams(bodyContent, params)
+	parameters := positionalParams(bodyContent, params, "body")
 	if len(parameters) == 0 {
 		return nil
 	}
@@ -135,14 +135,14 @@ func buildButtonComponent(index int, b TemplateButton, params map[string]string)
 }
 
 // positionalParams returns parameter entries for text's placeholders: numeric ones ascending (Meta maps positionally), named ones with parameter_name set.
-func positionalParams(text string, params map[string]string) []map[string]any {
+func positionalParams(text string, params map[string]string, prefix string) []map[string]any {
 	keys := OrderedPlaceholders(text)
 	if len(keys) == 0 {
 		return nil
 	}
 	out := make([]map[string]any, 0, len(keys))
 	for _, key := range keys {
-		entry := map[string]any{"type": "text", "text": params[key]}
+		entry := map[string]any{"type": "text", "text": params[prefix+":"+key]}
 		if _, err := strconv.Atoi(key); err != nil {
 			entry["parameter_name"] = key
 		}

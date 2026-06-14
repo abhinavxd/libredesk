@@ -109,6 +109,8 @@ const whatsappInboxes = computed(() =>
   inboxStore.inboxes.filter((inb) => inb.channel === 'whatsapp')
 )
 
+const RESERVED_NAME_PREFIX = 'libredesk_csat_'
+
 const STATUS_BADGE_VARIANT = {
   APPROVED: 'default',
   PENDING: 'secondary',
@@ -160,8 +162,9 @@ const columns = [
     id: 'actions',
     enableHiding: false,
     enableSorting: false,
-    cell: ({ row }) =>
-      h(
+    cell: ({ row }) => {
+      if ((row.original.name || '').startsWith(RESERVED_NAME_PREFIX)) return null
+      return h(
         Button,
         {
           variant: 'ghost',
@@ -170,6 +173,7 @@ const columns = [
         },
         () => h(Trash2, { class: 'size-4' })
       )
+    }
   }
 ]
 

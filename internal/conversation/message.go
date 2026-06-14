@@ -566,8 +566,10 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	}
 
 	// Best-effort render template variables before saving so agents see rendered content immediately.
-	if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-		content = m.template.RenderString(data, content)
+	if inboxRecord.Channel != inbox.ChannelWhatsApp {
+		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
+			content = m.template.RenderString(data, content)
+		}
 	}
 
 	// Insert the message into the database

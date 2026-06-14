@@ -501,6 +501,7 @@
   "contact.blockConfirm": "Are you sure you want to block this contact? They won't be able to chat, and incoming emails from their address will be rejected. This also blocks incoming emails from any other contacts that use the same email.",
   "contact.blockContact": "Block contact",
   "contact.blockedSuccessfully": "Contact blocked successfully",
+  "contact.countriesUnavailable": "Country list failed to load. Click to retry.",
   "contact.deleteNote": "Delete note",
   "contact.editContact": "Edit contact",
   "contact.identityNotVerified": "Identity not verified",

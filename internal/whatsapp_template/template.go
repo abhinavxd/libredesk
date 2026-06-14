@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -205,6 +206,9 @@ func (m *Manager) Delete(ctx context.Context, id int) error {
 	if err != nil {
 		return err
 	}
+	if strings.HasPrefix(t.Name, models.CSATTemplateNamePrefix) {
+		return envelope.NewError(envelope.InputError, "this template is reserved for CSAT surveys and cannot be deleted", nil)
+	}
 	if m.client != nil && m.resolver != nil {
 		if acc, err := m.resolver.WhatsAppAccount(t.InboxID); err == nil {
 			if err := m.client.DeleteTemplate(ctx, acc, t.Name); err != nil {
@@ -316,6 +320,15 @@ func buildSubmission(t models.Template) (whatsapp.TemplateSubmission, error) {
 
 	sampleValues := parseSampleValues(t.SampleValues)
 
+	headerText := ""
+	if t.HeaderType.Valid && strings.EqualFold(t.HeaderType.String, "TEXT") && t.HeaderContent.Valid {
+		headerText = t.HeaderContent.String
+	}
+	named := isNamed(headerText) || isNamed(t.BodyContent)
+	if named {
+		sub.ParameterFormat = "NAMED"
+	}
+
 	if t.HeaderType.Valid && t.HeaderType.String != "" {
 		hdr := whatsapp.TemplateComponent{
 			Type:   "HEADER",
@@ -323,18 +336,21 @@ func buildSubmission(t models.Template) (whatsapp.TemplateSubmission, error) {
 		}
 		if hdr.Format == "TEXT" && t.HeaderContent.Valid {
 			hdr.Text = t.HeaderContent.String
-			// Meta requires header_text examples when the header contains {{n}}.
-			if vals := positionalExamples(hdr.Text, sampleValues); len(vals) > 0 {
-				hdr.Example = map[string]any{"header_text": vals}
+			ex, err := buildExample(hdr.Text, sampleValues, named, "header_text")
+			if err != nil {
+				return whatsapp.TemplateSubmission{}, err
 			}
+			hdr.Example = ex
 		}
 		sub.Components = append(sub.Components, hdr)
 	}
 
 	body := whatsapp.TemplateComponent{Type: "BODY", Text: t.BodyContent}
-	if vals := positionalExamples(body.Text, sampleValues); len(vals) > 0 {
-		body.Example = map[string]any{"body_text": [][]string{vals}}
+	ex, err := buildExample(body.Text, sampleValues, named, "body_text")
+	if err != nil {
+		return whatsapp.TemplateSubmission{}, err
 	}
+	body.Example = ex
 	sub.Components = append(sub.Components, body)
 
 	if t.FooterContent.Valid && t.FooterContent.String != "" {
@@ -348,11 +364,18 @@ func buildSubmission(t models.Template) (whatsapp.TemplateSubmission, error) {
 		var btns []whatsapp.TemplateButton
 		if err := json.Unmarshal(t.Buttons, &btns); err == nil && len(btns) > 0 {
 			for i := range btns {
-				// Meta requires an example for URL buttons with placeholders.
-				if strings.EqualFold(btns[i].Type, "URL") && len(btns[i].Example) == 0 &&
-					len(whatsapp.OrderedPlaceholders(btns[i].URL)) > 0 {
-					btns[i].Example = []string{substitutePlaceholders(btns[i].URL, sampleValues)}
+				if !strings.EqualFold(btns[i].Type, "URL") || len(btns[i].Example) > 0 {
+					continue
 				}
+				keys := whatsapp.OrderedPlaceholders(btns[i].URL)
+				if len(keys) == 0 {
+					continue
+				}
+				url, err := substitutePlaceholders(btns[i].URL, keys, sampleValues)
+				if err != nil {
+					return whatsapp.TemplateSubmission{}, err
+				}
+				btns[i].Example = []string{url}
 			}
 			sub.Components = append(sub.Components, whatsapp.TemplateComponent{
 				Type:    "BUTTONS",
@@ -387,37 +410,62 @@ func parseSampleValues(raw json.RawMessage) map[string]string {
 	return out
 }
 
-// positionalExamples returns example values aligned to text's placeholders; missing keys fall back to the placeholder itself to keep Meta's expected count.
-func positionalExamples(text string, samples map[string]string) []string {
-	if len(samples) == 0 {
-		return nil
-	}
-	keys := whatsapp.OrderedPlaceholders(text)
-	if len(keys) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(keys))
-	for _, key := range keys {
-		if v, ok := samples[key]; ok && v != "" {
-			out = append(out, v)
-		} else {
-			out = append(out, "{{"+key+"}}")
+func isNamed(text string) bool {
+	for _, key := range whatsapp.OrderedPlaceholders(text) {
+		if _, err := strconv.Atoi(key); err != nil {
+			return true
 		}
 	}
-	return out
+	return false
 }
 
-// substitutePlaceholders replaces {{...}} placeholders with sample values, falling back to "example".
-func substitutePlaceholders(text string, samples map[string]string) string {
+func buildExample(text string, samples map[string]string, named bool, positionalKey string) (map[string]any, error) {
+	keys := whatsapp.OrderedPlaceholders(text)
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	if named {
+		params := make([]map[string]any, 0, len(keys))
+		for _, key := range keys {
+			v, err := sampleValue(samples, key)
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, map[string]any{"param_name": key, "example": v})
+		}
+		return map[string]any{positionalKey + "_named_params": params}, nil
+	}
+	vals := make([]string, 0, len(keys))
+	for _, key := range keys {
+		v, err := sampleValue(samples, key)
+		if err != nil {
+			return nil, err
+		}
+		vals = append(vals, v)
+	}
+	if positionalKey == "body_text" {
+		return map[string]any{positionalKey: [][]string{vals}}, nil
+	}
+	return map[string]any{positionalKey: vals}, nil
+}
+
+func substitutePlaceholders(text string, keys []string, samples map[string]string) (string, error) {
 	out := text
-	for _, key := range whatsapp.OrderedPlaceholders(text) {
-		v := samples[key]
-		if v == "" {
-			v = "example"
+	for _, key := range keys {
+		v, err := sampleValue(samples, key)
+		if err != nil {
+			return "", err
 		}
 		out = strings.ReplaceAll(out, "{{"+key+"}}", v)
 	}
-	return out
+	return out, nil
+}
+
+func sampleValue(samples map[string]string, key string) (string, error) {
+	if v, ok := samples[key]; ok && v != "" {
+		return v, nil
+	}
+	return "", fmt.Errorf("missing sample value for placeholder {{%s}}", key)
 }
 
 func submitErrReason(err error) string {

@@ -55,6 +55,7 @@ import {
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
 import WhatsAppComposer from './WhatsAppComposer.vue'
+import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
@@ -63,7 +64,7 @@ const conversationStore = useConversationStore()
 const emitter = useEmitter()
 
 const isWhatsAppChannel = computed(
-  () => conversationStore.current?.inbox_channel === 'whatsapp'
+  () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
 )
 
 const handleUpdateStatus = (status) => {

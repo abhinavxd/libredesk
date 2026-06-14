@@ -152,6 +152,7 @@ import { useStorage } from '@vueuse/core'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
+import { WHATSAPP_CHANNEL, WHATSAPP_WINDOW_MS } from '@main/features/conversation/whatsappTemplate'
 import { useUserStore } from '@main/stores/user'
 import { useDraftManager } from '@main/composables/useDraftManager'
 import api from '@main/api'
@@ -344,10 +345,10 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     return
   }
 
-  if (!isPrivate && conversationStore.current.inbox_channel === 'whatsapp') {
+  if (!isPrivate && conversationStore.current.inbox_channel === WHATSAPP_CHANNEL) {
     const lastInboundAt = conversationStore.current.last_inbound_at
     const windowOpen =
-      lastInboundAt && Date.now() - new Date(lastInboundAt).getTime() < 24 * 60 * 60 * 1000
+      lastInboundAt && Date.now() - new Date(lastInboundAt).getTime() < WHATSAPP_WINDOW_MS
     if (!windowOpen) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',

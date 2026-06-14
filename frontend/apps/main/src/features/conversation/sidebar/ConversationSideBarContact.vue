@@ -172,10 +172,9 @@ const phoneNumber = computed(() => {
   const number = conversation.value?.contact?.phone_number || t('conversation.sidebar.notAvailable')
   if (!countryCodeValue) return number
 
-  // Lookup calling code
   const country = countriesStore.countries.find((c) => c.iso_2 === countryCodeValue)
-  const callingCode = country ? country.calling_code : countryCodeValue
-  return `${callingCode} ${number}`
+  if (!country) return number
+  return `${country.calling_code} ${number}`
 })
 
 const countryName = computed(() => {

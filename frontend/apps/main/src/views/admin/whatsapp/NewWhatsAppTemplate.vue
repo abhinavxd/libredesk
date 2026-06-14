@@ -136,13 +136,17 @@
       <p class="text-xs text-muted-foreground">
         {{ $t('admin.whatsappTemplates.sampleValues.description') }}
       </p>
-      <div v-for="key in placeholders" :key="key" class="grid grid-cols-3 gap-3 items-center">
-        <label class="text-sm font-mono">{{ placeholderLabel(key) }}</label>
-        <Input
-          v-model="sampleValues[key]"
-          :placeholder="$t('admin.whatsappTemplates.sampleValues.placeholder')"
-          class="col-span-2"
-        />
+      <div v-for="key in placeholders" :key="key" class="grid grid-cols-3 gap-3 items-start">
+        <label class="text-sm font-mono pt-2">{{ placeholderLabel(key) }}</label>
+        <div class="col-span-2">
+          <Input
+            v-model="sampleValues[key]"
+            :placeholder="$t('admin.whatsappTemplates.sampleValues.placeholder')"
+          />
+          <p v-if="sampleErrors[key]" class="text-sm text-destructive mt-1">
+            {{ sampleErrors[key] }}
+          </p>
+        </div>
       </div>
     </div>
 
@@ -238,6 +242,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
+import { extractPlaceholders, placeholderLabel } from '@/features/conversation/whatsappTemplate.js'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -274,27 +279,18 @@ const form = useForm({
   }
 })
 
-const PLACEHOLDER_PATTERN = /\{\{([A-Za-z0-9_]+)\}\}/g
+const sampleErrors = reactive({})
 
 const placeholders = computed(() => {
   const sources = [form.values.body_content || '']
   if (form.values.header_type === 'TEXT') {
     sources.push(form.values.header_content || '')
   }
-  const seen = new Set()
-  const out = []
-  for (const src of sources) {
-    for (const match of src.matchAll(PLACEHOLDER_PATTERN)) {
-      if (!seen.has(match[1])) {
-        seen.add(match[1])
-        out.push(match[1])
-      }
-    }
+  for (const btn of buttons.value) {
+    if (btn.type === 'URL' && btn.url) sources.push(btn.url)
   }
-  return out
+  return extractPlaceholders(sources)
 })
-
-const placeholderLabel = (key) => `{{${key}}}`
 
 watch(placeholders, (current) => {
   const valid = new Set(current)
@@ -314,7 +310,26 @@ const cancel = () => {
   router.push({ name: 'whatsapp-templates' })
 }
 
+const validateSampleValues = () => {
+  for (const k of Object.keys(sampleErrors)) delete sampleErrors[k]
+  let ok = true
+  for (const key of placeholders.value) {
+    if (!(sampleValues[key] || '').trim()) {
+      sampleErrors[key] = t('globals.messages.required', { name: placeholderLabel(key) })
+      ok = false
+    }
+  }
+  return ok
+}
+
+watch(sampleValues, () => {
+  for (const key of placeholders.value) {
+    if ((sampleValues[key] || '').trim() && sampleErrors[key]) delete sampleErrors[key]
+  }
+})
+
 const onSubmit = form.handleSubmit(async (values) => {
+  if (!validateSampleValues()) return
   try {
     isLoading.value = true
     const payload = {

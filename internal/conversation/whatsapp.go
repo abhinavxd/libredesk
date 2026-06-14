@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -28,6 +29,8 @@ const WhatsAppWindowDuration = 24 * time.Hour
 const whatsAppMaxTextLength = 4096
 
 var phoneDigitsReplacer = strings.NewReplacer("+", "", "-", "", " ", "", "(", "", ")", "")
+
+var templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z0-9_]+\}\}`)
 
 // WhatsAppStatus values mirror Meta's delivery lifecycle, kept in message.meta since the message_status enum collapses delivered/read into sent.
 const (
@@ -129,7 +132,7 @@ func (m *Manager) mergeWhatsAppMeta(stmt *sqlx.Stmt, key string, patch map[strin
 		m.lo.Error("error merging whatsapp meta", "key", key, "error", err)
 		return err
 	}
-	m.BroadcastMessageUpdate(row.ConversationUUID, row.UUID, map[string]any{"meta": row.Meta})
+	m.BroadcastMessageUpdate(row.ConversationUUID, row.UUID, map[string]any{"meta": stripCSATUUID(row.Meta)})
 	return nil
 }
 
@@ -192,7 +195,14 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 		if err != nil {
 			return content, err
 		}
-		toPhone = phoneDigitsReplacer.Replace(countries.DialCodeForISO(contact.PhoneNumberCountryCode.String) + contact.PhoneNumber.String)
+		if contact.PhoneNumber.String == "" {
+			return content, envelope.NewError(envelope.InputError, "contact has no phone number", nil)
+		}
+		dialCode := countries.DialCodeForISO(contact.PhoneNumberCountryCode.String)
+		if dialCode == "" {
+			return content, envelope.NewError(envelope.InputError, "contact's phone country code is missing or invalid", nil)
+		}
+		toPhone = phoneDigitsReplacer.Replace(dialCode + contact.PhoneNumber.String)
 	}
 	if toPhone == "" {
 		return content, envelope.NewError(envelope.InputError, "contact has no phone number", nil)
@@ -263,16 +273,18 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 	return rendered, nil
 }
 
-// renderTemplateBody substitutes {{n}} / {{name}} placeholders; unmatched ones stay verbatim to expose missing params in the timeline.
+// renderTemplateBody fills {{name}} placeholders from "body:"+name params, leaving unmatched ones verbatim to expose missing params in the timeline.
 func renderTemplateBody(body string, params map[string]string) string {
 	if body == "" || len(params) == 0 {
 		return body
 	}
-	out := body
-	for k, v := range params {
-		out = strings.ReplaceAll(out, "{{"+k+"}}", v)
-	}
-	return out
+	return templatePlaceholderPattern.ReplaceAllStringFunc(body, func(match string) string {
+		name := match[2 : len(match)-2]
+		if v, ok := params["body:"+name]; ok {
+			return v
+		}
+		return match
+	})
 }
 
 // extractInt pulls an int out of a meta map regardless of the JSON decoder's numeric type.
@@ -321,4 +333,23 @@ func extractStringMap(m map[string]any, key string) map[string]string {
 		return out
 	}
 	return nil
+}
+
+func stripCSATUUID(meta json.RawMessage) json.RawMessage {
+	if len(meta) == 0 {
+		return meta
+	}
+	var m map[string]any
+	if err := json.Unmarshal(meta, &m); err != nil {
+		return meta
+	}
+	if _, ok := m["csat_uuid"]; !ok {
+		return meta
+	}
+	delete(m, "csat_uuid")
+	stripped, err := json.Marshal(m)
+	if err != nil {
+		return meta
+	}
+	return stripped
 }

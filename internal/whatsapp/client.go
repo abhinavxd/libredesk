@@ -51,15 +51,6 @@ func New(lo *logf.Logger) *Client {
 	}
 }
 
-// NewWithHTTPClient lets callers supply their own http.Client (for tests or SSRF guard).
-func NewWithHTTPClient(lo *logf.Logger, httpClient *http.Client) *Client {
-	c := New(lo)
-	if httpClient != nil {
-		c.httpClient = httpClient
-	}
-	return c
-}
-
 // SetBaseURL overrides the Graph API base URL (used by tests).
 func (c *Client) SetBaseURL(u string) { c.baseURL = strings.TrimRight(u, "/") }
 

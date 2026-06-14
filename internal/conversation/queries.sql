@@ -703,7 +703,8 @@ FROM conversation_messages
 WHERE source_id = ANY($1::text []);
 
 -- name: update-message-status
-update conversation_messages set status = $1, updated_at = NOW() where uuid = $2;
+UPDATE conversation_messages SET status = $1::message_status, updated_at = NOW()
+WHERE uuid = $2 AND NOT ($1 = 'sent' AND status = 'failed');
 
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
@@ -731,12 +732,23 @@ WHERE m.uuid = $1
 RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
 
 -- name: merge-message-meta-by-source-id
+WITH ranks(status, rank) AS (
+  VALUES ('sent', 1), ('delivered', 2), ('read', 3), ('failed', 4)
+)
 UPDATE conversation_messages m
 SET meta = COALESCE(m.meta, '{}'::jsonb) || $2::jsonb,
     updated_at = NOW()
 FROM conversations c
 WHERE m.source_id = $1
   AND c.id = m.conversation_id
+  AND COALESCE(m.meta->>'wa_status', '') != 'failed'
+  AND COALESCE(
+        (SELECT rank FROM ranks WHERE status = ($2::jsonb)->>'wa_status'),
+        0
+      ) >= COALESCE(
+        (SELECT rank FROM ranks WHERE status = m.meta->>'wa_status'),
+        0
+      )
 RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
 
 -- name: get-message-uuid-by-source-id

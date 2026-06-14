@@ -29,12 +29,13 @@ func handleGetInboxes(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	rootURL, _ := app.setting.GetAppRootURL()
 	for i := range inboxes {
 		if err := inboxes[i].ClearPasswords(); err != nil {
 			app.lo.Error("error clearing inbox passwords from response", "error", err)
 			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
-		setWebhookURL(app, &inboxes[i])
+		setWebhookURLWithRoot(app, &inboxes[i], rootURL)
 	}
 	return r.SendEnvelope(inboxes)
 }
@@ -59,10 +60,15 @@ func handleGetInbox(r *fastglue.Request) error {
 
 // setWebhookURL populates the computed webhook_url field for channels that receive inbound events over HTTP (currently WhatsApp only).
 func setWebhookURL(app *App, inb *imodels.Inbox) {
+	root, _ := app.setting.GetAppRootURL()
+	setWebhookURLWithRoot(app, inb, root)
+}
+
+func setWebhookURLWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
 	if inb.Channel != whatsappChannel.ChannelWhatsApp {
 		return
 	}
-	url := whatsAppCallbackURL(app, inb.ID)
+	url := whatsAppCallbackURLFromRoot(rootURL, inb.ID)
 	if url == "" {
 		return
 	}
@@ -72,7 +78,14 @@ func setWebhookURL(app *App, inb *imodels.Inbox) {
 
 func whatsAppCallbackURL(app *App, inboxID int) string {
 	root, err := app.setting.GetAppRootURL()
-	if err != nil || root == "" {
+	if err != nil {
+		return ""
+	}
+	return whatsAppCallbackURLFromRoot(root, inboxID)
+}
+
+func whatsAppCallbackURLFromRoot(root string, inboxID int) string {
+	if root == "" {
 		return ""
 	}
 	return strings.TrimRight(root, "/") + "/webhooks/whatsapp/" + strconv.Itoa(inboxID)
@@ -183,10 +196,14 @@ func handleCreateInbox(r *fastglue.Request) error {
 	}
 
 	if createdInbox.Channel == whatsappChannel.ChannelWhatsApp {
-		subscribeWhatsAppWebhook(app, createdInbox.ID)
-		if createdInbox.CSATEnabled {
-			ensureWhatsAppCSATTemplate(app, createdInbox.ID)
-		}
+		inboxID := createdInbox.ID
+		csatEnabled := createdInbox.CSATEnabled
+		go func() {
+			subscribeWhatsAppWebhook(app, inboxID)
+			if csatEnabled {
+				ensureWhatsAppCSATTemplate(app, inboxID)
+			}
+		}()
 	}
 
 	// Clear passwords before returning.
@@ -224,13 +241,27 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	var previousConfig json.RawMessage
+	if inbox.Channel == whatsappChannel.ChannelWhatsApp {
+		previous, err := app.inbox.GetDBRecord(id)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		previousConfig = previous.Config
+	}
+
 	updatedInbox, err := app.inbox.Update(id, inbox)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Validated after Update merges back the masked secrets; a failure keeps the new config in the DB so the agent can re-edit, matching the create path.
 	if err := validateWhatsAppCredentials(r, app, updatedInbox); err != nil {
+		if rbErr := app.inbox.UpdateConfig(id, previousConfig); rbErr != nil {
+			app.lo.Error("error rolling back inbox config after failed validation", "id", id, "error", rbErr)
+		}
+		if rbErr := reloadInbox(app, id); rbErr != nil {
+			app.lo.Error("error reloading inbox after config rollback", "id", id, "error", rbErr)
+		}
 		return err
 	}
 
@@ -240,11 +271,14 @@ func handleUpdateInbox(r *fastglue.Request) error {
 	}
 
 	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
-		subscribeWhatsAppWebhook(app, id)
 		app.whatsappAuthErrors.Delete(id)
-		if updatedInbox.CSATEnabled {
-			ensureWhatsAppCSATTemplate(app, id)
-		}
+		csatEnabled := updatedInbox.CSATEnabled
+		go func() {
+			subscribeWhatsAppWebhook(app, id)
+			if csatEnabled {
+				ensureWhatsAppCSATTemplate(app, id)
+			}
+		}()
 	}
 
 	// Clear passwords before returning.

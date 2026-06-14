@@ -212,17 +212,13 @@ func (p *WebhookPayload) ExtractStatuses() []ParsedStatus {
 			}
 			for _, s := range c.Value.Statuses {
 				ps := ParsedStatus{
-					MessageID:   s.ID,
-					Status:      s.Status,
-					Timestamp:   parseUnixSeconds(s.Timestamp),
-					RecipientID: s.RecipientID,
+					MessageID: s.ID,
+					Status:    s.Status,
+					Timestamp: parseUnixSeconds(s.Timestamp),
 				}
 				if len(s.Errors) > 0 {
 					err := s.Errors[0]
-					ps.ErrorCode = err.Code
-					ps.Subcode = err.Subcode
 					ps.UserMsg = firstNonEmptyStr(err.ErrorData.Details, err.UserMsg, err.Message)
-					ps.FBTraceID = err.FBTraceID
 				}
 				out = append(out, ps)
 			}

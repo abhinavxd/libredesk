@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/automation/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	vmodels "github.com/abhinavxd/libredesk/internal/view/models"
@@ -361,14 +362,18 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	_, err = enforceConversationAccess(app, uuid, user)
+	conv, err := enforceConversationAccess(app, uuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	readInboxID, readSourceID, err := app.conversation.WhatsAppReadReceiptTarget(uuid, auser.ID)
-	if err != nil {
-		app.lo.Error("error resolving whatsapp read receipt target", "conversation_uuid", uuid, "error", err)
+	var readInboxID int
+	var readSourceID string
+	if conv.InboxChannel == whatsappChannel.ChannelWhatsApp {
+		readInboxID, readSourceID, err = app.conversation.WhatsAppReadReceiptTarget(uuid, auser.ID)
+		if err != nil {
+			app.lo.Error("error resolving whatsapp read receipt target", "conversation_uuid", uuid, "error", err)
+		}
 	}
 
 	if err = app.conversation.UpdateUserLastSeen(uuid, auser.ID); err != nil {
