@@ -680,7 +680,7 @@ func (c *Manager) UpdateConversationWaitingSince(conversationUUID string, at *ti
 
 // UpdateConversationUserAssignee sets the assignee of a conversation to a specifc user.
 func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, actor umodels.User) error {
-	if err := c.UpdateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
+	if err := c.updateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return c.afterUserAssigned(uuid, assigneeID, actor)
@@ -760,7 +760,7 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 	}
 	previousAssignedTeamID := conversation.AssignedTeamID.Int
 
-	if err := c.UpdateAssignee(uuid, teamID, models.AssigneeTypeTeam); err != nil {
+	if err := c.updateAssignee(uuid, teamID, models.AssigneeTypeTeam); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
@@ -803,27 +803,6 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 		"assigned_team_id": teamID,
 	})
 
-	return nil
-}
-
-// UpdateAssignee updates the assignee of a conversation.
-func (c *Manager) UpdateAssignee(uuid string, assigneeID int, assigneeType string) error {
-	prev, prevErr := c.GetConversationListItem(uuid)
-	switch assigneeType {
-	case models.AssigneeTypeUser:
-		if _, err := c.q.UpdateConversationAssignedUser.Exec(uuid, assigneeID); err != nil {
-			c.lo.Error("error updating conversation assignee", "error", err)
-			return fmt.Errorf("updating assignee: %w", err)
-		}
-	case models.AssigneeTypeTeam:
-		if _, err := c.q.UpdateConversationAssignedTeam.Exec(uuid, assigneeID); err != nil {
-			c.lo.Error("error updating conversation assignee", "error", err)
-			return fmt.Errorf("updating assignee: %w", err)
-		}
-	default:
-		return fmt.Errorf("invalid assignee type: %s", assigneeType)
-	}
-	c.broadcastReassignment(uuid, prev, prevErr)
 	return nil
 }
 
@@ -1968,6 +1947,27 @@ func (c *Manager) FilterAuthorizedListUUIDs(agentID int, uuids []string) ([]stri
 		return nil, err
 	}
 	return authorized, nil
+}
+
+// updateAssignee updates the assignee of a conversation.
+func (c *Manager) updateAssignee(uuid string, assigneeID int, assigneeType string) error {
+	prev, prevErr := c.GetConversationListItem(uuid)
+	switch assigneeType {
+	case models.AssigneeTypeUser:
+		if _, err := c.q.UpdateConversationAssignedUser.Exec(uuid, assigneeID); err != nil {
+			c.lo.Error("error updating conversation assignee", "error", err)
+			return fmt.Errorf("updating assignee: %w", err)
+		}
+	case models.AssigneeTypeTeam:
+		if _, err := c.q.UpdateConversationAssignedTeam.Exec(uuid, assigneeID); err != nil {
+			c.lo.Error("error updating conversation assignee", "error", err)
+			return fmt.Errorf("updating assignee: %w", err)
+		}
+	default:
+		return fmt.Errorf("invalid assignee type: %s", assigneeType)
+	}
+	c.broadcastReassignment(uuid, prev, prevErr)
+	return nil
 }
 
 func nullTimeOrNil(t null.Time) any {
