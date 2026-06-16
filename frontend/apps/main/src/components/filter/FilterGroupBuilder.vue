@@ -1,17 +1,19 @@
 <template>
   <div class="space-y-2">
-    <template v-for="(grp, gi) in modelValue.rules" :key="grp.__id">
-      <div v-if="gi > 0" class="flex justify-center">
-        <ConnectorToggle :modelValue="modelValue.logic" @update:modelValue="setLogic" />
-      </div>
-      <FilterGroupCard
-        :modelValue="grp"
-        :fields="fields"
-        :canRemove="modelValue.rules.length > 1"
-        @update:modelValue="updateGroup(gi, $event)"
-        @remove="removeGroup(gi)"
-      />
-    </template>
+    <div class="max-h-[50vh] overflow-y-auto pr-1 space-y-2">
+      <template v-for="(grp, gi) in modelValue.rules" :key="grp.__id">
+        <div v-if="gi > 0" class="flex justify-center">
+          <ConnectorToggle :modelValue="modelValue.logic" @update:modelValue="setLogic" />
+        </div>
+        <FilterGroupCard
+          :modelValue="grp"
+          :fields="fields"
+          :canRemove="modelValue.rules.length > 1"
+          @update:modelValue="updateGroup(gi, $event)"
+          @remove="removeGroup(gi)"
+        />
+      </template>
+    </div>
 
     <Button
       type="button"

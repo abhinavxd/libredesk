@@ -1,15 +1,9 @@
 <template>
   <div class="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
     <div v-if="canRemove" class="flex justify-end">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        class="text-muted-foreground hover:text-foreground h-7 px-2"
-        @click.stop="emit('remove')"
-      >
-        {{ t('filter.removeGroup') }}
-      </Button>
+      <CloseButton :aria-label="t('filter.removeGroup')" :onClose="() => emit('remove')">
+        <Trash2 class="w-4 h-4" />
+      </CloseButton>
     </div>
 
     <template v-for="(rule, index) in group.rules" :key="rule.__id">
@@ -30,7 +24,7 @@
       type="button"
       variant="ghost"
       size="sm"
-      class="text-muted-foreground"
+      class="text-foreground"
       @click.stop="addCondition"
     >
       <Plus class="w-3 h-3 mr-1" />
@@ -41,8 +35,9 @@
 
 <script setup>
 import { Button } from '@shared-ui/components/ui/button'
-import { Plus } from 'lucide-vue-next'
+import { Plus, Trash2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import CloseButton from '@/components/button/CloseButton.vue'
 import FilterRow from '@/components/filter/FilterRow.vue'
 import ConnectorToggle from '@/components/filter/ConnectorToggle.vue'
 import { createLeaf } from '@/components/filter/filterTree'

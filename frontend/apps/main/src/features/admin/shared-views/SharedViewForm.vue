@@ -16,9 +16,7 @@
       <FormItem>
         <FormLabel>{{ t('globals.terms.filter', 2) }}</FormLabel>
         <FormControl>
-          <div class="max-h-[50vh] overflow-y-auto pr-1">
-            <FilterGroupBuilder :fields="filterFields" v-bind="componentField" />
-          </div>
+          <FilterGroupBuilder :fields="filterFields" v-bind="componentField" />
         </FormControl>
         <FormDescription>{{ t('view.form.filters.description') }}</FormDescription>
         <FormMessage />
