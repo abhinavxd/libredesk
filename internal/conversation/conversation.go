@@ -683,11 +683,11 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 	if err := c.updateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	return c.afterUserAssigned(uuid, assigneeID, actor)
+	return c.afterUserAssignedHooks(uuid, assigneeID, actor)
 }
 
-// AssignUnassignedConversationUser atomically assigns a conversation only if still unassigned and still in expectedTeamID, else returns ErrConversationAlreadyAssigned.
-func (c *Manager) AssignUnassignedConversationUser(uuid string, assigneeID, expectedTeamID int, actor umodels.User) error {
+// ClaimUnassignedConversation atomically assigns a conversation only if still unassigned and still in expectedTeamID, else returns ErrConversationAlreadyAssigned.
+func (c *Manager) ClaimUnassignedConversation(uuid string, assigneeID, expectedTeamID int, actor umodels.User) error {
 	prev, prevErr := c.GetConversationListItem(uuid)
 
 	res, err := c.q.ClaimUnassignedConversation.Exec(uuid, assigneeID, expectedTeamID)
@@ -705,11 +705,11 @@ func (c *Manager) AssignUnassignedConversationUser(uuid string, assigneeID, expe
 	}
 
 	c.broadcastReassignment(uuid, prev, prevErr)
-	return c.afterUserAssigned(uuid, assigneeID, actor)
+	return c.afterUserAssignedHooks(uuid, assigneeID, actor)
 }
 
-// afterUserAssigned runs the side-effects shared by every user-assignment path.
-func (c *Manager) afterUserAssigned(uuid string, assigneeID int, actor umodels.User) error {
+// afterUserAssignedHooks runs the side-effects shared by every user-assignment path.
+func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umodels.User) error {
 	conversation, err := c.GetConversation(0, uuid, "")
 	if err != nil {
 		return err
@@ -1949,7 +1949,7 @@ func (c *Manager) FilterAuthorizedListUUIDs(agentID int, uuids []string) ([]stri
 	return authorized, nil
 }
 
-// updateAssignee updates the assignee of a conversation.
+// updateAssignee updates the team / user assignee of a conversation and broadcasts the reassignment to connected clients.
 func (c *Manager) updateAssignee(uuid string, assigneeID int, assigneeType string) error {
 	prev, prevErr := c.GetConversationListItem(uuid)
 	switch assigneeType {

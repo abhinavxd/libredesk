@@ -29,7 +29,7 @@ const (
 
 type conversationStore interface {
 	GetUnassignedConversations() ([]models.Conversation, error)
-	AssignUnassignedConversationUser(conversationUUID string, userID, expectedTeamID int, user umodels.User) error
+	ClaimUnassignedConversation(conversationUUID string, userID, expectedTeamID int, user umodels.User) error
 	ActiveUserConversationsCount(userID int) (int, error)
 }
 
@@ -239,7 +239,7 @@ func (e *Engine) assignConversations() error {
 				continue
 			}
 
-			if err := e.conversationStore.AssignUnassignedConversationUser(conv.UUID, userID, teamID, e.systemUser); err != nil {
+			if err := e.conversationStore.ClaimUnassignedConversation(conv.UUID, userID, teamID, e.systemUser); err != nil {
 				// Already assigned by someone else, stop trying.
 				if errors.Is(err, conversation.ErrConversationAlreadyAssigned) {
 					e.lo.Debug("conversation already assigned, skipping", "conversation_uuid", conv.UUID)
