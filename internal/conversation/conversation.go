@@ -50,6 +50,7 @@ var (
 	//go:embed queries.sql
 	efs                             embed.FS
 	errConversationNotFound         = errors.New("conversation not found")
+	ErrConversationAlreadyAssigned  = errors.New("conversation already assigned")
 	conversationsAllowedFields      = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "last_interaction_at", "created_at", "waiting_since", "next_sla_deadline_at", "priority_id"}
 	conversationStatusAllowedFields = []string{"id", "name"}
 	usersAllowedFields              = []string{"email"}
@@ -277,6 +278,7 @@ type queries struct {
 	UpsertUserLastSeen                 *sqlx.Stmt `query:"upsert-user-last-seen"`
 	MarkConversationUnread             *sqlx.Stmt `query:"mark-conversation-unread"`
 	UpdateConversationAssignedUser     *sqlx.Stmt `query:"update-conversation-assigned-user"`
+	ClaimUnassignedConversation        *sqlx.Stmt `query:"claim-unassigned-conversation"`
 	UpdateConversationAssignedTeam     *sqlx.Stmt `query:"update-conversation-assigned-team"`
 	UpdateConversationCustomAttributes *sqlx.Stmt `query:"update-conversation-custom-attributes"`
 	UpdateConversationPriority         *sqlx.Stmt `query:"update-conversation-priority"`
@@ -681,8 +683,33 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 	if err := c.UpdateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	return c.afterUserAssigned(uuid, assigneeID, actor)
+}
 
-	// Refetch the conversation to get the updated details.
+// AssignUnassignedConversationUser atomically assigns a conversation only if still unassigned and still in expectedTeamID, else returns ErrConversationAlreadyAssigned.
+func (c *Manager) AssignUnassignedConversationUser(uuid string, assigneeID, expectedTeamID int, actor umodels.User) error {
+	prev, prevErr := c.GetConversationListItem(uuid)
+
+	res, err := c.q.ClaimUnassignedConversation.Exec(uuid, assigneeID, expectedTeamID)
+	if err != nil {
+		c.lo.Error("error claiming unassigned conversation", "uuid", uuid, "error", err)
+		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		c.lo.Error("error reading rows affected for conversation claim", "uuid", uuid, "error", err)
+		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if rows == 0 {
+		return ErrConversationAlreadyAssigned
+	}
+
+	c.broadcastReassignment(uuid, prev, prevErr)
+	return c.afterUserAssigned(uuid, assigneeID, actor)
+}
+
+// afterUserAssigned runs the side-effects shared by every user-assignment path.
+func (c *Manager) afterUserAssigned(uuid string, assigneeID int, actor umodels.User) error {
 	conversation, err := c.GetConversation(0, uuid, "")
 	if err != nil {
 		return err
@@ -695,10 +722,8 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		"conversation":      conversation,
 	})
 
-	// Evaluate automation rules.
 	c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationUserAssigned)
 
-	// Send notifications to assignee (skip if self-assigning).
 	if assigneeID != actor.ID {
 		if err := c.NotifyAssignment([]int{assigneeID}, conversation); err != nil {
 			c.lo.Error("error sending assignment notification", "error", err)
@@ -709,7 +734,6 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Broadcast conversation update to widget clients with assignee info.
 	agent, err := c.userStore.GetAgent(assigneeID, "")
 	if err == nil {
 		c.SignAvatarURL(&agent.AvatarURL)
@@ -799,17 +823,22 @@ func (c *Manager) UpdateAssignee(uuid string, assigneeID int, assigneeType strin
 	default:
 		return fmt.Errorf("invalid assignee type: %s", assigneeType)
 	}
+	c.broadcastReassignment(uuid, prev, prevErr)
+	return nil
+}
+
+// broadcastReassignment broadcasts a reassignment to agents, given the conversation's prior list item.
+func (c *Manager) broadcastReassignment(uuid string, prev models.ConversationListItem, prevErr error) {
 	next, nextErr := c.GetConversationListItem(uuid)
 	if nextErr != nil {
 		c.lo.Error("error fetching conversation list item for assignee broadcast", "uuid", uuid, "error", nextErr)
-		return nil
+		return
 	}
 	var prevPtr *models.ConversationListItem
 	if prevErr == nil {
 		prevPtr = &prev
 	}
 	c.BroadcastConvReassignment(prevPtr, &next)
-	return nil
 }
 
 // UpdateConversationPriority updates the priority of a conversation.
