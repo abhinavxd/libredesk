@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-2">
-    <div class="max-h-[50vh] overflow-y-auto pr-1 space-y-2">
+    <div class="max-h-[50vh] overflow-y-auto pr-1 pb-2 space-y-2">
       <template v-for="(grp, gi) in modelValue.rules" :key="grp.__id">
         <div v-if="gi > 0" class="flex justify-center">
           <ConnectorToggle :modelValue="modelValue.logic" @update:modelValue="setLogic" />

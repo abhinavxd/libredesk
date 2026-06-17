@@ -164,12 +164,14 @@ func parseFilters(filtersJSON string) (FilterNode, error) {
 		return FilterNode{}, nil
 	}
 	switch trimmed[0] {
+	// OLD: flat array of leaves (legacy), implicitly AND-ed, e.g. [{"model":"conversations","field":"status_id","operator":"equals","value":"1"}]
 	case '[':
 		var leaves []FilterNode
 		if err := json.Unmarshal([]byte(trimmed), &leaves); err != nil {
 			return FilterNode{}, fmt.Errorf("invalid filters JSON: %w", err)
 		}
 		return FilterNode{Logic: "AND", Rules: leaves}, nil
+	// NEW: logic + nested rules, e.g. {"logic":"AND","rules":[{"logic":"OR","rules":[<leaves>]},{"logic":"AND","rules":[<leaves>]}]}
 	case '{':
 		var node FilterNode
 		if err := json.Unmarshal([]byte(trimmed), &node); err != nil {
