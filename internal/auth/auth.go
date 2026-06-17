@@ -63,8 +63,10 @@ type Auth struct {
 	oauthCfgs map[int]oauth2.Config
 	verifiers map[int]*oidc.IDTokenVerifier
 	sess      *simplesessions.Manager
+	store     *sessredisstore.Store
 	logger    *logf.Logger
 	rd        *redis.Client
+	lifetime  time.Duration
 }
 
 // New creates an Auth service with configured OIDC providers
@@ -121,8 +123,10 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 		oauthCfgs: oauthCfgs,
 		verifiers: verifiers,
 		sess:      sess,
+		store:     st,
 		logger:    logger,
 		rd:        rd,
+		lifetime:  lifetime,
 	}, nil
 }
 
@@ -242,6 +246,16 @@ func (a *Auth) SaveSession(user amodels.User, r *fastglue.Request) error {
 		a.logger.Error("error setting login session", "error", err)
 		return err
 	}
+
+	// Track the session id per user so all of a user's sessions can be destroyed on password change.
+	ctx := context.Background()
+	key := fmt.Sprintf("user_sessions:%d", user.ID)
+	now := time.Now().Unix()
+	if err := a.rd.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: sess.ID()}).Err(); err != nil {
+		a.logger.Error("error tracking user session", "error", err)
+	}
+	a.rd.ZRemRangeByScore(ctx, key, "0", fmt.Sprintf("%d", now-int64(a.lifetime.Seconds())))
+	a.rd.Expire(ctx, key, a.lifetime)
 	return nil
 }
 
@@ -352,6 +366,22 @@ func (a *Auth) DestroySession(r *fastglue.Request) error {
 		return err
 	}
 	return nil
+}
+
+// DestroyUserSessions destroys all of a user's sessions (e.g. after a password change).
+func (a *Auth) DestroyUserSessions(userID int) error {
+	ctx := context.Background()
+	key := fmt.Sprintf("user_sessions:%d", userID)
+	ids, err := a.rd.ZRange(ctx, key, 0, -1).Result()
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := a.store.Destroy(id); err != nil {
+			a.logger.Error("error destroying session", "session_id", id, "error", err)
+		}
+	}
+	return a.rd.Del(ctx, key).Err()
 }
 
 // generateCSRFToken creates a random base64 encoded str.

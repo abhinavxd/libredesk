@@ -289,10 +289,13 @@ func handleUpdateAgent(r *fastglue.Request) error {
 		}
 	}
 
-	// Log activity if password was changed.
+	// Log activity and destroy existing sessions if password was changed.
 	if req.NewPassword != "" {
 		if err := app.activityLog.PasswordSet(auser.ID, auser.Email, ip, id, req.Email); err != nil {
 			app.lo.Error("error creating activity log", "error", err)
+		}
+		if err := app.auth.DestroyUserSessions(id); err != nil {
+			app.lo.Error("error destroying user sessions", "user_id", id, "error", err)
 		}
 	}
 
@@ -466,6 +469,9 @@ func handleSetPassword(r *fastglue.Request) error {
 	}
 	app.user.InvalidateAgentCache(id)
 	app.wsHub.KickUser(id)
+	if err := app.auth.DestroyUserSessions(id); err != nil {
+		app.lo.Error("error destroying user sessions", "user_id", id, "error", err)
+	}
 
 	return r.SendEnvelope(true)
 }
