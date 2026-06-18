@@ -51,20 +51,22 @@ func (u *Manager) CreateContact(user *models.User) error {
 	}
 
 	if user.Email.Valid && user.Email.String != "" {
-		// Reuse any existing contact with this email, preferring one with ext_id if multiple exist.
+		// An ext_id contact owns this email - reuse it; the no-ext-id upsert below can't match it and would insert a duplicate.
 		existing, err := u.GetContactByEmail(user.Email.String)
-		if err == nil {
+		if err == nil && existing.ExternalUserID.String != "" {
 			user.ID = existing.ID
 			return nil
 		}
 
 		// Other error than not found - fail.
-		if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
-			return err
+		if err != nil {
+			if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
+				return err
+			}
 		}
 	}
 
-	// No ext_id and no existing contact with email - create new.
+	// No ext_id contact for this email - insert new, or update the existing no-ext-id contact's name.
 	if err := u.q.InsertContactNoExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL).Scan(&user.ID); err != nil {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
