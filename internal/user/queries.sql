@@ -176,7 +176,9 @@ RETURNING id;
 INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id)
 VALUES ($1, 'contact', $2, $3, $4, $5, NULL)
 ON CONFLICT (email) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL
-DO UPDATE SET updated_at = now()
+DO UPDATE SET first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
+              last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
+              updated_at = now()
 RETURNING id;
 
 -- name: get-contact-by-email
