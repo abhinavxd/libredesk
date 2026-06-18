@@ -608,9 +608,13 @@ DELETE FROM conversation_messages WHERE CASE
 END;
 
 -- name: delete-private-message
--- Deletes a single private note by UUID. Only private=true messages can be
--- removed; sent/incoming messages are protected.
-DELETE FROM conversation_messages WHERE uuid = $1 AND private = true;
+-- Deletes a single private note, scoped to its conversation. Only private=true
+-- messages can be removed; sent/incoming messages are protected.
+-- $1 = message uuid, $2 = conversation uuid (prevents cross-conversation deletes).
+DELETE FROM conversation_messages
+WHERE uuid = $1
+  AND private = true
+  AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2);
 
 -- name: get-message-source-ids
 SELECT 

@@ -26,7 +26,7 @@ func handleDeleteMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if err := app.conversation.DeletePrivateMessage(uuid); err != nil {
+	if err := app.conversation.DeletePrivateMessage(cuuid, uuid); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)
