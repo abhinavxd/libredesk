@@ -175,5 +175,5 @@ func (u *Manager) MarkInactiveUsersOffline() []models.OfflineUser {
 // GetAllAgents returns a list of all agents.
 func (u *Manager) GetAgents() ([]models.UserCompact, error) {
 	// Some dirty hack.
-	return u.GetAllUsers(1, 999999999, []string{models.UserTypeAgent}, "desc", "users.updated_at", "")
+	return u.GetAllUsers(1, 999999999, []string{models.UserTypeAgent}, "desc", "users.updated_at", "", "")
 }

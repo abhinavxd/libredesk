@@ -3,6 +3,7 @@ package dbutil
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -182,5 +183,64 @@ func TestValidateFilters(t *testing.T) {
 	}
 	if err := ValidateFilters(`{"logic":"AND","rules":[{"model":"conversations","field":"nope","operator":"equals","value":"1"}]}`, testAllowed, testRenderers); err == nil {
 		t.Fatal("expected validation error for bad field")
+	}
+}
+
+func buildTZ(t *testing.T, loc, filtersJSON string) (string, []any, error) {
+	t.Helper()
+	return BuildPaginatedQuery("SELECT 1 FROM conversations WHERE 1=1", nil, PaginationOptions{Page: 1, PageSize: 30, Location: loc}, filtersJSON, testAllowed, testRenderers)
+}
+
+func TestDateFilterResolvesInConfiguredTimezone(t *testing.T) {
+	q, args, err := buildTZ(t, "Asia/Kolkata", `[{"model":"conversations","field":"created_at","operator":"equals","value":"2026-06-08"}]`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(q, "AT TIME ZONE") {
+		t.Fatalf("expected AT TIME ZONE in query, got: %s", q)
+	}
+	if !slices.Contains(args, any("2026-06-08")) || !slices.Contains(args, any("Asia/Kolkata")) {
+		t.Fatalf("expected date and timezone bound as params, got args: %v", args)
+	}
+}
+
+func TestDateFilterOperatorsBindDateAndTimezone(t *testing.T) {
+	cases := []struct {
+		op    string
+		value string
+	}{
+		{"equals", "2026-06-08"},
+		{"not equals", "2026-06-08"},
+		{"greater than", "2026-06-08"},
+		{"less than", "2026-06-08"},
+		{"between", "2026-06-08,2026-06-10"},
+	}
+	for _, c := range cases {
+		filter := fmt.Sprintf(`[{"model":"conversations","field":"created_at","operator":%q,"value":%q}]`, c.op, c.value)
+		q, args, err := buildTZ(t, "Asia/Kolkata", filter)
+		if err != nil {
+			t.Fatalf("op %q: unexpected error: %v", c.op, err)
+		}
+		if !strings.Contains(q, "AT TIME ZONE") {
+			t.Fatalf("op %q: expected AT TIME ZONE, got: %s", c.op, q)
+		}
+		if !slices.Contains(args, any("Asia/Kolkata")) {
+			t.Fatalf("op %q: timezone not bound as a param, args: %v", c.op, args)
+		}
+	}
+}
+
+func TestDateFilterInvalidTimezoneFallsBackToUTC(t *testing.T) {
+	for _, loc := range []string{"", "Mars/Olympus", "'; DROP TABLE users;--"} {
+		_, args, err := buildTZ(t, loc, `[{"model":"conversations","field":"created_at","operator":"equals","value":"2026-06-08"}]`)
+		if err != nil {
+			t.Fatalf("loc %q: unexpected error: %v", loc, err)
+		}
+		if !slices.Contains(args, any("UTC")) {
+			t.Fatalf("loc %q: expected UTC fallback in args, got: %v", loc, args)
+		}
+		if slices.Contains(args, any(loc)) && loc != "" {
+			t.Fatalf("loc %q: invalid timezone leaked into args: %v", loc, args)
+		}
 	}
 }

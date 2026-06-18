@@ -15,7 +15,7 @@ func handleGetActivityLogs(r *fastglue.Request) error {
 		total   = 0
 	)
 	page, pageSize := getPagination(r)
-	logs, err := app.activityLog.GetAll(order, orderBy, filters, page, pageSize)
+	logs, err := app.activityLog.GetAll(order, orderBy, filters, page, pageSize, app.setting.GetAppTimezone())
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

@@ -57,8 +57,8 @@ func New(opts Opts) (*Manager, error) {
 }
 
 // GetAll retrieves all activity logs.
-func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int) ([]models.ActivityLog, error) {
-	query, qArgs, err := m.makeQuery(page, pageSize, order, orderBy, filtersJSON)
+func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int, location string) ([]models.ActivityLog, error) {
+	query, qArgs, err := m.makeQuery(page, pageSize, order, orderBy, filtersJSON, location)
 	if err != nil {
 		m.lo.Error("error creating activity log list query", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -271,7 +271,7 @@ func (m *Manager) create(activityType, activityDescription string, actorID int, 
 }
 
 // makeQuery constructs the SQL query for fetching activity logs with filters and pagination.
-func (m *Manager) makeQuery(page, pageSize int, order, orderBy, filtersJSON string) (string, []any, error) {
+func (m *Manager) makeQuery(page, pageSize int, order, orderBy, filtersJSON, location string) (string, []any, error) {
 	var (
 		baseQuery = m.q.GetAllActivities
 		qArgs     []any
@@ -281,6 +281,7 @@ func (m *Manager) makeQuery(page, pageSize int, order, orderBy, filtersJSON stri
 		OrderBy:  orderBy,
 		Page:     page,
 		PageSize: pageSize,
+		Location: location,
 	}, filtersJSON, dbutil.AllowedFields{
 		"activity_logs": {"activity_type", "actor_id", "ip", "created_at"},
 	}, nil)

@@ -1627,6 +1627,7 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		OrderBy:  orderBy,
 		Page:     page,
 		PageSize: pageSize,
+		Location: c.filterLocation(),
 	}, filtersJSON, conversationListAllowedFields, conversationFilterRenderers)
 }
 
@@ -1916,6 +1917,19 @@ func (c *Manager) updateAssignee(uuid string, assigneeID int, assigneeType strin
 	}
 	c.broadcastReassignment(uuid, prev, prevErr)
 	return nil
+}
+
+// filterLocation returns the configured app timezone for resolving date filters. The builder normalizes invalid/empty values to UTC.
+func (c *Manager) filterLocation() string {
+	b, err := c.settingsStore.Get("app.timezone")
+	if err != nil {
+		return ""
+	}
+	var tz string
+	if err := json.Unmarshal(b, &tz); err != nil {
+		return ""
+	}
+	return tz
 }
 
 func nullTimeOrNil(t null.Time) any {

@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 )
 
 // ErrTooManyGroups is returned when a filter exceeds MaxFilterGroups. Callers map it to a user-facing error.
@@ -44,6 +46,8 @@ type PaginationOptions struct {
 	PageSize int
 	OrderBy  string
 	Order    string
+	// Location is the IANA timezone date-only filters are resolved in; empty falls back to UTC.
+	Location string
 }
 
 // Order directions.
@@ -106,7 +110,9 @@ func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOp
 		return "", nil, err
 	}
 
-	whereClause, filterArgs, err := buildWhereClause(root, existingArgs, allowedFields, renderers)
+	loc := stringutil.NormalizeTimezone(opts.Location)
+
+	whereClause, filterArgs, err := buildWhereClause(root, existingArgs, allowedFields, renderers, loc)
 	if err != nil {
 		return "", nil, err
 	}
@@ -153,7 +159,7 @@ func ValidateFilters(filtersJSON string, allowedFields AllowedFields, renderers 
 	}
 	args := []any{}
 	next := 1
-	_, err = buildNode(root, &args, &next, allowedFields, renderers, 0)
+	_, err = buildNode(root, &args, &next, allowedFields, renderers, 0, "UTC")
 	return err
 }
 
@@ -183,10 +189,10 @@ func parseFilters(filtersJSON string) (FilterNode, error) {
 	}
 }
 
-func buildWhereClause(root FilterNode, existingArgs []any, allowedFields AllowedFields, renderers FieldRenderers) (string, []any, error) {
+func buildWhereClause(root FilterNode, existingArgs []any, allowedFields AllowedFields, renderers FieldRenderers, loc string) (string, []any, error) {
 	args := []any{}
 	next := len(existingArgs) + 1
-	clause, err := buildNode(root, &args, &next, allowedFields, renderers, 0)
+	clause, err := buildNode(root, &args, &next, allowedFields, renderers, 0, loc)
 	if err != nil {
 		return "", nil, err
 	}
@@ -218,7 +224,7 @@ func countConditions(node FilterNode) int {
 	return n
 }
 
-func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFields, renderers FieldRenderers, depth int) (string, error) {
+func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFields, renderers FieldRenderers, depth int, loc string) (string, error) {
 	if depth > maxFilterDepth {
 		return "", fmt.Errorf("filter nesting too deep")
 	}
@@ -241,7 +247,7 @@ func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFie
 	}
 
 	if !node.isGroup() {
-		return buildLeaf(node, args, next, allowedFields, renderers)
+		return buildLeaf(node, args, next, allowedFields, renderers, loc)
 	}
 
 	logic := strings.ToUpper(strings.TrimSpace(node.Logic))
@@ -257,7 +263,7 @@ func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFie
 		if child.isEmpty() {
 			continue
 		}
-		clause, err := buildNode(child, args, next, allowedFields, renderers, depth+1)
+		clause, err := buildNode(child, args, next, allowedFields, renderers, depth+1, loc)
 		if err != nil {
 			return "", err
 		}
@@ -272,7 +278,7 @@ func buildNode(node FilterNode, args *[]any, next *int, allowedFields AllowedFie
 	return "(" + strings.Join(parts, " "+logic+" ") + ")", nil
 }
 
-func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields, renderers FieldRenderers) (string, error) {
+func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields, renderers FieldRenderers, loc string) (string, error) {
 	if render, ok := renderers.get(f.Model, f.Field); ok {
 		sql, rArgs, err := render(f.Operator, f.Value, *next)
 		if err != nil {
@@ -300,9 +306,9 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 	switch f.Operator {
 	case "equals":
 		if dateOnlyRe.MatchString(f.Value) {
-			cond := fmt.Sprintf("(%s >= $%d::DATE AND %s < ($%d::DATE + INTERVAL '1 day'))", field, *next, field, *next)
-			*args = append(*args, f.Value)
-			*next++
+			cond := fmt.Sprintf("(%s >= ($%d::date)::timestamp AT TIME ZONE $%d AND %s < ($%d::date + 1)::timestamp AT TIME ZONE $%d)", field, *next, *next+1, field, *next, *next+1)
+			*args = append(*args, f.Value, loc)
+			*next += 2
 			return cond, nil
 		}
 		cond := fmt.Sprintf("%s = $%d", field, *next)
@@ -311,9 +317,9 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 		return cond, nil
 	case "not equals":
 		if dateOnlyRe.MatchString(f.Value) {
-			cond := fmt.Sprintf("(%s < $%d::DATE OR %s >= ($%d::DATE + INTERVAL '1 day'))", field, *next, field, *next)
-			*args = append(*args, f.Value)
-			*next++
+			cond := fmt.Sprintf("(%s < ($%d::date)::timestamp AT TIME ZONE $%d OR %s >= ($%d::date + 1)::timestamp AT TIME ZONE $%d)", field, *next, *next+1, field, *next, *next+1)
+			*args = append(*args, f.Value, loc)
+			*next += 2
 			return cond, nil
 		}
 		cond := fmt.Sprintf("%s != $%d", field, *next)
@@ -322,9 +328,9 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 		return cond, nil
 	case "greater than":
 		if dateOnlyRe.MatchString(f.Value) {
-			cond := fmt.Sprintf("%s >= ($%d::DATE + INTERVAL '1 day')", field, *next)
-			*args = append(*args, f.Value)
-			*next++
+			cond := fmt.Sprintf("%s >= ($%d::date + 1)::timestamp AT TIME ZONE $%d", field, *next, *next+1)
+			*args = append(*args, f.Value, loc)
+			*next += 2
 			return cond, nil
 		}
 		cond := fmt.Sprintf("%s > $%d", field, *next)
@@ -333,9 +339,9 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 		return cond, nil
 	case "less than":
 		if dateOnlyRe.MatchString(f.Value) {
-			cond := fmt.Sprintf("%s < $%d::DATE", field, *next)
-			*args = append(*args, f.Value)
-			*next++
+			cond := fmt.Sprintf("%s < ($%d::date)::timestamp AT TIME ZONE $%d", field, *next, *next+1)
+			*args = append(*args, f.Value, loc)
+			*next += 2
 			return cond, nil
 		}
 		cond := fmt.Sprintf("%s < $%d", field, *next)
@@ -371,12 +377,13 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 		}
 		start := strings.TrimSpace(values[0])
 		end := strings.TrimSpace(values[1])
-		var cond string
 		if dateOnlyRe.MatchString(start) && dateOnlyRe.MatchString(end) {
-			cond = fmt.Sprintf("(%s >= $%d::DATE AND %s < ($%d::DATE + INTERVAL '1 day'))", field, *next, field, *next+1)
-		} else {
-			cond = fmt.Sprintf("%s BETWEEN $%d AND $%d", field, *next, *next+1)
+			cond := fmt.Sprintf("(%s >= ($%d::date)::timestamp AT TIME ZONE $%d AND %s < ($%d::date + 1)::timestamp AT TIME ZONE $%d)", field, *next, *next+2, field, *next+1, *next+2)
+			*args = append(*args, start, end, loc)
+			*next += 3
+			return cond, nil
 		}
+		cond := fmt.Sprintf("%s BETWEEN $%d AND $%d", field, *next, *next+1)
 		*args = append(*args, start, end)
 		*next += 2
 		return cond, nil
