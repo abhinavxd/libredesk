@@ -602,10 +602,19 @@ DELETE FROM conversations WHERE uuid = $1;
 
 -- MESSAGE queries.
 -- name: delete-message
-DELETE FROM conversation_messages WHERE CASE 
-    WHEN $1 > 0 THEN id = $1 
-    ELSE uuid = $2 
+DELETE FROM conversation_messages WHERE CASE
+    WHEN $1 > 0 THEN id = $1
+    ELSE uuid = $2
 END;
+
+-- name: delete-private-message
+-- Deletes a single private note, scoped to its conversation. Only private=true
+-- messages can be removed; sent/incoming messages are protected.
+-- $1 = message uuid, $2 = conversation uuid (prevents cross-conversation deletes).
+DELETE FROM conversation_messages
+WHERE uuid = $1
+  AND private = true
+  AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2);
 
 -- name: get-message-source-ids
 SELECT 

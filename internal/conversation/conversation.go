@@ -314,6 +314,7 @@ type queries struct {
 	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
 	UpdateMessageSourceID              *sqlx.Stmt `query:"update-message-source-id"`
 	DeleteMessage                      *sqlx.Stmt `query:"delete-message"`
+	DeletePrivateMessage               *sqlx.Stmt `query:"delete-private-message"`
 
 	// Conversation continuity queries.
 	GetOfflineLiveChatConversations *sqlx.Stmt `query:"get-offline-livechat-conversations"`
