@@ -506,9 +506,10 @@ const createConversation = form.handleSubmit(async (values) => {
 watch(
   () => conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).id,
   () => {
+    const currentValue = form.values?.content || ''
     form.setFieldValue(
       'content',
-      conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
+      currentValue + conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
     )
   },
   { deep: true }

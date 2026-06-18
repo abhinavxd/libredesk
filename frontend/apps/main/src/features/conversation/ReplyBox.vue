@@ -482,7 +482,7 @@ watch(
 
     // If macro has message content, set it in the editor.
     if (conversationStore.getMacro('reply').message_content) {
-      htmlContent.value = conversationStore.getMacro('reply').message_content
+      htmlContent.value = htmlContent.value + conversationStore.getMacro('reply').message_content
     }
   },
   { deep: true }
