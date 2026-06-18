@@ -1,4 +1,6 @@
 <template>
+  <ContextMenu>
+    <ContextMenuTrigger as-child :disabled="!isPrivateMessage">
   <div class="flex flex-col text-left" :class="isOutgoing ? 'items-end' : 'items-start'">
     <!-- Sender Name -->
     <div
@@ -186,6 +188,14 @@
       </Tooltip>
     </div>
   </div>
+    </ContextMenuTrigger>
+    <ContextMenuContent v-if="isPrivateMessage">
+      <ContextMenuItem class="text-destructive focus:text-destructive" @click="deleteNote">
+        <Trash2 class="mr-2 h-4 w-4" />
+        {{ t('conversation.deletePrivateNote') }}
+      </ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>
 </template>
 
 <script setup>
@@ -193,7 +203,13 @@ import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, Maximize2 } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, Maximize2, Trash2 } from 'lucide-vue-next'
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem
+} from '@shared-ui/components/ui/context-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
@@ -251,6 +267,11 @@ const props = defineProps({
 const convStore = useConversationStore()
 const { t } = useI18n()
 const userStore = useUserStore()
+
+// Delete a private note via the API (only private notes can be deleted).
+const deleteNote = () => {
+  convStore.deleteMessage(convStore.current?.uuid, props.message.uuid)
+}
 
 const isSystemUser = computed(() => props.message.author?.email === 'System')
 const canManageUsers = computed(() => !isSystemUser.value && userStore.can('users:manage'))

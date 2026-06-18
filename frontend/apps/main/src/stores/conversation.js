@@ -505,6 +505,19 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  async function deleteMessage (conversationUUID, messageUUID) {
+    try {
+      await api.deleteMessage(conversationUUID, messageUUID)
+      messages.data.removeMessage(conversationUUID, messageUUID)
+      incrementMessageVersion()
+    } catch (error) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: handleHTTPError(error).message
+      })
+    }
+  }
+
   function fetchNextConversations () {
     if (conversations.fetching || !conversations.hasMore) return
     fetchConversationsList(false, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page + 1)
@@ -1159,6 +1172,7 @@ export const useConversationStore = defineStore('conversation', () => {
     setDraft,
     removeDraft,
     hasDraft,
+    deleteMessage,
     addPendingMessage,
     replacePendingMessage,
     removePendingMessage,

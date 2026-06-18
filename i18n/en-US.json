@@ -489,6 +489,7 @@
   "conversation.bulkActions.toolbar": "Bulk actions toolbar",
   "conversation.couldNotFetch": "Could not fetch conversations",
   "conversation.downloadTranscript": "Download transcript",
+  "conversation.deletePrivateNote": "Delete note",
   "conversation.hideQuotedText": "Hide quoted text",
   "conversation.mentions": "Mentions",
   "conversation.myInbox": "My inbox",
