@@ -152,8 +152,8 @@ func (u *Manager) VerifyPassword(email string, password []byte) (models.User, er
 }
 
 // GetAllUsers returns a list of all users.
-func (u *Manager) GetAllUsers(page, pageSize int, userTypes []string, order, orderBy string, filtersJSON string) ([]models.UserCompact, error) {
-	query, qArgs, err := u.makeUserListQuery(page, pageSize, userTypes, order, orderBy, filtersJSON)
+func (u *Manager) GetAllUsers(page, pageSize int, userTypes []string, order, orderBy string, filtersJSON, location string) ([]models.UserCompact, error) {
+	query, qArgs, err := u.makeUserListQuery(page, pageSize, userTypes, order, orderBy, filtersJSON, location)
 	if err != nil {
 		u.lo.Error("error creating user list query", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -594,7 +594,7 @@ func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) error {
 }
 
 // makeUserListQuery generates a query to fetch users based on the provided filters.
-func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, order, orderBy, filtersJSON string) (string, []interface{}, error) {
+func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, order, orderBy, filtersJSON, location string) (string, []interface{}, error) {
 	var qArgs []any
 	qArgs = append(qArgs, pq.Array(userTypes))
 	return dbutil.BuildPaginatedQuery(u.q.GetUsersCompact, qArgs, dbutil.PaginationOptions{
@@ -602,9 +602,10 @@ func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, orde
 		OrderBy:  orderBy,
 		Page:     page,
 		PageSize: pageSize,
+		Location: location,
 	}, filtersJSON, dbutil.AllowedFields{
 		"users": {"email", "created_at", "updated_at"},
-	})
+	}, nil)
 }
 
 // verifyPassword compares the provided password with the stored password hash.

@@ -1477,7 +1477,8 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 	return storedCID, exists, mediaUUID
 }
 
-// emailFromAddress returns the From header, applying the inbox from-name template for agent senders.
+// emailFromAddress returns the From header, applying the inbox from-name template for agent senders
+// Falls back to the inbox's default from address if the template is empty, the sender is not an agent, or any errors occur.
 func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) string {
 	from := inb.FromAddress()
 

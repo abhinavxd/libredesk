@@ -5,7 +5,7 @@
       <div>
         <span>{{ conversationStore.currentContactName }}</span>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger>
             <div
