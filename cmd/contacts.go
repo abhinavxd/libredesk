@@ -22,6 +22,94 @@ type blockContactReq struct {
 	Enabled bool `json:"enabled"`
 }
 
+type contactFormValues struct {
+	FirstName              string
+	LastName               string
+	Email                  string
+	PhoneNumber            string
+	PhoneNumberCountryCode string
+	Country                string
+	AvatarURL              string
+}
+
+func parseContactFormValues(values map[string][]string) contactFormValues {
+	return contactFormValues{
+		FirstName:              getContactFormValue(values, "first_name"),
+		LastName:               getContactFormValue(values, "last_name"),
+		Email:                  strings.TrimSpace(getContactFormValue(values, "email")),
+		PhoneNumber:            nullifyContactFormValue(getContactFormValue(values, "phone_number")),
+		PhoneNumberCountryCode: nullifyContactFormValue(getContactFormValue(values, "phone_number_country_code")),
+		Country:                nullifyContactFormValue(getContactFormValue(values, "country")),
+		AvatarURL:              nullifyContactFormValue(getContactFormValue(values, "avatar_url")),
+	}
+}
+
+func getContactFormValue(values map[string][]string, key string) string {
+	if v, ok := values[key]; ok && len(v) > 0 {
+		return v[0]
+	}
+	return ""
+}
+
+func nullifyContactFormValue(value string) string {
+	if value == "null" {
+		return ""
+	}
+	return value
+}
+
+// handleCreateContact creates a new contact.
+func handleCreateContact(r *fastglue.Request) error {
+	var app = r.Context.(*App)
+
+	form, err := r.RequestCtx.MultipartForm()
+	if err != nil {
+		app.lo.Error("error parsing form data", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
+	}
+
+	fields := parseContactFormValues(form.Value)
+
+	// Validate email format if provided.
+	if fields.Email != "" && !stringutil.ValidEmail(fields.Email) {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidEmail"), nil, envelope.InputError)
+	}
+
+	contact := models.User{
+		FirstName:              fields.FirstName,
+		LastName:               fields.LastName,
+		Email:                  null.NewString(fields.Email, fields.Email != ""),
+		PhoneNumber:            null.NewString(fields.PhoneNumber, fields.PhoneNumber != ""),
+		PhoneNumberCountryCode: null.NewString(fields.PhoneNumberCountryCode, fields.PhoneNumberCountryCode != ""),
+		Country:                null.NewString(fields.Country, fields.Country != ""),
+	}
+
+	if err := app.user.CreateManualContact(&contact); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	createdContact, err := app.user.GetContactOrVisitor(contact.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Upload avatar if provided. Treat as best-effort: a failure does not
+	// roll back the already-created contact.
+	files, ok := form.File["files"]
+	if ok && len(files) > 0 {
+		if err := uploadUserAvatar(r, createdContact, files); err != nil {
+			app.lo.Error("failed to upload avatar for new contact", "contact_id", contact.ID, "error", err)
+		} else {
+			createdContact, err = app.user.GetContactOrVisitor(contact.ID, "")
+			if err != nil {
+				return sendErrorEnvelope(r, err)
+			}
+		}
+	}
+
+	return r.SendEnvelope(createdContact)
+}
+
 // handleGetContacts returns a list of contacts from the database.
 func handleGetContacts(r *fastglue.Request) error {
 	var (
@@ -85,69 +173,27 @@ func handleUpdateContact(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
 	}
 
-	// Parse form data
-	firstName := ""
-	if v, ok := form.Value["first_name"]; ok && len(v) > 0 {
-		firstName = string(v[0])
-	}
-	lastName := ""
-	if v, ok := form.Value["last_name"]; ok && len(v) > 0 {
-		lastName = string(v[0])
-	}
-	email := ""
-	if v, ok := form.Value["email"]; ok && len(v) > 0 {
-		email = strings.TrimSpace(string(v[0]))
-	}
-	phoneNumber := ""
-	if v, ok := form.Value["phone_number"]; ok && len(v) > 0 {
-		phoneNumber = string(v[0])
-	}
-	phoneNumberCountryCode := ""
-	if v, ok := form.Value["phone_number_country_code"]; ok && len(v) > 0 {
-		phoneNumberCountryCode = string(v[0])
-	}
-	country := ""
-	if v, ok := form.Value["country"]; ok && len(v) > 0 {
-		country = string(v[0])
-	}
-	avatarURL := ""
-	if v, ok := form.Value["avatar_url"]; ok && len(v) > 0 {
-		avatarURL = string(v[0])
-	}
-
-	// Set nulls to empty strings.
-	if avatarURL == "null" {
-		avatarURL = ""
-	}
-	if phoneNumberCountryCode == "null" {
-		phoneNumberCountryCode = ""
-	}
-	if phoneNumber == "null" {
-		phoneNumber = ""
-	}
-	if country == "null" {
-		country = ""
-	}
+	fields := parseContactFormValues(form.Value)
 
 	// Validate mandatory fields.
-	if email == "" {
+	if fields.Email == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "email"), nil, envelope.InputError)
 	}
-	if !stringutil.ValidEmail(email) {
+	if !stringutil.ValidEmail(fields.Email) {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidEmail"), nil, envelope.InputError)
 	}
-	if firstName == "" {
+	if fields.FirstName == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "first_name"), nil, envelope.InputError)
 	}
 
 	contactToUpdate := models.User{
-		FirstName:              firstName,
-		LastName:               lastName,
-		Email:                  null.StringFrom(email),
-		AvatarURL:              null.NewString(avatarURL, avatarURL != ""),
-		PhoneNumber:            null.NewString(phoneNumber, phoneNumber != ""),
-		PhoneNumberCountryCode: null.NewString(phoneNumberCountryCode, phoneNumberCountryCode != ""),
-		Country:                null.NewString(country, country != ""),
+		FirstName:              fields.FirstName,
+		LastName:               fields.LastName,
+		Email:                  null.StringFrom(fields.Email),
+		AvatarURL:              null.NewString(fields.AvatarURL, fields.AvatarURL != ""),
+		PhoneNumber:            null.NewString(fields.PhoneNumber, fields.PhoneNumber != ""),
+		PhoneNumberCountryCode: null.NewString(fields.PhoneNumberCountryCode, fields.PhoneNumberCountryCode != ""),
+		Country:                null.NewString(fields.Country, fields.Country != ""),
 	}
 
 	if err := app.user.UpdateContact(id, contactToUpdate); err != nil {
@@ -155,7 +201,7 @@ func handleUpdateContact(r *fastglue.Request) error {
 	}
 
 	// Delete avatar?
-	if avatarURL == "" && contact.AvatarURL.Valid {
+	if fields.AvatarURL == "" && contact.AvatarURL.Valid {
 		fileName := filepath.Base(contact.AvatarURL.String)
 		app.media.Delete(fileName)
 		contact.AvatarURL.Valid = false

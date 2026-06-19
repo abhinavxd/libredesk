@@ -10,6 +10,30 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// CreateManualContact creates a new contact with all optional fields from the management UI.
+func (u *Manager) CreateManualContact(user *models.User) error {
+	password, err := u.generatePassword()
+	if err != nil {
+		u.lo.Error("generating password", "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	// Normalize email.
+	user.Email = null.NewString(strings.ToLower(strings.TrimSpace(user.Email.String)), user.Email.Valid)
+
+	if err := u.q.InsertContactManual.QueryRow(
+		user.Email, user.FirstName, user.LastName, password, user.AvatarURL,
+		user.PhoneNumber, user.PhoneNumberCountryCode, user.Country,
+	).Scan(&user.ID); err != nil {
+		if dbutil.IsUniqueViolationError(err) {
+			return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
+		}
+		u.lo.Error("error creating manual contact", "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
 func (u *Manager) CreateContact(user *models.User) error {
 	password, err := u.generatePassword()
 	if err != nil {
