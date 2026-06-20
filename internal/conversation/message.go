@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
@@ -37,6 +39,16 @@ const (
 
 // Matches <img ... src="URL"> and captures the URL for downstream parsing.
 var imgSrcPattern = regexp.MustCompile(`(?i)<img\b[^>]*?\bsrc=["']([^"']*)["']`)
+
+// fromNameVars is the template context for an inbox's from-name template.
+type fromNameVars struct {
+	Agent fromNameAgent
+	Inbox fromNameInbox
+}
+
+type fromNameAgent struct{ FirstName, LastName, FullName string }
+
+type fromNameInbox struct{ Name string }
 
 // Run starts a pool of worker goroutines to handle message dispatching via inbox's channel and processes incoming messages. It scans for
 // pending outgoing messages at the specified read interval and pushes them to the outgoing queue to be sent.
@@ -167,8 +179,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	outbound := message.ToOutbound()
 
 	if inb.Channel() == inbox.ChannelEmail {
-		// Set from address of the inbox
-		outbound.From = inb.FromAddress()
+		outbound.From = m.emailFromAddress(inb, message)
 
 		// Set "In-Reply-To" and "References" headers for email threading.
 		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
@@ -346,6 +357,23 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	}
 
 	return messages, pageSize, nil
+}
+
+// GetAllConversationMessages returns all messages in a conversation in chronological order.
+func (m *Manager) GetAllConversationMessages(conversationUUID string, private *bool, msgTypes []string) ([]models.Message, error) {
+	var all []models.Message
+	for page := 1; ; page++ {
+		messages, _, err := m.GetConversationMessages(conversationUUID, page, maxMessagesPerPage, private, msgTypes)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, messages...)
+		if len(messages) == 0 || len(all) >= messages[0].Total {
+			break
+		}
+	}
+	slices.Reverse(all)
+	return all, nil
 }
 
 // GetMessage retrieves a message by UUID.
@@ -674,8 +702,13 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		// Update conversation last message details (also conditionally updates last_interaction if not activity/private).
 		m.UpdateConversationLastMessage(message.ConversationID, message.ConversationUUID, lastMessage, message.SenderType, message.Type, message.Private, message.CreatedAt, message.SenderID)
 
-		// Broadcast new message with computed preview.
-		m.BroadcastNewMessage(message, lastMessage)
+		var convItem *models.ConversationListItem
+		if item, err := m.GetConversationListItem(message.ConversationUUID); err == nil {
+			convItem = &item
+		} else {
+			m.lo.Error("error fetching conversation list item for broadcast", "uuid", message.ConversationUUID, "error", err)
+		}
+		m.BroadcastNewMessage(message, convItem, lastMessage)
 	}
 
 	// Refetch the message to get all fields populated (e.g., author, media URLs).
@@ -836,6 +869,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			Type:      umodels.UserTypeContact,
 		}
 		if err := m.userStore.CreateContact(&user); err != nil {
+			m.lo.Error("error creating contact for incoming message", "message_source_id", in.SourceID.String, "error", err)
 			return models.Message{}, fmt.Errorf("creating contact: %w", err)
 		}
 		senderID = user.ID
@@ -847,6 +881,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	if conversationID == 0 {
 		conversationID, conversationUUID, isNewConversation, err = m.findOrCreateConversation(in)
 		if err != nil {
+			m.lo.Error("error finding or creating conversation for incoming message", "message_source_id", in.SourceID.String, "error", err)
 			return models.Message{}, err
 		}
 	}
@@ -865,9 +900,9 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Upload message attachments. On failure, delete the conversation if it was just created for this message.
 	if upErr := m.UploadMessageAttachments(&msg); upErr != nil {
-		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID, "error", upErr)
+		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID.String, "error", upErr)
 		if isNewConversation && conversationUUID != "" {
-			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID)
+			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID.String)
 			if err := m.DeleteConversation(conversationUUID); err != nil {
 				return models.Message{}, fmt.Errorf("deleting conversation after message attachment upload failure: %w", err)
 			}
@@ -875,9 +910,15 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 		return models.Message{}, fmt.Errorf("uploading message attachments: %w", upErr)
 	}
 
-	// Insert message.
+	// Insert message. On failure, delete the conversation if it was just created for this message.
 	if err = m.InsertMessage(&msg); err != nil {
-		return models.Message{}, err
+		m.lo.Error("error inserting incoming message", "message_source_id", in.SourceID.String, "conversation_uuid", conversationUUID, "is_new", isNewConversation, "error", err)
+		if isNewConversation && conversationUUID != "" {
+			if delErr := m.DeleteConversation(conversationUUID); delErr != nil {
+				return models.Message{}, fmt.Errorf("deleting conversation after message insert failure: %w", delErr)
+			}
+		}
+		return models.Message{}, fmt.Errorf("inserting message: %w", err)
 	}
 
 	// When a customer replies to a continuity emailsync the message to their live chat widget via WebSocket.
@@ -1207,8 +1248,12 @@ func (m *Manager) UploadMessageAttachments(message *models.Message) error {
 			contentID = storedCID
 		}
 
-		// Sanitize filename.
 		attachment.Name = stringutil.SanitizeFilename(attachment.Name)
+
+		if len(attachment.Content) == 0 {
+			m.lo.Warn("skipping empty attachment", "name", attachment.Name, "content_id", contentID, "content_type", attachment.ContentType, "disposition", attachment.Disposition, "message_source_id", message.SourceID.String, "conversation_uuid", message.ConversationUUID)
+			continue
+		}
 
 		m.lo.Debug("uploading message attachment", "name", attachment.Name, "content_id", contentID, "size", attachment.Size, "content_type", attachment.ContentType, "disposition", attachment.Disposition)
 
@@ -1227,7 +1272,7 @@ func (m *Manager) UploadMessageAttachments(message *models.Message) error {
 			[]byte("{}"), /** meta **/
 		)
 		if err != nil {
-			m.lo.Error("failed to upload attachment", "name", attachment.Name, "error", err)
+			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
 			return fmt.Errorf("failed to upload media %s: %w", attachment.Name, err)
 		}
 
@@ -1531,9 +1576,65 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 	if !strings.HasPrefix(rawContentID, "ldsk-") {
 		storedCID = conversationUUID + "_" + rawContentID
 	}
-	exists, mediaUUID, err := m.mediaStore.ContentIDExists(storedCID)
+	exists, mediaUUID, err := m.mediaStore.ContentIDExists(storedCID, conversationUUID)
 	if err != nil {
 		m.lo.Error("error checking media existence by content ID", "content_id", storedCID, "error", err)
 	}
 	return storedCID, exists, mediaUUID
+}
+
+// emailFromAddress returns the From header, applying the inbox from-name template for agent senders
+// Falls back to the inbox's default from address if the template is empty, the sender is not an agent, or any errors occur.
+func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) string {
+	from := inb.FromAddress()
+
+	tpl := inb.FromNameTemplate()
+	if tpl == "" || message.SenderType != models.SenderTypeAgent {
+		return from
+	}
+
+	agent, err := m.userStore.GetAgentCachedOrLoad(message.SenderID)
+	if err != nil {
+		m.lo.Error("error fetching agent for from name template", "error", err, "sender_id", message.SenderID)
+		return from
+	}
+	if agent.IsSystemUser() {
+		return from
+	}
+
+	addr, err := mail.ParseAddress(from)
+	if err != nil {
+		m.lo.Error("error parsing inbox from address for name template", "error", err, "from", from)
+		return from
+	}
+
+	firstName := strings.TrimSpace(agent.FirstName)
+	lastName := strings.TrimSpace(agent.LastName)
+	data := fromNameVars{
+		Agent: fromNameAgent{
+			FirstName: firstName,
+			LastName:  lastName,
+			FullName:  strings.TrimSpace(firstName + " " + lastName),
+		},
+		Inbox: fromNameInbox{Name: inb.Name()},
+	}
+
+	t, err := template.New("from").Parse(tpl)
+	if err != nil {
+		m.lo.Error("error parsing from name template", "error", err, "template", tpl)
+		return from
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		m.lo.Error("error executing from name template", "error", err, "template", tpl)
+		return from
+	}
+
+	name := strings.TrimSpace(buf.String())
+	if name == "" {
+		return from
+	}
+	addr.Name = name
+	return addr.String()
 }

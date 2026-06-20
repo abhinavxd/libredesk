@@ -600,6 +600,7 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 func trimInboxFields(inb *imodels.Inbox) error {
 	inb.Name = strings.TrimSpace(inb.Name)
 	inb.From = strings.TrimSpace(inb.From)
+	inb.FromNameTemplate = strings.TrimSpace(inb.FromNameTemplate)
 
 	// WhatsApp has no separate display-name field; the inbox name is the message From.
 	if inb.Channel == whatsappChannel.ChannelWhatsApp && inb.From == "" {

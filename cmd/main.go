@@ -50,6 +50,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/webhook"
 	whatsappapi "github.com/abhinavxd/libredesk/internal/whatsapp"
 	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp_template"
+	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -118,6 +119,7 @@ type App struct {
 	whatsappIngester *WhatsAppIngester
 	// WhatsApp inbox IDs whose Meta token was recently rejected, keyed to the last error time.
 	whatsappAuthErrors sync.Map
+	wsHub              *ws.Hub
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -298,6 +300,7 @@ func main() {
 		userNotification: userNotification,
 		whatsappClient:   waClient,
 		whatsappTemplate: waTemplates,
+		wsHub:            wsHub,
 	}
 	app.consts.Store(constants)
 	whatsappIngester, err := newWhatsAppIngester(app)
@@ -328,10 +331,10 @@ func main() {
 
 	go func() {
 		colorlog.Green("Server started at %s", ko.String("app.server.address"))
-		if ko.String("server.socket") != "" {
-			colorlog.Green("Unix socket created at %s", ko.String("server.socket"))
+		if ko.String("app.server.socket") != "" {
+			colorlog.Green("Unix socket created at %s", ko.String("app.server.socket"))
 		}
-		if err := g.ListenAndServe(ko.String("app.server.address"), ko.String("server.socket"), s); err != nil {
+		if err := g.ListenAndServe(ko.String("app.server.address"), ko.String("app.server.socket"), s); err != nil {
 			log.Fatalf("error starting server: %v", err)
 		}
 	}()
@@ -379,7 +382,7 @@ func onUsersOffline(conv *conversation.Manager) func([]umodels.OfflineUser) {
 		for _, u := range users {
 			switch u.Type {
 			case umodels.UserTypeAgent:
-				conv.BroadcastAgentStatusToWidget(u.ID, umodels.Offline)
+				conv.BroadcastAgentAvailability(u.ID, umodels.Offline)
 			case umodels.UserTypeContact, umodels.UserTypeVisitor:
 				conv.BroadcastContactUpdate(u.ID, map[string]any{"availability_status": umodels.Offline})
 			}

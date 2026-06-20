@@ -84,7 +84,10 @@
             <!-- Message preview + unread count -->
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm flex-1 min-w-0 truncate text-muted-foreground">
-                <template v-if="hasDraftForConversation">
+                <template v-if="isTyping">
+                  <span class="italic text-primary">{{ $t('globals.terms.typing') }}</span>
+                </template>
+                <template v-else-if="hasDraftForConversation">
                   <span class="font-medium text-primary">{{ $t('globals.terms.draft') }}:</span>
                   {{ draftPreview }}
                 </template>
@@ -195,9 +198,9 @@ const CHANNEL_ICONS = {
 const channelIcon = computed(() => CHANNEL_ICONS[props.conversation.inbox_channel] || Mail)
 
 const conversationRoute = computed(() => {
-  const baseRoute = route.name.includes('team')
+  const baseRoute = route.params.teamID
     ? 'team-inbox-conversation'
-    : route.name.includes('view')
+    : route.params.viewID
       ? 'view-inbox-conversation'
       : 'inbox-conversation'
   return {
@@ -242,6 +245,8 @@ const hasSlaDeadlines = computed(() => {
 const hasDraftForConversation = computed(() => {
   return conversationStore.hasDraft(props.conversation.uuid)
 })
+
+const isTyping = computed(() => conversationStore.typingByUUID[props.conversation.uuid] === true)
 
 const draftPreview = computed(() => {
   const draft = conversationStore.getDraft(props.conversation.uuid)

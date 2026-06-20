@@ -101,7 +101,7 @@ func handleUpdateAgentAvailability(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
-	agent, err := app.user.GetAgent(auser.ID, "")
+	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -119,8 +119,9 @@ func handleUpdateAgentAvailability(r *fastglue.Request) error {
 	if err := app.user.UpdateAvailability(auser.ID, availReq.Status); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.user.InvalidateAgentCache(auser.ID)
 
-	go app.conversation.BroadcastAgentStatusToWidget(auser.ID, availReq.Status)
+	go app.conversation.BroadcastAgentAvailability(auser.ID, availReq.Status)
 
 	// Skip activity log when returning online from idle-away to avoid log spam.
 	if !(agent.AvailabilityStatus == models.Away && availReq.Status == models.Online) {
@@ -129,7 +130,7 @@ func handleUpdateAgentAvailability(r *fastglue.Request) error {
 		}
 	}
 
-	agent, err = app.user.GetAgent(auser.ID, "")
+	agent, err = app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -166,7 +167,7 @@ func handleUpdateCurrentAgent(r *fastglue.Request) error {
 
 	// Upload avatar?
 	if ok && len(files) > 0 {
-		agent, err := app.user.GetAgent(auser.ID, "")
+		agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -176,7 +177,7 @@ func handleUpdateCurrentAgent(r *fastglue.Request) error {
 	}
 
 	// Fetch updated agent and return.
-	agent, err := app.user.GetAgent(auser.ID, "")
+	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -278,8 +279,8 @@ func handleUpdateAgent(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Invalidate authz cache.
-	defer app.authz.InvalidateUserCache(id)
+	app.user.InvalidateAgentCache(id)
+	app.wsHub.KickUser(id)
 
 	// Create activity log if user availability status changed.
 	if oldAvailabilityStatus != req.AvailabilityStatus {
@@ -330,6 +331,9 @@ func handleDeleteAgent(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	defer app.wsHub.KickUser(id)
+	defer app.user.InvalidateAgentCache(id)
+
 	// Unassign all open conversations assigned to the user.
 	if err := app.conversation.UnassignOpen(id); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -344,7 +348,7 @@ func handleGetCurrentAgent(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
-	u, err := app.user.GetAgent(auser.ID, "")
+	u, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -359,7 +363,7 @@ func handleDeleteCurrentAgentAvatar(r *fastglue.Request) error {
 	)
 
 	// Get user
-	agent, err := app.user.GetAgent(auser.ID, "")
+	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -379,6 +383,7 @@ func handleDeleteCurrentAgentAvatar(r *fastglue.Request) error {
 	if err = app.user.UpdateAvatar(agent.ID, ""); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.user.InvalidateAgentCache(agent.ID)
 	return r.SendEnvelope(true)
 }
 
@@ -455,9 +460,12 @@ func handleSetPassword(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "{globals.terms.password}"), nil, envelope.InputError)
 	}
 
-	if err := app.user.ResetPassword(req.Token, req.Password); err != nil {
+	id, err := app.user.ResetPassword(req.Token, req.Password)
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.user.InvalidateAgentCache(id)
+	app.wsHub.KickUser(id)
 
 	return r.SendEnvelope(true)
 }
@@ -518,6 +526,7 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 	if err := app.user.UpdateAvatar(user.ID, "/uploads/"+media.UUID); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.user.InvalidateAgentCache(user.ID)
 	return nil
 }
 
@@ -542,6 +551,7 @@ func handleGenerateAPIKey(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.user.InvalidateAgentCache(user.ID)
 
 	// Return the API key and secret (only shown once)
 	response := struct {
@@ -575,6 +585,7 @@ func handleRevokeAPIKey(r *fastglue.Request) error {
 	if err := app.user.RevokeAPIKey(id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.user.InvalidateAgentCache(id)
 
 	return r.SendEnvelope(true)
 }

@@ -28,11 +28,8 @@
     </div>
 
     <div class="h-6 flex items-center gap-2">
-      <span v-if="conversationStore.conversation.loading">
-        <Skeleton class="w-24 h-4" />
-      </span>
       <router-link
-        v-else-if="userStore.can('contacts:read') && conversation?.contact_id"
+        v-if="userStore.can('contacts:read') && conversation?.contact_id"
         :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
         class="flex items-center gap-2 hover:underline cursor-pointer"
       >
@@ -45,7 +42,7 @@
     </div>
     <div class="flex gap-2 items-center">
       <Mail size="16" class="text-muted-foreground flex-shrink-0" />
-      <Tooltip v-if="isLivechat && !conversationStore.conversation.loading">
+      <Tooltip v-if="isLivechat">
         <TooltipTrigger as-child>
           <ShieldCheck v-if="isVerified" size="14" class="flex-shrink-0 text-green-600" />
           <ShieldQuestion v-else size="14" class="flex-shrink-0 text-amber-500" />
@@ -54,10 +51,7 @@
           isVerified ? t('contact.identityVerified') : t('contact.identityNotVerified')
         }}</TooltipContent>
       </Tooltip>
-      <span v-if="conversationStore.conversation.loading">
-        <Skeleton class="w-32 h-4" />
-      </span>
-      <span v-else-if="conversation?.contact?.email" class="sidebar-value break-all">
+      <span v-if="conversation?.contact?.email" class="sidebar-value break-all">
         {{ conversation?.contact?.email }}
       </span>
       <span v-else class="sidebar-label">
@@ -66,19 +60,13 @@
     </div>
     <div class="flex gap-2 items-center">
       <Phone size="16" class="text-muted-foreground flex-shrink-0" />
-      <span v-if="conversationStore.conversation.loading">
-        <Skeleton class="w-32 h-4" />
-      </span>
-      <span v-else class="sidebar-value">
+      <span class="sidebar-value">
         {{ phoneNumber }}
       </span>
     </div>
     <div class="flex gap-2 items-center" v-if="conversation?.contact?.external_user_id">
       <IdCard size="16" class="text-muted-foreground flex-shrink-0" />
-      <span v-if="conversationStore.conversation.loading">
-        <Skeleton class="w-32 h-4" />
-      </span>
-      <span v-else class="sidebar-value">
+      <span class="sidebar-value">
         {{ conversation.contact.external_user_id }}
       </span>
     </div>
@@ -98,7 +86,7 @@
     </div>
 
     <!-- Livechat visitor info -->
-    <template v-if="isLivechat && !conversationStore.conversation.loading">
+    <template v-if="isLivechat">
       <div v-if="conversation?.contact?.country" class="flex gap-2 items-center">
         <Globe size="16" class="text-muted-foreground flex-shrink-0" />
         <span class="sidebar-value">{{ countryName }}</span>
@@ -114,7 +102,7 @@
     </template>
 
     <!-- Context Links -->
-    <template v-if="contextLinks.length > 0 && !conversationStore.conversation.loading">
+    <template v-if="contextLinks.length > 0">
       <div
         v-for="app in contextLinks"
         :key="app.id"
@@ -156,7 +144,6 @@ import { useCountriesStore } from '@/stores/countries'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'
-import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import api from '../../../api'

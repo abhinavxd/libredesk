@@ -143,6 +143,7 @@ func (c *Client) CloseChannel() {
 // LiveChat represents the live chat inbox.
 type LiveChat struct {
 	id            int
+	name          string
 	config        Config
 	from          string
 	lo            *logf.Logger
@@ -156,6 +157,7 @@ type LiveChat struct {
 // Opts holds the options required for the live chat inbox.
 type Opts struct {
 	ID            int
+	Name          string
 	Config        Config
 	From          string
 	Lo            *logf.Logger
@@ -166,6 +168,7 @@ type Opts struct {
 func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*LiveChat, error) {
 	lc := &LiveChat{
 		id:            opts.ID,
+		name:          opts.Name,
 		config:        opts.Config,
 		from:          opts.From,
 		lo:            opts.Lo,
@@ -283,6 +286,16 @@ func (lc *LiveChat) ReplyToAddress() string {
 	return ""
 }
 
+// Name returns the inbox name.
+func (lc *LiveChat) Name() string {
+	return lc.name
+}
+
+// FromNameTemplate is not applicable to livechat and always returns empty.
+func (lc *LiveChat) FromNameTemplate() string {
+	return ""
+}
+
 // Channel returns the channel name for this inbox.
 func (lc *LiveChat) Channel() string {
 	return ChannelLiveChat
@@ -301,7 +314,7 @@ func (lc *LiveChat) AddClient(userID string) (*Client, error) {
 
 	client := &Client{
 		ID:      userID,
-		Channel: make(chan []byte, 1000),
+		Channel: make(chan []byte, 128),
 	}
 
 	// Add the client to the clients map.

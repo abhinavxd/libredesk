@@ -29,6 +29,7 @@ type Inbox struct {
 	CSATEnabled        bool            `db:"csat_enabled" json:"csat_enabled"`
 	PromptTagsOnReply  bool            `db:"prompt_tags_on_reply" json:"prompt_tags_on_reply"`
 	From               string          `db:"from" json:"from"`
+	FromNameTemplate   string          `db:"from_name_template" json:"from_name_template"`
 	Config             json.RawMessage `db:"config" json:"config"`
 	Secret             null.String     `db:"secret" json:"secret"`
 	LinkedEmailInboxID null.Int        `db:"linked_email_inbox_id" json:"linked_email_inbox_id"`
@@ -46,6 +47,7 @@ type Config struct {
 	SMTP                 []SMTPConfig `json:"smtp"`
 	IMAP                 []IMAPConfig `json:"imap"`
 	From                 string       `json:"from"`
+	FromNameTemplate     string       `json:"from_name_template"`
 	ReplyTo              string       `json:"reply_to"`
 	EnablePlusAddressing bool         `json:"enable_plus_addressing"`
 }

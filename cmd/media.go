@@ -165,7 +165,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	// Session/API key authenticated - perform full permission check.
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
 
-	user, err := app.user.GetAgent(auser.ID, "")
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

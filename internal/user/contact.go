@@ -94,7 +94,7 @@ func (u *Manager) UpdateContact(id int, user models.User) error {
 }
 
 // GetAllContacts returns a list of all contacts.
-func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filtersJSON string) ([]models.UserCompact, error) {
+func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filtersJSON, location string) ([]models.UserCompact, error) {
 	if pageSize > maxListPageSize {
 		pageSize = maxListPageSize
 	}
@@ -104,7 +104,7 @@ func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filters
 	if pageSize < 1 {
 		pageSize = 10
 	}
-	return u.GetAllUsers(page, pageSize, []string{models.UserTypeContact, models.UserTypeVisitor}, order, orderBy, filtersJSON)
+	return u.GetAllUsers(page, pageSize, []string{models.UserTypeContact, models.UserTypeVisitor}, order, orderBy, filtersJSON, location)
 }
 
 func (u *Manager) GetContactIDByChannelIdentity(channel, identifier string) (int, error) {

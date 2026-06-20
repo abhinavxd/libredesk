@@ -6,6 +6,7 @@ import AccountLayout from '@main/layouts/account/AccountLayout.vue'
 import AdminLayout from '@main/layouts/admin/AdminLayout.vue'
 import { useAppSettingsStore } from '../stores/appSettings'
 import { getI18n } from '../i18n'
+import { abortRouteScope } from '../api'
 
 const routes = [
   {
@@ -595,6 +596,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
+  // Cancel in-flight requests.
+  if (to.fullPath !== from.fullPath) {
+    abortRouteScope()
+  }
+
   const appSettingsStore = useAppSettingsStore()
   const siteName = appSettingsStore.settings?.['app.site_name'] || 'libredesk'
   const i18n = getI18n()

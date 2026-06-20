@@ -73,6 +73,7 @@ type SourceIDUpdater interface {
 // WhatsApp implements inbox.Inbox.
 type WhatsApp struct {
 	id            int
+	name          string
 	config        Config
 	from          string
 	client        *whatsapp.Client
@@ -84,6 +85,7 @@ type WhatsApp struct {
 // Opts holds construction options.
 type Opts struct {
 	ID            int
+	Name          string
 	Config        Config
 	From          string
 	Client        *whatsapp.Client
@@ -104,6 +106,7 @@ func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 	}
 	return &WhatsApp{
 		id:            opts.ID,
+		name:          opts.Name,
 		config:        opts.Config,
 		from:          opts.From,
 		client:        opts.Client,
@@ -125,11 +128,17 @@ func (w *WhatsApp) Receive(ctx context.Context) error { return nil }
 // Channel returns the channel name.
 func (w *WhatsApp) Channel() string { return ChannelWhatsApp }
 
+// Name returns the configured inbox name.
+func (w *WhatsApp) Name() string { return w.name }
+
 // FromAddress returns the configured display "from" string.
 func (w *WhatsApp) FromAddress() string { return w.from }
 
 // ReplyToAddress is not applicable to WhatsApp.
 func (w *WhatsApp) ReplyToAddress() string { return "" }
+
+// FromNameTemplate is not applicable to WhatsApp and always returns empty.
+func (w *WhatsApp) FromNameTemplate() string { return "" }
 
 // Close releases any resources. Currently a no-op.
 func (w *WhatsApp) Close() error { return nil }

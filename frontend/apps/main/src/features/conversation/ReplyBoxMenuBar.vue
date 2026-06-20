@@ -48,9 +48,37 @@
         <WhatsAppIcon class="h-4 w-4" />
       </Toggle>
     </div>
-    <Button class="h-8 w-6 px-8" @click="handleSend" :disabled="!enableSend" :isLoading="isSending" v-if="showSendButton">
-      {{ $t('globals.messages.send') }}
-    </Button>
+    <div class="flex items-center">
+      <Button
+        class="h-8 px-4 rounded-r-none"
+        @click="handleSend"
+        :disabled="!enableSend"
+        :isLoading="isSending"
+        v-if="showSendButton"
+      >
+        {{ $t('globals.messages.send') }}
+      </Button>
+      <DropdownMenu v-if="showSendButton">
+        <DropdownMenuTrigger as-child>
+          <Button
+            class="h-8 px-2 rounded-l-none border-l border-primary-foreground/30 [&[data-state=open]>svg]:rotate-180"
+            :disabled="!enableSend"
+          >
+            <ChevronDownIcon class="text-primary-foreground transition-transform" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuLabel>{{ $t('replyBox.sendAndSetAs') }}</DropdownMenuLabel>
+          <DropdownMenuItem
+            v-for="status in conversationStore.statusOptionsNoSnooze"
+            :key="status.value"
+            @click="handleSendAndSetStatus(status.label)"
+          >
+            {{ status.label }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   </div>
 </template>
 
@@ -59,7 +87,14 @@ import { ref, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
-import { Paperclip, Smile } from 'lucide-vue-next'
+import { Paperclip, Smile, ChevronDownIcon } from 'lucide-vue-next'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuContent,
+  DropdownMenuLabel
+} from '@shared-ui/components/ui/dropdown-menu'
 import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
@@ -86,6 +121,7 @@ defineProps({
   isSending: Boolean,
   enableSend: Boolean,
   handleSend: Function,
+  handleSendAndSetStatus: Function,
   showSendButton: {
     type: Boolean,
     default: true

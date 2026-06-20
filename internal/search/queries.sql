@@ -28,7 +28,7 @@ SELECT
     c.created_at as "conversation_created_at",
     c.reference_number as "conversation_reference_number",
     c.uuid as "conversation_uuid",
-    m.text_content,
+    LEFT(m.text_content, 200) AS text_content,
     cs.name as "conversation_status"
 FROM conversation_messages m
     JOIN conversations c ON m.conversation_id = c.id

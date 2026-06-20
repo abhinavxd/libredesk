@@ -99,7 +99,7 @@
         :userTeams="userStore.teams"
         :userViews="userViews"
         :sharedViews="sharedViewStore.sharedViewList"
-        @create-view="openCreateViewForm = true"
+        @create-view="createView"
         @edit-view="editView"
         @delete-view="deleteView"
         @create-conversation="() => (openCreateConversationDialog = true)"
@@ -191,9 +191,10 @@ watch(
   () => route.path,
   (path) => {
     if (path.startsWith('/inboxes') && path !== '/inboxes/search') {
-      lastInboxPath.value = path.replace(/\/conversation\/[^/]+$/, '')
+      lastInboxPath.value = path
     }
-  }
+  },
+  { immediate: true }
 )
 const userStore = useUserStore()
 const conversationStore = useConversationStore()
@@ -258,6 +259,11 @@ const initStores = async () => {
   ])
 }
 
+const createView = () => {
+  view.value = {}
+  openCreateViewForm.value = true
+}
+
 const editView = (v) => {
   view.value = { ...v }
   openCreateViewForm.value = true
@@ -292,6 +298,7 @@ const getUserViews = async () => {
 
 const initToaster = () => {
   emitter.on(EMITTER_EVENTS.SHOW_TOAST, (message) => {
+    if (!message.description) return
     if (message.variant === 'destructive') {
       sooner.error(message.description)
     } else if (message.variant === 'warning') {

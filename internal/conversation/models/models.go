@@ -135,6 +135,8 @@ type ConversationListItem struct {
 	LastInteractionSender null.String             `db:"last_interaction_sender" json:"last_interaction_sender"`
 	NextSLADeadlineAt     null.Time               `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	PriorityID            null.Int                `db:"priority_id" json:"priority_id"`
+	AssignedUserID        null.Int                `db:"assigned_user_id" json:"assigned_user_id"`
+	AssignedTeamID        null.Int                `db:"assigned_team_id" json:"assigned_team_id"`
 	UnreadMessageCount    int                     `db:"unread_message_count" json:"unread_message_count"`
 	Status                null.String             `db:"status" json:"status"`
 	Priority              null.String             `db:"priority" json:"priority"`
@@ -201,6 +203,9 @@ type Conversation struct {
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
 	LastInboundAt             null.Time              `db:"last_inbound_at" json:"last_inbound_at"`
 	ContactLastInboundAt      null.Time              `db:"contact_last_inbound_at" json:"contact_last_inbound_at"`
+	CSATRating                null.Int               `db:"csat_rating" json:"csat_rating"`
+	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
+	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
 }
 
@@ -266,6 +271,13 @@ type MessageAuthor struct {
 	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
 	Type               string      `db:"type" json:"type"`
 	LastActiveAt       null.Time   `db:"last_active_at" json:"last_active_at"`
+}
+
+func (a *MessageAuthor) FullName() string {
+	if a.LastName == "" {
+		return a.FirstName
+	}
+	return a.FirstName + " " + a.LastName
 }
 
 type ConversationCounts struct {

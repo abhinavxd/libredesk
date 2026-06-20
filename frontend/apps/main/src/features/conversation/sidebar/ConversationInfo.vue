@@ -1,23 +1,32 @@
 <template>
   <div class="space-y-3">
+    <div v-if="conversation.inbox_name">
+      <p class="sidebar-label">{{ $t('globals.terms.inbox', 1) }}</p>
+      <div class="flex items-center gap-1.5">
+        <component
+          :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
+          class="size-3.5 text-muted-foreground flex-shrink-0"
+        />
+        <p class="sidebar-value break-all">{{ conversation.inbox_name }}</p>
+      </div>
+    </div>
+
     <div v-if="conversation.subject">
       <p class="sidebar-label">{{ $t('globals.terms.subject') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <p v-else class="sidebar-value break-all">
+      <p class="sidebar-value break-all">
         {{ conversation.subject }}
       </p>
     </div>
 
     <div>
       <p class="sidebar-label">{{ $t('globals.terms.referenceNumber') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <p v-else class="sidebar-value">
+      <p class="sidebar-value">
         {{ conversation.reference_number }}
       </p>
     </div>
+
     <div>
       <p class="sidebar-label">{{ $t('globals.terms.initiatedAt') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <p v-if="conversation.created_at" class="sidebar-value">
         {{ format(conversation.created_at, 'PPpp') }}
       </p>
@@ -34,13 +43,10 @@
           :key="`${conversation.uuid}-${conversation.first_response_deadline_at}-${conversation.first_reply_at}`"
         />
       </div>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <div v-else>
-        <p v-if="conversation.first_reply_at" class="sidebar-value">
-          {{ format(conversation.first_reply_at, 'PPpp') }}
-        </p>
-        <p v-else class="sidebar-value">-</p>
-      </div>
+      <p v-if="conversation.first_reply_at" class="sidebar-value">
+        {{ format(conversation.first_reply_at, 'PPpp') }}
+      </p>
+      <p v-else class="sidebar-value">-</p>
     </div>
 
     <div>
@@ -53,13 +59,10 @@
           :key="`${conversation.uuid}-${conversation.resolution_deadline_at}-${conversation.resolved_at}`"
         />
       </div>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <div v-else>
-        <p v-if="conversation.resolved_at" class="sidebar-value">
-          {{ format(conversation.resolved_at, 'PPpp') }}
-        </p>
-        <p v-else class="sidebar-value">-</p>
-      </div>
+      <p v-if="conversation.resolved_at" class="sidebar-value">
+        {{ format(conversation.resolved_at, 'PPpp') }}
+      </p>
+      <p v-else class="sidebar-value">-</p>
     </div>
 
     <div>
@@ -72,7 +75,6 @@
           :key="`${conversation.uuid}-${conversation.next_response_deadline_at}-${conversation.next_response_met_at}`"
         />
       </div>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <p v-if="conversation.last_reply_at" class="sidebar-value">
         {{ format(conversation.last_reply_at, 'PPpp') }}
       </p>
@@ -81,8 +83,7 @@
 
     <div v-if="conversation.closed_at">
       <p class="sidebar-label">{{ $t('globals.terms.closedAt') }}</p>
-      <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
-      <p v-else class="sidebar-value">
+      <p class="sidebar-value">
         {{ format(conversation.closed_at, 'PPpp') }}
       </p>
     </div>
@@ -101,20 +102,48 @@
       :custom-attributes="conversation.custom_attributes || {}"
       @update:setattributes="updateCustomAttributes"
     />
+
+    <div v-if="conversation.csat_responded_at && conversation.csat_rating">
+      <p class="sidebar-label">{{ $t('globals.terms.csatRating') }}</p>
+      <div class="flex items-center gap-2">
+        <span class="text-lg">{{ csatRatingEmoji(conversation.csat_rating) }}</span>
+        <span class="sidebar-value">{{ $t(csatRatingTextKey(conversation.csat_rating)) }}</span>
+        <span class="text-xs text-muted-foreground">{{ conversation.csat_rating }}/5</span>
+      </div>
+    </div>
+
+    <div v-if="conversation.csat_responded_at && conversation.csat_feedback">
+      <p class="sidebar-label">{{ $t('globals.terms.csatFeedback') }}</p>
+      <p
+        class="sidebar-value italic whitespace-pre-wrap"
+        :class="{ 'line-clamp-3': isFeedbackLong && !feedbackExpanded }"
+      >
+        {{ conversation.csat_feedback }}
+      </p>
+      <button
+        v-if="isFeedbackLong"
+        type="button"
+        class="text-xs text-muted-foreground hover:text-foreground mt-1"
+        @click="feedbackExpanded = !feedbackExpanded"
+      >
+        {{ feedbackExpanded ? $t('globals.messages.showLess') : $t('globals.messages.showMore') }}
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { format } from 'date-fns'
+import { Mail, MessageSquare } from 'lucide-vue-next'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 import { useConversationStore } from '../../../stores/conversation'
-import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { csatRatingEmoji, csatRatingTextKey } from '@shared-ui/utils/csat.js'
 import api from '../../../api'
 import { useI18n } from 'vue-i18n'
 
@@ -124,6 +153,9 @@ const customAttributeStore = useCustomAttributeStore()
 const conversationStore = useConversationStore()
 const conversation = computed(() => conversationStore.current)
 customAttributeStore.fetchCustomAttributes()
+
+const feedbackExpanded = ref(false)
+const isFeedbackLong = computed(() => (conversation.value?.csat_feedback?.length || 0) > 160)
 
 const updateCustomAttributes = async (attributes) => {
   let previousAttributes = conversationStore.current.custom_attributes

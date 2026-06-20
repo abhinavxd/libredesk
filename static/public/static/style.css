@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap");
 
 :root {
   --primary-color: #1a1a1d;
@@ -22,7 +22,7 @@ body {
 
 body {
   background: #f9f9f9;
-  font-family: "Plus Jakarta Sans", "Inter", sans-serif;
+  font-family: "Instrument Sans", "Inter", sans-serif;
   font-size: 16px;
   line-height: 1.6;
   color: var(--text-color);

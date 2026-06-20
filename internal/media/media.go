@@ -122,13 +122,13 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 	// Detect content type and override if needed.
 	contentType, err := m.detectContentType(contentType, content)
 	if err != nil {
-		m.lo.Error("error detecting content type", "error", err)
+		m.lo.Error("error detecting content type", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return "", "", err
 	}
 
 	fName, err := m.store.Put(fileName, contentType, content)
 	if err != nil {
-		m.lo.Error("error uploading media", "error", err)
+		m.lo.Error("error uploading media to store", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return "", "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUploadingFile"), nil)
 	}
 	return fName, contentType, nil
@@ -138,7 +138,7 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte) (models.Media, error) {
 	var id int
 	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid).Scan(&id); err != nil {
-		m.lo.Error("error inserting media", "error", err)
+		m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return m.Get(id, "")
@@ -180,10 +180,13 @@ func (m *Manager) SetContentID(id int, contentID string) error {
 	return nil
 }
 
-// ContentIDExists checks if a content_id exists in the database and returns the UUID of the media file.
-func (m *Manager) ContentIDExists(contentID string) (bool, string, error) {
+// ContentIDExists reports whether a media row with the given content_id is linked to a message in the given conversation. Scoped this way so an orphan media row (e.g., from a partial failure) doesn't short-circuit a retry into skipping the upload.
+func (m *Manager) ContentIDExists(contentID, conversationUUID string) (bool, string, error) {
+	if contentID == "" || conversationUUID == "" {
+		return false, "", nil
+	}
 	var uuid string
-	if err := m.queries.ContentIDExists.Get(&uuid, contentID); err != nil {
+	if err := m.queries.ContentIDExists.Get(&uuid, contentID, conversationUUID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, "", nil
 		}

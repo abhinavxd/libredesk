@@ -33,16 +33,17 @@ const (
 )
 
 type UserCompact struct {
-	ID             int         `db:"id" json:"id"`
-	Type           string      `db:"type" json:"type"`
-	FirstName      string      `db:"first_name" json:"first_name"`
-	LastName       string      `db:"last_name" json:"last_name"`
-	Email          null.String `db:"email" json:"email"`
-	Enabled        bool        `db:"enabled" json:"enabled"`
-	AvatarURL      null.String `db:"avatar_url" json:"avatar_url"`
-	ExternalUserID null.String `db:"external_user_id" json:"external_user_id"`
-	CreatedAt      time.Time   `db:"created_at" json:"created_at"`
-	UpdatedAt      time.Time   `db:"updated_at" json:"updated_at"`
+	ID                 int         `db:"id" json:"id"`
+	Type               string      `db:"type" json:"type"`
+	FirstName          string      `db:"first_name" json:"first_name"`
+	LastName           string      `db:"last_name" json:"last_name"`
+	Email              null.String `db:"email" json:"email"`
+	Enabled            bool        `db:"enabled" json:"enabled"`
+	AvatarURL          null.String `db:"avatar_url" json:"avatar_url"`
+	ExternalUserID     null.String `db:"external_user_id" json:"external_user_id"`
+	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
+	CreatedAt          time.Time   `db:"created_at" json:"created_at"`
+	UpdatedAt          time.Time   `db:"updated_at" json:"updated_at"`
 
 	Total int `db:"total" json:"-"`
 }

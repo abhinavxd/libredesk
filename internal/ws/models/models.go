@@ -9,8 +9,9 @@ const (
 	MessageTypeNewNotification        = "new_notification"
 	MessageTypeError                  = "error"
 	MessageTypeConversationSubscribe  = "conversation_subscribe"
-	MessageTypeConversationSubscribed = "conversation_subscribed"
 	MessageTypeTyping                 = "typing"
+	MessageTypeListSubscribeReplace   = "list_subscribe_replace"
+	MessageTypeAgentAvailability      = "agent_availability_update"
 )
 
 // WSMessage represents a WS message.

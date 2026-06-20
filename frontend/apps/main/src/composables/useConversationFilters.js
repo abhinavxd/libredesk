@@ -78,6 +78,68 @@ export function useConversationFilters () {
             label: t('globals.terms.createdAt'),
             type: FIELD_TYPE.DATE,
             operators: FIELD_OPERATORS.DATE
+        },
+        waiting_since: {
+            label: t('globals.terms.waitingSince'),
+            type: FIELD_TYPE.DATE,
+            operators: FIELD_OPERATORS.DATE
+        },
+        snoozed_until: {
+            label: t('globals.terms.snoozedUntil'),
+            type: FIELD_TYPE.DATE,
+            operators: FIELD_OPERATORS.DATE
+        },
+        last_message_at: {
+            label: t('globals.terms.lastMessageAt'),
+            type: FIELD_TYPE.DATE,
+            operators: FIELD_OPERATORS.DATE
+        },
+        last_interaction_at: {
+            label: t('globals.terms.lastInteractionAt'),
+            type: FIELD_TYPE.DATE,
+            operators: FIELD_OPERATORS.DATE
+        },
+        next_sla_deadline_at: {
+            label: t('globals.terms.nextSlaDeadline'),
+            type: FIELD_TYPE.DATE,
+            operators: FIELD_OPERATORS.DATE
+        },
+        email: {
+            label: t('globals.terms.contactEmail'),
+            type: FIELD_TYPE.TEXT,
+            operators: FIELD_OPERATORS.TEXT,
+            model: 'users'
+        },
+        external_user_id: {
+            label: t('globals.terms.contactExternalId'),
+            type: FIELD_TYPE.TEXT,
+            operators: FIELD_OPERATORS.TEXT_EXACT,
+            model: 'users'
+        },
+        last_interaction_sender: {
+            label: t('globals.terms.lastInteractionBy'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.SELECT,
+            options: [
+                { label: t('globals.terms.contact'), value: 'contact' },
+                { label: t('globals.terms.agent'), value: 'agent' }
+            ]
+        },
+        sla_policy_id: {
+            label: t('globals.terms.slaPolicy'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.SELECT,
+            options: slaStore.options
+        },
+        channel: {
+            label: t('globals.terms.channel'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.SELECT,
+            options: [
+                { label: t('globals.terms.email'), value: 'email' },
+                { label: t('globals.terms.liveChat'), value: 'livechat' }
+            ],
+            model: 'inboxes'
         }
     }))
 

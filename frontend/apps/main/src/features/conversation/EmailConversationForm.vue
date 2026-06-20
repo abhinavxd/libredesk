@@ -287,6 +287,7 @@ const emailQuery = ref('')
 const conversationStore = useConversationStore()
 const macroStore = useMacroStore()
 let timeoutId = null
+let previousMacroView = ''
 const insertContent = ref('')
 const selectedContact = ref(null)
 const emailInputRef = ref(null)
@@ -333,6 +334,7 @@ onUnmounted(() => {
   clearTimeout(timeoutId)
   clearMediaFiles()
   conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
+  macroStore.setCurrentView(previousMacroView)
   emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
     command: null,
     open: false
@@ -340,6 +342,7 @@ onUnmounted(() => {
 })
 
 onMounted(() => {
+  previousMacroView = macroStore.currentView
   macroStore.setCurrentView('starting_conversation')
   emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
     command: 'apply-macro-to-new-conversation',

@@ -32,7 +32,7 @@ func handleGetContacts(r *fastglue.Request) error {
 		total   = 0
 	)
 	page, pageSize := getPagination(r)
-	contacts, err := app.user.GetContacts(page, pageSize, order, orderBy, filters)
+	contacts, err := app.user.GetContacts(page, pageSize, order, orderBy, filters, app.setting.GetAppTimezone())
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -237,7 +237,7 @@ func handleDeleteContactNote(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
-	agent, err := app.user.GetAgent(auser.ID, "")
+	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

@@ -80,7 +80,7 @@ func (c *Client) Put(name string, cType string, file io.ReadSeeker) (string, err
 	}
 
 	if _, err := c.s3.FilePut(p); err != nil {
-		return "", err
+		return "", fmt.Errorf("s3 put bucket=%q key=%q content_type=%q: %w", c.opts.Bucket, p.ObjectKey, cType, err)
 	}
 
 	return name, nil

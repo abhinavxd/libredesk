@@ -1,5 +1,5 @@
 -- name: get-users-compact
-SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id
+SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
 WHERE users.email != 'System' AND users.deleted_at IS NULL AND type = ANY($1)
 
@@ -120,10 +120,15 @@ SET availability_status = $2
 WHERE id = $1;
 
 -- name: update-last-active-at
+WITH prev AS (
+    SELECT availability_status AS old_status FROM users WHERE id = $1
+)
 UPDATE users
 SET last_active_at = now(),
 availability_status = CASE WHEN availability_status = 'offline' THEN 'online' ELSE availability_status END
-WHERE id = $1;
+FROM prev
+WHERE users.id = $1
+RETURNING (prev.old_status = 'offline')::boolean AS was_offline;
 
 -- name: update-inactive-offline
 UPDATE users
@@ -145,7 +150,8 @@ WHERE id = $1 AND type = 'agent';
 -- name: set-password
 UPDATE users
 SET password = $1, reset_password_token = NULL, reset_password_token_expiry = NULL
-WHERE reset_password_token = $2 AND reset_password_token_expiry > now();
+WHERE reset_password_token = $2 AND reset_password_token_expiry > now()
+RETURNING id;
 
 -- name: insert-agent
 WITH inserted_user AS (
@@ -445,3 +451,6 @@ SELECT
     (SELECT COUNT(*) FROM transfer_conversations) as conversations_transferred,
     (SELECT COUNT(*) FROM transfer_messages) as messages_transferred,
     (SELECT COUNT(*) FROM delete_visitor) as visitor_deleted;
+
+-- name: get-user-ids-by-role
+SELECT user_id FROM user_roles WHERE role_id = $1;
