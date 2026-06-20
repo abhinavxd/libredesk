@@ -262,6 +262,10 @@ func (m *Manager) HandleStatusUpdate(inboxID int, name, language, event, reason 
 		language = "en_US"
 	}
 	status := mapTemplateEventToStatus(event)
+	if status == "" {
+		m.lo.Info("ignoring unhandled whatsapp template status event", "name", name, "language", language, "event", event)
+		return nil
+	}
 	if _, err := m.q.UpdateStatusByNameLanguage.Exec(inboxID, name, status, reason, language); err != nil {
 		m.lo.Error("error applying template status update", "name", name, "language", language, "error", err)
 		return err
@@ -493,6 +497,6 @@ func mapTemplateEventToStatus(event string) string {
 	case "DISABLED":
 		return models.StatusDisabled
 	default:
-		return strings.ToUpper(event)
+		return ""
 	}
 }
