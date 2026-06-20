@@ -106,5 +106,10 @@ func V3_0_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS index_conversation_messages_on_source_id ON conversation_messages (source_id);`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

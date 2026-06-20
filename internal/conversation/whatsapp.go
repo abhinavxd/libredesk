@@ -112,6 +112,29 @@ func (m *Manager) RecordWhatsAppSendFailure(messageUUID, errorMsg string) error 
 	return m.mergeWhatsAppMeta(m.q.MergeMessageMetaByUUID, messageUUID, patch)
 }
 
+// SetWhatsAppSentAttachments records the attachment UUIDs already delivered for a message so retrying a partially-sent multi-attachment message does not re-deliver them.
+func (m *Manager) SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs []string) error {
+	if messageUUID == "" {
+		return nil
+	}
+	patch, err := json.Marshal(map[string]any{"whatsapp_sent_attachments": attachmentUUIDs})
+	if err != nil {
+		return err
+	}
+	var row struct {
+		UUID             string          `db:"uuid"`
+		ConversationUUID string          `db:"conversation_uuid"`
+		Meta             json.RawMessage `db:"meta"`
+	}
+	if err := m.q.MergeMessageMetaByUUID.Get(&row, messageUUID, patch); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 // mergeWhatsAppMeta is a no-op on an unmatched key, e.g. the 2nd..nth media of a multi-attachment send shares one message row.
 func (m *Manager) mergeWhatsAppMeta(stmt *sqlx.Stmt, key string, patch map[string]any) error {
 	patchBytes, err := json.Marshal(patch)
@@ -256,6 +279,9 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 				send.TemplateButtons = btns
 			}
 		}
+		if err := validateTemplateParams(t, templateParams); err != nil {
+			return content, err
+		}
 		rendered = renderTemplateBody(t.BodyContent, templateParams)
 	} else {
 		if !m.whatsAppWindowOpen(conv.ContactID, conv.InboxID) {
@@ -276,6 +302,23 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 
 	metaMap["whatsapp"] = json.RawMessage(encoded)
 	return rendered, nil
+}
+
+// validateTemplateParams rejects a template send whose body or text-header placeholders have no supplied value, so Meta's parameter-mismatch error surfaces locally as a clear input error.
+func validateTemplateParams(t wtmodels.Template, params map[string]string) error {
+	for _, key := range whatsapp.OrderedPlaceholders(t.BodyContent) {
+		if strings.TrimSpace(params["body:"+key]) == "" {
+			return envelope.NewError(envelope.InputError, fmt.Sprintf("missing value for template parameter {{%s}}", key), nil)
+		}
+	}
+	if t.HeaderType.Valid && strings.EqualFold(t.HeaderType.String, "TEXT") {
+		for _, key := range whatsapp.OrderedPlaceholders(t.HeaderContent.String) {
+			if strings.TrimSpace(params["header:"+key]) == "" {
+				return envelope.NewError(envelope.InputError, fmt.Sprintf("missing value for template header parameter {{%s}}", key), nil)
+			}
+		}
+	}
+	return nil
 }
 
 // renderTemplateBody fills {{name}} placeholders from "body:"+name params, leaving unmatched ones verbatim to expose missing params in the timeline.

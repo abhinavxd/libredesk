@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,6 +24,9 @@ const MetaCallTimeout = 30 * time.Second
 
 // maxStickerBytes is Meta's static sticker size cap; larger webp files are sent as documents.
 const maxStickerBytes = 100 * 1024
+
+// captionMarker tracks the standalone caption text send in the per-message sent-attachment set, alongside attachment UUIDs.
+const captionMarker = "__caption__"
 
 // Config is the per-inbox WhatsApp configuration from the inbox config JSONB, with tokens already decrypted.
 type Config struct {
@@ -60,9 +64,10 @@ type SendMeta struct {
 	TemplateButtons       []whatsapp.TemplateButton `json:"template_buttons,omitempty"`
 }
 
-// SourceIDUpdater persists the Meta message ID after a successful send for status correlation.
+// SourceIDUpdater persists the Meta message ID after a successful send for status correlation, and records per-attachment delivery so a retry does not re-deliver media.
 type SourceIDUpdater interface {
 	UpdateMessageSourceID(messageUUID, sourceID string) error
+	SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs []string) error
 }
 
 // WhatsApp implements inbox.Inbox.
@@ -171,38 +176,54 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 		return fmt.Errorf("outbound message has no content")
 	}
 
-	if err != nil {
-		return err
-	}
+	// Persist the source id even on a partial-failure error path, so a status webhook for the already-delivered media still correlates.
 	if sourceID != "" && w.sourceUpdater != nil {
 		if upErr := w.sourceUpdater.UpdateMessageSourceID(message.UUID, sourceID); upErr != nil {
 			w.lo.Error("failed to persist whatsapp source id", "message_uuid", message.UUID, "source_id", sourceID, "error", upErr)
 		}
 	}
-	return nil
+	return err
 }
 
 // sendAttachments sends one media message per attachment with the caption and reply context on the first; a caption that can't ride the first media type (audio/sticker) is sent as standalone text first.
+// Attachments already delivered on a prior attempt (tracked in message meta) are skipped, so retrying a partially-sent message never re-delivers media.
 func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, meta SendMeta, message models.OutboundMessage) (string, error) {
 	caption := strings.TrimSpace(textBody(message))
 	replyTo := meta.ReplyToWAMessageID
 	var firstID string
 
+	sent := parseSentAttachmentMarkers(message.Meta)
+	fail := func(err error) (string, error) {
+		if w.sourceUpdater != nil {
+			if perr := w.sourceUpdater.SetWhatsAppSentAttachments(message.UUID, markerKeys(sent)); perr != nil {
+				w.lo.Error("failed to persist whatsapp sent-attachment markers", "message_uuid", message.UUID, "error", perr)
+			}
+		}
+		return firstID, err
+	}
+
 	if caption != "" && len(message.Attachments) > 0 {
 		if t := mediaTypeForAttachment(message.Attachments[0]); t != "image" && t != "video" && t != "document" {
-			id, err := w.client.SendText(ctx, acc, meta.ToPhone, caption, replyTo)
-			if err != nil {
-				return "", err
+			if !sent[captionMarker] {
+				id, err := w.client.SendText(ctx, acc, meta.ToPhone, caption, replyTo)
+				if err != nil {
+					return fail(err)
+				}
+				sent[captionMarker] = true
+				firstID = id
 			}
-			firstID, caption, replyTo = id, "", ""
+			caption, replyTo = "", ""
 		}
 	}
 
 	for i, att := range message.Attachments {
+		if att.UUID != "" && sent[att.UUID] {
+			continue
+		}
 		mediaType := mediaTypeForAttachment(att)
 		mediaID, err := w.client.UploadMedia(ctx, acc, att.Content, att.ContentType, att.Name)
 		if err != nil {
-			return firstID, fmt.Errorf("uploading attachment to meta: %w", err)
+			return fail(fmt.Errorf("uploading attachment to meta: %w", err))
 		}
 
 		var attCaption, attReply string
@@ -213,13 +234,43 @@ func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, me
 
 		id, err := w.client.SendMedia(ctx, acc, meta.ToPhone, mediaType, mediaID, attCaption, att.Name, attReply)
 		if err != nil {
-			return firstID, err
+			return fail(err)
+		}
+		if att.UUID != "" {
+			sent[att.UUID] = true
 		}
 		if i == 0 && firstID == "" {
 			firstID = id
 		}
 	}
 	return firstID, nil
+}
+
+// parseSentAttachmentMarkers reads the set of attachment UUIDs (and the caption marker) already delivered for this message from its meta.
+func parseSentAttachmentMarkers(raw json.RawMessage) map[string]bool {
+	out := map[string]bool{}
+	if len(raw) == 0 {
+		return out
+	}
+	var env struct {
+		Sent []string `json:"whatsapp_sent_attachments"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return out
+	}
+	for _, k := range env.Sent {
+		out[k] = true
+	}
+	return out
+}
+
+func markerKeys(sent map[string]bool) []string {
+	keys := make([]string, 0, len(sent))
+	for k := range sent {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func parseSendMeta(raw json.RawMessage) (SendMeta, error) {
