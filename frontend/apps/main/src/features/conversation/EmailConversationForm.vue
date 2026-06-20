@@ -253,6 +253,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useInboxStore } from '@main/stores/inbox'
 import { useUsersStore } from '@main/stores/users'
+import { useUserStore } from '@main/stores/user'
 import { useTeamStore } from '@main/stores/team'
 import {
   Select,
@@ -277,6 +278,7 @@ const emit = defineEmits(['close'])
 const inboxStore = useInboxStore()
 const { t } = useI18n()
 const uStore = useUsersStore()
+const userStore = useUserStore()
 const teamStore = useTeamStore()
 const emitter = useEmitter()
 const loading = ref(false)
@@ -353,7 +355,7 @@ const form = useForm({
   initialValues: {
     inbox_id: null,
     team_id: null,
-    agent_id: null,
+    agent_id: userStore.userID ? String(userStore.userID) : null,
     subject: '',
     content: '',
     contact_email: '',

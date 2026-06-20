@@ -1,7 +1,105 @@
 <template>
   <form @submit.prevent="createConversation" class="flex flex-col flex-1 overflow-hidden">
     <div class="space-y-4 flex-shrink-0">
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-4 gap-4">
+        <div class="space-y-2 relative col-span-2 min-w-0">
+          <label class="text-sm font-medium">{{ $t('conversation.whatsapp.number') }}</label>
+          <div class="flex items-end">
+            <div class="w-fit shrink-0">
+              <ComboBox
+                v-model="phoneCountryCode"
+                :items="allCountries"
+                :placeholder="t('globals.terms.select')"
+                :buttonClass="'rounded-r-none border-r-0 min-w-20'"
+              >
+                <template #item="{ item }">
+                  <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 flex items-center justify-center">
+                      <span v-if="item.emoji">{{ item.emoji }}</span>
+                    </div>
+                    <span class="text-sm">{{ item.label }} ({{ item.calling_code }})</span>
+                  </div>
+                </template>
+                <template #selected="{ selected }">
+                  <div class="flex items-center gap-1.5">
+                    <span v-if="selected" class="text-base">{{ selected.emoji }}</span>
+                    <span v-if="selected && selected.calling_code" class="text-sm font-medium">{{
+                      selected.calling_code
+                    }}</span>
+                  </div>
+                </template>
+              </ComboBox>
+            </div>
+            <Input
+              type="tel"
+              v-model="phoneNumber"
+              class="rounded-l-none flex-1"
+              inputmode="numeric"
+              :placeholder="t('conversation.whatsapp.numberPlaceholder')"
+              @input="handleSearchContacts"
+              @keydown="handleSearchKeydown"
+              autocomplete="off"
+            />
+          </div>
+          <button
+            v-if="!allCountries.length"
+            type="button"
+            class="text-xs text-muted-foreground hover:text-foreground mt-1"
+            @click="countriesStore.fetchCountries"
+          >
+            {{ t('contact.countriesUnavailable') }}
+          </button>
+
+          <div
+            v-if="searchResults.length"
+            class="absolute w-full z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          >
+            <ul class="max-h-60 overflow-y-auto" role="listbox">
+              <li
+                v-for="(contact, index) in searchResults"
+                :key="contact.id"
+                @click="selectContact(contact)"
+                role="option"
+                :aria-selected="index === highlightedIndex"
+                class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors duration-200"
+                :class="
+                  index === highlightedIndex
+                    ? 'bg-accent text-accent-foreground'
+                    : 'hover:bg-accent hover:text-accent-foreground'
+                "
+              >
+                <div class="min-w-0">
+                  <p class="font-medium">{{ contact.first_name }} {{ contact.last_name }}</p>
+                  <p v-if="contact.phone_number" class="text-xs text-muted-foreground truncate">
+                    {{ contact.phone_number }}
+                  </p>
+                  <p v-if="contact.email" class="text-xs text-muted-foreground truncate">
+                    {{ contact.email }}
+                  </p>
+                  <div
+                    v-if="contact.external_user_id"
+                    class="flex items-center gap-1 text-xs text-muted-foreground"
+                  >
+                    <IdCard :size="12" class="flex-shrink-0" />
+                    <span class="truncate">{{ contact.external_user_id }}</span>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="space-y-2 min-w-0">
+          <label class="text-sm font-medium">{{ $t('globals.terms.firstName') }}</label>
+          <Input type="text" v-model="firstName" :disabled="!!selectedContact" />
+        </div>
+        <div class="space-y-2 min-w-0">
+          <label class="text-sm font-medium">{{ $t('globals.terms.lastName') }}</label>
+          <Input type="text" v-model="lastName" :disabled="!!selectedContact" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4">
         <div class="space-y-2">
           <label class="text-sm font-medium">{{ $t('globals.terms.inbox') }}</label>
           <Select v-model="inboxId">
@@ -21,134 +119,6 @@
             </SelectContent>
           </Select>
         </div>
-
-        <div class="space-y-2 relative">
-          <label class="text-sm font-medium">{{ $t('globals.terms.contact') }}</label>
-
-          <div v-if="selectedContact" class="flex items-center justify-between gap-2 box p-2">
-            <div class="min-w-0">
-              <p class="font-medium text-sm truncate">
-                {{ selectedContact.first_name }} {{ selectedContact.last_name }}
-              </p>
-              <p v-if="selectedContact.phone_number" class="text-xs text-muted-foreground truncate">
-                {{ selectedContact.phone_number }}
-              </p>
-            </div>
-            <Button type="button" variant="ghost" size="sm" @click="clearContact">
-              {{ $t('globals.messages.clear') }}
-            </Button>
-          </div>
-
-          <template v-else>
-            <Input
-              type="text"
-              :placeholder="t('conversation.whatsapp.searchOrEnterContact')"
-              v-model="contactQuery"
-              @input="handleSearchContacts"
-              @keydown="handleSearchKeydown"
-              autocomplete="off"
-            />
-            <div
-              v-if="searchResults.length"
-              class="absolute w-full z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-            >
-              <ul class="max-h-60 overflow-y-auto" role="listbox">
-                <li
-                  v-for="(contact, index) in searchResults"
-                  :key="contact.id"
-                  @click="selectContact(contact)"
-                  role="option"
-                  :aria-selected="index === highlightedIndex"
-                  class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors duration-200"
-                  :class="
-                    index === highlightedIndex
-                      ? 'bg-accent text-accent-foreground'
-                      : 'hover:bg-accent hover:text-accent-foreground'
-                  "
-                >
-                  <div class="min-w-0">
-                    <p class="font-medium">{{ contact.first_name }} {{ contact.last_name }}</p>
-                    <p v-if="contact.phone_number" class="text-xs text-muted-foreground truncate">
-                      {{ contact.phone_number }}
-                    </p>
-                    <p v-if="contact.email" class="text-xs text-muted-foreground truncate">
-                      {{ contact.email }}
-                    </p>
-                    <div
-                      v-if="contact.external_user_id"
-                      class="flex items-center gap-1 text-xs text-muted-foreground"
-                    >
-                      <IdCard :size="12" class="flex-shrink-0" />
-                      <span class="truncate">{{ contact.external_user_id }}</span>
-                    </div>
-                  </div>
-                </li>
-              </ul>
-            </div>
-          </template>
-        </div>
-      </div>
-
-      <div v-if="!selectedContact" class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <label class="text-sm font-medium">{{ $t('globals.terms.firstName') }}</label>
-            <Input type="text" v-model="firstName" />
-          </div>
-          <div class="space-y-2">
-            <label class="text-sm font-medium">{{ $t('globals.terms.lastName') }}</label>
-            <Input type="text" v-model="lastName" />
-          </div>
-        </div>
-
-        <div>
-          <label class="text-sm font-medium">{{ $t('globals.terms.phoneNumber') }}</label>
-          <div class="flex items-end mt-2">
-            <ComboBox
-              v-model="phoneCountryCode"
-              :items="allCountries"
-              :placeholder="t('globals.terms.select')"
-              :buttonClass="'rounded-r-none border-r-0'"
-            >
-              <template #item="{ item }">
-                <div class="flex items-center gap-2">
-                  <div class="w-7 h-7 flex items-center justify-center">
-                    <span v-if="item.emoji">{{ item.emoji }}</span>
-                  </div>
-                  <span class="text-sm">{{ item.label }} ({{ item.calling_code }})</span>
-                </div>
-              </template>
-              <template #selected="{ selected }">
-                <div class="flex items-center gap-1">
-                  <span v-if="selected" class="text-lg">{{ selected.emoji }}</span>
-                  <span
-                    v-if="selected && selected.calling_code"
-                    class="text-xs text-muted-foreground"
-                    >({{ selected.calling_code }})</span
-                  >
-                </div>
-              </template>
-            </ComboBox>
-            <Input
-              type="tel"
-              v-model="phoneNumber"
-              class="rounded-l-none"
-              inputmode="numeric"
-              :placeholder="t('globals.terms.phoneNumber')"
-            />
-          </div>
-          <button
-            v-if="!allCountries.length"
-            type="button"
-            class="text-xs text-muted-foreground hover:text-foreground mt-1"
-            @click="countriesStore.fetchCountries"
-          >
-            {{ t('contact.countriesUnavailable') }}
-          </button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4">
         <div class="space-y-2">
           <label class="text-sm font-medium">
             {{ $t('actions.assignTeam') }} ({{ $t('globals.terms.optional') }})
@@ -180,21 +150,29 @@
       <p v-if="!inboxId" class="text-sm text-muted-foreground">
         {{ $t('conversation.whatsapp.selectInboxFirst') }}
       </p>
-      <WhatsAppTemplatePicker
-        v-else
-        fill
-        class="flex-1"
-        :approved-templates="approvedTemplates"
-        :selected-template="selectedTemplate"
-        :template-params="templateParams"
-        :placeholders="placeholders"
-        :url-button-params="urlButtonParams"
-        :rendered-preview="renderedPreview"
-        :is-fetching="isFetchingTemplates"
-        @pick="pickTemplate"
-        @back="selectedTemplate = null"
-        @update:param="(key, v) => (templateParams[key] = v)"
-      />
+      <template v-else>
+        <Alert v-if="!selectedTemplate" class="mb-3">
+          <Info class="h-4 w-4" />
+          <AlertTitle>{{ $t('conversation.whatsapp.templateRequired.title') }}</AlertTitle>
+          <AlertDescription>
+            {{ $t('conversation.whatsapp.templateRequired.description') }}
+          </AlertDescription>
+        </Alert>
+        <WhatsAppTemplatePicker
+          fill
+          class="flex-1"
+          :approved-templates="approvedTemplates"
+          :selected-template="selectedTemplate"
+          :template-params="templateParams"
+          :placeholders="placeholders"
+          :url-button-params="urlButtonParams"
+          :rendered-preview="renderedPreview"
+          :is-fetching="isFetchingTemplates"
+          @pick="pickTemplate"
+          @back="selectedTemplate = null"
+          @update:param="(key, v) => (templateParams[key] = v)"
+        />
+      </template>
     </div>
 
     <DialogFooter class="mt-4 pt-2 flex-shrink-0">
@@ -209,9 +187,10 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
-import { IdCard } from 'lucide-vue-next'
+import { IdCard, Info } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
+import { Alert, AlertTitle, AlertDescription } from '@shared-ui/components/ui/alert'
 import { DialogFooter } from '@shared-ui/components/ui/dialog'
 import {
   Select,
@@ -228,6 +207,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useInboxStore } from '@main/stores/inbox'
 import { useUsersStore } from '@main/stores/users'
+import { useUserStore } from '@main/stores/user'
 import { useTeamStore } from '@main/stores/team'
 import { useCountriesStore } from '@main/stores/countries'
 import { useWhatsAppTemplatePicker } from './useWhatsAppTemplatePicker.js'
@@ -240,6 +220,7 @@ const { t } = useI18n()
 const emitter = useEmitter()
 const inboxStore = useInboxStore()
 const uStore = useUsersStore()
+const userStore = useUserStore()
 const teamStore = useTeamStore()
 const countriesStore = useCountriesStore()
 const { allCountries } = storeToRefs(countriesStore)
@@ -259,10 +240,9 @@ const {
 
 const inboxId = ref('')
 const teamId = ref('none')
-const agentId = ref('none')
+const agentId = ref(userStore.userID ? String(userStore.userID) : 'none')
 const loading = ref(false)
 
-const contactQuery = ref('')
 const searchResults = ref([])
 const highlightedIndex = ref(-1)
 const selectedContact = ref(null)
@@ -298,7 +278,11 @@ watch(inboxId, fetchTemplates)
 
 const hasContact = computed(() => {
   if (selectedContact.value) return true
-  return firstName.value.trim() !== '' && phoneNumber.value.trim() !== '' && phoneCountryCode.value !== ''
+  return (
+    firstName.value.trim() !== '' &&
+    phoneNumber.value.trim() !== '' &&
+    phoneCountryCode.value !== ''
+  )
 })
 
 const canSubmit = computed(
@@ -308,7 +292,7 @@ const canSubmit = computed(
 const handleSearchContacts = () => {
   clearTimeout(timeoutId)
   timeoutId = setTimeout(async () => {
-    const query = contactQuery.value.trim()
+    const query = phoneNumber.value.trim()
     if (query.length < 3) {
       searchResults.value.splice(0)
       return
@@ -346,14 +330,29 @@ const handleSearchKeydown = (e) => {
 
 const selectContact = (contact) => {
   selectedContact.value = contact
+  phoneNumber.value = contact.phone_number || ''
+  phoneCountryCode.value = contact.phone_number_country_code || ''
+  firstName.value = contact.first_name || ''
+  lastName.value = contact.last_name || ''
   searchResults.value.splice(0)
   highlightedIndex.value = -1
 }
 
-const clearContact = () => {
-  selectedContact.value = null
-  contactQuery.value = ''
-}
+watch(phoneNumber, (val) => {
+  if (selectedContact.value && val !== (selectedContact.value.phone_number || '')) {
+    selectedContact.value = null
+    firstName.value = ''
+    lastName.value = ''
+  }
+})
+
+watch(phoneCountryCode, (val) => {
+  if (selectedContact.value && val !== (selectedContact.value.phone_number_country_code || '')) {
+    selectedContact.value = null
+    firstName.value = ''
+    lastName.value = ''
+  }
+})
 
 const createConversation = async () => {
   if (!canSubmit.value) return

@@ -823,12 +823,17 @@ func handleCreateConversation(r *fastglue.Request) error {
 		contactID = contact.ID
 	}
 
+	var (
+		conversationID   int
+		conversationUUID string
+	)
+
 	subject, appendRefNum := req.Subject, true
 	if channel == whatsappChannel.ChannelWhatsApp {
 		subject, appendRefNum = "", false
 	}
 
-	conversationID, conversationUUID, err := app.conversation.CreateConversation(
+	conversationID, conversationUUID, err = app.conversation.CreateConversation(
 		contactID,
 		req.InboxID,
 		"",         /** last_message **/
@@ -987,7 +992,7 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 	if err != nil {
 		return 0, err
 	}
-	if err := app.user.SetContactPhoneIfMissing(id, waID, ""); err != nil {
+	if err := app.user.SetContactPhoneIfMissing(id, stringutil.NormalizeWhatsAppPhone(req.PhoneNumber), req.PhoneNumberCountryCode); err != nil {
 		app.lo.Error("error setting whatsapp contact phone", "user_id", id, "error", err)
 	}
 	return id, nil
