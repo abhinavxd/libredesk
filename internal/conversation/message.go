@@ -429,7 +429,7 @@ func (m *Manager) UpdateConversationLastInboundAt(conversationID int, at time.Ti
 	}
 	uuid, err := m.GetConversationUUID(conversationID)
 	if err == nil && uuid != "" {
-		m.BroadcastConversationUpdate(uuid, map[string]any{"last_inbound_at": stored.Format(time.RFC3339)})
+		m.BroadcastConversationUpdate(uuid, map[string]any{"contact_last_inbound_at": stored.Format(time.RFC3339)})
 	}
 	return nil
 }

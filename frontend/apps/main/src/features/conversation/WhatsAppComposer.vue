@@ -82,7 +82,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
-import { WHATSAPP_WINDOW_MS as WINDOW_MS } from './whatsappTemplate.js'
+import { WHATSAPP_WINDOW_MS as WINDOW_MS, whatsAppWindowInboundAt } from './whatsappTemplate.js'
 import { useWhatsAppTemplatePicker } from './useWhatsAppTemplatePicker.js'
 
 const CLOSING_SOON_MS = 4 * 60 * 60 * 1000
@@ -102,12 +102,12 @@ onBeforeUnmount(() => {
   }
 })
 
-const lastInboundAt = computed(() => conversationStore.current?.contact_last_inbound_at)
+const lastInboundAt = computed(() => whatsAppWindowInboundAt(conversationStore.current))
 
 const windowRemainingMs = computed(() => {
   const ts = lastInboundAt.value
   if (!ts) return 0
-  return WINDOW_MS - (nowTick.value - new Date(ts).getTime())
+  return WINDOW_MS - (nowTick.value - ts)
 })
 
 const windowOpen = computed(() => windowRemainingMs.value > 0)
