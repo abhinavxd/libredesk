@@ -286,6 +286,17 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", rateLimit(widgetAuth(handleChatSendMessage), "widget"))
 	g.POST("/api/v1/widget/media/upload", rateLimit(widgetAuth(handleWidgetMediaUpload), "widget"))
 
+	// WhatsApp.
+	g.GET("/webhooks/whatsapp/{inbox_id}", rateLimit(handleWhatsAppWebhookVerify, "public"))
+	g.POST("/webhooks/whatsapp/{inbox_id}", handleWhatsAppWebhookEvent)
+
+	// WhatsApp templates (admin).
+	g.GET("/api/v1/whatsapp/templates", perm(handleListWhatsAppTemplates, "inboxes:manage"))
+	g.GET("/api/v1/whatsapp/templates/{id}", perm(handleGetWhatsAppTemplate, "inboxes:manage"))
+	g.POST("/api/v1/whatsapp/templates", perm(handleCreateWhatsAppTemplate, "inboxes:manage"))
+	g.DELETE("/api/v1/whatsapp/templates/{id}", perm(handleDeleteWhatsAppTemplate, "inboxes:manage"))
+	g.POST("/api/v1/whatsapp/templates/sync", perm(handleSyncWhatsAppTemplates, "inboxes:manage"))
+
 	// Frontend pages.
 	g.GET("/", notAuthPage(serveIndexPage))
 	g.GET("/widget", validateWidgetInbox(serveWidgetIndexPage))
@@ -311,17 +322,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/csat/{uuid}", rateLimit(handleShowCSAT, "public"))
 	g.GET("/csat/{uuid}/widget", rateLimit(handleShowCSATWidget, "public"))
 	g.POST("/csat/{uuid}", rateLimit(handleUpdateCSATResponse, "public"))
-
-	// WhatsApp webhook (public, HMAC-verified).
-	g.GET("/webhooks/whatsapp/{inbox_id}", rateLimit(handleWhatsAppWebhookVerify, "public"))
-	g.POST("/webhooks/whatsapp/{inbox_id}", rateLimit(handleWhatsAppWebhookEvent, "public"))
-
-	// WhatsApp templates (admin).
-	g.GET("/api/v1/whatsapp/templates", perm(handleListWhatsAppTemplates, "inboxes:manage"))
-	g.GET("/api/v1/whatsapp/templates/{id}", perm(handleGetWhatsAppTemplate, "inboxes:manage"))
-	g.POST("/api/v1/whatsapp/templates", perm(handleCreateWhatsAppTemplate, "inboxes:manage"))
-	g.DELETE("/api/v1/whatsapp/templates/{id}", perm(handleDeleteWhatsAppTemplate, "inboxes:manage"))
-	g.POST("/api/v1/whatsapp/templates/sync", perm(handleSyncWhatsAppTemplates, "inboxes:manage"))
 
 	// Health check.
 	g.GET("/health", handleHealthCheck)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/mail"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -76,19 +77,24 @@ func setWebhookURLWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
 	_, inb.TokenInvalid = app.whatsappAuthErrors.Load(inb.ID)
 }
 
-func whatsAppCallbackURL(app *App, inboxID int) string {
-	root, err := app.setting.GetAppRootURL()
-	if err != nil {
-		return ""
-	}
-	return whatsAppCallbackURLFromRoot(root, inboxID)
-}
-
 func whatsAppCallbackURLFromRoot(root string, inboxID int) string {
 	if root == "" {
 		return ""
 	}
 	return strings.TrimRight(root, "/") + "/webhooks/whatsapp/" + strconv.Itoa(inboxID)
+}
+
+// isPublicWebhookURL reports whether root is a Meta-reachable webhook origin: an https URL with a non-loopback host.
+func isPublicWebhookURL(root string) bool {
+	u, err := url.Parse(strings.TrimSpace(root))
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	switch u.Hostname() {
+	case "", "localhost", "127.0.0.1", "::1":
+		return false
+	}
+	return true
 }
 
 // subscribeWhatsAppWebhook best-effort points the WABA's webhook at this inbox; the manual Meta dashboard setup stays as fallback.
@@ -97,14 +103,16 @@ func subscribeWhatsAppWebhook(app *App, inboxID int) {
 	if err != nil || app.whatsappClient == nil {
 		return
 	}
-	callbackURL := whatsAppCallbackURL(app, inboxID)
-	if callbackURL == "" {
+	root, _ := app.setting.GetAppRootURL()
+	if !isPublicWebhookURL(root) {
+		app.lo.Error("whatsapp webhook not auto-registered: the app root URL must be a public HTTPS URL Meta can reach; set it in Settings and re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "root_url", root)
 		return
 	}
+	callbackURL := whatsAppCallbackURLFromRoot(root, inboxID)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := app.whatsappClient.SubscribeWebhook(ctx, cfg.Account(), callbackURL, cfg.WebhookVerifyToken); err != nil {
-		app.lo.Warn("automatic whatsapp webhook subscription failed, configure the webhook manually in the Meta dashboard", "inbox_id", inboxID, "callback_url", callbackURL, "error", err)
+		app.lo.Error("whatsapp webhook auto-registration failed; configure it manually in the Meta dashboard or re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "callback_url", callbackURL, "error", err)
 		return
 	}
 	app.lo.Info("whatsapp webhook subscribed automatically", "inbox_id", inboxID, "callback_url", callbackURL)
