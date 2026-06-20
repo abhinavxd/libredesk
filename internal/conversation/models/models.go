@@ -458,10 +458,12 @@ func (m *Message) ToOutbound() OutboundMessage {
 }
 
 type IncomingContact struct {
-	ID        int
-	FirstName string
-	LastName  string
-	Email     null.String
+	ID             int
+	FirstName      string
+	LastName       string
+	Email          null.String
+	ExternalUserID null.String
+	AvatarURL      null.String
 }
 
 type IncomingMessage struct {

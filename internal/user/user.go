@@ -102,6 +102,7 @@ type queries struct {
 	InsertContactNoExtID          *sqlx.Stmt `query:"insert-contact-without-external-id"`
 	GetContactByEmail             *sqlx.Stmt `query:"get-contact-by-email"`
 	GetContactByEmailWithoutExtID *sqlx.Stmt `query:"get-contact-by-email-without-ext-id"`
+	GetContactExternalID          *sqlx.Stmt `query:"get-contact-external-id"`
 	IsEmailBlocked                *sqlx.Stmt `query:"is-email-blocked"`
 	SetExternalUserID             *sqlx.Stmt `query:"set-external-user-id"`
 	InsertNote                    *sqlx.Stmt `query:"insert-note"`
