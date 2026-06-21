@@ -594,8 +594,6 @@
   "conversation.whatsapp.sendTemplate": "Send template",
   "conversation.whatsapp.sendTemplate.description": "Pick an approved template and fill in any placeholders before sending.",
   "conversation.whatsapp.template": "Template",
-  "conversation.whatsapp.templateRequired.title": "Start with a template",
-  "conversation.whatsapp.templateRequired.description": "WhatsApp only lets you open a new conversation with a message template approved by Meta. Pick one below to continue.",
   "conversation.whatsapp.templateSent": "Template queued for delivery.",
   "conversation.whatsapp.unsupportedMessage": "The contact sent something WhatsApp does not deliver to business tools, like a poll or an animated sticker. It is only visible on their phone.",
   "conversation.whatsapp.windowClosed.description": "Meta only allows template messages once a contact hasn't messaged for over 24 hours.",

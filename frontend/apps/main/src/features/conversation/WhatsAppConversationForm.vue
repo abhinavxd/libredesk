@@ -151,13 +151,6 @@
         {{ $t('conversation.whatsapp.selectInboxFirst') }}
       </p>
       <template v-else>
-        <Alert v-if="!selectedTemplate" class="mb-3">
-          <Info class="h-4 w-4" />
-          <AlertTitle>{{ $t('conversation.whatsapp.templateRequired.title') }}</AlertTitle>
-          <AlertDescription>
-            {{ $t('conversation.whatsapp.templateRequired.description') }}
-          </AlertDescription>
-        </Alert>
         <WhatsAppTemplatePicker
           fill
           class="flex-1"
@@ -187,10 +180,9 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
-import { IdCard, Info } from 'lucide-vue-next'
+import { IdCard } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
-import { Alert, AlertTitle, AlertDescription } from '@shared-ui/components/ui/alert'
 import { DialogFooter } from '@shared-ui/components/ui/dialog'
 import {
   Select,

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -861,27 +863,37 @@ func handleCreateConversation(r *fastglue.Request) error {
 	var (
 		conversationID   int
 		conversationUUID string
+		createdNew       = true
 	)
 
 	subject, appendRefNum := req.Subject, true
 	if channel == whatsappChannel.ChannelWhatsApp {
 		subject, appendRefNum = "", false
+		// WhatsApp is one thread per contact; reuse the open conversation instead of creating a parallel one.
+		if id, uuid, lookupErr := app.conversation.GetLatestOpenConversationForContact(contactID, req.InboxID); lookupErr == nil {
+			conversationID, conversationUUID, createdNew = id, uuid, false
+		} else if !errors.Is(lookupErr, sql.ErrNoRows) {
+			app.lo.Error("error finding open whatsapp conversation", "error", lookupErr)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
 	}
 
-	conversationID, conversationUUID, err = app.conversation.CreateConversation(
-		contactID,
-		req.InboxID,
-		"",         /** last_message **/
-		time.Now(), /** last_message_at **/
-		subject,
-		appendRefNum,
-		nil,
-		req.CustomAttributes,
-		0, 0,
-	)
-	if err != nil {
-		app.lo.Error("error creating conversation", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	if createdNew {
+		conversationID, conversationUUID, err = app.conversation.CreateConversation(
+			contactID,
+			req.InboxID,
+			"",         /** last_message **/
+			time.Now(), /** last_message_at **/
+			subject,
+			appendRefNum,
+			nil,
+			req.CustomAttributes,
+			0, 0,
+		)
+		if err != nil {
+			app.lo.Error("error creating conversation", "error", err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
 	}
 
 	// Get media for the attachment ids, skip any already associated with a model.
@@ -909,25 +921,30 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	if sendErr != nil {
-		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
-			app.lo.Error("error deleting conversation", "error", err)
+		// Roll back only a conversation we created, not a reused one.
+		if createdNew {
+			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
+				app.lo.Error("error deleting conversation", "error", err)
+			}
 		}
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
 	}
 
 	// Trigger webhook for agent-initiated conversation; contact-initiated is handled by the incoming message hooks.
-	if agentInitiated {
+	if agentInitiated && createdNew {
 		if c, err := app.conversation.GetConversation(0, conversationUUID, ""); err == nil {
 			app.webhook.TriggerEvent(wmodels.EventConversationCreated, c)
 		}
 	}
 
-	// Assign the conversation to team/agent if provided, always assign team first as it clears assigned agent.
-	if req.AssignedTeamID > 0 {
-		app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
-	}
-	if req.AssignedAgentID > 0 {
-		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
+	// Don't reassign a reused conversation; team first as it clears the agent.
+	if createdNew {
+		if req.AssignedTeamID > 0 {
+			app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
+		}
+		if req.AssignedAgentID > 0 {
+			app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
+		}
 	}
 
 	conversation, _ := app.conversation.GetConversation(conversationID, "", "")
