@@ -5,7 +5,7 @@
         <CustomBreadcrumb :links="breadcrumbLinks" />
       </div>
 
-      <form @submit="onSubmit" class="space-y-6 max-w-3xl">
+      <form @submit="onSubmit" class="space-y-6 w-full">
         <FormField v-slot="{ componentField }" name="inbox_id">
           <FormItem>
             <FormLabel>{{ $t('globals.terms.inbox') }}</FormLabel>
