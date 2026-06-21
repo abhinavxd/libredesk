@@ -664,7 +664,7 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	}
 
 	// Encrypt WhatsApp credentials.
-	for _, fieldName := range []string{"access_token", "app_secret"} {
+	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token"} {
 		if value, ok := cfg[fieldName].(string); ok && value != "" && !crypto.IsEncrypted(value) {
 			encrypted, err := crypto.Encrypt(value, m.encryptionKey)
 			if err != nil {
@@ -741,7 +741,7 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	}
 
 	// Decrypt WhatsApp credentials.
-	for _, fieldName := range []string{"access_token", "app_secret"} {
+	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token"} {
 		if value, ok := cfg[fieldName].(string); ok && crypto.IsEncrypted(value) {
 			decrypted, err := crypto.Decrypt(value, m.encryptionKey)
 			if err != nil {
