@@ -14,6 +14,7 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 	"github.com/valyala/fasthttp"
@@ -152,7 +153,11 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 	// Meta posts all events of an app to one callback URL, so the URL's inbox ID is not authoritative.
 	inboxID = resolveWhatsAppInboxByPhoneNumberID(app, inboxID, m.PhoneNumberID)
 
-	cfg, err := whatsAppConfigForInbox(app, inboxID)
+	inbRec, err := app.inbox.GetDBRecord(inboxID)
+	if err != nil {
+		return fmt.Errorf("resolving inbox: %w", err)
+	}
+	cfg, err := whatsAppConfigFromRecord(inbRec)
 	if err != nil {
 		return fmt.Errorf("resolving inbox config: %w", err)
 	}
@@ -191,9 +196,9 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 
 	isNewConversation := false
 	conversationID, conversationUUID, err := app.conversation.GetLatestOpenConversationForContact(contactID, inboxID)
-	if errors.Is(err, sql.ErrNoRows) && cfg.ReopenWindowHours > 0 {
+	if errors.Is(err, sql.ErrNoRows) && inbRec.ReopenWindowHours > 0 {
 		// Reuse a recently-resolved conversation; the message insert hook reopens it.
-		conversationID, conversationUUID, err = app.conversation.GetReopenableConversationForContact(contactID, inboxID, cfg.ReopenWindowHours)
+		conversationID, conversationUUID, err = app.conversation.GetReopenableConversationForContact(contactID, inboxID, inbRec.ReopenWindowHours)
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		conversationID, conversationUUID, err = app.conversation.CreateConversation(
@@ -494,8 +499,12 @@ func whatsAppConfigForInbox(app *App, inboxID int) (whatsappChannel.Config, erro
 	if err != nil {
 		return whatsappChannel.Config{}, err
 	}
+	return whatsAppConfigFromRecord(rec)
+}
+
+func whatsAppConfigFromRecord(rec imodels.Inbox) (whatsappChannel.Config, error) {
 	if rec.Channel != whatsappChannel.ChannelWhatsApp {
-		return whatsappChannel.Config{}, fmt.Errorf("inbox %d is not a whatsapp inbox", inboxID)
+		return whatsappChannel.Config{}, fmt.Errorf("inbox %d is not a whatsapp inbox", rec.ID)
 	}
 	var cfg whatsappChannel.Config
 	if err := json.Unmarshal(rec.Config, &cfg); err != nil {

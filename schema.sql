@@ -86,6 +86,7 @@ CREATE TABLE inboxes (
 	enabled bool DEFAULT TRUE NOT NULL,
 	csat_enabled bool DEFAULT false NOT NULL,
 	prompt_tags_on_reply bool DEFAULT false NOT NULL,
+	reopen_window_hours INT DEFAULT 0 NOT NULL,
 	config jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"from" TEXT NULL,
 	from_name_template TEXT NOT NULL DEFAULT '',

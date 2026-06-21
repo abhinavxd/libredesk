@@ -12,6 +12,11 @@ func V3_0_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	_, err = db.Exec(`ALTER TABLE inboxes ADD COLUMN IF NOT EXISTS reopen_window_hours INT DEFAULT 0 NOT NULL;`)
+	if err != nil {
+		return err
+	}
+
 	_, err = db.Exec(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_inbound_at TIMESTAMPTZ NULL;`)
 	if err != nil {
 		return err

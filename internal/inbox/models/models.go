@@ -28,6 +28,7 @@ type Inbox struct {
 	Enabled            bool            `db:"enabled" json:"enabled"`
 	CSATEnabled        bool            `db:"csat_enabled" json:"csat_enabled"`
 	PromptTagsOnReply  bool            `db:"prompt_tags_on_reply" json:"prompt_tags_on_reply"`
+	ReopenWindowHours  int             `db:"reopen_window_hours" json:"reopen_window_hours"`
 	From               string          `db:"from" json:"from"`
 	FromNameTemplate   string          `db:"from_name_template" json:"from_name_template"`
 	Config             json.RawMessage `db:"config" json:"config"`

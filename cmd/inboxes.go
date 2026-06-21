@@ -132,42 +132,45 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	return nil
 }
 
-// ensureWhatsAppCSATTemplate provisions the inbox's reserved CSAT template on Meta; approval arrives via webhook/sync.
+// ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta from its config: creates it when absent, edits it in place when the message or button changed, recreates under a new language when that changed. Approval arrives via webhook/sync.
 func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	if app.whatsappTemplate == nil {
 		return
 	}
-	name := wtmodels.CSATTemplateName(inboxID)
-	exists, err := app.whatsappTemplate.Exists(inboxID, name, wtmodels.CSATTemplateLanguage)
-	if err != nil || exists {
+	cfg, err := whatsAppConfigForInbox(app, inboxID)
+	if err != nil {
+		app.lo.Warn("error reading whatsapp config for csat template", "inbox_id", inboxID, "error", err)
 		return
 	}
 	root, err := app.setting.GetAppRootURL()
 	if err != nil || root == "" {
 		return
 	}
-	buttons, err := json.Marshal([]map[string]string{{
-		"type": "URL",
-		"text": app.i18n.T("conversation.whatsapp.csatTemplateButton"),
-		"url":  strings.TrimRight(root, "/") + "/csat/{{1}}",
+	base := strings.TrimRight(root, "/")
+	buttons, err := json.Marshal([]map[string]any{{
+		"type":    "URL",
+		"text":    cfg.CSATButtonText(),
+		"url":     base + "/csat/{{1}}",
+		"example": []string{base + "/csat/example"},
 	}})
 	if err != nil {
 		return
 	}
+	name := wtmodels.CSATTemplateName(inboxID)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if _, err := app.whatsappTemplate.Create(ctx, wtmodels.Template{
+	if err := app.whatsappTemplate.EnsureReserved(ctx, wtmodels.Template{
 		InboxID:     inboxID,
 		Name:        name,
-		Language:    wtmodels.CSATTemplateLanguage,
+		Language:    cfg.CSATLanguage(),
 		Category:    wtmodels.CategoryUtility,
-		BodyContent: app.i18n.T("conversation.whatsapp.csatTemplateBody"),
+		BodyContent: cfg.CSATBody(),
 		Buttons:     buttons,
 	}); err != nil {
 		app.lo.Warn("error provisioning whatsapp csat template", "inbox_id", inboxID, "error", err)
 		return
 	}
-	app.lo.Info("whatsapp csat template submitted to meta", "inbox_id", inboxID, "name", name)
+	app.lo.Info("whatsapp csat template reconciled", "inbox_id", inboxID, "name", name)
 }
 
 // handleCreateInbox creates a new inbox

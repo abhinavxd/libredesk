@@ -9,10 +9,7 @@ import (
 )
 
 // Reserved per-inbox CSAT template, auto-provisioned and hidden from the agent picker.
-const (
-	CSATTemplateNamePrefix = "libredesk_csat_"
-	CSATTemplateLanguage   = "en_US"
-)
+const CSATTemplateNamePrefix = "libredesk_csat_"
 
 func CSATTemplateName(inboxID int) string {
 	return fmt.Sprintf("%s%d", CSATTemplateNamePrefix, inboxID)

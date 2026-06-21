@@ -103,18 +103,6 @@ func (m *Manager) GetByID(id int) (models.Template, error) {
 	return t, nil
 }
 
-// Exists reports whether a template with this name and language exists for the inbox, regardless of status.
-func (m *Manager) Exists(inboxID int, name, language string) (bool, error) {
-	var t models.Template
-	if err := m.q.GetByNameLanguage.Get(&t, inboxID, name, language); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
 // GetApproved returns the approved template matching inbox + name + language.
 func (m *Manager) GetApproved(inboxID int, name, language string) (models.Template, error) {
 	var t models.Template
@@ -153,51 +141,125 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	if m.client == nil || m.resolver == nil {
-		return stored, nil
-	}
+	return m.submitNewToMeta(ctx, stored), nil
+}
 
+// EnsureReserved reconciles a reserved (fixed-name) template like the per-inbox CSAT one: creates it when absent, edits it in place when only its content changed, and no-ops when it already matches. A language change lands here as a fresh create since name+language is a new template on Meta.
+func (m *Manager) EnsureReserved(ctx context.Context, desired models.Template) error {
+	var existing models.Template
+	err := m.q.GetByNameLanguage.Get(&existing, desired.InboxID, desired.Name, desired.Language)
+	if errors.Is(err, sql.ErrNoRows) {
+		_, cErr := m.Create(ctx, desired)
+		return cErr
+	}
+	if err != nil {
+		m.lo.Error("error loading reserved whatsapp template", "inbox_id", desired.InboxID, "name", desired.Name, "error", err)
+		return err
+	}
+	if !reservedContentChanged(existing, desired) {
+		return nil
+	}
+	// Meta only allows editing a template in approved/rejected/paused state; an edit on a pending one is a guaranteed error, so wait for the current review to settle and reconcile on the next save.
+	if strings.EqualFold(existing.Status, models.StatusPending) {
+		m.lo.Warn("skipping reserved template edit while pending meta review", "id", existing.ID, "name", existing.Name)
+		return nil
+	}
+	return m.editReserved(ctx, existing, desired)
+}
+
+// submitNewToMeta submits a freshly stored template to Meta and records the returned id or the rejection reason.
+func (m *Manager) submitNewToMeta(ctx context.Context, stored models.Template) models.Template {
+	if m.client == nil || m.resolver == nil {
+		return stored
+	}
 	acc, err := m.resolver.WhatsAppAccount(stored.InboxID)
 	if err != nil {
 		m.lo.Error("error resolving whatsapp account for template submit", "inbox_id", stored.InboxID, "error", err)
-		reason := "could not resolve WhatsApp account for submission"
-		if _, err := m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, reason); err != nil {
-			m.lo.Error("error persisting template rejected status", "id", stored.ID, "error", err)
-		}
-		stored.Status = models.StatusRejected
-		stored.RejectionReason = null.StringFrom(reason)
-		return stored, nil
+		return m.markRejected(stored, "could not resolve WhatsApp account for submission")
 	}
-
 	submission, err := buildSubmission(stored)
 	if err != nil {
 		m.lo.Error("error building template submission", "id", stored.ID, "error", err)
-		reason := "could not build template submission: " + err.Error()
-		if _, err := m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, reason); err != nil {
-			m.lo.Error("error persisting template rejected status", "id", stored.ID, "error", err)
-		}
-		stored.Status = models.StatusRejected
-		stored.RejectionReason = null.StringFrom(reason)
-		return stored, nil
+		return m.markRejected(stored, "could not build template submission: "+err.Error())
 	}
-
 	metaID, submitErr := m.client.SubmitTemplate(ctx, acc, submission)
 	if submitErr != nil {
 		m.lo.Error("error submitting template to meta", "id", stored.ID, "error", submitErr)
-		if _, err := m.q.UpdateStatus.Exec(stored.ID, models.StatusRejected, submitErrReason(submitErr)); err != nil {
-			m.lo.Error("error persisting template rejected status", "id", stored.ID, "error", err)
-		}
-		stored.Status = models.StatusRejected
-		stored.RejectionReason = null.StringFrom(submitErrReason(submitErr))
-		return stored, nil
+		return m.markRejected(stored, submitErrReason(submitErr))
 	}
-
 	if _, err := m.q.UpdateMetaID.Exec(stored.ID, metaID, models.StatusPending); err != nil {
 		m.lo.Error("error persisting meta template id", "id", stored.ID, "error", err)
 	}
 	stored.MetaTemplateID = null.StringFrom(metaID)
 	stored.Status = models.StatusPending
-	return stored, nil
+	return stored
+}
+
+// editReserved persists new content for an existing template and pushes it to Meta in place, re-submitting fresh when it was never registered.
+func (m *Manager) editReserved(ctx context.Context, existing, desired models.Template) error {
+	updated, err := m.updateContent(existing.ID, desired)
+	if err != nil {
+		return err
+	}
+	if m.client == nil || m.resolver == nil {
+		return nil
+	}
+	if !existing.MetaTemplateID.Valid || existing.MetaTemplateID.String == "" {
+		m.submitNewToMeta(ctx, updated)
+		return nil
+	}
+	acc, err := m.resolver.WhatsAppAccount(updated.InboxID)
+	if err != nil {
+		m.lo.Error("error resolving whatsapp account for template edit", "inbox_id", updated.InboxID, "error", err)
+		m.markRejected(updated, "could not resolve WhatsApp account for submission")
+		return nil
+	}
+	edit, err := buildEdit(updated)
+	if err != nil {
+		m.lo.Error("error building template edit", "id", updated.ID, "error", err)
+		m.markRejected(updated, "could not build template edit: "+err.Error())
+		return nil
+	}
+	if err := m.client.EditTemplate(ctx, acc, existing.MetaTemplateID.String, edit); err != nil {
+		m.lo.Error("error editing template on meta", "id", updated.ID, "error", err)
+		m.markRejected(updated, submitErrReason(err))
+		return nil
+	}
+	if _, err := m.q.UpdateStatus.Exec(updated.ID, models.StatusPending, ""); err != nil {
+		m.lo.Error("error persisting template pending status", "id", updated.ID, "error", err)
+	}
+	return nil
+}
+
+// updateContent overwrites the editable fields of a stored template.
+func (m *Manager) updateContent(id int, t models.Template) (models.Template, error) {
+	buttons := t.Buttons
+	if buttons == nil {
+		buttons = json.RawMessage(`[]`)
+	}
+	sample := t.SampleValues
+	if sample == nil {
+		sample = json.RawMessage(`{}`)
+	}
+	var updated models.Template
+	if err := m.q.Update.Get(&updated,
+		id, t.Name, t.Language, t.Category, t.HeaderType, t.HeaderContent,
+		t.BodyContent, t.FooterContent, buttons, sample,
+	); err != nil {
+		m.lo.Error("error updating whatsapp template", "id", id, "error", err)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return updated, nil
+}
+
+// markRejected records a rejection reason on a template and returns the updated row.
+func (m *Manager) markRejected(t models.Template, reason string) models.Template {
+	if _, err := m.q.UpdateStatus.Exec(t.ID, models.StatusRejected, reason); err != nil {
+		m.lo.Error("error persisting template rejected status", "id", t.ID, "error", err)
+	}
+	t.Status = models.StatusRejected
+	t.RejectionReason = null.StringFrom(reason)
+	return t
 }
 
 // Delete removes the template locally and on Meta (best-effort).
@@ -389,6 +451,38 @@ func buildSubmission(t models.Template) (whatsapp.TemplateSubmission, error) {
 	}
 
 	return sub, nil
+}
+
+// buildEdit reuses the submission components but drops name/language, which Meta does not allow changing on edit.
+func buildEdit(t models.Template) (whatsapp.TemplateEdit, error) {
+	sub, err := buildSubmission(t)
+	if err != nil {
+		return whatsapp.TemplateEdit{}, err
+	}
+	return whatsapp.TemplateEdit{
+		Category:        sub.Category,
+		ParameterFormat: sub.ParameterFormat,
+		Components:      sub.Components,
+	}, nil
+}
+
+// reservedContentChanged compares only the editable surface of a reserved template (body text and button label); the name, URL and language are fixed or handled by the caller.
+func reservedContentChanged(existing, desired models.Template) bool {
+	if strings.TrimSpace(existing.BodyContent) != strings.TrimSpace(desired.BodyContent) {
+		return true
+	}
+	return firstButtonText(existing.Buttons) != firstButtonText(desired.Buttons)
+}
+
+func firstButtonText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var btns []whatsapp.TemplateButton
+	if err := json.Unmarshal(raw, &btns); err != nil || len(btns) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(btns[0].Text)
 }
 
 // parseSampleValues decodes sample_values JSON, tolerating non-string values from the frontend.

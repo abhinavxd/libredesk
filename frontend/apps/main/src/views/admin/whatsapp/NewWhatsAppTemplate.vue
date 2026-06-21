@@ -182,8 +182,8 @@
           </div>
 
           <div v-for="(btn, idx) in buttons" :key="idx" class="grid grid-cols-12 gap-2 items-start">
-            <Select v-model="btn.type" class="col-span-3">
-              <SelectTrigger>
+            <Select v-model="btn.type">
+              <SelectTrigger class="col-span-4">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -195,15 +195,15 @@
               v-if="btn.type === 'URL'"
               v-model="btn.url"
               placeholder="https://example.com/"
-              class="col-span-5"
+              class="col-span-4"
             />
             <Input
               v-else-if="btn.type === 'PHONE_NUMBER'"
               v-model="btn.phone_number"
               placeholder="+1234567890"
-              class="col-span-5"
+              class="col-span-4"
             />
-            <div v-else class="col-span-5"></div>
+            <div v-else class="col-span-4"></div>
             <Button
               type="button"
               variant="ghost"

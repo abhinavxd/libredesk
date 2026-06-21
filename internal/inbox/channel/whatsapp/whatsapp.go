@@ -28,6 +28,13 @@ const maxStickerBytes = 100 * 1024
 // captionMarker tracks the standalone caption text send in the per-message sent-attachment set, alongside attachment UUIDs.
 const captionMarker = "__caption__"
 
+// CSAT template defaults applied when the inbox leaves these blank; the language code must match the body's language.
+const (
+	DefaultCSATTemplateLanguage   = "en_US"
+	DefaultCSATTemplateBody       = "Your conversation has been resolved. How did we do? Tap below to rate your experience."
+	DefaultCSATTemplateButtonText = "Rate us"
+)
+
 // Config is the per-inbox WhatsApp configuration from the inbox config JSONB, with tokens already decrypted.
 type Config struct {
 	PhoneNumberID      string `json:"phone_number_id"`
@@ -36,7 +43,10 @@ type Config struct {
 	AppSecret          string `json:"app_secret"`
 	WebhookVerifyToken string `json:"webhook_verify_token"`
 	APIVersion         string `json:"api_version"`
-	ReopenWindowHours  int    `json:"reopen_window_hours"`
+
+	CSATTemplateLanguage   string `json:"csat_template_language"`
+	CSATTemplateBody       string `json:"csat_template_body"`
+	CSATTemplateButtonText string `json:"csat_template_button_text"`
 }
 
 // Account converts the on-disk Config into the shape the API client wants.
@@ -48,6 +58,27 @@ func (c Config) Account() whatsapp.Account {
 		AppSecret:     c.AppSecret,
 		APIVersion:    c.APIVersion,
 	}
+}
+
+func (c Config) CSATLanguage() string {
+	if strings.TrimSpace(c.CSATTemplateLanguage) == "" {
+		return DefaultCSATTemplateLanguage
+	}
+	return c.CSATTemplateLanguage
+}
+
+func (c Config) CSATBody() string {
+	if strings.TrimSpace(c.CSATTemplateBody) == "" {
+		return DefaultCSATTemplateBody
+	}
+	return c.CSATTemplateBody
+}
+
+func (c Config) CSATButtonText() string {
+	if strings.TrimSpace(c.CSATTemplateButtonText) == "" {
+		return DefaultCSATTemplateButtonText
+	}
+	return c.CSATTemplateButtonText
 }
 
 // SendMeta is the per-message metadata threaded through OutboundMessage.Meta; a set TemplateName means a template send.

@@ -287,6 +287,13 @@ func (c *Client) DeleteTemplate(ctx context.Context, acc Account, name string) e
 	return err
 }
 
+// EditTemplate updates an existing template's content by Meta template ID; Meta resets it to pending review. Name and language cannot be changed this way.
+func (c *Client) EditTemplate(ctx context.Context, acc Account, metaTemplateID string, t TemplateEdit) error {
+	endpoint := fmt.Sprintf("%s/%s/%s", c.baseURL, acc.Version(), metaTemplateID)
+	_, err := c.doRequest(ctx, http.MethodPost, endpoint, t, acc)
+	return err
+}
+
 func (c *Client) sendMessage(ctx context.Context, acc Account, payload any) (string, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s/messages", c.baseURL, acc.Version(), acc.PhoneNumberID)
 	body, err := c.doRequest(ctx, http.MethodPost, endpoint, payload, acc)

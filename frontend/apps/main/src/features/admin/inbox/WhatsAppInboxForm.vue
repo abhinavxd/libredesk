@@ -31,6 +31,17 @@
       </FormItem>
     </FormField>
 
+    <FormField v-slot="{ componentField, handleChange }" name="prompt_tags_on_reply">
+      <FormItem>
+        <SwitchField
+          :title="$t('admin.inbox.promptTagsOnReply')"
+          :description="$t('admin.inbox.promptTagsOnReply.description')"
+          :checked="componentField.modelValue"
+          @update:checked="handleChange"
+        />
+      </FormItem>
+    </FormField>
+
     <FormField v-slot="{ componentField, handleChange }" name="csat_enabled">
       <FormItem>
         <SwitchField
@@ -46,16 +57,53 @@
       </p>
     </FormField>
 
-    <FormField v-slot="{ componentField, handleChange }" name="prompt_tags_on_reply">
-      <FormItem>
-        <SwitchField
-          :title="$t('admin.inbox.promptTagsOnReply')"
-          :description="$t('admin.inbox.promptTagsOnReply.description')"
-          :checked="componentField.modelValue"
-          @update:checked="handleChange"
-        />
-      </FormItem>
-    </FormField>
+    <div v-show="csatEnabled" class="box p-4 space-y-4">
+      <div>
+        <h3 class="font-semibold">{{ $t('admin.inbox.whatsapp.csatTemplate') }}</h3>
+        <p class="!mt-1 text-sm text-muted-foreground flex items-start gap-1.5">
+          <Lightbulb class="size-4 mt-0.5 shrink-0" />
+          <span>{{ $t('admin.inbox.whatsapp.csatTemplate.description') }}</span>
+        </p>
+      </div>
+
+      <FormField v-slot="{ componentField }" name="config.csat_template_body">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.whatsapp.csatTemplateBody') }}</FormLabel>
+          <FormControl>
+            <Textarea rows="3" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>
+            {{ $t('admin.inbox.whatsapp.csatTemplateBody.description') }}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <div class="grid grid-cols-2 gap-4">
+        <FormField v-slot="{ componentField }" name="config.csat_template_button_text">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.csatTemplateButtonText') }}</FormLabel>
+            <FormControl>
+              <Input type="text" v-bind="componentField" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField }" name="config.csat_template_language">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.csatTemplateLanguage') }}</FormLabel>
+            <FormControl>
+              <Input type="text" placeholder="en_US" v-bind="componentField" />
+            </FormControl>
+            <FormDescription>
+              {{ $t('admin.inbox.whatsapp.csatTemplateLanguage.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
+    </div>
 
     <!-- Meta Cloud API Credentials -->
     <div class="box p-4 space-y-4">
@@ -143,7 +191,7 @@
           </FormItem>
         </FormField>
 
-        <FormField v-slot="{ componentField }" name="config.reopen_window_hours">
+        <FormField v-slot="{ componentField }" name="reopen_window_hours">
           <FormItem>
             <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
             <FormControl>
@@ -211,7 +259,12 @@
 import { watch, computed } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { createFormSchema } from './whatsappFormSchema.js'
+import {
+  createFormSchema,
+  DEFAULT_CSAT_TEMPLATE_LANGUAGE,
+  DEFAULT_CSAT_TEMPLATE_BODY,
+  DEFAULT_CSAT_TEMPLATE_BUTTON_TEXT
+} from './whatsappFormSchema.js'
 import {
   FormControl,
   FormField,
@@ -221,6 +274,7 @@ import {
   FormDescription
 } from '@shared-ui/components/ui/form/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
+import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Lightbulb, TriangleAlert } from 'lucide-vue-next'
@@ -270,6 +324,7 @@ const form = useForm({
     enabled: true,
     csat_enabled: false,
     prompt_tags_on_reply: false,
+    reopen_window_hours: 48,
     config: {
       phone_number_id: '',
       waba_id: '',
@@ -277,10 +332,14 @@ const form = useForm({
       app_secret: '',
       webhook_verify_token: '',
       api_version: 'v21.0',
-      reopen_window_hours: 48
+      csat_template_language: DEFAULT_CSAT_TEMPLATE_LANGUAGE,
+      csat_template_body: DEFAULT_CSAT_TEMPLATE_BODY,
+      csat_template_button_text: DEFAULT_CSAT_TEMPLATE_BUTTON_TEXT
     }
   }
 })
+
+const csatEnabled = computed(() => form.values.csat_enabled)
 
 const onSubmit = form.handleSubmit(async (values) => {
   await props.submitForm(values)
@@ -309,9 +368,14 @@ watch(
     // An unset reopen window is off (0), not the new-inbox default of 48.
     form.setValues({
       ...newValues,
+      reopen_window_hours: newValues.reopen_window_hours ?? 0,
       config: {
         ...(newValues.config || {}),
-        reopen_window_hours: newValues.config?.reopen_window_hours ?? 0
+        csat_template_language:
+          newValues.config?.csat_template_language || DEFAULT_CSAT_TEMPLATE_LANGUAGE,
+        csat_template_body: newValues.config?.csat_template_body || DEFAULT_CSAT_TEMPLATE_BODY,
+        csat_template_button_text:
+          newValues.config?.csat_template_button_text || DEFAULT_CSAT_TEMPLATE_BUTTON_TEXT
       }
     })
   },

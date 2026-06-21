@@ -83,9 +83,10 @@ import { computed, h, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
-import { RefreshCw, Trash2 } from 'lucide-vue-next'
+import { Info, RefreshCw, Trash2 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Badge } from '@shared-ui/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -149,7 +150,25 @@ const columns = [
   {
     accessorKey: 'name',
     header: () => h('div', t('globals.terms.name')),
-    cell: ({ row }) => h('div', { class: 'font-mono text-xs' }, row.getValue('name'))
+    cell: ({ row }) => {
+      const name = row.getValue('name')
+      const children = [h('span', { class: 'font-mono text-xs' }, name)]
+      if ((row.original.name || '').startsWith(RESERVED_NAME_PREFIX)) {
+        children.push(
+          h(Tooltip, null, {
+            default: () => [
+              h(TooltipTrigger, { asChild: true }, () =>
+                h(Info, { class: 'size-3.5 text-muted-foreground cursor-help' })
+              ),
+              h(TooltipContent, { class: 'max-w-xs' }, () =>
+                t('admin.whatsappTemplates.csatReserved')
+              )
+            ]
+          })
+        )
+      }
+      return h('div', { class: 'flex items-center gap-1.5' }, children)
+    }
   },
   {
     accessorKey: 'language',

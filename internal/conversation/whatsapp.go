@@ -166,7 +166,7 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 	}
 
 	if m.whatsappTemplate != nil {
-		t, err := m.whatsappTemplate.GetApproved(conversation.InboxID, wtmodels.CSATTemplateName(conversation.InboxID), wtmodels.CSATTemplateLanguage)
+		t, err := m.whatsappTemplate.GetApproved(conversation.InboxID, wtmodels.CSATTemplateName(conversation.InboxID), m.csatTemplateLanguage(conversation.InboxID))
 		if err == nil {
 			meta["whatsapp_template_id"] = t.ID
 			meta["whatsapp_template_params"] = map[string]string{"button_url_0": csatUUID}
@@ -193,6 +193,19 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 		return nil
 	}
 	return m.InsertConversationActivity(models.ActivityCSATNotSent, conversation.UUID, "", actor)
+}
+
+// csatTemplateLanguage returns the inbox's configured CSAT template language so the send-time lookup matches the language the template was registered under.
+func (m *Manager) csatTemplateLanguage(inboxID int) string {
+	inb, err := m.inboxStore.GetDBRecord(inboxID)
+	if err != nil {
+		return whatsappChannel.DefaultCSATTemplateLanguage
+	}
+	var cfg whatsappChannel.Config
+	if err := json.Unmarshal(inb.Config, &cfg); err != nil {
+		return whatsappChannel.DefaultCSATTemplateLanguage
+	}
+	return cfg.CSATLanguage()
 }
 
 // whatsAppWindowOpen reports whether the contact is inside Meta's 24h window. Scoped to (contact, inbox), not a single conversation.
