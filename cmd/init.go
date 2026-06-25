@@ -757,7 +757,6 @@ func initWhatsAppInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, c
 		ID:            inboxRecord.ID,
 		Name:          inboxRecord.Name,
 		Config:        config,
-		From:          inboxRecord.From,
 		Client:        client,
 		Lo:            initLogger("whatsapp_inbox"),
 		SourceUpdater: sourceUpdater,

@@ -99,11 +99,9 @@ export function useWhatsAppTemplatePicker() {
     approvedTemplates,
     placeholders,
     urlButtonParams,
-    allParamKeys,
     allParamsFilled,
     renderedPreview,
     placeholderLabel,
-    clearParams,
     pickTemplate,
     reset
   }

@@ -252,7 +252,6 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 	}
 
 	templateID := extractInt(metaMap, "whatsapp_template_id")
-	headerMediaID, _ := metaMap["whatsapp_header_media_id"].(string)
 	templateParams := extractStringMap(metaMap, "whatsapp_template_params")
 
 	send := whatsappChannel.SendMeta{
@@ -278,7 +277,6 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 		send.TemplateName = t.Name
 		send.TemplateLanguage = t.Language
 		send.TemplateParams = templateParams
-		send.TemplateHeaderMediaID = headerMediaID
 		send.TemplateBodyContent = t.BodyContent
 		if t.HeaderType.Valid {
 			send.TemplateHeaderType = t.HeaderType.String

@@ -24,9 +24,8 @@ type messageReq struct {
 	EchoID      string                 `json:"echo_id"`
 
 	// WhatsApp-only. Set TemplateID to send an approved template; omit for free-form.
-	WhatsAppTemplateID       int               `json:"whatsapp_template_id,omitempty"`
-	WhatsAppTemplateParams   map[string]string `json:"whatsapp_template_params,omitempty"`
-	WhatsAppHeaderMediaID    string            `json:"whatsapp_header_media_id,omitempty"`
+	WhatsAppTemplateID     int               `json:"whatsapp_template_id,omitempty"`
+	WhatsAppTemplateParams map[string]string `json:"whatsapp_template_params,omitempty"`
 }
 
 // handleGetMessages returns messages for a conversation.
@@ -284,9 +283,6 @@ func handleSendMessage(r *fastglue.Request) error {
 	}
 	if len(req.WhatsAppTemplateParams) > 0 {
 		meta["whatsapp_template_params"] = req.WhatsAppTemplateParams
-	}
-	if req.WhatsAppHeaderMediaID != "" {
-		meta["whatsapp_header_media_id"] = req.WhatsAppHeaderMediaID
 	}
 	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, meta)
 	if err != nil {

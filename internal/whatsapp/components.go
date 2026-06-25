@@ -14,7 +14,6 @@ var placeholderPattern = regexp.MustCompile(`\{\{([A-Za-z0-9_]+)\}\}`)
 type TemplateSendParts struct {
 	HeaderType    string
 	HeaderContent string
-	HeaderMediaID string
 	BodyContent   string
 	Buttons       []TemplateButton
 	Params        map[string]string
@@ -88,17 +87,6 @@ func buildHeaderComponent(p TemplateSendParts) map[string]any {
 		return map[string]any{
 			"type":       "header",
 			"parameters": params,
-		}
-	case "IMAGE", "VIDEO", "DOCUMENT":
-		if p.HeaderMediaID == "" {
-			return nil
-		}
-		mediaKey := strings.ToLower(headerType)
-		return map[string]any{
-			"type": "header",
-			"parameters": []map[string]any{
-				{"type": mediaKey, mediaKey: map[string]any{"id": p.HeaderMediaID}},
-			},
 		}
 	}
 	return nil

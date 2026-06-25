@@ -619,7 +619,6 @@ func trimInboxFields(inb *imodels.Inbox) error {
 		inb.Config = trimmedConfig
 	}
 
-	// Meta tokens and IDs never contain whitespace, so pasted trailing spaces and newlines are always junk.
 	if inb.Channel == whatsappChannel.ChannelWhatsApp && len(inb.Config) > 0 {
 		var cfg whatsappChannel.Config
 		if err := json.Unmarshal(inb.Config, &cfg); err != nil {

@@ -55,26 +55,6 @@ func TestBuildSendComponents_ParameterizedTextHeader(t *testing.T) {
 	}
 }
 
-func TestBuildSendComponents_MediaHeader(t *testing.T) {
-	parts := TemplateSendParts{
-		HeaderType:    "IMAGE",
-		HeaderMediaID: "abc",
-		BodyContent:   "no placeholders",
-	}
-	out := BuildSendComponents(parts)
-	if len(out) != 1 {
-		t.Fatalf("expected only image header, got %d", len(out))
-	}
-	img := out[0]["parameters"].([]map[string]any)[0]
-	if img["type"] != "image" {
-		t.Fatalf("expected image type, got %v", img["type"])
-	}
-	media, _ := img["image"].(map[string]any)
-	if media["id"] != "abc" {
-		t.Fatalf("expected image id abc, got %v", media["id"])
-	}
-}
-
 func TestBuildSendComponents_NamedParameters(t *testing.T) {
 	parts := TemplateSendParts{
 		BodyContent: "Hi {{name}}, order {{order_id}}",

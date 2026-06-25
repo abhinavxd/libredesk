@@ -91,7 +91,6 @@ type SendMeta struct {
 	TemplateHeaderType    string                    `json:"template_header_type,omitempty"`
 	TemplateHeaderContent string                    `json:"template_header_content,omitempty"`
 	TemplateBodyContent   string                    `json:"template_body_content,omitempty"`
-	TemplateHeaderMediaID string                    `json:"template_header_media_id,omitempty"`
 	TemplateButtons       []whatsapp.TemplateButton `json:"template_buttons,omitempty"`
 }
 
@@ -106,7 +105,6 @@ type WhatsApp struct {
 	id            int
 	name          string
 	config        Config
-	from          string
 	client        *whatsapp.Client
 	lo            *logf.Logger
 	messageStore  inbox.MessageStore
@@ -118,7 +116,6 @@ type Opts struct {
 	ID            int
 	Name          string
 	Config        Config
-	From          string
 	Client        *whatsapp.Client
 	Lo            *logf.Logger
 	SourceUpdater SourceIDUpdater
@@ -139,7 +136,6 @@ func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 		id:            opts.ID,
 		name:          opts.Name,
 		config:        opts.Config,
-		from:          opts.From,
 		client:        opts.Client,
 		lo:            opts.Lo,
 		messageStore:  store,
@@ -162,8 +158,8 @@ func (w *WhatsApp) Channel() string { return ChannelWhatsApp }
 // Name returns the configured inbox name.
 func (w *WhatsApp) Name() string { return w.name }
 
-// FromAddress returns the configured display "from" string.
-func (w *WhatsApp) FromAddress() string { return w.from }
+// FromAddress is not applicable to WhatsApp.
+func (w *WhatsApp) FromAddress() string { return "" }
 
 // ReplyToAddress is not applicable to WhatsApp.
 func (w *WhatsApp) ReplyToAddress() string { return "" }
@@ -199,7 +195,6 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 		components := whatsapp.BuildSendComponents(whatsapp.TemplateSendParts{
 			HeaderType:    meta.TemplateHeaderType,
 			HeaderContent: meta.TemplateHeaderContent,
-			HeaderMediaID: meta.TemplateHeaderMediaID,
 			BodyContent:   meta.TemplateBodyContent,
 			Buttons:       meta.TemplateButtons,
 			Params:        meta.TemplateParams,
