@@ -117,9 +117,9 @@ type App struct {
 	whatsappTemplate *whatsappTemplate.Manager
 	whatsappClient   *whatsappapi.Client
 	whatsappIngester *WhatsAppIngester
-	// WhatsApp inbox IDs whose Meta token was recently rejected, keyed to the last error time.
-	whatsappAuthErrors sync.Map
-	wsHub              *ws.Hub
+	// Inbox IDs whose provider credentials were recently rejected, keyed to the last error time.
+	inboxAuthErrors sync.Map
+	wsHub           *ws.Hub
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate

@@ -74,7 +74,7 @@ func setWebhookURLWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
 		return
 	}
 	inb.WebhookURL = url
-	_, inb.TokenInvalid = app.whatsappAuthErrors.Load(inb.ID)
+	_, inb.TokenInvalid = app.inboxAuthErrors.Load(inb.ID)
 }
 
 func whatsAppCallbackURLFromRoot(root string, inboxID int) string {
@@ -282,7 +282,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 	}
 
 	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
-		app.whatsappAuthErrors.Delete(id)
+		app.inboxAuthErrors.Delete(id)
 		csatEnabled := updatedInbox.CSATEnabled
 		go func() {
 			subscribeWhatsAppWebhook(app, id)
@@ -604,11 +604,6 @@ func trimInboxFields(inb *imodels.Inbox) error {
 	inb.Name = strings.TrimSpace(inb.Name)
 	inb.From = strings.TrimSpace(inb.From)
 	inb.FromNameTemplate = strings.TrimSpace(inb.FromNameTemplate)
-
-	// WhatsApp has no separate display-name field; the inbox name is the message From.
-	if inb.Channel == whatsappChannel.ChannelWhatsApp && inb.From == "" {
-		inb.From = inb.Name
-	}
 
 	// Trim email config fields if this is an email channel.
 	if inb.Channel == inbox.ChannelEmail && len(inb.Config) > 0 {

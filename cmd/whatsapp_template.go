@@ -74,7 +74,7 @@ func makeWhatsAppAuthErrorHook(app *App) func(acc whatsapp.Account) {
 			if err := json.Unmarshal(rec.Config, &cfg); err != nil || cfg.PhoneNumberID != acc.PhoneNumberID {
 				continue
 			}
-			if _, flagged := app.whatsappAuthErrors.LoadOrStore(rec.ID, time.Now()); !flagged {
+			if _, flagged := app.inboxAuthErrors.LoadOrStore(rec.ID, time.Now()); !flagged {
 				app.lo.Error("whatsapp access token rejected by meta, sends and media downloads will fail until the token is replaced", "inbox_id", rec.ID)
 			}
 			return
