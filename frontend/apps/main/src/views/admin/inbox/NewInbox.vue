@@ -176,6 +176,7 @@ const submitWhatsAppForm = (values) => {
     enabled: values.enabled ?? true,
     csat_enabled: values.csat_enabled ?? false,
     prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
+    reopen_window_hours: values.reopen_window_hours ?? 0,
     config: values.config
   }
   createInbox(payload)

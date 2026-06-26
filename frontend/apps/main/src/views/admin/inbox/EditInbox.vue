@@ -108,6 +108,7 @@ const submitForm = (values) => {
       enabled: values.enabled,
       csat_enabled: values.csat_enabled,
       prompt_tags_on_reply: values.prompt_tags_on_reply,
+      reopen_window_hours: values.reopen_window_hours,
       config: { ...values.config }
     }
     // Match the password-dummy preservation pattern email uses: empty out
