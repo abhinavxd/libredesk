@@ -663,16 +663,29 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.TextContent = stringutil.HTML2Text(message.Content)
 	}
 
-	// Insert Message.
-	if err := m.q.InsertMessage.Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
+	// Insert + attach atomically: the outgoing scanner must not pick up a pending message while its attachments are still being linked.
+	tx, err := m.db.Beginx()
+	if err != nil {
+		m.lo.Error("error beginning message insert transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	defer tx.Rollback()
+
+	if err := tx.Stmtx(m.q.InsertMessage).Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
 		m.lo.Error("error inserting message in db", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Attach just inserted message to the media.
 	for _, media := range message.Media {
-		m.mediaStore.Attach(media.ID, mmodels.ModelMessages, message.ID)
+		if err := m.mediaStore.AttachTx(tx, media.ID, mmodels.ModelMessages, message.ID); err != nil {
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		m.lo.Error("error committing message insert transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Link inline media and stamp content_id so the cid: form just persisted resolves on read.

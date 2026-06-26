@@ -12,7 +12,14 @@
     />
     <div class="flex justify-items-start gap-2">
       <!-- File inputs -->
-      <input type="file" class="hidden" ref="attachmentInput" multiple @change="handleFileUpload" />
+      <input
+        type="file"
+        class="hidden"
+        ref="attachmentInput"
+        multiple
+        :accept="attachmentAccept"
+        @change="handleFileUpload"
+      />
       <!-- <input
         type="file"
         class="hidden"
@@ -100,6 +107,7 @@ import { useConversationStore } from '@main/stores/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
+import { WHATSAPP_MEDIA_ACCEPT } from '@main/features/conversation/whatsappMedia'
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([
@@ -151,6 +159,10 @@ const emitter = useEmitter()
 
 const isWhatsAppConversation = computed(
   () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
+)
+
+const attachmentAccept = computed(() =>
+  isWhatsAppConversation.value ? WHATSAPP_MEDIA_ACCEPT : undefined
 )
 
 const openTemplatePicker = () => {

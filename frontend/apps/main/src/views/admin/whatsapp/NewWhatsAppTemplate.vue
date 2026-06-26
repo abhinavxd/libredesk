@@ -6,24 +6,48 @@
       </div>
 
       <form @submit="onSubmit" class="space-y-6 w-full">
-        <FormField v-slot="{ componentField }" name="inbox_id">
-          <FormItem>
-            <FormLabel>{{ $t('globals.terms.inbox') }}</FormLabel>
-            <FormControl>
-              <Select v-bind="componentField">
-                <SelectTrigger>
-                  <SelectValue :placeholder="$t('placeholders.selectInbox')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="inb in whatsappInboxes" :key="inb.id" :value="inb.id">
-                    {{ inb.name }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="grid grid-cols-2 gap-4">
+          <FormField v-slot="{ componentField }" name="inbox_id">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.inbox') }}</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="$t('placeholders.selectInbox')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="inb in whatsappInboxes" :key="inb.id" :value="inb.id">
+                      {{ inb.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="category">
+            <FormItem>
+              <FormLabel>{{ $t('admin.whatsappTemplates.category') }}</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="$t('admin.whatsappTemplates.selectCategory')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="c in TEMPLATE_CATEGORIES" :key="c" :value="c">{{
+                      c
+                    }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormDescription>{{
+                $t('admin.whatsappTemplates.category.description')
+              }}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
 
         <div class="grid grid-cols-2 gap-4">
           <FormField v-slot="{ componentField }" name="name">
@@ -43,7 +67,11 @@
             <FormItem>
               <FormLabel>{{ $t('globals.terms.language') }}</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="en_US" v-bind="componentField" />
+                <ComboBox
+                  v-bind="componentField"
+                  :items="WHATSAPP_TEMPLATE_LANGUAGES"
+                  :placeholder="$t('globals.terms.search')"
+                />
               </FormControl>
               <FormDescription>{{
                 $t('admin.whatsappTemplates.language.description')
@@ -53,47 +81,27 @@
           </FormField>
         </div>
 
-        <FormField v-slot="{ componentField }" name="category">
-          <FormItem>
-            <FormLabel>{{ $t('admin.whatsappTemplates.category') }}</FormLabel>
-            <FormControl>
-              <Select v-bind="componentField">
-                <SelectTrigger>
-                  <SelectValue :placeholder="$t('admin.whatsappTemplates.selectCategory')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="c in TEMPLATE_CATEGORIES" :key="c" :value="c">{{
-                    c
-                  }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormControl>
-            <FormDescription>{{
-              $t('admin.whatsappTemplates.category.description')
-            }}</FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
         <div class="box p-4 space-y-4">
           <h3 class="font-semibold">{{ $t('admin.whatsappTemplates.header') }}</h3>
 
-          <FormField v-slot="{ componentField }" name="header_type">
-            <FormItem>
-              <FormLabel>{{ $t('admin.whatsappTemplates.headerType') }}</FormLabel>
-              <FormControl>
-                <Select v-bind="componentField">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="h in HEADER_TYPES" :key="h" :value="h">{{ h }}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
+          <div class="grid grid-cols-2 gap-4">
+            <FormField v-slot="{ componentField }" name="header_type">
+              <FormItem>
+                <FormLabel>{{ $t('admin.whatsappTemplates.headerType') }}</FormLabel>
+                <FormControl>
+                  <Select v-bind="componentField">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="h in HEADER_TYPES" :key="h" :value="h">{{ h }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+          </div>
 
           <FormField
             v-if="form.values.header_type === 'TEXT'"
@@ -276,6 +284,7 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
+import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import {
   createFormSchema,
@@ -283,6 +292,7 @@ import {
   HEADER_TYPES,
   BUTTON_TYPES
 } from '@/features/admin/whatsapp/whatsappTemplateSchema.js'
+import { WHATSAPP_TEMPLATE_LANGUAGES } from '@/features/admin/whatsapp/whatsappLanguages.js'
 import { useInboxStore } from '@main/stores/inbox'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'

@@ -51,8 +51,8 @@
           @update:checked="handleChange"
         />
       </FormItem>
-      <p class="!mt-2 text-muted-foreground text-xs flex items-start gap-1.5">
-        <Lightbulb class="size-4" />
+      <p class="!mt-2 text-muted-foreground text-sm flex items-start gap-1.5">
+        <Lightbulb class="size-4 mt-0.5 shrink-0" />
         <span>{{ $t('admin.inbox.csatSurveys.description_3') }}</span>
       </p>
     </FormField>
@@ -94,7 +94,11 @@
           <FormItem>
             <FormLabel>{{ $t('admin.inbox.whatsapp.csatTemplateLanguage') }}</FormLabel>
             <FormControl>
-              <Input type="text" placeholder="en_US" v-bind="componentField" />
+              <ComboBox
+                v-bind="componentField"
+                :items="WHATSAPP_TEMPLATE_LANGUAGES"
+                :placeholder="$t('globals.terms.search')"
+              />
             </FormControl>
             <FormDescription>
               {{ $t('admin.inbox.whatsapp.csatTemplateLanguage.description') }}
@@ -236,15 +240,13 @@
         <label class="text-sm font-medium">{{ $t('admin.inbox.whatsapp.webhookURL') }}</label>
         <div class="flex items-center gap-2">
           <Input :model-value="webhookURL" readonly class="font-mono text-xs" />
-          <Button type="button" variant="outline" size="sm" @click="copyWebhookURL">
-            {{ $t('globals.terms.copy') }}
-          </Button>
+          <CopyButton :text="webhookURL" />
         </div>
-        <p class="text-xs text-muted-foreground">
+        <p class="text-sm text-muted-foreground">
           {{ $t('admin.inbox.whatsapp.webhookURL.description') }}
         </p>
       </div>
-      <p v-else class="text-xs text-muted-foreground">
+      <p v-else class="text-sm text-muted-foreground">
         {{ $t('admin.inbox.whatsapp.webhookURL.afterSave') }}
       </p>
     </div>
@@ -274,13 +276,14 @@ import {
   FormDescription
 } from '@shared-ui/components/ui/form/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
+import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
+import { WHATSAPP_TEMPLATE_LANGUAGES } from '@main/features/admin/whatsapp/whatsappLanguages.js'
 import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
+import CopyButton from '@/components/button/CopyButton.vue'
 import { Lightbulb, TriangleAlert } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
-import { useEmitter } from '@/composables/useEmitter'
-import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 
 const props = defineProps({
   initialValues: {
@@ -306,7 +309,6 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
-const emitter = useEmitter()
 
 const webhookURL = computed(() => props.initialValues?.webhook_url || '')
 
@@ -344,20 +346,6 @@ const csatEnabled = computed(() => form.values.csat_enabled)
 const onSubmit = form.handleSubmit(async (values) => {
   await props.submitForm(values)
 })
-
-const copyWebhookURL = async () => {
-  try {
-    await navigator.clipboard.writeText(webhookURL.value)
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.copied')
-    })
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: t('globals.messages.somethingWentWrong')
-    })
-  }
-}
 
 watch(
   () => props.initialValues,

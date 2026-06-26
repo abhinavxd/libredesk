@@ -22,8 +22,14 @@ const ChannelWhatsApp = "whatsapp"
 // MetaCallTimeout caps a single Meta API call.
 const MetaCallTimeout = 30 * time.Second
 
-// maxStickerBytes is Meta's static sticker size cap; larger webp files are sent as documents.
-const maxStickerBytes = 100 * 1024
+// Meta's per-media-type upload size caps; a static sticker over maxStickerBytes is sent as a document.
+const (
+	maxStickerBytes  = 100 * 1024
+	maxImageBytes    = 5 * 1024 * 1024
+	maxVideoBytes    = 16 * 1024 * 1024
+	maxAudioBytes    = 16 * 1024 * 1024
+	maxDocumentBytes = 100 * 1024 * 1024
+)
 
 // captionMarker tracks the standalone caption text send in the per-message sent-attachment set, alongside attachment UUIDs.
 const captionMarker = "__caption__"
@@ -34,6 +40,29 @@ const (
 	DefaultCSATTemplateBody       = "Your conversation has been resolved. How did we do? Tap below to rate your experience."
 	DefaultCSATTemplateButtonText = "Rate us"
 )
+
+// supportedMediaMIMETypes is the set of MIME types Meta accepts for WhatsApp media upload.
+var supportedMediaMIMETypes = map[string]struct{}{
+	"audio/aac":  {},
+	"audio/mp4":  {},
+	"audio/mpeg": {},
+	"audio/amr":  {},
+	"audio/ogg":  {},
+	"audio/opus": {},
+	"application/vnd.ms-powerpoint": {},
+	"application/msword":            {},
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document":   {},
+	"application/vnd.openxmlformats-officedocument.presentationml.presentation": {},
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":         {},
+	"application/pdf":          {},
+	"text/plain":               {},
+	"application/vnd.ms-excel": {},
+	"image/jpeg":               {},
+	"image/png":                {},
+	"image/webp":               {},
+	"video/mp4":                {},
+	"video/3gpp":               {},
+}
 
 // Config is the per-inbox WhatsApp configuration from the inbox config JSONB, with tokens already decrypted.
 type Config struct {
@@ -223,6 +252,10 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 // sendAttachments sends one media message per attachment with the caption and reply context on the first; a caption that can't ride the first media type (audio/sticker) is sent as standalone text first.
 // Attachments already delivered on a prior attempt (tracked in message meta) are skipped, so retrying a partially-sent message never re-delivers media.
 func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, meta SendMeta, message models.OutboundMessage) (string, error) {
+	if bad := rejectedAttachments(message.Attachments); len(bad) > 0 {
+		return "", fmt.Errorf("WhatsApp can't send these files: %s", strings.Join(bad, "; "))
+	}
+
 	caption := strings.TrimSpace(textBody(message))
 	replyTo := meta.ReplyToWAMessageID
 	var firstID string
@@ -340,13 +373,57 @@ func textBody(m models.OutboundMessage) string {
 	return m.Content
 }
 
-// mediaTypeForAttachment maps a mime type to the WhatsApp media type; formats Meta doesn't accept natively go as documents.
-func mediaTypeForAttachment(att attachment.Attachment) string {
-	mime := strings.ToLower(strings.TrimSpace(att.ContentType))
+// rejectedAttachments returns a human-readable reason for every attachment Meta would reject on type or size.
+func rejectedAttachments(atts []attachment.Attachment) []string {
+	var reasons []string
+	for _, att := range atts {
+		if _, ok := supportedMediaMIMETypes[normalizeMIME(att.ContentType)]; !ok {
+			reasons = append(reasons, fmt.Sprintf("%s (unsupported type %s)", att.Name, att.ContentType))
+			continue
+		}
+		mediaType := mediaTypeForAttachment(att)
+		if max := maxMediaBytes(mediaType); att.Size > max {
+			reasons = append(reasons, fmt.Sprintf("%s (%s exceeds the %s %s limit)", att.Name, humanBytes(att.Size), humanBytes(max), mediaType))
+		}
+	}
+	return reasons
+}
+
+func maxMediaBytes(mediaType string) int {
+	switch mediaType {
+	case "image":
+		return maxImageBytes
+	case "video":
+		return maxVideoBytes
+	case "audio":
+		return maxAudioBytes
+	case "sticker":
+		return maxStickerBytes
+	}
+	return maxDocumentBytes
+}
+
+func humanBytes(n int) string {
+	switch {
+	case n >= 1024*1024:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1024*1024))
+	case n >= 1024:
+		return fmt.Sprintf("%.0f KB", float64(n)/1024)
+	}
+	return fmt.Sprintf("%d B", n)
+}
+
+func normalizeMIME(contentType string) string {
+	mime := strings.ToLower(strings.TrimSpace(contentType))
 	if i := strings.Index(mime, ";"); i >= 0 {
 		mime = strings.TrimSpace(mime[:i])
 	}
-	switch mime {
+	return mime
+}
+
+// mediaTypeForAttachment maps a mime type to the WhatsApp media type; formats Meta doesn't accept natively go as documents.
+func mediaTypeForAttachment(att attachment.Attachment) string {
+	switch normalizeMIME(att.ContentType) {
 	case "image/jpeg", "image/png":
 		return "image"
 	case "image/webp":
