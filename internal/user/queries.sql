@@ -233,6 +233,30 @@ VALUES ($1, $2::channels, $3)
 ON CONFLICT (channel, identifier) DO UPDATE SET updated_at = now()
 RETURNING contact_id;
 
+-- name: upsert-contact-with-channel-identity
+-- Atomically creates a contact (no email, no ext_id) and links the channel identity in one statement.
+-- If the identity already exists, returns its contact_id without inserting a new user row.
+-- $1=email, $2=first_name, $3=last_name, $4=password, $5=avatar_url, $6=channel, $7=identifier
+WITH existing AS (
+    SELECT contact_id FROM contact_channel_identities
+    WHERE channel = $6::channels AND identifier = $7
+),
+new_contact AS (
+    INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id)
+    SELECT $1, 'contact', $2, $3, $4, $5, NULL
+    WHERE NOT EXISTS (SELECT 1 FROM existing)
+    RETURNING id
+),
+new_identity AS (
+    INSERT INTO contact_channel_identities (contact_id, channel, identifier)
+    SELECT id, $6::channels, $7 FROM new_contact
+    RETURNING contact_id
+)
+SELECT COALESCE(
+    (SELECT contact_id FROM new_identity),
+    (SELECT contact_id FROM existing)
+) AS id;
+
 -- name: insert-visitor
 INSERT INTO users (email, type, first_name, last_name, custom_attributes)
 VALUES ($1, 'visitor', $2, $3, $4)

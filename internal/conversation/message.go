@@ -436,7 +436,7 @@ func (m *Manager) UpdateMessageStatusBySourceID(sourceID, status string) error {
 	}
 	if err := m.q.UpdateMessageStatusBySourceID.Get(&row, sourceID, status); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil
+			return fmt.Errorf("message not found for status update, will retry: source_id=%s status=%s", sourceID, status)
 		}
 		m.lo.Error("error updating message status by source id", "source_id", sourceID, "error", err)
 		return err

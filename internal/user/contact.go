@@ -128,7 +128,7 @@ func (u *Manager) LinkChannelIdentity(contactID int, channel, identifier string)
 	return linkedID, nil
 }
 
-// UpsertContactByChannelIdentity resolves the contact for a channel identity, creating and linking one when the identity is new; the returned id is canonical even if a concurrent insert won the conflict.
+// UpsertContactByChannelIdentity resolves the contact for a channel identity, creating and linking one when the identity is new.
 func (u *Manager) UpsertContactByChannelIdentity(channel, identifier string, contact *models.User) (int, error) {
 	id, err := u.GetContactIDByChannelIdentity(channel, identifier)
 	if err == nil {
@@ -137,10 +137,32 @@ func (u *Manager) UpsertContactByChannelIdentity(channel, identifier string, con
 	if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
 		return 0, err
 	}
+	// Contacts with no email and no ext_id have no uniqueness key, so CreateContact + LinkChannelIdentity
+	// are not atomic - a failed link leaves an orphan user row that grows on retry. Use the atomic CTE instead.
+	if contact.Email.String == "" && contact.ExternalUserID.String == "" {
+		return u.upsertContactWithChannelIdentity(channel, identifier, contact)
+	}
 	if err := u.CreateContact(contact); err != nil {
 		return 0, err
 	}
 	return u.LinkChannelIdentity(contact.ID, channel, identifier)
+}
+
+func (u *Manager) upsertContactWithChannelIdentity(channel, identifier string, contact *models.User) (int, error) {
+	password, err := u.generatePassword()
+	if err != nil {
+		return 0, fmt.Errorf("generating password: %w", err)
+	}
+	var id int
+	if err := u.q.UpsertContactWithChannelIdentity.QueryRow(
+		contact.Email, contact.FirstName, contact.LastName, password, contact.AvatarURL,
+		channel, identifier,
+	).Scan(&id); err != nil {
+		u.lo.Error("error upserting contact with channel identity", "channel", channel, "identifier", identifier, "error", err)
+		return 0, fmt.Errorf("upserting contact with channel identity: %w", err)
+	}
+	contact.ID = id
+	return id, nil
 }
 
 // SetContactPhoneIfMissing sets phone_number only when it is empty, never clobbering an agent-curated value.

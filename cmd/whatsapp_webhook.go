@@ -486,6 +486,7 @@ func forEachEnabledWhatsAppInbox(app *App, fn func(id int, cfg whatsappChannel.C
 		}
 		var cfg whatsappChannel.Config
 		if err := json.Unmarshal(rec.Config, &cfg); err != nil {
+			app.lo.Warn("skipping whatsapp inbox with unparseable config", "inbox_id", rec.ID, "error", err)
 			continue
 		}
 		if !fn(rec.ID, cfg) {

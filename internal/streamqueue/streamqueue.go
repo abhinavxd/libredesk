@@ -23,6 +23,8 @@ const (
 	defaultBatch        = 16
 	defaultAckTimeout   = 5 * time.Second
 
+	deadLetterWarnThresh = 1000
+
 	payloadField = "payload"
 	origIDField  = "orig_id"
 )
@@ -255,7 +257,12 @@ func (q *Queue) deadLetter(ids []string) {
 		if err := q.rd.XAck(q.ctx, q.stream, q.group, msg.ID).Err(); err == nil {
 			q.rd.XDel(q.ctx, q.stream, msg.ID)
 		}
-		q.lo.Error("stream entry dead-lettered after exceeding max attempts", "stream", q.stream, "dead_stream", q.deadStream, "id", msg.ID, "max_attempts", q.maxAttempts)
+		deadLetterLen := q.rd.XLen(q.ctx, q.deadStream).Val()
+		if deadLetterLen > deadLetterWarnThresh {
+			q.lo.Warn("DEAD-LETTER QUEUE OVERFLOW - ENTRIES CONSUMING REDIS MEMORY", "stream", q.stream, "dead_stream", q.deadStream, "dead_letter_count", deadLetterLen, "threshold", deadLetterWarnThresh)
+		} else {
+			q.lo.Warn("stream entry dead-lettered, check and fix the issue", "stream", q.stream, "dead_stream", q.deadStream, "id", msg.ID, "max_attempts", q.maxAttempts, "dead_letter_count", deadLetterLen)
+		}
 	}
 }
 
