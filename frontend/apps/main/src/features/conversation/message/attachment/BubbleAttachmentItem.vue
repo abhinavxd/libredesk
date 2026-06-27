@@ -4,21 +4,22 @@
       <PopoverTrigger as-child>
         <div
           class="relative w-36 h-28 rounded border overflow-hidden cursor-pointer transition-colors"
-          :class="
-            isImage
-              ? ''
-              : 'flex flex-col items-center justify-between bg-muted/40 hover:bg-muted p-3'
-          "
+          :class="[
+            isImage ? '' : 'flex flex-col items-center justify-between bg-muted/40 hover:bg-muted p-3',
+            failed ? 'border-2 border-destructive' : ''
+          ]"
           @click="onClick"
         >
           <template v-if="isImage">
             <img
-              :src="getThumbFilepath(attachment.url)"
+              :src="thumbFailed ? attachment.url : getThumbFilepath(attachment.url)"
               :alt="attachment.name"
               class="w-full h-full object-cover"
+              @error="thumbFailed = true"
             />
             <div
-              class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+              class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent transition-opacity pointer-events-none"
+              :class="failed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
             >
               <div class="min-w-0 flex-1 text-white image-meta">
                 <p class="font-medium text-xs truncate">{{ shortName(attachment.name) }}</p>
@@ -48,6 +49,20 @@
             :url="attachment.url"
             class="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
           />
+
+          <div
+            v-if="failed && !isImage"
+            class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-transparent rounded pointer-events-none"
+          />
+
+          <div
+            v-if="failed"
+            class="absolute inset-0 flex items-center justify-center"
+          >
+            <div class="w-9 h-9 rounded-full bg-destructive flex items-center justify-center shadow-md">
+              <CircleAlert class="text-white" :size="20" :stroke-width="2.5" />
+            </div>
+          </div>
         </div>
       </PopoverTrigger>
       <PopoverContent v-if="isAudio" class="w-80 p-3" @click.stop>
@@ -61,7 +76,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 import DownloadLink from '@/components/DownloadLink.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
@@ -72,15 +87,25 @@ import {
   FileImage,
   FileArchive,
   FileCode,
-  FileAudio
+  FileAudio,
+  CircleAlert
 } from 'lucide-vue-next'
 
 const props = defineProps({
-  attachment: { type: Object, required: true }
+  attachment: { type: Object, required: true },
+  failed: { type: Boolean, default: false }
 })
 const emit = defineEmits(['preview'])
 
 const showAudio = ref(false)
+const thumbFailed = ref(false)
+
+watch(
+  () => props.attachment.url,
+  () => {
+    thumbFailed.value = false
+  }
+)
 
 const shortName = (name) => (name || '').substring(0, 40)
 

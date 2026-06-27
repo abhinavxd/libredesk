@@ -233,6 +233,30 @@ func TestExtractReferenceNumber(t *testing.T) {
 	}
 }
 
+func TestSanitizeFilename(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{name: "plain", input: "Report Final.PDF", expected: "report-final.pdf"},
+		{name: "non latin with extension", input: "रिपोर्ट.pdf", expected: "file.pdf"},
+		{name: "emoji only", input: "📷📷", expected: "file"},
+		{name: "non latin no extension", input: "отчет", expected: "file"},
+		{name: "dots only", input: "...", expected: "file"},
+		{name: "mixed keeps latin part", input: "invoice-2024 रिपोर्ट.pdf", expected: "invoice-2024-.pdf"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SanitizeFilename(tt.input)
+			if result != tt.expected {
+				t.Errorf("SanitizeFilename(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestSanitizeUTF8(t *testing.T) {
 	tests := []struct {
 		name     string

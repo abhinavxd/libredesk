@@ -232,7 +232,7 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 		for _, ruleValue := range ruleValues {
 			// Normalize rule value by collapsing multiple spaces
 			normalizedRuleValue := strings.Join(strings.Fields(ruleValue), " ")
-			
+
 			// Respect CaseSensitiveMatch flag
 			if rule.CaseSensitiveMatch {
 				if strings.Contains(normalizedInputText, normalizedRuleValue) {
@@ -258,7 +258,7 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 		for _, ruleValue := range ruleValues {
 			// Normalize rule value by collapsing multiple spaces
 			normalizedRuleValue := strings.Join(strings.Fields(ruleValue), " ")
-			
+
 			// Respect CaseSensitiveMatch flag
 			if rule.CaseSensitiveMatch {
 				if strings.Contains(normalizedInputText, normalizedRuleValue) {

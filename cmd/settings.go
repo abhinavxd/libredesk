@@ -58,9 +58,10 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	// Trim whitespace and trailing slash from root URL.
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
 
-	// Get current language before update.
+	// Get current language and root URL before update.
 	app.Lock()
 	oldLang := ko.String("app.lang")
+	oldRootURL := ko.String("app.root_url")
 	app.Unlock()
 
 	if err := app.setting.Update(req); err != nil {
@@ -86,6 +87,11 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 		app.lo.Error("error reloading templates", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+
+	if req.RootURL != oldRootURL {
+		go resyncWhatsAppCSATTemplates(app)
+	}
+
 	return r.SendEnvelope(true)
 }
 

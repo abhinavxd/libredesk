@@ -53,6 +53,7 @@ var (
 	ActivityTagRemoved         = "tag_removed"
 	ActivitySLASet             = "sla_set"
 	ActivityParticipantAdded   = "participant_added"
+	ActivityCSATNotSent        = "csat_not_sent"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"
@@ -124,6 +125,7 @@ type ConversationListItem struct {
 	FirstReplyAt          null.Time               `db:"first_reply_at" json:"first_reply_at"`
 	LastReplyAt           null.Time               `db:"last_reply_at" json:"last_reply_at"`
 	ResolvedAt            null.Time               `db:"resolved_at" json:"resolved_at"`
+	LastResolvedAt        null.Time               `db:"last_resolved_at" json:"last_resolved_at"`
 	Subject               null.String             `db:"subject" json:"subject"`
 	LastMessage           null.String             `db:"last_message" json:"last_message"`
 	LastMessageAt         null.Time               `db:"last_message_at" json:"last_message_at"`
@@ -165,6 +167,7 @@ type Conversation struct {
 	InboxID                   int                    `db:"inbox_id" json:"inbox_id"`
 	ClosedAt                  null.Time              `db:"closed_at" json:"closed_at"`
 	ResolvedAt                null.Time              `db:"resolved_at" json:"resolved_at"`
+	LastResolvedAt            null.Time              `db:"last_resolved_at" json:"last_resolved_at"`
 	ReferenceNumber           string                 `db:"reference_number" json:"reference_number"`
 	Priority                  null.String            `db:"priority" json:"priority"`
 	PriorityID                null.Int               `db:"priority_id" json:"priority_id"`
@@ -198,6 +201,8 @@ type Conversation struct {
 	NextResponseDueAt         null.Time              `db:"next_response_deadline_at" json:"next_response_deadline_at"`
 	NextResponseMetAt         null.Time              `db:"next_response_met_at" json:"next_response_met_at"`
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
+	LastInboundAt             null.Time              `db:"last_inbound_at" json:"last_inbound_at"`
+	ContactLastInboundAt      null.Time              `db:"contact_last_inbound_at" json:"contact_last_inbound_at"`
 	CSATRating                null.Int               `db:"csat_rating" json:"csat_rating"`
 	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
 	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
@@ -222,6 +227,8 @@ type ConversationContact struct {
 	LastActiveAt           null.Time       `db:"last_active_at" json:"last_active_at"`
 	LastLoginAt            null.Time       `db:"last_login_at" json:"last_login_at"`
 	ExternalUserID         null.String     `db:"external_user_id" json:"external_user_id"`
+
+	ChannelIdentities umodels.ChannelIdentities `db:"channel_identities" json:"channel_identities,omitempty"`
 }
 
 func (c *ConversationContact) FullName() string {

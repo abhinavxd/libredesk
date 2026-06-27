@@ -1,0 +1,475 @@
+<template>
+  <form @submit="createConversation" class="flex flex-col flex-1 overflow-hidden">
+    <div class="space-y-4 pb-2 flex-shrink-0">
+      <div class="space-y-2">
+        <FormField name="contact_email">
+          <FormItem class="relative">
+            <FormLabel>{{ $t('globals.terms.email') }}</FormLabel>
+            <FormControl>
+              <Input
+                ref="emailInputRef"
+                type="email"
+                :placeholder="t('conversation.searchContact')"
+                v-model="emailQuery"
+                @input="handleSearchContacts"
+                @keydown="handleSearchKeydown"
+                autocomplete="off"
+              />
+            </FormControl>
+            <FormMessage />
+
+            <div
+              v-if="searchResults.length"
+              class="absolute w-full z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            >
+              <ul class="max-h-60 overflow-y-auto" role="listbox">
+                <li
+                  v-for="(contact, index) in searchResults"
+                  :key="contact.id"
+                  @click="selectContact(contact)"
+                  role="option"
+                  :aria-selected="index === highlightedIndex"
+                  class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors duration-200"
+                  :class="
+                    index === highlightedIndex
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent hover:text-accent-foreground'
+                  "
+                >
+                  <div>
+                    <p class="font-medium">
+                      {{ contact.first_name }} {{ contact.last_name }}
+                    </p>
+                    <p class="text-xs text-muted-foreground">{{ contact.email }}</p>
+                    <div
+                      v-if="contact.external_user_id"
+                      class="flex items-center gap-1 text-xs text-muted-foreground"
+                    >
+                      <IdCard :size="12" class="flex-shrink-0" />
+                      <span class="truncate">{{ contact.external_user_id }}</span>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </FormItem>
+        </FormField>
+
+        <div class="grid grid-cols-2 gap-4">
+          <FormField v-slot="{ componentField }" name="first_name">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
+              <FormControl>
+                <Input
+                  type="text"
+                  placeholder=""
+                  v-bind="componentField"
+                  :disabled="!!selectedContact"
+                  required
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="last_name">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.lastName') }}</FormLabel>
+              <FormControl>
+                <Input
+                  type="text"
+                  placeholder=""
+                  v-bind="componentField"
+                  :disabled="!!selectedContact"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <FormField v-slot="{ componentField }" name="subject">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
+              <FormControl>
+                <Input type="text" placeholder="" v-bind="componentField" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="inbox_id">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.inbox') }}</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="t('placeholders.selectInbox')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem
+                        v-for="option in inboxStore.emailOptions"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <FormField v-slot="{ componentField }" name="team_id">
+            <FormItem>
+              <FormLabel>
+                {{ $t('actions.assignTeam') }}
+                ({{ $t('globals.terms.optional') }})
+              </FormLabel>
+              <FormControl>
+                <SelectComboBox
+                  v-bind="componentField"
+                  :items="[
+                    { value: 'none', label: t('globals.terms.none') },
+                    ...teamStore.options
+                  ]"
+                  :placeholder="t('placeholders.selectTeam')"
+                  type="team"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="agent_id">
+            <FormItem>
+              <FormLabel>
+                {{ $t('actions.assignAgent') }}
+                ({{ $t('globals.terms.optional') }})
+              </FormLabel>
+              <FormControl>
+                <SelectComboBox
+                  v-bind="componentField"
+                  :items="[
+                    { value: 'none', label: t('globals.terms.none') },
+                    ...uStore.options
+                  ]"
+                  :placeholder="t('placeholders.selectAgent')"
+                  type="user"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-1 flex flex-col min-h-0 mt-4">
+      <FormField v-slot="{ componentField }" name="content">
+        <FormItem class="flex flex-col h-full">
+          <FormLabel>{{ $t('globals.terms.message') }}</FormLabel>
+          <FormControl class="flex-1 flex flex-col min-h-0">
+            <div class="flex flex-col h-full">
+              <Editor
+                v-model:htmlContent="componentField.modelValue"
+                @update:htmlContent="(value) => componentField.onChange(value)"
+                :placeholder="t('editor.hint.newLineCtrlK')"
+                :insertContent="insertContent"
+                :autoFocus="false"
+                :enableInlineImages="true"
+                class="w-full flex-1 overflow-y-auto p-2 box min-h-0"
+                @send="createConversation"
+                @filesDropped="uploadFiles"
+              />
+
+              <MacroActionsPreview
+                v-if="
+                  conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).actions?.length > 0
+                "
+                :actions="conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)?.actions || []"
+                :onRemove="
+                  (action) =>
+                    conversationStore.removeMacroAction(action, MACRO_CONTEXT.NEW_CONVERSATION)
+                "
+                class="mt-2 flex-shrink-0"
+              />
+
+              <ReplyBoxAttachmentPreview
+                :attachments="mediaFiles"
+                :uploadingFiles="uploadingFiles"
+                :onDelete="handleFileDelete"
+                v-if="mediaFiles.length > 0 || uploadingFiles.length > 0"
+                class="mt-2 flex-shrink-0"
+              />
+            </div>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </div>
+
+    <DialogFooter class="mt-4 pt-2 flex items-center !justify-between w-full flex-shrink-0">
+      <ReplyBoxMenuBar
+        :handleFileUpload="handleFileUpload"
+        @emojiSelect="handleEmojiSelect"
+        :showSendButton="false"
+      />
+      <Button type="submit" :disabled="isDisabled" :isLoading="loading">
+        {{ $t('globals.messages.submit') }}
+      </Button>
+    </DialogFooter>
+  </form>
+</template>
+
+<script setup>
+import { DialogFooter } from '@shared-ui/components/ui/dialog'
+import { Button } from '@shared-ui/components/ui/button'
+import { Input } from '@shared-ui/components/ui/input'
+import { useForm } from 'vee-validate'
+import { toTypedSchema } from '@vee-validate/zod'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@shared-ui/components/ui/form'
+import { z } from 'zod'
+import { ref, watch, onUnmounted, nextTick, onMounted, computed } from 'vue'
+import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
+import { useConversationStore } from '../../stores/conversation'
+import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
+import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { MACRO_CONTEXT } from '@main/constants/conversation'
+import { useEmitter } from '@main/composables/useEmitter'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { useInboxStore } from '@main/stores/inbox'
+import { useUsersStore } from '@main/stores/users'
+import { useUserStore } from '@main/stores/user'
+import { useTeamStore } from '@main/stores/team'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@shared-ui/components/ui/select'
+import { useI18n } from 'vue-i18n'
+import { useFileUpload } from '@/composables/useFileUpload'
+import Editor from '@/components/editor/TextEditor.vue'
+import { useMacroStore } from '@/stores/macro'
+import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import { UserTypeAgent } from '@/constants/user'
+import { IdCard } from 'lucide-vue-next'
+import api from '@/api'
+import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
+
+const emit = defineEmits(['close'])
+
+const inboxStore = useInboxStore()
+const { t } = useI18n()
+const uStore = useUsersStore()
+const userStore = useUserStore()
+const teamStore = useTeamStore()
+const emitter = useEmitter()
+const loading = ref(false)
+const searchResults = ref([])
+const emailQuery = ref('')
+const conversationStore = useConversationStore()
+const macroStore = useMacroStore()
+let timeoutId = null
+let previousMacroView = ''
+const insertContent = ref('')
+const selectedContact = ref(null)
+const emailInputRef = ref(null)
+
+const handleEmojiSelect = (emoji) => {
+  insertContent.value = undefined
+  // Force reactivity so the user can select the same emoji multiple times
+  nextTick(() => (insertContent.value = emoji))
+}
+
+const {
+  uploadingFiles,
+  handleFileUpload,
+  handleFileDelete,
+  uploadFiles,
+  mediaFiles,
+  clearMediaFiles
+} = useFileUpload({
+  linkedModel: 'messages'
+})
+
+const isDisabled = computed(() => {
+  if (loading.value || uploadingFiles.value.length > 0) return true
+  if (hasPendingInlineUpload(form?.values?.content)) return true
+  return false
+})
+
+const formSchema = z.object({
+  subject: z.string().min(1, t('validation.subjectCannotBeEmpty')),
+  content: z.string().min(1, t('validation.messageCannotBeEmpty')),
+  inbox_id: z
+    .any()
+    .refine((val) => inboxStore.emailOptions.some((option) => option.value === val), {
+      message: t('globals.messages.required')
+    }),
+  team_id: z.any().optional(),
+  agent_id: z.any().optional(),
+  contact_email: z.string().email(t('validation.invalidEmail')),
+  first_name: z.string().min(1, t('globals.messages.required')),
+  last_name: z.string().optional()
+})
+
+onUnmounted(() => {
+  clearTimeout(timeoutId)
+  clearMediaFiles()
+  conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
+  macroStore.setCurrentView(previousMacroView)
+  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
+    command: null,
+    open: false
+  })
+})
+
+onMounted(() => {
+  previousMacroView = macroStore.currentView
+  macroStore.setCurrentView('starting_conversation')
+  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
+    command: 'apply-macro-to-new-conversation',
+    open: false
+  })
+  nextTick(() => {
+    emailInputRef.value?.$el?.focus()
+  })
+})
+
+const form = useForm({
+  validationSchema: toTypedSchema(formSchema),
+  initialValues: {
+    inbox_id: null,
+    team_id: null,
+    agent_id: userStore.userID ? String(userStore.userID) : null,
+    subject: '',
+    content: '',
+    contact_email: '',
+    first_name: '',
+    last_name: ''
+  }
+})
+
+watch(emailQuery, (newVal) => {
+  form.setFieldValue('contact_email', newVal)
+  if (selectedContact.value && newVal !== selectedContact.value.email) {
+    selectedContact.value = null
+    form.setFieldValue('first_name', '')
+    form.setFieldValue('last_name', '')
+  }
+})
+
+const handleSearchContacts = async () => {
+  clearTimeout(timeoutId)
+  timeoutId = setTimeout(async () => {
+    const query = emailQuery.value.trim()
+
+    if (query.length < 3) {
+      searchResults.value.splice(0)
+      return
+    }
+
+    try {
+      const resp = await api.searchContacts({ query })
+      searchResults.value = resp.data.data.filter((c) => c.email)
+      highlightedIndex.value = -1
+    } catch (error) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: handleHTTPError(error).message
+      })
+      searchResults.value.splice(0)
+    }
+  }, 300)
+}
+
+const highlightedIndex = ref(-1)
+
+const handleSearchKeydown = (e) => {
+  if (!searchResults.value.length) return
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    highlightedIndex.value = Math.min(highlightedIndex.value + 1, searchResults.value.length - 1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    highlightedIndex.value = Math.max(highlightedIndex.value - 1, 0)
+  } else if (e.key === 'Enter' && highlightedIndex.value >= 0) {
+    e.preventDefault()
+    selectContact(searchResults.value[highlightedIndex.value])
+  } else if (e.key === 'Escape') {
+    searchResults.value.splice(0)
+    highlightedIndex.value = -1
+  }
+}
+
+const selectContact = (contact) => {
+  selectedContact.value = contact
+  emailQuery.value = contact.email
+  form.setFieldValue('first_name', contact.first_name)
+  form.setFieldValue('last_name', contact.last_name || '')
+  searchResults.value.splice(0)
+  highlightedIndex.value = -1
+}
+
+const createConversation = form.handleSubmit(async (values) => {
+  loading.value = true
+  try {
+    values.inbox_id = Number(values.inbox_id)
+    values.team_id = values.team_id ? Number(values.team_id) : null
+    values.agent_id = values.agent_id ? Number(values.agent_id) : null
+    values.attachments = mediaFiles.value.map((file) => file.id)
+    values.initiator = UserTypeAgent
+    const conversation = await api.createConversation(values)
+    const conversationUUID = conversation.data.data.uuid
+
+    const macro = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)
+    if (conversationUUID !== '' && macro?.id && macro?.actions?.length > 0) {
+      try {
+        await api.applyMacro(conversationUUID, macro.id, macro.actions)
+      } catch (error) {
+        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+          variant: 'destructive',
+          description: handleHTTPError(error).message
+        })
+      }
+    }
+    emit('close')
+    form.resetForm()
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    loading.value = false
+  }
+})
+
+watch(
+  () => conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).id,
+  () => {
+    form.setFieldValue(
+      'content',
+      conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
+    )
+  },
+  { deep: true }
+)
+</script>

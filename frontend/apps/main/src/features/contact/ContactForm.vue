@@ -149,25 +149,18 @@ import {
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
-import countries from '../../constants/countries.js'
+import { onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../../stores/user'
+import { useCountriesStore } from '../../stores/countries'
 
 defineProps(['formLoading', 'onSubmit'])
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const countriesStore = useCountriesStore()
+const { allCountries, countryOptions } = storeToRefs(countriesStore)
 
-const allCountries = countries.map((country) => ({
-  label: country.name,
-  value: country.iso_2,
-  emoji: country.emoji,
-  calling_code: country.calling_code
-}))
-
-const countryOptions = countries.map((country) => ({
-  label: country.name,
-  value: country.iso_2,
-  emoji: country.emoji
-}))
+onMounted(() => countriesStore.fetchCountries())
 </script>

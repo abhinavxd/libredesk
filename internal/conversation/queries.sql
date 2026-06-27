@@ -55,6 +55,7 @@ SELECT
     conversations.first_reply_at,
     conversations.last_reply_at,
     conversations.resolved_at,
+    conversations.last_resolved_at,
     conversations.subject,
     conversations.last_message,
     conversations.last_message_at,
@@ -186,6 +187,7 @@ SELECT
    c.updated_at,
    c.closed_at,
    c.resolved_at,
+   c.last_resolved_at,
    c.inbox_id,
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
@@ -238,12 +240,16 @@ SELECT
    ct.last_active_at as "contact.last_active_at",
    ct.last_login_at as "contact.last_login_at",
    ct.external_user_id as "contact.external_user_id",
+   (SELECT json_agg(json_build_object('channel', cci.channel, 'identifier', cci.identifier))
+      FROM contact_channel_identities cci WHERE cci.contact_id = ct.id) as "contact.channel_identities",
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
    as_latest.id as applied_sla_id,
    nxt_resp_event.deadline_at AS next_response_deadline_at,
    nxt_resp_event.met_at as next_response_met_at,
    c.last_continuity_email_sent_at,
+   c.last_inbound_at,
+   (SELECT MAX(c2.last_inbound_at) FROM conversations c2 WHERE c2.contact_id = c.contact_id AND c2.inbox_id = c.inbox_id) AS contact_last_inbound_at,
    csat.rating as csat_rating,
    csat.feedback as csat_feedback,
    csat.response_timestamp as csat_responded_at
@@ -415,11 +421,12 @@ WITH new_status AS (
     SELECT id, category FROM conversation_statuses WHERE name = $2
 )
 UPDATE conversations
-SET status_id     = (SELECT id FROM new_status),
-    resolved_at   = COALESCE(resolved_at, CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() END),
-    closed_at     = COALESCE(closed_at,   CASE WHEN $2 = 'Closed'                                  THEN NOW() END),
-    snoozed_until = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE NULL END,
-    updated_at    = NOW()
+SET status_id        = (SELECT id FROM new_status),
+    resolved_at      = COALESCE(resolved_at, CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() END),
+    last_resolved_at = CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() ELSE last_resolved_at END,
+    closed_at        = COALESCE(closed_at,   CASE WHEN $2 = 'Closed'                                  THEN NOW() END),
+    snoozed_until    = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE NULL END,
+    updated_at       = NOW()
 WHERE uuid = $1;
 
 -- name: get-user-active-conversations-count
@@ -777,10 +784,102 @@ FROM conversation_messages
 WHERE source_id = ANY($1::text []);
 
 -- name: update-message-status
-update conversation_messages set status = $1, updated_at = NOW() where uuid = $2;
+UPDATE conversation_messages SET status = $1::message_status, updated_at = NOW()
+WHERE uuid = $2 AND NOT ($1 = 'sent' AND status = 'failed');
+
+-- name: mark-message-pending-for-retry
+UPDATE conversation_messages SET status = 'pending', updated_at = NOW()
+WHERE uuid = $1 AND status IN ('failed', 'sent');
 
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
+
+-- name: update-message-source-id-by-uuid
+UPDATE conversation_messages SET source_id = $2, updated_at = NOW() WHERE uuid = $1;
+
+-- name: update-message-status-by-source-id
+UPDATE conversation_messages m
+SET status = $2, updated_at = NOW()
+FROM conversations c
+WHERE m.source_id = $1
+  AND m.status != 'failed'
+  AND c.id = m.conversation_id
+RETURNING m.uuid, c.uuid AS conversation_uuid;
+
+-- name: merge-message-meta-by-uuid
+UPDATE conversation_messages m
+SET meta = COALESCE(m.meta, '{}'::jsonb) || $2::jsonb,
+    updated_at = NOW()
+FROM conversations c
+WHERE m.uuid = $1
+  AND c.id = m.conversation_id
+RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
+
+-- name: merge-message-meta-by-source-id
+WITH ranks(status, rank) AS (
+  VALUES ('sent', 1), ('delivered', 2), ('read', 3), ('failed', 4)
+)
+UPDATE conversation_messages m
+SET meta = COALESCE(m.meta, '{}'::jsonb) || $2::jsonb,
+    updated_at = NOW()
+FROM conversations c
+WHERE m.source_id = $1
+  AND c.id = m.conversation_id
+  AND COALESCE(m.meta->>'wa_status', '') != 'failed'
+  AND COALESCE(
+        (SELECT rank FROM ranks WHERE status = ($2::jsonb)->>'wa_status'),
+        0
+      ) >= COALESCE(
+        (SELECT rank FROM ranks WHERE status = m.meta->>'wa_status'),
+        0
+      )
+RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
+
+-- name: get-message-uuid-by-source-id
+SELECT uuid FROM conversation_messages WHERE source_id = $1 LIMIT 1;
+
+-- name: get-whatsapp-read-receipt-target
+SELECT cm.source_id, c.inbox_id
+FROM conversation_messages cm
+JOIN conversations c ON c.id = cm.conversation_id
+JOIN inboxes i ON i.id = c.inbox_id
+WHERE c.uuid = $1
+  AND i.channel = 'whatsapp'
+  AND cm.type = 'incoming'
+  AND COALESCE(cm.source_id, '') != ''
+  AND cm.created_at > COALESCE(
+        (SELECT last_seen_at FROM conversation_last_seen ls
+         WHERE ls.conversation_id = c.id AND ls.user_id = $2),
+        'epoch'::timestamptz)
+ORDER BY cm.created_at DESC
+LIMIT 1;
+
+-- name: update-conversation-last-inbound-at
+UPDATE conversations SET last_inbound_at = GREATEST(last_inbound_at, $2), updated_at = NOW() WHERE id = $1
+RETURNING last_inbound_at;
+
+-- name: get-contact-window-inbound-at
+SELECT MAX(last_inbound_at) FROM conversations WHERE contact_id = $1 AND inbox_id = $2;
+
+-- name: get-latest-open-conversation-by-contact-inbox
+SELECT id, uuid
+FROM conversations
+WHERE contact_id = $1
+  AND inbox_id = $2
+  AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved')
+ORDER BY last_interaction_at DESC NULLS LAST, created_at DESC
+LIMIT 1;
+
+-- name: get-latest-reopenable-conversation-by-contact-inbox
+SELECT id, uuid
+FROM conversations
+WHERE contact_id = $1
+  AND inbox_id = $2
+  AND status_id IN (SELECT id FROM conversation_statuses WHERE category = 'resolved')
+  AND last_resolved_at IS NOT NULL
+  AND last_resolved_at >= NOW() - make_interval(hours => $3)
+ORDER BY last_resolved_at DESC
+LIMIT 1;
 
 -- name: get-offline-livechat-conversations
 SELECT

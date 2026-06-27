@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"time"
 
@@ -81,6 +82,30 @@ type User struct {
 	APIKey           null.String `db:"api_key" json:"api_key"`
 	APIKeyLastUsedAt null.Time   `db:"api_key_last_used_at" json:"api_key_last_used_at"`
 	APISecret        null.String `db:"api_secret" json:"-"`
+
+	ChannelIdentities ChannelIdentities `db:"channel_identities" json:"channel_identities,omitempty"`
+}
+
+// ChannelIdentity is a per-channel identifier (e.g. a WhatsApp phone) linked to a contact.
+type ChannelIdentity struct {
+	Channel    string `db:"channel" json:"channel"`
+	Identifier string `db:"identifier" json:"identifier"`
+}
+
+type ChannelIdentities []ChannelIdentity
+
+// Scan implements sql.Scanner for a json_agg of channel identities.
+func (c *ChannelIdentities) Scan(src interface{}) error {
+	if src == nil {
+		*c = nil
+		return nil
+	}
+	switch v := src.(type) {
+	case []byte:
+		return json.Unmarshal(v, c)
+	default:
+		return fmt.Errorf("unsupported type for ChannelIdentities: %T", src)
+	}
 }
 
 // ChatUser is a user with limited fields for live chat.

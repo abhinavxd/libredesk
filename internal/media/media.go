@@ -256,6 +256,14 @@ func (m *Manager) Attach(id int, model string, modelID int) error {
 	return nil
 }
 
+func (m *Manager) AttachTx(tx *sqlx.Tx, id int, model string, modelID int) error {
+	if _, err := tx.Stmtx(m.queries.Attach).Exec(id, model, modelID); err != nil {
+		m.lo.Error("error attaching media to model", "model", model, "model_id", modelID, "media_id", id, "error", err)
+		return fmt.Errorf("attaching media;%d to model:%s model_id:%d: %w", id, model, modelID, err)
+	}
+	return nil
+}
+
 // GetByModel retrieves all media files attached to a specific model.
 func (m *Manager) GetByModel(modelID int, model string) ([]models.Media, error) {
 	var media = make([]models.Media, 0)

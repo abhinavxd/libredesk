@@ -70,6 +70,20 @@
         {{ conversation.contact.external_user_id }}
       </span>
     </div>
+    <div
+      v-for="identity in conversation?.contact?.channel_identities"
+      :key="identity.channel + identity.identifier"
+      class="flex gap-2 items-center"
+    >
+      <WhatsAppIcon
+        v-if="identity.channel === 'whatsapp'"
+        class="size-4 text-muted-foreground flex-shrink-0"
+      />
+      <IdCard v-else size="16" class="text-muted-foreground flex-shrink-0" />
+      <span class="sidebar-value break-all">
+        {{ identity.channel === 'whatsapp' ? '+' + identity.identifier : identity.identifier }}
+      </span>
+    </div>
 
     <!-- Livechat visitor info -->
     <template v-if="isLivechat">
@@ -125,7 +139,8 @@ import {
   ShieldQuestion
 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import countries from '@/constants/countries.js'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
+import { useCountriesStore } from '@/stores/countries'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'
@@ -137,22 +152,22 @@ const emitter = useEmitter()
 const conversation = computed(() => conversationStore.current)
 const { t } = useI18n()
 const userStore = useUserStore()
+const countriesStore = useCountriesStore()
 
 const phoneNumber = computed(() => {
   const countryCodeValue = conversation.value?.contact?.phone_number_country_code || ''
   const number = conversation.value?.contact?.phone_number || t('conversation.sidebar.notAvailable')
   if (!countryCodeValue) return number
 
-  // Lookup calling code
-  const country = countries.find((c) => c.iso_2 === countryCodeValue)
-  const callingCode = country ? country.calling_code : countryCodeValue
-  return `${callingCode} ${number}`
+  const country = countriesStore.countries.find((c) => c.iso_2 === countryCodeValue)
+  if (!country) return number
+  return `${country.calling_code} ${number}`
 })
 
 const countryName = computed(() => {
   const code = conversation.value?.contact?.country
   if (!code) return ''
-  const c = countries.find((c) => c.iso_2 === code)
+  const c = countriesStore.countries.find((c) => c.iso_2 === code)
   return c ? c.name : code
 })
 
@@ -177,6 +192,7 @@ const contextLinks = ref([])
 const loadingAppId = ref(null)
 
 onMounted(async () => {
+  countriesStore.fetchCountries()
   try {
     const resp = await api.getActiveContextLinks()
     contextLinks.value = resp.data.data || []

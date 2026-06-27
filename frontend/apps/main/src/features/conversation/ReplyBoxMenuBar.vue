@@ -12,7 +12,14 @@
     />
     <div class="flex justify-items-start gap-2">
       <!-- File inputs -->
-      <input type="file" class="hidden" ref="attachmentInput" multiple @change="handleFileUpload" />
+      <input
+        type="file"
+        class="hidden"
+        ref="attachmentInput"
+        multiple
+        :accept="attachmentAccept"
+        @change="handleFileUpload"
+      />
       <!-- <input
         type="file"
         class="hidden"
@@ -36,6 +43,16 @@
         :pressed="isEmojiPickerVisible"
       >
         <Smile class="h-4 w-4" />
+      </Toggle>
+      <Toggle
+        v-if="isWhatsAppConversation"
+        class="px-2 py-2 border-0"
+        variant="outline"
+        :title="$t('conversation.whatsapp.sendTemplate')"
+        @click="openTemplatePicker"
+        :pressed="false"
+      >
+        <WhatsAppIcon class="h-4 w-4" />
       </Toggle>
     </div>
     <div class="flex items-center">
@@ -73,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
@@ -85,8 +102,12 @@ import {
   DropdownMenuContent,
   DropdownMenuLabel
 } from '@shared-ui/components/ui/dropdown-menu'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { useConversationStore } from '@main/stores/conversation'
-const conversationStore = useConversationStore()
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
+import { WHATSAPP_MEDIA_ACCEPT } from '@main/features/conversation/whatsappMedia'
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([
@@ -131,6 +152,21 @@ const triggerFileUpload = () => {
 
 const toggleEmojiPicker = () => {
   isEmojiPickerVisible.value = !isEmojiPickerVisible.value
+}
+
+const conversationStore = useConversationStore()
+const emitter = useEmitter()
+
+const isWhatsAppConversation = computed(
+  () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
+)
+
+const attachmentAccept = computed(() =>
+  isWhatsAppConversation.value ? WHATSAPP_MEDIA_ACCEPT : undefined
+)
+
+const openTemplatePicker = () => {
+  emitter.emit(EMITTER_EVENTS.WHATSAPP_TEMPLATE_PICKER_OPEN)
 }
 
 function onSelectEmoji(emoji) {

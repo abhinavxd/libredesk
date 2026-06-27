@@ -54,6 +54,7 @@ import {
   CircleUser,
   Contact
 } from 'lucide-vue-next'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 
 const navIconMap = {
   Settings,
@@ -61,6 +62,7 @@ const navIconMap = {
   Timer,
   Inbox: InboxIcon,
   CircleDot,
+  WhatsApp: WhatsAppIcon,
   Tag,
   SlidersHorizontal,
   Eye,

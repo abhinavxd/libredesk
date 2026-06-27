@@ -45,12 +45,14 @@
     <!-- Messages & reply box -->
     <div class="flex flex-col flex-grow overflow-hidden">
       <MessageList class="flex-1 overflow-y-auto" />
-      <ReplyBox />
+      <WhatsAppComposer v-if="isWhatsAppChannel" />
+      <ReplyBox v-else />
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useConversationStore } from '../../stores/conversation'
 import { MoreHorizontal } from 'lucide-vue-next'
 import {
@@ -62,6 +64,8 @@ import {
 import { Button } from '@shared-ui/components/ui/button'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
+import WhatsAppComposer from './WhatsAppComposer.vue'
+import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
@@ -99,6 +103,10 @@ const downloadTranscript = async () => {
     })
   }
 }
+
+const isWhatsAppChannel = computed(
+  () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
+)
 
 const handleUpdateStatus = (status) => {
   if (status === CONVERSATION_DEFAULT_STATUSES.SNOOZED) {
