@@ -34,12 +34,6 @@ const (
 // captionMarker tracks the standalone caption text send in the per-message sent-attachment set, alongside attachment UUIDs.
 const captionMarker = "__caption__"
 
-// CSAT template defaults applied when the inbox leaves these blank; the language code must match the body's language.
-const (
-	DefaultCSATTemplateLanguage   = "en_US"
-	DefaultCSATTemplateBody       = "Your conversation has been resolved. How did we do? Tap below to rate your experience."
-	DefaultCSATTemplateButtonText = "Rate us"
-)
 
 // supportedMediaMIMETypes is the set of MIME types Meta accepts for WhatsApp media upload.
 var supportedMediaMIMETypes = map[string]struct{}{
@@ -89,26 +83,6 @@ func (c Config) Account() whatsapp.Account {
 	}
 }
 
-func (c Config) CSATLanguage() string {
-	if strings.TrimSpace(c.CSATTemplateLanguage) == "" {
-		return DefaultCSATTemplateLanguage
-	}
-	return c.CSATTemplateLanguage
-}
-
-func (c Config) CSATBody() string {
-	if strings.TrimSpace(c.CSATTemplateBody) == "" {
-		return DefaultCSATTemplateBody
-	}
-	return c.CSATTemplateBody
-}
-
-func (c Config) CSATButtonText() string {
-	if strings.TrimSpace(c.CSATTemplateButtonText) == "" {
-		return DefaultCSATTemplateButtonText
-	}
-	return c.CSATTemplateButtonText
-}
 
 // SendMeta is the per-message metadata threaded through OutboundMessage.Meta; a set TemplateName means a template send.
 type SendMeta struct {

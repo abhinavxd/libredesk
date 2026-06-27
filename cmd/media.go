@@ -105,26 +105,24 @@ func handleMediaUpload(r *fastglue.Request) error {
 		file.Seek(0, 0)
 		thumbFile, err := image.CreateThumb(image.DefThumbSize, file)
 		if err != nil {
-			app.lo.Error("error creating thumb image", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
-		}
-		thumbName, _, err = app.media.Upload(thumbName, srcContentType, thumbFile)
-		if err != nil {
-			return sendErrorEnvelope(r, err)
+			app.lo.Warn("skipping thumbnail, unsupported image format", "error", err)
+		} else {
+			thumbName, _, err = app.media.Upload(thumbName, srcContentType, thumbFile)
+			if err != nil {
+				return sendErrorEnvelope(r, err)
+			}
 		}
 
-		// Store image dimensions in media meta, storing dimensions for image previews in future.
 		file.Seek(0, 0)
 		width, height, err := image.GetDimensions(file)
 		if err != nil {
-			cleanUp = true
-			app.lo.Error("error getting image dimensions", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
+			app.lo.Warn("skipping image dimensions, unsupported image format", "error", err)
+		} else {
+			meta, _ = json.Marshal(map[string]any{
+				"width":  width,
+				"height": height,
+			})
 		}
-		meta, _ = json.Marshal(map[string]interface{}{
-			"width":  width,
-			"height": height,
-		})
 	}
 
 	// Reset ptr.

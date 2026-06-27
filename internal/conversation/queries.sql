@@ -799,7 +799,6 @@ SET status = $2, updated_at = NOW()
 FROM conversations c
 WHERE m.source_id = $1
   AND m.status != 'failed'
-  AND m.status != $2
   AND c.id = m.conversation_id
 RETURNING m.uuid, c.uuid AS conversation_uuid;
 

@@ -142,6 +142,9 @@ func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 		app.lo.Warn("error reading whatsapp config for csat template", "inbox_id", inboxID, "error", err)
 		return
 	}
+	if strings.TrimSpace(cfg.CSATTemplateBody) == "" || strings.TrimSpace(cfg.CSATTemplateLanguage) == "" || strings.TrimSpace(cfg.CSATTemplateButtonText) == "" {
+		return
+	}
 	root, err := app.setting.GetAppRootURL()
 	if err != nil || root == "" {
 		return
@@ -149,7 +152,7 @@ func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	base := strings.TrimRight(root, "/")
 	buttons, err := json.Marshal([]map[string]any{{
 		"type":    "URL",
-		"text":    cfg.CSATButtonText(),
+		"text":    cfg.CSATTemplateButtonText,
 		"url":     base + "/csat/{{1}}",
 		"example": []string{base + "/csat/example"},
 	}})
@@ -162,9 +165,9 @@ func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	if err := app.whatsappTemplate.EnsureReserved(ctx, wtmodels.Template{
 		InboxID:     inboxID,
 		Name:        name,
-		Language:    cfg.CSATLanguage(),
+		Language:    cfg.CSATTemplateLanguage,
 		Category:    wtmodels.CategoryUtility,
-		BodyContent: cfg.CSATBody(),
+		BodyContent: cfg.CSATTemplateBody,
 		Buttons:     buttons,
 	}); err != nil {
 		app.lo.Warn("error provisioning whatsapp csat template", "inbox_id", inboxID, "error", err)
@@ -207,14 +210,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 	}
 
 	if createdInbox.Channel == whatsappChannel.ChannelWhatsApp {
-		inboxID := createdInbox.ID
-		csatEnabled := createdInbox.CSATEnabled
-		go func() {
-			subscribeWhatsAppWebhook(app, inboxID)
-			if csatEnabled {
-				ensureWhatsAppCSATTemplate(app, inboxID)
-			}
-		}()
+		go postSaveWhatsAppTasks(app, createdInbox.ID, createdInbox.CSATEnabled)
 	}
 
 	// Clear passwords before returning.
@@ -283,13 +279,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 
 	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
 		app.inboxAuthErrors.Delete(id)
-		csatEnabled := updatedInbox.CSATEnabled
-		go func() {
-			subscribeWhatsAppWebhook(app, id)
-			if csatEnabled {
-				ensureWhatsAppCSATTemplate(app, id)
-			}
-		}()
+		go postSaveWhatsAppTasks(app, id, updatedInbox.CSATEnabled)
 	}
 
 	// Clear passwords before returning.
@@ -348,6 +338,13 @@ func handleDeleteInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 	return r.SendEnvelope(true)
+}
+
+func postSaveWhatsAppTasks(app *App, inboxID int, csatEnabled bool) {
+	subscribeWhatsAppWebhook(app, inboxID)
+	if csatEnabled {
+		ensureWhatsAppCSATTemplate(app, inboxID)
+	}
 }
 
 // validateInbox validates the inbox

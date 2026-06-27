@@ -22,7 +22,7 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-const whatsAppDefaultContactName = "Customer"
+const whatsAppDefaultContactName = "Contact"
 
 // handleWhatsAppWebhookVerify responds to Meta's GET verification challenge.
 func handleWhatsAppWebhookVerify(r *fastglue.Request) error {
@@ -172,7 +172,10 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 	}
 
 	// Download media before taking the per-sender lock; a slow CDN must not stall other senders' workers.
-	attachments := fetchWhatsAppAttachments(ctx, app, cfg, m)
+	attachments, err := fetchWhatsAppAttachments(ctx, app, cfg, m)
+	if err != nil {
+		return fmt.Errorf("downloading whatsapp media: %w", err)
+	}
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -221,7 +224,7 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		return fmt.Errorf("looking up conversation: %w", err)
 	}
 
-	content, contentType := messageContent(m)
+	content, contentType := textPreview(m), cmodels.ContentTypeText
 
 	// The "[image]"-style placeholder only stays when the media download failed.
 	if m.Text == "" && m.Caption == "" && len(attachments) > 0 {
@@ -283,43 +286,40 @@ func buildInboundMeta(app *App, m whatsapp.ParsedMessage) json.RawMessage {
 }
 
 // fetchWhatsAppAttachments downloads the inbound message's media from Meta as a single-element attachment slice.
-func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel.Config, m whatsapp.ParsedMessage) attachment.Attachments {
+// A 4xx from Meta means the media is permanently gone; returns (nil, nil) so the message is inserted with a placeholder.
+// Any other error is returned so the caller can propagate it and let the stream queue retry the job.
+func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel.Config, m whatsapp.ParsedMessage) (attachment.Attachments, error) {
 	if m.MediaID == "" || app.whatsappClient == nil {
-		return nil
+		return nil, nil
 	}
 	acc := cfg.Account()
 
-	// Processing is async and Meta won't redeliver, so transient CDN errors are retried here.
 	var (
 		info whatsapp.MediaInfo
 		body []byte
 		err  error
 	)
 	for attempt := 1; ; attempt++ {
-		err = func() error {
-			dlCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-			defer cancel()
-			info, err = app.whatsappClient.GetMediaURL(dlCtx, acc, m.MediaID)
-			if err != nil {
-				return err
-			}
+		dlCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		info, err = app.whatsappClient.GetMediaURL(dlCtx, acc, m.MediaID)
+		if err == nil {
 			body, err = app.whatsappClient.DownloadMedia(dlCtx, acc, info.URL)
-			return err
-		}()
+		}
+		cancel()
 		if err == nil {
 			break
 		}
 		if ctx.Err() != nil {
-			return nil
+			return nil, nil
 		}
 		if attempt >= 3 {
-			app.lo.Error("error downloading whatsapp media, giving up", "media_id", m.MediaID, "attempts", attempt, "error", err)
-			return nil
+			app.lo.Warn("error downloading whatsapp media, inserting placeholder", "media_id", m.MediaID, "attempts", attempt, "error", err)
+			return nil, nil
 		}
 		app.lo.Warn("error downloading whatsapp media, retrying", "media_id", m.MediaID, "attempt", attempt, "error", err)
 		select {
 		case <-ctx.Done():
-			return nil
+			return nil, nil
 		case <-time.After(2 * time.Second):
 		}
 	}
@@ -341,7 +341,7 @@ func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel
 			Size:        len(body),
 			Disposition: attachment.DispositionAttachment,
 		},
-	}
+	}, nil
 }
 
 func defaultMediaFilename(messageType, mime string) string {
@@ -423,12 +423,9 @@ func textPreview(m whatsapp.ParsedMessage) string {
 	return "[whatsapp message]"
 }
 
-func messageContent(m whatsapp.ParsedMessage) (string, string) {
-	return textPreview(m), cmodels.ContentTypeText
-}
 
 func mapWhatsAppStatus(metaStatus string) string {
-	if metaStatus == "failed" {
+	if metaStatus == cmodels.MessageStatusFailed {
 		return cmodels.MessageStatusFailed
 	}
 	return cmodels.MessageStatusSent

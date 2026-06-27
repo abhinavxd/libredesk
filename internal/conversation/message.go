@@ -1293,7 +1293,7 @@ func (m *Manager) UploadMessageAttachments(message *models.Message) error {
 		attachmentExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(attachment.Name)), ".")
 		if slices.Contains(image.Exts, attachmentExt) && image.IsImageByContent(bytes.NewReader(attachment.Content)) {
 			if err := m.uploadThumbnailForMedia(media, attachment.Content); err != nil {
-				m.lo.Error("error uploading thumbnail", "error", err)
+				m.lo.Warn("skipping thumbnail, unsupported image format", "error", err)
 			}
 		}
 
