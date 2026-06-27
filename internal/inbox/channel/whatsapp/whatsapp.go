@@ -19,7 +19,6 @@ import (
 
 const ChannelWhatsApp = "whatsapp"
 
-// MetaCallTimeout caps a single Meta API call.
 const MetaCallTimeout = 30 * time.Second
 
 // Meta's per-media-type upload size caps; a static sticker over maxStickerBytes is sent as a document.
@@ -31,11 +30,10 @@ const (
 	maxDocumentBytes = 100 * 1024 * 1024
 )
 
-// captionMarker tracks the standalone caption text send in the per-message sent-attachment set, alongside attachment UUIDs.
+// captionMarker marks the standalone caption text as sent when the first attachment type can't carry a caption (audio/sticker). Prevents re-sending it on retry.
 const captionMarker = "__caption__"
 
 
-// supportedMediaMIMETypes is the set of MIME types Meta accepts for WhatsApp media upload.
 var supportedMediaMIMETypes = map[string]struct{}{
 	"audio/aac":  {},
 	"audio/mp4":  {},
@@ -72,7 +70,6 @@ type Config struct {
 	CSATTemplateButtonText string `json:"csat_template_button_text"`
 }
 
-// Account converts the on-disk Config into the shape the API client wants.
 func (c Config) Account() whatsapp.Account {
 	return whatsapp.Account{
 		PhoneNumberID: c.PhoneNumberID,
@@ -103,7 +100,6 @@ type SourceIDUpdater interface {
 	SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs []string) error
 }
 
-// WhatsApp implements inbox.Inbox.
 type WhatsApp struct {
 	id            int
 	name          string
@@ -114,7 +110,6 @@ type WhatsApp struct {
 	sourceUpdater SourceIDUpdater
 }
 
-// Opts holds construction options.
 type Opts struct {
 	ID            int
 	Name          string
@@ -124,7 +119,6 @@ type Opts struct {
 	SourceUpdater SourceIDUpdater
 }
 
-// New constructs a WhatsApp inbox.
 func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 	if opts.Client == nil {
 		return nil, fmt.Errorf("whatsapp client is required")
@@ -146,34 +140,18 @@ func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 	}, nil
 }
 
-// Identifier returns the inbox database ID.
-func (w *WhatsApp) Identifier() int { return w.id }
-
-// AppSecret returns the Meta app secret.
-func (w *WhatsApp) AppSecret() string { return w.config.AppSecret }
+func (w *WhatsApp) Identifier() int        { return w.id }
+func (w *WhatsApp) AppSecret() string      { return w.config.AppSecret }
+func (w *WhatsApp) Channel() string        { return ChannelWhatsApp }
+func (w *WhatsApp) Name() string           { return w.name }
+func (w *WhatsApp) FromAddress() string    { return "" }
+func (w *WhatsApp) ReplyToAddress() string { return "" }
+func (w *WhatsApp) FromNameTemplate() string { return "" }
+func (w *WhatsApp) Close() error           { return nil }
 
 // Receive is a no-op; inbound messages arrive via the webhook handler.
 func (w *WhatsApp) Receive(ctx context.Context) error { return nil }
 
-// Channel returns the channel name.
-func (w *WhatsApp) Channel() string { return ChannelWhatsApp }
-
-// Name returns the configured inbox name.
-func (w *WhatsApp) Name() string { return w.name }
-
-// FromAddress is not applicable to WhatsApp.
-func (w *WhatsApp) FromAddress() string { return "" }
-
-// ReplyToAddress is not applicable to WhatsApp.
-func (w *WhatsApp) ReplyToAddress() string { return "" }
-
-// FromNameTemplate is not applicable to WhatsApp and always returns empty.
-func (w *WhatsApp) FromNameTemplate() string { return "" }
-
-// Close releases any resources. Currently a no-op.
-func (w *WhatsApp) Close() error { return nil }
-
-// Send dispatches an outbound message to Meta.
 func (w *WhatsApp) Send(message models.OutboundMessage) error {
 	meta, err := parseSendMeta(message.Meta)
 	if err != nil {
@@ -223,8 +201,7 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 	return err
 }
 
-// sendAttachments sends one media message per attachment with the caption and reply context on the first; a caption that can't ride the first media type (audio/sticker) is sent as standalone text first.
-// Attachments already delivered on a prior attempt (tracked in message meta) are skipped, so retrying a partially-sent message never re-delivers media.
+// sendAttachments sends caption as standalone text when the first attachment can't carry it (audio/sticker); skips already-sent items on retry.
 func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, meta SendMeta, message models.OutboundMessage) (string, error) {
 	if bad := rejectedAttachments(message.Attachments); len(bad) > 0 {
 		return "", fmt.Errorf("WhatsApp can't send these files: %s", strings.Join(bad, "; "))
@@ -288,7 +265,6 @@ func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, me
 	return firstID, nil
 }
 
-// parseSentAttachmentMarkers reads the set of attachment UUIDs (and the caption marker) already delivered for this message from its meta.
 func parseSentAttachmentMarkers(raw json.RawMessage) map[string]bool {
 	out := map[string]bool{}
 	if len(raw) == 0 {
@@ -347,7 +323,6 @@ func textBody(m models.OutboundMessage) string {
 	return m.Content
 }
 
-// rejectedAttachments returns a human-readable reason for every attachment Meta would reject on type or size.
 func rejectedAttachments(atts []attachment.Attachment) []string {
 	var reasons []string
 	for _, att := range atts {
@@ -395,7 +370,6 @@ func normalizeMIME(contentType string) string {
 	return mime
 }
 
-// mediaTypeForAttachment maps a mime type to the WhatsApp media type; formats Meta doesn't accept natively go as documents.
 func mediaTypeForAttachment(att attachment.Attachment) string {
 	switch normalizeMIME(att.ContentType) {
 	case "image/jpeg", "image/png":
