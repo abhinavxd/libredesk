@@ -125,7 +125,6 @@ const windowExpiresIn = computed(() => {
 })
 
 const {
-  templates,
   selectedTemplate,
   templateParams,
   approvedTemplates,
@@ -133,12 +132,12 @@ const {
   urlButtonParams,
   allParamsFilled,
   renderedPreview,
+  isFetchingTemplates,
   pickTemplate,
-  reset
+  fetchTemplates,
 } = useWhatsAppTemplatePicker()
 
 const pickerOpen = ref(false)
-const isFetchingTemplates = ref(false)
 const isSending = ref(false)
 
 watch(
@@ -151,23 +150,7 @@ watch(
 
 const openTemplatePicker = async () => {
   pickerOpen.value = true
-  reset()
-
-  const inboxID = conversationStore.current?.inbox_id
-  if (!inboxID) return
-
-  try {
-    isFetchingTemplates.value = true
-    const resp = await api.getWhatsAppTemplates(inboxID)
-    templates.value = resp.data.data || []
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    isFetchingTemplates.value = false
-  }
+  await fetchTemplates(conversationStore.current?.inbox_id)
 }
 
 emitter.on(EMITTER_EVENTS.WHATSAPP_TEMPLATE_PICKER_OPEN, openTemplatePicker)

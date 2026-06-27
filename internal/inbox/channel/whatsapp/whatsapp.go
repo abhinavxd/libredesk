@@ -62,6 +62,7 @@ var supportedMediaMIMETypes = map[string]struct{}{
 	"image/webp":               {},
 	"video/mp4":                {},
 	"video/3gpp":               {},
+	"video/3gp":                {},
 }
 
 // Config is the per-inbox WhatsApp configuration from the inbox config JSONB, with tokens already decrypted.

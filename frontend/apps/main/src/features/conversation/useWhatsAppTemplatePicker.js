@@ -1,6 +1,10 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { PLACEHOLDER_PATTERN, extractPlaceholders, placeholderLabel } from './whatsappTemplate.js'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import api from '@main/api'
+import { PLACEHOLDER_PATTERN, extractPlaceholders } from './whatsappTemplate.js'
 
 // Media-header templates need a media ID the dashboard can't supply, AUTHENTICATION templates need OTP button params, and libredesk_csat_* names are reserved for surveys.
 const SENDABLE_HEADER_TYPES = ['', 'NONE', 'TEXT']
@@ -8,6 +12,7 @@ const RESERVED_NAME_PREFIX = 'libredesk_csat_'
 
 export function useWhatsAppTemplatePicker() {
   const { t } = useI18n()
+  const emitter = useEmitter()
   const templates = ref([])
   const selectedTemplate = ref(null)
   const templateParams = reactive({})
@@ -68,8 +73,23 @@ export function useWhatsAppTemplatePicker() {
     return body
   })
 
-  const clearParams = () => {
-    Object.keys(templateParams).forEach((k) => delete templateParams[k])
+  const isFetchingTemplates = ref(false)
+
+  const fetchTemplates = async (inboxID) => {
+    reset()
+    if (!inboxID) return
+    try {
+      isFetchingTemplates.value = true
+      const resp = await api.getWhatsAppTemplates(inboxID)
+      templates.value = resp.data.data || []
+    } catch (error) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: handleHTTPError(error).message
+      })
+    } finally {
+      isFetchingTemplates.value = false
+    }
   }
 
   const pickTemplate = (tmpl) => {
@@ -82,7 +102,7 @@ export function useWhatsAppTemplatePicker() {
   const reset = () => {
     selectedTemplate.value = null
     templates.value = []
-    clearParams()
+    Object.keys(templateParams).forEach((k) => delete templateParams[k])
   }
 
   watch(selectedTemplate, () => {
@@ -101,8 +121,9 @@ export function useWhatsAppTemplatePicker() {
     urlButtonParams,
     allParamsFilled,
     renderedPreview,
-    placeholderLabel,
+    isFetchingTemplates,
     pickTemplate,
+    fetchTemplates,
     reset
   }
 }

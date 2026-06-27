@@ -466,23 +466,31 @@ func buildEdit(t models.Template) (whatsapp.TemplateEdit, error) {
 	}, nil
 }
 
-// reservedContentChanged compares only the editable surface of a reserved template (body text and button label); the name, URL and language are fixed or handled by the caller.
 func reservedContentChanged(existing, desired models.Template) bool {
 	if strings.TrimSpace(existing.BodyContent) != strings.TrimSpace(desired.BodyContent) {
 		return true
 	}
-	return firstButtonText(existing.Buttons) != firstButtonText(desired.Buttons)
+	return !buttonsSurfaceEqual(existing.Buttons, desired.Buttons)
 }
 
-func firstButtonText(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
+func buttonsSurfaceEqual(a, b json.RawMessage) bool {
+	var ab, bb []whatsapp.TemplateButton
+	if err := json.Unmarshal(a, &ab); err != nil {
+		ab = nil
 	}
-	var btns []whatsapp.TemplateButton
-	if err := json.Unmarshal(raw, &btns); err != nil || len(btns) == 0 {
-		return ""
+	if err := json.Unmarshal(b, &bb); err != nil {
+		bb = nil
 	}
-	return strings.TrimSpace(btns[0].Text)
+	if len(ab) != len(bb) {
+		return false
+	}
+	for i := range ab {
+		if strings.TrimSpace(ab[i].Text) != strings.TrimSpace(bb[i].Text) ||
+			strings.TrimSpace(ab[i].URL) != strings.TrimSpace(bb[i].URL) {
+			return false
+		}
+	}
+	return true
 }
 
 // parseSampleValues decodes sample_values JSON, tolerating non-string values from the frontend.

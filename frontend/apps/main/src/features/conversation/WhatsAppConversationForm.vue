@@ -210,7 +210,6 @@ const countriesStore = useCountriesStore()
 const { allCountries } = storeToRefs(countriesStore)
 
 const {
-  templates,
   selectedTemplate,
   templateParams,
   approvedTemplates,
@@ -218,8 +217,9 @@ const {
   urlButtonParams,
   allParamsFilled,
   renderedPreview,
+  isFetchingTemplates,
   pickTemplate,
-  reset
+  fetchTemplates
 } = useWhatsAppTemplatePicker()
 
 const inboxId = ref('')
@@ -236,29 +236,11 @@ const firstName = ref('')
 const lastName = ref('')
 const phoneCountryCode = ref('')
 const phoneNumber = ref('')
-const isFetchingTemplates = ref(false)
 
 onMounted(() => countriesStore.fetchCountries())
 onUnmounted(() => clearTimeout(timeoutId))
 
-const fetchTemplates = async () => {
-  reset()
-  if (!inboxId.value) return
-  try {
-    isFetchingTemplates.value = true
-    const resp = await api.getWhatsAppTemplates(inboxId.value)
-    templates.value = resp.data.data || []
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    isFetchingTemplates.value = false
-  }
-}
-
-watch(inboxId, fetchTemplates)
+watch(inboxId, (id) => fetchTemplates(id))
 
 const hasContact = computed(() => {
   if (selectedContact.value) return true
@@ -322,16 +304,12 @@ const selectContact = (contact) => {
   highlightedIndex.value = -1
 }
 
-watch(phoneNumber, (val) => {
-  if (selectedContact.value && val !== (selectedContact.value.phone_number || '')) {
-    selectedContact.value = null
-    firstName.value = ''
-    lastName.value = ''
-  }
-})
-
-watch(phoneCountryCode, (val) => {
-  if (selectedContact.value && val !== (selectedContact.value.phone_number_country_code || '')) {
+watch([phoneNumber, phoneCountryCode], ([num, code]) => {
+  if (!selectedContact.value) return
+  if (
+    num !== (selectedContact.value.phone_number || '') ||
+    code !== (selectedContact.value.phone_number_country_code || '')
+  ) {
     selectedContact.value = null
     firstName.value = ''
     lastName.value = ''

@@ -132,6 +132,20 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	return nil
 }
 
+func resyncWhatsAppCSATTemplates(app *App) {
+	inboxes, err := app.inbox.GetAll()
+	if err != nil {
+		app.lo.Error("error fetching inboxes for csat template resync", "error", err)
+		return
+	}
+	for _, inb := range inboxes {
+		if inb.Channel != whatsappChannel.ChannelWhatsApp {
+			continue
+		}
+		ensureWhatsAppCSATTemplate(app, inb.ID)
+	}
+}
+
 // ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta from its config: creates it when absent, edits it in place when the message or button changed, recreates under a new language when that changed. Approval arrives via webhook/sync.
 func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	if app.whatsappTemplate == nil {
@@ -210,7 +224,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 	}
 
 	if createdInbox.Channel == whatsappChannel.ChannelWhatsApp {
-		go postSaveWhatsAppTasks(app, createdInbox.ID, createdInbox.CSATEnabled)
+		go postSaveWhatsAppTasks(app, createdInbox.ID)
 	}
 
 	// Clear passwords before returning.
@@ -279,7 +293,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 
 	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
 		app.inboxAuthErrors.Delete(id)
-		go postSaveWhatsAppTasks(app, id, updatedInbox.CSATEnabled)
+		go postSaveWhatsAppTasks(app, id)
 	}
 
 	// Clear passwords before returning.
@@ -340,11 +354,9 @@ func handleDeleteInbox(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
-func postSaveWhatsAppTasks(app *App, inboxID int, csatEnabled bool) {
+func postSaveWhatsAppTasks(app *App, inboxID int) {
 	subscribeWhatsAppWebhook(app, inboxID)
-	if csatEnabled {
-		ensureWhatsAppCSATTemplate(app, inboxID)
-	}
+	ensureWhatsAppCSATTemplate(app, inboxID)
 }
 
 // validateInbox validates the inbox

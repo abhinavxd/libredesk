@@ -85,8 +85,8 @@ func makeWhatsAppAuthErrorHook(app *App) func(acc whatsapp.Account) {
 // handleListWhatsAppTemplates lists templates for a given inbox (?inbox_id=123).
 func handleListWhatsAppTemplates(r *fastglue.Request) error {
 	app := r.Context.(*App)
-	if app.whatsappTemplate == nil {
-		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "whatsapp not configured", nil, envelope.GeneralError)
+	if whatsAppTemplateUnavailable(r, app) {
+		return nil
 	}
 	inboxIDRaw := string(r.RequestCtx.QueryArgs().Peek("inbox_id"))
 	inboxID, err := strconv.Atoi(inboxIDRaw)
@@ -103,8 +103,8 @@ func handleListWhatsAppTemplates(r *fastglue.Request) error {
 // handleGetWhatsAppTemplate returns a single template by id.
 func handleGetWhatsAppTemplate(r *fastglue.Request) error {
 	app := r.Context.(*App)
-	if app.whatsappTemplate == nil {
-		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "whatsapp not configured", nil, envelope.GeneralError)
+	if whatsAppTemplateUnavailable(r, app) {
+		return nil
 	}
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
@@ -120,8 +120,8 @@ func handleGetWhatsAppTemplate(r *fastglue.Request) error {
 // handleCreateWhatsAppTemplate stores a new template and submits it to Meta.
 func handleCreateWhatsAppTemplate(r *fastglue.Request) error {
 	app := r.Context.(*App)
-	if app.whatsappTemplate == nil {
-		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "whatsapp not configured", nil, envelope.GeneralError)
+	if whatsAppTemplateUnavailable(r, app) {
+		return nil
 	}
 	var t wtmodels.Template
 	if err := r.Decode(&t, "json"); err != nil {
@@ -140,8 +140,8 @@ func handleCreateWhatsAppTemplate(r *fastglue.Request) error {
 // handleDeleteWhatsAppTemplate removes a template locally and on Meta.
 func handleDeleteWhatsAppTemplate(r *fastglue.Request) error {
 	app := r.Context.(*App)
-	if app.whatsappTemplate == nil {
-		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "whatsapp not configured", nil, envelope.GeneralError)
+	if whatsAppTemplateUnavailable(r, app) {
+		return nil
 	}
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
@@ -156,8 +156,8 @@ func handleDeleteWhatsAppTemplate(r *fastglue.Request) error {
 // handleSyncWhatsAppTemplates pulls templates from Meta and upserts locally.
 func handleSyncWhatsAppTemplates(r *fastglue.Request) error {
 	app := r.Context.(*App)
-	if app.whatsappTemplate == nil {
-		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "whatsapp not configured", nil, envelope.GeneralError)
+	if whatsAppTemplateUnavailable(r, app) {
+		return nil
 	}
 	inboxIDRaw := string(r.RequestCtx.QueryArgs().Peek("inbox_id"))
 	inboxID, err := strconv.Atoi(inboxIDRaw)
@@ -170,4 +170,12 @@ func handleSyncWhatsAppTemplates(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadGateway, err.Error(), nil, envelope.GeneralError)
 	}
 	return r.SendEnvelope(map[string]int{"synced": count})
+}
+
+func whatsAppTemplateUnavailable(r *fastglue.Request, app *App) bool {
+	if app.whatsappTemplate != nil {
+		return false
+	}
+	r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "whatsapp not configured", nil, envelope.GeneralError)
+	return true
 }

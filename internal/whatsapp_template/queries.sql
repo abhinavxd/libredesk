@@ -66,7 +66,17 @@ ON CONFLICT (inbox_id, name, language) DO UPDATE SET
     footer_content = EXCLUDED.footer_content,
     buttons = EXCLUDED.buttons,
     rejection_reason = EXCLUDED.rejection_reason,
-    updated_at = NOW()
+    updated_at = CASE WHEN (
+        whatsapp_templates.meta_template_id IS DISTINCT FROM EXCLUDED.meta_template_id OR
+        whatsapp_templates.category IS DISTINCT FROM EXCLUDED.category OR
+        whatsapp_templates.status IS DISTINCT FROM EXCLUDED.status OR
+        whatsapp_templates.header_type IS DISTINCT FROM EXCLUDED.header_type OR
+        whatsapp_templates.header_content IS DISTINCT FROM EXCLUDED.header_content OR
+        whatsapp_templates.body_content IS DISTINCT FROM EXCLUDED.body_content OR
+        whatsapp_templates.footer_content IS DISTINCT FROM EXCLUDED.footer_content OR
+        whatsapp_templates.buttons IS DISTINCT FROM EXCLUDED.buttons OR
+        whatsapp_templates.rejection_reason IS DISTINCT FROM EXCLUDED.rejection_reason
+    ) THEN NOW() ELSE whatsapp_templates.updated_at END
 RETURNING *;
 
 -- name: update-status-by-meta-name-language
