@@ -65,6 +65,7 @@ ON CONFLICT (inbox_id, name, language) DO UPDATE SET
     body_content = EXCLUDED.body_content,
     footer_content = EXCLUDED.footer_content,
     buttons = EXCLUDED.buttons,
+    sample_values = EXCLUDED.sample_values,
     rejection_reason = EXCLUDED.rejection_reason,
     updated_at = CASE WHEN (
         whatsapp_templates.meta_template_id IS DISTINCT FROM EXCLUDED.meta_template_id OR
