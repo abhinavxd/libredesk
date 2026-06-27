@@ -341,6 +341,7 @@ type queries struct {
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
 	InsertMessage                      *sqlx.Stmt `query:"insert-message"`
 	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
+	MarkMessagePendingForRetry         *sqlx.Stmt `query:"mark-message-pending-for-retry"`
 	UpdateMessageSourceID              *sqlx.Stmt `query:"update-message-source-id"`
 	UpdateMessageSourceIDByUUID        *sqlx.Stmt `query:"update-message-source-id-by-uuid"`
 	UpdateMessageStatusBySourceID      *sqlx.Stmt `query:"update-message-status-by-source-id"`

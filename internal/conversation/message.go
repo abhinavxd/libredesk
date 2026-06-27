@@ -22,6 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -188,6 +189,12 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Send message
 	err = inb.Send(outbound)
 	if err != nil && err != livechat.ErrClientNotConnected {
+		var partial *whatsappChannel.PartialSendError
+		if errors.As(err, &partial) {
+			m.lo.Warn("whatsapp partial send - some attachments not delivered", "message_uuid", message.UUID, "error", err)
+			m.UpdateMessageStatus(message.UUID, models.MessageStatusSent)
+			return
+		}
 		if inb.Channel() == inbox.ChannelWhatsApp {
 			m.RecordWhatsAppSendFailure(message.UUID, err.Error())
 		}
@@ -486,11 +493,17 @@ func (m *Manager) GetReopenableConversationForContact(contactID, inboxID, window
 	return row.ID, row.UUID, nil
 }
 
-// MarkMessageAsPending updates message status to `Pending`, enqueuing it for sending.
+// MarkMessageAsPending sets a failed or partially-sent message back to pending for retry.
+// The SQL WHERE guards against concurrent retries - 0 rows means another retry is already in flight.
 func (m *Manager) MarkMessageAsPending(uuid string) error {
-	if err := m.UpdateMessageStatus(uuid, models.MessageStatusPending); err != nil {
+	res, err := m.q.MarkMessagePendingForRetry.Exec(uuid)
+	if err != nil {
 		m.lo.Error("error marking message as pending", "uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorSendingMessage"), nil)
+	}
+	n, err := res.RowsAffected()
+	if err != nil || n == 0 {
+		return nil
 	}
 	return nil
 }

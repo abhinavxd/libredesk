@@ -213,15 +213,43 @@ const userStore = useUserStore()
 // Setup file upload composable
 const {
   uploadingFiles,
-  handleFileUpload,
+  handleFileUpload: _handleFileUpload,
   handleFileDelete,
-  uploadFiles,
+  uploadFiles: _uploadFiles,
   mediaFiles,
   clearMediaFiles,
   setMediaFiles
 } = useFileUpload({
   linkedModel: 'messages'
 })
+
+const WA_MAX_FILE_MB = 100
+
+function validateWhatsAppFiles(files) {
+  if (conversationStore.current?.inbox_channel !== WHATSAPP_CHANNEL) return files
+  const valid = []
+  for (const file of files) {
+    if (file.size > WA_MAX_FILE_MB * 1024 * 1024) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: t('conversation.whatsapp.fileSizeExceeded', { name: file.name, size: WA_MAX_FILE_MB })
+      })
+    } else {
+      valid.push(file)
+    }
+  }
+  return valid
+}
+
+const handleFileUpload = (event) => {
+  const files = validateWhatsAppFiles(Array.from(event.target.files))
+  if (files.length) _handleFileUpload({ target: { files } })
+}
+
+const uploadFiles = (files) => {
+  const valid = validateWhatsAppFiles(Array.from(files))
+  if (valid.length) _uploadFiles(valid)
+}
 
 // Setup draft management composable
 const currentDraftKey = computed(() => conversationStore.current?.uuid || null)

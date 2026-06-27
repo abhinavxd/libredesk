@@ -21,7 +21,7 @@ const ChannelWhatsApp = "whatsapp"
 
 const MetaCallTimeout = 30 * time.Second
 
-// Meta's per-media-type upload size caps; a static sticker over maxStickerBytes is sent as a document.
+// Meta's published per-media-type upload size caps.
 const (
 	maxStickerBytes  = 100 * 1024
 	maxImageBytes    = 5 * 1024 * 1024
@@ -32,6 +32,14 @@ const (
 
 // captionMarker marks the standalone caption text as sent when the first attachment type can't carry a caption (audio/sticker). Prevents re-sending it on retry.
 const captionMarker = "__caption__"
+
+// PartialSendError is returned when at least one item was delivered but the send did not complete fully.
+type PartialSendError struct {
+	Err error
+}
+
+func (e *PartialSendError) Error() string { return e.Err.Error() }
+func (e *PartialSendError) Unwrap() error { return e.Err }
 
 
 var supportedMediaMIMETypes = map[string]struct{}{
@@ -218,6 +226,9 @@ func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, me
 				w.lo.Error("failed to persist whatsapp sent-attachment markers", "message_uuid", message.UUID, "error", perr)
 			}
 		}
+		if firstID != "" || len(sent) > 0 {
+			return firstID, &PartialSendError{Err: err}
+		}
 		return firstID, err
 	}
 
@@ -260,6 +271,11 @@ func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, me
 		}
 		if i == 0 && firstID == "" {
 			firstID = id
+		}
+	}
+	if w.sourceUpdater != nil {
+		if err := w.sourceUpdater.SetWhatsAppSentAttachments(message.UUID, markerKeys(sent)); err != nil {
+			w.lo.Error("failed to persist whatsapp sent-attachment markers on success", "message_uuid", message.UUID, "error", err)
 		}
 	}
 	return firstID, nil
@@ -341,15 +357,15 @@ func rejectedAttachments(atts []attachment.Attachment) []string {
 func maxMediaBytes(mediaType string) int {
 	switch mediaType {
 	case "image":
-		return maxImageBytes
+		return effectiveLimit(maxImageBytes)
 	case "video":
-		return maxVideoBytes
+		return effectiveLimit(maxVideoBytes)
 	case "audio":
-		return maxAudioBytes
+		return effectiveLimit(maxAudioBytes)
 	case "sticker":
-		return maxStickerBytes
+		return effectiveLimit(maxStickerBytes)
 	}
-	return maxDocumentBytes
+	return effectiveLimit(maxDocumentBytes)
 }
 
 func humanBytes(n int) string {
@@ -373,16 +389,29 @@ func normalizeMIME(contentType string) string {
 func mediaTypeForAttachment(att attachment.Attachment) string {
 	switch normalizeMIME(att.ContentType) {
 	case "image/jpeg", "image/png":
+		if att.Size > 0 && att.Size > effectiveLimit(maxImageBytes) {
+			return "document"
+		}
 		return "image"
 	case "image/webp":
-		if att.Size > 0 && att.Size <= maxStickerBytes {
+		if att.Size > 0 && att.Size <= effectiveLimit(maxStickerBytes) {
 			return "sticker"
 		}
 		return "document"
 	case "video/mp4", "video/3gpp", "video/3gp":
+		if att.Size > 0 && att.Size > effectiveLimit(maxVideoBytes) {
+			return "document"
+		}
 		return "video"
 	case "audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg", "audio/opus":
+		if att.Size > 0 && att.Size > effectiveLimit(maxAudioBytes) {
+			return "document"
+		}
 		return "audio"
 	}
 	return "document"
+}
+
+func effectiveLimit(n int) int {
+	return n * 95 / 100
 }

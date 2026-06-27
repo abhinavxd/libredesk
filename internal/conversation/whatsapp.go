@@ -112,6 +112,29 @@ func (m *Manager) RecordWhatsAppSendFailure(messageUUID, errorMsg string) error 
 	return m.mergeWhatsAppMeta(m.q.MergeMessageMetaByUUID, messageUUID, patch)
 }
 
+// HasPartialWhatsAppSend reports whether a sent message has attachments that were not delivered, making it eligible for retry.
+func (m *Manager) HasPartialWhatsAppSend(msg models.Message) bool {
+	if len(msg.Attachments) == 0 {
+		return false
+	}
+	var meta struct {
+		SentAttachments []string `json:"whatsapp_sent_attachments"`
+	}
+	if err := json.Unmarshal(msg.Meta, &meta); err != nil || len(meta.SentAttachments) == 0 {
+		return false
+	}
+	sent := make(map[string]struct{}, len(meta.SentAttachments))
+	for _, id := range meta.SentAttachments {
+		sent[id] = struct{}{}
+	}
+	for _, att := range msg.Attachments {
+		if _, ok := sent[att.UUID]; !ok {
+			return true
+		}
+	}
+	return false
+}
+
 // SetWhatsAppSentAttachments records the attachment UUIDs already delivered for a message so retrying a partially-sent multi-attachment message does not re-deliver them.
 func (m *Manager) SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs []string) error {
 	if messageUUID == "" {
@@ -131,6 +154,10 @@ func (m *Manager) SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs
 			return nil
 		}
 		return err
+	}
+	var metaMap map[string]any
+	if err := json.Unmarshal(row.Meta, &metaMap); err == nil && row.ConversationUUID != "" {
+		m.BroadcastMessageUpdate(row.ConversationUUID, row.UUID, map[string]any{"meta": metaMap})
 	}
 	return nil
 }

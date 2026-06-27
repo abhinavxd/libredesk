@@ -787,6 +787,10 @@ WHERE source_id = ANY($1::text []);
 UPDATE conversation_messages SET status = $1::message_status, updated_at = NOW()
 WHERE uuid = $2 AND NOT ($1 = 'sent' AND status = 'failed');
 
+-- name: mark-message-pending-for-retry
+UPDATE conversation_messages SET status = 'pending', updated_at = NOW()
+WHERE uuid = $1 AND status IN ('failed', 'sent');
+
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
 

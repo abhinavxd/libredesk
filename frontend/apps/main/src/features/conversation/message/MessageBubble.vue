@@ -124,7 +124,17 @@
           </div>
 
           <!-- Attachments -->
-          <BubbleAttachmentPreview :attachments="nonInlineAttachments" />
+          <BubbleAttachmentPreview :attachments="nonInlineAttachments" :failedUUIDs="failedAttachmentUUIDs" />
+
+          <!-- Retry failed attachments (WhatsApp partial send) -->
+          <button
+            v-if="showAttachmentRetry"
+            @click="retryMessage(message)"
+            class="flex items-center gap-1 mt-1 text-xs text-destructive hover:text-destructive/80 transition-colors duration-200 self-end"
+          >
+            <RotateCcw :size="10" />
+            {{ t('conversation.whatsapp.retryAttachments') }}
+          </button>
 
           <!-- CSAT Response -->
           <CSATResponseDisplay :message="message" />
@@ -316,6 +326,25 @@ const showRetry = computed(() => isOutgoing.value && props.message.status === 'f
 
 const sendFailureReason = computed(() =>
   props.message.status === 'failed' ? props.message.meta?.wa_failure_reason : null
+)
+
+const failedAttachmentUUIDs = computed(() => {
+  const sent = props.message.meta?.whatsapp_sent_attachments
+  if (!Array.isArray(sent) || !props.message.attachments?.length) return new Set()
+  const sentSet = new Set(sent)
+  return new Set(
+    props.message.attachments
+      .filter((a) => a.uuid && !sentSet.has(a.uuid))
+      .map((a) => a.uuid)
+  )
+})
+
+const showAttachmentRetry = computed(
+  () =>
+    isOutgoing.value &&
+    props.message.status === 'sent' &&
+    failedAttachmentUUIDs.value.size > 0 &&
+    props.message.sender_id === userStore.userID
 )
 
 const retryMessage = (msg) => {

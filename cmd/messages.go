@@ -174,7 +174,12 @@ func handleRetryMessage(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if msg.SenderType != cmodels.SenderTypeAgent || msg.Status != cmodels.MessageStatusFailed || msg.SenderID != user.ID || msg.ConversationUUID != cuuid {
+
+	// Allow partial sends and failed messages to be retried, but only by the agent who sent them.
+	isFailed := msg.Status == cmodels.MessageStatusFailed
+	isPartialSend := msg.Status == cmodels.MessageStatusSent && app.conversation.HasPartialWhatsAppSend(msg)
+
+	if msg.SenderType != cmodels.SenderTypeAgent || (!isFailed && !isPartialSend) || msg.SenderID != user.ID || msg.ConversationUUID != cuuid {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
 

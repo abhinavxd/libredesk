@@ -598,6 +598,8 @@
   "conversation.whatsapp.windowClosed.description": "Meta only allows template messages once a contact hasn't messaged for over 24 hours.",
   "conversation.whatsapp.windowClosed.title": "24-hour reply window closed",
   "conversation.whatsapp.windowClosing": "Reply window closes in {time}. After that, only template messages can be sent.",
+  "conversation.whatsapp.fileSizeExceeded": "{name} exceeds the {size} MB limit for this file type on WhatsApp.",
+  "conversation.whatsapp.retryAttachments": "Retry failed attachments",
   "conversationStatus.alreadyInUse": "Cannot delete status as it is in use, Please remove this status from all conversations before deleting",
   "conversationStatus.cannotUpdateDefault": "Cannot update default conversation status",
   "csat.alreadySubmitted": "CSAT already submitted",
