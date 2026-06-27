@@ -49,6 +49,9 @@ SELECT * FROM whatsapp_templates WHERE inbox_id = $1 ORDER BY updated_at DESC;
 -- name: get-by-name-language
 SELECT * FROM whatsapp_templates WHERE inbox_id = $1 AND name = $2 AND language = $3;
 
+-- name: get-by-name
+SELECT * FROM whatsapp_templates WHERE inbox_id = $1 AND name = $2 LIMIT 1;
+
 -- name: upsert-from-meta
 INSERT INTO whatsapp_templates (
     inbox_id, meta_template_id, name, language, category, status,

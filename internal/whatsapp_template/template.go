@@ -51,6 +51,7 @@ type queries struct {
 	Delete                     *sqlx.Stmt `query:"delete"`
 	GetByID                    *sqlx.Stmt `query:"get-by-id"`
 	GetByInbox                 *sqlx.Stmt `query:"get-by-inbox"`
+	GetByName                  *sqlx.Stmt `query:"get-by-name"`
 	GetByNameLanguage          *sqlx.Stmt `query:"get-by-name-language"`
 	UpsertFromMeta             *sqlx.Stmt `query:"upsert-from-meta"`
 	UpdateStatusByNameLanguage *sqlx.Stmt `query:"update-status-by-meta-name-language"`
@@ -99,6 +100,18 @@ func (m *Manager) GetByID(id int) (models.Template, error) {
 		}
 		m.lo.Error("error fetching whatsapp template", "id", id, "error", err)
 		return t, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return t, nil
+}
+
+// GetByName returns the template matching inbox + name regardless of status.
+func (m *Manager) GetByName(inboxID int, name string) (models.Template, error) {
+	var t models.Template
+	if err := m.q.GetByName.Get(&t, inboxID, name); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return t, ErrTemplateNotFound
+		}
+		return t, err
 	}
 	return t, nil
 }

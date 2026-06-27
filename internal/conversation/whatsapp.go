@@ -207,6 +207,11 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 
 	if m.whatsAppWindowOpen(conversation.ContactID, conversation.InboxID) {
 		content := m.i18n.Ts("conversation.whatsapp.csatMessage", "link", csatURL)
+		if m.whatsappTemplate != nil {
+			if tmpl, err := m.whatsappTemplate.GetByName(conversation.InboxID, wtmodels.CSATTemplateName(conversation.InboxID)); err == nil && tmpl.BodyContent != "" {
+				content = tmpl.BodyContent + "\n" + csatURL
+			}
+		}
 		if _, err := m.QueueReply(nil, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, content, nil, nil, nil, meta); err != nil {
 			m.lo.Error("error sending whatsapp CSAT link", "conversation_uuid", conversation.UUID, "error", err)
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

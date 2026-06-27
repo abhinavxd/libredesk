@@ -193,6 +193,7 @@ type webhookStore interface {
 // WhatsAppTemplateStore is an interface over internal/whatsapp_template to avoid a circular import.
 type WhatsAppTemplateStore interface {
 	GetByID(id int) (wtmodels.Template, error)
+	GetByName(inboxID int, name string) (wtmodels.Template, error)
 	GetApproved(inboxID int, name, language string) (wtmodels.Template, error)
 }
 
