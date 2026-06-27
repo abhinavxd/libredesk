@@ -584,7 +584,7 @@
   "conversation.tryAdjustingFilters": "Try adjusting filters",
   "conversation.viewPermissionDenied": "You do not have access to this view",
   "conversation.whatsapp.csatMessage": "Your conversation has been resolved. How did we do? Rate your experience: {link}",
-  "conversation.whatsapp.csatNotSent": "CSAT survey was not sent. The WhatsApp reply window is closed and no approved CSAT template is available for this inbox.",
+  "conversation.whatsapp.csatNotSent": "CSAT survey was not sent. The WhatsApp reply window is closed.",
   "conversation.whatsapp.noApprovedTemplates": "No approved templates yet. Create and submit one from Admin then WhatsApp templates.",
   "conversation.whatsapp.number": "WhatsApp number",
   "conversation.whatsapp.numberPlaceholder": "Search or enter a number",
