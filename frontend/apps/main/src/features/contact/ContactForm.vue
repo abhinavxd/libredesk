@@ -94,14 +94,6 @@
             </FormField>
           </div>
         </div>
-        <button
-          v-if="!allCountries.length"
-          type="button"
-          class="text-xs text-muted-foreground hover:text-foreground mt-1 self-start"
-          @click="countriesStore.fetchCountries"
-        >
-          {{ t('contact.countriesUnavailable') }}
-        </button>
       </div>
     </div>
 

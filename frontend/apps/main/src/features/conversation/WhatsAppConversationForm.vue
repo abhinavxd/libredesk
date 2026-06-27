@@ -41,14 +41,6 @@
               autocomplete="off"
             />
           </div>
-          <button
-            v-if="!allCountries.length"
-            type="button"
-            class="text-xs text-muted-foreground hover:text-foreground mt-1"
-            @click="countriesStore.fetchCountries"
-          >
-            {{ t('contact.countriesUnavailable') }}
-          </button>
 
           <div
             v-if="searchResults.length"
