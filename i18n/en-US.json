@@ -115,6 +115,7 @@
   "admin.general.siteName": "Site name",
   "admin.general.siteName.min": "Site name should be at least 1 character",
   "admin.general.timezone.placeholder": "Select timezone",
+  "admin.inbox.authenticationFailed": "Authentication failed. Messages and media won't send or download until you update this inbox's credentials.",
   "admin.inbox.authProtocol": "Authentication Protocol",
   "admin.inbox.authProtocol.description": "Authentication protocol to use.",
   "admin.inbox.authProtocol.login": "Login",

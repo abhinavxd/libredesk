@@ -23,6 +23,8 @@ import { RouterLink } from 'vue-router'
 import InboxDataTableDropDown from '@main/features/admin/inbox/InboxDataTableDropDown.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Button } from '@shared-ui/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
+import { TriangleAlert } from 'lucide-vue-next'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
@@ -101,7 +103,7 @@ const columns = [
       return h('div', { class: 'text-center' }, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      const children = [
         h(RouterLink,
           {
             to: { name: 'edit-inbox', params: { id: row.original.id } },
@@ -109,7 +111,20 @@ const columns = [
           },
           () => row.getValue('name')
         )
-      )
+      ]
+      if (row.original.token_invalid) {
+        children.push(
+          h(Tooltip, null, {
+            default: () => [
+              h(TooltipTrigger, { asChild: true }, () =>
+                h(TriangleAlert, { class: 'size-4 text-destructive shrink-0' })
+              ),
+              h(TooltipContent, null, () => t('admin.inbox.authenticationFailed'))
+            ]
+          })
+        )
+      }
+      return h('div', { class: 'flex items-center justify-center gap-1.5' }, children)
     }
   },
   {
