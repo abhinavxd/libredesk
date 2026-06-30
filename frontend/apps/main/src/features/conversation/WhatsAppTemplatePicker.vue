@@ -7,24 +7,43 @@
       {{ $t('conversation.whatsapp.noApprovedTemplates') }}
     </p>
 
-    <div
-      v-else-if="!selectedTemplate"
-      class="overflow-y-auto space-y-2"
-      :class="fill ? 'flex-1 min-h-0' : 'max-h-80'"
-    >
-      <button
-        v-for="tmpl in approvedTemplates"
-        :key="tmpl.id"
-        type="button"
-        class="w-full text-left box p-3 hover:bg-accent transition-colors"
-        @click="$emit('pick', tmpl)"
-      >
-        <div class="flex items-center justify-between gap-2">
-          <div class="font-mono text-sm">{{ tmpl.name }}</div>
-          <Badge variant="outline">{{ tmpl.language }}</Badge>
+    <div v-else-if="!selectedTemplate" :class="fill ? 'flex flex-col flex-1 min-h-0' : ''">
+      <div class="relative mb-2 shrink-0">
+        <Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input v-model="search" :placeholder="$t('globals.terms.search')" class="px-8" />
+        <button
+          v-if="search"
+          type="button"
+          class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+          @click="search = ''"
+        >
+          <X class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="overflow-y-auto pr-1" :class="fill ? 'flex-1 min-h-0' : 'h-80'">
+        <p
+          v-if="!filteredTemplates.length"
+          class="flex h-full items-center justify-center text-center text-sm text-muted-foreground"
+        >
+          {{ $t('globals.messages.noResultsFound') }}
+        </p>
+        <div v-else class="space-y-2">
+          <button
+            v-for="tmpl in filteredTemplates"
+            :key="tmpl.id"
+            type="button"
+            class="w-full text-left box p-3 hover:bg-accent transition-colors"
+            @click="$emit('pick', tmpl)"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div class="font-mono text-sm">{{ tmpl.name }}</div>
+              <Badge variant="outline">{{ tmpl.language }}</Badge>
+            </div>
+            <div class="text-xs text-muted-foreground mt-1 line-clamp-2">{{ tmpl.body_content }}</div>
+          </button>
         </div>
-        <div class="text-xs text-muted-foreground mt-1 line-clamp-2">{{ tmpl.body_content }}</div>
-      </button>
+      </div>
     </div>
 
     <div v-else class="space-y-4" :class="{ 'flex-1 min-h-0 overflow-y-auto': fill }">
@@ -64,12 +83,14 @@
 </template>
 
 <script setup>
+import { computed, ref } from 'vue'
+import { Search, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Input } from '@shared-ui/components/ui/input'
 import { placeholderLabel } from './whatsappTemplate.js'
 
-defineProps({
+const props = defineProps({
   approvedTemplates: { type: Array, default: () => [] },
   selectedTemplate: { type: Object, default: null },
   templateParams: { type: Object, required: true },
@@ -81,4 +102,16 @@ defineProps({
 })
 
 defineEmits(['pick', 'back', 'update:param'])
+
+const search = ref('')
+
+const filteredTemplates = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return props.approvedTemplates
+  return props.approvedTemplates.filter(
+    (t) =>
+      (t.name || '').toLowerCase().includes(q) ||
+      (t.body_content || '').toLowerCase().includes(q)
+  )
+})
 </script>
