@@ -369,8 +369,9 @@ type queries struct {
 	GetActiveLivechatConversationsByAgent *sqlx.Stmt `query:"get-active-livechat-conversations-by-agent"`
 
 	// WS list-subscribe authz.
-	FilterAuthorizedListUUIDs     *sqlx.Stmt `query:"filter-authorized-list-uuids"`
-	GetConversationUUIDsByContact *sqlx.Stmt `query:"get-conversation-uuids-by-contact"`
+	FilterAuthorizedListUUIDs          *sqlx.Stmt `query:"filter-authorized-list-uuids"`
+	GetConversationUUIDsByContact      *sqlx.Stmt `query:"get-conversation-uuids-by-contact"`
+	GetConversationUUIDsByContactInbox *sqlx.Stmt `query:"get-conversation-uuids-by-contact-inbox"`
 }
 
 // CreateConversation creates a new conversation. If maxConversations > 0, the insert is

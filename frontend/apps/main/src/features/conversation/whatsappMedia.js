@@ -3,7 +3,6 @@ const WHATSAPP_MEDIA_EXTENSIONS = [
   'jpg',
   'jpeg',
   'png',
-  'webp',
   'mp4',
   '3gp',
   '3gpp',

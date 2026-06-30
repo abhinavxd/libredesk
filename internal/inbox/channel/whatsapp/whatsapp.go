@@ -23,14 +23,13 @@ const MetaCallTimeout = 30 * time.Second
 
 // Meta's published per-media-type upload size caps.
 const (
-	maxStickerBytes  = 100 * 1024
 	maxImageBytes    = 5 * 1024 * 1024
 	maxVideoBytes    = 16 * 1024 * 1024
 	maxAudioBytes    = 16 * 1024 * 1024
 	maxDocumentBytes = 100 * 1024 * 1024
 )
 
-// captionMarker marks the standalone caption text as sent when the first attachment type can't carry a caption (audio/sticker). Prevents re-sending it on retry.
+// captionMarker marks the standalone caption text as sent when the first attachment type can't carry a caption (audio). Prevents re-sending it on retry.
 const captionMarker = "__caption__"
 
 // PartialSendError is returned when at least one item was delivered but the send did not complete fully.
@@ -41,14 +40,13 @@ type PartialSendError struct {
 func (e *PartialSendError) Error() string { return e.Err.Error() }
 func (e *PartialSendError) Unwrap() error { return e.Err }
 
-
 var supportedMediaMIMETypes = map[string]struct{}{
-	"audio/aac":  {},
-	"audio/mp4":  {},
-	"audio/mpeg": {},
-	"audio/amr":  {},
-	"audio/ogg":  {},
-	"audio/opus": {},
+	"audio/aac":                     {},
+	"audio/mp4":                     {},
+	"audio/mpeg":                    {},
+	"audio/amr":                     {},
+	"audio/ogg":                     {},
+	"audio/opus":                    {},
 	"application/vnd.ms-powerpoint": {},
 	"application/msword":            {},
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.document":   {},
@@ -59,7 +57,6 @@ var supportedMediaMIMETypes = map[string]struct{}{
 	"application/vnd.ms-excel": {},
 	"image/jpeg":               {},
 	"image/png":                {},
-	"image/webp":               {},
 	"video/mp4":                {},
 	"video/3gpp":               {},
 	"video/3gp":                {},
@@ -88,7 +85,6 @@ func (c Config) Account() whatsapp.Account {
 		APIVersion:    c.APIVersion,
 	}
 }
-
 
 // SendMeta is the per-message metadata threaded through OutboundMessage.Meta; a set TemplateName means a template send.
 type SendMeta struct {
@@ -149,14 +145,14 @@ func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 	}, nil
 }
 
-func (w *WhatsApp) Identifier() int        { return w.id }
-func (w *WhatsApp) AppSecret() string      { return w.config.AppSecret }
-func (w *WhatsApp) Channel() string        { return ChannelWhatsApp }
-func (w *WhatsApp) Name() string           { return w.name }
-func (w *WhatsApp) FromAddress() string    { return "" }
-func (w *WhatsApp) ReplyToAddress() string { return "" }
+func (w *WhatsApp) Identifier() int          { return w.id }
+func (w *WhatsApp) AppSecret() string        { return w.config.AppSecret }
+func (w *WhatsApp) Channel() string          { return ChannelWhatsApp }
+func (w *WhatsApp) Name() string             { return w.name }
+func (w *WhatsApp) FromAddress() string      { return "" }
+func (w *WhatsApp) ReplyToAddress() string   { return "" }
 func (w *WhatsApp) FromNameTemplate() string { return "" }
-func (w *WhatsApp) Close() error           { return nil }
+func (w *WhatsApp) Close() error             { return nil }
 
 // Receive is a no-op; inbound messages arrive via the webhook handler.
 func (w *WhatsApp) Receive(ctx context.Context) error { return nil }
@@ -210,7 +206,7 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 	return err
 }
 
-// sendAttachments sends caption as standalone text when the first attachment can't carry it (audio/sticker); skips already-sent items on retry.
+// sendAttachments sends caption as standalone text when the first attachment can't carry it (audio); skips already-sent items on retry.
 func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, meta SendMeta, message models.OutboundMessage) (string, error) {
 	if bad := rejectedAttachments(message.Attachments); len(bad) > 0 {
 		return "", fmt.Errorf("WhatsApp can't send these files: %s", strings.Join(bad, "; "))
@@ -343,7 +339,12 @@ func textBody(m models.OutboundMessage) string {
 func rejectedAttachments(atts []attachment.Attachment) []string {
 	var reasons []string
 	for _, att := range atts {
-		if _, ok := supportedMediaMIMETypes[normalizeMIME(att.ContentType)]; !ok {
+		mime := normalizeMIME(att.ContentType)
+		if mime == "image/webp" {
+			reasons = append(reasons, fmt.Sprintf("%s (WebP images aren't supported; convert to JPEG or PNG)", att.Name))
+			continue
+		}
+		if _, ok := supportedMediaMIMETypes[mime]; !ok {
 			reasons = append(reasons, fmt.Sprintf("%s (unsupported type %s)", att.Name, att.ContentType))
 			continue
 		}
@@ -363,8 +364,6 @@ func maxMediaBytes(mediaType string) int {
 		return effectiveLimit(maxVideoBytes)
 	case "audio":
 		return effectiveLimit(maxAudioBytes)
-	case "sticker":
-		return effectiveLimit(maxStickerBytes)
 	}
 	return effectiveLimit(maxDocumentBytes)
 }
@@ -379,6 +378,7 @@ func humanBytes(n int) string {
 	return fmt.Sprintf("%d B", n)
 }
 
+// normalizeMIME lowercases the content type and drops any ";" parameters (e.g. "image/jpeg; charset=binary" -> "image/jpeg") for lookup against the supported-type map.
 func normalizeMIME(contentType string) string {
 	mime := strings.ToLower(strings.TrimSpace(contentType))
 	if i := strings.Index(mime, ";"); i >= 0 {
@@ -394,11 +394,6 @@ func mediaTypeForAttachment(att attachment.Attachment) string {
 			return "document"
 		}
 		return "image"
-	case "image/webp":
-		if att.Size > 0 && att.Size <= effectiveLimit(maxStickerBytes) {
-			return "sticker"
-		}
-		return "document"
 	case "video/mp4", "video/3gpp", "video/3gp":
 		if att.Size > 0 && att.Size > effectiveLimit(maxVideoBytes) {
 			return "document"
@@ -413,6 +408,7 @@ func mediaTypeForAttachment(att attachment.Attachment) string {
 	return "document"
 }
 
+// effectiveLimit keeps 2% headroom below Meta's hard caps to absorb size-measurement skew at the boundary.
 func effectiveLimit(n int) int {
-	return n * 95 / 100
+	return n * 98 / 100
 }

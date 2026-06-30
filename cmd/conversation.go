@@ -1028,11 +1028,11 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 	}
 	dialCode := countries.DialCodeForISO(req.PhoneNumberCountryCode)
 	if dialCode == "" {
-		return 0, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "`phone_number_country_code`"), nil)
+		return 0, envelope.NewError(envelope.InputError, "`phone_number_country_code` is invalid", nil)
 	}
 	waID := stringutil.NormalizeWhatsAppPhone(dialCode + req.PhoneNumber)
 	if waID == "" {
-		return 0, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.invalid", "name", "`phone_number`"), nil)
+		return 0, envelope.NewError(envelope.InputError, "`phone_number` is invalid", nil)
 	}
 	contact := umodels.User{
 		Type:             umodels.UserTypeContact,

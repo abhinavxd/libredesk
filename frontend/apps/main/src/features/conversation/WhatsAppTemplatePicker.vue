@@ -1,7 +1,7 @@
 <template>
   <div :class="{ 'flex flex-col min-h-0': fill }">
     <p v-if="isFetching" class="py-2 text-sm text-muted-foreground">
-      {{ $t('globals.messages.loading') }}
+      {{ $t('globals.terms.loading') }}
     </p>
     <p v-else-if="!approvedTemplates.length" class="py-2 text-sm text-muted-foreground">
       {{ $t('conversation.whatsapp.noApprovedTemplates') }}

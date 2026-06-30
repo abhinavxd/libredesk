@@ -856,7 +856,7 @@ LIMIT 1;
 
 -- name: update-conversation-last-inbound-at
 UPDATE conversations SET last_inbound_at = GREATEST(last_inbound_at, $2), updated_at = NOW() WHERE id = $1
-RETURNING last_inbound_at;
+RETURNING contact_id, inbox_id;
 
 -- name: get-contact-window-inbound-at
 SELECT MAX(last_inbound_at) FROM conversations WHERE contact_id = $1 AND inbox_id = $2;
@@ -1043,5 +1043,12 @@ WHERE uuid = ANY($1::uuid[])
 SELECT uuid::text
 FROM conversations
 WHERE contact_id = $1
+ORDER BY last_message_at DESC NULLS LAST
+LIMIT 200;
+
+-- name: get-conversation-uuids-by-contact-inbox
+SELECT uuid::text
+FROM conversations
+WHERE contact_id = $1 AND inbox_id = $2
 ORDER BY last_message_at DESC NULLS LAST
 LIMIT 200;

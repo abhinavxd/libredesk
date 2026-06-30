@@ -83,7 +83,15 @@ ON CONFLICT (inbox_id, name, language) DO UPDATE SET
     ) THEN NOW() ELSE whatsapp_templates.updated_at END
 RETURNING *;
 
--- name: update-status-by-meta-name-language
+-- name: update-status-by-meta-id
+UPDATE whatsapp_templates
+SET status = $3,
+    rejection_reason = $4,
+    updated_at = NOW()
+WHERE inbox_id = $1
+  AND meta_template_id = $2;
+
+-- name: update-status-by-name-language
 UPDATE whatsapp_templates
 SET status = $3,
     rejection_reason = $4,

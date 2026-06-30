@@ -105,7 +105,7 @@ func subscribeWhatsAppWebhook(app *App, inboxID int) {
 	}
 	root, _ := app.setting.GetAppRootURL()
 	if !isPublicWebhookURL(root) {
-		app.lo.Error("whatsapp webhook not auto-registered: the app root URL must be a public HTTPS URL Meta can reach; set it in Settings and re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "root_url", root)
+		app.lo.Warn("whatsapp webhook not auto-registered: the app root URL must be a public HTTPS URL Meta can reach; set it in Settings and re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "root_url", root)
 		return
 	}
 	callbackURL := whatsAppCallbackURLFromRoot(root, inboxID)

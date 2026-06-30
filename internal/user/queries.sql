@@ -250,6 +250,7 @@ new_contact AS (
 new_identity AS (
     INSERT INTO contact_channel_identities (contact_id, channel, identifier)
     SELECT id, $6::channels, $7 FROM new_contact
+    ON CONFLICT (channel, identifier) DO UPDATE SET updated_at = now()
     RETURNING contact_id
 )
 SELECT COALESCE(

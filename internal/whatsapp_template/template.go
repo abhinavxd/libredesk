@@ -54,7 +54,8 @@ type queries struct {
 	GetByName                  *sqlx.Stmt `query:"get-by-name"`
 	GetByNameLanguage          *sqlx.Stmt `query:"get-by-name-language"`
 	UpsertFromMeta             *sqlx.Stmt `query:"upsert-from-meta"`
-	UpdateStatusByNameLanguage *sqlx.Stmt `query:"update-status-by-meta-name-language"`
+	UpdateStatusByMetaID       *sqlx.Stmt `query:"update-status-by-meta-id"`
+	UpdateStatusByNameLanguage *sqlx.Stmt `query:"update-status-by-name-language"`
 }
 
 // Opts holds dependencies.
@@ -329,22 +330,37 @@ func (m *Manager) SyncFromMeta(ctx context.Context, inboxID int) (int, error) {
 	return count, nil
 }
 
-// HandleStatusUpdate processes a Meta template status webhook.
-func (m *Manager) HandleStatusUpdate(inboxID int, name, language, event, reason string) error {
-	if name == "" {
-		return fmt.Errorf("missing template name in status update")
-	}
-	if language == "" {
-		language = "en_US"
+// HandleStatusUpdate processes a Meta template status webhook, matching by Meta template id when present and falling back to (inbox, name).
+func (m *Manager) HandleStatusUpdate(inboxID int, metaTemplateID, name, language, event, reason string) error {
+	if metaTemplateID == "" && name == "" {
+		return fmt.Errorf("missing template identity in status update")
 	}
 	status := mapTemplateEventToStatus(event)
 	if status == "" {
 		m.lo.Info("ignoring unhandled whatsapp template status event", "name", name, "language", language, "event", event)
 		return nil
 	}
-	if _, err := m.q.UpdateStatusByNameLanguage.Exec(inboxID, name, status, reason, language); err != nil {
-		m.lo.Error("error applying template status update", "name", name, "language", language, "error", err)
+	if metaTemplateID != "" {
+		res, err := m.q.UpdateStatusByMetaID.Exec(inboxID, metaTemplateID, status, reason)
+		if err != nil {
+			m.lo.Error("error applying template status update by meta id", "meta_template_id", metaTemplateID, "error", err)
+			return err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			return nil
+		}
+	}
+	if name == "" {
+		m.lo.Warn("template status update matched no row", "inbox_id", inboxID, "meta_template_id", metaTemplateID)
+		return nil
+	}
+	res, err := m.q.UpdateStatusByNameLanguage.Exec(inboxID, name, status, reason, language)
+	if err != nil {
+		m.lo.Error("error applying template status update by name", "name", name, "language", language, "error", err)
 		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		m.lo.Warn("template status update matched no row", "inbox_id", inboxID, "name", name, "language", language)
 	}
 	return nil
 }
@@ -416,7 +432,7 @@ func buildSubmission(t models.Template) (whatsapp.TemplateSubmission, error) {
 		}
 		if hdr.Format == "TEXT" && t.HeaderContent.Valid {
 			hdr.Text = t.HeaderContent.String
-			ex, err := buildExample(hdr.Text, sampleValues, named, "header_text")
+			ex, err := buildExample(hdr.Text, sampleValues, "header_text")
 			if err != nil {
 				return whatsapp.TemplateSubmission{}, err
 			}
@@ -426,7 +442,7 @@ func buildSubmission(t models.Template) (whatsapp.TemplateSubmission, error) {
 	}
 
 	body := whatsapp.TemplateComponent{Type: "BODY", Text: t.BodyContent}
-	ex, err := buildExample(body.Text, sampleValues, named, "body_text")
+	ex, err := buildExample(body.Text, sampleValues, "body_text")
 	if err != nil {
 		return whatsapp.TemplateSubmission{}, err
 	}
@@ -539,12 +555,12 @@ func isNamed(text string) bool {
 	return false
 }
 
-func buildExample(text string, samples map[string]string, named bool, positionalKey string) (map[string]any, error) {
+func buildExample(text string, samples map[string]string, positionalKey string) (map[string]any, error) {
 	keys := whatsapp.OrderedPlaceholders(text)
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	if named {
+	if isNamed(text) {
 		params := make([]map[string]any, 0, len(keys))
 		for _, key := range keys {
 			v, err := sampleValue(samples, key)
@@ -592,7 +608,8 @@ func submitErrReason(err error) string {
 	if err == nil {
 		return ""
 	}
-	if me, ok := err.(*whatsapp.MetaAPIError); ok {
+	var me *whatsapp.MetaAPIError
+	if errors.As(err, &me) {
 		if me.UserMsg != "" {
 			return me.UserMsg
 		}

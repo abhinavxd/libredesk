@@ -443,6 +443,10 @@ func (m *Manager) UpdateMessageStatusBySourceID(sourceID, status string) error {
 	}
 	if err := m.q.UpdateMessageStatusBySourceID.Get(&row, sourceID, status); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			// ErrNoRows means either a terminally-failed row excluded by the query (don't retry) or a row not yet inserted because the status webhook outran the send (retry).
+			if exists, _ := m.MessageExists(sourceID); exists {
+				return nil
+			}
 			return fmt.Errorf("message not found for status update, will retry: source_id=%s status=%s", sourceID, status)
 		}
 		m.lo.Error("error updating message status by source id", "source_id", sourceID, "error", err)
@@ -457,14 +461,29 @@ func (m *Manager) UpdateConversationLastInboundAt(conversationID int, at time.Ti
 	if at.IsZero() {
 		at = time.Now()
 	}
-	var stored time.Time
-	if err := m.q.UpdateConversationLastInboundAt.QueryRow(conversationID, at).Scan(&stored); err != nil {
+	var row struct {
+		ContactID int `db:"contact_id"`
+		InboxID   int `db:"inbox_id"`
+	}
+	if err := m.q.UpdateConversationLastInboundAt.QueryRow(conversationID, at).Scan(&row.ContactID, &row.InboxID); err != nil {
 		m.lo.Error("error updating conversation last_inbound_at", "conversation_id", conversationID, "error", err)
 		return err
 	}
-	uuid, err := m.GetConversationUUID(conversationID)
-	if err == nil && uuid != "" {
-		m.BroadcastConversationUpdate(uuid, map[string]any{"contact_last_inbound_at": stored.Format(time.RFC3339)})
+	var windowAt sql.NullTime
+	if err := m.q.GetContactWindowInboundAt.Get(&windowAt, row.ContactID, row.InboxID); err != nil {
+		m.lo.Error("error fetching contact window for broadcast", "contact_id", row.ContactID, "inbox_id", row.InboxID, "error", err)
+		return nil
+	}
+	if !windowAt.Valid {
+		return nil
+	}
+	var uuids []string
+	if err := m.q.GetConversationUUIDsByContactInbox.Select(&uuids, row.ContactID, row.InboxID); err != nil {
+		m.lo.Error("error fetching contact's conversations for broadcast", "contact_id", row.ContactID, "inbox_id", row.InboxID, "error", err)
+		return nil
+	}
+	for _, uuid := range uuids {
+		m.BroadcastConversationUpdate(uuid, map[string]any{"contact_last_inbound_at": windowAt.Time.Format(time.RFC3339)})
 	}
 	return nil
 }
@@ -494,16 +513,10 @@ func (m *Manager) GetReopenableConversationForContact(contactID, inboxID, window
 }
 
 // MarkMessageAsPending sets a failed or partially-sent message back to pending for retry.
-// The SQL WHERE guards against concurrent retries - 0 rows means another retry is already in flight.
 func (m *Manager) MarkMessageAsPending(uuid string) error {
-	res, err := m.q.MarkMessagePendingForRetry.Exec(uuid)
-	if err != nil {
+	if _, err := m.q.MarkMessagePendingForRetry.Exec(uuid); err != nil {
 		m.lo.Error("error marking message as pending", "uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorSendingMessage"), nil)
-	}
-	n, err := res.RowsAffected()
-	if err != nil || n == 0 {
-		return nil
 	}
 	return nil
 }
