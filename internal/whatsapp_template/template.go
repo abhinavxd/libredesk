@@ -170,6 +170,7 @@ func (m *Manager) EnsureReserved(ctx context.Context, desired models.Template) e
 		return err
 	}
 	if !reservedContentChanged(existing, desired) {
+		m.lo.Debug("reserved template already matches desired content", "id", existing.ID, "name", existing.Name)
 		return nil
 	}
 	// Meta only allows editing a template in approved/rejected/paused state; an edit on a pending one is a guaranteed error, so wait for the current review to settle and reconcile on the next save.
