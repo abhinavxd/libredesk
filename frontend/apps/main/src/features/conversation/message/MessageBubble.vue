@@ -66,7 +66,13 @@
             :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
           >
             <div
-              v-if="message.content_type === 'text'"
+              v-if="message.meta?.wa_unsupported"
+              class="mb-1 text-muted-foreground italic text-sm"
+            >
+              {{ t('conversation.whatsapp.unsupportedMessage') }}
+            </div>
+            <div
+              v-else-if="message.content_type === 'text'"
               class="mb-1 native-html whitespace-pre-wrap"
               :class="{ 'mb-3': message.attachments.length > 0 }"
             >
@@ -118,7 +124,17 @@
           </div>
 
           <!-- Attachments -->
-          <BubbleAttachmentPreview :attachments="nonInlineAttachments" />
+          <BubbleAttachmentPreview :attachments="nonInlineAttachments" :failedUUIDs="failedAttachmentUUIDs" />
+
+          <!-- Retry failed attachments (WhatsApp partial send) -->
+          <button
+            v-if="showAttachmentRetry"
+            @click="retryMessage(message)"
+            class="flex items-center gap-1 mt-1 text-xs text-destructive hover:text-destructive/80 transition-colors duration-200 self-end"
+          >
+            <RotateCcw :size="10" />
+            {{ t('conversation.whatsapp.retryAttachments') }}
+          </button>
 
           <!-- CSAT Response -->
           <CSATResponseDisplay :message="message" />
@@ -136,6 +152,14 @@
               </TooltipTrigger>
               <TooltipContent>
                 <p>{{ t('conversation.sentViaEmail') }}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip v-if="sendFailureReason">
+              <TooltipTrigger>
+                <CircleAlert :size="12" class="text-destructive" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p class="max-w-xs break-words">{{ sendFailureReason }}</p>
               </TooltipContent>
             </Tooltip>
             <RotateCcw
@@ -193,7 +217,7 @@ import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, Maximize2 } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, CircleAlert, Maximize2 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
@@ -299,6 +323,29 @@ const showCheckCheck = computed(
   () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
 )
 const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
+
+const sendFailureReason = computed(() =>
+  props.message.status === 'failed' ? props.message.meta?.wa_failure_reason : null
+)
+
+const failedAttachmentUUIDs = computed(() => {
+  const sent = props.message.meta?.whatsapp_sent_attachments
+  if (!Array.isArray(sent) || !props.message.attachments?.length) return new Set()
+  const sentSet = new Set(sent)
+  return new Set(
+    props.message.attachments
+      .filter((a) => a.uuid && !sentSet.has(a.uuid))
+      .map((a) => a.uuid)
+  )
+})
+
+const showAttachmentRetry = computed(
+  () =>
+    isOutgoing.value &&
+    props.message.status === 'sent' &&
+    failedAttachmentUUIDs.value.size > 0 &&
+    props.message.sender_id === userStore.userID
+)
 
 const retryMessage = (msg) => {
   api.retryMessage(convStore.current.uuid, msg.uuid)

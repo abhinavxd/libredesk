@@ -30,6 +30,18 @@
             {{ $t('globals.terms.learnMore') }}
           </a>
         </div>
+        <div class="space-y-1">
+          <p class="text-sm font-medium text-foreground">{{ $t('globals.terms.whatsapp') }}</p>
+          <p class="text-sm text-muted-foreground">{{ $t('admin.inbox.help.whatsapp') }}</p>
+          <a
+            href="https://docs.libredesk.io/configuration/whatsapp"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link-style text-sm"
+          >
+            {{ $t('globals.terms.learnMore') }}
+          </a>
+        </div>
       </div>
     </template>
   </AdminSplitLayout>

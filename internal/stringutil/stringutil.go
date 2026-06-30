@@ -18,12 +18,18 @@ const (
 )
 
 var (
-	regexpNonAlNum  = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
-	regexpSpaces    = regexp.MustCompile(`[\s]+`)
-	uuidV4Regex     = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
-	regexpRefNumber = regexp.MustCompile(`#(\d+)`)
-	regexpConvUUID  = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+	regexpNonAlNum    = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
+	regexpSpaces      = regexp.MustCompile(`[\s]+`)
+	uuidV4Regex       = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
+	regexpRefNumber   = regexp.MustCompile(`#(\d+)`)
+	regexpConvUUID    = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+	waPhoneFormatting = strings.NewReplacer("+", "", "-", "", " ", "", "(", "", ")", "")
 )
+
+// NormalizeWhatsAppPhone strips formatting to the bare digit string Meta uses as the wa_id.
+func NormalizeWhatsAppPhone(s string) string {
+	return waPhoneFormatting.Replace(s)
+}
 
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.
 func SanitizeUTF8(s string) string {
@@ -56,7 +62,17 @@ func SanitizeFilename(fName string) string {
 
 	// Convert to lowercase
 	name = strings.ToLower(name)
-	return filepath.Base(name)
+	name = filepath.Base(name)
+
+	// Fully non-latin names sanitize down to nothing (or just the extension) and break media upload.
+	ext := filepath.Ext(name)
+	if strings.Trim(ext, ".") == "" {
+		ext = ""
+	}
+	if strings.Trim(strings.TrimSuffix(name, ext), ".-_ ") == "" {
+		name = "file" + ext
+	}
+	return name
 }
 
 // RandomAlphanumeric generates a random alphanumeric string of length n.

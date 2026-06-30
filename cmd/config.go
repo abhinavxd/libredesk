@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 
+	"github.com/abhinavxd/libredesk/internal/countries"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/zerodha/fastglue"
 )
@@ -60,4 +61,10 @@ func handleGetConfig(r *fastglue.Request) error {
 	publicSettings["app.sso_providers"] = enabledProviders
 
 	return r.SendEnvelope(publicSettings)
+}
+
+// handleGetCountries returns the static country reference list (dial code, name, emoji, ISO-2) used by phone inputs.
+func handleGetCountries(r *fastglue.Request) error {
+	r.RequestCtx.Response.Header.Set("Cache-Control", "private, max-age=86400")
+	return r.SendEnvelope(json.RawMessage(countries.JSON()))
 }

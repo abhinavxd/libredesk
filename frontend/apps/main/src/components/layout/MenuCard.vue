@@ -18,7 +18,7 @@ import { Badge } from '@shared-ui/components/ui/badge'
 const props = defineProps({
   title: String,
   subTitle: String,
-  icon: [Function, String],
+  icon: [Function, String, Object],
   onClick: Function,
   badge: String
 })
