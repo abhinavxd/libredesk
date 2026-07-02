@@ -724,6 +724,8 @@ VALUES
     ('app.allowed_file_upload_extensions', '["*"]'::jsonb),
 	('app.timezone', '"Asia/Kolkata"'::jsonb),
 	('app.business_hours_id', '""'::jsonb),
+	('app.set_away_on_login', 'false'::jsonb),
+	('app.show_conversation_subject', 'true'::jsonb),
     ('notification.email.username', '"admin@yourcompany.com"'::jsonb),
     ('notification.email.host', '""'::jsonb),
     ('notification.email.port', '587'::jsonb),
