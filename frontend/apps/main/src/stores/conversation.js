@@ -1038,13 +1038,17 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function draftMapKey (uuid, type) {
+    return `${uuid}::${type}`
+  }
+
   async function fetchAllDrafts () {
     try {
       const resp = await api.getAllDrafts()
       const newDrafts = new Map()
       if (resp.data?.data) {
         for (const draft of resp.data.data) {
-          newDrafts.set(draft.conversation_uuid, draft)
+          newDrafts.set(draftMapKey(draft.conversation_uuid, draft.type), draft)
         }
       }
       drafts.value = newDrafts
@@ -1056,22 +1060,30 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  function getDraft (uuid) {
-    return drafts.value.get(uuid)
+  function getDraft (uuid, type) {
+    return drafts.value.get(draftMapKey(uuid, type))
   }
 
-  function setDraft (uuid, draft) {
-    drafts.value.set(uuid, draft)
+  function setDraft (uuid, type, draft) {
+    drafts.value.set(draftMapKey(uuid, type), draft)
     drafts.value = new Map(drafts.value)
   }
 
-  function removeDraft (uuid) {
-    drafts.value.delete(uuid)
+  function removeDraft (uuid, type) {
+    drafts.value.delete(draftMapKey(uuid, type))
     drafts.value = new Map(drafts.value)
   }
 
-  function hasDraft (uuid) {
-    return drafts.value.has(uuid)
+  function hasDraft (uuid, type) {
+    return drafts.value.has(draftMapKey(uuid, type))
+  }
+
+  function conversationHasDraft (uuid) {
+    return hasDraft(uuid, 'reply') || hasDraft(uuid, 'private_note')
+  }
+
+  function conversationDraftPreview (uuid) {
+    return getDraft(uuid, 'reply') || getDraft(uuid, 'private_note')
   }
 
 
@@ -1159,6 +1171,8 @@ export const useConversationStore = defineStore('conversation', () => {
     setDraft,
     removeDraft,
     hasDraft,
+    conversationHasDraft,
+    conversationDraftPreview,
     addPendingMessage,
     replacePendingMessage,
     removePendingMessage,

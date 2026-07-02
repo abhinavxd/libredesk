@@ -13,8 +13,13 @@ import (
 const maxMetaSize = 32 * 1024 // 32KB
 
 type draftReq struct {
+	Type    string          `json:"type"`
 	Content string          `json:"content"`
 	Meta    json.RawMessage `json:"meta"`
+}
+
+func isValidDraftType(t string) bool {
+	return t == "reply" || t == "private_note"
 }
 
 // handleUpsertConversationDraft saves or updates a draft for a conversation.
@@ -42,6 +47,13 @@ func handleUpsertConversationDraft(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
+	if req.Type == "" {
+		req.Type = "reply"
+	}
+	if !isValidDraftType(req.Type) {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+
 	if len(req.Meta) > maxMetaSize {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
@@ -51,7 +63,7 @@ func handleUpsertConversationDraft(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
-	draft, err := app.conversation.UpsertConversationDraft(conv.ID, user.ID, req.Content, req.Meta)
+	draft, err := app.conversation.UpsertConversationDraft(conv.ID, user.ID, req.Type, req.Content, req.Meta)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -82,17 +94,22 @@ func handleGetAllDrafts(r *fastglue.Request) error {
 // handleDeleteConversationDraft deletes a draft for a conversation.
 func handleDeleteConversationDraft(r *fastglue.Request) error {
 	var (
-		app   = r.Context.(*App)
-		auser = r.RequestCtx.UserValue("user").(amodels.User)
-		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		app       = r.Context.(*App)
+		auser     = r.RequestCtx.UserValue("user").(amodels.User)
+		uuid      = r.RequestCtx.UserValue("uuid").(string)
+		draftType = string(r.RequestCtx.QueryArgs().Peek("type"))
 	)
+
+	if draftType != "" && !isValidDraftType(draftType) {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
 
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if err := app.conversation.DeleteConversationDraft(0, uuid, user.ID); err != nil {
+	if err := app.conversation.DeleteConversationDraft(0, uuid, user.ID, draftType); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 

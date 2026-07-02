@@ -48,14 +48,17 @@ const isDraftEmpty = (draft) => {
   return textContent.length === 0 && !hasInlineImage && !hasAttachments && !hasMacroActions
 }
 
+const draftKey = (uuid, type) => `${uuid}::${type}`
+
 /**
- * Composable for managing draft state and persistence
- * Saves to localStorage immediately, syncs to backend on conversation switch/send/unload
- * 
- * @param key - Reactive reference to current draft key
+ * Composable for managing draft state and persistence, keyed per conversation and message type
+ * (reply / private note). Saves to localStorage immediately, syncs to backend on switch/send/unload.
+ *
+ * @param conversationUUID - Reactive reference to the current conversation UUID
+ * @param messageType - Reactive reference to the current message type ('reply' | 'private_note')
  * @param uploadedFiles - Optional reactive reference to uploaded files array
  */
-export function useDraftManager (key, uploadedFiles = null) {
+export function useDraftManager (conversationUUID, messageType, uploadedFiles = null) {
   const conversationStore = useConversationStore()
   const htmlContent = ref('')
   const textContent = ref('')
@@ -72,14 +75,12 @@ export function useDraftManager (key, uploadedFiles = null) {
   /**
    * Save draft to localStorage only
    */
-  const saveDraftLocal = (draftKey) => {
-    if (!draftKey) return
+  const saveDraftLocal = (uuid, type) => {
+    if (!uuid) return
     const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
     const draftMeta = {}
     if (macroActions.length > 0) {
       draftMeta.macro_actions = macroActions
-    } else {
-      delete draftMeta.macro_actions
     }
 
     // Set only required attachment fields
@@ -91,48 +92,33 @@ export function useDraftManager (key, uploadedFiles = null) {
         filename: file.filename,
         content_type: file.content_type
       }))
-    } else {
-      delete draftMeta.attachments
     }
 
-    // Save to localStorage
-    localDrafts.value[draftKey] = { content: htmlContent.value, meta: draftMeta }
-
-    // Mark as dirty for backend sync
+    localDrafts.value[draftKey(uuid, type)] = { content: htmlContent.value, meta: draftMeta }
     isDirty.value = true
   }
 
-  /**
-   * Get draft from localStorage
-   */
-  const getLocalDraft = (draftKey) => localDrafts.value[draftKey] || null
+  const getLocalDraft = (uuid, type) => localDrafts.value[draftKey(uuid, type)] || null
 
-  /**
-   * Remove draft from localStorage
-   */
-  const removeLocalDraft = (draftKey) => {
-    if (localDrafts.value[draftKey]) {
-      delete localDrafts.value[draftKey]
-    }
+  const removeLocalDraft = (uuid, type) => {
+    delete localDrafts.value[draftKey(uuid, type)]
   }
 
   /**
    * Sync localStorage draft to backend
    */
-  const syncDraftToBackend = async (draftKey) => {
-    if (!draftKey || !isDirty.value) return
-    const localDraft = getLocalDraft(draftKey)
+  const syncDraftToBackend = async (uuid, type) => {
+    if (!uuid || !isDirty.value) return
+    const localDraft = getLocalDraft(uuid, type)
     if (!localDraft) return
 
     try {
       if (isDraftEmpty(localDraft)) {
-        // Empty draft - delete instead of save
-        await api.deleteDraft(draftKey)
-        conversationStore.removeDraft(draftKey)
+        await api.deleteDraft(uuid, type)
+        conversationStore.removeDraft(uuid, type)
       } else {
-        // Has content - save draft
-        await api.saveDraft(draftKey, localDraft)
-        conversationStore.setDraft(draftKey, localDraft)
+        await api.saveDraft(uuid, type, localDraft)
+        conversationStore.setDraft(uuid, type, localDraft)
       }
       isDirty.value = false
     } catch (error) {
@@ -155,22 +141,22 @@ export function useDraftManager (key, uploadedFiles = null) {
   /**
    * Load draft from store (pre-fetched on app init)
    */
-  const loadDraft = async (draftKey) => {
-    if (!draftKey) return
+  const loadDraft = async (uuid, type) => {
+    if (!uuid) return
     isLoading.value = true
     isDirty.value = false
     skipNextSave.value = true
     try {
       // Check if there's an unsynced localStorage draft - sync it first
-      const localDraft = getLocalDraft(draftKey)
+      const localDraft = getLocalDraft(uuid, type)
       if (localDraft && !isDraftEmpty(localDraft)) {
-        await api.saveDraft(draftKey, localDraft)
-        conversationStore.setDraft(draftKey, localDraft)
+        await api.saveDraft(uuid, type, localDraft)
+        conversationStore.setDraft(uuid, type, localDraft)
       }
-      removeLocalDraft(draftKey)
+      removeLocalDraft(uuid, type)
 
       // Load from store (drafts pre-fetched on app init)
-      const draft = conversationStore.getDraft(draftKey)
+      const draft = conversationStore.getDraft(uuid, type)
       if (!draft) {
         resetState()
         return
@@ -181,8 +167,8 @@ export function useDraftManager (key, uploadedFiles = null) {
 
       // Check if draft is empty - if so, delete it and return
       if (isDraftEmpty({ content, meta })) {
-        await api.deleteDraft(draftKey)
-        conversationStore.removeDraft(draftKey)
+        await api.deleteDraft(uuid, type)
+        conversationStore.removeDraft(uuid, type)
         resetState()
         return
       }
@@ -201,36 +187,38 @@ export function useDraftManager (key, uploadedFiles = null) {
   /**
    * Clear draft from both localStorage and backend
    */
-  const clearDraft = async (draftKey) => {
-    if (!draftKey) return
-    removeLocalDraft(draftKey)
+  const clearDraft = async (uuid = conversationUUID.value, type = messageType.value) => {
+    if (!uuid) return
+    removeLocalDraft(uuid, type)
     try {
-      await api.deleteDraft(draftKey)
-      conversationStore.removeDraft(draftKey)
+      await api.deleteDraft(uuid, type)
+      conversationStore.removeDraft(uuid, type)
       resetState()
     } catch (error) {
       // Silent fail
     }
   }
 
-
-  // Watch for key changes - sync to backend before switching
+  // Watch for conversation/type changes - sync old draft to backend before loading the new one
   watch(
-    key,
-    async (newKey, oldKey) => {
+    [conversationUUID, messageType],
+    async (newVals, oldVals) => {
+      const [newUuid, newType] = newVals
+      const [oldUuid, oldType] = oldVals || []
+      const changed = newUuid !== oldUuid || newType !== oldType
+      if (!changed) return
+
       // Block saves during transition to prevent race
       isTransitioning.value = true
 
-      // Sync old draft to backend before switching
-      if (newKey !== oldKey && isDirty.value) {
-        await syncDraftToBackend(oldKey)
-        removeLocalDraft(oldKey)
+      if (oldUuid && isDirty.value) {
+        await syncDraftToBackend(oldUuid, oldType)
+        removeLocalDraft(oldUuid, oldType)
       }
 
-      // Load new draft from backend
-      if (newKey && newKey !== oldKey) {
-        await loadDraft(newKey)
-      } else if (!newKey && oldKey) {
+      if (newUuid) {
+        await loadDraft(newUuid, newType)
+      } else {
         resetState()
       }
 
@@ -260,9 +248,9 @@ export function useDraftManager (key, uploadedFiles = null) {
         return
       }
 
-      // Need to make sure not loading or transitioning, as during transition the `key` will change
-      if (!isLoading.value && !isTransitioning.value && key.value) {
-        saveDraftLocal(key.value)
+      // Need to make sure not loading or transitioning, as during transition the key will change
+      if (!isLoading.value && !isTransitioning.value && conversationUUID.value) {
+        saveDraftLocal(conversationUUID.value, messageType.value)
       }
     },
     { debounce: 100, deep: true }
@@ -270,8 +258,8 @@ export function useDraftManager (key, uploadedFiles = null) {
 
   // Sync to backend when page is hidden (tab switch)
   useEventListener(document, 'visibilitychange', async () => {
-    if (document.visibilityState === 'hidden' && isDirty.value && key.value) {
-      await syncDraftToBackend(key.value)
+    if (document.visibilityState === 'hidden' && isDirty.value && conversationUUID.value) {
+      await syncDraftToBackend(conversationUUID.value, messageType.value)
     }
   })
 

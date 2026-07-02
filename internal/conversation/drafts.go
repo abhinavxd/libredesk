@@ -10,11 +10,11 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 )
 
-func (m *Manager) UpsertConversationDraft(conversationID, userID int, content string, meta json.RawMessage) (models.ConversationDraft, error) {
+func (m *Manager) UpsertConversationDraft(conversationID, userID int, draftType, content string, meta json.RawMessage) (models.ConversationDraft, error) {
 	var draft models.ConversationDraft
 	content = rewriteInlineImagesToCID(content)
 
-	if err := m.q.UpsertConversationDraft.Get(&draft, conversationID, userID, content, meta); err != nil {
+	if err := m.q.UpsertConversationDraft.Get(&draft, conversationID, userID, draftType, content, meta); err != nil {
 		m.lo.Error("error upserting conversation draft", "conversation_id", conversationID, "user_id", userID, "error", err)
 		return draft, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -35,14 +35,14 @@ func (m *Manager) GetAllUserDrafts(userID int) ([]models.ConversationDraft, erro
 	return drafts, nil
 }
 
-// DeleteConversationDraft deletes a draft for a conversation by ID or UUID.
-func (m *Manager) DeleteConversationDraft(conversationID int, uuid string, userID int) error {
+// DeleteConversationDraft deletes a draft for a conversation by ID or UUID. An empty draftType deletes all types.
+func (m *Manager) DeleteConversationDraft(conversationID int, uuid string, userID int, draftType string) error {
 	var uuidParam any
 	if uuid != "" {
 		uuidParam = uuid
 	}
 
-	if _, err := m.q.DeleteConversationDraft.Exec(conversationID, uuidParam, userID); err != nil {
+	if _, err := m.q.DeleteConversationDraft.Exec(conversationID, uuidParam, userID, draftType); err != nil {
 		m.lo.Error("error deleting conversation draft", "conversation_id", conversationID, "uuid", uuid, "user_id", userID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

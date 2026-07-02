@@ -150,7 +150,6 @@
 
 <script setup>
 import { ref, watch, computed, toRaw } from 'vue'
-import { useStorage } from '@vueuse/core'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
@@ -222,8 +221,12 @@ const {
   linkedModel: 'messages'
 })
 
-// Setup draft management composable
-const currentDraftKey = computed(() => conversationStore.current?.uuid || null)
+// Message type (reply / private note) always resets to reply when the conversation changes.
+const messageType = ref('reply')
+const currentConversationUUID = computed(() => conversationStore.current?.uuid || null)
+watch(currentConversationUUID, () => { messageType.value = 'reply' }, { flush: 'sync' })
+
+// Setup draft management composable, keyed per conversation and message type.
 const {
   htmlContent,
   textContent,
@@ -231,14 +234,13 @@ const {
   clearDraft,
   loadedAttachments,
   loadedMacroActions
-} = useDraftManager(currentDraftKey, mediaFiles)
+} = useDraftManager(currentConversationUUID, messageType, mediaFiles)
 
 // Rest of existing state
 const openAIKeyPrompt = ref(false)
 const isOpenAIKeyUpdating = ref(false)
 const isEditorFullscreen = ref(false)
 const isSending = ref(false)
-const messageType = useStorage('replyBoxMessageType', 'reply')
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
@@ -459,7 +461,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
 
   // Clear state on success.
   if (!hasMessageSendingErrored) {
-    clearDraft(currentDraftKey.value)
+    clearDraft()
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
     clearMediaFiles()
     emailErrors.value = []
