@@ -97,7 +97,7 @@ type IMAPConfig struct {
 // ClearPasswords masks all config passwords
 func (m *Inbox) ClearPasswords() error {
 	switch m.Channel {
-	case "email":
+	case "email", "twitter":
 		var cfg map[string]interface{}
 		if err := json.Unmarshal(m.Config, &cfg); err != nil {
 			return err
@@ -105,20 +105,22 @@ func (m *Inbox) ClearPasswords() error {
 
 		dummyPassword := strings.Repeat(stringutil.PasswordDummy, 10)
 
-		// Clear IMAP passwords
-		if imapSlice, ok := cfg["imap"].([]interface{}); ok {
-			for _, imapItem := range imapSlice {
-				if imapMap, ok := imapItem.(map[string]interface{}); ok {
-					imapMap["password"] = dummyPassword
+		if m.Channel == "email" {
+			// Clear IMAP passwords
+			if imapSlice, ok := cfg["imap"].([]interface{}); ok {
+				for _, imapItem := range imapSlice {
+					if imapMap, ok := imapItem.(map[string]interface{}); ok {
+						imapMap["password"] = dummyPassword
+					}
 				}
 			}
-		}
 
-		// Clear SMTP passwords
-		if smtpSlice, ok := cfg["smtp"].([]interface{}); ok {
-			for _, smtpItem := range smtpSlice {
-				if smtpMap, ok := smtpItem.(map[string]interface{}); ok {
-					smtpMap["password"] = dummyPassword
+			// Clear SMTP passwords
+			if smtpSlice, ok := cfg["smtp"].([]interface{}); ok {
+				for _, smtpItem := range smtpSlice {
+					if smtpMap, ok := smtpItem.(map[string]interface{}); ok {
+						smtpMap["password"] = dummyPassword
+					}
 				}
 			}
 		}
@@ -128,6 +130,10 @@ func (m *Inbox) ClearPasswords() error {
 			oauthMap["access_token"] = dummyPassword
 			oauthMap["refresh_token"] = dummyPassword
 			oauthMap["client_secret"] = dummyPassword
+		}
+
+		if webhookMap, ok := cfg["webhook"].(map[string]interface{}); ok {
+			webhookMap["consumer_secret"] = dummyPassword
 		}
 
 		clearedConfig, err := json.Marshal(cfg)

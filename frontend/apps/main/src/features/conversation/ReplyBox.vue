@@ -13,7 +13,7 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="processSend(true, true, deferredStatus)">{{
+        <AlertDialogAction @click="processSend(true, true, false, deferredStatus)">{{
           $t('replyBox.sendAnyway')
         }}</AlertDialogAction>
       </AlertDialogFooter>
@@ -30,9 +30,26 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="processSend(false, true, deferredStatus)">{{
+        <AlertDialogAction @click="processSend(false, true, false, deferredStatus)">{{
           $t('replyBox.sendAnyway')
         }}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
+  <AlertDialog :open="showPublicTwitterWarning" @update:open="showPublicTwitterWarning = $event">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Post public reply on X?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This reply will be visible publicly on X. Review the content before posting.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click="processSend(false, true, true, deferredStatus)">
+          Post publicly
+        </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
@@ -249,6 +266,7 @@ const aiPrompts = computed(() => aiPromptStore.prompts)
 const replyBoxContentRef = ref(null)
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
+const showPublicTwitterWarning = ref(false)
 const deferredStatus = ref(null)
 const mentions = ref([])
 
@@ -308,7 +326,7 @@ const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
 
-const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
+const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, skipPublicTwitterCheck = false, statusToSet = null) => {
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
@@ -359,6 +377,17 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
         }
       }
     }
+  }
+
+  if (
+    !isPrivate &&
+    !skipPublicTwitterCheck &&
+    conversationStore.current.inbox_channel === 'twitter' &&
+    conversationStore.current.meta?.twitter_source === 'mention'
+  ) {
+    deferredStatus.value = statusToSet
+    showPublicTwitterWarning.value = true
+    return
   }
   let tempUUID = null
 
@@ -469,7 +498,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   isSending.value = false
 }
 
-const processSendAndSetStatus = (status) => processSend(false, false, status)
+const processSendAndSetStatus = (status) => processSend(false, false, false, status)
 
 /**
  * Watches for changes in the conversation's macro id and update message content.

@@ -282,6 +282,19 @@ WHERE
   OR
   ($3::TEXT != '' AND c.reference_number = $3::TEXT)
 
+-- name: get-conversation-by-twitter-thread
+SELECT id, uuid
+FROM conversations
+WHERE inbox_id = $1
+  AND contact_id = $2
+  AND meta->>'twitter_source' = $3
+  AND (
+    meta->>'dm_thread_id' = $4
+    OR meta->>'conversation_id' = $4
+  )
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC
+LIMIT 1;
 
 -- name: get-conversations-created-after
 SELECT

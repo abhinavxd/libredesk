@@ -83,6 +83,27 @@
       </div>
     </div>
 
+    <div
+      v-if="isPublicTwitterReply && messageType === 'reply'"
+      class="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100"
+    >
+      <div class="flex items-start gap-2">
+        <AlertTriangle class="size-4 mt-0.5 flex-shrink-0" />
+        <div>
+          <p class="font-medium">This reply will be posted publicly on X.</p>
+          <a
+            v-if="tweetUrl"
+            :href="tweetUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline"
+          >
+            View original tweet
+          </a>
+        </div>
+      </div>
+    </div>
+
     <!-- Main tiptap editor -->
     <div class="flex-grow flex flex-col overflow-hidden">
       <Editor
@@ -140,7 +161,7 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
-import { Maximize2, Minimize2 } from 'lucide-vue-next'
+import { AlertTriangle, Maximize2, Minimize2 } from 'lucide-vue-next'
 import Editor from '@main/components/editor/TextEditor.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
@@ -253,6 +274,12 @@ const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)
 const editorRef = ref(null)
+const conversationMeta = computed(() => conversationStore.current?.meta || {})
+const isPublicTwitterReply = computed(() => (
+  conversationStore.current?.inbox_channel === 'twitter' &&
+  conversationMeta.value?.twitter_source === 'mention'
+))
+const tweetUrl = computed(() => conversationMeta.value?.tweet_url || '')
 
 const toggleBcc = async () => {
   showBcc.value = !showBcc.value

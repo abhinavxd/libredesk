@@ -50,6 +50,11 @@ type fromNameAgent struct{ FirstName, LastName, FullName string }
 
 type fromNameInbox struct{ Name string }
 
+type conversationLookupResult struct {
+	ID   int    `db:"id"`
+	UUID string `db:"uuid"`
+}
+
 // Run starts a pool of worker goroutines to handle message dispatching via inbox's channel and processes incoming messages. It scans for
 // pending outgoing messages at the specified read interval and pushes them to the outgoing queue to be sent.
 func (m *Manager) Run(ctx context.Context, incomingQWorkers, outgoingQWorkers, scanInterval time.Duration) {
@@ -313,6 +318,12 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 	case inbox.ChannelLiveChat:
 		// Live chat doesn't use templates for rendering messages.
 		return nil
+	case inbox.ChannelTwitter:
+		// Twitter/X messages are plain text and should not use email templates.
+		message.Content = stringutil.HTML2Text(message.Content)
+		message.TextContent = stringutil.HTML2Text(message.TextContent)
+		message.ContentType = models.ContentTypeText
+		return nil
 	default:
 		m.lo.Warn("unknown message channel", "channel", channel)
 		return fmt.Errorf("unknown message channel: %s", channel)
@@ -495,6 +506,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	}
 
 	var sourceID string
+	contentType := models.ContentTypeHTML
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
@@ -518,6 +530,25 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			m.lo.Error("error generating source message id", "error", err)
 			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
+	case inbox.ChannelTwitter:
+		content = strings.TrimSpace(stringutil.HTML2Text(content))
+		contentType = models.ContentTypeText
+
+		conversation, err := m.GetConversation(0, conversationUUID, "")
+		if err != nil {
+			m.lo.Error("error fetching twitter conversation", "conversation_uuid", conversationUUID, "error", err)
+			return models.Message{}, err
+		}
+
+		conversationMeta := incomingMetaMap(conversation.Meta)
+		if conversationMeta["twitter_source"] == "mention" && len([]rune(content)) > 280 {
+			return models.Message{}, envelope.NewError(envelope.InputError, "Twitter public replies cannot exceed 280 characters", nil)
+		}
+		for k, v := range conversationMeta {
+			if _, exists := metaMap[k]; !exists {
+				metaMap[k] = v
+			}
+		}
 	}
 
 	// Marshal meta.
@@ -540,7 +571,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		SenderType:        models.SenderTypeAgent,
 		Status:            models.MessageStatusPending,
 		Content:           content,
-		ContentType:       models.ContentTypeHTML,
+		ContentType:       contentType,
 		Private:           false,
 		Media:             media,
 		SourceID:          null.StringFrom(sourceID),
@@ -778,10 +809,12 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	// Find or create contact.
 	if senderID == 0 {
 		user := umodels.User{
-			FirstName: in.Contact.FirstName,
-			LastName:  in.Contact.LastName,
-			Email:     in.Contact.Email,
-			Type:      umodels.UserTypeContact,
+			FirstName:      in.Contact.FirstName,
+			LastName:       in.Contact.LastName,
+			Email:          in.Contact.Email,
+			ExternalUserID: in.Contact.ExternalUserID,
+			AvatarURL:      in.Contact.AvatarURL,
+			Type:           umodels.UserTypeContact,
 		}
 		if err := m.userStore.CreateContact(&user); err != nil {
 			m.lo.Error("error creating contact for incoming message", "message_source_id", in.SourceID.String, "error", err)
@@ -1191,6 +1224,17 @@ func (m *Manager) findOrCreateConversation(in models.IncomingMessage) (int, stri
 		err              error
 	)
 
+	if in.Channel == inbox.ChannelTwitter {
+		conversationID, conversationUUID, err = m.findTwitterConversation(in)
+		if err != nil {
+			return 0, "", false, err
+		}
+		if conversationID > 0 {
+			return conversationID, conversationUUID, false, nil
+		}
+		return m.createConversationFromIncoming(in)
+	}
+
 	// Search for existing conversation using the in-reply-to and references.
 	m.lo.Debug("searching conversation using in-reply-to and references", "in_reply_to", in.InReplyTo, "references", in.References)
 
@@ -1203,23 +1247,7 @@ func (m *Manager) findOrCreateConversation(in models.IncomingMessage) (int, stri
 	// Conversation not found, create one.
 	if conversationID == 0 {
 		m.lo.Debug("no conversation found with in-reply-to and references, creating new conversation", "in_reply_to", in.InReplyTo, "references", in.References)
-		lastMessage := stringutil.HTML2Text(in.Content)
-		lastMessageAt := time.Now()
-		conversationID, conversationUUID, err = m.CreateConversation(in.Contact.ID,
-			in.InboxID,
-			lastMessage,
-			lastMessageAt,
-			in.Subject,
-			false, /**append reference number to subject**/
-			nil,   /** meta **/
-			nil,   /** customer attributes **/
-			0,     /** max conversation **/
-			0,     /** rate limit window **/
-		)
-		if err != nil || conversationID == 0 {
-			return 0, "", false, err
-		}
-		return conversationID, conversationUUID, true, nil
+		return m.createConversationFromIncoming(in)
 	}
 
 	// Get UUID for the found conversation ID.
@@ -1228,6 +1256,57 @@ func (m *Manager) findOrCreateConversation(in models.IncomingMessage) (int, stri
 		return 0, "", false, err
 	}
 	return conversationID, conversationUUID, false, nil
+}
+
+func (m *Manager) findTwitterConversation(in models.IncomingMessage) (int, string, error) {
+	meta := incomingMetaMap(in.Meta)
+	source, _ := meta["twitter_source"].(string)
+	threadID := ""
+	switch source {
+	case "dm":
+		threadID, _ = meta["dm_thread_id"].(string)
+	case "mention":
+		threadID, _ = meta["conversation_id"].(string)
+	}
+	if source == "" || threadID == "" {
+		return 0, "", nil
+	}
+
+	var result conversationLookupResult
+	if err := m.q.GetConversationByTwitterThread.Get(&result, in.InboxID, in.Contact.ID, source, threadID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, "", nil
+		}
+		return 0, "", err
+	}
+	return result.ID, result.UUID, nil
+}
+
+func (m *Manager) createConversationFromIncoming(in models.IncomingMessage) (int, string, bool, error) {
+	conversationID, conversationUUID, err := m.CreateConversation(in.Contact.ID,
+		in.InboxID,
+		stringutil.HTML2Text(in.Content),
+		time.Now(),
+		in.Subject,
+		false, /**append reference number to subject**/
+		incomingMetaMap(in.Meta),
+		nil, /** customer attributes **/
+		0,   /** max conversation **/
+		0,   /** rate limit window **/
+	)
+	if err != nil || conversationID == 0 {
+		return 0, "", false, err
+	}
+	return conversationID, conversationUUID, true, nil
+}
+
+func incomingMetaMap(raw json.RawMessage) map[string]any {
+	meta := map[string]any{}
+	if len(raw) == 0 {
+		return meta
+	}
+	_ = json.Unmarshal(raw, &meta)
+	return meta
 }
 
 // messageExistsBySourceID returns conversation ID if a message with any of the given source IDs exists.

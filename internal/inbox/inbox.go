@@ -28,6 +28,7 @@ import (
 const (
 	ChannelEmail    = "email"
 	ChannelLiveChat = "livechat"
+	ChannelTwitter  = "twitter"
 )
 
 var (
@@ -79,6 +80,7 @@ type MessageStore interface {
 type UserStore interface {
 	GetAgent(id int, email string) (umodels.User, error)
 	IsEmailBlocked(email string) (bool, error)
+	GetContactExternalID(id int) (string, error)
 }
 
 // Opts contains the options for initializing the inbox manager.
@@ -91,6 +93,20 @@ type Opts struct {
 type receiverState struct {
 	cancel context.CancelFunc
 	done   chan struct{} // closed when the goroutine exits
+}
+
+type emailInboxUpdateConfig struct {
+	AuthType             string            `json:"auth_type"`
+	OAuth                map[string]string `json:"oauth"`
+	IMAP                 []map[string]any  `json:"imap"`
+	SMTP                 []map[string]any  `json:"smtp"`
+	ReplyTo              string            `json:"reply_to"`
+	EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+}
+
+type twitterInboxUpdateConfig struct {
+	OAuth   map[string]string `json:"oauth"`
+	Webhook map[string]string `json:"webhook"`
 }
 
 type Manager struct {
@@ -340,22 +356,8 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	// Preserve existing passwords if update has empty password
 	switch current.Channel {
 	case "email":
-		var currentCfg struct {
-			AuthType             string            `json:"auth_type"`
-			OAuth                map[string]string `json:"oauth"`
-			IMAP                 []map[string]any  `json:"imap"`
-			SMTP                 []map[string]any  `json:"smtp"`
-			ReplyTo              string            `json:"reply_to"`
-			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
-		}
-		var updateCfg struct {
-			AuthType             string            `json:"auth_type"`
-			OAuth                map[string]string `json:"oauth"`
-			IMAP                 []map[string]any  `json:"imap"`
-			SMTP                 []map[string]any  `json:"smtp"`
-			ReplyTo              string            `json:"reply_to"`
-			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
-		}
+		var currentCfg emailInboxUpdateConfig
+		var updateCfg emailInboxUpdateConfig
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
 			m.lo.Error("error unmarshalling current config", "id", id, "error", err)
@@ -406,6 +408,53 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 		updatedConfig, err := json.Marshal(updateCfg)
 		if err != nil {
 			m.lo.Error("error marshalling updated config", "id", id, "error", err)
+			return imodels.Inbox{}, err
+		}
+		inbox.Config = updatedConfig
+	case "twitter":
+		var currentCfg twitterInboxUpdateConfig
+		var updateCfg map[string]any
+
+		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
+			m.lo.Error("error unmarshalling current twitter config", "id", id, "error", err)
+			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		if len(inbox.Config) == 0 {
+			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "{globals.terms.config}"), nil)
+		}
+		if err := json.Unmarshal(inbox.Config, &updateCfg); err != nil {
+			m.lo.Error("error unmarshalling updated twitter config", "id", id, "error", err)
+			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		if currentCfg.OAuth != nil {
+			oauthMap, _ := updateCfg["oauth"].(map[string]any)
+			if oauthMap == nil {
+				oauthMap = make(map[string]any)
+				updateCfg["oauth"] = oauthMap
+			}
+			for k, v := range currentCfg.OAuth {
+				current, _ := oauthMap[k].(string)
+				if current == "" || strings.Contains(current, stringutil.PasswordDummy) {
+					oauthMap[k] = v
+				}
+			}
+		}
+		if currentCfg.Webhook != nil {
+			webhookMap, _ := updateCfg["webhook"].(map[string]any)
+			if webhookMap == nil {
+				webhookMap = make(map[string]any)
+				updateCfg["webhook"] = webhookMap
+			}
+			if currentCfg.Webhook["consumer_secret"] != "" {
+				currentSecret, _ := webhookMap["consumer_secret"].(string)
+				if currentSecret == "" || strings.Contains(currentSecret, stringutil.PasswordDummy) {
+					webhookMap["consumer_secret"] = currentCfg.Webhook["consumer_secret"]
+				}
+			}
+		}
+		updatedConfig, err := json.Marshal(updateCfg)
+		if err != nil {
+			m.lo.Error("error marshalling updated twitter config", "id", id, "error", err)
 			return imodels.Inbox{}, err
 		}
 		inbox.Config = updatedConfig
@@ -635,6 +684,16 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
+	if webhookMap, ok := cfg["webhook"].(map[string]any); ok {
+		if consumerSecret, ok := webhookMap["consumer_secret"].(string); ok && consumerSecret != "" {
+			encrypted, err := crypto.Encrypt(consumerSecret, m.encryptionKey)
+			if err != nil {
+				return nil, fmt.Errorf("encrypting webhook consumer_secret: %w", err)
+			}
+			webhookMap["consumer_secret"] = encrypted
+		}
+	}
+
 	encrypted, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling encrypted config: %w", err)
@@ -697,6 +756,18 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 					continue
 				}
 				oauthMap[fieldName] = decrypted
+			}
+		}
+	}
+
+	if webhookMap, ok := cfg["webhook"].(map[string]any); ok {
+		if consumerSecret, ok := webhookMap["consumer_secret"].(string); ok && consumerSecret != "" {
+			decrypted, err := crypto.Decrypt(consumerSecret, m.encryptionKey)
+			if err != nil {
+				m.lo.Error("error decrypting webhook consumer secret, clearing field", "error", err)
+				webhookMap["consumer_secret"] = ""
+			} else {
+				webhookMap["consumer_secret"] = decrypted
 			}
 		}
 	}

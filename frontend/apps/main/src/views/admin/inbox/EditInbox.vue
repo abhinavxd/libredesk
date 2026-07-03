@@ -17,6 +17,12 @@
       :available-languages="availableLanguages"
       v-else-if="inbox.channel === 'livechat'"
     />
+    <TwitterInboxForm
+      :initialValues="inbox"
+      :submitForm="submitForm"
+      :isLoading="isLoading"
+      v-else-if="inbox.channel === 'twitter'"
+    />
   </div>
 </template>
 
@@ -25,6 +31,11 @@ import { onMounted, ref } from 'vue'
 import api from '../../../api'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
+import TwitterInboxForm from '@/features/admin/inbox/TwitterInboxForm.vue'
+import {
+  parseTwitterActivityEventTypes,
+  parseTwitterStreamRules
+} from '@/features/admin/inbox/twitterFormSchema.js'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -92,6 +103,51 @@ const submitForm = (values) => {
       ...values,
       channel: inbox.value.channel,
       config: values.config
+    }
+  } else if (inbox.value.channel === 'twitter') {
+    const oauth = { ...values.oauth }
+    for (const key of ['access_token', 'client_secret', 'refresh_token']) {
+      if (oauth[key]?.includes('•')) {
+        oauth[key] = ''
+      }
+    }
+    const webhookConsumerSecret = values.webhook_consumer_secret?.includes('•')
+      ? ''
+      : values.webhook_consumer_secret
+    payload = {
+      name: values.name,
+      from: values.screen_name,
+      channel: inbox.value.channel,
+      enabled: values.enabled ?? true,
+      csat_enabled: values.csat_enabled ?? false,
+      prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
+      config: {
+        account_user_id: values.account_user_id,
+        screen_name: values.screen_name,
+        auth_type: values.auth_type,
+        oauth,
+        provider: values.provider,
+        base_url: values.base_url,
+        delivery_mode: values.delivery_mode,
+        filtered_stream: {
+          rules: parseTwitterStreamRules(values.filtered_stream_rules_json)
+        },
+        webhook: {
+          id: values.webhook_id,
+          url: values.webhook_url,
+          consumer_secret: webhookConsumerSecret
+        },
+        activity: {
+          subscription_id: values.activity_subscription_id,
+          event_types: parseTwitterActivityEventTypes(values.activity_event_types)
+        },
+        ingest_dms: values.ingest_dms,
+        ingest_mentions: values.ingest_mentions,
+        poll_interval: values.poll_interval,
+        scan_since: values.scan_since,
+        dm_cursor: values.dm_cursor,
+        mentions_cursor: values.mentions_cursor
+      }
     }
   }
 
