@@ -91,10 +91,13 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 	// Authenticate based on auth type. Auth failures flag the inbox as
 	// disconnected; a successful auth clears the flag.
 	if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
-		// Refresh OAuth token if needed
+		// Refresh OAuth token if needed. Flag a disconnect only when the provider
+		// rejects our credentials, not on a transient failure reaching it.
 		oauthConfig, _, err := e.refreshOAuthIfNeeded()
 		if err != nil {
-			e.setConnectionStatus(err)
+			if !isTransientOAuthError(err) {
+				e.setConnectionStatus(err)
+			}
 			return err
 		}
 

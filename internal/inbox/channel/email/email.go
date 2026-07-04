@@ -3,7 +3,9 @@ package email
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"sync"
 	"time"
 
@@ -112,12 +114,11 @@ func (e *Email) setConnectionStatus(connErr error) {
 
 	e.connStatusMu.Lock()
 	disconnected := connErr != nil
-	if disconnected == e.disconnected {
-		e.connStatusMu.Unlock()
+	unchanged := disconnected == e.disconnected
+	e.connStatusMu.Unlock()
+	if unchanged {
 		return
 	}
-	e.disconnected = disconnected
-	e.connStatusMu.Unlock()
 
 	if disconnected {
 		e.lo.Warn("inbox disconnected from mail server", "inbox_id", e.id, "error", connErr)
@@ -125,9 +126,24 @@ func (e *Email) setConnectionStatus(connErr error) {
 		e.lo.Info("inbox reconnected to mail server", "inbox_id", e.id)
 	}
 
+	// Cache the new status only once it's persisted, so a failed write is retried
+	// on the next poll instead of being swallowed by the transition check above.
 	if err := e.connStatusCallback(e.id, connErr); err != nil {
 		e.lo.Error("failed to persist inbox connection status", "inbox_id", e.id, "error", err)
+		return
 	}
+
+	e.connStatusMu.Lock()
+	e.disconnected = disconnected
+	e.connStatusMu.Unlock()
+}
+
+// isTransientOAuthError reports whether err is a transport-level failure reaching
+// the OAuth provider (network, DNS, timeout) rather than the provider rejecting our
+// credentials. Transient failures shouldn't flag the inbox as disconnected.
+func isTransientOAuthError(err error) bool {
+	var urlErr *url.Error
+	return errors.As(err, &urlErr)
 }
 
 // Identifier returns the unique identifier of the inbox which is the database ID.
