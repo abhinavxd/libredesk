@@ -108,15 +108,17 @@ type Manager struct {
 
 // Prepared queries.
 type queries struct {
-	GetInbox       *sqlx.Stmt `query:"get-inbox"`
-	GetInboxByUUID *sqlx.Stmt `query:"get-inbox-by-uuid"`
-	GetActive      *sqlx.Stmt `query:"get-active-inboxes"`
-	GetAll         *sqlx.Stmt `query:"get-all-inboxes"`
-	Update         *sqlx.Stmt `query:"update"`
-	Toggle         *sqlx.Stmt `query:"toggle"`
-	SoftDelete     *sqlx.Stmt `query:"soft-delete"`
-	InsertInbox    *sqlx.Stmt `query:"insert-inbox"`
-	UpdateConfig   *sqlx.Stmt `query:"update-config"`
+	GetInbox        *sqlx.Stmt `query:"get-inbox"`
+	GetInboxByUUID  *sqlx.Stmt `query:"get-inbox-by-uuid"`
+	GetActive       *sqlx.Stmt `query:"get-active-inboxes"`
+	GetAll          *sqlx.Stmt `query:"get-all-inboxes"`
+	Update          *sqlx.Stmt `query:"update"`
+	Toggle          *sqlx.Stmt `query:"toggle"`
+	SoftDelete      *sqlx.Stmt `query:"soft-delete"`
+	InsertInbox     *sqlx.Stmt `query:"insert-inbox"`
+	UpdateConfig    *sqlx.Stmt `query:"update-config"`
+	SetDisconnected *sqlx.Stmt `query:"set-inbox-disconnected"`
+	SetConnected    *sqlx.Stmt `query:"set-inbox-connected"`
 }
 
 // New returns a new inbox manager.
@@ -466,6 +468,24 @@ func (m *Manager) SoftDelete(id int) error {
 	if _, err := m.queries.SoftDelete.Exec(id); err != nil {
 		m.lo.Error("error deleting inbox", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
+// MarkDisconnected flags an inbox as disconnected from its mail server.
+func (m *Manager) MarkDisconnected(id int) error {
+	if _, err := m.queries.SetDisconnected.Exec(id); err != nil {
+		m.lo.Error("error marking inbox as disconnected", "inbox_id", id, "error", err)
+		return err
+	}
+	return nil
+}
+
+// MarkConnected clears an inbox's disconnected flag.
+func (m *Manager) MarkConnected(id int) error {
+	if _, err := m.queries.SetConnected.Exec(id); err != nil {
+		m.lo.Error("error marking inbox as connected", "inbox_id", id, "error", err)
+		return err
 	}
 	return nil
 }

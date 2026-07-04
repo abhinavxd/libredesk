@@ -21,6 +21,7 @@ import { onMounted, ref } from 'vue'
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import InboxDataTableDropDown from '@main/features/admin/inbox/InboxDataTableDropDown.vue'
+import InboxConnectionStatus from '@main/features/admin/inbox/InboxConnectionStatus.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Button } from '@shared-ui/components/ui/button'
 import DataTable from '@main/components/datatable/DataTable.vue'
@@ -120,6 +121,11 @@ const columns = [
     cell: function ({ row }) {
       return h('div', { class: 'text-center' }, row.getValue('channel'))
     }
+  },
+  {
+    id: 'status',
+    header: () => h('div', { class: 'text-center' }, t('globals.terms.status', 1)),
+    cell: ({ row }) => h(InboxConnectionStatus, { inbox: row.original })
   },
   {
     accessorKey: 'enabled',

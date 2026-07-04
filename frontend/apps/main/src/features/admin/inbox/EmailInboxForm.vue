@@ -175,22 +175,57 @@
       </div>
     </div>
 
-    <!-- OAuth Connected Status -->
+    <!-- OAuth Connection Status -->
     <div
       v-show="isOAuthInbox"
-      class="box p-4 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+      class="box p-4"
+      :class="
+        isDisconnected
+          ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+          : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+      "
     >
       <div class="flex items-start justify-between">
         <div class="flex items-center space-x-3 flex-1">
-          <CheckCircle2 class="w-5 h-5 text-green-600 flex-shrink-0" />
+          <TriangleAlert v-if="isDisconnected" class="w-5 h-5 text-red-600 flex-shrink-0" />
+          <CheckCircle2 v-else class="w-5 h-5 text-green-600 flex-shrink-0" />
           <div class="flex-1">
-            <p class="font-semibold text-green-900 dark:text-green-100">
-              {{ $t('admin.inbox.oauth.connectedVia', { provider: oauthProvider }) }}
+            <p
+              class="font-semibold"
+              :class="
+                isDisconnected
+                  ? 'text-red-900 dark:text-red-100'
+                  : 'text-green-900 dark:text-green-100'
+              "
+            >
+              {{
+                isDisconnected
+                  ? $t('admin.inbox.oauth.disconnectedTitle')
+                  : $t('admin.inbox.oauth.connectedVia', { provider: oauthProvider })
+              }}
             </p>
-            <p class="text-sm text-green-700 dark:text-green-300">{{ oauthEmail }}</p>
+            <p
+              class="text-sm"
+              :class="
+                isDisconnected
+                  ? 'text-red-700 dark:text-red-300'
+                  : 'text-green-700 dark:text-green-300'
+              "
+            >
+              {{
+                isDisconnected
+                  ? $t('admin.inbox.oauth.disconnectedDescription', { provider: oauthProvider })
+                  : oauthEmail
+              }}
+            </p>
             <p
               v-show="oauthClientId"
-              class="text-xs text-green-600 dark:text-green-400 font-mono mt-1"
+              class="text-xs font-mono mt-1"
+              :class="
+                isDisconnected
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-green-600 dark:text-green-400'
+              "
             >
               {{ $t('globals.terms.clientID') }}: {{ oauthClientId.substring(0, 20) }}...{{
                 oauthClientId.slice(-8)
@@ -810,7 +845,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
-import { CheckCircle2, RefreshCw, Mail, Lightbulb } from 'lucide-vue-next'
+import { CheckCircle2, RefreshCw, Mail, Lightbulb, TriangleAlert } from 'lucide-vue-next'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
@@ -938,6 +973,9 @@ const oauthClientId = computed(() => {
 })
 
 const isMicrosoftInbox = computed(() => form.values.oauth?.provider === PROVIDER_MICROSOFT)
+
+// Not part of the form schema; comes from the inbox record.
+const isDisconnected = computed(() => Boolean(props.initialValues?.disconnected_at))
 
 const submitLabel = computed(() => {
   return (

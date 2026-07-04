@@ -88,11 +88,13 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 
 	defer client.Logout()
 
-	// Authenticate based on auth type
+	// Authenticate based on auth type. Auth failures flag the inbox as
+	// disconnected; a successful auth clears the flag.
 	if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
 		// Refresh OAuth token if needed
 		oauthConfig, _, err := e.refreshOAuthIfNeeded()
 		if err != nil {
+			e.setConnectionStatus(err)
 			return err
 		}
 
@@ -102,13 +104,16 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 			token:    oauthConfig.AccessToken,
 		}
 		if err := client.Authenticate(saslClient); err != nil {
+			e.setConnectionStatus(err)
 			return fmt.Errorf("error authenticating with OAuth to IMAP server: %w", err)
 		}
 	} else {
 		if err := client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
+			e.setConnectionStatus(err)
 			return fmt.Errorf("error logging in to the IMAP server: %w", err)
 		}
 	}
+	e.setConnectionStatus(nil)
 
 	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: true}).Wait(); err != nil {
 		return fmt.Errorf("error selecting mailbox: %w", err)

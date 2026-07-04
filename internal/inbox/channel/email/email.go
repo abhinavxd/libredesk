@@ -41,20 +41,30 @@ type Email struct {
 	userStore            inbox.UserStore
 	wg                   sync.WaitGroup
 	tokenRefreshCallback TokenRefreshCallback
+
+	connStatusCallback ConnectionStatusCallback
+	connStatusMu       sync.Mutex
+	disconnected       bool
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
 // It receives the inbox ID and the updated config with new tokens.
 type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
 
+// ConnectionStatusCallback is called when the inbox's connection health changes.
+// connErr is nil when healthy and the underlying error when disconnected.
+type ConnectionStatusCallback func(inboxID int, connErr error) error
+
 // Opts holds the options required for the email inbox.
 type Opts struct {
-	ID                   int
-	Name                 string
-	Headers              map[string]string
-	Config               models.Config
-	Lo                   *logf.Logger
-	TokenRefreshCallback TokenRefreshCallback // Optional callback for token refresh
+	ID                       int
+	Name                     string
+	Headers                  map[string]string
+	Config                   models.Config
+	Lo                       *logf.Logger
+	TokenRefreshCallback     TokenRefreshCallback     // Optional callback for token refresh
+	Disconnected             bool                     // Seeds the in-memory connection status from the DB
+	ConnectionStatusCallback ConnectionStatusCallback // Optional callback to persist connection status changes
 }
 
 // New returns a new instance of the email inbox.
@@ -87,8 +97,37 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		authType:             opts.Config.AuthType,
 		enablePlusAddressing: opts.Config.EnablePlusAddressing,
 		tokenRefreshCallback: opts.TokenRefreshCallback,
+		connStatusCallback:   opts.ConnectionStatusCallback,
+		disconnected:         opts.Disconnected,
 	}
 	return e, nil
+}
+
+// setConnectionStatus persists a change in connection health, but only when the
+// status actually transitions, to avoid redundant DB writes on every poll.
+func (e *Email) setConnectionStatus(connErr error) {
+	if e.connStatusCallback == nil {
+		return
+	}
+
+	e.connStatusMu.Lock()
+	disconnected := connErr != nil
+	if disconnected == e.disconnected {
+		e.connStatusMu.Unlock()
+		return
+	}
+	e.disconnected = disconnected
+	e.connStatusMu.Unlock()
+
+	if disconnected {
+		e.lo.Warn("inbox disconnected from mail server", "inbox_id", e.id, "error", connErr)
+	} else {
+		e.lo.Info("inbox reconnected to mail server", "inbox_id", e.id)
+	}
+
+	if err := e.connStatusCallback(e.id, connErr); err != nil {
+		e.lo.Error("failed to persist inbox connection status", "inbox_id", e.id, "error", err)
+	}
 }
 
 // Identifier returns the unique identifier of the inbox which is the database ID.

@@ -33,6 +33,7 @@ type Inbox struct {
 	Config             json.RawMessage `db:"config" json:"config"`
 	Secret             null.String     `db:"secret" json:"secret"`
 	LinkedEmailInboxID null.Int        `db:"linked_email_inbox_id" json:"linked_email_inbox_id"`
+	DisconnectedAt     null.Time       `db:"disconnected_at" json:"disconnected_at"`
 }
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.

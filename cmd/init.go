@@ -696,12 +696,22 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		return nil
 	}
 
+	// Callback to persist the inbox connection status (disconnected/reconnected) in DB.
+	connectionStatusCallback := func(inboxID int, connErr error) error {
+		if connErr != nil {
+			return mgr.MarkDisconnected(inboxID)
+		}
+		return mgr.MarkConnected(inboxID)
+	}
+
 	inbox, err := email.New(msgStore, usrStore, email.Opts{
-		ID:                   inboxRecord.ID,
-		Name:                 inboxRecord.Name,
-		Config:               config,
-		Lo:                   initLogger("email_inbox"),
-		TokenRefreshCallback: tokenRefreshCallback,
+		ID:                       inboxRecord.ID,
+		Name:                     inboxRecord.Name,
+		Config:                   config,
+		Lo:                       initLogger("email_inbox"),
+		Disconnected:             inboxRecord.DisconnectedAt.Valid,
+		TokenRefreshCallback:     tokenRefreshCallback,
+		ConnectionStatusCallback: connectionStatusCallback,
 	})
 
 	if err != nil {
