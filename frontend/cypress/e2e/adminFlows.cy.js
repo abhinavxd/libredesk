@@ -121,9 +121,14 @@ describe('Admin setup and outgoing conversation', () => {
   it('replies to the conversation and the email lands in MailHog', () => {
     expect(conversationUuid, 'conversation from previous step').to.be.a('string')
 
+    cy.intercept('GET', '**/messages?page=*').as('loadMessages')
     cy.intercept('POST', `**/api/v1/conversations/${conversationUuid}/messages`).as('sendReply')
 
     cy.visit(`/inboxes/all/conversation/${conversationUuid}`)
+    // Wait for the thread to load before replying: the recipient (To) is derived from the
+    // latest message, so sending before it loads is rejected with "recipient required".
+    cy.wait('@loadMessages')
+    cy.get('input[placeholder="Email addresses separated by comma"]').first().should('not.have.value', '')
     cy.get('.tiptap.ProseMirror').first().click().type(replyBody)
     cy.contains('button', /^Send$/).click() // exact: avoid the adjacent "Send and set status" split button
 

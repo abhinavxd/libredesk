@@ -90,8 +90,12 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     isLoading.value = true
     loadedKey.value = null
     // Prefetch may still be in flight on a fresh page load; reading the store now would apply an empty draft.
+    const before = htmlContent.value
     await conversationStore.draftsReady
-    applyDraft(conversationStore.getDraft(uuid, type))
+    // If the user typed while drafts were still loading, keep their input instead of clobbering it.
+    if (htmlContent.value === before) {
+      applyDraft(conversationStore.getDraft(uuid, type))
+    }
     loadedKey.value = draftKey(uuid, type)
     isLoading.value = false
   }
