@@ -27,6 +27,8 @@ export const useConversationStore = defineStore('conversation', () => {
   const currentCC = ref([])
   const macros = ref({})
   const drafts = ref(new Map())
+  let resolveDraftsReady
+  const draftsReady = new Promise((resolve) => { resolveDraftsReady = resolve })
   const userStore = useUserStore()
   const router = useRouter()
   const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
@@ -1057,6 +1059,8 @@ export const useConversationStore = defineStore('conversation', () => {
         variant: 'destructive',
         description: handleHTTPError(e).message
       })
+    } finally {
+      resolveDraftsReady()
     }
   }
 
@@ -1166,6 +1170,7 @@ export const useConversationStore = defineStore('conversation', () => {
     typingByUUID,
     sendTyping,
     drafts,
+    draftsReady,
     fetchAllDrafts,
     getDraft,
     setDraft,

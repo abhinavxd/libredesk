@@ -221,10 +221,22 @@ const {
   linkedModel: 'messages'
 })
 
-// Message type (reply / private note) always resets to reply when the conversation changes.
 const messageType = ref('reply')
 const currentConversationUUID = computed(() => conversationStore.current?.uuid || null)
-watch(currentConversationUUID, () => { messageType.value = 'reply' }, { flush: 'sync' })
+// Open in the saved draft's mode so a private-note draft isn't hidden behind the reply tab; await prefetch so hasDraft is accurate on reload.
+watch(
+  currentConversationUUID,
+  async (uuid) => {
+    messageType.value = 'reply'
+    if (!uuid) return
+    await conversationStore.draftsReady
+    if (uuid !== currentConversationUUID.value) return
+    if (!conversationStore.hasDraft(uuid, 'reply') && conversationStore.hasDraft(uuid, 'private_note')) {
+      messageType.value = 'private_note'
+    }
+  },
+  { immediate: true }
+)
 
 // Setup draft management composable, keyed per conversation and message type.
 const {
@@ -461,7 +473,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
 
   // Clear state on success.
   if (!hasMessageSendingErrored) {
-    clearDraft()
+    clearDraft(convUUID, isPrivate ? 'private_note' : 'reply')
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
     clearMediaFiles()
     emailErrors.value = []
