@@ -97,18 +97,19 @@ func handleLogout(r *fastglue.Request) error {
 	return r.RedirectURI("/", fasthttp.StatusFound, nil, "")
 }
 
-// applyLoginAvailability invalidates the agent cache and, if set_away_on_login is enabled,
-// sets the agent to away and broadcasts the change.
+// applyLoginAvailability sets the agent away on login if set_away_on_login is enabled.
 func applyLoginAvailability(app *App, userID int) {
 	app.Lock()
 	setAway := ko.Bool("app.set_away_on_login")
 	app.Unlock()
-	app.user.InvalidateAgentCache(userID)
 	if setAway {
 		if err := app.user.UpdateAvailability(userID, umodels.AwayManual); err != nil {
 			app.lo.Error("error setting availability on login", "error", err)
 			return
 		}
+	}
+	app.user.InvalidateAgentCache(userID)
+	if setAway {
 		go app.conversation.BroadcastAgentAvailability(userID, umodels.AwayManual)
 	}
 }

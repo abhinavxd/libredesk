@@ -69,7 +69,7 @@ export const hexToHSL = (hex) => {
  * @returns {string} HSL string ready for a CSS variable
  */
 export const getContrastingHSL = (hex) => {
-  return relativeLuminance(hex) > 0.5 ? DARK_FOREGROUND_HSL : LIGHT_FOREGROUND_HSL
+  return relativeLuminance(hex) > 0.179 ? DARK_FOREGROUND_HSL : LIGHT_FOREGROUND_HSL
 }
 
 // WCAG contrast ratio between two hex colors, from 1 (identical) to 21 (black/white).
