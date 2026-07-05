@@ -18,10 +18,6 @@ type draftReq struct {
 	Meta    json.RawMessage `json:"meta"`
 }
 
-func isValidDraftType(t string) bool {
-	return t == "reply" || t == "private_note"
-}
-
 // handleUpsertConversationDraft saves or updates a draft for a conversation.
 func handleUpsertConversationDraft(r *fastglue.Request) error {
 	var (
@@ -114,4 +110,8 @@ func handleDeleteConversationDraft(r *fastglue.Request) error {
 	}
 
 	return r.SendEnvelope(true)
+}
+
+func isValidDraftType(t string) bool {
+	return t == "reply" || t == "private_note"
 }
