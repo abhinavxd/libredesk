@@ -3,6 +3,7 @@ package main
 import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -60,7 +61,8 @@ func handleLogin(r *fastglue.Request) error {
 	if err := app.user.UpdateLastLoginAt(user.ID); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	app.user.InvalidateAgentCache(user.ID)
+
+	applyLoginAvailability(app, user.ID)
 
 	// Insert activity log.
 	if err := app.activityLog.Login(user.ID, user.Email.String, ip); err != nil {
@@ -93,4 +95,21 @@ func handleLogout(r *fastglue.Request) error {
 	r.RequestCtx.Response.Header.Add("Pragma", "no-cache")
 	r.RequestCtx.Response.Header.Add("Expires", "-1")
 	return r.RedirectURI("/", fasthttp.StatusFound, nil, "")
+}
+
+// applyLoginAvailability sets the agent away on login if set_away_on_login is enabled.
+func applyLoginAvailability(app *App, userID int) {
+	app.Lock()
+	setAway := ko.Bool("app.set_away_on_login")
+	app.Unlock()
+	if setAway {
+		if err := app.user.UpdateAvailability(userID, umodels.AwayManual); err != nil {
+			app.lo.Error("error setting availability on login", "error", err)
+			return
+		}
+	}
+	app.user.InvalidateAgentCache(userID)
+	if setAway {
+		go app.conversation.BroadcastAgentAvailability(userID, umodels.AwayManual)
+	}
 }

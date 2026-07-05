@@ -9,6 +9,7 @@
         return;
     }
     window.__libredeskWidgetLoaded = true;
+    const DEFAULT_LAUNCHER_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAmRQTFRFAAAAERclERgnERgnERgnEBcoERgnEhgmERknEhcnERgnERgnERgnERgnERgnERgnERgnERgnERgnERgnERgnEhkoAD0wERgmERgnERgnERgnERgnERgnERgnERgnERgnERgnEhclERgmERgnERgnERgnERgnERgoERknERkmERgnERgnERgnERgnEhgnExkmERknERgnERgnERgnERcnERgnERgnERgnERgnERgnEBgnEhUcERgmERgnERgnERgnDA4uDBAcERgnERcoBw4vERgnERgnERgnERgnERgnERgoEBgoERcoERolERgnERooEhgnERgnEBkoERgnERknERgnERgnERgnERgnEhgoERgnEhcnERgnEhcmERgnEhgmERgnEhgmERgnERgnERgpERgoERgnERknERgnERgnERgnEhgnERgnERgnERgnERgnERcmEBcmERgnERgnEhknERgmERgnExYnEhkoEhgnERgnERgnEhgnERgnERgnEhgnERgnERgnERgnEhgnERgmEhkoERgnERgnERgnERgnERgnERcnERcnEhcnERgnEBgjERgnDxokERkmERgnERgnERgnERgoEBcoERgnERgnERYpERgmEhYdERgnERgnERgmDRIZDxUoERgnERgnERgnERknERgmERgnEBcnERgnERgnERgnEhcnEhcnERgnERgmERkmERgnERcoERgnEhknEhknERgnERgmERgnERgnERgnERgnEBknERgmERgmERgnEBcmFBcmERgnERcmERknERslERgnERgnDxkowSUfnQAAAMx0Uk5TAAcNExYZGA4HHUNrlbXP3+fmtpZsRR4BD0aRxuz/7ceTRxARW+/wu2EZBkux8/e6Twggiu6SIzi8/P3APgFS19pXAgHg5F4CUuFWOtY+HiIGiwhHThS3FvZfDrMQPhnCHURkagWMlAcMrw0Rxc4TFdje5RgZFN0TDK0EBmP+aTzrQhgchY49RA2utAie9B8TW0sFoAYp0135NwmhUSRVAWLUUAEHpvu5Ny6IHWPysAYKqBIo41uJPQ34FzusxMNiPRibCAQLFgwEci4RpmpYSgAAAzdJREFUeJzt12tIU2EYB/DzL41ULKxIP6hEfkiECALRELsgiVHZJAQzF80JGWaWIFpWgtjFUjMrpVBa4AVJyzIqK/ogRpnRBYphNyqUVKIsjdK52bbKlpk+r77Hvjz/D2PsPOf8f5ydvecMyn8OGMAABjCAAQxgAAMYwAAGMIABDGAAAxjAgInsa49l0Anf/gPABfgNsKVzMgFe9krHw9jyarIAfvgw+++TbjslxskABFiLukfc4mHd8lB1wGJ0/nsfT+CeyoAgoG2UzT5Ak5qA0LGvND/glmqAMMvU1jGH/IEGtQAReEKY8ne+ohJgNR6T5vzc61UBRHa1Eyd951xUAaBBx2jXv2N8Xgeflw9Y30yf9ZxXIx0QbfxE7leUJaiWDVjxfuT1d+SEoEoyIBaNAv2KMmthuVyA1ih2v3fpeScXEHVfqN/6yNAiFbBJbIG3xrLSIBOgrXcXBCDsjExA/A3BfkUJL5MISMA1YcAqnJIHSMRlYUC3tlgeIAn0u8uvaFAkD5CCWmHA5y8D8gBOyeSby1CikS8RsHzsR7Hh6dXnyQOkGWnPQo7ZUCDxK0iqmyIM0LjmygNkgHhvc8jSKos8wO6GLmGAV/h+eQBlDwyiAF02aYwIyOo5J9ivR5ZMQHbDW0HAOs+9MgFKTp9BDJCYSZujAg4Ui/2NnR6/Sy7gEE4IAZIfVcoFHMExkf4dJS+Ik1RAwaWXIoCZ+p2SAYV3bwv0D6alUEeJgCIcFuj37tdtkww4iYMCAFe3B+RZIqAEpIX9Rxat3UIfpgFOg7aw27MgJoE+TASUpc6g98dCJx1gKPhIPWAOoBXopwHKkUE8XC4QI1JPBFTfIT6V6wMQLdZPA9T0p1PGClERFyXYTwLU4Y9lJaRjjfm4zjBsaPPZwtLESNF6GqAeW4feZ1rM81vN5q/OV4PcHAy9AZlAhHg9DbAv5OcP2+NN3oDFvN3+/jra505D21PT81RLeh6wbDztREDjRturd1CgqTg/1OHzJlS6Hm28UFuB4HG2EwHN3QmlJrPJ91nc+HsmBGix9N0MNGtUaCcCVA0DGMAABjCAAQxgAAMYwAAGMIABDGAAA74DhTG6gQJjoUQAAAAASUVORK5CYII=';
 
     class Libredesk {
         constructor(config = {}) {
@@ -197,17 +198,15 @@
                 transition: transform 0.3s ease;
             `;
 
-            if (launcher.logo_url) {
-                this.defaultIcon = document.createElement('img');
-                this.defaultIcon.src = launcher.logo_url;
-                this.defaultIcon.style.cssText = `
-                    width: 100%;
-                    height: 100%;
-                    border-radius: 50%;
-                    object-fit: cover;
-                `;
-                this.iconContainer.appendChild(this.defaultIcon);
-            }
+            this.defaultIcon = document.createElement('img');
+            this.defaultIcon.src = launcher.logo_url || DEFAULT_LAUNCHER_LOGO;
+            this.defaultIcon.style.cssText = `
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                object-fit: cover;
+            `;
+            this.iconContainer.appendChild(this.defaultIcon);
 
             this.arrowIcon = document.createElement('div');
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

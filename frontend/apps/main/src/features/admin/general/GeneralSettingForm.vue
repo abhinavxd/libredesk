@@ -154,6 +154,30 @@
     </FormField>
     </div>
 
+    <div class="grid gap-6 md:grid-cols-2">
+      <FormField v-slot="{ componentField, handleChange }" name="set_away_on_login">
+        <FormItem>
+          <SwitchField
+            :title="t('admin.general.setAwayOnLogin')"
+            :description="t('admin.general.setAwayOnLogin.description')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField, handleChange }" name="show_conversation_subject">
+        <FormItem>
+          <SwitchField
+            :title="t('admin.general.showConversationSubject')"
+            :description="t('admin.general.showConversationSubject.description')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
+    </div>
+
     <Button type="submit" :isLoading="formLoading"> {{ submitLabel }} </Button>
   </form>
 </template>
@@ -193,6 +217,7 @@ import { useEmitter } from '../../../composables/useEmitter.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { timeZones } from '../../../constants/timezones.js'
 import { useI18n } from 'vue-i18n'
+import SwitchField from '@shared-ui/components/SwitchField.vue'
 import api from '../../../api/index.js'
 
 const emitter = useEmitter()

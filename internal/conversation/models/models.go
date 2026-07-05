@@ -175,6 +175,7 @@ type Conversation struct {
 	AssignedUserID            null.Int               `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID            null.Int               `db:"assigned_team_id" json:"assigned_team_id"`
 	WaitingSince              null.Time              `db:"waiting_since" json:"waiting_since"`
+	SnoozedUntil              null.Time              `db:"snoozed_until" json:"snoozed_until"`
 	Subject                   null.String            `db:"subject" json:"subject"`
 	InboxMail                 string                 `db:"inbox_mail" json:"inbox_mail"`
 	InboxReplyTo              string                 `db:"inbox_reply_to" json:"inbox_reply_to"`
