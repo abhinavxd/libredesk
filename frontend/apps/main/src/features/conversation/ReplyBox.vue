@@ -223,7 +223,7 @@ const {
 
 const messageType = ref('reply')
 const currentConversationUUID = computed(() => conversationStore.current?.uuid || null)
-// Open in the saved draft's mode so a private-note draft isn't hidden behind the reply tab; await prefetch so hasDraft is accurate on reload.
+// Open in whichever type has a saved draft; needs the prefetch complete for hasDraft to be accurate.
 watch(
   currentConversationUUID,
   async (uuid) => {
@@ -508,9 +508,7 @@ watch(
 watch(
   loadedMacroActions,
   (actions) => {
-    if (actions.length > 0) {
-      conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
-    }
+    conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
   },
   { deep: true }
 )
@@ -521,9 +519,7 @@ watch(
 watch(
   loadedAttachments,
   (attachments) => {
-    if (attachments.length > 0) {
-      setMediaFiles([...attachments])
-    }
+    setMediaFiles([...attachments])
   },
   { deep: true }
 )

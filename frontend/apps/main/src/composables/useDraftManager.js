@@ -40,7 +40,6 @@ const isDraftEmpty = (draft) => {
 
 const draftKey = (uuid, type) => `${uuid}::${type}`
 
-// Compare only the meaningful bits so equal drafts don't churn the backend on every load.
 const metaSignature = (meta) =>
   JSON.stringify({
     macro_actions: meta?.macro_actions || [],
@@ -52,7 +51,6 @@ const sameDraft = (a, b) => {
   return (a?.content || '') === (b?.content || '') && metaSignature(a?.meta) === metaSignature(b?.meta)
 }
 
-// Per-conversation, per-type draft state; the server-backed store is the single source of truth and edits debounce back to it.
 export function useDraftManager (conversationUUID, messageType, uploadedFiles = null) {
   const conversationStore = useConversationStore()
   const htmlContent = ref('')
@@ -61,7 +59,7 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
   const loadedAttachments = ref([])
   const loadedMacroActions = ref([])
 
-  // Saves fire only while this equals the live key, keeping the transient empty editor during open/switch from clobbering a real draft.
+  // Live-key guard: the editor is transiently empty during open/switch and must not clobber a stored draft.
   const loadedKey = ref(null)
   const currentKey = () => draftKey(conversationUUID.value, messageType.value)
 
@@ -91,7 +89,7 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
   const load = async (uuid, type) => {
     isLoading.value = true
     loadedKey.value = null
-    // Prefetch may still be in flight on a fresh page load; wait rather than read an empty store.
+    // Prefetch may still be in flight on a fresh page load; reading the store now would apply an empty draft.
     await conversationStore.draftsReady
     applyDraft(conversationStore.getDraft(uuid, type))
     loadedKey.value = draftKey(uuid, type)
@@ -144,7 +142,7 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     { deep: true }
   )
 
-  // Flush the outgoing draft, then load the incoming one. Serialized so rapid switches can't interleave.
+  // Serialize switches: a rapid A->B->A must not interleave save and load.
   let chain = Promise.resolve()
   watch(
     [conversationUUID, messageType],
