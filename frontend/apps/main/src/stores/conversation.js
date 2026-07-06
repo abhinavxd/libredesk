@@ -14,6 +14,7 @@ import { getI18n } from '../i18n'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@/constants/conversation'
 import { useThrottleFn } from '@vueuse/core'
 import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
 import { delayedLoading } from '@/utils/delayed-loading'
 import api from '../api'
 
@@ -28,6 +29,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const macros = ref({})
   const drafts = ref(new Map())
   const userStore = useUserStore()
+  const notificationStore = useNotificationStore()
   const router = useRouter()
   const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
 
@@ -682,6 +684,7 @@ export const useConversationStore = defineStore('conversation', () => {
     conversation.data.status = v
     try {
       await api.updateConversationStatus(conversation.data.uuid, { status: v })
+      notificationStore.markAssignmentAsReadForConversation(conversation.data.uuid)
     } catch (error) {
       if (conversation.data) conversation.data.status = previous
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

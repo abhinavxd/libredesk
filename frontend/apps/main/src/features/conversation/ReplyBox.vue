@@ -161,6 +161,7 @@ import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
 import { useAiPromptStore } from '@main/stores/aiPrompt'
+import { useNotificationStore } from '@main/stores/notification'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -205,6 +206,7 @@ const formSchema = toTypedSchema(
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
+const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
@@ -429,6 +431,8 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
       if (isPrivate && response?.data?.data) {
         conversationStore.replacePendingMessage(convUUID, tempUUID, response.data.data)
       }
+
+      notificationStore.markAssignmentAsReadForConversation(convUUID)
     } catch (error) {
       hasMessageSendingErrored = true
       // Remove pending message and restore editor content.
