@@ -37,6 +37,7 @@ type queries struct {
 	GetNotificationStats   *sqlx.Stmt `query:"get-notification-stats"`
 	InsertNotification     *sqlx.Stmt `query:"insert-notification"`
 	MarkAsRead             *sqlx.Stmt `query:"mark-as-read"`
+	MarkAssignmentAsRead   *sqlx.Stmt `query:"mark-assignment-as-read"`
 	MarkAllAsRead          *sqlx.Stmt `query:"mark-all-as-read"`
 	DeleteNotification     *sqlx.Stmt `query:"delete-notification"`
 	DeleteAllNotifications *sqlx.Stmt `query:"delete-all-notifications"`
@@ -100,6 +101,15 @@ func (m *UserNotificationManager) MarkAsRead(id, userID int) error {
 			return nil
 		}
 		m.lo.Error("error marking notification as read", "id", id, "user_id", userID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
+// MarkAssignmentAsRead marks unread assignment notifications as read for a conversation and user.
+func (m *UserNotificationManager) MarkAssignmentAsRead(conversationID, userID int) error {
+	if _, err := m.q.MarkAssignmentAsRead.Exec(conversationID, userID); err != nil {
+		m.lo.Error("error marking assignment notification as read", "conversation_id", conversationID, "user_id", userID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil

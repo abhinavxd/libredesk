@@ -27,6 +27,14 @@ RETURNING id, created_at, updated_at, user_id, notification_type, title, body, i
 -- name: mark-as-read
 UPDATE user_notifications SET is_read = true, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING id;
 
+-- name: mark-assignment-as-read
+UPDATE user_notifications
+SET is_read = true, updated_at = now()
+WHERE conversation_id = $1
+  AND user_id = $2
+  AND notification_type = 'assignment'
+  AND is_read = false;
+
 -- name: mark-all-as-read
 UPDATE user_notifications SET is_read = true, updated_at = now() WHERE user_id = $1 AND is_read = false;
 
