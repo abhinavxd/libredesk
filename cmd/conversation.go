@@ -608,6 +608,7 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 	if err := app.conversation.UpdateConversationStatus(uuid, 0 /**status_id**/, status, snoozedUntil, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	markAssignmentNotificationRead(app, conversation, user)
 
 	// If status is `Resolved`, send CSAT survey if enabled on inbox.
 	if status == cmodels.StatusResolved {
