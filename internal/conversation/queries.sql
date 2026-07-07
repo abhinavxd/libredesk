@@ -200,6 +200,7 @@ SELECT
    c.first_reply_at,
    c.last_reply_at,
    c.waiting_since,
+   c.snoozed_until,
    c.assigned_user_id,
    c.assigned_team_id,
    c.subject,

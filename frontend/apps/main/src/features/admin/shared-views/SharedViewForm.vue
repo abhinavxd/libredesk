@@ -1,7 +1,7 @@
 <template>
   <Spinner v-if="formLoading"></Spinner>
   <form @submit="onSubmit" class="space-y-6 w-full" :class="{ 'opacity-50': formLoading }">
-    <FormField v-slot="{ componentField }" name="name">
+    <FormField v-slot="{ componentField }" name="name" :validate-on-blur="false">
       <FormItem>
         <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
         <FormControl>
@@ -16,7 +16,7 @@
       <FormItem>
         <FormLabel>{{ t('globals.terms.filter', 2) }}</FormLabel>
         <FormControl>
-          <FilterBuilder :fields="filterFields" :showButtons="false" v-bind="componentField" />
+          <FilterGroupBuilder :fields="filterFields" v-bind="componentField" />
         </FormControl>
         <FormDescription>{{ t('view.form.filters.description') }}</FormDescription>
         <FormMessage />
@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, provide } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { Button } from '@shared-ui/components/ui/button'
@@ -87,10 +87,17 @@ import {
   FormLabel,
   FormMessage
 } from '@shared-ui/components/ui/form'
-import FilterBuilder from '@/components/filter/FilterBuilder.vue'
+import FilterGroupBuilder from '@/components/filter/FilterGroupBuilder.vue'
+import {
+  normalizeToTwoLevel,
+  serializeFilterTree,
+  deserializeFilterTree,
+  collectLeaves,
+  isPartialLeaf,
+  createRoot
+} from '@/components/filter/filterTree'
 import { useConversationFilters } from '@/composables/useConversationFilters'
 import { useTeamStore } from '@/stores/team'
-import { OPERATOR, FIELD_TYPE } from '@/constants/filterConfig.js'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import {
   Select,
@@ -106,6 +113,8 @@ import { z } from 'zod'
 const { conversationsListFilters } = useConversationFilters()
 const { t } = useI18n()
 const formLoading = ref(false)
+const validateTick = ref(0)
+provide('filterValidateTick', validateTick)
 const tStore = useTeamStore()
 const props = defineProps({
   initialValues: {
@@ -135,7 +144,7 @@ const submitLabel = computed(() => {
 
 const filterFields = computed(() =>
   Object.entries(conversationsListFilters.value).map(([field, value]) => ({
-    model: 'conversations',
+    model: value.model || 'conversations',
     label: value.label,
     field,
     type: value.type,
@@ -154,22 +163,12 @@ const formSchema = toTypedSchema(
         .min(2, { message: t('view.form.name.length') })
         .max(140, { message: t('view.form.name.length') }),
       filters: z
-        .array(
-          z.object({
-            model: z.string().optional(),
-            field: z.string().optional(),
-            operator: z.string().optional(),
-            value: z
-              .union([
-                z.string(),
-                z.number(),
-                z.boolean(),
-                z.array(z.union([z.string(), z.number()]))
-              ])
-              .optional()
-          })
-        )
-        .default([]),
+        .object({
+          logic: z.string().optional(),
+          rules: z.array(z.any()).optional()
+        })
+        .passthrough()
+        .default(() => createRoot()),
       visibility: z.enum(['all', 'team']),
       team_id: z.string().nullable().optional()
     })
@@ -185,52 +184,31 @@ const formSchema = toTypedSchema(
 const form = useForm({
   validationSchema: formSchema,
   initialValues: {
-    visibility: props.initialValues.visibility || 'all'
+    visibility: props.initialValues.visibility || 'all',
+    filters: createRoot()
   }
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
-  // Make sure at least one filter is selected
-  if (!values.filters || values.filters.length === 0) {
+  const leaves = collectLeaves(values.filters)
+  if (leaves.length === 0) {
     form.setFieldError('filters', t('view.form.filter.selectAtLeastOne'))
     return
   }
-
-  // Check for partial filters
-  const hasPartialFilters = values.filters.some(
-    (f) =>
-      !f.field ||
-      !f.operator ||
-      (![OPERATOR.SET, OPERATOR.NOT_SET].includes(f.operator) &&
-        (!f.value || (Array.isArray(f.value) && f.value.length === 0)))
-  )
-  if (hasPartialFilters) {
-    form.setFieldError('filters', t('view.form.filter.partiallyFilled'))
+  if (leaves.some(isPartialLeaf)) {
+    validateTick.value++
     return
   }
 
-  // Serialize array values to JSON strings for backend
-  if (values.filters) {
-    values.filters = values.filters.map((filter) => {
-      if (Array.isArray(filter.value)) {
-        const numericValues = filter.value.map((v) => {
-          const num = Number(v)
-          return isNaN(num) ? v : num
-        })
-        return { ...filter, value: JSON.stringify(numericValues) }
-      }
-      return filter
-    })
-  }
+  const payload = { ...values, filters: serializeFilterTree(values.filters) }
 
-  // Clear team_id if visibility is 'all', otherwise convert to number
-  if (values.visibility === 'all') {
-    values.team_id = null
+  if (payload.visibility === 'all') {
+    payload.team_id = null
   } else {
-    values.team_id = values.team_id ? Number(values.team_id) : null
+    payload.team_id = payload.team_id ? Number(payload.team_id) : null
   }
 
-  props.submitForm(values)
+  props.submitForm(payload)
 })
 
 watch(
@@ -238,25 +216,11 @@ watch(
   (newValues) => {
     if (Object.keys(newValues).length === 0) return
 
-    // Deserialize multi-select filter values from JSON strings to arrays
     const processedVal = { ...newValues }
-    if (processedVal.filters) {
-      processedVal.filters = processedVal.filters.map((filter) => {
-        const field = filterFields.value.find((f) => f.field === filter.field)
-        const isMultiSelectField = field?.type === FIELD_TYPE.MULTI_SELECT
-
-        if (isMultiSelectField && typeof filter.value === 'string') {
-          try {
-            const parsed = JSON.parse(filter.value)
-            const stringValues = Array.isArray(parsed) ? parsed.map((v) => String(v)) : parsed
-            return { ...filter, value: stringValues }
-          } catch (e) {
-            return filter
-          }
-        }
-        return filter
-      })
-    }
+    processedVal.filters = deserializeFilterTree(
+      normalizeToTwoLevel(newValues.filters),
+      filterFields.value
+    )
 
     // Convert team_id to string for the select component
     if (processedVal.team_id) {

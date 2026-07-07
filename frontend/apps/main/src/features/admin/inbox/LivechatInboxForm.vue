@@ -1,6 +1,5 @@
 <template>
   <form @submit="onSubmit" class="space-y-6 w-full">
-    <!-- Main Tabs -->
     <Tabs v-model="activeTab" class="w-full">
       <TabsList class="flex flex-wrap gap-1 h-auto p-1 w-fit">
         <TabsTrigger value="general">{{ $t('globals.terms.general') }}</TabsTrigger>
@@ -86,7 +85,6 @@
           </FormField>
 
           <div class="grid grid-cols-2 gap-4">
-            <!-- Language -->
             <FormField v-slot="{ componentField }" name="config.language">
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.language') }}</FormLabel>
@@ -106,7 +104,6 @@
               </FormItem>
             </FormField>
 
-            <!-- Fallback Language (shown only when auto-detect is selected) -->
             <FormField v-if="form.values.config?.language === 'auto'" v-slot="{ componentField }" name="config.fallback_language">
               <FormItem>
                 <FormLabel>{{ $t('admin.inbox.livechat.fallbackLanguage') }}</FormLabel>
@@ -128,7 +125,6 @@
           </div>
 
           <div class="grid grid-cols-2 gap-4">
-            <!-- Email Fallback Inbox -->
             <FormField v-slot="{ componentField }" name="linked_email_inbox_id">
               <FormItem>
                 <FormLabel>{{ $t('admin.inbox.livechat.conversationContinuity') }}</FormLabel>
@@ -193,7 +189,6 @@
 
         <!-- Appearance Tab -->
         <div v-show="activeTab === 'appearance'" class="space-y-8">
-          <!-- Logo URL -->
           <FormField v-slot="{ componentField }" name="config.logo_url">
             <FormItem>
               <FormLabel>{{ $t('globals.terms.logoUrl') }}</FormLabel>
@@ -208,7 +203,6 @@
             </FormItem>
           </FormField>
 
-          <!-- Dark mode -->
           <FormField v-slot="{ componentField, handleChange }" name="config.dark_mode">
             <FormItem>
               <SwitchField
@@ -220,7 +214,6 @@
             </FormItem>
           </FormField>
 
-          <!-- Show Powered By -->
           <FormField v-slot="{ componentField, handleChange }" name="config.show_powered_by">
             <FormItem>
               <SwitchField
@@ -243,6 +236,10 @@
                     <Input type="color" v-bind="componentField" />
                   </FormControl>
                   <FormMessage />
+                  <p v-if="lowPrimaryContrast" class="text-sm text-destructive flex items-start gap-1.5">
+                    <TriangleAlert class="size-4 shrink-0 mt-0.5" />
+                    <span>{{ $t('admin.inbox.livechat.colors.primary.contrastWarning') }}</span>
+                  </p>
                 </FormItem>
               </FormField>
             </div>
@@ -252,7 +249,6 @@
           <div class="space-y-4">
             <h4 class="text-base font-semibold text-foreground">{{ $t('globals.terms.homeScreen') }}</h4>
 
-            <!-- Header Text Color -->
             <FormField v-slot="{ componentField }" name="config.home_screen.header_text_color">
               <FormItem>
                 <FormLabel>{{ $t('globals.messages.headerTextColor') }}</FormLabel>
@@ -269,15 +265,18 @@
                   </RadioGroup>
                 </FormControl>
                 <FormDescription>{{ $t('admin.inbox.livechat.homeScreen.headerTextColor.description') }}</FormDescription>
+                <p v-if="lowHeaderContrast" class="text-sm text-destructive flex items-start gap-1.5">
+                  <TriangleAlert class="size-4 shrink-0 mt-0.5" />
+                  <span>{{ $t('admin.inbox.livechat.homeScreen.headerTextColor.contrastWarning') }}</span>
+                </p>
               </FormItem>
             </FormField>
 
-            <!-- Background Type -->
             <FormField v-slot="{ componentField }" name="config.home_screen.background.type">
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.background') }}</FormLabel>
                 <FormControl>
-                  <RadioGroup v-bind="componentField" class="flex gap-4">
+                  <RadioGroup v-bind="componentField" @update:model-value="onBackgroundTypeChange" class="flex gap-4">
                     <div class="flex items-center space-x-2">
                       <RadioGroupItem id="bg-solid" value="solid" />
                       <Label for="bg-solid">{{ $t('globals.terms.solid') }}</Label>
@@ -295,9 +294,8 @@
               </FormItem>
             </FormField>
 
-            <!-- Solid color picker -->
             <div v-if="form.values.config?.home_screen?.background?.type === 'solid'" class="grid grid-cols-2 gap-4">
-              <FormField v-slot="{ componentField }" name="config.home_screen.background.color">
+              <FormField v-slot="{ componentField }" name="config.home_screen.background.color" keep-value>
                 <FormItem>
                   <FormLabel>{{ $t('globals.messages.backgroundColor') }}</FormLabel>
                   <FormControl>
@@ -308,9 +306,8 @@
               </FormField>
             </div>
 
-            <!-- Gradient color pickers -->
             <div v-if="form.values.config?.home_screen?.background?.type === 'gradient'" class="grid grid-cols-2 gap-4">
-              <FormField v-slot="{ componentField }" name="config.home_screen.background.gradient_start">
+              <FormField v-slot="{ componentField }" name="config.home_screen.background.gradient_start" keep-value>
                 <FormItem>
                   <FormLabel>{{ $t('globals.messages.gradientStart') }}</FormLabel>
                   <FormControl>
@@ -319,7 +316,7 @@
                   <FormMessage />
                 </FormItem>
               </FormField>
-              <FormField v-slot="{ componentField }" name="config.home_screen.background.gradient_end">
+              <FormField v-slot="{ componentField }" name="config.home_screen.background.gradient_end" keep-value>
                 <FormItem>
                   <FormLabel>{{ $t('globals.messages.gradientEnd') }}</FormLabel>
                   <FormControl>
@@ -330,8 +327,7 @@
               </FormField>
             </div>
 
-            <!-- Image URL -->
-            <FormField v-if="form.values.config?.home_screen?.background?.type === 'image'" v-slot="{ componentField }" name="config.home_screen.background.image_url">
+            <FormField v-if="form.values.config?.home_screen?.background?.type === 'image'" v-slot="{ componentField }" name="config.home_screen.background.image_url" keep-value>
               <FormItem>
                 <FormLabel>{{ $t('globals.messages.backgroundImageUrl') }}</FormLabel>
                 <FormControl>
@@ -341,7 +337,6 @@
               </FormItem>
             </FormField>
 
-            <!-- Fade Background -->
             <FormField v-slot="{ componentField, handleChange }" name="config.home_screen.fade_background">
               <FormItem>
                 <SwitchField
@@ -403,6 +398,10 @@
                       {{ $t('globals.messages.addExternalLink') }}
                     </Button>
                   </div>
+                  <p v-if="showHomeAppsError && incompleteHomeApps" class="text-sm text-destructive flex items-start gap-1.5">
+                    <TriangleAlert class="size-4 shrink-0 mt-0.5" />
+                    <span>{{ $t('admin.inbox.livechat.homeApps.incomplete') }}</span>
+                  </p>
                 </div>
                 <FormMessage />
               </FormItem>
@@ -414,7 +413,6 @@
             <h4 class="text-base font-semibold text-foreground">{{ $t('admin.inbox.livechat.launcher') }}</h4>
 
             <div class="grid grid-cols-2 gap-4">
-              <!-- Launcher Position -->
               <FormField v-slot="{ componentField }" name="config.launcher.position">
                 <FormItem>
                   <FormLabel>{{ $t('admin.inbox.livechat.launcher.position') }}</FormLabel>
@@ -437,7 +435,6 @@
                 </FormItem>
               </FormField>
 
-              <!-- Launcher Logo -->
               <FormField v-slot="{ componentField }" name="config.launcher.logo_url">
                 <FormItem>
                   <FormLabel>{{ $t('admin.inbox.livechat.launcher.logo') }}</FormLabel>
@@ -454,7 +451,6 @@
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-              <!-- Launcher Color -->
               <FormField v-slot="{ componentField }" name="config.launcher.color">
                 <FormItem>
                   <FormLabel>{{ $t('admin.inbox.livechat.launcher.color') }}</FormLabel>
@@ -467,7 +463,6 @@
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-              <!-- Launcher Spacing Side -->
               <FormField v-slot="{ componentField }" name="config.launcher.spacing.side">
                 <FormItem>
                   <FormLabel>{{ $t('admin.inbox.livechat.launcher.spacing.side') }}</FormLabel>
@@ -481,7 +476,6 @@
                 </FormItem>
               </FormField>
 
-              <!-- Launcher Spacing Bottom -->
               <FormField v-slot="{ componentField }" name="config.launcher.spacing.bottom">
                 <FormItem>
                   <FormLabel>{{ $t('admin.inbox.livechat.launcher.spacing.bottom') }}</FormLabel>
@@ -698,6 +692,10 @@
                   $t('admin.inbox.livechat.secretKey.description')
                 }}</FormDescription>
                 <FormMessage />
+                <p v-if="weakSecret" class="!mt-2 text-muted-foreground text-xs flex items-start gap-1.5">
+                  <TriangleAlert class="size-4 shrink-0 mt-0.5" />
+                  <span>{{ $t('admin.inbox.livechat.secretKey.weak') }}</span>
+                </p>
               </FormItem>
             </FormField>
 
@@ -977,7 +975,7 @@
 </template>
 
 <script setup>
-import { watch, computed, ref, onMounted } from 'vue'
+import { watch, computed, ref, inject, onMounted, onBeforeUnmount } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './livechatFormSchema.js'
@@ -1009,8 +1007,48 @@ import Draggable from 'vuedraggable'
 import { useI18n } from 'vue-i18n'
 import PreChatFormConfig, { getDefaultPrechatFields } from './PreChatFormConfig.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'
+import { useEmitter } from '@/composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import CopyButton from '@/components/button/CopyButton.vue'
 import CodeEditor from '@/components/editor/CodeEditor.vue'
+import { contrastRatio } from '@shared-ui/utils/color'
+
+// Warn only when a color is nearly indistinguishable from what it sits on; merely-low
+// (but perceptible) contrast is left to the user's judgment, so this sits below WCAG's 3.
+const MIN_CONTRAST = 2
+const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
+// Widget page background shown when no explicit header color is set (mirrors --background in main.scss).
+const WIDGET_BG = { light: '#ffffff', dark: '#1a1a1e' }
+const DEFAULT_GRADIENT_START = '#2563eb'
+const DEFAULT_GRADIENT_END = '#1e40af'
+
+// Maps a field path prefix to its tab, so a failed submit jumps to the tab holding the error.
+// Ordered: specific prefixes before the general-tab fallbacks.
+const FIELD_TAB = [
+  ['config.home_screen', 'appearance'],
+  ['config.colors', 'appearance'],
+  ['config.launcher', 'appearance'],
+  ['config.home_apps', 'appearance'],
+  ['config.logo_url', 'appearance'],
+  ['config.notice_banner', 'messages'],
+  ['config.greeting_message', 'messages'],
+  ['config.introduction_message', 'messages'],
+  ['config.chat_introduction', 'messages'],
+  ['config.chat_reply_expectation_message', 'messages'],
+  ['config.features', 'features'],
+  ['config.prechat_form', 'prechat'],
+  ['config.visitors', 'users'],
+  ['config.users', 'users'],
+  ['config.session_duration', 'security'],
+  ['config.trusted_domains', 'security'],
+  ['config.blocked_ips', 'security'],
+  ['secret', 'security'],
+  ['config.continuity', 'general'],
+  ['config.brand_name', 'general'],
+  ['config.website_url', 'general'],
+  ['config.language', 'general'],
+  ['name', 'general'],
+]
 
 const props = defineProps({
   initialValues: {
@@ -1051,29 +1089,28 @@ const prechatConfig = ref({
 
 const inboxStore = useInboxStore()
 const appSettingsStore = useAppSettingsStore()
+const emitter = useEmitter()
 
 const emailInboxes = computed(() =>
   inboxStore.inboxes.filter((inbox) => inbox.channel === 'email' && inbox.enabled)
 )
 
-// Get base URL from app settings
 const baseUrl = computed(() => {
   return appSettingsStore.settings?.['app.root_url'] || window.location.origin
 })
 
-// Generate integration snippet
+const inboxUUID = computed(() => props.initialValues?.uuid || '<INBOX_UUID>')
+
 const integrationSnippet = computed(() => {
-  const inboxUUID = props.initialValues?.uuid || '<INBOX_UUID>'
   return `<script>
   window.LibredeskSettings = {
     baseURL: '${baseUrl.value}',
-    inboxID: '${inboxUUID}'
+    inboxID: '${inboxUUID.value}'
   };
 <\/script>
 <script async src="${baseUrl.value}/widget.js"><\/script>`
 })
 
-// JWT payload example
 const jwtPayloadExample = computed(() => {
   return `{
   "external_user_id": "your_app_user_123",    // Required: Your system's unique user ID
@@ -1088,22 +1125,18 @@ const jwtPayloadExample = computed(() => {
 }`
 })
 
-// Authenticated integration snippet
 const authenticatedIntegrationSnippet = computed(() => {
-  const inboxUUID = props.initialValues?.uuid || '<INBOX_UUID>'
   return `<script>
   window.LibredeskSettings = {
     baseURL: '${baseUrl.value}',
-    inboxID: '${inboxUUID}',
+    inboxID: '${inboxUUID.value}',
     userJWT: 'YOUR_SIGNED_JWT_TOKEN_HERE' // Generated by your server
   };
 <\/script>
 <script async src="${baseUrl.value}/widget.js"><\/script>`
 })
 
-// JavaScript API example
 const jsApiSnippet = computed(() => {
-  const inboxUUID = props.initialValues?.uuid || '<INBOX_UUID>'
   return `window.Libredesk.show();
 window.Libredesk.hide();
 window.Libredesk.toggle();
@@ -1156,12 +1189,12 @@ const form = useForm({
         primary: '#2563eb'
       },
       home_screen: {
-        header_text_color: 'white',
+        header_text_color: 'black',
         background: {
           type: 'solid',
-          color: '',
-          gradient_start: '#2563eb',
-          gradient_end: '#1e40af',
+          color: '#ffffff',
+          gradient_start: DEFAULT_GRADIENT_START,
+          gradient_end: DEFAULT_GRADIENT_END,
           image_url: ''
         },
         fade_background: false
@@ -1205,6 +1238,74 @@ const submitLabel = computed(() => {
   return props.submitLabel || (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
 })
 
+const lowHeaderContrast = computed(() => {
+  const hs = form.values.config?.home_screen
+  if (!hs?.background) return false
+
+  const textColor = hs.header_text_color === 'black' ? '#000000' : '#ffffff'
+  const pageBg = form.values.config?.dark_mode ? WIDGET_BG.dark : WIDGET_BG.light
+  // An empty/unset color renders the widget's page background, so measure against that.
+  const isLow = (bg) =>
+    HEX_COLOR.test(bg) && contrastRatio(textColor, bg) < MIN_CONTRAST
+
+  switch (hs.background.type) {
+    case 'solid':
+      return isLow(hs.background.color || pageBg)
+    case 'gradient':
+      return isLow(hs.background.gradient_start) || isLow(hs.background.gradient_end)
+    default:
+      return false
+  }
+})
+
+// Primary is used as a fill (buttons, message bubbles, badges) over the widget background,
+// so warn if it blends into the background of the configured light/dark mode.
+const lowPrimaryContrast = computed(() => {
+  const primary = form.values.config?.colors?.primary
+  if (!HEX_COLOR.test(primary)) return false
+  const pageBg = form.values.config?.dark_mode ? WIDGET_BG.dark : WIDGET_BG.light
+  return contrastRatio(primary, pageBg) < MIN_CONTRAST
+})
+
+// Advisory only: a short secret weakens HS256 JWT signing. Not enforced, since a hard
+// minimum would force rotating existing secrets and break live integrations.
+const weakSecret = computed(() => {
+  const s = form.values.secret
+  return typeof s === 'string' && s.length > 0 && s.length < 32
+})
+
+// home_apps in form.values only syncs on change events, so pull the live ref for the preview.
+const previewConfig = computed(() => ({
+  ...form.values.config,
+  home_apps: homeApps.value
+}))
+
+// InboxView renders the preview in the help rail; feed it this form's live config while mounted.
+const livechatPreview = inject('livechatPreview', null)
+watch(
+  previewConfig,
+  (cfg) => {
+    if (livechatPreview) livechatPreview.value = cfg
+  },
+  { immediate: true, deep: true }
+)
+onBeforeUnmount(() => {
+  if (livechatPreview) livechatPreview.value = null
+})
+
+// Switching to gradient with no colors set would render a blank picker (black),
+// so seed sensible defaults while retaining any colors already chosen.
+const onBackgroundTypeChange = (type) => {
+  if (type !== 'gradient') return
+  const bg = form.values.config?.home_screen?.background || {}
+  if (!bg.gradient_start) {
+    form.setFieldValue('config.home_screen.background.gradient_start', DEFAULT_GRADIENT_START)
+  }
+  if (!bg.gradient_end) {
+    form.setFieldValue('config.home_screen.background.gradient_end', DEFAULT_GRADIENT_END)
+  }
+}
+
 const addHomeApp = (type) => {
   if (type === 'announcement') {
     homeApps.value.push({ type: 'announcement', title: '', description: '', image_url: '', url: '' })
@@ -1220,53 +1321,60 @@ const removeHomeApp = (index) => {
 }
 
 const updateHomeApps = () => {
+  showHomeAppsError.value = false
   form.setFieldValue('config.home_apps', homeApps.value)
 }
 
-// Fetch inboxes and app settings on mount
+const isHomeAppEmpty = (item) =>
+  item.type === 'announcement'
+    ? !item.title && !item.description && !item.image_url && !item.url
+    : !item.text && !item.url
+
+const isHomeAppComplete = (item) =>
+  item.type === 'announcement'
+    ? Boolean(item.title && item.image_url && item.url)
+    : Boolean(item.text && item.url)
+
+// A row with some data but missing required fields, so submit is blocked instead of
+// silently dropping what the user typed. Fully empty rows are dropped on submit.
+const incompleteHomeApps = computed(() =>
+  homeApps.value.some((item) => !isHomeAppEmpty(item) && !isHomeAppComplete(item))
+)
+
+// Only surface the incomplete warning after a save attempt, not while the user is still typing.
+const showHomeAppsError = ref(false)
+
+const textareaToLines = (value) =>
+  typeof value === 'string' ? value.split('\n').map((line) => line.trim()).filter(Boolean) : []
+
 onMounted(() => {
   inboxStore.fetchInboxes()
   appSettingsStore.fetchPublicConfig()
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
-  // Transform trusted_domains from textarea to array
-  if (values.config.trusted_domains) {
-    values.config.trusted_domains = values.config.trusted_domains
-      .split('\n')
-      .map((domain) => domain.trim())
-      .filter((domain) => domain)
-  } else {
-    values.config.trusted_domains = []
-  }
+  values.config.trusted_domains = textareaToLines(values.config.trusted_domains)
+  values.config.blocked_ips = textareaToLines(values.config.blocked_ips)
 
-  // Transform blocked_ips from textarea to array
-  if (values.config.blocked_ips) {
-    values.config.blocked_ips = values.config.blocked_ips
-      .split('\n')
-      .map((ip) => ip.trim())
-      .filter((ip) => ip)
-  } else {
-    values.config.blocked_ips = []
-  }
-
-  // Filter out incomplete home apps before submission
-  if (values.config.home_apps) {
-    values.config.home_apps = values.config.home_apps.filter((item) => {
-      if (item.type === 'announcement') return item.title && item.url && item.image_url
-      if (item.type === 'external_link') return item.text && item.url
-      return true
+  // Block on partially-filled home apps so typed data isn't silently discarded;
+  // drop only fully empty rows.
+  if (incompleteHomeApps.value) {
+    showHomeAppsError.value = true
+    activeTab.value = 'appearance'
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: t('admin.inbox.livechat.homeApps.incomplete')
     })
+    return
   }
+  values.config.home_apps = homeApps.value.filter((item) => !isHomeAppEmpty(item))
 
-  // if no linked email inbox, nullify and clear continuity config
   if (!values.linked_email_inbox_id) {
     values.linked_email_inbox_id = null
     values.config.continuity = {}
   }
 
-  // Sync prechat config to form values before submission.
-  // If no fields are enabled, disable the form.
+  // Treat an enabled prechat form with no enabled fields as disabled.
   const pc = { ...prechatConfig.value }
   if (pc.enabled && pc.fields?.length > 0 && !pc.fields.some((f) => f.enabled)) {
     pc.enabled = false
@@ -1274,6 +1382,11 @@ const onSubmit = form.handleSubmit(async (values) => {
   values.config.prechat_form = pc
 
   await props.submitForm(values)
+}, ({ errors }) => {
+  const firstKey = Object.keys(errors)[0]
+  if (!firstKey) return
+  const match = FIELD_TAB.find(([prefix]) => firstKey === prefix || firstKey.startsWith(prefix))
+  if (match) activeTab.value = match[1]
 })
 
 watch(
@@ -1283,22 +1396,18 @@ watch(
       return
     }
 
-    // Transform trusted_domains array back to textarea format
-    if (newValues.config?.trusted_domains && Array.isArray(newValues.config.trusted_domains)) {
+    if (Array.isArray(newValues.config?.trusted_domains)) {
       newValues.config.trusted_domains = newValues.config.trusted_domains.join('\n')
     }
 
-    // Transform blocked_ips array back to textarea format
-    if (newValues.config?.blocked_ips && Array.isArray(newValues.config.blocked_ips)) {
+    if (Array.isArray(newValues.config?.blocked_ips)) {
       newValues.config.blocked_ips = newValues.config.blocked_ips.join('\n')
     }
 
-    // Set home apps for the reactive array
     if (newValues.config?.home_apps) {
       homeApps.value = [...newValues.config.home_apps]
     }
 
-    // Set prechat config
     if (newValues.config?.prechat_form) {
       const pc = JSON.parse(JSON.stringify(newValues.config.prechat_form))
       if (!pc.fields || pc.fields.length === 0) {

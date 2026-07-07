@@ -59,7 +59,7 @@
           <!-- Message Envelope -->
           <MessageEnvelope :message="message" v-if="showEnvelope" />
 
-          <hr class="mb-2" v-if="showEnvelope" />
+          <hr class="mb-2 border-muted-foreground/20" v-if="showEnvelope" />
 
           <!-- Message Content -->
           <div
@@ -90,7 +90,9 @@
               :class="
                 message.private
                   ? 'bg-gradient-to-t from-private via-private/90 to-transparent'
-                  : 'bg-gradient-to-t from-background via-background/90 to-transparent'
+                  : isOutgoing
+                    ? 'bg-gradient-to-t from-secondary via-secondary/90 to-transparent'
+                    : 'bg-gradient-to-t from-background via-background/90 to-transparent'
               "
             >
               <button
@@ -307,7 +309,7 @@ const nonInlineAttachments = computed(() =>
 
 const bubbleClasses = computed(() => ({
   'bg-private': isOutgoing.value && props.message.private,
-  'border border-border': isOutgoing.value && !props.message.private,
+  'bg-secondary border border-border': isOutgoing.value && !props.message.private,
   'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
   'border-destructive': isOutgoing.value && props.message.status === 'failed',
   relative: isOutgoing.value,

@@ -99,7 +99,7 @@
         :userTeams="userStore.teams"
         :userViews="userViews"
         :sharedViews="sharedViewStore.sharedViewList"
-        @create-view="openCreateViewForm = true"
+        @create-view="createView"
         @edit-view="editView"
         @delete-view="deleteView"
         @create-conversation="() => (openCreateConversationDialog = true)"
@@ -257,6 +257,11 @@ const initStores = async () => {
     tagStore.fetchTags(),
     customAttributeStore.fetchCustomAttributes()
   ])
+}
+
+const createView = () => {
+  view.value = {}
+  openCreateViewForm.value = true
 }
 
 const editView = (v) => {
