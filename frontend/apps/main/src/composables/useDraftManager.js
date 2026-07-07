@@ -94,16 +94,22 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     isLoading.value = false
   }
 
+  // Serialize every server write so a delete can never land before an earlier save and resurrect the row.
+  let syncChain = Promise.resolve()
+  const queueSync = (fn) => {
+    syncChain = syncChain.then(fn, fn)
+  }
+
   // Update the store synchronously; server sync runs in the background, never awaited.
   const save = (uuid, type) => {
     const draft = buildDraft()
     if (sameDraft(draft, conversationStore.getDraft(uuid, type))) return
     if (isDraftEmpty(draft)) {
       conversationStore.removeDraft(uuid, type)
-      api.deleteDraft(uuid, type).catch(() => {})
+      queueSync(() => api.deleteDraft(uuid, type).catch(() => {}))
     } else {
       conversationStore.setDraft(uuid, type, draft)
-      api.saveDraft(uuid, type, draft).catch(() => {})
+      queueSync(() => api.saveDraft(uuid, type, draft).catch(() => {}))
     }
   }
 
@@ -111,12 +117,10 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     if (loadedKey.value === currentKey()) save(conversationUUID.value, messageType.value)
   }, 500)
 
-  const clearDraft = async (uuid = conversationUUID.value, type = messageType.value) => {
+  const clearDraft = (uuid = conversationUUID.value, type = messageType.value) => {
     if (!uuid) return
-    try {
-      await api.deleteDraft(uuid, type)
-      conversationStore.removeDraft(uuid, type)
-    } catch {}
+    conversationStore.removeDraft(uuid, type)
+    queueSync(() => api.deleteDraft(uuid, type).catch(() => {}))
     if (uuid === conversationUUID.value && type === messageType.value) applyDraft(null)
   }
 
