@@ -509,8 +509,13 @@ export const useConversationStore = defineStore('conversation', () => {
 
   async function deleteMessage (conversationUUID, messageUUID) {
     try {
-      await api.deleteMessage(conversationUUID, messageUUID)
-      messages.data.removeMessage(conversationUUID, messageUUID)
+      const resp = await api.deleteMessage(conversationUUID, messageUUID)
+      const deletedText = resp.data.data.content
+      messages.data.updateMessage(conversationUUID, messageUUID, {
+        content: deletedText,
+        text_content: deletedText,
+        meta: { deleted_at: new Date().toISOString() }
+      })
       incrementMessageVersion()
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

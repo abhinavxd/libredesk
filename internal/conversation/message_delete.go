@@ -1,22 +1,48 @@
 package conversation
 
-import "github.com/abhinavxd/libredesk/internal/envelope"
+import (
+	"database/sql"
+	"errors"
+	"time"
 
-// DeletePrivateMessage deletes a private note by UUID, scoped to the given
-// conversation. Only messages with private=true can be deleted (enforced by the
-// SQL query); sent/incoming messages are protected. The conversation scope
-// prevents deleting a note from a different conversation than the caller's.
-// Returns a NotFound error if no matching private note exists.
-func (m *Manager) DeletePrivateMessage(conversationUUID, messageUUID string) error {
+	"github.com/abhinavxd/libredesk/internal/envelope"
+)
+
+// DeletePrivateMessage soft-deletes a private note, unlinks its media for GC, and returns the tombstone text.
+func (m *Manager) DeletePrivateMessage(conversationUUID, messageUUID string) (string, error) {
 	m.lo.Info("deleting private note", "conversation_uuid", conversationUUID, "message_uuid", messageUUID)
-	res, err := m.q.DeletePrivateMessage.Exec(messageUUID, conversationUUID)
-	if err != nil {
+
+	var res struct {
+		MessageID      int  `db:"message_id"`
+		PreviewUpdated bool `db:"preview_updated"`
+	}
+	deletedPreview := m.i18n.T("conversation.privateNoteDeleted")
+	if err := m.q.DeletePrivateMessage.Get(&res, messageUUID, conversationUUID, deletedPreview); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", m.i18n.Ts("globals.terms.message")), nil)
+		}
 		m.lo.Error("error deleting private note", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", m.i18n.Ts("globals.terms.message")), nil)
+
+	m.BroadcastMessageUpdate(conversationUUID, messageUUID, map[string]any{
+		"content":      deletedPreview,
+		"text_content": deletedPreview,
+		"meta":         map[string]any{"deleted_at": time.Now()},
+	})
+	if res.PreviewUpdated {
+		m.BroadcastConversationUpdate(conversationUUID, map[string]any{"last_message": deletedPreview})
 	}
-	return nil
+
+	media, err := m.mediaStore.GetByModel(res.MessageID, "messages")
+	if err != nil {
+		m.lo.Error("error fetching private note media to unlink", "message_id", res.MessageID, "error", err)
+		return deletedPreview, nil
+	}
+	for _, md := range media {
+		if err := m.mediaStore.Attach(md.ID, "messages", 0); err != nil {
+			m.lo.Error("error unlinking private note media", "media_id", md.ID, "error", err)
+		}
+	}
+	return deletedPreview, nil
 }

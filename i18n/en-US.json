@@ -503,6 +503,7 @@
   "conversation.downloadTranscript": "Download transcript",
   "conversation.deletePrivateNote": "Delete note",
   "conversation.deletePrivateNoteConfirmation": "This permanently deletes the note. It can't be recovered.",
+  "conversation.privateNoteDeleted": "This note was deleted",
   "conversation.filters.tooManyGroups": "Too many filter groups. A view can have at most {max}. Remove the extra groups and save again.",
   "conversation.hideQuotedText": "Hide quoted text",
   "conversation.mentions": "Mentions",

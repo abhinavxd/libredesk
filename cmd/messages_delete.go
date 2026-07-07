@@ -5,9 +5,7 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// handleDeleteMessage deletes a private note from a conversation. Only private
-// notes can be removed (enforced by the SQL query); sent/incoming messages are
-// protected. Returns 404 if the message doesn't exist or isn't private.
+// handleDeleteMessage soft-deletes a private note in a conversation.
 func handleDeleteMessage(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -21,13 +19,13 @@ func handleDeleteMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Ensure the agent has access to the conversation.
 	if _, err = enforceConversationAccess(app, cuuid, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if err := app.conversation.DeletePrivateMessage(cuuid, uuid); err != nil {
+	content, err := app.conversation.DeletePrivateMessage(cuuid, uuid)
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(true)
+	return r.SendEnvelope(map[string]any{"content": content})
 }
