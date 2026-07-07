@@ -1,5 +1,5 @@
 <template>
-  <form @submit="onSmtpSubmit" class="space-y-6">
+  <form @submit="onSmtpSubmit" novalidate class="space-y-6">
     <FormField name="enabled" v-slot="{ value, handleChange }">
       <FormItem>
         <FormControl>

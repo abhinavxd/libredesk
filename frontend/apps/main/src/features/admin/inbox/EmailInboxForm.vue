@@ -1,5 +1,5 @@
 <template>
-  <form @submit="onSubmit" class="space-y-6 w-full">
+  <form @submit="onSubmit" novalidate class="space-y-6 w-full">
     <!-- Basic Fields -->
     <FormField v-if="showFormFields" v-slot="{ componentField }" name="name">
       <FormItem>
