@@ -1,277 +1,162 @@
 import { ref, watch } from 'vue'
-import { watchDebounced, useStorage, useEventListener } from '@vueuse/core'
+import { useDebounceFn, useEventListener } from '@vueuse/core'
 import { useConversationStore } from '@main/stores/conversation'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { getTextFromHTML } from '@shared-ui/utils/string.js'
 import api from '@main/api'
 
-/**
- * Validate macro actions have required structure
- */
+const hasKeys = (obj, keys) => Boolean(obj) && keys.every(key => key in obj)
+
 const validateMacroActions = (actions) => {
   if (!Array.isArray(actions)) return []
   return actions.filter(action =>
-    action &&
-    'type' in action &&
-    'value' in action &&
+    hasKeys(action, ['type', 'value', 'display_value']) &&
     Array.isArray(action.value) &&
-    'display_value' in action &&
     Array.isArray(action.display_value)
   )
 }
 
-/**
- * Validate attachments have required structure
- */
 const validateAttachments = (attachments) => {
   if (!Array.isArray(attachments)) return []
   return attachments.filter(attachment =>
-    attachment &&
-    'id' in attachment &&
-    'size' in attachment &&
-    'uuid' in attachment &&
-    'filename' in attachment &&
-    'content_type' in attachment
+    hasKeys(attachment, ['id', 'size', 'uuid', 'filename', 'content_type'])
   )
 }
 
-/**
- * Check if draft has no meaningful content
- */
 const isDraftEmpty = (draft) => {
-  if (!draft) return true
-  const content = draft.content || ''
-  const textContent = getTextFromHTML(content)
+  const content = draft?.content || ''
+  const hasText = getTextFromHTML(content).length > 0
   const hasInlineImage = /<img\b/i.test(content)
-  const hasAttachments = draft.meta?.attachments?.length > 0
-  const hasMacroActions = draft.meta?.macro_actions?.length > 0
-  return textContent.length === 0 && !hasInlineImage && !hasAttachments && !hasMacroActions
+  const hasAttachments = draft?.meta?.attachments?.length > 0
+  const hasMacroActions = draft?.meta?.macro_actions?.length > 0
+  return !hasText && !hasInlineImage && !hasAttachments && !hasMacroActions
 }
 
-/**
- * Composable for managing draft state and persistence
- * Saves to localStorage immediately, syncs to backend on conversation switch/send/unload
- * 
- * @param key - Reactive reference to current draft key
- * @param uploadedFiles - Optional reactive reference to uploaded files array
- */
-export function useDraftManager (key, uploadedFiles = null) {
+const draftKey = (uuid, type) => `${uuid}::${type}`
+
+const metaSignature = (meta) =>
+  JSON.stringify({
+    macro_actions: meta?.macro_actions || [],
+    attachments: (meta?.attachments || []).map(a => a.uuid)
+  })
+
+const sameDraft = (a, b) => {
+  if (isDraftEmpty(a) && isDraftEmpty(b)) return true
+  return (a?.content || '') === (b?.content || '') && metaSignature(a?.meta) === metaSignature(b?.meta)
+}
+
+export function useDraftManager (conversationUUID, messageType, uploadedFiles = null) {
   const conversationStore = useConversationStore()
   const htmlContent = ref('')
   const textContent = ref('')
   const isLoading = ref(false)
-  const isDirty = ref(false)
-  const skipNextSave = ref(false)
   const loadedAttachments = ref([])
   const loadedMacroActions = ref([])
-  const isTransitioning = ref(false)
 
-  // Reactive localStorage for all drafts
-  const localDrafts = useStorage('libredesk_drafts', {})
+  // Live-key guard: the editor is transiently empty during open/switch and must not clobber a stored draft.
+  const loadedKey = ref(null)
+  const currentKey = () => draftKey(conversationUUID.value, messageType.value)
 
-  /**
-   * Save draft to localStorage only
-   */
-  const saveDraftLocal = (draftKey) => {
-    if (!draftKey) return
+  const buildDraft = () => {
+    const meta = {}
     const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
-    const draftMeta = {}
-    if (macroActions.length > 0) {
-      draftMeta.macro_actions = macroActions
-    } else {
-      delete draftMeta.macro_actions
-    }
-
-    // Set only required attachment fields
+    if (macroActions.length > 0) meta.macro_actions = macroActions
     if (uploadedFiles?.value?.length > 0) {
-      draftMeta.attachments = uploadedFiles.value.map(file => ({
+      meta.attachments = uploadedFiles.value.map(file => ({
         id: file.id,
         size: file.size,
         uuid: file.uuid,
         filename: file.filename,
         content_type: file.content_type
       }))
-    } else {
-      delete draftMeta.attachments
     }
-
-    // Save to localStorage
-    localDrafts.value[draftKey] = { content: htmlContent.value, meta: draftMeta }
-
-    // Mark as dirty for backend sync
-    isDirty.value = true
+    return { content: htmlContent.value, meta }
   }
 
-  /**
-   * Get draft from localStorage
-   */
-  const getLocalDraft = (draftKey) => localDrafts.value[draftKey] || null
-
-  /**
-   * Remove draft from localStorage
-   */
-  const removeLocalDraft = (draftKey) => {
-    if (localDrafts.value[draftKey]) {
-      delete localDrafts.value[draftKey]
-    }
-  }
-
-  /**
-   * Sync localStorage draft to backend
-   */
-  const syncDraftToBackend = async (draftKey) => {
-    if (!draftKey || !isDirty.value) return
-    const localDraft = getLocalDraft(draftKey)
-    if (!localDraft) return
-
-    try {
-      if (isDraftEmpty(localDraft)) {
-        // Empty draft - delete instead of save
-        await api.deleteDraft(draftKey)
-        conversationStore.removeDraft(draftKey)
-      } else {
-        // Has content - save draft
-        await api.saveDraft(draftKey, localDraft)
-        conversationStore.setDraft(draftKey, localDraft)
-      }
-      isDirty.value = false
-    } catch (error) {
-      // Silent fail - will retry on next sync
-    }
-  }
-
-  /**
-   * Reset all draft state to initial values
-   */
-  const resetState = () => {
-    htmlContent.value = ''
+  const applyDraft = (draft) => {
+    htmlContent.value = draft?.content || ''
     textContent.value = ''
-    isLoading.value = false
-    isDirty.value = false
-    loadedAttachments.value = []
-    loadedMacroActions.value = []
+    loadedAttachments.value = validateAttachments(draft?.meta?.attachments)
+    loadedMacroActions.value = validateMacroActions(draft?.meta?.macro_actions)
   }
 
-  /**
-   * Load draft from store (pre-fetched on app init)
-   */
-  const loadDraft = async (draftKey) => {
-    if (!draftKey) return
+  const load = async (uuid, type) => {
     isLoading.value = true
-    isDirty.value = false
-    skipNextSave.value = true
-    try {
-      // Check if there's an unsynced localStorage draft - sync it first
-      const localDraft = getLocalDraft(draftKey)
-      if (localDraft && !isDraftEmpty(localDraft)) {
-        await api.saveDraft(draftKey, localDraft)
-        conversationStore.setDraft(draftKey, localDraft)
-      }
-      removeLocalDraft(draftKey)
+    loadedKey.value = null
+    // Prefetch may still be in flight on a fresh page load; reading the store now would apply an empty draft.
+    const before = htmlContent.value
+    await conversationStore.draftsReady
+    // If the user typed while drafts were still loading, keep their input instead of clobbering it.
+    if (htmlContent.value === before) {
+      applyDraft(conversationStore.getDraft(uuid, type))
+    }
+    loadedKey.value = draftKey(uuid, type)
+    isLoading.value = false
+  }
 
-      // Load from store (drafts pre-fetched on app init)
-      const draft = conversationStore.getDraft(draftKey)
-      if (!draft) {
-        resetState()
-        return
-      }
+  // Serialize every server write so a delete can never land before an earlier save and resurrect the row.
+  let syncChain = Promise.resolve()
+  const queueSync = (fn) => {
+    syncChain = syncChain.then(fn, fn)
+  }
 
-      const content = draft.content || ''
-      const meta = draft.meta || {}
-
-      // Check if draft is empty - if so, delete it and return
-      if (isDraftEmpty({ content, meta })) {
-        await api.deleteDraft(draftKey)
-        conversationStore.removeDraft(draftKey)
-        resetState()
-        return
-      }
-
-      htmlContent.value = content
-      textContent.value = ''
-      loadedAttachments.value = validateAttachments(meta.attachments)
-      loadedMacroActions.value = validateMacroActions(meta.macro_actions)
-    } catch (error) {
-      resetState()
-    } finally {
-      isLoading.value = false
+  // Update the store synchronously; server sync runs in the background, never awaited.
+  const save = (uuid, type) => {
+    const draft = buildDraft()
+    if (sameDraft(draft, conversationStore.getDraft(uuid, type))) return
+    if (isDraftEmpty(draft)) {
+      conversationStore.removeDraft(uuid, type)
+      queueSync(() => api.deleteDraft(uuid, type).catch(() => {}))
+    } else {
+      conversationStore.setDraft(uuid, type, draft)
+      queueSync(() => api.saveDraft(uuid, type, draft).catch(() => {}))
     }
   }
 
-  /**
-   * Clear draft from both localStorage and backend
-   */
-  const clearDraft = async (draftKey) => {
-    if (!draftKey) return
-    removeLocalDraft(draftKey)
-    try {
-      await api.deleteDraft(draftKey)
-      conversationStore.removeDraft(draftKey)
-      resetState()
-    } catch (error) {
-      // Silent fail
-    }
+  const debouncedSave = useDebounceFn(() => {
+    if (loadedKey.value === currentKey()) save(conversationUUID.value, messageType.value)
+  }, 500)
+
+  const clearDraft = (uuid = conversationUUID.value, type = messageType.value) => {
+    if (!uuid) return
+    conversationStore.removeDraft(uuid, type)
+    queueSync(() => api.deleteDraft(uuid, type).catch(() => {}))
+    if (uuid === conversationUUID.value && type === messageType.value) applyDraft(null)
   }
 
-
-  // Watch for key changes - sync to backend before switching
-  watch(
-    key,
-    async (newKey, oldKey) => {
-      // Block saves during transition to prevent race
-      isTransitioning.value = true
-
-      // Sync old draft to backend before switching
-      if (newKey !== oldKey && isDirty.value) {
-        await syncDraftToBackend(oldKey)
-        removeLocalDraft(oldKey)
-      }
-
-      // Load new draft from backend
-      if (newKey && newKey !== oldKey) {
-        await loadDraft(newKey)
-      } else if (!newKey && oldKey) {
-        resetState()
-      }
-
-      // Allow saves after debounce window passes (200ms > 100ms debounce)
-      setTimeout(() => {
-        isTransitioning.value = false
-      }, 200)
-    },
-    { immediate: true }
-  )
-
-  // Watch changes in draft content/meta to save locally
   const watchSources = [
     htmlContent,
     textContent,
     () => conversationStore.macros[MACRO_CONTEXT.REPLY]
   ]
-  if (uploadedFiles) {
-    watchSources.push(uploadedFiles)
-  }
+  if (uploadedFiles) watchSources.push(uploadedFiles)
 
-  watchDebounced(
+  watch(
     watchSources,
     () => {
-      if (skipNextSave.value) {
-        skipNextSave.value = false
-        return
-      }
-
-      // Need to make sure not loading or transitioning, as during transition the `key` will change
-      if (!isLoading.value && !isTransitioning.value && key.value) {
-        saveDraftLocal(key.value)
-      }
+      if (!isLoading.value && loadedKey.value === currentKey()) debouncedSave()
     },
-    { debounce: 100, deep: true }
+    { deep: true }
   )
 
-  // Sync to backend when page is hidden (tab switch)
-  useEventListener(document, 'visibilitychange', async () => {
-    if (document.visibilityState === 'hidden' && isDirty.value && key.value) {
-      await syncDraftToBackend(key.value)
+  // Serialize switches: a rapid A->B->A must not interleave save and load.
+  let chain = Promise.resolve()
+  watch(
+    [conversationUUID, messageType],
+    ([uuid, type], oldVals) => {
+      const [prevUuid, prevType] = oldVals || []
+      chain = chain.then(async () => {
+        if (prevUuid && loadedKey.value === draftKey(prevUuid, prevType)) save(prevUuid, prevType)
+        if (uuid) await load(uuid, type)
+        else applyDraft(null)
+      }).catch(() => {})
+    },
+    { immediate: true }
+  )
+
+  useEventListener(document, 'visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && conversationUUID.value && loadedKey.value === currentKey()) {
+      save(conversationUUID.value, messageType.value)
     }
   })
 

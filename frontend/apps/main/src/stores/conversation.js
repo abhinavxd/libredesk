@@ -28,6 +28,10 @@ export const useConversationStore = defineStore('conversation', () => {
   const currentCC = ref([])
   const macros = ref({})
   const drafts = ref(new Map())
+  // In-memory, resets on reload.
+  const selectedDraftType = ref(new Map())
+  let resolveDraftsReady
+  const draftsReady = new Promise((resolve) => { resolveDraftsReady = resolve })
   const userStore = useUserStore()
   const notificationStore = useNotificationStore()
   const router = useRouter()
@@ -1041,13 +1045,17 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function draftMapKey (uuid, type) {
+    return `${uuid}::${type}`
+  }
+
   async function fetchAllDrafts () {
     try {
       const resp = await api.getAllDrafts()
       const newDrafts = new Map()
       if (resp.data?.data) {
         for (const draft of resp.data.data) {
-          newDrafts.set(draft.conversation_uuid, draft)
+          newDrafts.set(draftMapKey(draft.conversation_uuid, draft.type), draft)
         }
       }
       drafts.value = newDrafts
@@ -1056,25 +1064,48 @@ export const useConversationStore = defineStore('conversation', () => {
         variant: 'destructive',
         description: handleHTTPError(e).message
       })
+    } finally {
+      resolveDraftsReady()
     }
   }
 
-  function getDraft (uuid) {
-    return drafts.value.get(uuid)
+  function getDraft (uuid, type) {
+    return drafts.value.get(draftMapKey(uuid, type))
   }
 
-  function setDraft (uuid, draft) {
-    drafts.value.set(uuid, draft)
+  function setDraft (uuid, type, draft) {
+    drafts.value.set(draftMapKey(uuid, type), draft)
     drafts.value = new Map(drafts.value)
   }
 
-  function removeDraft (uuid) {
-    drafts.value.delete(uuid)
+  function removeDraft (uuid, type) {
+    drafts.value.delete(draftMapKey(uuid, type))
     drafts.value = new Map(drafts.value)
   }
 
-  function hasDraft (uuid) {
-    return drafts.value.has(uuid)
+  function hasDraft (uuid, type) {
+    return drafts.value.has(draftMapKey(uuid, type))
+  }
+
+  function conversationHasDraft (uuid) {
+    return hasDraft(uuid, 'reply') || hasDraft(uuid, 'private_note')
+  }
+
+  function setSelectedDraftType (uuid, type) {
+    selectedDraftType.value.set(uuid, type)
+    selectedDraftType.value = new Map(selectedDraftType.value)
+  }
+
+  function resolveDraftType (uuid) {
+    const last = selectedDraftType.value.get(uuid)
+    if (last && hasDraft(uuid, last)) return last
+    if (hasDraft(uuid, 'reply')) return 'reply'
+    if (hasDraft(uuid, 'private_note')) return 'private_note'
+    return last || 'reply'
+  }
+
+  function conversationDraftPreview (uuid) {
+    return getDraft(uuid, resolveDraftType(uuid))
   }
 
 
@@ -1157,11 +1188,16 @@ export const useConversationStore = defineStore('conversation', () => {
     typingByUUID,
     sendTyping,
     drafts,
+    draftsReady,
     fetchAllDrafts,
     getDraft,
     setDraft,
     removeDraft,
     hasDraft,
+    conversationHasDraft,
+    conversationDraftPreview,
+    setSelectedDraftType,
+    resolveDraftType,
     addPendingMessage,
     replacePendingMessage,
     removePendingMessage,

@@ -316,10 +316,12 @@ CREATE TABLE conversation_drafts (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
     user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+    type TEXT NOT NULL DEFAULT 'reply',
     content TEXT NOT NULL,
-	meta JSONB DEFAULT '{}'::jsonb NOT NULL
+	meta JSONB DEFAULT '{}'::jsonb NOT NULL,
+	CONSTRAINT constraint_conversation_drafts_on_type CHECK (type IN ('reply', 'private_note'))
 );
-CREATE UNIQUE INDEX index_uniq_conversation_drafts_on_conversation_id_and_user_id ON conversation_drafts (conversation_id, user_id);
+CREATE UNIQUE INDEX index_uniq_conversation_drafts_on_conversation_id_and_user_id_and_type ON conversation_drafts (conversation_id, user_id, type);
 
 DROP TABLE IF EXISTS macros CASCADE;
 CREATE TABLE macros (
