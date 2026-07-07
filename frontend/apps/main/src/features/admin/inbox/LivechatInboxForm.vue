@@ -1,5 +1,5 @@
 <template>
-  <form @submit="onSubmit" class="space-y-6 w-full">
+  <form @submit="onSubmit" novalidate class="space-y-6 w-full">
     <Tabs v-model="activeTab" class="w-full">
       <TabsList class="flex flex-wrap gap-1 h-auto p-1 w-fit">
         <TabsTrigger value="general">{{ $t('globals.terms.general') }}</TabsTrigger>
@@ -71,6 +71,7 @@
               <FormControl>
                 <Input type="text" placeholder="" v-bind="componentField" />
               </FormControl>
+              <FormMessage />
             </FormItem>
           </FormField>
 
@@ -81,6 +82,7 @@
                 <Input type="url" placeholder="https://example.com" v-bind="componentField" />
               </FormControl>
               <FormDescription>{{ $t('admin.inbox.livechat.websiteUrl.description') }}</FormDescription>
+              <FormMessage />
             </FormItem>
           </FormField>
 
@@ -1034,7 +1036,7 @@ const FIELD_TAB = [
   ['config.greeting_message', 'messages'],
   ['config.introduction_message', 'messages'],
   ['config.chat_introduction', 'messages'],
-  ['config.chat_reply_expectation_message', 'messages'],
+  ['config.chat_reply_expectation_message', 'features'],
   ['config.features', 'features'],
   ['config.prechat_form', 'prechat'],
   ['config.visitors', 'users'],
