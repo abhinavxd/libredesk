@@ -295,7 +295,7 @@ const messageRows = computed(() => {
   animation: highlightFade 2.5s ease-out forwards;
 }
 
-:global(.dark) .highlight-mention::after {
+:global(.dark .highlight-mention::after) {
   background-color: rgb(250 204 21 / 0.2);
 }
 
