@@ -526,6 +526,7 @@ type ConversationDraft struct {
 	ConversationID   int64           `db:"conversation_id" json:"conversation_id"`
 	ConversationUUID string          `db:"conversation_uuid" json:"conversation_uuid"`
 	UserID           int64           `db:"user_id" json:"user_id"`
+	Type             string          `db:"type" json:"type"`
 	Content          string          `db:"content" json:"content"`
 	CreatedAt        time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt        time.Time       `db:"updated_at" json:"updated_at"`

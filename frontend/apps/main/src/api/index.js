@@ -407,8 +407,8 @@ const updateInbox = (id, data) =>
     }
   })
 const deleteInbox = (id) => http.delete(`/api/v1/inboxes/${id}`)
-const saveDraft = (uuid, data) =>
-  http.post(`/api/v1/conversations/${uuid}/draft`, data, {
+const saveDraft = (uuid, type, data) =>
+  http.post(`/api/v1/conversations/${uuid}/draft`, { ...data, type }, {
     headers: {
       'Content-Type': 'application/json'
     }
@@ -416,7 +416,8 @@ const saveDraft = (uuid, data) =>
 
 const getAllDrafts = () => http.get('/api/v1/drafts')
 
-const deleteDraft = (uuid) => http.delete(`/api/v1/conversations/${uuid}/draft`)
+const deleteDraft = (uuid, type) =>
+  http.delete(`/api/v1/conversations/${uuid}/draft`, { params: { type } })
 const getCurrentUserViews = () => http.get('/api/v1/views/me')
 const createView = (data) =>
   http.post('/api/v1/views/me', data, {
