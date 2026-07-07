@@ -1,5 +1,5 @@
 <template>
-  <form @submit.prevent="onSubmit" class="space-y-8">
+  <form @submit.prevent="onSubmit" novalidate class="space-y-8">
     <!-- Summary Section -->
     <div class="bg-muted/30 box py-6 px-3" v-if="!isNewForm">
       <div class="flex items-start gap-6">

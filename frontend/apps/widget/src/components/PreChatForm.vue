@@ -9,7 +9,7 @@
           {{ formTitle }}
         </div>
 
-        <form ref="formRef" @submit.prevent="submitForm" class="space-y-4">
+        <form ref="formRef" @submit.prevent="submitForm" novalidate class="space-y-4">
           <!-- Dynamic fields -->
           <div v-for="field in sortedFields" :key="field.key" class="space-y-2">
             <!-- Text input -->

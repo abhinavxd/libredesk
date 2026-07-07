@@ -1,5 +1,5 @@
 <template>
-  <form @submit="onSubmit" class="space-y-6 w-full">
+  <form @submit="onSubmit" novalidate class="space-y-6 w-full">
     <div class="grid gap-6 md:grid-cols-2">
     <FormField v-slot="{ field }" name="site_name">
       <FormItem>
