@@ -603,10 +603,42 @@ DELETE FROM conversations WHERE uuid = $1;
 
 -- MESSAGE queries.
 -- name: delete-message
-DELETE FROM conversation_messages WHERE CASE 
-    WHEN $1 > 0 THEN id = $1 
-    ELSE uuid = $2 
+DELETE FROM conversation_messages WHERE CASE
+    WHEN $1 > 0 THEN id = $1
+    ELSE uuid = $2
 END;
+
+-- name: delete-private-message
+-- $1 = message uuid, $2 = conversation uuid, $3 = deleted placeholder text.
+WITH deleted AS (
+    UPDATE conversation_messages
+    SET content = $3, text_content = $3, updated_at = NOW(),
+        meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('deleted_at', NOW())
+    WHERE uuid = $1
+      AND private = true
+      AND meta->>'deleted_at' IS NULL
+      AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
+    RETURNING id, conversation_id, created_at
+),
+media_unlink AS (
+    UPDATE media SET model_id = 0
+    FROM deleted d
+    WHERE media.model_type = 'messages' AND media.model_id = d.id
+),
+preview AS (
+    UPDATE conversations c
+    SET last_message = $3, updated_at = NOW()
+    FROM deleted d
+    WHERE c.id = d.conversation_id
+      AND NOT EXISTS (
+          SELECT 1 FROM conversation_messages m2
+          WHERE m2.conversation_id = d.conversation_id
+            AND m2.created_at > d.created_at
+      )
+    RETURNING c.id
+)
+SELECT EXISTS (SELECT 1 FROM preview) AS preview_updated
+FROM deleted d;
 
 -- name: get-message-source-ids
 SELECT 

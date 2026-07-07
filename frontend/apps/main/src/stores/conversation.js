@@ -511,6 +511,25 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  async function deleteMessage (conversationUUID, messageUUID) {
+    try {
+      const resp = await api.deleteMessage(conversationUUID, messageUUID)
+      const deletedText = resp.data.data.content
+      const existing = messages.data.getAllPagesMessages(conversationUUID).find(m => m.uuid === messageUUID)
+      messages.data.updateMessage(conversationUUID, messageUUID, {
+        content: deletedText,
+        text_content: deletedText,
+        meta: { ...(existing?.meta || {}), deleted_at: new Date().toISOString() }
+      })
+      incrementMessageVersion()
+    } catch (error) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: handleHTTPError(error).message
+      })
+    }
+  }
+
   function fetchNextConversations () {
     if (conversations.fetching || !conversations.hasMore) return
     fetchConversationsList(false, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page + 1)
@@ -1194,6 +1213,7 @@ export const useConversationStore = defineStore('conversation', () => {
     setDraft,
     removeDraft,
     hasDraft,
+    deleteMessage,
     conversationHasDraft,
     conversationDraftPreview,
     setSelectedDraftType,
