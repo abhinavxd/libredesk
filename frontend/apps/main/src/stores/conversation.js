@@ -515,10 +515,11 @@ export const useConversationStore = defineStore('conversation', () => {
     try {
       const resp = await api.deleteMessage(conversationUUID, messageUUID)
       const deletedText = resp.data.data.content
+      const existing = messages.data.getAllPagesMessages(conversationUUID).find(m => m.uuid === messageUUID)
       messages.data.updateMessage(conversationUUID, messageUUID, {
         content: deletedText,
         text_content: deletedText,
-        meta: { deleted_at: new Date().toISOString() }
+        meta: { ...(existing?.meta || {}), deleted_at: new Date().toISOString() }
       })
       incrementMessageVersion()
     } catch (error) {

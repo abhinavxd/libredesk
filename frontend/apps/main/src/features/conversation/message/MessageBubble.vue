@@ -317,7 +317,9 @@ const userStore = useUserStore()
 const alertOpen = ref(false)
 
 const deleteNote = () => {
-  convStore.deleteMessage(convStore.current?.uuid, props.message.uuid)
+  const conversationUUID = convStore.current?.uuid
+  if (!conversationUUID) return
+  convStore.deleteMessage(conversationUUID, props.message.uuid)
   alertOpen.value = false
 }
 

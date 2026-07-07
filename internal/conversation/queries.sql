@@ -613,12 +613,17 @@ END;
 WITH deleted AS (
     UPDATE conversation_messages
     SET content = $3, text_content = $3, updated_at = NOW(),
-        meta = meta || jsonb_build_object('deleted_at', NOW())
+        meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('deleted_at', NOW())
     WHERE uuid = $1
       AND private = true
       AND meta->>'deleted_at' IS NULL
       AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
     RETURNING id, conversation_id, created_at
+),
+media_unlink AS (
+    UPDATE media SET model_id = 0
+    FROM deleted d
+    WHERE media.model_type = 'messages' AND media.model_id = d.id
 ),
 preview AS (
     UPDATE conversations c
@@ -632,7 +637,7 @@ preview AS (
       )
     RETURNING c.id
 )
-SELECT d.id AS message_id, EXISTS (SELECT 1 FROM preview) AS preview_updated
+SELECT EXISTS (SELECT 1 FROM preview) AS preview_updated
 FROM deleted d;
 
 -- name: get-message-source-ids
