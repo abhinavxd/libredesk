@@ -5,14 +5,13 @@ import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { getTextFromHTML } from '@shared-ui/utils/string.js'
 import api from '@main/api'
 
+const hasKeys = (obj, keys) => Boolean(obj) && keys.every(key => key in obj)
+
 const validateMacroActions = (actions) => {
   if (!Array.isArray(actions)) return []
   return actions.filter(action =>
-    action &&
-    'type' in action &&
-    'value' in action &&
+    hasKeys(action, ['type', 'value', 'display_value']) &&
     Array.isArray(action.value) &&
-    'display_value' in action &&
     Array.isArray(action.display_value)
   )
 }
@@ -20,12 +19,7 @@ const validateMacroActions = (actions) => {
 const validateAttachments = (attachments) => {
   if (!Array.isArray(attachments)) return []
   return attachments.filter(attachment =>
-    attachment &&
-    'id' in attachment &&
-    'size' in attachment &&
-    'uuid' in attachment &&
-    'filename' in attachment &&
-    'content_type' in attachment
+    hasKeys(attachment, ['id', 'size', 'uuid', 'filename', 'content_type'])
   )
 }
 
@@ -100,19 +94,16 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     isLoading.value = false
   }
 
-  const save = async (uuid, type) => {
+  // Update the store synchronously; server sync runs in the background, never awaited.
+  const save = (uuid, type) => {
     const draft = buildDraft()
     if (sameDraft(draft, conversationStore.getDraft(uuid, type))) return
-    try {
-      if (isDraftEmpty(draft)) {
-        await api.deleteDraft(uuid, type)
-        conversationStore.removeDraft(uuid, type)
-      } else {
-        await api.saveDraft(uuid, type, draft)
-        conversationStore.setDraft(uuid, type, draft)
-      }
-    } catch (error) {
-      // Keep the editor content; the next save retries.
+    if (isDraftEmpty(draft)) {
+      conversationStore.removeDraft(uuid, type)
+      api.deleteDraft(uuid, type).catch(() => {})
+    } else {
+      conversationStore.setDraft(uuid, type, draft)
+      api.saveDraft(uuid, type, draft).catch(() => {})
     }
   }
 
@@ -125,9 +116,7 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     try {
       await api.deleteDraft(uuid, type)
       conversationStore.removeDraft(uuid, type)
-    } catch (error) {
-      // Silent fail
-    }
+    } catch {}
     if (uuid === conversationUUID.value && type === messageType.value) applyDraft(null)
   }
 
@@ -153,7 +142,7 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     ([uuid, type], oldVals) => {
       const [prevUuid, prevType] = oldVals || []
       chain = chain.then(async () => {
-        if (prevUuid && loadedKey.value === draftKey(prevUuid, prevType)) await save(prevUuid, prevType)
+        if (prevUuid && loadedKey.value === draftKey(prevUuid, prevType)) save(prevUuid, prevType)
         if (uuid) await load(uuid, type)
         else applyDraft(null)
       }).catch(() => {})

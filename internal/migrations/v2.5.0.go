@@ -21,8 +21,8 @@ func V2_5_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	if _, err := db.Exec(`
 		DO $$
 		BEGIN
-			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'constraint_conversation_drafts_type') THEN
-				ALTER TABLE conversation_drafts ADD CONSTRAINT constraint_conversation_drafts_type CHECK (type IN ('reply', 'private_note'));
+			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'constraint_conversation_drafts_on_type') THEN
+				ALTER TABLE conversation_drafts ADD CONSTRAINT constraint_conversation_drafts_on_type CHECK (type IN ('reply', 'private_note'));
 			END IF;
 		END$$;
 	`); err != nil {

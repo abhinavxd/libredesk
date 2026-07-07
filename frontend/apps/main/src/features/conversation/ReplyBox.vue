@@ -223,17 +223,19 @@ const {
 
 const messageType = ref('reply')
 const currentConversationUUID = computed(() => conversationStore.current?.uuid || null)
-// Open in whichever type has a saved draft; needs the prefetch complete for hasDraft to be accurate.
 watch(
   currentConversationUUID,
-  async (uuid) => {
-    messageType.value = 'reply'
-    if (!uuid) return
+  async (uuid, prevUuid) => {
+    if (prevUuid) conversationStore.setSelectedDraftType(prevUuid, messageType.value)
+    if (!uuid) {
+      messageType.value = 'reply'
+      return
+    }
+    messageType.value = conversationStore.resolveDraftType(uuid)
+    // Prefetch may still be in flight on first load; re-resolve once drafts land.
     await conversationStore.draftsReady
     if (uuid !== currentConversationUUID.value) return
-    if (!conversationStore.hasDraft(uuid, 'reply') && conversationStore.hasDraft(uuid, 'private_note')) {
-      messageType.value = 'private_note'
-    }
+    messageType.value = conversationStore.resolveDraftType(uuid)
   },
   { immediate: true }
 )
@@ -502,13 +504,12 @@ watch(
   { deep: true }
 )
 
-/**
- * Watch loaded macro actions from draft and update conversation store.
- */
+// Reset first so a loaded draft never inherits the previous conversation's macro id/message_content (drafts store only actions).
 watch(
   loadedMacroActions,
   (actions) => {
-    conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
+    conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
+    if (actions.length) conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
   },
   { deep: true }
 )
@@ -554,13 +555,10 @@ watch(
   { deep: true, immediate: true }
 )
 
-// Clear media files and reset macro when conversation changes.
+// Media files and macro state are restored per draft by the draft manager; resetting here would race ahead of the save and drop them.
 watch(
   () => conversationStore.current?.uuid,
   () => {
-    clearMediaFiles()
-    conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
-    // Focus editor on conversation change
     setTimeout(() => {
       replyBoxContentRef.value?.focus()
     }, 100)

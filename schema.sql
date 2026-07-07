@@ -319,7 +319,7 @@ CREATE TABLE conversation_drafts (
     type TEXT NOT NULL DEFAULT 'reply',
     content TEXT NOT NULL,
 	meta JSONB DEFAULT '{}'::jsonb NOT NULL,
-	CONSTRAINT constraint_conversation_drafts_type CHECK (type IN ('reply', 'private_note'))
+	CONSTRAINT constraint_conversation_drafts_on_type CHECK (type IN ('reply', 'private_note'))
 );
 CREATE UNIQUE INDEX index_uniq_conversation_drafts_on_conversation_id_and_user_id_and_type ON conversation_drafts (conversation_id, user_id, type);
 

@@ -27,6 +27,8 @@ export const useConversationStore = defineStore('conversation', () => {
   const currentCC = ref([])
   const macros = ref({})
   const drafts = ref(new Map())
+  // In-memory, resets on reload.
+  const selectedDraftType = ref(new Map())
   let resolveDraftsReady
   const draftsReady = new Promise((resolve) => { resolveDraftsReady = resolve })
   const userStore = useUserStore()
@@ -1086,8 +1088,21 @@ export const useConversationStore = defineStore('conversation', () => {
     return hasDraft(uuid, 'reply') || hasDraft(uuid, 'private_note')
   }
 
+  function setSelectedDraftType (uuid, type) {
+    selectedDraftType.value.set(uuid, type)
+    selectedDraftType.value = new Map(selectedDraftType.value)
+  }
+
+  function resolveDraftType (uuid) {
+    const last = selectedDraftType.value.get(uuid)
+    if (last && hasDraft(uuid, last)) return last
+    if (hasDraft(uuid, 'reply')) return 'reply'
+    if (hasDraft(uuid, 'private_note')) return 'private_note'
+    return last || 'reply'
+  }
+
   function conversationDraftPreview (uuid) {
-    return getDraft(uuid, 'reply') || getDraft(uuid, 'private_note')
+    return getDraft(uuid, resolveDraftType(uuid))
   }
 
 
@@ -1178,6 +1193,8 @@ export const useConversationStore = defineStore('conversation', () => {
     hasDraft,
     conversationHasDraft,
     conversationDraftPreview,
+    setSelectedDraftType,
+    resolveDraftType,
     addPendingMessage,
     replacePendingMessage,
     removePendingMessage,
