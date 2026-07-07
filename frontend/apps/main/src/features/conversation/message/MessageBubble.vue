@@ -1,6 +1,4 @@
 <template>
-  <ContextMenu>
-    <ContextMenuTrigger as-child :disabled="!isPrivateMessage">
   <div class="flex flex-col text-left" :class="isOutgoing ? 'items-end' : 'items-start'">
     <!-- Sender Name -->
     <div
@@ -28,7 +26,7 @@
     </div>
 
     <!-- Message Bubble -->
-    <div class="flex flex-row gap-2 w-full" :class="{ 'justify-end': isOutgoing }">
+    <div class="flex flex-row gap-2 w-full group" :class="{ 'justify-end': isOutgoing }">
       <!-- Avatar (left for incoming) -->
       <template v-if="!isOutgoing">
         <router-link
@@ -49,9 +47,32 @@
       <!-- Bubble Wrapper with max 80% width -->
       <div
         class="w-4/5"
-        :class="{ 'flex justify-end': isOutgoing }"
+        :class="{ 'flex justify-end items-center gap-2': isOutgoing }"
         style="contain: inline-size"
       >
+        <!-- Delete note menu (private notes, appears on hover, left of bubble) -->
+        <div
+          v-if="isPrivateMessage"
+          class="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200"
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" class="w-8 h-8 p-0 text-muted-foreground">
+                <MoreHorizontal class="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                class="text-destructive focus:text-destructive"
+                @click="alertOpen = true"
+              >
+                <Trash2 class="mr-2 h-4 w-4" />
+                {{ t('conversation.deletePrivateNote') }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
         <div
           class="flex flex-col justify-end message-bubble"
           :class="bubbleClasses"
@@ -190,14 +211,21 @@
       </Tooltip>
     </div>
   </div>
-    </ContextMenuTrigger>
-    <ContextMenuContent v-if="isPrivateMessage">
-      <ContextMenuItem class="text-destructive focus:text-destructive" @click="deleteNote">
-        <Trash2 class="mr-2 h-4 w-4" />
-        {{ t('conversation.deletePrivateNote') }}
-      </ContextMenuItem>
-    </ContextMenuContent>
-  </ContextMenu>
+
+  <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogDescription>
+          {{ t('conversation.deletePrivateNoteConfirmation') }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click="deleteNote">{{ t('globals.messages.delete') }}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>
 
 <script setup>
@@ -205,13 +233,24 @@ import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, Maximize2, Trash2 } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, Maximize2, Trash2, MoreHorizontal } from 'lucide-vue-next'
 import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem
-} from '@shared-ui/components/ui/context-menu'
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from '@shared-ui/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import { Button } from '@shared-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
@@ -270,9 +309,11 @@ const convStore = useConversationStore()
 const { t } = useI18n()
 const userStore = useUserStore()
 
-// Delete a private note via the API (only private notes can be deleted).
+const alertOpen = ref(false)
+
 const deleteNote = () => {
   convStore.deleteMessage(convStore.current?.uuid, props.message.uuid)
+  alertOpen.value = false
 }
 
 const isSystemUser = computed(() => props.message.author?.email === 'System')
