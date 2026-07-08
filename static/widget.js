@@ -274,6 +274,8 @@
 
             this.iframe = document.createElement('iframe');
             this.iframe.src = `${this.config.baseURL}/widget?inbox_id=${this.config.inboxID}`;
+            this.iframe.loading = 'eager';
+            this.iframe.setAttribute('title', 'StackBlaze support chat');
             this.iframe.style.cssText = `
                 position: fixed;
                 border: none;
@@ -283,11 +285,36 @@
                 width: ${this.IFRAME_WIDTH};
                 height: ${this.IFRAME_HEIGHT};
                 transition: ${iframeTransition};
-                display: none;
             `;
 
             document.body.appendChild(this.widgetButtonWrapper);
             document.body.appendChild(this.iframe);
+            this.setIframeHidden(true);
+        }
+
+        setIframeHidden (hidden) {
+            if (!this.iframe) return;
+
+            if (hidden) {
+                this.iframe.style.visibility = 'hidden';
+                this.iframe.style.opacity = '0';
+                this.iframe.style.pointerEvents = 'none';
+
+                if (this.isMobile) {
+                    // Keep the iframe in the layout at full viewport size so mobile
+                    // WebKit paints the Vue app before the visitor opens chat.
+                    this.iframe.style.display = 'block';
+                    this.applyIframeLayout();
+                } else {
+                    this.iframe.style.display = 'none';
+                }
+                return;
+            }
+
+            this.iframe.style.display = 'block';
+            this.iframe.style.visibility = 'visible';
+            this.iframe.style.opacity = '1';
+            this.iframe.style.pointerEvents = 'auto';
         }
 
         sendMobileState () {
@@ -499,7 +526,7 @@
             this.isMobile = window.innerWidth <= this.MOBILE_BREAKPOINT;
             this.isChatVisible = true;
 
-            this.iframe.style.display = 'block';
+            this.setIframeHidden(false);
             this.applyIframeLayout();
             this.lockHostPageScroll();
             this.updateLauncherVisibility();
@@ -519,7 +546,7 @@
             if (!this.iframe) return;
 
             this.unlockHostPageScroll();
-            this.iframe.style.display = 'none';
+            this.setIframeHidden(true);
             this.isChatVisible = false;
             this.toggleButton.style.transform = 'scale(1)';
             this.updateLauncherVisibility();

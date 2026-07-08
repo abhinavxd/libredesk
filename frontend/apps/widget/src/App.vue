@@ -16,7 +16,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch, getCurrentInstance } from 'vue'
+import { computed, onMounted, ref, watch, getCurrentInstance } from 'vue'
 import { Toaster } from '@shared-ui/components/ui/sonner'
 import { TooltipProvider } from '@shared-ui/components/ui/tooltip'
 import { useWidgetStore } from './store/widget.js'
@@ -32,6 +32,7 @@ import MainLayout from '@widget/layouts/MainLayout.vue'
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const initialDataStarted = ref(false)
 
 // Register stores for the global 401 response interceptor.
 registerStores({ userStore, chatStore, widgetStore })
@@ -75,6 +76,29 @@ const fetchInitialConversations = async () => {
   }
 }
 
+const ensureInitialConversations = async () => {
+  if (initialDataStarted.value) return
+  initialDataStarted.value = true
+  await fetchInitialConversations()
+}
+
+const prepareSession = async (sessionToken) => {
+  if (!sessionToken) return
+
+  userStore.setSessionToken(sessionToken)
+  setApiSessionToken(sessionToken)
+  skipInitialWsSync()
+
+  try {
+    const meResp = await api.getAuthMe()
+    if (userStore.userSessionToken === sessionToken) {
+      userStore.setUserMeta(meResp.data.data)
+    }
+  } catch {
+    // 401 is handled by the global response interceptor.
+  }
+}
+
 // Listen for messages from parent window (widget.js)
 const setupParentMessageListeners = () => {
   window.addEventListener('message', async (event) => {
@@ -82,6 +106,7 @@ const setupParentMessageListeners = () => {
       widgetStore.setOpen(false)
     } else if (event.data.type === 'WIDGET_OPENED') {
       widgetStore.setOpen(true)
+      void ensureInitialConversations()
     } else if (event.data.type === 'SET_MOBILE_STATE') {
       widgetStore.setMobileFullScreen(event.data.isMobile)
     } else if (event.data.type === 'WIDGET_EXPANDED') {
@@ -90,28 +115,12 @@ const setupParentMessageListeners = () => {
       if (event.data.visitorToken) {
         initVisitorToken(event.data.visitorToken)
       }
-      const sessionToken = event.data.sessionToken
       try {
-        if (sessionToken) {
-          userStore.setSessionToken(sessionToken)
-          setApiSessionToken(sessionToken)
-          // Session exists, fetchInitialConversations will load data. Skip WS sync.
-          skipInitialWsSync()
-          // Fetch user metadata for returning visitors.
-          // Guard against stale response if SET_JWT_TOKEN exchange replaced the token.
-          try {
-            const meResp = await api.getAuthMe()
-            if (userStore.userSessionToken === sessionToken) {
-              userStore.setUserMeta(meResp.data.data)
-            }
-          } catch {
-            // 401 is handled by the global response interceptor.
-          }
-        }
-        await fetchInitialConversations()
+        await prepareSession(event.data.sessionToken)
       } finally {
         signalWidgetLoaded()
       }
+      void ensureInitialConversations()
     } else if (event.data.type === 'SET_JWT_TOKEN') {
       if (event.data.visitorToken) {
         initVisitorToken(event.data.visitorToken)
@@ -121,15 +130,14 @@ const setupParentMessageListeners = () => {
           const resp = await api.exchangeJWTForSession(event.data.jwt)
           const { session_token, user } = resp.data.data
           saveSession(session_token, user, userStore)
-          // Session exists, fetchInitialConversations will load data. Skip WS sync.
           skipInitialWsSync()
           chatStore.conversations = null
-          await fetchInitialConversations()
         } catch (err) {
           console.error('Failed to exchange JWT for session:', err)
         } finally {
           signalWidgetLoaded()
         }
+        void ensureInitialConversations()
       }
     } else if (event.data.type === 'CLEAR_SESSION') {
       userStore.clearSessionToken()
