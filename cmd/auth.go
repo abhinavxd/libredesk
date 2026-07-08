@@ -104,7 +104,7 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	applyLoginAvailability(app, user.ID)
+	app.user.InvalidateAgentCache(user.ID)
 
 	// Insert activity log.
 	if err := app.activityLog.Login(user.ID, user.Email.String, ip); err != nil {
