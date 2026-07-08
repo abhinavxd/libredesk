@@ -66,6 +66,26 @@
                       }}<span v-if="field.required" class="text-destructive"> *</span>
                     </label>
                   </div>
+                  <template v-else-if="field.type === 'phone'">
+                    <label class="text-sm font-medium">
+                      {{ field.label
+                      }}<span v-if="field.required" class="text-destructive"> *</span>
+                    </label>
+                    <div class="flex items-stretch">
+                      <div
+                        class="flex items-center gap-2 px-3 rounded-l-md border border-r-0 border-input text-sm text-muted-foreground"
+                      >
+                        <span>{{ $t('globals.terms.select') }}</span>
+                        <ChevronDown :size="14" class="opacity-50" />
+                      </div>
+                      <Input
+                        type="tel"
+                        :placeholder="field.placeholder || ''"
+                        readonly
+                        class="rounded-l-none"
+                      />
+                    </div>
+                  </template>
                   <template v-else>
                     <label class="text-sm font-medium">
                       {{ field.label
@@ -349,8 +369,8 @@ import {
 } from 'lucide-vue-next'
 import { hexToHSL, getContrastingHSL } from '@shared-ui/utils/color'
 import { renderTemplate } from '@shared-ui/utils/string'
-import defaultLauncherLogo from '@/assets/libredesk-launcher.png'
 
+const DEFAULT_LAUNCHER_LOGO = '/static/public/launcher-logo.png'
 const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
 const LAUNCHER_SIZE = 52
 
@@ -395,7 +415,7 @@ const parsedIntroduction = computed(() =>
   renderTemplate(props.config.introduction_message || '', { firstName: '', lastName: '' })
 )
 
-const launcherLogo = computed(() => props.config.launcher?.logo_url || defaultLauncherLogo)
+const launcherLogo = computed(() => props.config.launcher?.logo_url || DEFAULT_LAUNCHER_LOGO)
 
 const replyExpectation = computed(() =>
   props.config.show_office_hours_in_chat ? props.config.chat_reply_expectation_message : ''

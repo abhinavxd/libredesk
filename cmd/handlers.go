@@ -383,6 +383,7 @@ func serveStaticFiles(r *fastglue.Request) error {
 		contentType = http.DetectContentType(file.ReadBytes())
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
+	r.RequestCtx.Response.Header.Set("Cache-Control", "public, max-age=86400")
 	r.RequestCtx.SetBody(file.ReadBytes())
 	return nil
 }

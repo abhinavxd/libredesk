@@ -41,6 +41,10 @@ const (
 	maxEmailLength                  = 254
 	maxNameLength                   = 128
 	maxExternalUserIDLength         = 128
+	maxPhoneNumberLength            = 20
+	maxPhoneCountryCodeLength       = 10
+	fieldTypePhone                  = "phone"
+	phoneCountryCodeSuffix          = "_country_code"
 )
 
 // WidgetSession holds session data stored in Redis.
@@ -59,6 +63,7 @@ type Claims struct {
 	Email                   string         `json:"email,omitempty"`
 	FirstName               string         `json:"first_name,omitempty"`
 	LastName                string         `json:"last_name,omitempty"`
+	PhoneNumber             string         `json:"phone_number,omitempty"`
 	ContactCustomAttributes map[string]any `json:"contact_custom_attributes,omitempty"`
 	jwt.RegisteredClaims
 }
@@ -379,6 +384,9 @@ func handleAuthExchange(r *fastglue.Request) error {
 	}
 	if len(claims.LastName) > maxNameLength {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxNameLength)), nil, envelope.InputError)
+	}
+	if len(claims.PhoneNumber) > maxPhoneNumberLength {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxPhoneNumberLength)), nil, envelope.InputError)
 	}
 
 	// Resolve or create the contact.
@@ -754,9 +762,7 @@ func saveContactAttrsAndCollectConvoAttrs(app *App, contactID int, claims *Claim
 	return formConvoAttrs
 }
 
-// resolveOrCreateExternalContact finds or creates a contact from JWT claims.
-// It tries: 1) lookup by external_user_id, 2) create new (which internally enriches by email if possible).
-// On every call it syncs name/email from JWT claims if they differ from stored values, to keep contact info up to date.
+// resolveOrCreateExternalContact finds a contact by external_user_id (syncing changed JWT fields) or creates one.
 func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 	user, err := resolveUserFromClaims(app, claims)
 	if err != nil {
@@ -765,10 +771,11 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 		}
 	}
 
-	// Sync name/email from JWT only if changed.
+	// Sync name/email/phone from JWT only if changed.
 	if user.ID > 0 && claims.ExternalUserID != "" {
-		if user.FirstName != claims.FirstName || user.LastName != claims.LastName || user.Email.String != claims.Email {
-			if err := app.user.UpdateContactBasicInfo(user.ID, claims.FirstName, claims.LastName, claims.Email); err != nil {
+		if user.FirstName != claims.FirstName || user.LastName != claims.LastName || user.Email.String != claims.Email ||
+			user.PhoneNumber.String != claims.PhoneNumber {
+			if err := app.user.UpdateContactBasicInfo(user.ID, claims.FirstName, claims.LastName, claims.Email, claims.PhoneNumber); err != nil {
 				app.lo.Error("error updating contact basic info", "contact_id", user.ID, "error", err)
 			}
 		}
@@ -781,6 +788,7 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 			FirstName:        claims.FirstName,
 			LastName:         claims.LastName,
 			Email:            null.NewString(claims.Email, true),
+			PhoneNumber:      null.NewString(claims.PhoneNumber, claims.PhoneNumber != ""),
 			ExternalUserID:   null.NewString(claims.ExternalUserID, true),
 			CustomAttributes: marshalCustomAttributes(claims.ContactCustomAttributes, app),
 		}
@@ -795,8 +803,8 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 
 // createVisitorContact creates a new visitor contact from form data.
 func createVisitorContact(app *App, formData map[string]any, config livechat.Config, inbox imodels.Inbox) (umodels.User, string, map[string]any, error) {
-	// Validate form data and get final name/email for new visitor.
-	finalName, finalEmail, err := validateFormData(formData, config, nil)
+	// Validate form data and get final name/email/phone for new visitor.
+	finalName, finalEmail, finalPhone, finalPhoneCountryCode, err := validateFormData(formData, config, nil)
 	if err != nil {
 		return umodels.User{}, "", nil, err
 	}
@@ -805,9 +813,11 @@ func createVisitorContact(app *App, formData map[string]any, config livechat.Con
 	formContactAttrs, formConvoAttrs := validateCustomAttributes(formData, config, app)
 
 	visitor := umodels.User{
-		Email:            null.NewString(finalEmail, finalEmail != ""),
-		FirstName:        finalName,
-		CustomAttributes: marshalCustomAttributes(formContactAttrs, app),
+		Email:                  null.NewString(finalEmail, finalEmail != ""),
+		FirstName:              finalName,
+		PhoneNumber:            null.NewString(finalPhone, finalPhone != ""),
+		PhoneNumberCountryCode: null.NewString(finalPhoneCountryCode, finalPhoneCountryCode != ""),
+		CustomAttributes:       marshalCustomAttributes(formContactAttrs, app),
 	}
 
 	if err := app.user.CreateVisitor(&visitor); err != nil {
@@ -1040,9 +1050,13 @@ func validateCustomAttributes(formData map[string]any, config livechat.Config, a
 
 	// Create a map of valid field keys for quick lookup
 	validFields := make(map[string]livechat.PreChatFormField)
+	phoneCompanionKeys := make(map[string]bool)
 	for _, field := range config.PreChatForm.Fields {
 		if field.Enabled {
 			validFields[field.Key] = field
+			if field.Type == fieldTypePhone {
+				phoneCompanionKeys[field.Key+phoneCountryCodeSuffix] = true
+			}
 		}
 	}
 
@@ -1052,6 +1066,10 @@ func validateCustomAttributes(formData map[string]any, config livechat.Config, a
 		const maxKeyLength = 100
 		if len(key) > maxKeyLength {
 			app.lo.Warn("form field key exceeds maximum length", "key", key, "length", len(key), "max", maxKeyLength)
+			continue
+		}
+
+		if phoneCompanionKeys[key] {
 			continue
 		}
 
@@ -1127,67 +1145,78 @@ func validateAttributeValue(key string, value any, app *App) any {
 	return nil
 }
 
-// validateFormData validates form data against pre-chat form configuration
-// Returns the final name/email to use and any validation errors
-func validateFormData(formData map[string]any, config livechat.Config, existingUser *umodels.User) (string, string, error) {
-	var finalName, finalEmail string
+// validateFormData returns the final name/email/phone/phone country code to persist from the pre-chat form.
+func validateFormData(formData map[string]any, config livechat.Config, existingUser *umodels.User) (string, string, string, string, error) {
+	var finalName, finalEmail, finalPhone, finalPhoneCountryCode string
 
 	if !config.PreChatForm.Enabled {
-		return finalName, finalEmail, nil
+		return finalName, finalEmail, finalPhone, finalPhoneCountryCode, nil
 	}
 
-	// Process each enabled field in the pre-chat form
+	var exName, exEmail, exPhone, exPhoneCountryCode string
+	if existingUser != nil {
+		exName = existingUser.FirstName
+		exEmail = existingUser.Email.String
+		exPhone = existingUser.PhoneNumber.String
+		exPhoneCountryCode = existingUser.PhoneNumberCountryCode.String
+	}
+
 	for _, field := range config.PreChatForm.Fields {
-		if !field.Enabled {
+		if !field.Enabled || !field.IsDefault {
 			continue
 		}
 
 		switch field.Key {
 		case "name":
-			if value, exists := formData[field.Key]; exists {
-				if nameStr, ok := value.(string); ok {
-					// For existing users, ignore form name if they already have one
-					if existingUser != nil && existingUser.FirstName != "" {
-						finalName = existingUser.FirstName
-					} else {
-						finalName = nameStr
-					}
-				}
-			}
-			// Validate required field
+			finalName = resolveFormField(formData, field.Key, exName)
 			if field.Required && finalName == "" {
-				return "", "", fmt.Errorf("name is required")
+				return "", "", "", "", fmt.Errorf("name is required")
 			}
 			if len(finalName) > maxNameLength {
-				return "", "", fmt.Errorf("name too long")
+				return "", "", "", "", fmt.Errorf("name too long")
 			}
 
 		case "email":
-			if value, exists := formData[field.Key]; exists {
-				if emailStr, ok := value.(string); ok {
-					// For existing users, ignore form email if they already have one
-					if existingUser != nil && existingUser.Email.Valid && existingUser.Email.String != "" {
-						finalEmail = existingUser.Email.String
-					} else {
-						finalEmail = emailStr
-					}
-				}
-			}
-			// Validate required field
+			finalEmail = resolveFormField(formData, field.Key, exEmail)
 			if field.Required && finalEmail == "" {
-				return "", "", fmt.Errorf("email is required")
+				return "", "", "", "", fmt.Errorf("email is required")
 			}
 			if len(finalEmail) > maxEmailLength {
-				return "", "", fmt.Errorf("email too long")
+				return "", "", "", "", fmt.Errorf("email too long")
 			}
-			// Validate email format if provided
 			if finalEmail != "" && !stringutil.ValidEmail(finalEmail) {
-				return "", "", fmt.Errorf("invalid email format")
+				return "", "", "", "", fmt.Errorf("invalid email format")
+			}
+
+		case fieldTypePhone:
+			finalPhone = resolveFormField(formData, field.Key, exPhone)
+			finalPhoneCountryCode = resolveFormField(formData, field.Key+phoneCountryCodeSuffix, exPhoneCountryCode)
+			if field.Required && (finalPhone == "" || finalPhoneCountryCode == "") {
+				return "", "", "", "", fmt.Errorf("phone is required")
+			}
+			if len(finalPhone) > maxPhoneNumberLength {
+				return "", "", "", "", fmt.Errorf("phone too long")
+			}
+			if len(finalPhoneCountryCode) > maxPhoneCountryCodeLength {
+				return "", "", "", "", fmt.Errorf("phone country code too long")
+			}
+			if finalPhone == "" {
+				finalPhoneCountryCode = ""
 			}
 		}
 	}
 
-	return finalName, finalEmail, nil
+	return finalName, finalEmail, finalPhone, finalPhoneCountryCode, nil
+}
+
+func resolveFormField(formData map[string]any, key, existing string) string {
+	if existing != "" {
+		return existing
+	}
+	if value, ok := formData[key].(string); ok {
+		return value
+	}
+	return ""
 }
 
 // filterPreChatFormFields filters out pre-chat form fields that reference non-existent custom attributes while retaining the default fields

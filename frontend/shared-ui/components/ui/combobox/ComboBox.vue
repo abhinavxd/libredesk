@@ -8,8 +8,10 @@
           :aria-expanded="open"
           :class="['w-full justify-between', buttonClass]"
         >
-          <span class="min-w-0 flex-1 truncate text-left">
-            <slot name="selected" :selected="selectedItem">{{ selectedLabel }}</slot>
+          <span class="flex min-w-0 flex-1 items-center text-left">
+            <slot name="selected" :selected="selectedItem">
+              <span class="min-w-0 truncate">{{ selectedLabel }}</span>
+            </slot>
           </span>
           <CaretSortIcon class="h-4 w-4 shrink-0 opacity-50" />
         </Button>

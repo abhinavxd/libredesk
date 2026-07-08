@@ -138,6 +138,16 @@
               </FormItem>
             </FormField>
 
+            <!-- Phone input -->
+            <PhoneNumberInput
+              v-else-if="field.type === 'phone'"
+              :phone-number-name="field.key"
+              :country-code-name="countryCodeKey(field.key)"
+              :label="field.label"
+              :placeholder="field.placeholder || ''"
+              :required="field.required"
+            />
+
             <!-- List/Select input -->
             <FormField
               v-else-if="field.type === 'list'"
@@ -221,6 +231,8 @@ import {
   FormLabel,
   FormMessage
 } from '@shared-ui/components/ui/form'
+import PhoneNumberInput from '@shared-ui/components/PhoneNumberInput.vue'
+import { countryCodeKey } from '@shared-ui/utils/phone.js'
 import { useWidgetStore } from '../store/widget.js'
 import { useI18n } from 'vue-i18n'
 import { createPreChatFormSchema } from './preChatFormSchema.js'
@@ -251,9 +263,9 @@ const formFields = computed(() => config.value.fields || [])
 const sortedFields = computed(() => {
   let fields = formFields.value.filter((field) => field.enabled)
 
-  // If user has session token, exclude default name and email fields
+  // If user has session token, exclude default name, email and phone fields
   if (props.excludeDefaultFields) {
-    fields = fields.filter((field) => !['name', 'email'].includes(field.key))
+    fields = fields.filter((field) => !['name', 'email', 'phone'].includes(field.key))
   }
 
   return fields.sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -270,6 +282,9 @@ const initialValues = computed(() => {
   sortedFields.value.forEach((field) => {
     if (field.type === 'checkbox') {
       values[field.key] = false
+    } else if (field.type === 'phone') {
+      values[field.key] = ''
+      values[countryCodeKey(field.key)] = ''
     } else {
       values[field.key] = ''
     }

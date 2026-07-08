@@ -166,12 +166,14 @@ JOIN roles r ON r.name = role_name
 RETURNING user_id;
 
 -- name: insert-contact-with-external-id
-INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes)
-VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7)
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes, phone_number, phone_number_country_code)
+VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (external_user_id) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL
 DO UPDATE SET email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
               first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
               last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
+              phone_number = COALESCE(NULLIF(EXCLUDED.phone_number, ''), users.phone_number),
+              phone_number_country_code = COALESCE(NULLIF(EXCLUDED.phone_number_country_code, ''), users.phone_number_country_code),
               updated_at = now()
 RETURNING id;
 
@@ -205,8 +207,8 @@ UPDATE users SET external_user_id = $2, updated_at = now()
 WHERE id = $1 AND type = 'contact' AND deleted_at IS NULL;
 
 -- name: insert-visitor
-INSERT INTO users (email, type, first_name, last_name, custom_attributes)
-VALUES ($1, 'visitor', $2, $3, $4)
+INSERT INTO users (email, type, first_name, last_name, custom_attributes, phone_number, phone_number_country_code)
+VALUES ($1, 'visitor', $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: update-last-login-at
@@ -237,6 +239,7 @@ UPDATE users
 SET first_name = COALESCE(NULLIF($2, ''), first_name),
     last_name = COALESCE(NULLIF($3, ''), last_name),
     email = COALESCE(NULLIF($4, ''), email),
+    phone_number = COALESCE(NULLIF($5, ''), phone_number),
     updated_at = now()
 WHERE id = $1 AND type IN ('contact', 'visitor');
 

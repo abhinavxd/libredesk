@@ -3,7 +3,7 @@
     <DropdownMenuTrigger as-child>
       <SidebarMenuButton
         size="md"
-        class="p-0"
+        class="p-0 !overflow-visible"
       >
         <div class="relative">
           <Avatar class="h-8 w-8 rounded">
@@ -14,7 +14,7 @@
           </Avatar>
           <StatusDot
             :status="userStore.user.availability_status"
-            size="md"
+            size="sm"
             class="absolute bottom-0 right-0 border border-background"
           />
         </div>

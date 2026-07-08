@@ -25,20 +25,9 @@
 
       <!-- Fields Configuration -->
       <div class="space-y-4">
-        <div class="flex justify-between items-center">
-          <h4 class="font-medium text-foreground">
-            {{ $t('admin.inbox.livechat.prechatForm.fields') }}
-          </h4>
-          <Button
-            variant="outline"
-            size="sm"
-            @click="fetchCustomAttributes"
-            :disabled="availableCustomAttributes.length === 0"
-          >
-            <Plus class="w-4 h-4"/>
-            {{ $t('admin.inbox.livechat.prechatForm.addField') }}
-          </Button>
-        </div>
+        <h4 class="font-medium text-foreground">
+          {{ $t('admin.inbox.livechat.prechatForm.fields') }}
+        </h4>
 
         <!-- Field List -->
         <div class="space-y-3">
@@ -142,7 +131,8 @@
 <script>
 export const getDefaultPrechatFields = () => [
   { key: 'name', type: 'text', label: 'Full name', placeholder: 'Enter your name', required: true, enabled: true, order: 1, is_default: true },
-  { key: 'email', type: 'email', label: 'Email address', placeholder: 'your@email.com', required: true, enabled: true, order: 2, is_default: true }
+  { key: 'email', type: 'email', label: 'Email address', placeholder: 'your@email.com', required: true, enabled: true, order: 2, is_default: true },
+  { key: 'phone', type: 'phone', label: 'Phone number', placeholder: '', required: false, enabled: false, order: 3, is_default: true }
 ]
 </script>
 

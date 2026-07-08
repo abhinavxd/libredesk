@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { countryCodeKey, phoneNumberSchema, countryCodeSchema } from '@shared-ui/utils/phone.js'
 
 export const createPreChatFormSchema = (t, fields = []) => {
   const schemaFields = {}
@@ -7,7 +8,21 @@ export const createPreChatFormSchema = (t, fields = []) => {
     .filter(field => field.enabled)
     .forEach(field => {
       let fieldSchema
-      
+
+      if (field.type === 'phone') {
+        let numberSchema = phoneNumberSchema(t, field.required)
+        let codeSchema = countryCodeSchema(t, field.required)
+
+        if (!field.required) {
+          numberSchema = numberSchema.optional()
+          codeSchema = codeSchema.optional()
+        }
+
+        schemaFields[field.key] = numberSchema
+        schemaFields[countryCodeKey(field.key)] = codeSchema
+        return
+      }
+
       switch (field.type) {
         case 'email':
           fieldSchema = z

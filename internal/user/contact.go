@@ -43,7 +43,7 @@ func (u *Manager) CreateContact(user *models.User) error {
 		}
 
 		// Upsert by ext_id - creates new or updates email/name on ext_id conflict.
-		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes).Scan(&user.ID); err != nil {
+		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes, user.PhoneNumber, user.PhoneNumberCountryCode).Scan(&user.ID); err != nil {
 			u.lo.Error("error inserting contact with external ID", "error", err)
 			return fmt.Errorf("inserting contact with external ID: %w", err)
 		}
@@ -74,9 +74,9 @@ func (u *Manager) CreateContact(user *models.User) error {
 	return nil
 }
 
-// UpdateContactBasicInfo updates only the name and email of a contact.
-func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email string) error {
-	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email))); err != nil {
+// UpdateContactBasicInfo updates only the name, email and phone of a contact.
+func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, phoneNumber string) error {
+	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email)), phoneNumber); err != nil {
 		u.lo.Error("error updating contact basic info", "error", err)
 		return fmt.Errorf("updating contact basic info: %w", err)
 	}
