@@ -809,12 +809,14 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
 	// Validate the request
 	if err := validateCreateConversationRequest(req, app); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	email := strings.ToLower(strings.TrimSpace(req.Email))
+	email := req.Email
 	to := []string{email}
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
