@@ -74,7 +74,7 @@
 
               <!-- Subject -->
               <p
-                v-if="conversation.subject"
+                v-if="showSubject && conversation.subject"
                 class="text-xs text-muted-foreground truncate"
               >
                 {{ conversation.subject }}
@@ -166,6 +166,7 @@ import SlaBadge from '@main/features/sla/SlaBadge.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'
+import { useAppSettingsStore } from '@main/stores/appSettings'
 import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
 import { useI18n } from 'vue-i18n'
 
@@ -173,6 +174,7 @@ let timer = null
 const now = ref(new Date())
 const route = useRoute()
 const conversationStore = useConversationStore()
+const appSettingsStore = useAppSettingsStore()
 const { canBulkAct } = useBulkActionPermissions()
 const { t } = useI18n()
 const frdStatus = ref('')
@@ -235,18 +237,22 @@ const hasSlaDeadlines = computed(() => {
 })
 
 const hasDraftForConversation = computed(() => {
-  return conversationStore.hasDraft(props.conversation.uuid)
+  return conversationStore.conversationHasDraft(props.conversation.uuid)
 })
 
 const isTyping = computed(() => conversationStore.typingByUUID[props.conversation.uuid] === true)
 
 const draftPreview = computed(() => {
-  const draft = conversationStore.getDraft(props.conversation.uuid)
+  const draft = conversationStore.conversationDraftPreview(props.conversation.uuid)
   if (!draft?.content) return ''
   const text = draft.content.replace(/<[^>]*>/g, '').trim()
   if (!text && /<img\b/i.test(draft.content)) return t('globals.terms.image', 1)
   return text.length > 120 ? text.slice(0, 120) + '...' : text
 })
+
+const showSubject = computed(
+  () => appSettingsStore.settings['app.show_conversation_subject'] !== false
+)
 
 const isCurrent = computed(() => props.conversation.uuid === props.currentConversation?.uuid)
 

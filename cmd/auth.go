@@ -103,6 +103,7 @@ func handleOIDCCallback(r *fastglue.Request) error {
 	if err := app.user.UpdateLastLoginAt(user.ID); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+
 	app.user.InvalidateAgentCache(user.ID)
 
 	// Insert activity log.

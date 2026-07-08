@@ -175,6 +175,7 @@ type Conversation struct {
 	AssignedUserID            null.Int               `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID            null.Int               `db:"assigned_team_id" json:"assigned_team_id"`
 	WaitingSince              null.Time              `db:"waiting_since" json:"waiting_since"`
+	SnoozedUntil              null.Time              `db:"snoozed_until" json:"snoozed_until"`
 	Subject                   null.String            `db:"subject" json:"subject"`
 	InboxMail                 string                 `db:"inbox_mail" json:"inbox_mail"`
 	InboxReplyTo              string                 `db:"inbox_reply_to" json:"inbox_reply_to"`
@@ -525,6 +526,7 @@ type ConversationDraft struct {
 	ConversationID   int64           `db:"conversation_id" json:"conversation_id"`
 	ConversationUUID string          `db:"conversation_uuid" json:"conversation_uuid"`
 	UserID           int64           `db:"user_id" json:"user_id"`
+	Type             string          `db:"type" json:"type"`
 	Content          string          `db:"content" json:"content"`
 	CreatedAt        time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt        time.Time       `db:"updated_at" json:"updated_at"`

@@ -5,10 +5,11 @@ const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
 const hexColor = (t) => z.string().regex(hexColorRegex, { message: t('validation.invalidColor') })
 const optionalHexColor = (t) => hexColor(t).optional().or(z.literal(''))
 const optionalUrl = (t) => z.string().url({ message: t('validation.invalidUrl') }).optional().or(z.literal(''))
-const spacingNumber = (t) => {
-  const msg = t('validation.minmaxNumber', { min: 0, max: 200 })
-  return z.coerce.number({ invalid_type_error: msg }).min(0, { message: msg }).max(200, { message: msg })
+const rangeNumber = (t, min, max) => {
+  const msg = t('validation.minmaxNumber', { min, max })
+  return z.coerce.number({ invalid_type_error: msg }).min(min, { message: msg }).max(max, { message: msg })
 }
+const spacingNumber = (t) => rangeNumber(t, 0, 200)
 
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, { message: t('globals.messages.required') }),
@@ -43,6 +44,10 @@ export const createFormSchema = (t) => z.object({
     notice_banner: z.object({
       enabled: z.boolean(),
       text: z.string().optional()
+    }).superRefine((nb, ctx) => {
+      if (nb.enabled && !nb.text?.trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['text'], message: t('globals.messages.required') })
+      }
     }),
     colors: z.object({
       primary: hexColor(t)
@@ -55,6 +60,15 @@ export const createFormSchema = (t) => z.object({
         gradient_start: optionalHexColor(t),
         gradient_end: optionalHexColor(t),
         image_url: optionalUrl(t),
+      }).superRefine((bg, ctx) => {
+        // An empty solid color is intentional (the widget falls back to the page background),
+        // but a gradient/image with no value renders nothing, so require those.
+        if (bg.type === 'gradient') {
+          if (!bg.gradient_start) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['gradient_start'], message: t('globals.messages.required') })
+          if (!bg.gradient_end) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['gradient_end'], message: t('globals.messages.required') })
+        } else if (bg.type === 'image' && !bg.image_url) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['image_url'], message: t('globals.messages.required') })
+        }
       }),
       fade_background: z.boolean(),
     }),
@@ -64,7 +78,7 @@ export const createFormSchema = (t) => z.object({
     }),
     continuity: z.object({
       offline_threshold: z.string().min(1, { message: t('globals.messages.required') }).refine(isGoDuration, { message: t('validation.invalidDuration') }),
-      max_messages_per_email: z.number().min(1).max(100),
+      max_messages_per_email: rangeNumber(t, 1, 100),
       min_email_interval: z.string().min(1, { message: t('globals.messages.required') }).refine(isGoDuration, { message: t('validation.invalidDuration') }),
     }).optional(),
     session_duration: z.string().min(1, { message: t('globals.messages.required') }).refine(isGoDuration, { message: t('validation.invalidDuration') }),

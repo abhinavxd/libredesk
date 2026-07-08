@@ -36,9 +36,9 @@ const statusClass = computed(() => {
     case 'away':
     case 'away_manual':
     case 'away_and_reassigning':
-      return 'bg-amber-500'
+      return 'border-2 border-amber-500 bg-[linear-gradient(to_right,theme(colors.amber.500)_50%,transparent_50%)]'
     default:
-      return 'bg-gray-400'
+      return 'border-2 border-gray-400'
   }
 })
 </script>

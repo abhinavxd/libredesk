@@ -200,6 +200,7 @@ SELECT
    c.first_reply_at,
    c.last_reply_at,
    c.waiting_since,
+   c.snoozed_until,
    c.assigned_user_id,
    c.assigned_team_id,
    c.subject,
@@ -602,10 +603,42 @@ DELETE FROM conversations WHERE uuid = $1;
 
 -- MESSAGE queries.
 -- name: delete-message
-DELETE FROM conversation_messages WHERE CASE 
-    WHEN $1 > 0 THEN id = $1 
-    ELSE uuid = $2 
+DELETE FROM conversation_messages WHERE CASE
+    WHEN $1 > 0 THEN id = $1
+    ELSE uuid = $2
 END;
+
+-- name: delete-private-message
+-- $1 = message uuid, $2 = conversation uuid, $3 = deleted placeholder text.
+WITH deleted AS (
+    UPDATE conversation_messages
+    SET content = $3, text_content = $3, updated_at = NOW(),
+        meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('deleted_at', NOW())
+    WHERE uuid = $1
+      AND private = true
+      AND meta->>'deleted_at' IS NULL
+      AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
+    RETURNING id, conversation_id, created_at
+),
+media_unlink AS (
+    UPDATE media SET model_id = 0
+    FROM deleted d
+    WHERE media.model_type = 'messages' AND media.model_id = d.id
+),
+preview AS (
+    UPDATE conversations c
+    SET last_message = $3, updated_at = NOW()
+    FROM deleted d
+    WHERE c.id = d.conversation_id
+      AND NOT EXISTS (
+          SELECT 1 FROM conversation_messages m2
+          WHERE m2.conversation_id = d.conversation_id
+            AND m2.created_at > d.created_at
+      )
+    RETURNING c.id
+)
+SELECT EXISTS (SELECT 1 FROM preview) AS preview_updated
+FROM deleted d;
 
 -- name: get-message-source-ids
 SELECT 
@@ -859,14 +892,14 @@ SET last_continuity_email_sent_at = NOW(),
 WHERE id = $1;
 
 -- name: upsert-conversation-draft
-INSERT INTO conversation_drafts (conversation_id, user_id, content, meta, updated_at)
-VALUES ($1, $2, $3, $4, NOW())
-ON CONFLICT (conversation_id, user_id)
+INSERT INTO conversation_drafts (conversation_id, user_id, type, content, meta, updated_at)
+VALUES ($1, $2, $3, $4, $5, NOW())
+ON CONFLICT (conversation_id, user_id, type)
 DO UPDATE SET content = EXCLUDED.content, meta = EXCLUDED.meta, updated_at = NOW()
 RETURNING *;
 
 -- name: get-all-user-drafts
-SELECT cd.id, cd.conversation_id, cd.user_id, cd.content, cd.meta, cd.created_at, cd.updated_at, c.uuid as conversation_uuid
+SELECT cd.id, cd.conversation_id, cd.user_id, cd.type, cd.content, cd.meta, cd.created_at, cd.updated_at, c.uuid as conversation_uuid
 FROM conversation_drafts cd
 INNER JOIN conversations c ON cd.conversation_id = c.id
 WHERE cd.user_id = $1
@@ -877,7 +910,8 @@ DELETE FROM conversation_drafts
 WHERE conversation_id IN (
   SELECT id FROM conversations
   WHERE ($1 > 0 AND id = $1) OR (NULLIF($2, '')::uuid IS NOT NULL AND uuid = NULLIF($2, '')::uuid)
-) AND user_id = $3;
+) AND user_id = $3
+AND ($4::text = '' OR type = $4::text);
 
 -- name: delete-stale-drafts
 DELETE FROM conversation_drafts

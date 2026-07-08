@@ -6,6 +6,17 @@
         <span>{{ conversationStore.currentContactName }}</span>
       </div>
       <div class="flex items-center gap-2">
+        <Tooltip v-if="isSnoozed && snoozedUntilLabel">
+          <TooltipTrigger as-child>
+            <span class="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+              <Clock :size="12" />
+              {{ snoozedUntilLabel }}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {{ t('conversation.snoozedUntil', { time: snoozedUntilLabel }) }}
+          </TooltipContent>
+        </Tooltip>
         <DropdownMenu>
           <DropdownMenuTrigger>
             <div
@@ -51,14 +62,17 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useConversationStore } from '../../stores/conversation'
-import { MoreHorizontal } from 'lucide-vue-next'
+import { Clock, MoreHorizontal } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
+import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
@@ -71,6 +85,15 @@ import api from '@main/api'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
 const { t } = useI18n()
+
+const isSnoozed = computed(
+  () => conversationStore.current?.status === CONVERSATION_DEFAULT_STATUSES.SNOOZED
+)
+const snoozedUntilLabel = computed(() =>
+  conversationStore.current?.snoozed_until
+    ? formatMessageTimestamp(conversationStore.current.snoozed_until)
+    : ''
+)
 
 const downloadTranscript = async () => {
   const conversation = conversationStore.current
