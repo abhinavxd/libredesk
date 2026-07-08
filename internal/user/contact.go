@@ -75,8 +75,8 @@ func (u *Manager) CreateContact(user *models.User) error {
 }
 
 // UpdateContactBasicInfo updates only the name, email and phone of a contact.
-func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, phoneNumber, phoneNumberCountryCode string) error {
-	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email)), phoneNumber, phoneNumberCountryCode); err != nil {
+func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, phoneNumber string) error {
+	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email)), phoneNumber); err != nil {
 		u.lo.Error("error updating contact basic info", "error", err)
 		return fmt.Errorf("updating contact basic info: %w", err)
 	}

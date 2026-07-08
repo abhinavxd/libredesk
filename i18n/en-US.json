@@ -1082,6 +1082,7 @@
   "validation.invalidInbox": "Invalid inbox",
   "validation.invalidKey": "Invalid key",
   "validation.invalidPermission": "Invalid permission",
+  "validation.invalidPhone": "Invalid phone number",
   "validation.invalidPortValue": "Invalid port value",
   "validation.invalidProvider": "Invalid provider",
   "validation.invalidSnoozeDuration": "Invalid snooze duration",

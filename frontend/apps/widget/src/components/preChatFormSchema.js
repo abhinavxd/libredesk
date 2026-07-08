@@ -10,13 +10,10 @@ export const createPreChatFormSchema = (t, fields = []) => {
       let fieldSchema
 
       if (field.type === 'phone') {
-        let numberSchema = phoneNumberSchema(t)
-        let codeSchema = countryCodeSchema(t)
+        let numberSchema = phoneNumberSchema(t, field.required)
+        let codeSchema = countryCodeSchema(t, field.required)
 
-        if (field.required) {
-          numberSchema = numberSchema.min(1, { message: t('globals.messages.required') })
-          codeSchema = codeSchema.min(1, { message: t('globals.messages.required') })
-        } else {
+        if (!field.required) {
           numberSchema = numberSchema.optional()
           codeSchema = codeSchema.optional()
         }
