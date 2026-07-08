@@ -212,7 +212,6 @@
   "admin.inbox.livechat.noticeBanner.enabled": "Enable notice banner",
   "admin.inbox.livechat.noticeBanner.text": "Notice banner text",
   "admin.inbox.livechat.officeHours": "Office hours",
-  "admin.inbox.livechat.prechatForm.addField": "Add field",
   "admin.inbox.livechat.prechatForm.availableFields": "Available custom attributes",
   "admin.inbox.livechat.prechatForm.enabled": "Enable pre-chat form",
   "admin.inbox.livechat.prechatForm.enabled.description": "Show a form to collect information before chat starts",

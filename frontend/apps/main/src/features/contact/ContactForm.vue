@@ -40,60 +40,7 @@
       </div>
 
       <div class="flex flex-col flex-1">
-        <div class="flex items-end">
-          <FormField v-slot="{ componentField }" name="phone_number_country_code">
-            <FormItem class="w-max">
-              <FormLabel class="flex items-center whitespace-nowrap">
-                {{ t('globals.terms.phoneNumber') }}
-              </FormLabel>
-              <FormControl>
-                <ComboBox
-                  v-bind="componentField"
-                  :items="allCountries"
-                  :placeholder="t('globals.terms.select')"
-                  :buttonClass="'rounded-r-none border-r-0'"
-                >
-                  <template #item="{ item }">
-                    <div class="flex items-center gap-2">
-                      <div class="w-7 h-7 flex items-center justify-center">
-                        <span v-if="item.emoji">{{ item.emoji }}</span>
-                      </div>
-                      <span class="text-sm">{{ item.label }} ({{ item.calling_code }})</span>
-                    </div>
-                  </template>
-
-                  <template #selected="{ selected }">
-                    <div class="flex items-center gap-1">
-                      <span v-if="selected" class="text-lg">{{ selected.emoji }}</span>
-                      <span
-                        v-if="selected && selected.calling_code"
-                        class="text-xs text-muted-foreground"
-                        >({{ selected.calling_code }})</span
-                      >
-                    </div>
-                  </template>
-                </ComboBox>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <div class="flex-1">
-            <FormField v-slot="{ componentField }" name="phone_number">
-              <FormItem class="relative">
-                <FormControl>
-                  <Input
-                    type="tel"
-                    v-bind="componentField"
-                    class="rounded-l-none"
-                    inputmode="numeric"
-                  />
-                  <FormMessage class="absolute top-full mt-1 text-sm" />
-                </FormControl>
-              </FormItem>
-            </FormField>
-          </div>
-        </div>
+        <PhoneNumberInput />
       </div>
     </div>
 
@@ -149,7 +96,8 @@ import {
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
-import countries from '../../constants/countries.js'
+import PhoneNumberInput from '@shared-ui/components/PhoneNumberInput.vue'
+import { countryOptions } from '@shared-ui/constants/countries.js'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../../stores/user'
 
@@ -157,17 +105,4 @@ defineProps(['formLoading', 'onSubmit'])
 
 const { t } = useI18n()
 const userStore = useUserStore()
-
-const allCountries = countries.map((country) => ({
-  label: country.name,
-  value: country.iso_2,
-  emoji: country.emoji,
-  calling_code: country.calling_code
-}))
-
-const countryOptions = countries.map((country) => ({
-  label: country.name,
-  value: country.iso_2,
-  emoji: country.emoji
-}))
 </script>

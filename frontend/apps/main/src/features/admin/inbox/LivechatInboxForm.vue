@@ -1414,6 +1414,14 @@ watch(
       const pc = JSON.parse(JSON.stringify(newValues.config.prechat_form))
       if (!pc.fields || pc.fields.length === 0) {
         pc.fields = getDefaultPrechatFields()
+      } else {
+        // Backfill default fields (e.g. phone) missing from inboxes saved before the field existed.
+        const existingKeys = new Set(pc.fields.map((field) => field.key))
+        let nextOrder = pc.fields.reduce((max, field) => Math.max(max, field.order || 0), 0)
+        const missing = getDefaultPrechatFields()
+          .filter((field) => !existingKeys.has(field.key))
+          .map((field) => ({ ...field, order: ++nextOrder }))
+        pc.fields = [...pc.fields, ...missing]
       }
       prechatConfig.value = pc
     }

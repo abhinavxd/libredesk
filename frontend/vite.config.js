@@ -53,6 +53,10 @@ export default defineConfig(({ mode, command }) => {
           target: 'http://127.0.0.1:9000',
           changeOrigin: true,
         },
+        '/static': {
+          target: 'http://127.0.0.1:9000',
+          changeOrigin: true,
+        },
         '/logout': {
           target: 'http://127.0.0.1:9000',
           changeOrigin: true,

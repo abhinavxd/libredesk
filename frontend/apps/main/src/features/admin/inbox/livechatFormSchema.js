@@ -110,7 +110,7 @@ export const createFormSchema = (t) => z.object({
       title: z.string().optional(),
       fields: z.array(z.object({
         key: z.string().min(1),
-        type: z.enum(['text', 'email', 'number', 'checkbox', 'date', 'link', 'list']),
+        type: z.enum(['text', 'email', 'number', 'checkbox', 'date', 'link', 'list', 'phone']),
         label: z.string().min(1, { message: t('globals.messages.required') }),
         placeholder: z.string().optional(),
         required: z.boolean(),
