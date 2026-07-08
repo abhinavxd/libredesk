@@ -10,7 +10,6 @@ type General struct {
 	AllowedFileUploadExtensions []string `json:"app.allowed_file_upload_extensions"`
 	Timezone                    string   `json:"app.timezone"`
 	BusinessHoursID             string   `json:"app.business_hours_id"`
-	SetAwayOnLogin              bool     `json:"app.set_away_on_login"`
 	ShowConversationSubject     bool     `json:"app.show_conversation_subject"`
 }
 

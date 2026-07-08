@@ -155,17 +155,6 @@
     </div>
 
     <div class="grid gap-6 md:grid-cols-2">
-      <FormField v-slot="{ componentField, handleChange }" name="set_away_on_login">
-        <FormItem>
-          <SwitchField
-            :title="t('admin.general.setAwayOnLogin')"
-            :description="t('admin.general.setAwayOnLogin.description')"
-            :checked="componentField.modelValue"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
-
       <FormField v-slot="{ componentField, handleChange }" name="show_conversation_subject">
         <FormItem>
           <SwitchField

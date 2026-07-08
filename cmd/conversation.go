@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
@@ -808,27 +809,38 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
 	// Validate the request
 	if err := validateCreateConversationRequest(req, app); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	to := []string{req.Email}
+	email := req.Email
+	to := []string{email}
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Find or create contact.
 	contact := umodels.User{
-		Email:            null.StringFrom(req.Email),
+		Email:            null.StringFrom(email),
 		FirstName:        req.FirstName,
 		LastName:         req.LastName,
 		ExternalUserID:   null.NewString(req.ExternalUserID, req.ExternalUserID != ""),
 		CustomAttributes: json.RawMessage(`{}`),
 	}
-	if err := app.user.CreateContact(&contact); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	// Reuse an existing contact as-is; this endpoint is gated only on conversations:write and must never rename a contact.
+	existing, err := app.user.GetContactByEmail(email)
+	if err != nil {
+		if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
+			return sendErrorEnvelope(r, err)
+		}
+		if err := app.user.CreateContact(&contact); err != nil {
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
+	} else {
+		contact.ID = existing.ID
 	}
 
 	// Create conversation first.

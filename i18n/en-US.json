@@ -115,8 +115,6 @@
   "admin.general.rootURL.valid": "Root URL should be a valid URL",
   "admin.general.siteName": "Site name",
   "admin.general.siteName.min": "Site name should be at least 1 character",
-  "admin.general.setAwayOnLogin": "Set agents away on login",
-  "admin.general.setAwayOnLogin.description": "Agents will be set to away when they log in and must manually go online.",
   "admin.general.showConversationSubject": "Show subject in conversation list",
   "admin.general.showConversationSubject.description": "Display the conversation subject line in the conversation list when available.",
   "admin.general.timezone.placeholder": "Select timezone",
