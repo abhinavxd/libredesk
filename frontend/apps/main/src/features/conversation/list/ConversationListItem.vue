@@ -87,7 +87,7 @@
                 <template v-if="isTyping">
                   <span class="italic text-primary">{{ $t('globals.terms.typing') }}</span>
                 </template>
-                <template v-else-if="hasDraftForConversation">
+                <template v-else-if="hasDraftForConversation && !isCurrent">
                   <span class="font-medium text-primary">{{ $t('globals.terms.draft') }}:</span>
                   {{ draftPreview }}
                 </template>
@@ -116,7 +116,6 @@
                 :label="'FRD'"
                 :showExtra="false"
                 @status="frdStatus = $event"
-                :key="`${conversation.uuid}-${conversation.first_response_deadline_at}-${conversation.first_reply_at}`"
               />
               <SlaBadge
                 v-show="rdStatus === 'overdue' || rdStatus === 'remaining'"
@@ -125,7 +124,6 @@
                 :label="'RD'"
                 :showExtra="false"
                 @status="rdStatus = $event"
-                :key="`${conversation.uuid}-${conversation.resolution_deadline_at}-${conversation.resolved_at}`"
               />
               <SlaBadge
                 v-show="nrdStatus === 'overdue' || nrdStatus === 'remaining'"
@@ -134,7 +132,6 @@
                 :label="'NRD'"
                 :showExtra="false"
                 @status="nrdStatus = $event"
-                :key="`${conversation.uuid}-${conversation.next_response_deadline_at}-${conversation.next_response_met_at}`"
               />
             </div>
           </div>
