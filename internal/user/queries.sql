@@ -240,6 +240,7 @@ SET first_name = COALESCE(NULLIF($2, ''), first_name),
     last_name = COALESCE(NULLIF($3, ''), last_name),
     email = COALESCE(NULLIF($4, ''), email),
     phone_number = COALESCE(NULLIF($5, ''), phone_number),
+    phone_number_country_code = COALESCE(NULLIF($6, ''), phone_number_country_code),
     updated_at = now()
 WHERE id = $1 AND type IN ('contact', 'visitor');
 

@@ -1119,7 +1119,8 @@ const jwtPayloadExample = computed(() => {
   "email": "user@example.com",                // Required: User's email
   "first_name": "John",                       // Required: User's first name
   "last_name": "Doe",                         // Optional: User's last name
-  "phone_number": "+15551234567",             // Optional: User's phone number
+  "phone_number": "9876543210",                // Optional: User's phone number (no country calling code)
+  "phone_number_country_code": "IN",          // Optional: ISO 3166-1 alpha-2 country code (e.g. "IN", "US")
   "exp": 1735689600,                          // Required: Expiration time (Unix timestamp in seconds)
   "contact_custom_attributes": {              // Optional: Contact-level attributes
     "plan": "premium",
