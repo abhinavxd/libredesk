@@ -244,10 +244,12 @@ const isTyping = computed(() => conversationStore.typingByUUID[props.conversatio
 
 const draftPreview = computed(() => {
   const draft = conversationStore.conversationDraftPreview(props.conversation.uuid)
-  if (!draft?.content) return ''
-  const text = draft.content.replace(/<[^>]*>/g, '').trim()
-  if (!text && /<img\b/i.test(draft.content)) return t('globals.terms.image', 1)
-  return text.length > 120 ? text.slice(0, 120) + '...' : text
+  if (!draft?.content && !draft?.meta?.attachments?.length) return ''
+  const text = (draft.content || '').replace(/<[^>]*>/g, '').trim()
+  if (text) return text.length > 120 ? text.slice(0, 120) + '...' : text
+  if (draft.meta?.attachments?.length) return conversationStore.getMediaPreview(draft.meta.attachments)
+  if (/<img\b/i.test(draft.content || '')) return t('globals.terms.image', 1)
+  return ''
 })
 
 const showSubject = computed(
