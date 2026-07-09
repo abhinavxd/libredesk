@@ -24,7 +24,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { toRef, watch } from 'vue'
 import { useSla } from '../../composables/useSla'
 import { AlertCircle, CheckCircle, Clock } from 'lucide-vue-next'
 const props = defineProps({
@@ -38,7 +38,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['status'])
-let sla = useSla(ref(props.dueAt), ref(props.actualAt))
+let sla = useSla(toRef(props, 'dueAt'), toRef(props, 'actualAt'))
 
 // Watch for status change and emit
 watch(
