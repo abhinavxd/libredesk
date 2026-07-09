@@ -276,13 +276,18 @@ func (u *Manager) UpgradeVisitorToContact(visitorID int) error {
 	return nil
 }
 
-// SetExternalUserID sets the external_user_id on an existing contact.
-func (u *Manager) SetExternalUserID(id int, externalUserID string) error {
-	if _, err := u.q.SetExternalUserID.Exec(id, externalUserID); err != nil {
+// SetExternalUserID sets the external_user_id on an existing contact, reporting whether a row was updated.
+func (u *Manager) SetExternalUserID(id int, externalUserID string) (bool, error) {
+	res, err := u.q.SetExternalUserID.Exec(id, externalUserID)
+	if err != nil {
 		u.lo.Error("error setting external user ID", "id", id, "external_user_id", externalUserID, "error", err)
-		return fmt.Errorf("setting external user ID: %w", err)
+		return false, fmt.Errorf("setting external user ID: %w", err)
 	}
-	return nil
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("setting external user ID: %w", err)
+	}
+	return rows > 0, nil
 }
 
 // UpdateAvatar updates the user avatar.
