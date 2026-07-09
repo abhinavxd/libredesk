@@ -284,7 +284,7 @@ const initialValues = computed(() => {
       values[field.key] = false
     } else if (field.type === 'phone') {
       values[field.key] = ''
-      values[countryCodeKey(field.key)] = field.required ? defaultCountryCode() : ''
+      values[countryCodeKey(field.key)] = defaultCountryCode()
     } else {
       values[field.key] = ''
     }
