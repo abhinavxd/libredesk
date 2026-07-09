@@ -64,6 +64,7 @@ type Claims struct {
 	FirstName               string         `json:"first_name,omitempty"`
 	LastName                string         `json:"last_name,omitempty"`
 	PhoneNumber             string         `json:"phone_number,omitempty"`
+	PhoneNumberCountryCode  string         `json:"phone_number_country_code,omitempty"`
 	ContactCustomAttributes map[string]any `json:"contact_custom_attributes,omitempty"`
 	jwt.RegisteredClaims
 }
@@ -387,6 +388,10 @@ func handleAuthExchange(r *fastglue.Request) error {
 	}
 	if len(claims.PhoneNumber) > maxPhoneNumberLength {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxPhoneNumberLength)), nil, envelope.InputError)
+	}
+	// Country code is cosmetic - drop an invalid one instead of failing the whole exchange.
+	if len(claims.PhoneNumberCountryCode) > maxPhoneCountryCodeLength {
+		claims.PhoneNumberCountryCode = ""
 	}
 
 	// Resolve or create the contact.
@@ -774,8 +779,8 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 	// Sync name/email/phone from JWT only if changed.
 	if user.ID > 0 && claims.ExternalUserID != "" {
 		if user.FirstName != claims.FirstName || user.LastName != claims.LastName || user.Email.String != claims.Email ||
-			user.PhoneNumber.String != claims.PhoneNumber {
-			if err := app.user.UpdateContactBasicInfo(user.ID, claims.FirstName, claims.LastName, claims.Email, claims.PhoneNumber); err != nil {
+			user.PhoneNumber.String != claims.PhoneNumber || user.PhoneNumberCountryCode.String != claims.PhoneNumberCountryCode {
+			if err := app.user.UpdateContactBasicInfo(user.ID, claims.FirstName, claims.LastName, claims.Email, claims.PhoneNumber, claims.PhoneNumberCountryCode); err != nil {
 				app.lo.Error("error updating contact basic info", "contact_id", user.ID, "error", err)
 			}
 		}
@@ -785,12 +790,13 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 	// Create contact if not found.
 	if claims.ExternalUserID != "" {
 		user := umodels.User{
-			FirstName:        claims.FirstName,
-			LastName:         claims.LastName,
-			Email:            null.NewString(claims.Email, true),
-			PhoneNumber:      null.NewString(claims.PhoneNumber, claims.PhoneNumber != ""),
-			ExternalUserID:   null.NewString(claims.ExternalUserID, true),
-			CustomAttributes: marshalCustomAttributes(claims.ContactCustomAttributes, app),
+			FirstName:              claims.FirstName,
+			LastName:               claims.LastName,
+			Email:                  null.NewString(claims.Email, true),
+			PhoneNumber:            null.NewString(claims.PhoneNumber, claims.PhoneNumber != ""),
+			PhoneNumberCountryCode: null.NewString(claims.PhoneNumberCountryCode, claims.PhoneNumberCountryCode != ""),
+			ExternalUserID:         null.NewString(claims.ExternalUserID, true),
+			CustomAttributes:       marshalCustomAttributes(claims.ContactCustomAttributes, app),
 		}
 		if err := app.user.CreateContact(&user); err != nil {
 			return 0, err
