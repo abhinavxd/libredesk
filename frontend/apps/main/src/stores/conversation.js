@@ -1216,6 +1216,7 @@ export const useConversationStore = defineStore('conversation', () => {
     deleteMessage,
     conversationHasDraft,
     conversationDraftPreview,
+    getMediaPreview,
     setSelectedDraftType,
     resolveDraftType,
     addPendingMessage,
