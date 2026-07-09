@@ -232,7 +232,7 @@ import {
   FormMessage
 } from '@shared-ui/components/ui/form'
 import PhoneNumberInput from '@shared-ui/components/PhoneNumberInput.vue'
-import { countryCodeKey } from '@shared-ui/utils/phone.js'
+import { countryCodeKey, defaultCountryCode } from '@shared-ui/utils/phone.js'
 import { useWidgetStore } from '../store/widget.js'
 import { useI18n } from 'vue-i18n'
 import { createPreChatFormSchema } from './preChatFormSchema.js'
@@ -284,7 +284,7 @@ const initialValues = computed(() => {
       values[field.key] = false
     } else if (field.type === 'phone') {
       values[field.key] = ''
-      values[countryCodeKey(field.key)] = ''
+      values[countryCodeKey(field.key)] = field.required ? defaultCountryCode() : ''
     } else {
       values[field.key] = ''
     }
