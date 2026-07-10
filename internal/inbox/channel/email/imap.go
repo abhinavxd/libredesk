@@ -548,15 +548,11 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 
 // getContactName extracts the contact's first and last name from the IMAP address.
 func getContactName(imapAddr imap.Address) (string, string) {
-	from := strings.TrimSpace(imapAddr.Name)
-	names := strings.Fields(from)
-	if len(names) == 0 {
+	first, last := stringutil.SplitName(imapAddr.Name)
+	if first == "" {
 		return imapAddr.Host, ""
 	}
-	if len(names) == 1 {
-		return names[0], ""
-	}
-	return names[0], names[1]
+	return first, last
 }
 
 // isAutoReply checks if a given email envelope indicates an auto-reply message.
