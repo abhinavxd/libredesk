@@ -247,6 +247,7 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 
 	transcript := ""
 	var extraTools []ai.Tool
+	var tctx ai.ToolContext
 	if req.ConversationUUID != "" {
 		conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
 		if err != nil {
@@ -255,8 +256,9 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		transcript = conversationTranscript(app, req.ConversationUUID)
 		auser := r.RequestCtx.UserValue("user").(amodels.User)
 		extraTools = contactHistoryTools(app, auser.ID, conv.ContactID, req.ConversationUUID)
+		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
 	}
-	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, extraTools...)
+	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, tctx, extraTools...)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -278,6 +280,7 @@ func handleAICopilot(r *fastglue.Request) error {
 
 	convoContext := ""
 	var extraTools []ai.Tool
+	var tctx ai.ToolContext
 	if req.ConversationUUID != "" {
 		conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
 		if err != nil {
@@ -286,8 +289,9 @@ func handleAICopilot(r *fastglue.Request) error {
 		convoContext = conversationTranscript(app, req.ConversationUUID)
 		auser := r.RequestCtx.UserValue("user").(amodels.User)
 		extraTools = contactHistoryTools(app, auser.ID, conv.ContactID, req.ConversationUUID)
+		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
 	}
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, extraTools...)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, tctx, extraTools...)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

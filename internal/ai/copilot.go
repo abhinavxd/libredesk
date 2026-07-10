@@ -19,7 +19,7 @@ Always call the search_articles tool before answering any question about the pro
 )
 
 // GenerateReply drafts a reply to a conversation using the agentic loop (tools included).
-func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction string, extraTools ...Tool) (string, error) {
+func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction string, tctx ToolContext, extraTools ...Tool) (string, error) {
 	var user strings.Builder
 	if strings.TrimSpace(transcript) != "" {
 		fmt.Fprintf(&user, "Conversation so far:\n%s\n\n", transcript)
@@ -30,11 +30,11 @@ func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction str
 	user.WriteString("Draft the reply now.")
 
 	history := []models.ChatMessage{{Role: "user", Content: user.String()}}
-	return m.RunAgent(ctx, replyDraftSystemPrompt, history, defaultMaxSteps, extraTools...)
+	return m.RunAgent(ctx, replyDraftSystemPrompt, history, defaultMaxSteps, tctx, extraTools...)
 }
 
 // Copilot answers an agent's chat message, optionally grounded in a conversation.
-func (m *Manager) Copilot(ctx context.Context, conversationContext string, history []models.ChatMessage, extraTools ...Tool) (string, error) {
+func (m *Manager) Copilot(ctx context.Context, conversationContext string, history []models.ChatMessage, tctx ToolContext, extraTools ...Tool) (string, error) {
 	msgs := make([]models.ChatMessage, 0, len(history)+1)
 	if strings.TrimSpace(conversationContext) != "" {
 		msgs = append(msgs, models.ChatMessage{
@@ -43,5 +43,5 @@ func (m *Manager) Copilot(ctx context.Context, conversationContext string, histo
 		})
 	}
 	msgs = append(msgs, history...)
-	return m.RunAgent(ctx, copilotSystemPrompt, msgs, defaultMaxSteps, extraTools...)
+	return m.RunAgent(ctx, copilotSystemPrompt, msgs, defaultMaxSteps, tctx, extraTools...)
 }

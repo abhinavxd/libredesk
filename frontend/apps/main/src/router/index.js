@@ -196,9 +196,25 @@ const routes = [
           },
           {
             path: 'ai',
-            name: 'ai-settings',
-            component: () => import('@main/views/admin/ai/AISettings.vue'),
-            meta: { titleKey: 'admin.ai.title' }
+            redirect: { name: 'ai-providers' }
+          },
+          {
+            path: 'ai/providers',
+            name: 'ai-providers',
+            component: () => import('@main/views/admin/ai/AIProviders.vue'),
+            meta: { titleKey: 'admin.ai.providers' }
+          },
+          {
+            path: 'ai/snippets',
+            name: 'ai-snippets',
+            component: () => import('@main/views/admin/ai/AISnippets.vue'),
+            meta: { titleKey: 'admin.ai.snippets' }
+          },
+          {
+            path: 'ai/tools',
+            name: 'ai-tools',
+            component: () => import('@main/views/admin/ai/AITools.vue'),
+            meta: { titleKey: 'admin.ai.tools' }
           },
           {
             path: 'ai/tools/new',

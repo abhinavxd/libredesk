@@ -53,7 +53,9 @@ import {
   BarChart3,
   CircleUser,
   Contact,
-  Sparkles
+  Sparkles,
+  NotebookText,
+  Wrench
 } from 'lucide-vue-next'
 
 const navIconMap = {
@@ -79,7 +81,9 @@ const navIconMap = {
   BarChart3,
   CircleUser,
   Contact,
-  Sparkles
+  Sparkles,
+  NotebookText,
+  Wrench
 }
 import {
   DropdownMenu,

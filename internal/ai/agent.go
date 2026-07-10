@@ -11,7 +11,7 @@ import (
 const defaultMaxSteps = 5
 
 // RunAgent runs the tool-calling loop up to maxSteps and returns the model's text answer.
-func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, extraTools ...Tool) (string, error) {
+func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext, extraTools ...Tool) (string, error) {
 	if maxSteps <= 0 {
 		maxSteps = defaultMaxSteps
 	}
@@ -25,7 +25,7 @@ func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []m
 		systemPrompt += "\n\nWorkspace admin instructions (follow these, they take precedence on tone and format):\n" + instructions
 	}
 
-	registry, defs, err := m.buildToolRegistry(extraTools...)
+	registry, defs, err := m.buildToolRegistry(tctx, extraTools...)
 	if err != nil {
 		return "", err
 	}
