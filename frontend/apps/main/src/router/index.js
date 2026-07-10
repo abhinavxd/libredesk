@@ -195,6 +195,25 @@ const routes = [
             meta: { titleKey: 'globals.terms.general' }
           },
           {
+            path: 'ai',
+            name: 'ai-settings',
+            component: () => import('@main/views/admin/ai/AISettings.vue'),
+            meta: { titleKey: 'admin.ai.title' }
+          },
+          {
+            path: 'ai/tools/new',
+            name: 'new-ai-tool',
+            component: () => import('@main/views/admin/ai/CreateOrEditTool.vue'),
+            meta: { titleKey: 'admin.ai.tool.new' }
+          },
+          {
+            path: 'ai/tools/:id/edit',
+            name: 'edit-ai-tool',
+            props: true,
+            component: () => import('@main/views/admin/ai/CreateOrEditTool.vue'),
+            meta: { titleKey: 'admin.ai.tool.edit' }
+          },
+          {
             path: 'business-hours',
             component: () => import('@main/views/admin/business-hours/BusinessHours.vue'),
             meta: { titleKey: 'globals.terms.businessHour', titleCount: 2 },

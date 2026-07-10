@@ -37,6 +37,17 @@
       >
         <Smile class="h-4 w-4" />
       </Toggle>
+      <Toggle
+        class="px-2 py-2 border-0"
+        variant="outline"
+        :pressed="false"
+        :disabled="isGenerating"
+        :title="$t('replyBox.generateReply')"
+        @click="emit('generateReply')"
+      >
+        <Loader2 v-if="isGenerating" class="h-4 w-4 animate-spin" />
+        <Sparkles v-else class="h-4 w-4" />
+      </Toggle>
     </div>
     <div class="flex items-center">
       <Button
@@ -77,7 +88,7 @@ import { ref, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
-import { Paperclip, Smile, ChevronDownIcon } from 'lucide-vue-next'
+import { Paperclip, Smile, ChevronDownIcon, Sparkles, Loader2 } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -100,12 +111,13 @@ const attachmentInput = ref(null)
 // const inlineImageInput = ref(null)
 const isEmojiPickerVisible = ref(false)
 const emojiPickerRef = ref(null)
-const emit = defineEmits(['emojiSelect'])
+const emit = defineEmits(['emojiSelect', 'generateReply'])
 
 // Using defineProps for props that don't need two-way binding
 defineProps({
   isFullscreen: Boolean,
   isSending: Boolean,
+  isGenerating: Boolean,
   enableSend: Boolean,
   handleSend: Function,
   handleSendAndSetStatus: Function,

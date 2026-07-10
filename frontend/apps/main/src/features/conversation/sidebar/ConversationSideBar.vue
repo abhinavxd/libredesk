@@ -1,124 +1,135 @@
 <template>
-  <div>
-    <ConversationSideBarContact class="p-4" />
-    <Accordion type="multiple" collapsible v-model="accordionState">
-      <AccordionItem value="actions" class="accordion-item">
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('globals.terms.action', 2) }}
-        </AccordionTrigger>
+  <Tabs default-value="details" class="flex flex-col h-full">
+    <TabsList class="grid grid-cols-2 mx-4 mt-3">
+      <TabsTrigger value="details">{{ $t('copilot.details') }}</TabsTrigger>
+      <TabsTrigger value="copilot">{{ $t('copilot.title') }}</TabsTrigger>
+    </TabsList>
 
-        <!-- Agent, team, priority, and tags assignment -->
-        <AccordionContent class="accordion-content--actions">
-          <div>
-            <SelectComboBox
-              v-model="conversationStore.current.assigned_user_id"
-              :items="[{ value: 'none', label: t('globals.terms.none') }, ...usersStore.options]"
-              :placeholder="t('placeholders.selectAgent')"
-              @select="selectAgent"
-              type="user"
+    <TabsContent value="details" class="mt-0">
+      <ConversationSideBarContact class="p-4" />
+      <Accordion type="multiple" collapsible v-model="accordionState">
+        <AccordionItem value="actions" class="accordion-item">
+          <AccordionTrigger class="accordion-trigger">
+            {{ $t('globals.terms.action', 2) }}
+          </AccordionTrigger>
+
+          <!-- Agent, team, priority, and tags assignment -->
+          <AccordionContent class="accordion-content--actions">
+            <div>
+              <SelectComboBox
+                v-model="conversationStore.current.assigned_user_id"
+                :items="[{ value: 'none', label: t('globals.terms.none') }, ...usersStore.options]"
+                :placeholder="t('placeholders.selectAgent')"
+                @select="selectAgent"
+                type="user"
+              />
+            </div>
+
+            <div>
+              <SelectComboBox
+                v-model="conversationStore.current.assigned_team_id"
+                :items="[{ value: 'none', label: t('globals.terms.none') }, ...teamsStore.options]"
+                :placeholder="t('placeholders.selectTeam')"
+                @select="selectTeam"
+                type="team"
+              />
+            </div>
+
+            <div>
+              <SelectComboBox
+                v-model="conversationStore.current.priority_id"
+                :items="priorityOptions"
+                :placeholder="t('placeholders.selectPriority')"
+                @select="selectPriority"
+                type="priority"
+              />
+            </div>
+
+            <div>
+              <SelectTag
+                v-if="conversationStore.current"
+                :model-value="conversationStore.current.tags || []"
+                @update:modelValue="onTagsChange"
+                :items="tags.map((tag) => ({ label: tag, value: tag }))"
+                :placeholder="t('placeholders.selectTags')"
+              />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <!-- Information -->
+        <AccordionItem value="information" class="accordion-item">
+          <AccordionTrigger class="accordion-trigger">
+            {{ $t('conversation.sidebar.information') }}
+          </AccordionTrigger>
+          <AccordionContent class="accordion-content">
+            <ConversationInfo />
+          </AccordionContent>
+        </AccordionItem>
+
+        <!-- Contact attributes -->
+        <AccordionItem
+          value="contact_attributes"
+          class="accordion-item"
+          v-if="customAttributeStore.contactAttributeOptions.length > 0"
+        >
+          <AccordionTrigger class="accordion-trigger">
+            {{ $t('conversation.sidebar.contactAttributes') }}
+          </AccordionTrigger>
+          <AccordionContent class="accordion-content">
+            <CustomAttributes
+              :loading="conversationStore.current.loading"
+              :attributes="customAttributeStore.contactAttributeOptions"
+              :customAttributes="conversationStore.current?.contact?.custom_attributes || {}"
+              @update:setattributes="updateContactCustomAttributes"
             />
-          </div>
+          </AccordionContent>
+        </AccordionItem>
 
-          <div>
-            <SelectComboBox
-              v-model="conversationStore.current.assigned_team_id"
-              :items="[{ value: 'none', label: t('globals.terms.none') }, ...teamsStore.options]"
-              :placeholder="t('placeholders.selectTeam')"
-              @select="selectTeam"
-              type="team"
-            />
-          </div>
+        <!-- Page visits (livechat only) -->
+        <AccordionItem
+          value="page_visits"
+          class="accordion-item"
+          v-if="conversationStore.current?.inbox_channel === 'livechat'"
+        >
+          <AccordionTrigger class="accordion-trigger">
+            {{ $t('conversation.sidebar.lastVisitedPages') }}
+          </AccordionTrigger>
+          <AccordionContent class="accordion-content">
+            <ConversationSideBarPageVisits />
+          </AccordionContent>
+        </AccordionItem>
 
-          <div>
-            <SelectComboBox
-              v-model="conversationStore.current.priority_id"
-              :items="priorityOptions"
-              :placeholder="t('placeholders.selectPriority')"
-              @select="selectPriority"
-              type="priority"
-            />
-          </div>
+        <!-- Contact notes -->
+        <AccordionItem
+          value="contact_notes"
+          class="accordion-item"
+          v-if="conversationStore.current?.contact?.id && userStore.can('contact_notes:read')"
+        >
+          <AccordionTrigger class="accordion-trigger">
+            {{ $t('globals.terms.note', 2) }}
+          </AccordionTrigger>
+          <AccordionContent class="accordion-content">
+            <ContactNotes :contact-id="conversationStore.current.contact.id" compact />
+          </AccordionContent>
+        </AccordionItem>
 
-          <div>
-            <SelectTag
-              v-if="conversationStore.current"
-              :model-value="conversationStore.current.tags || []"
-              @update:modelValue="onTagsChange"
-              :items="tags.map((tag) => ({ label: tag, value: tag }))"
-              :placeholder="t('placeholders.selectTags')"
-            />
-          </div>
-        </AccordionContent>
-      </AccordionItem>
+        <!-- Previous conversations -->
+        <AccordionItem value="previous_conversations" class="accordion-item">
+          <AccordionTrigger class="accordion-trigger">
+            {{ $t('conversation.sidebar.previousConvo') }}
+          </AccordionTrigger>
+          <AccordionContent class="accordion-content">
+            <PreviousConversations />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </TabsContent>
 
-      <!-- Information -->
-      <AccordionItem value="information" class="accordion-item">
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.information') }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <ConversationInfo />
-        </AccordionContent>
-      </AccordionItem>
-
-      <!-- Contact attributes -->
-      <AccordionItem
-        value="contact_attributes"
-        class="accordion-item"
-        v-if="customAttributeStore.contactAttributeOptions.length > 0"
-      >
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.contactAttributes') }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <CustomAttributes
-            :loading="conversationStore.current.loading"
-            :attributes="customAttributeStore.contactAttributeOptions"
-            :customAttributes="conversationStore.current?.contact?.custom_attributes || {}"
-            @update:setattributes="updateContactCustomAttributes"
-          />
-        </AccordionContent>
-      </AccordionItem>
-
-      <!-- Page visits (livechat only) -->
-      <AccordionItem
-        value="page_visits"
-        class="accordion-item"
-        v-if="conversationStore.current?.inbox_channel === 'livechat'"
-      >
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.lastVisitedPages') }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <ConversationSideBarPageVisits />
-        </AccordionContent>
-      </AccordionItem>
-
-      <!-- Contact notes -->
-      <AccordionItem
-        value="contact_notes"
-        class="accordion-item"
-        v-if="conversationStore.current?.contact?.id && userStore.can('contact_notes:read')"
-      >
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('globals.terms.note', 2) }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <ContactNotes :contact-id="conversationStore.current.contact.id" compact />
-        </AccordionContent>
-      </AccordionItem>
-
-      <!-- Previous conversations -->
-      <AccordionItem value="previous_conversations" class="accordion-item">
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.previousConvo') }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <PreviousConversations />
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  </div>
+    <TabsContent value="copilot" class="flex-1 min-h-0 mt-0">
+      <CopilotPanel />
+    </TabsContent>
+  </Tabs>
 </template>
 
 <script setup>
@@ -134,8 +145,10 @@ import {
   AccordionItem,
   AccordionTrigger
 } from '@shared-ui/components/ui/accordion'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/ui/tabs'
 import ConversationInfo from './ConversationInfo.vue'
 import ConversationSideBarContact from '@/features/conversation/sidebar/ConversationSideBarContact.vue'
+import CopilotPanel from '@/features/conversation/sidebar/CopilotPanel.vue'
 import { SelectTag } from '@shared-ui/components/ui/select'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'

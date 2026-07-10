@@ -203,7 +203,7 @@ func initFS(staticDir string) stuffbin.FileSystem {
 		// Only include paths that exist in the custom dir.
 		var sf []string
 		for _, def := range staticFiles {
-			src := strings.Split(def, ":")[0]
+			src, _, _ := strings.Cut(def, ":")
 			if _, err := os.Stat(filepath.Join(staticDir, src)); err == nil {
 				sf = append(sf, def)
 			}
@@ -243,7 +243,7 @@ func loadSettings(m *setting.Manager) {
 
 	// Setting keys are dot separated, eg: app.favicon_url. Unflatten them into
 	// nested maps {app: {favicon_url}}.
-	var out map[string]interface{}
+	var out map[string]any
 
 	if err := json.Unmarshal(j, &out); err != nil {
 		log.Fatalf("error unmarshalling settings from DB: %v", err)
@@ -464,7 +464,7 @@ func getTmplFuncs(consts *constants, i18n *i18n.I18n) template.FuncMap {
 		"SiteName": func() string {
 			return consts.SiteName
 		},
-		"L": func() interface{} {
+		"L": func() any {
 			return i18n
 		},
 	}
@@ -478,7 +478,7 @@ func reloadSettings(app *App) error {
 		app.lo.Error("error parsing settings from DB", "error", err)
 		return err
 	}
-	var out map[string]interface{}
+	var out map[string]any
 	if err := json.Unmarshal(j, &out); err != nil {
 		app.lo.Error("error unmarshalling settings from DB", "error", err)
 		return err

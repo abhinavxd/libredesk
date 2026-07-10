@@ -34,6 +34,17 @@ export const adminNavItems = [
     ]
   },
   {
+    titleKey: 'admin.ai.title',
+    children: [
+      {
+        titleKey: 'admin.ai.title',
+        href: '/admin/ai',
+        permission: 'ai:manage',
+        icon: 'Sparkles'
+      }
+    ]
+  },
+  {
     titleKey: 'globals.terms.channel',
     isTitleKeyPlural: true,
     children: [

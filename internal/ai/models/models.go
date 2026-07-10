@@ -1,17 +1,46 @@
 package models
 
-import "time"
+import (
+	"time"
 
+	"github.com/jmoiron/sqlx/types"
+)
+
+const (
+	ProviderTypeCompletion = "completion"
+	ProviderTypeEmbedding  = "embedding"
+
+	KnowledgeTypeSnippet = "snippet"
+
+	// Source types for embeddings.
+	SourceSnippet = "snippet"
+)
+
+// Provider is a row in ai_providers (one per type: completion / embedding).
 type Provider struct {
-	ID        string    `db:"id"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-	Name      string    `db:"name"`
-	Provider  string    `db:"provider"`
-	Config    string    `db:"config"`
-	IsDefault bool      `db:"is_default"`
+	ID        int            `db:"id" json:"id"`
+	CreatedAt time.Time      `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time      `db:"updated_at" json:"updated_at"`
+	Name      string         `db:"name" json:"name"`
+	Provider  string         `db:"provider" json:"provider"`
+	Type      string         `db:"type" json:"type"`
+	Config    types.JSONText `db:"config" json:"config"`
+	IsDefault bool           `db:"is_default" json:"is_default"`
 }
 
+// ProviderConfig is the decoded ai_providers.config JSONB. OpenAI-compatible.
+type ProviderConfig struct {
+	Provider     string   `json:"provider"`
+	BaseURL      string   `json:"base_url"`
+	APIKey       string   `json:"api_key"`
+	Model        string   `json:"model"`
+	Temperature  *float64 `json:"temperature,omitempty"`
+	MaxTokens    int      `json:"max_tokens"`
+	Dimensions   int      `json:"dimensions"`
+	Instructions string   `json:"instructions"`
+}
+
+// Prompt backs the agent-facing rephrase/summarize actions in the reply box.
 type Prompt struct {
 	ID        int       `db:"id" json:"id"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
@@ -19,4 +48,100 @@ type Prompt struct {
 	Title     string    `db:"title" json:"title"`
 	Key       string    `db:"key" json:"key"`
 	Content   string    `db:"content" json:"content,omitempty"`
+}
+
+type KnowledgeBaseItem struct {
+	ID        int       `db:"id" json:"id"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+	Type      string    `db:"type" json:"type"`
+	Title     string    `db:"title" json:"title"`
+	Content   string    `db:"content" json:"content"`
+	Enabled   bool      `db:"enabled" json:"enabled"`
+}
+
+// Tool is a custom, admin-defined HTTP tool the assistant can call.
+type Tool struct {
+	ID          int            `db:"id" json:"id"`
+	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
+	UpdatedAt   time.Time      `db:"updated_at" json:"updated_at"`
+	Name        string         `db:"name" json:"name"`
+	Description string         `db:"description" json:"description"`
+	URL         string         `db:"url" json:"url"`
+	Method      string         `db:"method" json:"method"`
+	Auth        types.JSONText `db:"auth" json:"auth"`
+	Parameters  types.JSONText `db:"parameters" json:"parameters"`
+	Enabled     bool           `db:"enabled" json:"enabled"`
+}
+
+// ToolAuth is the decoded ai_tools.auth JSONB: a single header injected on the request.
+type ToolAuth struct {
+	Header string `json:"header"`
+	Value  string `json:"value"`
+}
+
+// Embedding is a stored chunk vector row.
+type Embedding struct {
+	ID         int64  `db:"id"`
+	SourceType string `db:"source_type"`
+	SourceID   int64  `db:"source_id"`
+	ChunkText  string `db:"chunk_text"`
+	Embedding  []byte `db:"embedding"`
+	Dimensions int    `db:"dimensions"`
+}
+
+// SearchResult is one hit from the in-memory embedding search.
+type SearchResult struct {
+	SourceType string  `json:"source_type"`
+	SourceID   int     `json:"source_id"`
+	ChunkText  string  `json:"chunk_text"`
+	Score      float64 `json:"score"`
+}
+
+// ChatMessage is one OpenAI-compatible chat message.
+type ChatMessage struct {
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	Name       string     `json:"name,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+}
+
+type ToolCall struct {
+	ID       string           `json:"id"`
+	Type     string           `json:"type"`
+	Function ToolCallFunction `json:"function"`
+}
+
+type ToolCallFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+// ToolDef is a tool advertised to the model in a chat completion request.
+type ToolDef struct {
+	Type     string       `json:"type"`
+	Function ToolFunction `json:"function"`
+}
+
+type ToolFunction struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  types.JSONText `json:"parameters"`
+}
+
+type PromptPayload struct {
+	SystemPrompt string `json:"system_prompt"`
+	UserPrompt   string `json:"user_prompt"`
+}
+
+type ChatCompletionPayload struct {
+	Messages []ChatMessage `json:"messages"`
+	Tools    []ToolDef     `json:"tools,omitempty"`
+}
+
+// ChatCompletionResult is the parsed assistant turn: either text or tool calls.
+type ChatCompletionResult struct {
+	Content   string     `json:"content"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }

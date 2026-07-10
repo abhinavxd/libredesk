@@ -244,6 +244,27 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
 	g.PUT("/api/v1/ai/provider", perm(handleUpdateAIProvider, "ai:manage"))
 
+	// AI provider config (completion / embedding).
+	g.GET("/api/v1/ai/config/{type}", perm(handleGetAIConfig, "ai:manage"))
+	g.PUT("/api/v1/ai/config/{type}", perm(handleUpdateAIConfig, "ai:manage"))
+
+	// AI custom tools.
+	g.GET("/api/v1/ai/tools", perm(handleGetAITools, "ai:manage"))
+	g.GET("/api/v1/ai/tools/{id}", perm(handleGetAITool, "ai:manage"))
+	g.POST("/api/v1/ai/tools", perm(handleCreateAITool, "ai:manage"))
+	g.PUT("/api/v1/ai/tools/{id}", perm(handleUpdateAITool, "ai:manage"))
+	g.DELETE("/api/v1/ai/tools/{id}", perm(handleDeleteAITool, "ai:manage"))
+
+	// AI knowledge base snippets.
+	g.GET("/api/v1/ai/snippets", perm(handleGetAISnippets, "ai:manage"))
+	g.POST("/api/v1/ai/snippets", perm(handleCreateAISnippet, "ai:manage"))
+	g.PUT("/api/v1/ai/snippets/{id}", perm(handleUpdateAISnippet, "ai:manage"))
+	g.DELETE("/api/v1/ai/snippets/{id}", perm(handleDeleteAISnippet, "ai:manage"))
+
+	// AI assistant: reply drafting + copilot chat.
+	g.POST("/api/v1/ai/generate-reply", auth(handleAIGenerateReply))
+	g.POST("/api/v1/ai/copilot", auth(handleAICopilot))
+
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))
 	g.POST("/api/v1/custom-attributes", perm(handleCreateCustomAttribute, "custom_attributes:manage"))

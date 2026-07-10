@@ -456,11 +456,20 @@ const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
     'Content-Type': 'application/json'
   }
 })
-const updateAIProvider = (data) => http.put('/api/v1/ai/provider', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const updateAIProvider = (data) => http.put('/api/v1/ai/provider', data)
+const getAIConfig = (type) => http.get(`/api/v1/ai/config/${type}`)
+const updateAIConfig = (type, data) => http.put(`/api/v1/ai/config/${type}`, data)
+const getAITools = () => http.get('/api/v1/ai/tools')
+const getAITool = (id) => http.get(`/api/v1/ai/tools/${id}`)
+const createAITool = (data) => http.post('/api/v1/ai/tools', data)
+const updateAITool = (id, data) => http.put(`/api/v1/ai/tools/${id}`, data)
+const deleteAITool = (id) => http.delete(`/api/v1/ai/tools/${id}`)
+const getAISnippets = () => http.get('/api/v1/ai/snippets')
+const createAISnippet = (data) => http.post('/api/v1/ai/snippets', data)
+const updateAISnippet = (id, data) => http.put(`/api/v1/ai/snippets/${id}`, data)
+const deleteAISnippet = (id) => http.delete(`/api/v1/ai/snippets/${id}`)
+const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data)
+const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data)
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
   headers: {
@@ -658,6 +667,19 @@ export default {
   deleteSharedView,
   getAiPrompts,
   aiCompletion,
+  getAIConfig,
+  updateAIConfig,
+  getAITools,
+  getAITool,
+  createAITool,
+  updateAITool,
+  deleteAITool,
+  getAISnippets,
+  createAISnippet,
+  updateAISnippet,
+  deleteAISnippet,
+  aiGenerateReply,
+  aiCopilot,
   searchConversations,
   searchMessages,
   searchContacts,
