@@ -18,13 +18,15 @@ import (
 
 const (
 	toolSearchArticles = "search_articles"
+	// ToolContactHistory is reserved; the API layer injects this tool per request.
+	ToolContactHistory = "get_contact_history"
 
 	maxToolResponseBytes = 8000
 )
 
 var (
 	// reservedToolNames are built-in tool names custom tools may not use.
-	reservedToolNames = map[string]bool{toolSearchArticles: true}
+	reservedToolNames = map[string]bool{toolSearchArticles: true, ToolContactHistory: true}
 
 	toolHTTPClient = &http.Client{Timeout: 20 * time.Second}
 
@@ -169,12 +171,13 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	return string(out), nil
 }
 
-// buildToolRegistry returns the built-in and enabled custom tools plus their model-facing definitions.
-func (m *Manager) buildToolRegistry() (map[string]Tool, []models.ToolDef, error) {
+// buildToolRegistry returns the built-in, request-injected, and enabled custom tools plus their model-facing definitions.
+func (m *Manager) buildToolRegistry(extra ...Tool) (map[string]Tool, []models.ToolDef, error) {
 	registry := map[string]Tool{}
 	var defs []models.ToolDef
 
 	builtins := []Tool{&searchArticlesTool{m: m}}
+	builtins = append(builtins, extra...)
 	for _, t := range builtins {
 		registry[t.Name()] = t
 		defs = append(defs, toolDef(t))

@@ -11,15 +11,15 @@ import (
 const (
 	replyDraftSystemPrompt = `You are a support-agent assistant for libredesk, a customer support tool. Draft a reply to the customer's latest message in the conversation below.
 
-Ground your answer in the knowledge base: call the search_articles tool before answering when the question is about the product. Be concise, accurate and professional. Do not invent information; if the knowledge base does not cover it, say what you can and suggest next steps. Return only the reply text the agent can send, with no preamble or sign-off placeholders.`
+Ground your answer in the knowledge base: call the search_articles tool before answering when the question is about the product. If a tool for the customer's past conversations is available, consult it when their history is relevant (for example a recurring issue or something promised earlier). Be concise, accurate and professional. Do not invent information; if the knowledge base does not cover it, say what you can and suggest next steps. Return only the reply text the agent can send, with no preamble or sign-off placeholders.`
 
 	copilotSystemPrompt = `You are Copilot, an assistant for support agents inside libredesk.
 
-Always call the search_articles tool before answering any question about the product, company, policies, pricing, or how something works - do not answer these from your own knowledge without searching first. Only skip the search for pure chit-chat or when the answer is already present in the provided conversation context. If the search returns nothing relevant, say you could not find it in the knowledge base. Answer clearly and concisely, ground answers in what the search and conversation context return, and if you are unsure, say so.`
+Always call the search_articles tool before answering any question about the product, company, policies, pricing, or how something works - do not answer these from your own knowledge without searching first. Only skip the search for pure chit-chat or when the answer is already present in the provided conversation context. If the search returns nothing relevant, say you could not find it in the knowledge base. If a tool for the customer's past conversations is available, consult it when their history is relevant. Answer clearly and concisely, ground answers in what the search and conversation context return, and if you are unsure, say so.`
 )
 
 // GenerateReply drafts a reply to a conversation using the agentic loop (tools included).
-func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction string) (string, error) {
+func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction string, extraTools ...Tool) (string, error) {
 	var user strings.Builder
 	if strings.TrimSpace(transcript) != "" {
 		fmt.Fprintf(&user, "Conversation so far:\n%s\n\n", transcript)
@@ -30,11 +30,11 @@ func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction str
 	user.WriteString("Draft the reply now.")
 
 	history := []models.ChatMessage{{Role: "user", Content: user.String()}}
-	return m.RunAgent(ctx, replyDraftSystemPrompt, history, defaultMaxSteps)
+	return m.RunAgent(ctx, replyDraftSystemPrompt, history, defaultMaxSteps, extraTools...)
 }
 
 // Copilot answers an agent's chat message, optionally grounded in a conversation.
-func (m *Manager) Copilot(ctx context.Context, conversationContext string, history []models.ChatMessage) (string, error) {
+func (m *Manager) Copilot(ctx context.Context, conversationContext string, history []models.ChatMessage, extraTools ...Tool) (string, error) {
 	msgs := make([]models.ChatMessage, 0, len(history)+1)
 	if strings.TrimSpace(conversationContext) != "" {
 		msgs = append(msgs, models.ChatMessage{
@@ -43,5 +43,5 @@ func (m *Manager) Copilot(ctx context.Context, conversationContext string, histo
 		})
 	}
 	msgs = append(msgs, history...)
-	return m.RunAgent(ctx, copilotSystemPrompt, msgs, defaultMaxSteps)
+	return m.RunAgent(ctx, copilotSystemPrompt, msgs, defaultMaxSteps, extraTools...)
 }

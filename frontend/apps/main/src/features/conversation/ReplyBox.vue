@@ -80,7 +80,7 @@
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
         class="max-w-[60%] max-h-[75%] h-[70%] bg-card text-card-foreground p-4 flex flex-col"
-        :class="{ '!bg-private': messageType === 'private_note' }"
+        :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
         @escapeKeyDown="isEditorFullscreen = false"
         :hide-close-button="true"
       >
@@ -108,6 +108,7 @@
           @fileDelete="handleFileDelete"
           @filesDropped="uploadFiles"
           @aiPromptSelected="handleAiPromptSelected"
+          @generating="isGenerating = $event"
           class="h-full flex-grow"
         />
       </DialogContent>
@@ -115,8 +116,8 @@
 
     <!-- Main Editor non-fullscreen -->
     <div
-      class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col"
-      :class="{ '!bg-private': messageType === 'private_note' }"
+      class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
+      :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
       v-if="!isEditorFullscreen"
     >
       <ReplyBoxContent
@@ -143,6 +144,7 @@
         @fileDelete="handleFileDelete"
         @filesDropped="uploadFiles"
         @aiPromptSelected="handleAiPromptSelected"
+        @generating="isGenerating = $event"
       />
     </div>
   </div>
@@ -257,6 +259,7 @@ const openAIKeyPrompt = ref(false)
 const isOpenAIKeyUpdating = ref(false)
 const isEditorFullscreen = ref(false)
 const isSending = ref(false)
+const isGenerating = ref(false)
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
@@ -569,3 +572,51 @@ watch(
   }
 )
 </script>
+
+<style scoped>
+/* Animated multi-color border shown around the reply box while the AI drafts a reply. */
+@property --ai-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.ai-generating::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--ai-angle),
+    #ff3d3d,
+    #ff9e2c,
+    #ffe234,
+    #33d17a,
+    #29b6f6,
+    #7c4dff,
+    #ff4dd2,
+    #ff3d3d
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ai-border-spin 2.5s linear infinite;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@keyframes ai-border-spin {
+  to {
+    --ai-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-generating::after {
+    animation: none;
+  }
+}
+</style>

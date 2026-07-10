@@ -249,7 +249,8 @@ const emit = defineEmits([
   'inlineImageUpload',
   'fileDelete',
   'filesDropped',
-  'aiPromptSelected'
+  'aiPromptSelected',
+  'generating'
 ])
 
 const conversationStore = useConversationStore()
@@ -359,6 +360,7 @@ const handleAiPromptSelected = (key) => {
 }
 
 const isGenerating = ref(false)
+watch(isGenerating, (val) => emit('generating', val))
 const handleGenerateReply = async () => {
   if (isGenerating.value) return
   isGenerating.value = true

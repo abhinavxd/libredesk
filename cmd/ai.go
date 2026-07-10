@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/abhinavxd/libredesk/internal/ai"
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -245,13 +246,17 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 	}
 
 	transcript := ""
+	var extraTools []ai.Tool
 	if req.ConversationUUID != "" {
-		if err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+		conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
+		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 		transcript = conversationTranscript(app, req.ConversationUUID)
+		auser := r.RequestCtx.UserValue("user").(amodels.User)
+		extraTools = contactHistoryTools(app, auser.ID, conv.ContactID, req.ConversationUUID)
 	}
-	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction)
+	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, extraTools...)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -272,13 +277,17 @@ func handleAICopilot(r *fastglue.Request) error {
 	}
 
 	convoContext := ""
+	var extraTools []ai.Tool
 	if req.ConversationUUID != "" {
-		if err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+		conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
+		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 		convoContext = conversationTranscript(app, req.ConversationUUID)
+		auser := r.RequestCtx.UserValue("user").(amodels.User)
+		extraTools = contactHistoryTools(app, auser.ID, conv.ContactID, req.ConversationUUID)
 	}
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, extraTools...)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -286,15 +295,14 @@ func handleAICopilot(r *fastglue.Request) error {
 }
 
 // enforceAIConversationAccess checks the requesting agent can access the conversation whose transcript is being fed to the LLM.
-func enforceAIConversationAccess(r *fastglue.Request, uuid string) error {
+func enforceAIConversationAccess(r *fastglue.Request, uuid string) (*cmodels.Conversation, error) {
 	app := r.Context.(*App)
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = enforceConversationAccess(app, uuid, user)
-	return err
+	return enforceConversationAccess(app, uuid, user)
 }
 
 // conversationTranscript builds a plaintext transcript of a conversation's public messages for use as AI context.
