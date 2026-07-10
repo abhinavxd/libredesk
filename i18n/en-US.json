@@ -132,6 +132,7 @@
   "admin.ai.tool.authValuePlaceholder": "Leave blank to keep the current value",
   "admin.ai.tool.parameters": "Parameters (JSON schema)",
   "admin.ai.tool.parametersHint": "Optional JSON schema for the tool arguments. Leave blank for a single text input.",
+  "admin.ai.tool.parametersInvalid": "Invalid JSON. Check the syntax and try again.",
   "admin.ai.tool.new": "New tool",
   "admin.ai.tool.edit": "Edit tool",
   "admin.ai.tool.deleteConfirmation": "This will permanently delete the tool.",

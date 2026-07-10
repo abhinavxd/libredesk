@@ -148,9 +148,10 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 		if err := json.Unmarshal(t.tool.Auth, &auth); err == nil && auth.Header != "" {
 			value, derr := crypto.Decrypt(auth.Value, t.encryptionKey)
 			if derr != nil {
-				value = auth.Value
+				t.lo.Error("error decrypting custom tool auth; skipping auth header", "tool", t.tool.Name, "error", derr)
+			} else {
+				req.Header.Set(auth.Header, value)
 			}
-			req.Header.Set(auth.Header, value)
 		}
 	}
 

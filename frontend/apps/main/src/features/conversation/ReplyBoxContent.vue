@@ -94,7 +94,7 @@
         :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
-        :disabled="isDraftLoading"
+        :disabled="isDraftLoading || isGenerating"
         :enableMentions="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"

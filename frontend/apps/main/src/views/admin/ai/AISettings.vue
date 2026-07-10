@@ -49,7 +49,7 @@
             <DataTable
               :columns="createSnippetColumns(t, { onEdit: editSnippet })"
               :data="snippets"
-              :loading="isLoading"
+              :loading="isSnippetsLoading"
             />
           </TabsContent>
 
@@ -62,7 +62,7 @@
             <DataTable
               :columns="createToolColumns(t, { onEdit: editTool })"
               :data="tools"
-              :loading="isLoading"
+              :loading="isToolsLoading"
             />
           </TabsContent>
         </Tabs>
@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
@@ -104,7 +104,9 @@ const { t } = useI18n()
 const emitter = useEmitter()
 const route = useRoute()
 const router = useRouter()
-const isLoading = ref(false)
+const isSnippetsLoading = ref(false)
+const isToolsLoading = ref(false)
+const isLoading = computed(() => isSnippetsLoading.value || isToolsLoading.value)
 const activeTab = ref(route.query.tab || 'providers')
 
 const snippets = ref([])
@@ -143,7 +145,7 @@ onUnmounted(() => {
 
 const getSnippets = async () => {
   try {
-    isLoading.value = true
+    isSnippetsLoading.value = true
     const resp = await api.getAISnippets()
     snippets.value = resp.data.data || []
   } catch (error) {
@@ -152,13 +154,13 @@ const getSnippets = async () => {
       description: handleHTTPError(error).message
     })
   } finally {
-    isLoading.value = false
+    isSnippetsLoading.value = false
   }
 }
 
 const getTools = async () => {
   try {
-    isLoading.value = true
+    isToolsLoading.value = true
     const resp = await api.getAITools()
     tools.value = resp.data.data || []
   } catch (error) {
@@ -167,7 +169,7 @@ const getTools = async () => {
       description: handleHTTPError(error).message
     })
   } finally {
-    isLoading.value = false
+    isToolsLoading.value = false
   }
 }
 

@@ -207,7 +207,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     try {
       parameters = JSON.parse(values.parameters)
     } catch {
-      form.setFieldError('parameters', t('admin.ai.tool.parametersHint'))
+      form.setFieldError('parameters', t('admin.ai.tool.parametersInvalid'))
       return
     }
   }

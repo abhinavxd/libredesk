@@ -38,7 +38,7 @@
         :placeholder="$t('copilot.placeholder')"
         rows="2"
         class="resize-none"
-        @keydown.enter.exact.prevent="send"
+        @keydown.enter.exact="onEnterKey"
       />
       <Button type="submit" size="icon" :disabled="isThinking || !input.trim()">
         <SendHorizontal class="h-4 w-4" />
@@ -82,7 +82,8 @@ const send = async () => {
   if (!text || isThinking.value) return
 
   const uuid = conversationStore.current?.uuid || ''
-  conversationStore.setCopilotMessages(uuid, [...messages.value, { role: 'user', content: text }])
+  const prevMessages = messages.value
+  conversationStore.setCopilotMessages(uuid, [...prevMessages, { role: 'user', content: text }])
   input.value = ''
   isThinking.value = true
   await scrollToBottom()
@@ -97,6 +98,8 @@ const send = async () => {
       { role: 'assistant', content: resp.data.data || '' }
     ])
   } catch (error) {
+    conversationStore.setCopilotMessages(uuid, prevMessages)
+    input.value = text
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
@@ -105,5 +108,11 @@ const send = async () => {
     isThinking.value = false
     await scrollToBottom()
   }
+}
+
+const onEnterKey = (e) => {
+  if (e.isComposing) return
+  e.preventDefault()
+  send()
 }
 </script>

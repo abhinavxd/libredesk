@@ -29,7 +29,7 @@ func newTestConfig(max, min, overlap int) ChunkConfig {
 func generateHTML(tag, content string, count int) string {
 	var b strings.Builder
 	for i := 0; i < count; i++ {
-		b.WriteString(fmt.Sprintf("<%s>%s %d</%s>\n", tag, content, i, tag))
+		fmt.Fprintf(&b, "<%s>%s %d</%s>\n", tag, content, i, tag)
 	}
 	return b.String()
 }
