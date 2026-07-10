@@ -7,21 +7,27 @@ export const createSnippetColumns = (t, { onEdit } = {}) => [
   {
     accessorKey: 'title',
     header: () => h('div', { class: 'text-center' }, t('globals.terms.title')),
-    cell: ({ row }) =>
-      h(
-        'div',
-        { class: 'text-center' },
-        onEdit
-          ? h(
-              'span',
-              {
-                class: 'text-primary hover:underline cursor-pointer',
-                onClick: () => onEdit(row.original)
-              },
-              row.getValue('title')
-            )
-          : row.getValue('title')
-      )
+    cell: ({ row }) => {
+      const title = onEdit
+        ? h(
+            'span',
+            {
+              class: 'text-primary hover:underline cursor-pointer',
+              onClick: () => onEdit(row.original)
+            },
+            row.getValue('title')
+          )
+        : row.getValue('title')
+      const children = [title]
+      if (row.original.source === 'conversation') {
+        children.push(
+          h(Badge, { variant: 'secondary', class: 'ml-2 align-middle' }, () =>
+            t('admin.ai.snippet.autoCreated')
+          )
+        )
+      }
+      return h('div', { class: 'text-center' }, children)
+    }
   },
   {
     accessorKey: 'enabled',

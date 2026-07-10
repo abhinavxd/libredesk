@@ -15,6 +15,7 @@ import (
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
 	"github.com/abhinavxd/libredesk/internal/ai"
+	"github.com/abhinavxd/libredesk/internal/aiagent"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	"github.com/abhinavxd/libredesk/internal/autoassigner"
@@ -969,6 +970,20 @@ func initAI(db *sqlx.DB, i18n *i18n.I18n) *ai.Manager {
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)
+	}
+	return m
+}
+
+// initAIAgent inits the autonomous AI agent manager.
+func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager) *aiagent.Manager {
+	m, err := aiagent.New(aiagent.Opts{
+		DB:        db,
+		Lo:        initLogger("ai_agent"),
+		I18n:      i18n,
+		QueueSize: cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
+	}, aiManager, convo, mediaManager, settingManager)
+	if err != nil {
+		log.Fatalf("error initializing AI agent manager: %v", err)
 	}
 	return m
 }

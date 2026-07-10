@@ -102,6 +102,18 @@ type Manager struct {
 	wg                         sync.WaitGroup
 	continuityConfig           ContinuityConfig
 	subjectRefFormat           string
+	aiAgent                    AIAgentEngine
+}
+
+// AIAgentEngine is notified when a conversation assigned to an AI assistant may need a response.
+type AIAgentEngine interface {
+	HandleConversationEvent(conversationID, assigneeUserID int)
+	HandleConversationResolved(conversationID int)
+}
+
+// SetAIAgent wires the AI agent engine after construction to avoid an import cycle.
+func (c *Manager) SetAIAgent(e AIAgentEngine) {
+	c.aiAgent = e
 }
 
 // WidgetConversationView represents the conversation data for widget clients
@@ -763,6 +775,10 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 		})
 	}
 
+	if c.aiAgent != nil {
+		c.aiAgent.HandleConversationEvent(conversation.ID, assigneeID)
+	}
+
 	return nil
 }
 
@@ -941,6 +957,9 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 			resolvedAt = time.Now()
 		}
 		agentData["resolved_at"] = resolvedAt.Format(time.RFC3339)
+		if c.aiAgent != nil {
+			c.aiAgent.HandleConversationResolved(conversationBeforeChange.ID)
+		}
 	}
 	if status == models.StatusClosed {
 		closedAt := time.Now()

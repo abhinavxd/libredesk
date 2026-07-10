@@ -17,9 +17,10 @@ const (
 	SystemUserEmail = "System"
 
 	// User types
-	UserTypeAgent   = "agent"
-	UserTypeContact = "contact"
-	UserTypeVisitor = "visitor"
+	UserTypeAgent       = "agent"
+	UserTypeContact     = "contact"
+	UserTypeVisitor     = "visitor"
+	UserTypeAIAssistant = "ai_assistant"
 
 	// User availability statuses
 	Online  = "online"

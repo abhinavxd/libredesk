@@ -116,6 +116,12 @@ queue_size = 2000
 # Number of workers processing automation rules
 worker_count = 10
 
+[ai_agent]
+# Number of workers running autonomous AI assistant responses
+worker_count = 2
+# Maximum number of AI assistant response jobs that can be queued
+queue_size = 1000
+
 [autoassigner]
 # How often to run automatic conversation assignment
 autoassign_interval = "5m"

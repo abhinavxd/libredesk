@@ -4,10 +4,17 @@ package image
 
 import (
 	"bytes"
+	"encoding/base64"
 	"io"
 
 	"github.com/disintegration/imaging"
 	"github.com/gabriel-vasile/mimetype"
+)
+
+const (
+	// llmMaxDim caps an image's longest edge before it is sent to a vision model.
+	llmMaxDim      = 1568
+	llmJPEGQuality = 85
 )
 
 var (
@@ -66,4 +73,19 @@ func CreateThumb(thumbPxSize int, r io.Reader) (*bytes.Reader, error) {
 	}
 
 	return bytes.NewReader(out.Bytes()), nil
+}
+
+// EncodeForLLM decodes an image, downscales its longest edge to at most llmMaxDim, re-encodes it as
+// JPEG, and returns the base64 payload plus media type for a vision model request.
+func EncodeForLLM(content []byte) (data string, mediaType string, err error) {
+	img, err := imaging.Decode(bytes.NewReader(content))
+	if err != nil {
+		return "", "", err
+	}
+	img = imaging.Fit(img, llmMaxDim, llmMaxDim, imaging.Lanczos)
+	var out bytes.Buffer
+	if err := imaging.Encode(&out, img, imaging.JPEG, imaging.JPEGQuality(llmJPEGQuality)); err != nil {
+		return "", "", err
+	}
+	return base64.StdEncoding.EncodeToString(out.Bytes()), "image/jpeg", nil
 }

@@ -8,6 +8,13 @@ export const createFormSchema = (t) => z.object({
     .min(1, {
       message: t('admin.general.siteName.min'),
     }),
+  copilot_name: z
+    .string({
+      required_error: t('globals.messages.required'),
+    })
+    .min(1, {
+      message: t('globals.messages.required'),
+    }),
   lang: z.string().optional(),
   timezone: z.string().optional(),
   business_hours_id: z.string().optional(),

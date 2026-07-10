@@ -196,9 +196,37 @@ const routes = [
           },
           {
             path: 'ai',
-            name: 'ai-settings',
-            component: () => import('@main/views/admin/ai/AISettings.vue'),
-            meta: { titleKey: 'admin.ai.title' }
+            redirect: { name: 'ai-providers' }
+          },
+          {
+            path: 'ai/providers',
+            name: 'ai-providers',
+            component: () => import('@main/views/admin/ai/AIProviders.vue'),
+            meta: { titleKey: 'admin.ai.providers' }
+          },
+          {
+            path: 'ai/snippets',
+            name: 'ai-snippets',
+            component: () => import('@main/views/admin/ai/AISnippets.vue'),
+            meta: { titleKey: 'admin.ai.snippets' }
+          },
+          {
+            path: 'ai/suggestions',
+            name: 'ai-suggestions',
+            component: () => import('@main/views/admin/ai/AISuggestions.vue'),
+            meta: { titleKey: 'admin.ai.suggestions' }
+          },
+          {
+            path: 'ai/tools',
+            name: 'ai-tools',
+            component: () => import('@main/views/admin/ai/AITools.vue'),
+            meta: { titleKey: 'admin.ai.tools' }
+          },
+          {
+            path: 'ai/assistants',
+            name: 'ai-assistants',
+            component: () => import('@main/views/admin/ai/AIAssistants.vue'),
+            meta: { titleKey: 'admin.ai.assistants' }
           },
           {
             path: 'ai/tools/new',
@@ -212,6 +240,19 @@ const routes = [
             props: true,
             component: () => import('@main/views/admin/ai/CreateOrEditTool.vue'),
             meta: { titleKey: 'admin.ai.tool.edit' }
+          },
+          {
+            path: 'ai/assistants/new',
+            name: 'new-ai-assistant',
+            component: () => import('@main/views/admin/ai/CreateOrEditAssistant.vue'),
+            meta: { titleKey: 'admin.ai.assistant.new' }
+          },
+          {
+            path: 'ai/assistants/:id/edit',
+            name: 'edit-ai-assistant',
+            props: true,
+            component: () => import('@main/views/admin/ai/CreateOrEditAssistant.vue'),
+            meta: { titleKey: 'admin.ai.assistant.edit' }
           },
           {
             path: 'business-hours',

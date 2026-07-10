@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,11 @@ const (
 	defaultOpenAIBaseURL   = "https://api.openai.com/v1"
 	defaultCompletionModel = "gpt-4o-mini"
 	defaultEmbeddingModel  = "text-embedding-3-small"
+
+	// Transient provider failures (429, 5xx, network errors) are retried with exponential backoff.
+	maxRequestRetries = 3
+	retryBaseBackoff  = 500 * time.Millisecond
+	retryMaxBackoff   = 5 * time.Second
 )
 
 // OpenAIClient talks to any OpenAI-compatible API (base URL selects the host).
@@ -67,9 +73,19 @@ func (o *OpenAIClient) SendChatCompletion(payload models.ChatCompletionPayload) 
 		maxTokens = 1024
 	}
 
+	messages := payload.Messages
+	sentImages := 0
+	for _, msg := range messages {
+		sentImages += len(msg.Images)
+	}
+	if !o.cfg.Vision {
+		messages = stripImages(messages)
+	}
+	o.lo.Debug("chat completion request", "model", model, "messages", len(messages), "images", sentImages, "vision", o.cfg.Vision, "tools", len(payload.Tools))
+
 	body := map[string]any{
 		"model":      model,
-		"messages":   payload.Messages,
+		"messages":   messages,
 		"max_tokens": maxTokens,
 	}
 	if o.cfg.Temperature != nil {
@@ -164,15 +180,54 @@ func (o *OpenAIClient) GetEmbeddingsBatch(texts []string) ([][]float32, error) {
 	return out, nil
 }
 
+// stripImages returns messages with image parts removed, so a non-vision model never receives them.
+func stripImages(msgs []models.ChatMessage) []models.ChatMessage {
+	hasImage := false
+	for _, m := range msgs {
+		if len(m.Images) > 0 {
+			hasImage = true
+			break
+		}
+	}
+	if !hasImage {
+		return msgs
+	}
+	out := make([]models.ChatMessage, len(msgs))
+	copy(out, msgs)
+	for i := range out {
+		out[i].Images = nil
+	}
+	return out
+}
+
 func (o *OpenAIClient) post(path string, body map[string]any) ([]byte, error) {
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request body: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, o.cfg.BaseURL+path, bytes.NewBuffer(bodyBytes))
+	for attempt := 0; ; attempt++ {
+		respBytes, retryAfter, retryable, err := o.doRequest(path, bodyBytes)
+		if err == nil {
+			return respBytes, nil
+		}
+		if !retryable || attempt >= maxRequestRetries {
+			return nil, err
+		}
+		delay := retryAfter
+		if delay <= 0 {
+			delay = backoffDelay(attempt)
+		}
+		o.lo.Warn("retrying AI provider request after transient error", "attempt", attempt+1, "max_retries", maxRequestRetries, "delay", delay.String(), "error", err)
+		time.Sleep(delay)
+	}
+}
+
+// doRequest sends one attempt; retryAfter/retryable tell the caller whether and when to retry.
+func (o *OpenAIClient) doRequest(path string, bodyBytes []byte) ([]byte, time.Duration, bool, error) {
+	req, err := http.NewRequest(http.MethodPost, o.cfg.BaseURL+path, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+		return nil, 0, false, fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+o.cfg.APIKey)
 	req.Header.Set("Content-Type", "application/json")
@@ -180,18 +235,50 @@ func (o *OpenAIClient) post(path string, body map[string]any) ([]byte, error) {
 	resp, err := o.client.Do(req)
 	if err != nil {
 		o.lo.Error("error making request to AI provider", "error", err)
-		return nil, fmt.Errorf("making HTTP request: %w", err)
+		return nil, 0, true, fmt.Errorf("making HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBytes, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode == http.StatusUnauthorized {
+	switch {
+	case resp.StatusCode == http.StatusOK:
+		return respBytes, 0, false, nil
+	case resp.StatusCode == http.StatusUnauthorized:
 		o.lo.Error("unauthorized from AI provider (401)", "base_url", o.cfg.BaseURL, "response", string(respBytes))
-		return nil, ErrInvalidAPIKey
-	}
-	if resp.StatusCode != http.StatusOK {
+		return nil, 0, false, ErrInvalidAPIKey
+	case resp.StatusCode == http.StatusTooManyRequests:
+		o.lo.Error("rate limited by AI provider (429)", "response", string(respBytes))
+		return nil, parseRetryAfter(resp.Header.Get("Retry-After")), true, fmt.Errorf("provider API error: status %d: %s", resp.StatusCode, string(respBytes))
+	case resp.StatusCode >= 500:
+		o.lo.Error("server error from AI provider", "status", resp.StatusCode, "response", string(respBytes))
+		return nil, 0, true, fmt.Errorf("provider API error: status %d: %s", resp.StatusCode, string(respBytes))
+	default:
 		o.lo.Error("non-ok response from AI provider", "status", resp.StatusCode, "response", string(respBytes))
-		return nil, fmt.Errorf("provider API error: status %d: %s", resp.StatusCode, string(respBytes))
+		return nil, 0, false, fmt.Errorf("provider API error: status %d: %s", resp.StatusCode, string(respBytes))
 	}
-	return respBytes, nil
+}
+
+func backoffDelay(attempt int) time.Duration {
+	d := retryBaseBackoff << attempt
+	if d > retryMaxBackoff || d <= 0 {
+		d = retryMaxBackoff
+	}
+	return d
+}
+
+// parseRetryAfter reads the delta-seconds form of Retry-After, capped so a request path never stalls long.
+func parseRetryAfter(v string) time.Duration {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0
+	}
+	secs, err := strconv.Atoi(v)
+	if err != nil || secs < 0 {
+		return 0
+	}
+	d := time.Duration(secs) * time.Second
+	if d > retryMaxBackoff {
+		d = retryMaxBackoff
+	}
+	return d
 }

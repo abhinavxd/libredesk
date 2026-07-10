@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/abhinavxd/libredesk/internal/ai"
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -196,7 +197,7 @@ func handleCreateAISnippet(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	item, err := app.ai.CreateKnowledgeBaseItem(req.Title, req.Content, req.Enabled)
+	item, err := app.ai.CreateKnowledgeBaseItem(req.Title, req.Content, aimodels.KnowledgeSourceManual, req.Enabled)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -245,13 +246,16 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 	}
 
 	transcript := ""
+	var tctx ai.ToolContext
 	if req.ConversationUUID != "" {
-		if err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+		conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
+		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
+		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
 		transcript = conversationTranscript(app, req.ConversationUUID)
 	}
-	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction)
+	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, tctx)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -272,29 +276,85 @@ func handleAICopilot(r *fastglue.Request) error {
 	}
 
 	convoContext := ""
+	var conv *cmodels.Conversation
+	var tctx ai.ToolContext
 	if req.ConversationUUID != "" {
-		if err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+		c, err := enforceAIConversationAccess(r, req.ConversationUUID)
+		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
+		conv = c
+		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
 		convoContext = conversationTranscript(app, req.ConversationUUID)
 	}
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, tctx)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+	// Persist this exchange (agent's last message + the reply) so the chat survives a refresh.
+	if conv != nil {
+		auser := r.RequestCtx.UserValue("user").(amodels.User)
+		last := req.Messages[len(req.Messages)-1]
+		if last.Role == "user" {
+			if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, "user", last.Content); err != nil {
+				app.lo.Error("error saving copilot user message", "error", err)
+			}
+		}
+		if strings.TrimSpace(resp) != "" {
+			if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, "assistant", resp); err != nil {
+				app.lo.Error("error saving copilot reply", "error", err)
+			}
+		}
 	}
 	return r.SendEnvelope(resp)
 }
 
+// handleGetCopilotMessages returns the requesting agent's persisted copilot chat for a conversation.
+func handleGetCopilotMessages(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	uuid := string(r.RequestCtx.QueryArgs().Peek("conversation_uuid"))
+	if uuid == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	conv, err := enforceAIConversationAccess(r, uuid)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	msgs, err := app.ai.GetCopilotMessages(conv.ID, auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(msgs)
+}
+
+// handleClearCopilotMessages clears the requesting agent's copilot chat for a conversation.
+func handleClearCopilotMessages(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	uuid := string(r.RequestCtx.QueryArgs().Peek("conversation_uuid"))
+	if uuid == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	conv, err := enforceAIConversationAccess(r, uuid)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	if err := app.ai.ClearCopilotMessages(conv.ID, auser.ID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
 // enforceAIConversationAccess checks the requesting agent can access the conversation whose transcript is being fed to the LLM.
-func enforceAIConversationAccess(r *fastglue.Request, uuid string) error {
+func enforceAIConversationAccess(r *fastglue.Request, uuid string) (*cmodels.Conversation, error) {
 	app := r.Context.(*App)
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = enforceConversationAccess(app, uuid, user)
-	return err
+	return enforceConversationAccess(app, uuid, user)
 }
 
 // conversationTranscript builds a plaintext transcript of a conversation's public messages for use as AI context.

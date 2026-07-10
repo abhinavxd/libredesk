@@ -264,6 +264,24 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// AI assistant: reply drafting + copilot chat.
 	g.POST("/api/v1/ai/generate-reply", auth(handleAIGenerateReply))
 	g.POST("/api/v1/ai/copilot", auth(handleAICopilot))
+	g.GET("/api/v1/ai/copilot/messages", auth(handleGetCopilotMessages))
+	g.DELETE("/api/v1/ai/copilot/messages", auth(handleClearCopilotMessages))
+
+	// Autonomous AI agents (assistants).
+	g.GET("/api/v1/ai/assistants", perm(handleGetAIAssistants, "ai:manage"))
+	g.GET("/api/v1/ai/assistants/{id}", perm(handleGetAIAssistant, "ai:manage"))
+	g.POST("/api/v1/ai/assistants", perm(handleCreateAIAssistant, "ai:manage"))
+	g.PUT("/api/v1/ai/assistants/{id}", perm(handleUpdateAIAssistant, "ai:manage"))
+	g.DELETE("/api/v1/ai/assistants/{id}", perm(handleDeleteAIAssistant, "ai:manage"))
+	g.POST("/api/v1/ai/assistants/{id}/preview", perm(handleAIAssistantPreview, "ai:manage"))
+	g.GET("/api/v1/ai/assistants/{id}/stats", perm(handleGetAIAssistantStats, "ai:manage"))
+
+	// AI FAQ learning: review queue for suggestions mined from resolved conversations + on/off setting.
+	g.GET("/api/v1/ai/faq-suggestions", perm(handleGetAIFaqSuggestions, "ai:manage"))
+	g.POST("/api/v1/ai/faq-suggestions/{id}/approve", perm(handleApproveAIFaqSuggestion, "ai:manage"))
+	g.POST("/api/v1/ai/faq-suggestions/{id}/reject", perm(handleRejectAIFaqSuggestion, "ai:manage"))
+	g.GET("/api/v1/ai/faq-learning", perm(handleGetAIFaqLearning, "ai:manage"))
+	g.PUT("/api/v1/ai/faq-learning", perm(handleUpdateAIFaqLearning, "ai:manage"))
 
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))

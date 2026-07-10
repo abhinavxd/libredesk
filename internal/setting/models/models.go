@@ -11,6 +11,7 @@ type General struct {
 	Timezone                    string   `json:"app.timezone"`
 	BusinessHoursID             string   `json:"app.business_hours_id"`
 	ShowConversationSubject     bool     `json:"app.show_conversation_subject"`
+	CopilotName                 string   `json:"app.copilot_name"`
 }
 
 type EmailNotification struct {

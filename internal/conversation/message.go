@@ -271,6 +271,8 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 			"FullName":  sender.FullName(),
 			"Email":     sender.Email.String,
 		},
+		// Lets templates disclose AI-composed replies, e.g. {{ if .IsAIComposed }}Composed by AI{{ end }}.
+		"IsAIComposed": sender.Type == umodels.UserTypeAIAssistant,
 	}
 
 	// For automated replies set author fields to empty strings as the recipients will see name as System.
@@ -1396,6 +1398,11 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	} else {
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming)
+
+		// If assigned to an AI assistant, let it respond to this inbound customer message.
+		if m.aiAgent != nil && conversation.AssignedUserID.Valid {
+			m.aiAgent.HandleConversationEvent(conversation.ID, conversation.AssignedUserID.Int)
+		}
 
 		if conversation.SLAPolicyID.Int == 0 {
 			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")

@@ -22,38 +22,28 @@
         </div>
 
         <div class="grid gap-6 md:grid-cols-2">
-          <FormField v-slot="{ field }" name="provider">
-            <FormItem>
-              <FormLabel>{{ t('globals.terms.provider') }}</FormLabel>
-              <FormControl>
-                <Input type="text" v-bind="field" disabled />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ field }" name="model">
+          <FormField v-slot="{ componentField }" name="model">
             <FormItem>
               <FormLabel>{{ t('globals.terms.model') }}</FormLabel>
               <FormControl>
-                <Input type="text" v-bind="field" />
+                <Input type="text" v-bind="componentField" />
               </FormControl>
               <FormMessage />
             </FormItem>
           </FormField>
 
-          <FormField v-slot="{ field }" name="base_url">
+          <FormField v-slot="{ componentField }" name="base_url">
             <FormItem>
               <FormLabel>{{ t('admin.ai.baseUrl') }}</FormLabel>
               <FormControl>
-                <Input type="text" v-bind="field" />
+                <Input type="text" v-bind="componentField" />
               </FormControl>
               <FormDescription>{{ t('admin.ai.baseUrlHint') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
 
-          <FormField v-slot="{ field }" name="api_key">
+          <FormField v-slot="{ componentField }" name="api_key">
             <FormItem>
               <FormLabel>{{ t('admin.ai.apiKey') }}</FormLabel>
               <FormControl>
@@ -61,53 +51,63 @@
                   type="password"
                   autocomplete="new-password"
                   :placeholder="t('admin.ai.apiKeyPlaceholder')"
-                  v-bind="field"
+                  v-bind="componentField"
                 />
               </FormControl>
-              <FormDescription v-if="hasApiKey">{{ t('admin.ai.keySet') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
 
           <template v-if="showCompletionFields">
-            <FormField v-slot="{ field }" name="temperature">
+            <FormField v-slot="{ componentField }" name="temperature">
               <FormItem>
                 <FormLabel>{{ t('admin.ai.temperature') }}</FormLabel>
                 <FormControl>
-                  <Input type="number" step="0.1" min="0" max="2" v-bind="field" />
+                  <Input type="number" step="0.1" min="0" max="2" v-bind="componentField" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             </FormField>
 
-            <FormField v-slot="{ field }" name="max_tokens">
+            <FormField v-slot="{ componentField }" name="max_tokens">
               <FormItem>
                 <FormLabel>{{ t('admin.ai.maxTokens') }}</FormLabel>
                 <FormControl>
-                  <Input type="number" min="1" step="1" v-bind="field" />
+                  <Input type="number" min="1" step="1" v-bind="componentField" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             </FormField>
 
-            <FormField v-slot="{ field }" name="instructions">
+            <FormField v-slot="{ componentField }" name="instructions">
               <FormItem class="md:col-span-2">
                 <FormLabel>{{ t('admin.ai.instructions') }}</FormLabel>
                 <FormControl>
-                  <Textarea rows="4" v-bind="field" />
+                  <Textarea rows="4" v-bind="componentField" />
                 </FormControl>
                 <FormDescription>{{ t('admin.ai.instructionsHint') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
+
+            <FormField v-slot="{ componentField, handleChange }" name="vision">
+              <FormItem class="md:col-span-2">
+                <SwitchField
+                  :title="t('admin.ai.vision')"
+                  :description="t('admin.ai.visionHint')"
+                  :checked="componentField.modelValue"
+                  @update:checked="handleChange"
+                />
+              </FormItem>
+            </FormField>
           </template>
 
           <template v-if="showEmbeddingFields">
-            <FormField v-slot="{ field }" name="dimensions">
+            <FormField v-slot="{ componentField }" name="dimensions">
               <FormItem>
                 <FormLabel>{{ t('admin.ai.dimensions') }}</FormLabel>
                 <FormControl>
-                  <Input type="number" min="1" step="1" v-bind="field" />
+                  <Input type="number" min="1" step="1" v-bind="componentField" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -129,6 +129,7 @@ import * as z from 'zod'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
+import SwitchField from '@shared-ui/components/SwitchField.vue'
 import {
   Select,
   SelectContent,
@@ -170,6 +171,13 @@ const emitter = useEmitter()
 const formLoading = ref(false)
 const hasApiKey = ref(false)
 const selectedPreset = ref('')
+
+// Sensible starting values shown when a provider has none saved yet.
+const fieldDefaults = {
+  temperature: props.showCompletionFields ? '0.3' : '',
+  maxTokens: props.showCompletionFields ? '1024' : '',
+  dimensions: props.showEmbeddingFields ? '1536' : ''
+}
 
 // OpenAI-compatible provider presets: pre-fill base URL + model (+ dims for embedding).
 const completionPresets = [
@@ -250,7 +258,6 @@ const isPositiveInt = (v) => {
 const form = useForm({
   validationSchema: toTypedSchema(
     z.object({
-      provider: z.string().optional(),
       model: z.string({ required_error: t('globals.messages.required') }).min(1, {
         message: t('globals.messages.required')
       }),
@@ -265,18 +272,19 @@ const form = useForm({
       }),
       dimensions: numberField().refine((v) => isBlank(v) || isPositiveInt(v), {
         message: t('admin.ai.positiveNumber')
-      })
+      }),
+      vision: z.boolean().optional()
     })
   ),
   initialValues: {
-    provider: 'openai',
     model: '',
     base_url: '',
     api_key: '',
     instructions: '',
-    temperature: '',
-    max_tokens: '',
-    dimensions: ''
+    temperature: fieldDefaults.temperature,
+    max_tokens: fieldDefaults.maxTokens,
+    dimensions: fieldDefaults.dimensions,
+    vision: false
   }
 })
 
@@ -286,15 +294,15 @@ onMounted(async () => {
     const data = resp.data.data || {}
     hasApiKey.value = !!data.has_api_key
     form.setValues({
-      provider: data.provider || 'openai',
       model: data.model || '',
       base_url: data.base_url || '',
       api_key: data.api_key || '',
       instructions: data.instructions || '',
-      temperature: data.temperature != null ? String(data.temperature) : '',
-      // max_tokens/dimensions of 0 means "unset" for this provider type - keep the field blank.
-      max_tokens: data.max_tokens ? String(data.max_tokens) : '',
-      dimensions: data.dimensions ? String(data.dimensions) : ''
+      // Fall back to sensible defaults when the provider has nothing saved (0/absent).
+      temperature: data.temperature != null ? String(data.temperature) : fieldDefaults.temperature,
+      max_tokens: data.max_tokens ? String(data.max_tokens) : fieldDefaults.maxTokens,
+      dimensions: data.dimensions ? String(data.dimensions) : fieldDefaults.dimensions,
+      vision: !!data.vision
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -306,13 +314,13 @@ onMounted(async () => {
 
 const onSubmit = form.handleSubmit(async (values) => {
   const payload = {
-    provider: values.provider || 'openai',
     model: values.model,
     base_url: values.base_url || ''
   }
   if (values.api_key) payload.api_key = values.api_key
   if (props.showCompletionFields) {
     payload.instructions = values.instructions || ''
+    payload.vision = !!values.vision
     if (values.temperature !== '' && values.temperature != null)
       payload.temperature = Number(values.temperature)
     if (values.max_tokens !== '' && values.max_tokens != null)

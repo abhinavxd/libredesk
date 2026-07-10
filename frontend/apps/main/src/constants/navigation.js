@@ -37,10 +37,38 @@ export const adminNavItems = [
     titleKey: 'admin.ai.title',
     children: [
       {
-        titleKey: 'admin.ai.title',
-        href: '/admin/ai',
+        titleKey: 'admin.ai.providers',
+        href: '/admin/ai/providers',
         permission: 'ai:manage',
         icon: 'Sparkles'
+      },
+      {
+        titleKey: 'admin.ai.snippets',
+        href: '/admin/ai/snippets',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'NotebookText'
+      },
+      {
+        titleKey: 'admin.ai.suggestions',
+        href: '/admin/ai/suggestions',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'Lightbulb'
+      },
+      {
+        titleKey: 'admin.ai.tools',
+        href: '/admin/ai/tools',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'Wrench'
+      },
+      {
+        titleKey: 'admin.ai.assistants',
+        href: '/admin/ai/assistants',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'Bot'
       }
     ]
   },

@@ -1,6 +1,9 @@
 package models
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx/types"
@@ -14,6 +17,10 @@ const (
 
 	// Source types for embeddings.
 	SourceSnippet = "snippet"
+
+	// ai_knowledge_base.source values.
+	KnowledgeSourceManual       = "manual"
+	KnowledgeSourceConversation = "conversation"
 )
 
 // Provider is a row in ai_providers (one per type: completion / embedding).
@@ -38,6 +45,8 @@ type ProviderConfig struct {
 	MaxTokens    int      `json:"max_tokens"`
 	Dimensions   int      `json:"dimensions"`
 	Instructions string   `json:"instructions"`
+	// Vision marks the completion model as accepting image input; when false the harness drops image parts.
+	Vision bool `json:"vision"`
 }
 
 // Prompt backs the agent-facing rephrase/summarize actions in the reply box.
@@ -58,6 +67,9 @@ type KnowledgeBaseItem struct {
 	Title     string    `db:"title" json:"title"`
 	Content   string    `db:"content" json:"content"`
 	Enabled   bool      `db:"enabled" json:"enabled"`
+	Source    string    `db:"source" json:"source"`
+	// EmbeddedFingerprint is the content+model+dimensions signature last successfully embedded; empty means it needs (re)embedding.
+	EmbeddedFingerprint string `db:"embedded_fingerprint" json:"-"`
 }
 
 // Tool is a custom, admin-defined HTTP tool the assistant can call.
@@ -98,6 +110,12 @@ type SearchResult struct {
 	Score      float64 `json:"score"`
 }
 
+// SourceRef identifies one embedding source, used to scope a search to a subset of the index.
+type SourceRef struct {
+	SourceType string `json:"source_type"`
+	SourceID   int    `json:"source_id"`
+}
+
 // ChatMessage is one OpenAI-compatible chat message.
 type ChatMessage struct {
 	Role       string     `json:"role"`
@@ -105,6 +123,50 @@ type ChatMessage struct {
 	Name       string     `json:"name,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+
+	// Images are folded into the OpenAI multimodal content array by MarshalJSON; empty keeps the plain string content.
+	Images []ChatImage `json:"-"`
+}
+
+// ChatImage is one image part sent to vision-capable models.
+type ChatImage struct {
+	MediaType string // e.g. image/png, image/jpeg
+	Data      string // base64-encoded image bytes
+}
+
+// CopilotMessage is one persisted turn of an agent's copilot chat on a conversation.
+type CopilotMessage struct {
+	Role    string `db:"role" json:"role"`
+	Content string `db:"content" json:"content"`
+}
+
+// MarshalJSON emits plain string content when there are no images, or the OpenAI multimodal
+// content array (text part followed by image_url parts) when images are attached.
+func (m ChatMessage) MarshalJSON() ([]byte, error) {
+	type wire struct {
+		Role       string     `json:"role"`
+		Content    any        `json:"content"`
+		Name       string     `json:"name,omitempty"`
+		ToolCallID string     `json:"tool_call_id,omitempty"`
+		ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	}
+	w := wire{Role: m.Role, Name: m.Name, ToolCallID: m.ToolCallID, ToolCalls: m.ToolCalls}
+	if len(m.Images) == 0 {
+		w.Content = m.Content
+		return json.Marshal(w)
+	}
+	parts := make([]map[string]any, 0, len(m.Images)+1)
+	if strings.TrimSpace(m.Content) != "" {
+		parts = append(parts, map[string]any{"type": "text", "text": m.Content})
+	}
+	for _, img := range m.Images {
+		parts = append(parts, map[string]any{
+			"type":      "image_url",
+			"image_url": map[string]any{"url": fmt.Sprintf("data:%s;base64,%s", img.MediaType, img.Data)},
+		})
+	}
+	w.Content = parts
+	return json.Marshal(w)
 }
 
 type ToolCall struct {

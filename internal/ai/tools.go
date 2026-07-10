@@ -98,20 +98,29 @@ func (t *searchArticlesTool) Execute(ctx context.Context, args string) (string, 
 	return b.String(), nil
 }
 
+// ToolContext is per-run context injected into custom tool calls server-side. It is never part
+// of the model-facing schema, so the model cannot see or spoof it (e.g. the contact's identity).
+type ToolContext struct {
+	ContactExternalID string
+	ContactEmail      string
+}
+
 // httpTool is an admin-defined custom tool that calls an external HTTP endpoint.
 type httpTool struct {
 	tool          models.Tool
 	encryptionKey string
 	lo            *logf.Logger
 	client        *http.Client
+	tctx          ToolContext
 }
 
-func newHTTPTool(t models.Tool, encryptionKey string, lo *logf.Logger) *httpTool {
+func newHTTPTool(t models.Tool, encryptionKey string, lo *logf.Logger, tctx ToolContext) *httpTool {
 	return &httpTool{
 		tool:          t,
 		encryptionKey: encryptionKey,
 		lo:            lo,
 		client:        toolHTTPClient,
+		tctx:          tctx,
 	}
 }
 
@@ -154,6 +163,15 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 		}
 	}
 
+	// Inject the contact's identity so tools (e.g. a CRM lookup) know who this is. Server-side
+	// only, never advertised to the model.
+	if t.tctx.ContactExternalID != "" {
+		req.Header.Set("X-Libredesk-Contact-External-Id", t.tctx.ContactExternalID)
+	}
+	if t.tctx.ContactEmail != "" {
+		req.Header.Set("X-Libredesk-Contact-Email", t.tctx.ContactEmail)
+	}
+
 	resp, err := t.client.Do(req)
 	if err != nil {
 		t.lo.Error("error calling custom tool", "tool", t.tool.Name, "error", err)
@@ -169,26 +187,39 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 }
 
 // buildToolRegistry returns the built-in and enabled custom tools plus their model-facing definitions.
-func (m *Manager) buildToolRegistry() (map[string]Tool, []models.ToolDef, error) {
+// buildToolRegistry assembles the tools advertised to the model. allowedToolIDs nil means all enabled
+// custom tools (trusted agent-facing callers); non-nil restricts to that set (the autonomous assistant's
+// granted tools). includeBuiltinSearch adds the global knowledge search tool.
+func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, includeBuiltinSearch bool) (map[string]Tool, []models.ToolDef, error) {
 	registry := map[string]Tool{}
 	var defs []models.ToolDef
 
-	builtins := []Tool{&searchArticlesTool{m: m}}
-	for _, t := range builtins {
-		registry[t.Name()] = t
-		defs = append(defs, toolDef(t))
+	if includeBuiltinSearch {
+		builtin := &searchArticlesTool{m: m}
+		registry[builtin.Name()] = builtin
+		defs = append(defs, toolDef(builtin))
 	}
 
 	customTools, err := m.GetEnabledTools()
 	if err != nil {
 		return nil, nil, err
 	}
+	var allowed map[int]bool
+	if allowedToolIDs != nil {
+		allowed = make(map[int]bool, len(allowedToolIDs))
+		for _, id := range allowedToolIDs {
+			allowed[id] = true
+		}
+	}
 	for _, ct := range customTools {
+		if allowed != nil && !allowed[ct.ID] {
+			continue
+		}
 		if _, exists := registry[ct.Name]; exists {
 			m.lo.Warn("skipping custom tool that collides with a built-in tool", "name", ct.Name)
 			continue
 		}
-		ht := newHTTPTool(ct, m.encryptionKey, m.lo)
+		ht := newHTTPTool(ct, m.encryptionKey, m.lo, tctx)
 		registry[ht.Name()] = ht
 		defs = append(defs, toolDef(ht))
 	}

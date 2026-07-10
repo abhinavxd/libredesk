@@ -30,7 +30,7 @@ const tool = ref({})
 const isLoading = ref(false)
 
 const breadcrumbLinks = [
-  { path: 'ai-settings', label: t('admin.ai.title') },
+  { path: 'ai-tools', label: t('admin.ai.tools') },
   { path: '', label: props.id ? t('admin.ai.tool.edit') : t('admin.ai.tool.new') }
 ]
 
@@ -44,7 +44,7 @@ const submitForm = async (values) => {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })
-    router.push({ name: 'ai-settings', query: { tab: 'tools' } })
+    router.push({ name: 'ai-tools' })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

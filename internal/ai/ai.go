@@ -37,6 +37,7 @@ type Manager struct {
 	chunkCfg      stringutil.ChunkConfig
 	index         *embeddingIndex
 	reindexMu     sync.Mutex
+	reconcileMu   sync.Mutex
 }
 
 // Opts contains options for initializing the Manager.
@@ -54,26 +55,30 @@ type ProviderConfigView struct {
 }
 
 type queries struct {
-	GetProviderByType        *sqlx.Stmt `query:"get-provider-by-type"`
-	UpdateProviderConfig     *sqlx.Stmt `query:"update-provider-config"`
-	SetCompletionKey         *sqlx.Stmt `query:"set-completion-key"`
-	GetPrompt                *sqlx.Stmt `query:"get-prompt"`
-	GetPrompts               *sqlx.Stmt `query:"get-prompts"`
-	GetKnowledgeBaseItems    *sqlx.Stmt `query:"get-knowledge-base-items"`
-	GetKnowledgeBaseItem     *sqlx.Stmt `query:"get-knowledge-base-item"`
-	InsertKnowledgeBaseItem  *sqlx.Stmt `query:"insert-knowledge-base-item"`
-	UpdateKnowledgeBaseItem  *sqlx.Stmt `query:"update-knowledge-base-item"`
-	DeleteKnowledgeBaseItem  *sqlx.Stmt `query:"delete-knowledge-base-item"`
-	InsertEmbedding          *sqlx.Stmt `query:"insert-embedding"`
-	DeleteEmbeddingsBySource *sqlx.Stmt `query:"delete-embeddings-by-source"`
-	GetAllEmbeddings         *sqlx.Stmt `query:"get-all-embeddings"`
-	GetTools                 *sqlx.Stmt `query:"get-tools"`
-	GetTool                  *sqlx.Stmt `query:"get-tool"`
-	GetEnabledTools          *sqlx.Stmt `query:"get-enabled-tools"`
-	GetToolAuth              *sqlx.Stmt `query:"get-tool-auth"`
-	InsertTool               *sqlx.Stmt `query:"insert-tool"`
-	UpdateTool               *sqlx.Stmt `query:"update-tool"`
-	DeleteTool               *sqlx.Stmt `query:"delete-tool"`
+	GetProviderByType           *sqlx.Stmt `query:"get-provider-by-type"`
+	UpdateProviderConfig        *sqlx.Stmt `query:"update-provider-config"`
+	SetCompletionKey            *sqlx.Stmt `query:"set-completion-key"`
+	GetPrompt                   *sqlx.Stmt `query:"get-prompt"`
+	GetPrompts                  *sqlx.Stmt `query:"get-prompts"`
+	GetKnowledgeBaseItems       *sqlx.Stmt `query:"get-knowledge-base-items"`
+	GetKnowledgeBaseItem        *sqlx.Stmt `query:"get-knowledge-base-item"`
+	InsertKnowledgeBaseItem     *sqlx.Stmt `query:"insert-knowledge-base-item"`
+	UpdateKnowledgeBaseItem     *sqlx.Stmt `query:"update-knowledge-base-item"`
+	DeleteKnowledgeBaseItem     *sqlx.Stmt `query:"delete-knowledge-base-item"`
+	SetKnowledgeBaseFingerprint *sqlx.Stmt `query:"set-knowledge-base-embedded-fingerprint"`
+	InsertEmbedding             *sqlx.Stmt `query:"insert-embedding"`
+	DeleteEmbeddingsBySource    *sqlx.Stmt `query:"delete-embeddings-by-source"`
+	GetAllEmbeddings            *sqlx.Stmt `query:"get-all-embeddings"`
+	GetTools                    *sqlx.Stmt `query:"get-tools"`
+	GetTool                     *sqlx.Stmt `query:"get-tool"`
+	GetEnabledTools             *sqlx.Stmt `query:"get-enabled-tools"`
+	GetToolAuth                 *sqlx.Stmt `query:"get-tool-auth"`
+	InsertTool                  *sqlx.Stmt `query:"insert-tool"`
+	UpdateTool                  *sqlx.Stmt `query:"update-tool"`
+	DeleteTool                  *sqlx.Stmt `query:"delete-tool"`
+	GetCopilotMessages          *sqlx.Stmt `query:"get-copilot-messages"`
+	InsertCopilotMessage        *sqlx.Stmt `query:"insert-copilot-message"`
+	DeleteCopilotMessages       *sqlx.Stmt `query:"delete-copilot-messages"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -114,6 +119,19 @@ func (m *Manager) Completion(k string, prompt string) (string, error) {
 	}
 
 	response, err := client.SendPrompt(models.PromptPayload{SystemPrompt: systemPrompt, UserPrompt: prompt})
+	if err != nil {
+		return "", m.providerError(err)
+	}
+	return response, nil
+}
+
+// CompletionRaw runs an ad-hoc system+user prompt (no DB-stored prompt) and returns the text.
+func (m *Manager) CompletionRaw(systemPrompt, userPrompt string) (string, error) {
+	client, err := m.getProviderClient(models.ProviderTypeCompletion)
+	if err != nil {
+		return "", err
+	}
+	response, err := client.SendPrompt(models.PromptPayload{SystemPrompt: systemPrompt, UserPrompt: userPrompt})
 	if err != nil {
 		return "", m.providerError(err)
 	}
@@ -169,6 +187,15 @@ func (m *Manager) GetProviderConfig(providerType string) (ProviderConfigView, er
 	return view, nil
 }
 
+// VisionEnabled reports whether the completion model is marked as accepting image input.
+func (m *Manager) VisionEnabled() bool {
+	cfg, err := m.getRawProviderConfig(models.ProviderTypeCompletion)
+	if err != nil {
+		return false
+	}
+	return cfg.Vision
+}
+
 // UpdateProviderConfig updates a provider type's config; a blank api_key keeps the stored key.
 func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderConfig) error {
 	if providerType != models.ProviderTypeCompletion && providerType != models.ProviderTypeEmbedding {
@@ -199,6 +226,7 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 		MaxTokens:    in.MaxTokens,
 		Dimensions:   in.Dimensions,
 		Instructions: in.Instructions,
+		Vision:       in.Vision,
 	}
 	b, err := json.Marshal(cfg)
 	if err != nil {

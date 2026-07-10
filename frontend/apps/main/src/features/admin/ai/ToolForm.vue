@@ -74,7 +74,6 @@
             <Input
               type="password"
               autocomplete="new-password"
-              :placeholder="t('admin.ai.tool.authValuePlaceholder')"
               v-bind="componentField"
             />
           </FormControl>

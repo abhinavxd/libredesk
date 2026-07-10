@@ -17,19 +17,22 @@ SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE key
 SELECT id, created_at, updated_at, key, title FROM ai_prompts ORDER BY title;
 
 -- name: get-knowledge-base-items
-SELECT id, created_at, updated_at, type, title, content, enabled FROM ai_knowledge_base ORDER BY updated_at DESC;
+SELECT id, created_at, updated_at, type, title, content, enabled, source, embedded_fingerprint FROM ai_knowledge_base ORDER BY updated_at DESC;
 
 -- name: get-knowledge-base-item
-SELECT id, created_at, updated_at, type, title, content, enabled FROM ai_knowledge_base WHERE id = $1;
+SELECT id, created_at, updated_at, type, title, content, enabled, source, embedded_fingerprint FROM ai_knowledge_base WHERE id = $1;
 
 -- name: insert-knowledge-base-item
-INSERT INTO ai_knowledge_base (type, title, content, enabled) VALUES ($1, $2, $3, $4) RETURNING *;
+INSERT INTO ai_knowledge_base (type, title, content, enabled, source) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: update-knowledge-base-item
 UPDATE ai_knowledge_base SET title = $2, content = $3, enabled = $4, updated_at = now() WHERE id = $1 RETURNING *;
 
 -- name: delete-knowledge-base-item
 DELETE FROM ai_knowledge_base WHERE id = $1;
+
+-- name: set-knowledge-base-embedded-fingerprint
+UPDATE ai_knowledge_base SET embedded_fingerprint = $2 WHERE id = $1;
 
 -- name: insert-embedding
 INSERT INTO embeddings (source_type, source_id, chunk_text, embedding, dimensions) VALUES ($1, $2, $3, $4, $5);
@@ -62,3 +65,12 @@ WHERE id = $1 RETURNING *;
 
 -- name: delete-tool
 DELETE FROM ai_tools WHERE id = $1;
+
+-- name: get-copilot-messages
+SELECT role, content FROM copilot_messages WHERE conversation_id = $1 AND user_id = $2 ORDER BY id;
+
+-- name: insert-copilot-message
+INSERT INTO copilot_messages (conversation_id, user_id, role, content) VALUES ($1, $2, $3, $4);
+
+-- name: delete-copilot-messages
+DELETE FROM copilot_messages WHERE conversation_id = $1 AND user_id = $2;

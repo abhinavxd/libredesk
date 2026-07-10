@@ -7,9 +7,17 @@
       </Button>
     </div>
     <div ref="scrollRef" class="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-      <p v-if="messages.length === 0" class="text-sm text-muted-foreground">
-        {{ $t('copilot.emptyState') }}
-      </p>
+      <div
+        v-if="messages.length === 0"
+        class="h-full flex flex-col items-center justify-center gap-3 text-center px-4"
+      >
+        <div class="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+          <Bot class="h-6 w-6 text-primary" />
+        </div>
+        <p class="text-sm text-muted-foreground">
+          {{ $t('copilot.emptyState', { name: appSettingsStore.copilotName }) }}
+        </p>
+      </div>
       <div
         v-for="(msg, i) in messages"
         :key="i"
@@ -48,17 +56,19 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Textarea } from '@shared-ui/components/ui/textarea'
-import { SendHorizontal, Eraser } from 'lucide-vue-next'
+import { SendHorizontal, Eraser, Bot } from 'lucide-vue-next'
 import { useConversationStore } from '@/stores/conversation'
+import { useAppSettingsStore } from '@/stores/appSettings'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@/api'
 
 const conversationStore = useConversationStore()
+const appSettingsStore = useAppSettingsStore()
 const emitter = useEmitter()
 
 // Chat history lives in the store keyed by conversation uuid so it survives tab
@@ -68,9 +78,41 @@ const input = ref('')
 const isThinking = ref(false)
 const scrollRef = ref(null)
 
-const clearChat = () => {
-  conversationStore.clearCopilotMessages(conversationStore.current?.uuid || '')
+const clearChat = async () => {
+  const uuid = conversationStore.current?.uuid || ''
+  conversationStore.clearCopilotMessages(uuid)
+  if (!uuid) return
+  try {
+    await api.clearCopilotMessages(uuid)
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  }
 }
+
+// Load the persisted chat from the server when a conversation opens, so a refresh
+// does not lose it. Skip if the store already has messages for it (a live session).
+const hydrate = async (uuid) => {
+  if (!uuid || conversationStore.getCopilotMessages(uuid).length > 0) return
+  try {
+    const resp = await api.getCopilotMessages(uuid)
+    const loaded = (resp.data.data || []).map((m) => ({ role: m.role, content: m.content }))
+    if (loaded.length) {
+      conversationStore.setCopilotMessages(uuid, loaded)
+      await scrollToBottom()
+    }
+  } catch {
+    // Non-fatal: the panel still works without history.
+  }
+}
+
+onMounted(() => hydrate(conversationStore.current?.uuid || ''))
+watch(
+  () => conversationStore.current?.uuid,
+  (uuid) => hydrate(uuid || '')
+)
 
 const scrollToBottom = async () => {
   await nextTick()

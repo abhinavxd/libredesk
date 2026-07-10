@@ -10,8 +10,15 @@ import (
 
 const defaultMaxSteps = 5
 
-// RunAgent runs the tool-calling loop up to maxSteps and returns the model's text answer.
-func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int) (string, error) {
+// RunAgent runs the tool-calling loop for the trusted agent-facing callers (copilot, reply drafting):
+// all enabled custom tools plus the built-in knowledge search.
+func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext) (string, error) {
+	return m.RunAgentWithTools(ctx, systemPrompt, history, maxSteps, tctx, nil, true, nil)
+}
+
+// RunAgentWithTools runs the tool-calling loop. allowedToolIDs nil = all enabled custom tools; non-nil
+// restricts to that set. includeBuiltinSearch adds the global knowledge search. extra are always included.
+func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext, allowedToolIDs []int, includeBuiltinSearch bool, extra []Tool) (string, error) {
 	if maxSteps <= 0 {
 		maxSteps = defaultMaxSteps
 	}
@@ -25,9 +32,13 @@ func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []m
 		systemPrompt += "\n\nWorkspace admin instructions (follow these, they take precedence on tone and format):\n" + instructions
 	}
 
-	registry, defs, err := m.buildToolRegistry()
+	registry, defs, err := m.buildToolRegistry(tctx, allowedToolIDs, includeBuiltinSearch)
 	if err != nil {
 		return "", err
+	}
+	for _, t := range extra {
+		registry[t.Name()] = t
+		defs = append(defs, toolDef(t))
 	}
 
 	messages := make([]models.ChatMessage, 0, len(history)+2)
@@ -36,13 +47,23 @@ func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []m
 	}
 	messages = append(messages, history...)
 
+	imageCount := 0
+	for _, msg := range messages {
+		imageCount += len(msg.Images)
+	}
+	m.lo.Debug("ai run starting", "model", cfg.Model, "vision", cfg.Vision, "max_steps", maxSteps, "history_messages", len(history), "images", imageCount, "tools", len(defs))
+	m.lo.Debug("ai run system prompt", "prompt", systemPrompt)
+
 	for step := 0; step < maxSteps; step++ {
+		m.lo.Debug("ai run step", "step", step, "messages", len(messages))
 		res, err := m.chatCompletion(client, models.ChatCompletionPayload{Messages: messages, Tools: defs})
 		if err != nil {
 			return "", err
 		}
+		m.lo.Debug("ai run model response", "step", step, "content_len", len(res.Content), "tool_calls", len(res.ToolCalls))
 
 		if len(res.ToolCalls) == 0 {
+			m.lo.Debug("ai run final answer", "answer", res.Content)
 			return res.Content, nil
 		}
 
@@ -76,6 +97,7 @@ func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []m
 }
 
 func (m *Manager) executeToolCall(ctx context.Context, registry map[string]Tool, tc models.ToolCall) string {
+	m.lo.Debug("ai run tool call", "tool", tc.Function.Name, "args", tc.Function.Arguments)
 	tool, ok := registry[tc.Function.Name]
 	if !ok {
 		m.lo.Warn("model called unknown tool", "tool", tc.Function.Name)
@@ -86,6 +108,7 @@ func (m *Manager) executeToolCall(ctx context.Context, registry map[string]Tool,
 		m.lo.Error("error executing tool", "tool", tc.Function.Name, "error", err)
 		return "error executing tool: " + err.Error()
 	}
+	m.lo.Debug("ai run tool result", "tool", tc.Function.Name, "result_len", len(out))
 	return out
 }
 
