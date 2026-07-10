@@ -550,7 +550,7 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 func getContactName(imapAddr imap.Address) (string, string) {
 	first, last := stringutil.SplitName(imapAddr.Name)
 	if first == "" {
-		return imapAddr.Host, ""
+		return imapAddr.Mailbox, ""
 	}
 	return first, last
 }
