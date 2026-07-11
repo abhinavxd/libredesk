@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -19,12 +20,15 @@ import (
 const (
 	toolSearchArticles = "search_articles"
 
-	maxToolResponseBytes = 8000
+	maxToolResponseBytes = 1 << 20
 )
 
 var (
 	// reservedToolNames are built-in tool names custom tools may not use.
 	reservedToolNames = map[string]bool{toolSearchArticles: true}
+
+	// allowedToolMethods are the HTTP methods a custom tool may use: GET reads, POST writes.
+	allowedToolMethods = map[string]bool{http.MethodGet: true, http.MethodPost: true}
 
 	toolHTTPClient = &http.Client{Timeout: 20 * time.Second}
 
@@ -141,25 +145,45 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 		method = http.MethodPost
 	}
 
+	// GET carries no body, so the model's arguments go on the query string; other methods send them as
+	// the JSON body.
+	url := t.tool.URL
 	var bodyReader io.Reader
-	if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch {
+	if method == http.MethodGet {
+		q, err := argsToQuery(args)
+		if err != nil {
+			return "", err
+		}
+		if q != "" {
+			if strings.Contains(url, "?") {
+				url += "&" + q
+			} else {
+				url += "?" + q
+			}
+		}
+	} else {
 		bodyReader = bytes.NewBufferString(args)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, t.tool.URL, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if bodyReader != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	if len(t.tool.Auth) > 0 {
 		var auth models.ToolAuth
 		if err := json.Unmarshal(t.tool.Auth, &auth); err == nil && auth.Header != "" {
 			value, derr := crypto.Decrypt(auth.Value, t.encryptionKey)
 			if derr != nil {
-				value = auth.Value
+				// A failed decrypt means a corrupted or re-keyed secret; sending the raw stored value
+				// would leak ciphertext and fail auth confusingly. Skip the header and let the call 401.
+				t.lo.Error("could not decrypt custom tool auth secret; sending request without it", "tool", t.tool.Name, "error", derr)
+			} else {
+				req.Header.Set(auth.Header, value)
 			}
-			req.Header.Set(auth.Header, value)
 		}
 	}
 
@@ -224,6 +248,41 @@ func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, incl
 		defs = append(defs, toolDef(ht))
 	}
 	return registry, defs, nil
+}
+
+// argsToQuery flattens the model's JSON argument object into a URL query string, JSON-encoding any
+// non-scalar values. A blank or "{}" args string yields an empty query.
+func argsToQuery(args string) (string, error) {
+	args = strings.TrimSpace(args)
+	if args == "" || args == "{}" {
+		return "", nil
+	}
+	dec := json.NewDecoder(strings.NewReader(args))
+	dec.UseNumber()
+	var m map[string]any
+	if err := dec.Decode(&m); err != nil {
+		return "", fmt.Errorf("invalid arguments: %w", err)
+	}
+	q := neturl.Values{}
+	for k, v := range m {
+		switch val := v.(type) {
+		case nil:
+			continue
+		case string:
+			q.Set(k, val)
+		case json.Number:
+			q.Set(k, val.String())
+		case bool:
+			q.Set(k, fmt.Sprintf("%v", val))
+		default:
+			b, err := json.Marshal(val)
+			if err != nil {
+				return "", fmt.Errorf("encoding argument %q: %w", k, err)
+			}
+			q.Set(k, string(b))
+		}
+	}
+	return q.Encode(), nil
 }
 
 func toolDef(t Tool) models.ToolDef {

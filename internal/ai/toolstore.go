@@ -53,6 +53,9 @@ func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 	if reservedToolNames[t.Name] {
 		return t, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.reservedName"), nil)
 	}
+	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
+		return t, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
 	auth, err := m.prepareToolAuth(t.Auth, nil)
 	if err != nil {
 		return t, err
@@ -73,6 +76,9 @@ func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 	if reservedToolNames[t.Name] {
 		return t, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.reservedName"), nil)
+	}
+	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
+		return t, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	var existing types.JSONText
 	if err := m.q.GetToolAuth.Get(&existing, id); err != nil {

@@ -138,7 +138,7 @@ import {
 } from '@shared-ui/components/ui/form/index.js'
 import { useI18n } from 'vue-i18n'
 
-const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+const methods = ['GET', 'POST']
 
 const props = defineProps({
   initialValues: { type: Object, default: () => ({}) },
