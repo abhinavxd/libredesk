@@ -64,10 +64,12 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     if (uploadedFiles?.value?.length > 0) {
       meta.attachments = uploadedFiles.value.map(file => ({
         id: file.id,
+        url: file.url,
         size: file.size,
         uuid: file.uuid,
         filename: file.filename,
-        content_type: file.content_type
+        content_type: file.content_type,
+        disposition: file.disposition
       }))
     }
     return { content: htmlContent.value, meta }

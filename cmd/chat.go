@@ -792,7 +792,7 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 		user := umodels.User{
 			FirstName:              claims.FirstName,
 			LastName:               claims.LastName,
-			Email:                  null.NewString(claims.Email, true),
+			Email:                  null.NewString(claims.Email, claims.Email != ""),
 			PhoneNumber:            null.NewString(claims.PhoneNumber, claims.PhoneNumber != ""),
 			PhoneNumberCountryCode: null.NewString(claims.PhoneNumberCountryCode, claims.PhoneNumberCountryCode != ""),
 			ExternalUserID:         null.NewString(claims.ExternalUserID, true),

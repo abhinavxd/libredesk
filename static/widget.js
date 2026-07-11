@@ -21,7 +21,7 @@
             }
 
             this.IFRAME_BORDER_RADIUS = '16px';
-            this.IFRAME_BOX_SHADOW = '0 12px 48px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.25)';
+            this.IFRAME_BOX_SHADOW = '0 1px 6px rgba(9, 14, 21, 0.5), 0 4px 32px rgba(9, 14, 21, 0.65)';
             this.IFRAME_WIDTH = '400px';
             this.IFRAME_HEIGHT = '700px';
             this.EXPANDED_WIDTH = '750px';
@@ -184,7 +184,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);
+                box-shadow: 0 1px 4px rgba(9, 14, 21, 0.45), 0 3px 18px rgba(9, 14, 21, 0.55);
                 transition: transform 0.3s ease;
             `;
 

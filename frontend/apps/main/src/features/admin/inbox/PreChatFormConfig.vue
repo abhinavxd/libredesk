@@ -56,6 +56,7 @@
                     <Switch v-model:checked="field.enabled" />
                     <Button
                       v-if="!field.is_default"
+                      type="button"
                       variant="ghost"
                       size="sm"
                       @click="removeField(index)"

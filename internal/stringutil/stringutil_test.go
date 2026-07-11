@@ -270,3 +270,29 @@ func TestSanitizeUTF8(t *testing.T) {
 		})
 	}
 }
+
+func TestSplitName(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantFirst string
+		wantLast  string
+	}{
+		{name: "empty", input: "", wantFirst: "", wantLast: ""},
+		{name: "whitespace only", input: "   ", wantFirst: "", wantLast: ""},
+		{name: "single name", input: "Cher", wantFirst: "Cher", wantLast: ""},
+		{name: "first and last", input: "John Doe", wantFirst: "John", wantLast: "Doe"},
+		{name: "middle name", input: "John Michael Doe", wantFirst: "John", wantLast: "Michael Doe"},
+		{name: "multi-word surname", input: "Ludwig van der Berg", wantFirst: "Ludwig", wantLast: "van der Berg"},
+		{name: "extra spaces", input: "  John   Doe  ", wantFirst: "John", wantLast: "Doe"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			first, last := SplitName(tt.input)
+			if first != tt.wantFirst || last != tt.wantLast {
+				t.Errorf("SplitName(%q) = (%q, %q), want (%q, %q)", tt.input, first, last, tt.wantFirst, tt.wantLast)
+			}
+		})
+	}
+}

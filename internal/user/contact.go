@@ -33,12 +33,16 @@ func (u *Manager) CreateContact(user *models.User) error {
 					return emailErr
 				}
 			} else {
-				if setErr := u.SetExternalUserID(existing.ID, user.ExternalUserID.String); setErr == nil {
+				enriched, setErr := u.SetExternalUserID(existing.ID, user.ExternalUserID.String)
+				if setErr != nil && !dbutil.IsUniqueViolationError(setErr) {
+					return setErr
+				}
+				if enriched {
 					user.ID = existing.ID
 					return nil
 				}
-				// ext_id already belongs to another contact - fall through to upsert.
-				u.lo.Info("ext_id already exists on another contact, skipping enrichment", "contact_id", existing.ID, "ext_id", user.ExternalUserID.String)
+				// ext_id already belongs to another contact, or the contact was deleted mid-flight - fall through to upsert.
+				u.lo.Info("skipping contact enrichment, falling back to upsert", "contact_id", existing.ID, "ext_id", user.ExternalUserID.String)
 			}
 		}
 

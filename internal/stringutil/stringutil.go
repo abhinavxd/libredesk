@@ -237,3 +237,15 @@ func ExtractReferenceNumber(subject string) string {
 	}
 	return ""
 }
+
+// SplitName splits a full name; the first word is the first name, the rest is the last name.
+func SplitName(name string) (string, string) {
+	fields := strings.Fields(name)
+	if len(fields) == 0 {
+		return "", ""
+	}
+	if len(fields) == 1 {
+		return fields[0], ""
+	}
+	return fields[0], strings.Join(fields[1:], " ")
+}
