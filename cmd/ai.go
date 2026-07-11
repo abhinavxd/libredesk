@@ -9,6 +9,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -251,7 +252,11 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
+		// Only a verified contact has a trustworthy identity; a visitor's email/external ID is
+		// self-claimed, so never hand it to tools - that would let them impersonate anyone.
+		if conv.Contact.Type == umodels.UserTypeContact {
+			tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
+		}
 		transcript = conversationTranscript(app, req.ConversationUUID)
 	}
 	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, tctx)
@@ -283,7 +288,11 @@ func handleAICopilot(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, err)
 		}
 		conv = c
-		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
+		// Only a verified contact has a trustworthy identity; a visitor's email/external ID is
+		// self-claimed, so never hand it to tools - that would let them impersonate anyone.
+		if conv.Contact.Type == umodels.UserTypeContact {
+			tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
+		}
 		convoContext = conversationTranscript(app, req.ConversationUUID)
 	}
 	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, tctx)
