@@ -17,6 +17,19 @@
         <p class="text-sm text-muted-foreground">
           {{ $t('copilot.emptyState', { name: appSettingsStore.copilotName }) }}
         </p>
+        <div class="flex flex-col gap-2 w-full max-w-[85%]">
+          <Button
+            v-for="preset in presets"
+            :key="preset"
+            type="button"
+            variant="outline"
+            size="sm"
+            class="w-full whitespace-normal h-auto py-1.5"
+            @click="send(preset)"
+          >
+            {{ preset }}
+          </Button>
+        </div>
       </div>
       <div
         v-for="(msg, i) in messages"
@@ -65,11 +78,18 @@ import { useAppSettingsStore } from '@/stores/appSettings'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { useI18n } from 'vue-i18n'
 import api from '@/api'
 
 const conversationStore = useConversationStore()
 const appSettingsStore = useAppSettingsStore()
 const emitter = useEmitter()
+const { t } = useI18n()
+
+const presets = computed(() => [
+  t('copilot.preset.summarize'),
+  t('copilot.preset.customerAsking')
+])
 
 // Chat history lives in the store keyed by conversation uuid so it survives tab
 // switches (this panel unmounts) and never leaks across conversations.
@@ -119,8 +139,8 @@ const scrollToBottom = async () => {
   if (scrollRef.value) scrollRef.value.scrollTop = scrollRef.value.scrollHeight
 }
 
-const send = async () => {
-  const text = input.value.trim()
+const send = async (preset) => {
+  const text = (typeof preset === 'string' ? preset : input.value).trim()
   if (!text || isThinking.value) return
 
   const uuid = conversationStore.current?.uuid || ''

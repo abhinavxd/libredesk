@@ -244,7 +244,6 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-
 	transcript := ""
 	var tctx ai.ToolContext
 	if req.ConversationUUID != "" {
@@ -365,23 +364,5 @@ func conversationTranscript(app *App, uuid string) string {
 		app.lo.Error("error building conversation transcript for AI", "error", err)
 		return ""
 	}
-	if len(msgs) > maxTranscriptMessages {
-		msgs = msgs[len(msgs)-maxTranscriptMessages:]
-	}
-	var b strings.Builder
-	for _, msg := range msgs {
-		role := "Agent"
-		if msg.SenderType == cmodels.SenderTypeContact {
-			role = "Customer"
-		}
-		text := strings.TrimSpace(msg.TextContent)
-		if text == "" {
-			continue
-		}
-		b.WriteString(role)
-		b.WriteString(": ")
-		b.WriteString(text)
-		b.WriteString("\n")
-	}
-	return b.String()
+	return cmodels.Transcript(msgs, maxTranscriptMessages)
 }
