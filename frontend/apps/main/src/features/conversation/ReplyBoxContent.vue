@@ -132,8 +132,9 @@
       :handleSend="handleSend"
       :handleSendAndSetStatus="handleSendAndSetStatus"
       :isGenerating="isGenerating"
+      :showGenerateReply="messageType !== 'private_note'"
       @emojiSelect="handleEmojiSelect"
-      @generateReply="handleGenerateReply"
+      @generateReply="$emit('generateReply')"
     />
   </div>
 </template>
@@ -154,9 +155,7 @@ import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachmen
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { useI18n } from 'vue-i18n'
-import api from '@/api'
-import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { validateEmail, convertTextToHtml } from '@shared-ui/utils/string'
+import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import { useUsersStore } from '@main/stores/users'
 import { useTeamStore } from '@main/stores/team'
@@ -238,6 +237,10 @@ const props = defineProps({
     type: Boolean,
     required: false,
     default: false
+  },
+  isGenerating: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -249,7 +252,8 @@ const emit = defineEmits([
   'inlineImageUpload',
   'fileDelete',
   'filesDropped',
-  'aiPromptSelected'
+  'aiPromptSelected',
+  'generateReply'
 ])
 
 const conversationStore = useConversationStore()
@@ -356,26 +360,6 @@ const handleEmojiSelect = (emoji) => {
 
 const handleAiPromptSelected = (key) => {
   emit('aiPromptSelected', key)
-}
-
-const isGenerating = ref(false)
-const handleGenerateReply = async () => {
-  if (isGenerating.value) return
-  isGenerating.value = true
-  try {
-    const resp = await api.aiGenerateReply({
-      conversation_uuid: conversationStore.current?.uuid || '',
-      instruction: textContent.value
-    })
-    htmlContent.value = convertTextToHtml(resp.data.data || '')
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    isGenerating.value = false
-  }
 }
 
 // Watch and update macro view based on message type this filters our macros.

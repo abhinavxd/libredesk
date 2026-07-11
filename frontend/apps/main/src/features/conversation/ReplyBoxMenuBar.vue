@@ -38,6 +38,7 @@
         <Smile class="h-4 w-4" />
       </Toggle>
       <Toggle
+        v-if="showGenerateReply"
         class="px-2 py-2 border-0"
         variant="outline"
         :pressed="false"
@@ -122,6 +123,10 @@ defineProps({
   handleSend: Function,
   handleSendAndSetStatus: Function,
   showSendButton: {
+    type: Boolean,
+    default: true
+  },
+  showGenerateReply: {
     type: Boolean,
     default: true
   },

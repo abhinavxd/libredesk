@@ -80,7 +80,7 @@
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
         class="max-w-[60%] max-h-[75%] h-[70%] bg-card text-card-foreground p-4 flex flex-col"
-        :class="{ '!bg-private': messageType === 'private_note' }"
+        :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
         @escapeKeyDown="isEditorFullscreen = false"
         :hide-close-button="true"
       >
@@ -108,6 +108,8 @@
           @fileDelete="handleFileDelete"
           @filesDropped="uploadFiles"
           @aiPromptSelected="handleAiPromptSelected"
+          :isGenerating="isGenerating"
+          @generateReply="handleGenerateReply"
           class="h-full flex-grow"
         />
       </DialogContent>
@@ -115,8 +117,8 @@
 
     <!-- Main Editor non-fullscreen -->
     <div
-      class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col"
-      :class="{ '!bg-private': messageType === 'private_note' }"
+      class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
+      :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
       v-if="!isEditorFullscreen"
     >
       <ReplyBoxContent
@@ -143,6 +145,8 @@
         @fileDelete="handleFileDelete"
         @filesDropped="uploadFiles"
         @aiPromptSelected="handleAiPromptSelected"
+        :isGenerating="isGenerating"
+        @generateReply="handleGenerateReply"
       />
     </div>
   </div>
@@ -184,6 +188,7 @@ import { Input } from '@shared-ui/components/ui/input'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
+import { convertTextToHtml } from '@shared-ui/utils/string'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
 import {
@@ -257,6 +262,7 @@ const openAIKeyPrompt = ref(false)
 const isOpenAIKeyUpdating = ref(false)
 const isEditorFullscreen = ref(false)
 const isSending = ref(false)
+const isGenerating = ref(false)
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
@@ -294,6 +300,25 @@ const handleAiPromptSelected = async (key) => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  }
+}
+
+const handleGenerateReply = async () => {
+  if (isGenerating.value) return
+  isGenerating.value = true
+  try {
+    const resp = await api.aiGenerateReply({
+      conversation_uuid: conversationStore.current?.uuid || '',
+      instruction: textContent.value
+    })
+    htmlContent.value = convertTextToHtml(resp.data.data || '')
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isGenerating.value = false
   }
 }
 
@@ -569,3 +594,59 @@ watch(
   }
 )
 </script>
+
+<style scoped>
+/* While the AI drafts a reply, a point of light orbits the reply box: a bright
+   comet head that fades to a transparent tail, with its glow travelling along. */
+@property --ai-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.ai-generating {
+  box-shadow: 0 6px 22px -10px hsl(var(--primary) / 0.28);
+}
+
+.ai-generating::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--ai-angle),
+    hsl(var(--primary)) 0deg,
+    hsl(var(--primary) / 0) 90deg,
+    hsl(var(--primary) / 0) 180deg,
+    hsl(var(--primary)) 180deg,
+    hsl(var(--primary) / 0) 270deg,
+    hsl(var(--primary) / 0) 360deg
+  );
+  filter: drop-shadow(0 0 5px hsl(var(--primary) / 0.5));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ai-border-spin 2.4s linear infinite;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@keyframes ai-border-spin {
+  to {
+    --ai-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Steady even glow so the active state stays legible without motion. */
+  .ai-generating {
+    box-shadow: 0 0 0 1.5px hsl(var(--primary) / 0.4);
+  }
+  .ai-generating::after {
+    display: none;
+  }
+}
+</style>
