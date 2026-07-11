@@ -960,6 +960,16 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		if c.aiAgent != nil {
 			c.aiAgent.HandleConversationResolved(conversationBeforeChange.ID)
 		}
+		// Send the CSAT survey here so every resolve path (agent UI, AI assistant, automation) triggers
+		// it - a caller that resolves without going through the HTTP handler would otherwise skip it.
+		// SendCSATReply is idempotent and no-ops when the contact has no email.
+		if inb, err := c.inboxStore.GetDBRecord(conversationBeforeChange.InboxID); err != nil {
+			c.lo.Error("error fetching inbox for CSAT on resolve", "conversation_uuid", uuid, "error", err)
+		} else if inb.CSATEnabled {
+			if err := c.SendCSATReply(actor.ID, conversationBeforeChange); err != nil {
+				c.lo.Error("error sending CSAT on resolve", "conversation_uuid", uuid, "error", err)
+			}
+		}
 	}
 	if status == models.StatusClosed {
 		closedAt := time.Now()
