@@ -79,6 +79,17 @@
               </FormItem>
             </FormField>
 
+            <FormField v-slot="{ componentField }" name="reasoning_effort">
+              <FormItem>
+                <FormLabel>{{ t('admin.ai.reasoningEffort') }}</FormLabel>
+                <FormControl>
+                  <Input type="text" placeholder="none" v-bind="componentField" />
+                </FormControl>
+                <FormDescription>{{ t('admin.ai.reasoningEffortHint') }}</FormDescription>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+
             <FormField v-slot="{ componentField }" name="instructions">
               <FormItem class="md:col-span-2">
                 <FormLabel>{{ t('admin.ai.instructions') }}</FormLabel>
@@ -264,6 +275,7 @@ const form = useForm({
       base_url: z.string().optional(),
       api_key: z.string().optional(),
       instructions: z.string().optional(),
+      reasoning_effort: z.string().optional(),
       temperature: numberField().refine((v) => isBlank(v) || inRange(v, 0, 2), {
         message: t('admin.ai.temperatureRange')
       }),
@@ -281,6 +293,7 @@ const form = useForm({
     base_url: '',
     api_key: '',
     instructions: '',
+    reasoning_effort: '',
     temperature: fieldDefaults.temperature,
     max_tokens: fieldDefaults.maxTokens,
     dimensions: fieldDefaults.dimensions,
@@ -298,6 +311,7 @@ onMounted(async () => {
       base_url: data.base_url || '',
       api_key: data.api_key || '',
       instructions: data.instructions || '',
+      reasoning_effort: data.reasoning_effort || '',
       // Fall back to sensible defaults when the provider has nothing saved (0/absent).
       temperature: data.temperature != null ? String(data.temperature) : fieldDefaults.temperature,
       max_tokens: data.max_tokens ? String(data.max_tokens) : fieldDefaults.maxTokens,
@@ -321,6 +335,7 @@ const onSubmit = form.handleSubmit(async (values) => {
   if (props.showCompletionFields) {
     payload.instructions = values.instructions || ''
     payload.vision = !!values.vision
+    payload.reasoning_effort = (values.reasoning_effort || '').trim()
     if (values.temperature !== '' && values.temperature != null)
       payload.temperature = Number(values.temperature)
     if (values.max_tokens !== '' && values.max_tokens != null)

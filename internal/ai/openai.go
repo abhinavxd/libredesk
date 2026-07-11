@@ -84,12 +84,18 @@ func (o *OpenAIClient) SendChatCompletion(payload models.ChatCompletionPayload) 
 	o.lo.Debug("chat completion request", "model", model, "messages", len(messages), "images", sentImages, "vision", o.cfg.Vision, "tools", len(payload.Tools))
 
 	body := map[string]any{
-		"model":      model,
-		"messages":   messages,
-		"max_tokens": maxTokens,
+		"model":                 model,
+		"messages":              messages,
+		"max_completion_tokens": maxTokens,
 	}
+	// Only send optional params the admin set. Reasoning models (e.g. GPT-5.x) reject a non-default
+	// temperature and require reasoning_effort "none" to use tools on /chat/completions; leave
+	// temperature blank and set reasoning_effort accordingly for those.
 	if o.cfg.Temperature != nil {
 		body["temperature"] = *o.cfg.Temperature
+	}
+	if o.cfg.ReasoningEffort != "" {
+		body["reasoning_effort"] = o.cfg.ReasoningEffort
 	}
 	if len(payload.Tools) > 0 {
 		body["tools"] = payload.Tools

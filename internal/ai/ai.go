@@ -218,15 +218,16 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 	}
 
 	cfg := models.ProviderConfig{
-		Provider:     "openai",
-		BaseURL:      in.BaseURL,
-		APIKey:       apiKey,
-		Model:        in.Model,
-		Temperature:  in.Temperature,
-		MaxTokens:    in.MaxTokens,
-		Dimensions:   in.Dimensions,
-		Instructions: in.Instructions,
-		Vision:       in.Vision,
+		Provider:        "openai",
+		BaseURL:         in.BaseURL,
+		APIKey:          apiKey,
+		Model:           in.Model,
+		Temperature:     in.Temperature,
+		MaxTokens:       in.MaxTokens,
+		Dimensions:      in.Dimensions,
+		Instructions:    in.Instructions,
+		Vision:          in.Vision,
+		ReasoningEffort: in.ReasoningEffort,
 	}
 	b, err := json.Marshal(cfg)
 	if err != nil {

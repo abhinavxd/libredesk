@@ -45,6 +45,9 @@ type ProviderConfig struct {
 	MaxTokens    int      `json:"max_tokens"`
 	Dimensions   int      `json:"dimensions"`
 	Instructions string   `json:"instructions"`
+	// ReasoningEffort, when set, is sent as-is. Reasoning models (e.g. GPT-5.x) need "none" to use
+	// tools on /chat/completions; leave blank for models that reject the param.
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
 	// Vision marks the completion model as accepting image input; when false the harness drops image parts.
 	Vision bool `json:"vision"`
 }
