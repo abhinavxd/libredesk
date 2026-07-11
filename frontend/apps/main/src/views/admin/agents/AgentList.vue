@@ -40,13 +40,11 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { useUsersStore } from '@/stores/users'
 import { useI18n } from 'vue-i18n'
 import Importer from '@/components/importer/Importer.vue'
 import api from '@/api'
 
 const isLoading = ref(false)
-const usersStore = useUsersStore()
 const { t } = useI18n()
 const data = ref([])
 const emitter = useEmitter()
@@ -67,8 +65,8 @@ onUnmounted(() => {
 const getData = async () => {
   try {
     isLoading.value = true
-    await usersStore.fetchUsers(true)
-    data.value = usersStore.users
+    const response = await api.getUsers()
+    data.value = response?.data?.data || []
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
