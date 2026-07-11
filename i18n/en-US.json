@@ -519,6 +519,7 @@
   "ai.agent.handoffMaxTurns": "The AI assistant reached its response limit for this conversation and handed it off to a human.",
   "ai.agent.handoffError": "The AI assistant could not respond and handed this conversation off to a human.",
   "ai.agent.handoffNoAnswer": "The AI assistant did not have an answer and handed this conversation off to a human.",
+  "ai.agent.handoffOtherParticipant": "Someone other than the contact replied on this conversation, so the AI assistant handed it off to a human.",
   "ai.enterOpenAIAPIKey": "Enter OpenAI API Key",
   "auth.backToLogin": "Back to login",
   "auth.checkEmailForReset": "Check your email for the password reset link.",

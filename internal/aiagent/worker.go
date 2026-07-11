@@ -128,6 +128,14 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if !lastIsInboundContact(msgs) {
 		return
 	}
+	// The reply and any identity-scoped tools act as the primary contact. An email thread can carry
+	// messages from other participants (CC'd, or joined via plus-address, each a distinct contact), so
+	// only act on a turn the primary contact authored - otherwise a participant's message could drive
+	// tool actions under the contact's identity. Anyone else gets a human.
+	if msgs[len(msgs)-1].SenderID != conv.ContactID {
+		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffOtherParticipant"))
+		return
+	}
 	// Turn cap is per engagement (since the assistant was last assigned), so a human reassigning a
 	// capped conversation to the assistant gives it a fresh budget instead of bouncing straight back.
 	var turns int
@@ -146,6 +154,10 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		&searchKnowledgeTool{m: m},
 		&handoffTool{m: m, conv: conv, assistant: assistant, outcome: outcome},
 		&resolveTool{m: m, conv: conv, assistant: assistant, outcome: outcome},
+	}
+	if recent := m.recentContactConversations(conv); len(recent) > 0 {
+		systemPrompt += fmt.Sprintf("\n\nThis customer has %d other conversation(s) from the last %d days. Call get_previous_conversations if the current issue might be a follow-up or related to them.", len(recent), recentConversationDays)
+		tools = append(tools, &previousConversationsTool{m: m, conversations: recent})
 	}
 
 	// Only a JWT-verified contact has a trustworthy identity; a visitor's email/external ID is
@@ -294,6 +306,19 @@ func (m *Manager) buildHistory(msgs []cmodels.Message) []aimodels.ChatMessage {
 		history = append(history, aimodels.ChatMessage{Role: role, Content: text, Images: images})
 	}
 	return history
+}
+
+// recentContactConversations lists a verified contact's other recent conversations; a visitor's self-claimed identity gets none.
+func (m *Manager) recentContactConversations(conv cmodels.Conversation) []models.RecentConversation {
+	if conv.Contact.Type != umodels.UserTypeContact {
+		return nil
+	}
+	recent := []models.RecentConversation{}
+	if err := m.q.GetRecentContactConvos.Select(&recent, conv.ContactID, conv.ID, recentConversationDays, maxRecentConversations); err != nil {
+		m.lo.Error("error fetching recent contact conversations for ai agent", "conversation_uuid", conv.UUID, "error", err)
+		return nil
+	}
+	return recent
 }
 
 func (m *Manager) encodeAttachmentImage(att attachment.Attachment) (aimodels.ChatImage, bool) {

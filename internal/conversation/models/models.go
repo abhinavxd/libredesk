@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
@@ -537,4 +538,27 @@ type ConversationDraft struct {
 type MentionInput struct {
 	Type string `json:"type"` // "agent" or "team"
 	ID   int    `json:"id"`
+}
+
+// Transcript renders the last max messages as a plaintext "Customer:/Agent:" transcript for AI context.
+func Transcript(msgs []Message, max int) string {
+	if len(msgs) > max {
+		msgs = msgs[len(msgs)-max:]
+	}
+	var b strings.Builder
+	for _, msg := range msgs {
+		role := "Agent"
+		if msg.SenderType == SenderTypeContact {
+			role = "Customer"
+		}
+		text := strings.TrimSpace(msg.TextContent)
+		if text == "" {
+			continue
+		}
+		b.WriteString(role)
+		b.WriteString(": ")
+		b.WriteString(text)
+		b.WriteString("\n")
+	}
+	return b.String()
 }
