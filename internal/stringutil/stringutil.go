@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/jaytaylor/html2text"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
 const (
@@ -23,6 +26,12 @@ var (
 	uuidV4Regex     = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
 	regexpRefNumber = regexp.MustCompile(`#(\d+)`)
 	regexpConvUUID  = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+
+	// markdownRenderer escapes raw HTML in the input; single newlines render as <br>.
+	markdownRenderer = goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(html.WithHardWraps()),
+	)
 )
 
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.
@@ -41,6 +50,15 @@ func HTML2Text(html string) string {
 		return ""
 	}
 	return strings.TrimSpace(out)
+}
+
+// Markdown2HTML converts markdown to HTML, falling back to the input on error.
+func Markdown2HTML(md string) string {
+	var b strings.Builder
+	if err := markdownRenderer.Convert([]byte(md), &b); err != nil {
+		return md
+	}
+	return b.String()
 }
 
 // SanitizeFilename sanitizes the provided filename.

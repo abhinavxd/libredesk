@@ -141,13 +141,18 @@ func parseHTMLBoundaries(htmlContent string, cfg ChunkConfig) ([]htmlBoundary, e
 			}
 
 			if isBlockElement(tag) {
-				boundaries = append(boundaries, htmlBoundary{
-					Type:     tag,
-					Content:  contentStr,
-					Priority: getPriority(tag),
-					Tokens:   cfg.TokenizerFunc(cleanText),
-				})
-				return
+				tokens := cfg.TokenizerFunc(cleanText)
+				// An oversized container taken as one atomic boundary would be truncated at
+				// MaxTokens, silently dropping the rest; descend into its block children instead.
+				if tokens <= cfg.MaxTokens || isPreservedBlock(tag, cfg.PreserveBlocks) || !splittableIntoBlocks(n) {
+					boundaries = append(boundaries, htmlBoundary{
+						Type:     tag,
+						Content:  contentStr,
+						Priority: getPriority(tag),
+						Tokens:   tokens,
+					})
+					return
+				}
 			}
 		}
 
@@ -179,6 +184,31 @@ func getPriority(tag string) int {
 
 func isPreservedBlock(blockType string, preserveBlocks []string) bool {
 	return slices.Contains(preserveBlocks, blockType)
+}
+
+// splittableIntoBlocks reports whether all of a node's visible content lives inside block-element
+// children, so splitting the node into its children loses nothing.
+func splittableIntoBlocks(n *html.Node) bool {
+	hasBlock := false
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		switch c.Type {
+		case html.TextNode:
+			if strings.TrimSpace(c.Data) != "" {
+				return false
+			}
+		case html.ElementNode:
+			if isBlockElement(strings.ToLower(c.Data)) {
+				hasBlock = true
+				continue
+			}
+			var buf strings.Builder
+			html.Render(&buf, c)
+			if strings.TrimSpace(HTML2Text(buf.String())) != "" {
+				return false
+			}
+		}
+	}
+	return hasBlock
 }
 
 func mergeBoundaries(boundaries []htmlBoundary, cfg ChunkConfig) []htmlBoundary {
@@ -293,7 +323,7 @@ func createChunks(boundaries []htmlBoundary, cfg ChunkConfig) []htmlBoundary {
 			chunks = append(chunks, currentChunk)
 
 			var overlapContent string
-			if !isPreservedBlock(boundary.Type, cfg.PreserveBlocks) && len(chunks) > 0 {
+			if !isPreservedBlock(boundary.Type, cfg.PreserveBlocks) {
 				overlapContent = extractOverlap(currentChunk.Content, cfg)
 			}
 

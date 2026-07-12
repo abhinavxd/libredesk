@@ -146,7 +146,7 @@ const buildDelta = (raw, unit, increaseIsGood) => {
   const value = raw ?? 0
   const suffix = unit === 'percent' ? '%' : ''
   if (value === 0) {
-    return { deltaText: '—', deltaClass: 'text-muted-foreground' }
+    return { deltaText: '-', deltaClass: 'text-muted-foreground' }
   }
   const arrow = value > 0 ? '▲' : '▼'
   const good = value > 0 ? increaseIsGood : !increaseIsGood

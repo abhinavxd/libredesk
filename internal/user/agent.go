@@ -149,9 +149,13 @@ func (u *Manager) SoftDeleteAgent(id int) error {
 	if id == systemUser.ID {
 		return envelope.NewError(envelope.InputError, u.i18n.T("user.cannotDeleteSystemUser"), nil)
 	}
-	if _, err := u.q.SoftDeleteAgent.Exec(id); err != nil {
+	var deleted int
+	if err := u.q.SoftDeleteAgent.Get(&deleted, id); err != nil {
 		u.lo.Error("error deleting user", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if deleted == 0 {
+		return envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", u.i18n.T("globals.terms.agent")), nil)
 	}
 	return nil
 }

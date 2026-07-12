@@ -24,8 +24,16 @@ const (
 )
 
 var (
-	// reservedToolNames are built-in tool names custom tools may not use.
-	reservedToolNames = map[string]bool{toolSearchArticles: true}
+	// reservedToolNames are built-in tool names (including the autonomous assistant's, see
+	// internal/aiagent/tools.go) custom tools may not use: a colliding custom tool would be
+	// silently replaced by the built-in in the agent loop's registry.
+	reservedToolNames = map[string]bool{
+		toolSearchArticles:           true,
+		"search_knowledge_base":      true,
+		"hand_off_to_human":          true,
+		"resolve":                    true,
+		"get_previous_conversations": true,
+	}
 
 	// allowedToolMethods are the HTTP methods a custom tool may use: GET reads, POST writes.
 	allowedToolMethods = map[string]bool{http.MethodGet: true, http.MethodPost: true}
@@ -210,10 +218,7 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	return string(out), nil
 }
 
-// buildToolRegistry returns the built-in and enabled custom tools plus their model-facing definitions.
-// buildToolRegistry assembles the tools advertised to the model. allowedToolIDs nil means all enabled
-// custom tools (trusted agent-facing callers); non-nil restricts to that set (the autonomous assistant's
-// granted tools). includeBuiltinSearch adds the global knowledge search tool.
+// buildToolRegistry assembles the tools advertised to the model: allowedToolIDs nil means all enabled custom tools, non-nil restricts to that set.
 func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, includeBuiltinSearch bool) (map[string]Tool, []models.ToolDef, error) {
 	registry := map[string]Tool{}
 	var defs []models.ToolDef

@@ -2,6 +2,7 @@ package aiagent
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	imageutil "github.com/abhinavxd/libredesk/internal/image"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 )
 
@@ -117,6 +119,9 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	assistant, err := m.GetAssistantByUserID(int(conv.AssignedUserID.Int))
 	if err != nil {
+		if err != sql.ErrNoRows {
+			m.lo.Error("error fetching assistant for ai agent", "conversation_id", convID, "user_id", conv.AssignedUserID.Int, "error", err)
+		}
 		return
 	}
 	m.lo.Debug("ai agent handling conversation", "conversation_id", convID, "conversation_uuid", conv.UUID, "assistant_id", assistant.ID, "assistant", assistant.Name, "status", conv.Status.String, "enabled", assistant.Enabled)
@@ -168,7 +173,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	tools := []ai.Tool{
 		&searchKnowledgeTool{m: m},
 		&handoffTool{m: m, conv: conv, assistant: assistant, outcome: outcome},
-		&resolveTool{m: m, conv: conv, assistant: assistant, outcome: outcome},
+		&resolveTool{m: m, conv: conv, outcome: outcome},
 	}
 	if recent := m.recentContactConversations(conv); len(recent) > 0 {
 		systemPrompt += fmt.Sprintf("\n\nThis customer has %d other conversation(s) from the last %d days. Call get_previous_conversations if the current issue might be a follow-up or related to them.", len(recent), recentConversationDays)
@@ -199,10 +204,24 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if answer != "" {
 		m.lo.Debug("ai agent replying", "conversation_uuid", conv.UUID, "reply_len", len(answer), "resolved", outcome.resolved)
 		m.postReply(conv, assistant, answer)
-	} else if !outcome.resolved {
+	}
+	if outcome.resolved {
+		m.resolve(conv, assistant)
+		return
+	}
+	if answer == "" {
 		m.lo.Debug("ai agent no answer, handing off", "conversation_uuid", conv.UUID)
 		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffNoAnswer"))
 	}
+}
+
+// resolve runs after the reply is queued so the CSAT survey sent on resolve follows the answer.
+func (m *Manager) resolve(conv cmodels.Conversation, assistant models.Assistant) {
+	if err := m.convo.UpdateConversationStatus(conv.UUID, 0, cmodels.StatusResolved, "", m.actorUser(assistant)); err != nil {
+		m.lo.Error("error resolving conversation", "conversation_uuid", conv.UUID, "error", err)
+		return
+	}
+	m.recordEvent(assistant.ID, conv.ID, "resolve")
 }
 
 func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistant, text string) {
@@ -210,7 +229,7 @@ func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistan
 	if conv.InboxChannel == channelEmail && conv.Contact.Email.String != "" {
 		to = []string{conv.Contact.Email.String}
 	}
-	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, textToHTML(text), to, nil, nil, map[string]interface{}{}); err != nil {
+	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(text), to, nil, nil, map[string]interface{}{}); err != nil {
 		m.lo.Error("error sending assistant reply", "conversation_uuid", conv.UUID, "error", err)
 	}
 }
@@ -227,10 +246,14 @@ func (m *Manager) handoff(conv cmodels.Conversation, assistant models.Assistant,
 		m.lo.Error("error posting handoff note", "conversation_uuid", conv.UUID, "error", err)
 	}
 	if assistant.FallbackTeamID.Valid {
-		if err := m.convo.UpdateConversationTeamAssignee(conv.UUID, int(assistant.FallbackTeamID.Int), actor); err != nil {
+		fallbackTeamID := int(assistant.FallbackTeamID.Int)
+		if err := m.convo.UpdateConversationTeamAssignee(conv.UUID, fallbackTeamID, actor); err != nil {
 			m.lo.Error("error assigning fallback team", "conversation_uuid", conv.UUID, "error", err)
 		}
-		return
+		// A same-team assignment keeps the assigned user, so the assistant must be removed explicitly.
+		if int(conv.AssignedTeamID.Int) != fallbackTeamID {
+			return
+		}
 	}
 	if err := m.convo.RemoveConversationAssignee(conv.UUID, cmodels.AssigneeTypeUser, actor); err != nil {
 		m.lo.Error("error unassigning assistant on handoff", "conversation_uuid", conv.UUID, "error", err)

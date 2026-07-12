@@ -185,7 +185,7 @@ const getSuggestions = async (query) => {
   const q = query.toLowerCase()
 
   const users = usersStore.users
-    .filter((u) => u.enabled)
+    .filter((u) => u.enabled && u.type !== 'ai_assistant')
     .filter((u) => `${u.first_name} ${u.last_name}`.toLowerCase().includes(q))
     .map((u) => ({
       id: u.id,

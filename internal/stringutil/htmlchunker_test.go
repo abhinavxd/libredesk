@@ -193,6 +193,17 @@ func TestChunkHTMLContent_EdgeCases(t *testing.T) {
 			config:         newTestConfig(50, 20, 10),
 			expectedChunks: 1, // Should truncate oversized content to fit max tokens
 		},
+		{
+			name:   "Oversized Wrapper Div Splits Into Children",
+			html:   "<div>" + strings.Repeat("<p>"+strings.Repeat("word ", 100)+"</p>", 10) + "</div>",
+			config: newTestConfig(150, 20, 10),
+			validate: func(t *testing.T, chunks []string) {
+				assert.Greater(t, len(chunks), 1, "Wrapper div content should be split, not truncated to one chunk")
+				full := strings.Join(chunks, " ")
+				assert.Greater(t, len(full), 4000, "Most of the wrapped content should survive chunking")
+			},
+			expectedChunks: -1, // Validated via validate func
+		},
 	}
 
 	for _, tc := range testCases {
@@ -203,7 +214,9 @@ func TestChunkHTMLContent_EdgeCases(t *testing.T) {
 				assert.Contains(t, err.Error(), tc.expectedError)
 			} else {
 				require.NoError(t, err)
-				assert.Len(t, chunks, tc.expectedChunks)
+				if tc.expectedChunks >= 0 {
+					assert.Len(t, chunks, tc.expectedChunks)
+				}
 				if tc.validate != nil {
 					tc.validate(t, chunks)
 				}

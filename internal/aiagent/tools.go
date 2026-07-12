@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html"
 	"slices"
 	"strings"
 
@@ -122,10 +121,9 @@ func (t *handoffTool) Execute(ctx context.Context, args string) (string, error) 
 }
 
 type resolveTool struct {
-	m         *Manager
-	conv      cmodels.Conversation
-	assistant models.Assistant
-	outcome   *runOutcome
+	m       *Manager
+	conv    cmodels.Conversation
+	outcome *runOutcome
 }
 
 func (t *resolveTool) Name() string { return "resolve" }
@@ -136,14 +134,10 @@ func (t *resolveTool) Description() string {
 
 func (t *resolveTool) Parameters() types.JSONText { return emptyParams }
 
+// Execute only records the intent; the status change (which sends the CSAT survey) is applied
+// after the assistant's reply is posted, so the survey never reaches the customer first.
 func (t *resolveTool) Execute(ctx context.Context, args string) (string, error) {
 	t.m.lo.Debug("ai agent resolve tool called", "conversation_uuid", t.conv.UUID)
-	actor := t.m.actorUser(t.assistant)
-	if err := t.m.convo.UpdateConversationStatus(t.conv.UUID, 0, cmodels.StatusResolved, "", actor); err != nil {
-		t.m.lo.Error("error resolving conversation", "conversation_uuid", t.conv.UUID, "error", err)
-		return "Failed to resolve the conversation.", nil
-	}
-	t.m.recordEvent(t.assistant.ID, t.conv.ID, "resolve")
 	t.outcome.resolved = true
 	return "Conversation marked as resolved.", nil
 }
@@ -189,9 +183,4 @@ func (t *previousConversationsTool) Execute(ctx context.Context, args string) (s
 		return "No previous conversations could be retrieved.", nil
 	}
 	return b.String(), nil
-}
-
-// textToHTML escapes plain text and converts newlines to <br> for the HTML reply body.
-func textToHTML(s string) string {
-	return strings.ReplaceAll(html.EscapeString(s), "\n", "<br>")
 }

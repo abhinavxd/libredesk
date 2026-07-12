@@ -203,10 +203,12 @@
                   <FormControl>
                     <SelectTag
                       :items="
-                        usersStore.options.concat({
-                          label: t('admin.sla.assignedUser'),
-                          value: 'assigned_user'
-                        })
+                        usersStore.options
+                          .filter((o) => o.type !== 'ai_assistant')
+                          .concat({
+                            label: t('admin.sla.assignedUser'),
+                            value: 'assigned_user'
+                          })
                       "
                       :placeholder="t('globals.messages.startTypingToSearch')"
                       v-model="componentField.modelValue"

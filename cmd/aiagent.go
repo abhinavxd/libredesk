@@ -42,11 +42,17 @@ func handleCreateAIAssistant(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if err := validateAvatarFile(r, files); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	assistant, err := app.aiAgent.CreateAssistant(req)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	if err := applyAssistantAvatar(r, assistant.UserID, files, req.RemoveAvatar); err != nil {
+		if delErr := app.aiAgent.DeleteAssistant(assistant.ID); delErr != nil {
+			app.lo.Error("error rolling back assistant after avatar failure", "assistant_id", assistant.ID, "error", delErr)
+		}
 		return sendErrorEnvelope(r, err)
 	}
 	assistant, err = app.aiAgent.GetAssistant(assistant.ID)
@@ -64,6 +70,9 @@ func handleUpdateAIAssistant(r *fastglue.Request) error {
 	}
 	req, files, err := decodeAssistantForm(r)
 	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := validateAvatarFile(r, files); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	assistant, err := app.aiAgent.UpdateAssistant(id, req)
