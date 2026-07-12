@@ -40,11 +40,11 @@ const submitForm = async (values) => {
       await api.updateAITool(props.id, values)
     } else {
       await api.createAITool(values)
+      router.push({ name: 'ai-tools' })
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })
-    router.push({ name: 'ai-tools' })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

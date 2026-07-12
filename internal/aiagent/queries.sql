@@ -74,7 +74,7 @@ INSERT INTO ai_agent_events (assistant_id, conversation_id, type) VALUES ($1, $2
 -- $1 = assistant user id (message sender), $2 = assistant id (events), $3 = window start, $4 = window end.
 SELECT
   (SELECT count(DISTINCT conversation_id) FROM conversation_messages WHERE sender_id = $1 AND type = 'outgoing' AND private = false AND created_at >= $3 AND created_at < $4 AND NOT COALESCE((meta->>'is_csat')::boolean, false)) AS conversations,
-  (SELECT count(*) FROM conversation_messages WHERE sender_id = $1 AND type = 'outgoing' AND private = false AND created_at >= $3 AND created_at < $4 AND NOT COALESCE((meta->>'is_csat')::boolean, false)) AS replies,
+  (SELECT count(*) FROM conversation_messages WHERE sender_id = $1 AND type = 'outgoing' AND private = false AND created_at >= $3 AND created_at < $4 AND NOT COALESCE((meta->>'is_csat')::boolean, false) AND NOT COALESCE((meta->>'is_confirmation')::boolean, false)) AS replies,
   (SELECT count(DISTINCT conversation_id) FROM ai_agent_events WHERE assistant_id = $2 AND type = 'handoff' AND created_at >= $3 AND created_at < $4) AS handoffs,
   (SELECT count(DISTINCT conversation_id) FROM ai_agent_events WHERE assistant_id = $2 AND type = 'resolve' AND created_at >= $3 AND created_at < $4) AS resolves,
   (SELECT count(DISTINCT e.conversation_id) FROM ai_agent_events e JOIN conversations c ON c.id = e.conversation_id JOIN conversation_statuses s ON s.id = c.status_id
@@ -91,6 +91,7 @@ SELECT
 SELECT count(*) FROM conversation_messages
 WHERE conversation_id = $1 AND sender_id = $2 AND type = 'outgoing' AND private = false
   AND NOT COALESCE((meta->>'is_csat')::boolean, false)
+  AND NOT COALESCE((meta->>'is_confirmation')::boolean, false)
   AND created_at > COALESCE((
     SELECT max(created_at) FROM conversation_messages
     WHERE conversation_id = $1 AND type = 'activity'

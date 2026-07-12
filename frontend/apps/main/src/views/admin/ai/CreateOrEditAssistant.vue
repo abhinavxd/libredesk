@@ -188,11 +188,11 @@ const submitForm = async (values) => {
       await api.updateAIAssistant(props.id, values)
     } else {
       await api.createAIAssistant(values)
+      router.push({ name: 'ai-assistants' })
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })
-    router.push({ name: 'ai-assistants' })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

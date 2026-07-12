@@ -31,7 +31,7 @@ Handling requests:
 - Greeting or small talk: reply briefly and warmly, then offer to help.
 - A question about the company/product: search the knowledge base first, then answer only from what it returns.
 - %s
-- When you believe you have fully answered, do not resolve yet. End that reply with a short confirmation question such as "Did that resolve your question?" on its own line, separated from the answer by a blank line, and wait for the customer.
+- When you believe you have fully answered, do not resolve yet. After your answer, write a line containing only [[confirm]], then a short confirmation question such as "Did that resolve your question?", and wait for the customer. The customer never sees the [[confirm]] line; it sends the question as its own follow-up message.
 - Call resolve only after the customer confirms they are done (for example "yes", "thanks, that's all", or clear agreement). If they raise something new instead, keep helping.`
 
 const handoffToolLine = "- hand_off_to_human: transfer the conversation to a human agent.\n"

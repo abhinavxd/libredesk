@@ -12,6 +12,8 @@ import (
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	imageutil "github.com/abhinavxd/libredesk/internal/image"
+	"time"
+
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 )
@@ -24,6 +26,13 @@ const (
 	maxImagesPerMessage = 3
 	maxImagesTotal      = 4
 	maxImageBytes       = 8 << 20
+
+	// confirmMarker is the line the model emits before its trailing confirmation question so it
+	// can be split off and sent as a separate message.
+	confirmMarker = "[[confirm]]"
+
+	// typingRefreshInterval must stay under the widget's 5s typing expiry (TYPING_RECEIVE_TIMEOUT).
+	typingRefreshInterval = 3 * time.Second
 )
 
 // terminalStatuses are conversation statuses the assistant does not act on.
@@ -188,9 +197,9 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if conv.Contact.Type == umodels.UserTypeContact {
 		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
 	}
-	m.convo.BroadcastTypingToWidgetClientsOnly(conv.UUID, true)
+	stopTyping := m.keepTyping(conv.UUID)
 	answer, err := m.ai.RunAgentWithTools(ctx, systemPrompt, history, aiRunMaxSteps, tctx, assistant.ToolIDs, false, tools)
-	m.convo.BroadcastTypingToWidgetClientsOnly(conv.UUID, false)
+	stopTyping()
 	if err != nil {
 		m.lo.Error("error running ai agent", "conversation_uuid", conv.UUID, "error", err)
 		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
@@ -202,10 +211,17 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		return
 	}
 	// The model's text answer is the reply to the customer. Handoff and resolve are separate tool actions.
-	answer = strings.TrimSpace(answer)
+	answer, confirm := splitConfirmation(strings.TrimSpace(answer))
+	// Email gets one message; separate chat-style bubbles only suit the widget.
+	if conv.InboxChannel == channelEmail && confirm != "" {
+		answer, confirm = answer+"\n\n"+confirm, ""
+	}
 	if answer != "" {
 		m.lo.Debug("ai agent replying", "conversation_uuid", conv.UUID, "reply_len", len(answer), "resolved", outcome.resolved)
-		m.postReply(conv, assistant, answer)
+		m.postReply(conv, assistant, answer, nil)
+	}
+	if confirm != "" {
+		m.postReply(conv, assistant, confirm, map[string]any{"is_confirmation": true})
 	}
 	if outcome.resolved {
 		m.resolve(conv, assistant)
@@ -226,12 +242,37 @@ func (m *Manager) resolve(conv cmodels.Conversation, assistant models.Assistant)
 	m.recordEvent(assistant.ID, conv.ID, "resolve")
 }
 
-func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistant, text string) {
+// keepTyping re-broadcasts typing until the returned stop func runs; the widget clears the indicator 5s after the last event.
+func (m *Manager) keepTyping(conversationUUID string) func() {
+	m.convo.BroadcastTypingToWidgetClientsOnly(conversationUUID, true)
+	stop := make(chan struct{})
+	go func() {
+		t := time.NewTicker(typingRefreshInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+				m.convo.BroadcastTypingToWidgetClientsOnly(conversationUUID, true)
+			}
+		}
+	}()
+	return func() {
+		close(stop)
+		m.convo.BroadcastTypingToWidgetClientsOnly(conversationUUID, false)
+	}
+}
+
+func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistant, text string, meta map[string]any) {
 	var to []string
 	if conv.InboxChannel == channelEmail && conv.Contact.Email.String != "" {
 		to = []string{conv.Contact.Email.String}
 	}
-	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(text), to, nil, nil, map[string]interface{}{}); err != nil {
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(text), to, nil, nil, meta); err != nil {
 		m.lo.Error("error sending assistant reply", "conversation_uuid", conv.UUID, "error", err)
 	}
 }
@@ -280,7 +321,15 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 	history := []aimodels.ChatMessage{{Role: "user", Content: message}}
 	tools := []ai.Tool{&searchKnowledgeTool{m: m}}
 	// Preview is search-only: no custom tools (empty allowed set), no built-in, no side effects.
-	return m.ai.RunAgentWithTools(ctx, buildSystemPrompt(a), history, aiRunMaxSteps, ai.ToolContext{}, []int{}, false, tools)
+	answer, err := m.ai.RunAgentWithTools(ctx, buildSystemPrompt(a), history, aiRunMaxSteps, ai.ToolContext{}, []int{}, false, tools)
+	if err != nil {
+		return "", err
+	}
+	main, confirm := splitConfirmation(strings.TrimSpace(answer))
+	if confirm != "" {
+		main += "\n\n" + confirm
+	}
+	return main, nil
 }
 
 func lastIsInboundContact(msgs []cmodels.Message) bool {
@@ -382,4 +431,17 @@ func unreadableFileMarker(att attachment.Attachment) string {
 
 func unreadableImageMarker(att attachment.Attachment) string {
 	return fmt.Sprintf("[The customer attached an image %q that you cannot view. Ask them to describe it if it matters.]", att.Name)
+}
+
+func splitConfirmation(answer string) (string, string) {
+	idx := strings.LastIndex(answer, confirmMarker)
+	if idx == -1 {
+		return answer, ""
+	}
+	main := strings.TrimSpace(strings.ReplaceAll(answer[:idx], confirmMarker, ""))
+	confirm := strings.TrimSpace(answer[idx+len(confirmMarker):])
+	if main == "" {
+		return confirm, ""
+	}
+	return main, confirm
 }
