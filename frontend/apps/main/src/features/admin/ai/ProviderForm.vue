@@ -126,7 +126,12 @@
           </template>
         </div>
 
-        <Button type="submit" :isLoading="formLoading">{{ t('globals.messages.save') }}</Button>
+        <div class="flex gap-2">
+          <Button type="submit" :isLoading="formLoading">{{ t('globals.messages.save') }}</Button>
+          <Button type="button" variant="secondary" :isLoading="testLoading" @click="onTest">
+            {{ t('admin.ai.testConnection') }}
+          </Button>
+        </div>
       </form>
     </CardContent>
   </Card>
@@ -180,12 +185,14 @@ const props = defineProps({
 const { t } = useI18n()
 const emitter = useEmitter()
 const formLoading = ref(false)
+const testLoading = ref(false)
 const hasApiKey = ref(false)
 const selectedPreset = ref('')
 
 // Sensible starting values shown when a provider has none saved yet.
+// Temperature stays blank: some models reject non-default values, so the provider default is the safe start.
 const fieldDefaults = {
-  temperature: props.showCompletionFields ? '0.3' : '',
+  temperature: '',
   maxTokens: props.showCompletionFields ? '1024' : '',
   dimensions: props.showEmbeddingFields ? '1536' : ''
 }
@@ -193,6 +200,12 @@ const fieldDefaults = {
 // OpenAI-compatible provider presets: pre-fill base URL + model (+ dims for embedding).
 const completionPresets = [
   { value: 'openai', label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  {
+    value: 'anthropic',
+    label: 'Anthropic (Claude)',
+    base_url: 'https://api.anthropic.com/v1',
+    model: 'claude-sonnet-4-6'
+  },
   {
     value: 'openrouter',
     label: 'OpenRouter',
@@ -331,7 +344,7 @@ onMounted(async () => {
   }
 })
 
-const onSubmit = form.handleSubmit(async (values) => {
+const buildPayload = (values) => {
   const payload = {
     model: values.model,
     base_url: values.base_url || ''
@@ -350,10 +363,32 @@ const onSubmit = form.handleSubmit(async (values) => {
     if (values.dimensions !== '' && values.dimensions != null)
       payload.dimensions = Number(values.dimensions)
   }
+  return payload
+}
 
+const onTest = async () => {
+  const { valid } = await form.validate()
+  if (!valid) return
+  try {
+    testLoading.value = true
+    await api.testAIConfig(props.type, buildPayload(form.values))
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('admin.ai.testSuccess')
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    testLoading.value = false
+  }
+}
+
+const onSubmit = form.handleSubmit(async (values) => {
   try {
     formLoading.value = true
-    await api.updateAIConfig(props.type, payload)
+    await api.updateAIConfig(props.type, buildPayload(values))
     hasApiKey.value = hasApiKey.value || !!values.api_key
     form.setFieldValue('api_key', hasApiKey.value ? '•'.repeat(10) : '')
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

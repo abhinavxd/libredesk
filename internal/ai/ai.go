@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -19,6 +20,9 @@ import (
 	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
+
+// Provider error bodies shown to admins on a connection test are capped at this length.
+const maxTestErrorLen = 500
 
 var (
 	//go:embed queries.sql
@@ -246,6 +250,41 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 	return nil
 }
 
+// TestProviderConfig makes one live provider request with the given config; a blank or masked api_key uses the stored key.
+func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConfig) error {
+	if providerType != models.ProviderTypeCompletion && providerType != models.ProviderTypeEmbedding {
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	cfg := in
+	cfg.Provider = "openai"
+	if cfg.APIKey == "" || strings.Contains(cfg.APIKey, stringutil.PasswordDummy) {
+		stored, err := m.getProviderConfig(providerType)
+		if err != nil {
+			return err
+		}
+		cfg.APIKey = stored.APIKey
+	}
+	client := NewOpenAIClient(cfg, m.lo)
+
+	if providerType == models.ProviderTypeCompletion {
+		if _, err := client.SendPrompt(models.PromptPayload{SystemPrompt: "You are a connection test.", UserPrompt: "Reply with OK."}); err != nil {
+			return m.testProviderError(err)
+		}
+		return nil
+	}
+
+	vec, err := client.GetEmbeddings("connection test")
+	if err != nil {
+		return m.testProviderError(err)
+	}
+	if cfg.Dimensions > 0 && len(vec) != cfg.Dimensions {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("ai.testDimensionsMismatch",
+			"configured", strconv.Itoa(cfg.Dimensions), "returned", strconv.Itoa(len(vec))), nil)
+	}
+	return nil
+}
+
 // UpdateProvider sets the completion provider API key.
 func (m *Manager) UpdateProvider(provider, apiKey string) error {
 	if provider != "openai" {
@@ -326,4 +365,16 @@ func (m *Manager) providerError(err error) error {
 	}
 	m.lo.Error("error from AI provider", "error", err)
 	return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+}
+
+// testProviderError surfaces the provider's own error message so the admin can act on it.
+func (m *Manager) testProviderError(err error) error {
+	if errors.Is(err, ErrApiKeyNotSet) {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("ai.apiKeyNotSet", "provider", "OpenAI"), nil)
+	}
+	msg := err.Error()
+	if len(msg) > maxTestErrorLen {
+		msg = msg[:maxTestErrorLen] + "…"
+	}
+	return envelope.NewError(envelope.InputError, msg, nil)
 }

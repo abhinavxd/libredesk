@@ -110,6 +110,22 @@ func handleUpdateAIConfig(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
+// handleTestAIConfig makes one live provider request with the submitted config.
+func handleTestAIConfig(r *fastglue.Request) error {
+	var (
+		app          = r.Context.(*App)
+		providerType = r.RequestCtx.UserValue("type").(string)
+		req          aimodels.ProviderConfig
+	)
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	if err := app.ai.TestProviderConfig(providerType, req); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
 // handleGetAITools returns all custom tools (auth secrets masked).
 func handleGetAITools(r *fastglue.Request) error {
 	app := r.Context.(*App)

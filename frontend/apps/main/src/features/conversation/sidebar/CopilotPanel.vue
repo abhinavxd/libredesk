@@ -9,22 +9,25 @@
     <div ref="scrollRef" class="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
       <div
         v-if="messages.length === 0"
-        class="h-full flex flex-col items-center justify-center gap-3 text-center px-4"
+        class="h-full flex flex-col items-center justify-center gap-4 text-center px-4"
       >
         <div class="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
           <Bot class="h-6 w-6 text-primary" />
         </div>
-        <p class="text-sm text-muted-foreground">
-          {{ $t('copilot.emptyState', { name: appSettingsStore.copilotName }) }}
-        </p>
-        <div class="flex flex-col gap-2 w-full max-w-[85%]">
+        <div class="space-y-1">
+          <p class="text-sm font-medium text-foreground">{{ appSettingsStore.copilotName }}</p>
+          <p class="text-xs text-muted-foreground">
+            {{ $t('copilot.emptyState', { name: appSettingsStore.copilotName }) }}
+          </p>
+        </div>
+        <div class="flex flex-col gap-1.5 w-full max-w-[85%]">
           <Button
             v-for="preset in presets"
             :key="preset"
             type="button"
             variant="outline"
             size="sm"
-            class="w-full whitespace-normal h-auto py-1.5"
+            class="w-full justify-start whitespace-normal h-auto py-1.5 font-normal text-muted-foreground"
             @click="send(preset)"
           >
             {{ preset }}
@@ -34,36 +37,51 @@
       <div
         v-for="(msg, i) in messages"
         :key="i"
-        class="flex"
+        class="flex gap-2"
         :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
       >
         <div
+          v-if="msg.role !== 'user'"
+          class="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-primary/10 flex items-center justify-center"
+        >
+          <Bot class="h-3.5 w-3.5 text-primary" />
+        </div>
+        <div
           class="rounded-lg px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words"
           :class="
-            msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+            msg.role === 'user'
+              ? 'bg-primary text-primary-foreground rounded-br-sm'
+              : 'bg-muted text-foreground rounded-bl-sm'
           "
         >
           {{ msg.content }}
         </div>
       </div>
-      <div v-if="isThinking" class="flex justify-start">
-        <div class="rounded-lg px-3 py-2 text-sm bg-muted text-muted-foreground">
-          {{ $t('copilot.thinking') }}
+      <div v-if="isThinking" class="flex gap-2 justify-start">
+        <div
+          class="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-primary/10 flex items-center justify-center"
+        >
+          <Bot class="h-3.5 w-3.5 text-primary" />
+        </div>
+        <div class="rounded-lg rounded-bl-sm px-3 py-2 bg-muted text-muted-foreground">
+          <DotLoader />
+          <span class="sr-only">{{ $t('copilot.thinking') }}</span>
         </div>
       </div>
     </div>
 
-    <form class="border-t border-border p-3 flex gap-2 items-end" @submit.prevent="send">
-      <Textarea
-        v-model="input"
-        :placeholder="$t('copilot.placeholder')"
-        rows="2"
-        class="resize-none"
-        @keydown.enter.exact.prevent="send"
-      />
-      <Button type="submit" size="icon" :disabled="isThinking || !input.trim()">
-        <SendHorizontal class="h-4 w-4" />
-      </Button>
+    <form class="border-t border-border p-3" @submit.prevent="send">
+      <div
+        class="rounded-lg border border-input bg-background shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring"
+      >
+        <Textarea
+          v-model="input"
+          :placeholder="$t('copilot.placeholder')"
+          rows="2"
+          class="min-h-[44px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+          @keydown.enter.exact.prevent="send"
+        />
+      </div>
     </form>
   </div>
 </template>
@@ -72,7 +90,8 @@
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Textarea } from '@shared-ui/components/ui/textarea'
-import { SendHorizontal, Eraser, Bot } from 'lucide-vue-next'
+import { DotLoader } from '@shared-ui/components/ui/loader'
+import { Eraser, Bot } from 'lucide-vue-next'
 import { useConversationStore } from '@/stores/conversation'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import { useEmitter } from '@/composables/useEmitter'

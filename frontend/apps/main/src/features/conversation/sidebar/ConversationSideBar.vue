@@ -1,11 +1,11 @@
 <template>
   <Tabs v-model="activeTab" class="flex flex-col h-full">
-    <TabsList class="grid grid-cols-2 mx-4 mt-3">
-      <TabsTrigger value="details">{{ $t('copilot.details') }}</TabsTrigger>
-      <TabsTrigger value="copilot">{{ appSettingsStore.copilotName }}</TabsTrigger>
+    <TabsList class="grid grid-cols-2 mx-4 mt-3 h-8 p-0">
+      <TabsTrigger value="details" class="text-xs">{{ $t('copilot.details') }}</TabsTrigger>
+      <TabsTrigger value="copilot" class="text-xs">{{ appSettingsStore.copilotName }}</TabsTrigger>
     </TabsList>
 
-    <TabsContent value="details" class="mt-0">
+    <TabsContent value="details" class="mt-0 motion-safe:animate-slide-in">
       <ConversationSideBarContact class="p-4" />
       <Accordion type="multiple" collapsible v-model="accordionState">
         <AccordionItem value="actions" class="accordion-item">
@@ -126,7 +126,7 @@
       </Accordion>
     </TabsContent>
 
-    <TabsContent value="copilot" class="flex-1 min-h-0 mt-0">
+    <TabsContent value="copilot" class="flex-1 min-h-0 mt-0 motion-safe:animate-slide-in">
       <CopilotPanel />
     </TabsContent>
   </Tabs>

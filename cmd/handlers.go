@@ -247,6 +247,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// AI provider config (completion / embedding).
 	g.GET("/api/v1/ai/config/{type}", perm(handleGetAIConfig, "ai:manage"))
 	g.PUT("/api/v1/ai/config/{type}", perm(handleUpdateAIConfig, "ai:manage"))
+	g.POST("/api/v1/ai/config/{type}/test", perm(handleTestAIConfig, "ai:manage"))
 
 	// AI custom tools.
 	g.GET("/api/v1/ai/tools", perm(handleGetAITools, "ai:manage"))

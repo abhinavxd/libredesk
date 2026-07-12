@@ -459,6 +459,7 @@ const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
 const updateAIProvider = (data) => http.put('/api/v1/ai/provider', data)
 const getAIConfig = (type) => http.get(`/api/v1/ai/config/${type}`)
 const updateAIConfig = (type, data) => http.put(`/api/v1/ai/config/${type}`, data)
+const testAIConfig = (type, data) => http.post(`/api/v1/ai/config/${type}/test`, data)
 const getAITools = () => http.get('/api/v1/ai/tools')
 const getAITool = (id) => http.get(`/api/v1/ai/tools/${id}`)
 const createAITool = (data) => http.post('/api/v1/ai/tools', data)
@@ -694,6 +695,7 @@ export default {
   aiCompletion,
   getAIConfig,
   updateAIConfig,
+  testAIConfig,
   getAITools,
   getAITool,
   createAITool,

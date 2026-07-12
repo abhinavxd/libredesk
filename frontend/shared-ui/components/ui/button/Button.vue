@@ -18,20 +18,14 @@ const props = defineProps({
   <Primitive
     :as="as"
     :as-child="asChild"
-    :class="
-      cn(
-        buttonVariants({ variant, size }),
-        'relative',
-        { 'text-transparent': isLoading },
-        props.class
-      )
-    "
+    :class="cn(buttonVariants({ variant, size }), 'relative', props.class)"
     :disabled="isLoading || disabled"
   >
-    <slot />
+    <!-- display:contents keeps the button's flex/gap layout; the spinner inherits the variant's text color. -->
+    <span class="contents" :class="{ invisible: isLoading }"><slot /></span>
     <span
       v-if="isLoading"
-      class="absolute inset-0 flex items-center justify-center pointer-events-none text-background"
+      class="absolute inset-0 flex items-center justify-center pointer-events-none"
     >
       <Loader2 class="h-5 w-5 animate-spin" />
     </span>

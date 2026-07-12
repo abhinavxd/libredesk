@@ -23,6 +23,10 @@ const (
 	maxRequestRetries = 3
 	retryBaseBackoff  = 500 * time.Millisecond
 	retryMaxBackoff   = 5 * time.Second
+
+	// Reasoning models reject max_tokens and non-default temperature with structured 400s;
+	// those requests are adjusted and retried instead of surfacing the error.
+	maxParamAdaptations = 2
 )
 
 // OpenAIClient talks to any OpenAI-compatible API (base URL selects the host).
@@ -84,19 +88,10 @@ func (o *OpenAIClient) SendChatCompletion(payload models.ChatCompletionPayload) 
 	o.lo.Debug("chat completion request", "model", model, "messages", len(messages), "images", sentImages, "vision", o.cfg.Vision, "tools", len(payload.Tools))
 
 	body := map[string]any{
-		"model":    model,
-		"messages": messages,
+		"model":      model,
+		"messages":   messages,
+		"max_tokens": maxTokens,
 	}
-	// Reasoning models require max_completion_tokens and reject the older max_tokens; other models
-	// (including most OpenAI-compatible third-party servers) only understand max_tokens.
-	if o.cfg.ReasoningEffort != "" {
-		body["max_completion_tokens"] = maxTokens
-	} else {
-		body["max_tokens"] = maxTokens
-	}
-	// Only send optional params the admin set. Reasoning models (e.g. GPT-5.x) reject a non-default
-	// temperature and require reasoning_effort "none" to use tools on /chat/completions; leave
-	// temperature blank and set reasoning_effort accordingly for those.
 	if o.cfg.Temperature != nil {
 		body["temperature"] = *o.cfg.Temperature
 	}
@@ -218,12 +213,27 @@ func (o *OpenAIClient) post(path string, body map[string]any) ([]byte, error) {
 		return nil, fmt.Errorf("marshalling request body: %w", err)
 	}
 
+	adaptations := 0
 	for attempt := 0; ; attempt++ {
 		respBytes, retryAfter, retryable, err := o.doRequest(path, bodyBytes)
 		if err == nil {
 			return respBytes, nil
 		}
-		if !retryable || attempt >= maxRequestRetries {
+		if !retryable {
+			if adaptations < maxParamAdaptations {
+				if param, ok := adaptUnsupportedParam(body, respBytes); ok {
+					adaptations++
+					bodyBytes, err = json.Marshal(body)
+					if err != nil {
+						return nil, fmt.Errorf("marshalling request body: %w", err)
+					}
+					o.lo.Warn("AI provider rejected a request parameter, retrying without it; clear the field in the provider settings to avoid the extra round trip", "param", param)
+					continue
+				}
+			}
+			return nil, err
+		}
+		if attempt >= maxRequestRetries {
 			return nil, err
 		}
 		delay := retryAfter
@@ -266,7 +276,7 @@ func (o *OpenAIClient) doRequest(path string, bodyBytes []byte) ([]byte, time.Du
 		return nil, 0, true, fmt.Errorf("provider API error: status %d: %s", resp.StatusCode, string(respBytes))
 	default:
 		o.lo.Error("non-ok response from AI provider", "status", resp.StatusCode, "response", string(respBytes))
-		return nil, 0, false, fmt.Errorf("provider API error: status %d: %s", resp.StatusCode, string(respBytes))
+		return respBytes, 0, false, fmt.Errorf("provider API error: status %d: %s", resp.StatusCode, string(respBytes))
 	}
 }
 
@@ -276,6 +286,39 @@ func backoffDelay(attempt int) time.Duration {
 		d = retryMaxBackoff
 	}
 	return d
+}
+
+// adaptUnsupportedParam adjusts body in place when the provider rejected a tuning parameter, reporting which one.
+func adaptUnsupportedParam(body map[string]any, resp []byte) (string, bool) {
+	var parsed struct {
+		Error struct {
+			Code  string `json:"code"`
+			Param string `json:"param"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(resp, &parsed); err != nil {
+		return "", false
+	}
+	if parsed.Error.Code != "unsupported_parameter" && parsed.Error.Code != "unsupported_value" {
+		return "", false
+	}
+	switch parsed.Error.Param {
+	case "max_tokens":
+		v, ok := body["max_tokens"]
+		if !ok {
+			return "", false
+		}
+		delete(body, "max_tokens")
+		body["max_completion_tokens"] = v
+		return "max_tokens", true
+	case "temperature", "reasoning_effort":
+		if _, ok := body[parsed.Error.Param]; !ok {
+			return "", false
+		}
+		delete(body, parsed.Error.Param)
+		return parsed.Error.Param, true
+	}
+	return "", false
 }
 
 // parseRetryAfter reads the delta-seconds form of Retry-After, capped so a request path never stalls long.
