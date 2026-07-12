@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/zerodha/logf"
 )
 
@@ -36,15 +38,25 @@ type OpenAIClient struct {
 	client *http.Client
 }
 
-func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger) *OpenAIClient {
+func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger, dialControl ssrf.Control) *OpenAIClient {
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = defaultOpenAIBaseURL
 	}
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
 	return &OpenAIClient{
-		cfg:    cfg,
-		lo:     lo,
-		client: &http.Client{Timeout: 60 * time.Second},
+		cfg: cfg,
+		lo:  lo,
+		client: &http.Client{
+			Timeout: 60 * time.Second,
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   5 * time.Second,
+					KeepAlive: 30 * time.Second,
+					Control:   dialControl,
+				}).DialContext,
+				ForceAttemptHTTP2: true,
+			},
+		},
 	}
 }
 
