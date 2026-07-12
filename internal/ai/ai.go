@@ -8,14 +8,18 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
@@ -45,6 +49,8 @@ type Manager struct {
 	reconcileMu   sync.Mutex
 	snippetGenMu  sync.Mutex
 	snippetGen    map[int]uint64
+	dialControl   ssrf.Control
+	toolClient    *http.Client
 }
 
 // Opts contains options for initializing the Manager.
@@ -53,6 +59,7 @@ type Opts struct {
 	I18n          *i18n.I18n
 	Lo            *logf.Logger
 	EncryptionKey string
+	DialControl   ssrf.Control
 }
 
 // ProviderConfigView is the sanitized provider config returned to admins, with the API key dummy-masked.
@@ -103,6 +110,18 @@ func New(opts Opts) (*Manager, error) {
 		chunkCfg:      stringutil.DefaultChunkConfig(),
 		index:         newEmbeddingIndex(),
 		snippetGen:    make(map[int]uint64),
+		dialControl:   opts.DialControl,
+		toolClient: &http.Client{
+			Timeout: 20 * time.Second,
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   5 * time.Second,
+					KeepAlive: 30 * time.Second,
+					Control:   opts.DialControl,
+				}).DialContext,
+				ForceAttemptHTTP2: true,
+			},
+		},
 	}
 	m.chunkCfg.Logger = opts.Lo
 	m.chunkCfg.TokenizerFunc = newTokenCounter(opts.Lo)
@@ -271,7 +290,7 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 		}
 		cfg.APIKey = stored.APIKey
 	}
-	client := NewOpenAIClient(cfg, m.lo)
+	client := NewOpenAIClient(cfg, m.lo, m.dialControl)
 
 	if providerType == models.ProviderTypeCompletion {
 		if _, err := client.SendPrompt(context.Background(), models.PromptPayload{SystemPrompt: "You are a connection test.", UserPrompt: "Reply with OK."}); err != nil {
@@ -358,7 +377,7 @@ func (m *Manager) getProviderClient(providerType string) (ProviderClient, error)
 	if err != nil {
 		return nil, err
 	}
-	return NewOpenAIClient(cfg, m.lo), nil
+	return NewOpenAIClient(cfg, m.lo, m.dialControl), nil
 }
 
 func (m *Manager) providerError(err error) error {

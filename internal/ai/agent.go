@@ -28,7 +28,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 	if err != nil {
 		return "", err
 	}
-	client := NewOpenAIClient(cfg, m.lo)
+	client := NewOpenAIClient(cfg, m.lo, m.dialControl)
 	if instructions := strings.TrimSpace(cfg.Instructions); allowedToolIDs == nil && instructions != "" && systemPrompt != "" {
 		systemPrompt += "\n\nWorkspace admin instructions (follow these, they take precedence on tone and format):\n" + instructions
 	}

@@ -46,6 +46,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/sla"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
@@ -787,8 +788,23 @@ func initAuthz(i18n *i18n.I18n) *authz.Enforcer {
 	return enforcer
 }
 
+// initSSRFControl builds the shared outbound-request guard from config, still honoring the deprecated `webhook.allowed_hosts` key.
+func initSSRFControl() ssrf.Control {
+	lo := initLogger("ssrf")
+	enabled := ko.Bool("ssrf.enabled")
+	cidrs := ko.Strings("ssrf.allowed_cidrs")
+
+	if legacy := ko.Strings("webhook.allowed_hosts"); len(legacy) > 0 {
+		lo.Warn("`webhook.allowed_hosts` is deprecated; use the [ssrf] config block instead")
+		enabled = true
+		cidrs = append(cidrs, legacy...)
+	}
+
+	return ssrf.NewControl(enabled, cidrs, lo)
+}
+
 // initAuth initializes the authentication manager.
-func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n) *auth_.Auth {
+func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n, dialControl ssrf.Control) *auth_.Auth {
 	lo := initLogger("auth")
 
 	providers, err := buildProviders(o)
@@ -798,7 +814,7 @@ func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n) *auth_.Auth {
 
 	secure := !ko.Bool("app.server.disable_secure_cookies")
 	sessionLifetime := ko.Duration("app.server.session_lifetime")
-	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure, SessionLifetime: sessionLifetime}, i18n, rd, lo)
+	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure, SessionLifetime: sessionLifetime}, i18n, rd, lo, dialControl)
 	if err != nil {
 		log.Fatalf("error initializing auth: %v", err)
 	}
@@ -960,13 +976,14 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(db *sqlx.DB, i18n *i18n.I18n) *ai.Manager {
+func initAI(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
 		DB:            db,
 		Lo:            lo,
 		I18n:          i18n,
 		EncryptionKey: ko.MustString("app.encryption_key"),
+		DialControl:   dialControl,
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)
@@ -1060,7 +1077,7 @@ func initContextLink(db *sqlx.DB, i18n *i18n.I18n) *contextlink.Manager {
 }
 
 // initWebhook inits webhook manager.
-func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
+func initWebhook(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *webhook.Manager {
 	var lo = initLogger("webhook")
 	m, err := webhook.New(webhook.Opts{
 		DB:            db,
@@ -1070,7 +1087,7 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 		QueueSize:     ko.MustInt("webhook.queue_size"),
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
-		AllowedHosts:  ko.Strings("webhook.allowed_hosts"),
+		DialControl:   dialControl,
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)

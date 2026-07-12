@@ -133,8 +133,17 @@ workers = 5
 queue_size = 10000
 # HTTP timeout for webhook requests
 timeout = "15s"
-# CIDR ranges allowed to bypass SSRF protection (e.g. ["10.0.0.0/8"])
-allowed_hosts = []
+
+# SSRF guard for admin-configured outbound URLs (webhooks, OIDC discovery, AI provider and tool calls).
+[ssrf]
+# Block outbound requests to private/loopback/link-local/cloud-metadata IPs.
+# Leave false for self-hosted single-tenant deployments, where internal webhooks,
+# OIDC providers and model endpoints on private IPs are legitimate.
+# Set true for multi-tenant/hosted deployments where those URLs come from untrusted tenants.
+enabled = false
+# CIDR ranges allowed to bypass the guard when enabled, for reaching known internal hosts.
+# Examples: ["10.0.0.0/8", "192.168.1.10/32", "172.16.0.0/12", "fd00::/8"]
+allowed_cidrs = []
 
 [conversation]
 # How often to check for conversations to unsnooze

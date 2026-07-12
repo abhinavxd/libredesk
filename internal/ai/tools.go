@@ -9,7 +9,6 @@ import (
 	"net/http"
 	neturl "net/url"
 	"strings"
-	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/crypto"
@@ -37,8 +36,6 @@ var (
 
 	// allowedToolMethods are the HTTP methods a custom tool may use: GET reads, POST writes.
 	allowedToolMethods = map[string]bool{http.MethodGet: true, http.MethodPost: true}
-
-	toolHTTPClient = &http.Client{Timeout: 20 * time.Second}
 
 	searchArticlesParams = types.JSONText(`{
 		"type": "object",
@@ -126,12 +123,12 @@ type httpTool struct {
 	tctx          ToolContext
 }
 
-func newHTTPTool(t models.Tool, encryptionKey string, lo *logf.Logger, tctx ToolContext) *httpTool {
+func newHTTPTool(t models.Tool, encryptionKey string, lo *logf.Logger, client *http.Client, tctx ToolContext) *httpTool {
 	return &httpTool{
 		tool:          t,
 		encryptionKey: encryptionKey,
 		lo:            lo,
-		client:        toolHTTPClient,
+		client:        client,
 		tctx:          tctx,
 	}
 }
@@ -250,7 +247,7 @@ func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, incl
 			m.lo.Warn("skipping custom tool that collides with a built-in tool", "name", ct.Name)
 			continue
 		}
-		ht := newHTTPTool(ct, m.encryptionKey, m.lo, tctx)
+		ht := newHTTPTool(ct, m.encryptionKey, m.lo, m.toolClient, tctx)
 		registry[ht.Name()] = ht
 		defs = append(defs, toolDef(ht))
 	}
