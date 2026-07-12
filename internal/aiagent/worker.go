@@ -172,8 +172,10 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	outcome := &runOutcome{}
 	tools := []ai.Tool{
 		&searchKnowledgeTool{m: m},
-		&handoffTool{m: m, conv: conv, assistant: assistant, outcome: outcome},
 		&resolveTool{m: m, conv: conv, outcome: outcome},
+	}
+	if assistant.HandoffEnabled {
+		tools = append(tools, &handoffTool{m: m, conv: conv, assistant: assistant, outcome: outcome})
 	}
 	if recent := m.recentContactConversations(conv); len(recent) > 0 {
 		systemPrompt += fmt.Sprintf("\n\nThis customer has %d other conversation(s) from the last %d days. Call get_previous_conversations if the current issue might be a follow-up or related to them.", len(recent), recentConversationDays)

@@ -108,6 +108,17 @@
       </FormField>
     </div>
 
+    <FormField v-slot="{ componentField, handleChange }" name="handoff_enabled">
+      <FormItem>
+        <SwitchField
+          :title="t('admin.ai.assistant.offerHandoff')"
+          :description="t('admin.ai.assistant.offerHandoffHint')"
+          :checked="componentField.modelValue"
+          @update:checked="handleChange"
+        />
+      </FormItem>
+    </FormField>
+
     <FormField v-slot="{ componentField }" name="fallback_team_id">
       <FormItem>
         <FormLabel>{{ t('admin.ai.assistant.fallbackTeam') }}</FormLabel>
@@ -264,6 +275,7 @@ const form = useForm({
         .min(1, { message: t('admin.ai.assistant.maxTurnsHint') })
         .max(20, { message: t('admin.ai.assistant.maxTurnsHint') }),
       fallback_team_id: z.string().optional(),
+      handoff_enabled: z.boolean().optional(),
       instructions: z.string().optional(),
       guardrails: z.string().optional(),
       enabled: z.boolean().optional()
@@ -277,6 +289,7 @@ const form = useForm({
     response_length: 'balanced',
     max_turns: 6,
     fallback_team_id: 'none',
+    handoff_enabled: true,
     instructions: '',
     guardrails: '',
     enabled: true
@@ -302,6 +315,7 @@ watch(
       response_length: values.response_length || 'balanced',
       max_turns: values.max_turns ?? 6,
       fallback_team_id: values.fallback_team_id ? String(values.fallback_team_id) : 'none',
+      handoff_enabled: values.handoff_enabled ?? true,
       instructions: values.instructions || '',
       guardrails: values.guardrails || '',
       enabled: values.enabled ?? true
@@ -342,6 +356,7 @@ const onSubmit = form.handleSubmit(async (values) => {
         values.fallback_team_id && values.fallback_team_id !== 'none'
           ? Number(values.fallback_team_id)
           : null,
+      handoff_enabled: !!values.handoff_enabled,
       instructions: values.instructions || '',
       guardrails: values.guardrails || '',
       enabled: !!values.enabled,

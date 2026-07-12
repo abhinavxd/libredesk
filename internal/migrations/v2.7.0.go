@@ -119,12 +119,16 @@ func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			response_length TEXT NOT NULL DEFAULT 'balanced',
 			max_turns INTEGER NOT NULL DEFAULT 6,
 			fallback_team_id INTEGER NULL REFERENCES teams(id) ON DELETE SET NULL,
+			handoff_enabled BOOLEAN NOT NULL DEFAULT true,
 			enabled BOOLEAN NOT NULL DEFAULT true,
 			CONSTRAINT constraint_ai_assistants_on_tone CHECK (tone IN ('friendly', 'professional', 'neutral', 'casual')),
 			CONSTRAINT constraint_ai_assistants_on_response_length CHECK (response_length IN ('concise', 'balanced', 'detailed')),
 			CONSTRAINT constraint_ai_assistants_on_max_turns CHECK (max_turns > 0 AND max_turns <= 20)
 		);
 	`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE ai_assistants ADD COLUMN IF NOT EXISTS handoff_enabled BOOLEAN NOT NULL DEFAULT true;`); err != nil {
 		return err
 	}
 	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS index_ai_assistants_on_user_id ON ai_assistants(user_id);`); err != nil {

@@ -218,7 +218,8 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	return string(out), nil
 }
 
-// buildToolRegistry assembles the tools advertised to the model: allowedToolIDs nil means all enabled custom tools, non-nil restricts to that set.
+// buildToolRegistry assembles the tools advertised to the model: allowedToolIDs nil means built-in
+// tools only (agent-facing surfaces get no custom tools), non-nil restricts custom tools to that set.
 func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, includeBuiltinSearch bool) (map[string]Tool, []models.ToolDef, error) {
 	registry := map[string]Tool{}
 	var defs []models.ToolDef
@@ -229,19 +230,20 @@ func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, incl
 		defs = append(defs, toolDef(builtin))
 	}
 
+	if allowedToolIDs == nil {
+		return registry, defs, nil
+	}
+
 	customTools, err := m.GetEnabledTools()
 	if err != nil {
 		return nil, nil, err
 	}
-	var allowed map[int]bool
-	if allowedToolIDs != nil {
-		allowed = make(map[int]bool, len(allowedToolIDs))
-		for _, id := range allowedToolIDs {
-			allowed[id] = true
-		}
+	allowed := make(map[int]bool, len(allowedToolIDs))
+	for _, id := range allowedToolIDs {
+		allowed[id] = true
 	}
 	for _, ct := range customTools {
-		if allowed != nil && !allowed[ct.ID] {
+		if !allowed[ct.ID] {
 			continue
 		}
 		if _, exists := registry[ct.Name]; exists {

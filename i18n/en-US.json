@@ -172,6 +172,8 @@
   "admin.ai.assistant.maxTurnsHint": "Number of back-and-forth replies before the assistant hands off. Between 1 and 20.",
   "admin.ai.assistant.fallbackTeam": "Fallback team",
   "admin.ai.assistant.fallbackTeamHint": "Team the conversation is handed off to when the assistant cannot help.",
+  "admin.ai.assistant.offerHandoff": "Offer handoff to a human",
+  "admin.ai.assistant.offerHandoffHint": "When off, the assistant never offers to connect the customer with a human agent and tells them it cannot help with questions outside its knowledge.",
   "admin.ai.assistant.instructions": "Instructions",
   "admin.ai.assistant.instructionsHint": "Custom system prompt that guides how this assistant responds.",
   "admin.ai.assistant.guardrails": "Guardrails",

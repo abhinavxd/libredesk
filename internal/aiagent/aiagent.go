@@ -258,7 +258,7 @@ func (m *Manager) CreateAssistant(a models.Assistant) (models.Assistant, error) 
 	}
 
 	var id int
-	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation).Scan(&id); err != nil {
+	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled).Scan(&id); err != nil {
 		m.lo.Error("error creating assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -293,7 +293,7 @@ func (m *Manager) UpdateAssistant(id int, a models.Assistant) (models.Assistant,
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation); err != nil {
+	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled); err != nil {
 		m.lo.Error("error updating assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

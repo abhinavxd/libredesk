@@ -9,7 +9,6 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -246,20 +245,13 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
 	transcript := ""
-	var tctx ai.ToolContext
 	if req.ConversationUUID != "" {
-		conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
-		if err != nil {
+		if _, err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
 			return sendErrorEnvelope(r, err)
-		}
-		// Only a verified contact has a trustworthy identity; a visitor's email/external ID is
-		// self-claimed, so never hand it to tools - that would let them impersonate anyone.
-		if conv.Contact.Type == umodels.UserTypeContact {
-			tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
 		}
 		transcript = conversationTranscript(app, req.ConversationUUID)
 	}
-	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, tctx)
+	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, ai.ToolContext{})
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -281,21 +273,15 @@ func handleAICopilot(r *fastglue.Request) error {
 
 	convoContext := ""
 	var conv *cmodels.Conversation
-	var tctx ai.ToolContext
 	if req.ConversationUUID != "" {
 		c, err := enforceAIConversationAccess(r, req.ConversationUUID)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 		conv = c
-		// Only a verified contact has a trustworthy identity; a visitor's email/external ID is
-		// self-claimed, so never hand it to tools - that would let them impersonate anyone.
-		if conv.Contact.Type == umodels.UserTypeContact {
-			tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
-		}
 		convoContext = conversationTranscript(app, req.ConversationUUID)
 	}
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, tctx)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, ai.ToolContext{})
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
