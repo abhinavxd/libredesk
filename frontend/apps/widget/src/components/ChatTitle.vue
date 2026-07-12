@@ -56,6 +56,11 @@ const { t } = useI18n()
 const businessHoursStatus = computed(() => {
   const config = widgetStore.config
 
+  // While the AI assistant is handling the chat, its own expectation is shown instead.
+  if (chatStore.currentConversation?.assignee?.expectation) {
+    return null
+  }
+
   // Show business hrs?
   if (!config.show_office_hours_in_chat) {
     return null

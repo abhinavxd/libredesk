@@ -306,18 +306,23 @@ onMounted(async () => {
     const resp = await api.getAIConfig(props.type)
     const data = resp.data.data || {}
     hasApiKey.value = !!data.has_api_key
-    form.setValues({
-      model: data.model || '',
-      base_url: data.base_url || '',
-      api_key: data.api_key || '',
-      instructions: data.instructions || '',
-      reasoning_effort: data.reasoning_effort || '',
-      // Fall back to sensible defaults when the provider has nothing saved (0/absent).
-      temperature: data.temperature != null ? String(data.temperature) : fieldDefaults.temperature,
-      max_tokens: data.max_tokens ? String(data.max_tokens) : fieldDefaults.maxTokens,
-      dimensions: data.dimensions ? String(data.dimensions) : fieldDefaults.dimensions,
-      vision: !!data.vision
-    })
+    // Pass false so loading an unconfigured provider doesn't flash a "Required" error before the admin has typed anything.
+    form.setValues(
+      {
+        model: data.model || '',
+        base_url: data.base_url || '',
+        api_key: data.api_key || '',
+        instructions: data.instructions || '',
+        reasoning_effort: data.reasoning_effort || '',
+        // Fall back to sensible defaults when the provider has nothing saved (0/absent).
+        temperature:
+          data.temperature != null ? String(data.temperature) : fieldDefaults.temperature,
+        max_tokens: data.max_tokens ? String(data.max_tokens) : fieldDefaults.maxTokens,
+        dimensions: data.dimensions ? String(data.dimensions) : fieldDefaults.dimensions,
+        vision: !!data.vision
+      },
+      false
+    )
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

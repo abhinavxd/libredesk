@@ -156,6 +156,9 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 
 	systemPrompt := buildSystemPrompt(assistant) + "\n\n" + buildContactContext(conv.Contact)
+	if subject := strings.TrimSpace(conv.Subject.String); subject != "" {
+		systemPrompt += "\n\nConversation subject: " + subject
+	}
 	history := m.buildHistory(msgs)
 	m.lo.Debug("ai agent running", "conversation_uuid", conv.UUID, "history_messages", len(history), "turns", turns)
 	outcome := &runOutcome{}
