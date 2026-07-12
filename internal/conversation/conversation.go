@@ -109,6 +109,7 @@ type Manager struct {
 type AIAgentEngine interface {
 	HandleConversationEvent(conversationID, assigneeUserID int)
 	HandleConversationResolved(conversationID int)
+	AssistantExpectation(userID int) string
 }
 
 // SetAIAgent wires the AI agent engine after construction to avoid an import cycle.
@@ -764,6 +765,11 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 	agent, err := c.userStore.GetAgent(assigneeID, "")
 	if err == nil {
 		c.SignAvatarURL(&agent.AvatarURL)
+		// Always send expectation (empty for humans) so it clears when the AI hands off to an agent.
+		expectation := ""
+		if c.aiAgent != nil {
+			expectation = c.aiAgent.AssistantExpectation(assigneeID)
+		}
 		c.BroadcastConversationToWidget(uuid, conversation.ContactID, conversation.InboxID, map[string]any{
 			"assignee": map[string]any{
 				"id":                  agent.ID,
@@ -771,6 +777,7 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 				"last_name":           agent.LastName,
 				"avatar_url":          agent.AvatarURL,
 				"availability_status": agent.AvailabilityStatus,
+				"expectation":         expectation,
 			},
 		})
 	}
@@ -1723,6 +1730,10 @@ func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) 
 				}
 			}
 
+			expectation := ""
+			if m.aiAgent != nil {
+				expectation = m.aiAgent.AssistantExpectation(assignee.ID)
+			}
 			view.Assignee = map[string]any{
 				"id":                  assignee.ID,
 				"first_name":          assignee.FirstName,
@@ -1731,6 +1742,7 @@ func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) 
 				"availability_status": assignee.AvailabilityStatus,
 				"type":                assignee.Type,
 				"active_at":           assignee.LastActiveAt,
+				"expectation":         expectation,
 			}
 		}
 	}

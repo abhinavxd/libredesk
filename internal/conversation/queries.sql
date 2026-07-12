@@ -335,11 +335,13 @@ SELECT
     COALESCE(au.first_name, '') as "assignee.first_name",
     COALESCE(au.id, 0) as "assignee.id",
     COALESCE(au.last_name, '') as "assignee.last_name",
-    COALESCE(au.type::TEXT, '') as "assignee.type"
+    COALESCE(au.type::TEXT, '') as "assignee.type",
+    COALESCE(aa.expectation, '') as "assignee.expectation"
 FROM conversations c
 INNER JOIN inboxes inb on c.inbox_id = inb.id
 LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 LEFT JOIN users au ON c.assigned_user_id = au.id
+LEFT JOIN ai_assistants aa ON aa.user_id = au.id
 LEFT JOIN users lis ON c.last_interaction_sender_id = lis.id
 WHERE c.uuid = $1
   AND inb.deleted_at IS NULL;

@@ -49,6 +49,7 @@ type queries struct {
 	CountAITurns            *sqlx.Stmt `query:"count-ai-turns-since-assignment"`
 	GetRecentContactConvos  *sqlx.Stmt `query:"get-recent-contact-conversations"`
 	GetAssistantWindowStats *sqlx.Stmt `query:"get-assistant-window-stats"`
+	GetAssistantExpectation *sqlx.Stmt `query:"get-assistant-expectation-by-user-id"`
 	InsertAIAgentEvent      *sqlx.Stmt `query:"insert-ai-agent-event"`
 
 	InsertFAQSuggestion           *sqlx.Stmt `query:"insert-faq-suggestion"`
@@ -228,6 +229,15 @@ func (m *Manager) GetAssistantByUserID(userID int) (models.Assistant, error) {
 	return a, nil
 }
 
+// AssistantExpectation returns the assistant's widget note, empty if none.
+func (m *Manager) AssistantExpectation(userID int) string {
+	var expectation string
+	if err := m.q.GetAssistantExpectation.Get(&expectation, userID); err != nil {
+		return ""
+	}
+	return expectation
+}
+
 // CreateAssistant creates the assistant's identity user and config in one transaction.
 func (m *Manager) CreateAssistant(a models.Assistant) (models.Assistant, error) {
 	if err := m.validate(&a); err != nil {
@@ -248,7 +258,7 @@ func (m *Manager) CreateAssistant(a models.Assistant) (models.Assistant, error) 
 	}
 
 	var id int
-	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled).Scan(&id); err != nil {
+	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation).Scan(&id); err != nil {
 		m.lo.Error("error creating assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -283,7 +293,7 @@ func (m *Manager) UpdateAssistant(id int, a models.Assistant) (models.Assistant,
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled); err != nil {
+	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation); err != nil {
 		m.lo.Error("error updating assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

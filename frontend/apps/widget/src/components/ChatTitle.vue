@@ -8,6 +8,9 @@
       <h3 class="text-base font-bold text-foreground">
         {{ chatTitle.name }}
       </h3>
+      <p v-if="chatTitle.expectation" class="text-xs text-muted-foreground">
+        {{ chatTitle.expectation }}
+      </p>
       <p class="text-xs text-muted-foreground">
         <!-- Show business hours status meaning we are out of business hours -->
         <span v-if="businessHoursStatus">
@@ -111,6 +114,7 @@ const chatTitle = computed(() => {
       avatarUrl: assignee.avatar_url || '',
       avatarFallback: assignee.first_name.charAt(0).toUpperCase(),
       availability_status: assignee.availability_status?.startsWith('away') ? 'away' : assignee.availability_status,
+      expectation: assignee.expectation || '',
       hasAssignee: true
     }
   }

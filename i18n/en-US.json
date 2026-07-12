@@ -176,6 +176,8 @@
   "admin.ai.assistant.instructionsHint": "Custom system prompt that guides how this assistant responds.",
   "admin.ai.assistant.guardrails": "Guardrails",
   "admin.ai.assistant.guardrailsHint": "Rules the assistant must never break.",
+  "admin.ai.assistant.expectation": "Expectation message",
+  "admin.ai.assistant.expectationHint": "Shown to the customer while this assistant is handling the conversation, so they know what to expect from it. It disappears when the chat is handed off to a human.",
   "admin.ai.assistant.tools": "Tools",
   "admin.ai.assistant.toolsHint": "Tools this assistant is allowed to call. It can only use the ones you grant here. Knowledge snippets are shared across all assistants automatically.",
   "admin.ai.assistant.toolsEmpty": "No tools yet. Create tools under AI to grant them here.",

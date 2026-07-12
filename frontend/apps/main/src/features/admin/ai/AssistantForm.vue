@@ -42,6 +42,17 @@
       </FormItem>
     </FormField>
 
+    <FormField v-slot="{ componentField }" name="expectation">
+      <FormItem>
+        <FormLabel>{{ t('admin.ai.assistant.expectation') }}</FormLabel>
+        <FormControl>
+          <Textarea rows="2" v-bind="componentField" />
+        </FormControl>
+        <FormDescription>{{ t('admin.ai.assistant.expectationHint') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <div class="grid gap-6 md:grid-cols-3">
       <FormField v-slot="{ componentField }" name="tone">
         <FormItem>
@@ -244,6 +255,7 @@ const form = useForm({
         .string({ required_error: t('globals.messages.required') })
         .min(1, { message: t('globals.messages.required') }),
       description: z.string().optional(),
+      expectation: z.string().optional(),
       tone: z.string().optional(),
       response_length: z.string().optional(),
       max_turns: z.coerce
@@ -260,6 +272,7 @@ const form = useForm({
   initialValues: {
     name: '',
     description: '',
+    expectation: '',
     tone: 'friendly',
     response_length: 'balanced',
     max_turns: 6,
@@ -284,6 +297,7 @@ watch(
     form.setValues({
       name: values.name || '',
       description: values.description || '',
+      expectation: values.expectation || '',
       tone: values.tone || 'friendly',
       response_length: values.response_length || 'balanced',
       max_turns: values.max_turns ?? 6,
@@ -320,6 +334,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     const payload = {
       name: values.name,
       description: values.description || '',
+      expectation: values.expectation || '',
       tone: values.tone || 'friendly',
       response_length: values.response_length || 'balanced',
       max_turns: Number(values.max_turns),

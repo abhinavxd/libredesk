@@ -114,6 +114,7 @@ func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			description TEXT NOT NULL DEFAULT '',
 			instructions TEXT NOT NULL DEFAULT '',
 			guardrails TEXT NOT NULL DEFAULT '',
+			expectation TEXT NOT NULL DEFAULT '',
 			tone TEXT NOT NULL DEFAULT 'professional',
 			response_length TEXT NOT NULL DEFAULT 'balanced',
 			max_turns INTEGER NOT NULL DEFAULT 6,
