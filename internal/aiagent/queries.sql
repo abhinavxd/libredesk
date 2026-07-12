@@ -53,6 +53,9 @@ DELETE FROM ai_assistants WHERE id = $1;
 -- name: get-assistant-tools
 SELECT tool_id FROM ai_assistant_tools WHERE assistant_id = $1 ORDER BY tool_id;
 
+-- name: get-all-assistant-tools
+SELECT assistant_id, tool_id FROM ai_assistant_tools ORDER BY assistant_id, tool_id;
+
 -- name: delete-assistant-tools
 DELETE FROM ai_assistant_tools WHERE assistant_id = $1;
 
@@ -66,29 +69,32 @@ INSERT INTO ai_agent_events (assistant_id, conversation_id, type) VALUES ($1, $2
 
 -- name: get-assistant-window-stats
 -- $1 = assistant user id (message sender), $2 = assistant id (events), $3 = window start, $4 = window end.
+-- CSAT survey messages are sent under the assistant's identity but are not genuine replies, so they
+-- are excluded from the reply/conversation counts.
 SELECT
-  (SELECT count(DISTINCT conversation_id) FROM conversation_messages WHERE sender_id = $1 AND type = 'outgoing' AND private = false AND created_at >= $3 AND created_at < $4) AS conversations,
-  (SELECT count(*) FROM conversation_messages WHERE sender_id = $1 AND type = 'outgoing' AND private = false AND created_at >= $3 AND created_at < $4) AS replies,
+  (SELECT count(DISTINCT conversation_id) FROM conversation_messages WHERE sender_id = $1 AND type = 'outgoing' AND private = false AND created_at >= $3 AND created_at < $4 AND NOT COALESCE((meta->>'is_csat')::boolean, false)) AS conversations,
+  (SELECT count(*) FROM conversation_messages WHERE sender_id = $1 AND type = 'outgoing' AND private = false AND created_at >= $3 AND created_at < $4 AND NOT COALESCE((meta->>'is_csat')::boolean, false)) AS replies,
   (SELECT count(DISTINCT conversation_id) FROM ai_agent_events WHERE assistant_id = $2 AND type = 'handoff' AND created_at >= $3 AND created_at < $4) AS handoffs,
   (SELECT count(DISTINCT conversation_id) FROM ai_agent_events WHERE assistant_id = $2 AND type = 'resolve' AND created_at >= $3 AND created_at < $4) AS resolves,
   (SELECT count(DISTINCT e.conversation_id) FROM ai_agent_events e JOIN conversations c ON c.id = e.conversation_id JOIN conversation_statuses s ON s.id = c.status_id
      WHERE e.assistant_id = $2 AND e.type = 'resolve' AND e.created_at >= $3 AND e.created_at < $4 AND s.name <> 'Resolved') AS reopened,
   (SELECT count(*) FROM csat_responses cr WHERE cr.rating > 0 AND cr.created_at >= $3 AND cr.created_at < $4 AND EXISTS (
-     SELECT 1 FROM conversation_messages m WHERE m.conversation_id = cr.conversation_id AND m.sender_id = $1 AND m.type = 'outgoing' AND m.private = false)) AS csat_count,
+     SELECT 1 FROM conversation_messages m WHERE m.conversation_id = cr.conversation_id AND m.sender_id = $1 AND m.type = 'outgoing' AND m.private = false AND NOT COALESCE((m.meta->>'is_csat')::boolean, false))) AS csat_count,
   COALESCE((SELECT round(avg(cr.rating)::numeric, 2) FROM csat_responses cr WHERE cr.rating > 0 AND cr.created_at >= $3 AND cr.created_at < $4 AND EXISTS (
-     SELECT 1 FROM conversation_messages m WHERE m.conversation_id = cr.conversation_id AND m.sender_id = $1 AND m.type = 'outgoing' AND m.private = false)), 0)::float8 AS csat_avg,
+     SELECT 1 FROM conversation_messages m WHERE m.conversation_id = cr.conversation_id AND m.sender_id = $1 AND m.type = 'outgoing' AND m.private = false AND NOT COALESCE((m.meta->>'is_csat')::boolean, false))), 0)::float8 AS csat_avg,
   COALESCE((SELECT round((count(*) FILTER (WHERE cr.rating >= 4))::numeric / NULLIF(count(*), 0) * 100, 1) FROM csat_responses cr WHERE cr.rating > 0 AND cr.created_at >= $3 AND cr.created_at < $4 AND EXISTS (
-     SELECT 1 FROM conversation_messages m WHERE m.conversation_id = cr.conversation_id AND m.sender_id = $1 AND m.type = 'outgoing' AND m.private = false)), 0)::float8 AS csat_positive;
+     SELECT 1 FROM conversation_messages m WHERE m.conversation_id = cr.conversation_id AND m.sender_id = $1 AND m.type = 'outgoing' AND m.private = false AND NOT COALESCE((m.meta->>'is_csat')::boolean, false))), 0)::float8 AS csat_positive;
 
 -- name: count-ai-turns-since-assignment
--- Counts the assistant's public replies in the current engagement, i.e. since it was last
--- (re)assigned. Any assignment/status change writes an activity row, so the last activity marks
--- the start of this engagement and a fresh assignment resets the turn budget.
+-- Counts the assistant's public replies since it was last (re)assigned, so a fresh assignment resets
+-- the turn budget. Keyed off the last assignment activity only; unrelated activity (priority, status,
+-- tag changes) must not reset the cap.
 SELECT count(*) FROM conversation_messages
 WHERE conversation_id = $1 AND sender_id = $2 AND type = 'outgoing' AND private = false
   AND created_at > COALESCE((
     SELECT max(created_at) FROM conversation_messages
     WHERE conversation_id = $1 AND type = 'activity'
+      AND meta->>'activity_type' IN ('assigned_user_change', 'self_assign')
   ), to_timestamp(0));
 
 -- name: get-recent-contact-conversations
@@ -119,3 +125,7 @@ FROM ai_faq_suggestions WHERE id = $1;
 
 -- name: update-faq-suggestion-status
 UPDATE ai_faq_suggestions SET status = $2, reviewed_by_id = $3, reviewed_at = now(), updated_at = now() WHERE id = $1;
+
+-- name: approve-faq-suggestion-if-pending
+UPDATE ai_faq_suggestions SET status = 'approved', reviewed_by_id = $2, reviewed_at = now(), updated_at = now()
+WHERE id = $1 AND status = 'pending';

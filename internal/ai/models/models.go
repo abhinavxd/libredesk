@@ -113,12 +113,6 @@ type SearchResult struct {
 	Score      float64 `json:"score"`
 }
 
-// SourceRef identifies one embedding source, used to scope a search to a subset of the index.
-type SourceRef struct {
-	SourceType string `json:"source_type"`
-	SourceID   int    `json:"source_id"`
-}
-
 // ChatMessage is one OpenAI-compatible chat message.
 type ChatMessage struct {
 	Role       string     `json:"role"`

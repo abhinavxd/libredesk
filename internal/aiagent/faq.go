@@ -80,12 +80,19 @@ func (m *Manager) ApproveFAQSuggestion(id int, question, answer string, reviewer
 	if answer == "" {
 		answer = s.Answer
 	}
-	if _, err := m.ai.CreateKnowledgeBaseItem(question, answer, aimodels.KnowledgeSourceConversation, true); err != nil {
-		return err
-	}
-	if _, err := m.q.UpdateFAQSuggestionStatus.Exec(id, models.FAQStatusApproved, reviewerID); err != nil {
+	// Claim the suggestion before creating the snippet: only the caller that flips pending->approved
+	// creates one, so a concurrent or retried approval can't produce duplicate snippets.
+	res, err := m.q.ApproveFAQSuggestionIfPending.Exec(id, reviewerID)
+	if err != nil {
 		m.lo.Error("error approving faq suggestion", "id", id, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.faqAlreadyReviewed"), nil)
+	}
+	if _, err := m.ai.CreateKnowledgeBaseItem(question, answer, aimodels.KnowledgeSourceConversation, true); err != nil {
+		m.lo.Error("faq suggestion approved but snippet creation failed", "id", id, "error", err)
+		return err
 	}
 	return nil
 }

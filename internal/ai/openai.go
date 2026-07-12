@@ -84,9 +84,15 @@ func (o *OpenAIClient) SendChatCompletion(payload models.ChatCompletionPayload) 
 	o.lo.Debug("chat completion request", "model", model, "messages", len(messages), "images", sentImages, "vision", o.cfg.Vision, "tools", len(payload.Tools))
 
 	body := map[string]any{
-		"model":                 model,
-		"messages":              messages,
-		"max_completion_tokens": maxTokens,
+		"model":    model,
+		"messages": messages,
+	}
+	// Reasoning models require max_completion_tokens and reject the older max_tokens; other models
+	// (including most OpenAI-compatible third-party servers) only understand max_tokens.
+	if o.cfg.ReasoningEffort != "" {
+		body["max_completion_tokens"] = maxTokens
+	} else {
+		body["max_tokens"] = maxTokens
 	}
 	// Only send optional params the admin set. Reasoning models (e.g. GPT-5.x) reject a non-default
 	// temperature and require reasoning_effort "none" to use tools on /chat/completions; leave

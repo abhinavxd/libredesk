@@ -32,29 +32,31 @@ const (
 var efs embed.FS
 
 type queries struct {
-	GetAssistants            *sqlx.Stmt `query:"get-assistants"`
-	GetAssistant             *sqlx.Stmt `query:"get-assistant"`
-	GetAssistantByUserID     *sqlx.Stmt `query:"get-assistant-by-user-id"`
-	GetAssistantUserIDs      *sqlx.Stmt `query:"get-assistant-user-ids"`
-	InsertAssistantUser      *sqlx.Stmt `query:"insert-assistant-user"`
-	InsertAssistant          *sqlx.Stmt `query:"insert-assistant"`
-	UpdateAssistant          *sqlx.Stmt `query:"update-assistant"`
-	UpdateAssistantUser      *sqlx.Stmt `query:"update-assistant-user"`
-	SoftDeleteAssistantUser  *sqlx.Stmt `query:"soft-delete-assistant-user"`
-	DeleteAssistant          *sqlx.Stmt `query:"delete-assistant"`
-	GetAssistantTools        *sqlx.Stmt `query:"get-assistant-tools"`
-	DeleteAssistantTools     *sqlx.Stmt `query:"delete-assistant-tools"`
-	InsertAssistantTool      *sqlx.Stmt `query:"insert-assistant-tool"`
-	CountAITurns             *sqlx.Stmt `query:"count-ai-turns-since-assignment"`
-	GetRecentContactConvos   *sqlx.Stmt `query:"get-recent-contact-conversations"`
-	GetAssistantWindowStats  *sqlx.Stmt `query:"get-assistant-window-stats"`
-	InsertAIAgentEvent       *sqlx.Stmt `query:"insert-ai-agent-event"`
+	GetAssistants           *sqlx.Stmt `query:"get-assistants"`
+	GetAssistant            *sqlx.Stmt `query:"get-assistant"`
+	GetAssistantByUserID    *sqlx.Stmt `query:"get-assistant-by-user-id"`
+	GetAssistantUserIDs     *sqlx.Stmt `query:"get-assistant-user-ids"`
+	InsertAssistantUser     *sqlx.Stmt `query:"insert-assistant-user"`
+	InsertAssistant         *sqlx.Stmt `query:"insert-assistant"`
+	UpdateAssistant         *sqlx.Stmt `query:"update-assistant"`
+	UpdateAssistantUser     *sqlx.Stmt `query:"update-assistant-user"`
+	SoftDeleteAssistantUser *sqlx.Stmt `query:"soft-delete-assistant-user"`
+	DeleteAssistant         *sqlx.Stmt `query:"delete-assistant"`
+	GetAssistantTools       *sqlx.Stmt `query:"get-assistant-tools"`
+	GetAllAssistantTools    *sqlx.Stmt `query:"get-all-assistant-tools"`
+	DeleteAssistantTools    *sqlx.Stmt `query:"delete-assistant-tools"`
+	InsertAssistantTool     *sqlx.Stmt `query:"insert-assistant-tool"`
+	CountAITurns            *sqlx.Stmt `query:"count-ai-turns-since-assignment"`
+	GetRecentContactConvos  *sqlx.Stmt `query:"get-recent-contact-conversations"`
+	GetAssistantWindowStats *sqlx.Stmt `query:"get-assistant-window-stats"`
+	InsertAIAgentEvent      *sqlx.Stmt `query:"insert-ai-agent-event"`
 
-	InsertFAQSuggestion       *sqlx.Stmt `query:"insert-faq-suggestion"`
-	CountFAQByConversation    *sqlx.Stmt `query:"count-faq-suggestions-by-conversation"`
-	GetFAQSuggestions         *sqlx.Stmt `query:"get-faq-suggestions"`
-	GetFAQSuggestion          *sqlx.Stmt `query:"get-faq-suggestion"`
-	UpdateFAQSuggestionStatus *sqlx.Stmt `query:"update-faq-suggestion-status"`
+	InsertFAQSuggestion           *sqlx.Stmt `query:"insert-faq-suggestion"`
+	CountFAQByConversation        *sqlx.Stmt `query:"count-faq-suggestions-by-conversation"`
+	GetFAQSuggestions             *sqlx.Stmt `query:"get-faq-suggestions"`
+	GetFAQSuggestion              *sqlx.Stmt `query:"get-faq-suggestion"`
+	UpdateFAQSuggestionStatus     *sqlx.Stmt `query:"update-faq-suggestion-status"`
+	ApproveFAQSuggestionIfPending *sqlx.Stmt `query:"approve-faq-suggestion-if-pending"`
 }
 
 type Manager struct {
@@ -69,7 +71,10 @@ type Manager struct {
 
 	queue    chan int
 	inflight map[int]bool
-	mu       sync.Mutex
+	// pending marks a conversation that received a fresh event while its response was in flight, so
+	// markDone re-enqueues it instead of dropping the follow-up.
+	pending map[int]bool
+	mu      sync.Mutex
 
 	miningQueue    chan int
 	miningInflight map[int]bool
@@ -103,6 +108,7 @@ func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaMan
 		setting:          settingManager,
 		queue:            make(chan int, opts.QueueSize),
 		inflight:         map[int]bool{},
+		pending:          map[int]bool{},
 		miningQueue:      make(chan int, opts.QueueSize),
 		miningInflight:   map[int]bool{},
 		assistantUserIDs: map[int]bool{},
@@ -118,14 +124,35 @@ func (m *Manager) GetAssistants() ([]models.Assistant, error) {
 		m.lo.Error("error fetching assistants", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	toolsByAssistant, err := m.allAssistantTools()
+	if err != nil {
+		return nil, err
+	}
 	for i := range assistants {
-		toolIDs, err := m.getTools(assistants[i].ID)
-		if err != nil {
-			return nil, err
+		ids := toolsByAssistant[assistants[i].ID]
+		if ids == nil {
+			ids = []int{}
 		}
-		assistants[i].ToolIDs = toolIDs
+		assistants[i].ToolIDs = ids
 	}
 	return assistants, nil
+}
+
+// allAssistantTools returns tool ids grouped by assistant id in a single query.
+func (m *Manager) allAssistantTools() (map[int][]int, error) {
+	var rows []struct {
+		AssistantID int `db:"assistant_id"`
+		ToolID      int `db:"tool_id"`
+	}
+	if err := m.q.GetAllAssistantTools.Select(&rows); err != nil {
+		m.lo.Error("error fetching assistant tools", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	out := make(map[int][]int)
+	for _, r := range rows {
+		out[r.AssistantID] = append(out[r.AssistantID], r.ToolID)
+	}
+	return out, nil
 }
 
 // GetAssistant returns one assistant with its knowledge links.

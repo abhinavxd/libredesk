@@ -75,6 +75,9 @@ func (m *Manager) HandleConversationEvent(conversationID, assigneeUserID int) {
 func (m *Manager) enqueue(convID int) {
 	m.mu.Lock()
 	if m.inflight[convID] {
+		// A response is already running; remember to run again so a message that arrives mid-response
+		// still gets answered.
+		m.pending[convID] = true
 		m.mu.Unlock()
 		return
 	}
@@ -86,6 +89,7 @@ func (m *Manager) enqueue(convID int) {
 	default:
 		m.mu.Lock()
 		delete(m.inflight, convID)
+		delete(m.pending, convID)
 		m.mu.Unlock()
 		m.lo.Warn("ai agent queue full, dropping response job", "conversation_id", convID)
 	}
@@ -93,8 +97,13 @@ func (m *Manager) enqueue(convID int) {
 
 func (m *Manager) markDone(convID int) {
 	m.mu.Lock()
+	requeue := m.pending[convID]
+	delete(m.pending, convID)
 	delete(m.inflight, convID)
 	m.mu.Unlock()
+	if requeue {
+		m.enqueue(convID)
+	}
 }
 
 func (m *Manager) handle(ctx context.Context, convID int) {

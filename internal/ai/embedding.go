@@ -58,15 +58,8 @@ func (ix *embeddingIndex) removeSource(sourceType string, sourceID int) {
 	ix.replaceSource(sourceType, sourceID, nil)
 }
 
-// sourceKey identifies one embedding source in the in-memory index.
-type sourceKey struct {
-	sourceType string
-	sourceID   int
-}
-
 // search returns the top-k matches and the count of chunks skipped for mismatched vector dimensions.
-// A non-nil allowed set restricts the search to those sources; nil searches the whole index.
-func (ix *embeddingIndex) search(query []float32, k int, allowed map[sourceKey]bool) ([]models.SearchResult, int) {
+func (ix *embeddingIndex) search(query []float32, k int) ([]models.SearchResult, int) {
 	ix.mu.RLock()
 	defer ix.mu.RUnlock()
 
@@ -78,9 +71,6 @@ func (ix *embeddingIndex) search(query []float32, k int, allowed map[sourceKey]b
 	dimMismatch := 0
 	results := make([]models.SearchResult, 0, len(ix.chunks))
 	for _, c := range ix.chunks {
-		if allowed != nil && !allowed[sourceKey{c.sourceType, c.sourceID}] {
-			continue
-		}
 		if len(c.vec) != len(query) {
 			dimMismatch++
 			continue
@@ -106,31 +96,15 @@ func (ix *embeddingIndex) search(query []float32, k int, allowed map[sourceKey]b
 
 // Search embeds the query and returns the top-k most similar chunks across the whole index.
 func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.SearchResult, error) {
-	return m.search(query, k, nil)
-}
-
-// SearchScoped restricts retrieval to the given sources; an empty refs slice returns no results.
-func (m *Manager) SearchScoped(ctx context.Context, query string, k int, refs []models.SourceRef) ([]models.SearchResult, error) {
-	if len(refs) == 0 {
-		return nil, nil
-	}
-	allowed := make(map[sourceKey]bool, len(refs))
-	for _, r := range refs {
-		allowed[sourceKey{r.SourceType, r.SourceID}] = true
-	}
-	return m.search(query, k, allowed)
-}
-
-func (m *Manager) search(query string, k int, allowed map[sourceKey]bool) ([]models.SearchResult, error) {
 	qvec, err := m.GetEmbeddings(query)
 	if err != nil {
 		return nil, err
 	}
-	results, dimMismatch := m.index.search(qvec, k, allowed)
+	results, dimMismatch := m.index.search(qvec, k)
 	if dimMismatch > 0 {
 		m.lo.Warn("skipped stale embeddings with mismatched dimensions; reindex the knowledge base after changing the embedding model", "count", dimMismatch, "query_dimensions", len(qvec))
 	}
-	m.lo.Debug("rag search", "query", query, "scoped", allowed != nil, "hits", len(results))
+	m.lo.Debug("rag search", "query", query, "hits", len(results))
 	for i, r := range results {
 		preview := r.ChunkText
 		if len(preview) > 120 {

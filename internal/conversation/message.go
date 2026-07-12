@@ -701,6 +701,9 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	// Store the activity type structurally so callers can filter activities without parsing i18n content.
+	meta, _ := json.Marshal(map[string]string{"activity_type": activityType})
+
 	message := models.Message{
 		Type:             models.MessageActivity,
 		Status:           models.MessageStatusSent,
@@ -710,6 +713,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 		Private:          true,
 		SenderID:         actor.ID,
 		SenderType:       models.SenderTypeAgent,
+		Meta:             meta,
 	}
 
 	if err := m.InsertMessage(&message); err != nil {
