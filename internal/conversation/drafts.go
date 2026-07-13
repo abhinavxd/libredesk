@@ -78,6 +78,10 @@ func (m *Manager) resolveDraftInlineCIDs(content string) string {
 		if err != nil {
 			continue
 		}
+		// Attached media may belong to another conversation; resolving it would leak a signed URL that bypasses the serve permission check.
+		if media.ModelID.Valid {
+			continue
+		}
 		content = strings.ReplaceAll(content, "cid:"+cid, m.mediaStore.GetURL(media.UUID, media.ContentType, media.Filename))
 	}
 	return content
