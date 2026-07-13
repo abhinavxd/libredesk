@@ -261,6 +261,40 @@ func (al *Manager) RolePermissionsChanged(actorID int, actorEmail, ip string, ro
 	)
 }
 
+// ContactDeleted records permanent deletion of a contact and their data.
+func (al *Manager) ContactDeleted(actorID int, actorEmail, ip string, contactID int, contactEmail string) error {
+	description := al.i18n.Ts("activityLog.contactDeleted",
+		"actorEmail", actorEmail,
+		"actorId", fmt.Sprintf("#%d", actorID),
+		"contactEmail", contactEmail,
+		"contactId", fmt.Sprintf("#%d", contactID))
+	return al.create(
+		models.ContactDeleted,
+		description,
+		actorID,
+		umodels.UserModel,
+		contactID,
+		ip,
+	)
+}
+
+// ContactDataExported records an export of a contact's stored data.
+func (al *Manager) ContactDataExported(actorID int, actorEmail, ip string, contactID int, contactEmail string) error {
+	description := al.i18n.Ts("activityLog.contactDataExported",
+		"actorEmail", actorEmail,
+		"actorId", fmt.Sprintf("#%d", actorID),
+		"contactEmail", contactEmail,
+		"contactId", fmt.Sprintf("#%d", contactID))
+	return al.create(
+		models.ContactDataExported,
+		description,
+		actorID,
+		umodels.UserModel,
+		contactID,
+		ip,
+	)
+}
+
 // create creates a new activity log in DB.
 func (m *Manager) create(activityType, activityDescription string, actorID int, targetModelType string, targetModelID int, ip string) error {
 	if _, err := m.q.InsertActivity.Exec(activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {

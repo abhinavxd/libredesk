@@ -47,7 +47,7 @@
               {{ contact.created_at ? format(new Date(contact.created_at), 'PPP') : 'N/A' }}
             </div>
 
-            <div class="w-30 pt-3">
+            <div class="flex gap-2 pt-3">
               <Button
                 :variant="contact.enabled ? 'destructive' : 'outline'"
                 @click="showBlockConfirmation = true"
@@ -56,6 +56,24 @@
                 <ShieldOffIcon v-if="contact.enabled" size="18" />
                 <ShieldCheckIcon v-else size="18" />
                 {{ t(contact.enabled ? 'globals.messages.block' : 'globals.messages.unblock') }}
+              </Button>
+              <Button
+                v-if="userStore.can('contacts:export')"
+                variant="outline"
+                size="sm"
+                @click="exportContact"
+              >
+                <DownloadIcon size="18" />
+                {{ t('contact.exportData') }}
+              </Button>
+              <Button
+                v-if="userStore.can('contacts:delete')"
+                variant="destructive"
+                size="sm"
+                @click="showDeleteConfirmation = true"
+              >
+                <Trash2Icon size="18" />
+                {{ t('contact.deleteContact') }}
               </Button>
             </div>
           </div>
@@ -92,13 +110,30 @@
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog :open="showDeleteConfirmation" @update:open="showDeleteConfirmation = $event">
+        <DialogContent class="sm:max-w-md">
+          <DialogHeader class="gap-y-3">
+            <DialogTitle>{{ t('contact.deleteContact') }}</DialogTitle>
+            <DialogDescription>{{ t('contact.deleteConfirm') }}</DialogDescription>
+          </DialogHeader>
+          <div class="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" @click="showDeleteConfirmation = false">
+              {{ t('globals.messages.cancel') }}
+            </Button>
+            <Button variant="destructive" @click="confirmDelete">
+              {{ t('globals.messages.delete') }}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   </ContactDetail>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
@@ -114,7 +149,14 @@ import {
   DialogDescription
 } from '@shared-ui/components/ui/dialog'
 import { useUserStore } from '../../stores/user'
-import { ShieldOffIcon, ShieldCheckIcon, IdCardIcon, CalendarIcon } from 'lucide-vue-next'
+import {
+  ShieldOffIcon,
+  ShieldCheckIcon,
+  IdCardIcon,
+  CalendarIcon,
+  DownloadIcon,
+  Trash2Icon
+} from 'lucide-vue-next'
 import ContactDetail from '@/layouts/contact/ContactDetail.vue'
 import api from '../../api'
 import ContactForm from '@/features/contact/ContactForm.vue'
@@ -129,9 +171,11 @@ import { Spinner } from '@shared-ui/components/ui/spinner'
 const { t } = useI18n()
 const emitter = useEmitter()
 const route = useRoute()
+const router = useRouter()
 const formLoading = ref(false)
 const contact = ref(null)
 const showBlockConfirmation = ref(false)
+const showDeleteConfirmation = ref(false)
 const userStore = useUserStore()
 
 const form = useForm({
@@ -178,6 +222,36 @@ async function toggleBlock() {
     emitToast(
       contact.value.enabled ? t('contact.unblockedSuccessfully') : t('contact.blockedSuccessfully')
     )
+  } catch (err) {
+    showError(err)
+  }
+}
+
+async function confirmDelete() {
+  showDeleteConfirmation.value = false
+  try {
+    formLoading.value = true
+    await api.deleteContact(contact.value.id)
+    emitToast(t('contact.deletedSuccessfully'))
+    router.push({ name: 'contacts' })
+  } catch (err) {
+    showError(err)
+  } finally {
+    formLoading.value = false
+  }
+}
+
+async function exportContact() {
+  try {
+    const response = await api.exportContact(contact.value.id)
+    const url = URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `contact-${contact.value.id}-data.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
   } catch (err) {
     showError(err)
   }
