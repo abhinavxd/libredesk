@@ -56,7 +56,8 @@ type queries struct {
 	CountFAQByConversation        *sqlx.Stmt `query:"count-faq-suggestions-by-conversation"`
 	GetFAQSuggestions             *sqlx.Stmt `query:"get-faq-suggestions"`
 	GetFAQSuggestion              *sqlx.Stmt `query:"get-faq-suggestion"`
-	UpdateFAQSuggestionStatus     *sqlx.Stmt `query:"update-faq-suggestion-status"`
+	RejectFAQSuggestionIfPending  *sqlx.Stmt `query:"reject-faq-suggestion-if-pending"`
+	RevertFAQSuggestionToPending  *sqlx.Stmt `query:"revert-faq-suggestion-to-pending"`
 	ApproveFAQSuggestionIfPending *sqlx.Stmt `query:"approve-faq-suggestion-if-pending"`
 }
 

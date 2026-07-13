@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -58,14 +59,32 @@ func (m *Manager) UpdateKnowledgeBaseItem(id int, title, content string, enabled
 	return item, nil
 }
 
+// DeleteKnowledgeBaseItem removes the snippet and its embeddings in one transaction so a failure
+// can't leave deleted content searchable.
 func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
-	if _, err := m.q.DeleteKnowledgeBaseItem.Exec(id); err != nil {
+	m.reindexMu.Lock()
+	defer m.reindexMu.Unlock()
+
+	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		m.lo.Error("error beginning knowledge base delete transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Stmtx(m.q.DeleteKnowledgeBaseItem).Exec(id); err != nil {
 		m.lo.Error("error deleting knowledge base item", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	if err := m.RemoveEmbeddings(models.SourceSnippet, id); err != nil {
-		m.lo.Error("error removing snippet embeddings", "error", err)
+	if _, err := tx.Stmtx(m.q.DeleteEmbeddingsBySource).Exec(models.SourceSnippet, id); err != nil {
+		m.lo.Error("error deleting snippet embeddings", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	if err := tx.Commit(); err != nil {
+		m.lo.Error("error committing knowledge base delete transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	m.index.removeSource(models.SourceSnippet, id)
 	return nil
 }
 

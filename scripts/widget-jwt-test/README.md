@@ -8,7 +8,7 @@ widget with it, or as an anonymous visitor with the JWT checkbox off.
 
 Serve the file over HTTP (the widget won't load from `file://`):
 
-```
+```shell
 python -m http.server 8005
 ```
 

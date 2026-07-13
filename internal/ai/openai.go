@@ -2,6 +2,7 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,6 +28,8 @@ const (
 	// Reasoning models reject max_tokens and non-default temperature with structured 400s;
 	// those requests are adjusted and retried instead of surfacing the error.
 	maxParamAdaptations = 2
+
+	maxProviderResponseBytes = 20 << 20
 )
 
 // OpenAIClient talks to any OpenAI-compatible API (base URL selects the host).
@@ -49,8 +52,8 @@ func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger) *OpenAIClient {
 }
 
 // SendPrompt runs a single system+user prompt and returns the assistant text.
-func (o *OpenAIClient) SendPrompt(payload models.PromptPayload) (string, error) {
-	res, err := o.SendChatCompletion(models.ChatCompletionPayload{
+func (o *OpenAIClient) SendPrompt(ctx context.Context, payload models.PromptPayload) (string, error) {
+	res, err := o.SendChatCompletion(ctx, models.ChatCompletionPayload{
 		Messages: []models.ChatMessage{
 			{Role: "system", Content: payload.SystemPrompt},
 			{Role: "user", Content: payload.UserPrompt},
@@ -63,7 +66,7 @@ func (o *OpenAIClient) SendPrompt(payload models.PromptPayload) (string, error) 
 }
 
 // SendChatCompletion posts a chat completion, optionally advertising tools.
-func (o *OpenAIClient) SendChatCompletion(payload models.ChatCompletionPayload) (models.ChatCompletionResult, error) {
+func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.ChatCompletionPayload) (models.ChatCompletionResult, error) {
 	if o.cfg.APIKey == "" {
 		return models.ChatCompletionResult{}, ErrApiKeyNotSet
 	}
@@ -103,7 +106,7 @@ func (o *OpenAIClient) SendChatCompletion(payload models.ChatCompletionPayload) 
 		body["tool_choice"] = "auto"
 	}
 
-	respBytes, err := o.post("/chat/completions", body)
+	respBytes, err := o.post(ctx, "/chat/completions", body)
 	if err != nil {
 		return models.ChatCompletionResult{}, err
 	}
@@ -129,8 +132,8 @@ func (o *OpenAIClient) SendChatCompletion(payload models.ChatCompletionPayload) 
 }
 
 // GetEmbeddings returns the embedding vector for the given text.
-func (o *OpenAIClient) GetEmbeddings(text string) ([]float32, error) {
-	vecs, err := o.GetEmbeddingsBatch([]string{text})
+func (o *OpenAIClient) GetEmbeddings(ctx context.Context, text string) ([]float32, error) {
+	vecs, err := o.GetEmbeddingsBatch(ctx, []string{text})
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +141,7 @@ func (o *OpenAIClient) GetEmbeddings(text string) ([]float32, error) {
 }
 
 // GetEmbeddingsBatch returns embedding vectors for all texts in a single request.
-func (o *OpenAIClient) GetEmbeddingsBatch(texts []string) ([][]float32, error) {
+func (o *OpenAIClient) GetEmbeddingsBatch(ctx context.Context, texts []string) ([][]float32, error) {
 	if o.cfg.APIKey == "" {
 		return nil, ErrApiKeyNotSet
 	}
@@ -158,7 +161,7 @@ func (o *OpenAIClient) GetEmbeddingsBatch(texts []string) ([][]float32, error) {
 		body["dimensions"] = o.cfg.Dimensions
 	}
 
-	respBytes, err := o.post("/embeddings", body)
+	respBytes, err := o.post(ctx, "/embeddings", body)
 	if err != nil {
 		return nil, err
 	}
@@ -178,10 +181,15 @@ func (o *OpenAIClient) GetEmbeddingsBatch(texts []string) ([][]float32, error) {
 
 	// The API may return embeddings out of order; place each by its index.
 	out := make([][]float32, len(texts))
+	seen := make([]bool, len(texts))
 	for _, d := range parsed.Data {
 		if d.Index < 0 || d.Index >= len(out) {
 			return nil, fmt.Errorf("embedding index %d out of range", d.Index)
 		}
+		if seen[d.Index] {
+			return nil, fmt.Errorf("duplicate embedding index %d", d.Index)
+		}
+		seen[d.Index] = true
 		out[d.Index] = d.Embedding
 	}
 	return out, nil
@@ -207,7 +215,7 @@ func stripImages(msgs []models.ChatMessage) []models.ChatMessage {
 	return out
 }
 
-func (o *OpenAIClient) post(path string, body map[string]any) ([]byte, error) {
+func (o *OpenAIClient) post(ctx context.Context, path string, body map[string]any) ([]byte, error) {
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request body: %w", err)
@@ -215,7 +223,7 @@ func (o *OpenAIClient) post(path string, body map[string]any) ([]byte, error) {
 
 	adaptations := 0
 	for attempt := 0; ; attempt++ {
-		respBytes, retryAfter, retryable, err := o.doRequest(path, bodyBytes)
+		respBytes, retryAfter, retryable, err := o.doRequest(ctx, path, bodyBytes)
 		if err == nil {
 			return respBytes, nil
 		}
@@ -241,13 +249,17 @@ func (o *OpenAIClient) post(path string, body map[string]any) ([]byte, error) {
 			delay = backoffDelay(attempt)
 		}
 		o.lo.Warn("retrying AI provider request after transient error", "attempt", attempt+1, "max_retries", maxRequestRetries, "delay", delay.String(), "error", err)
-		time.Sleep(delay)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(delay):
+		}
 	}
 }
 
 // doRequest sends one attempt; retryAfter/retryable tell the caller whether and when to retry.
-func (o *OpenAIClient) doRequest(path string, bodyBytes []byte) ([]byte, time.Duration, bool, error) {
-	req, err := http.NewRequest(http.MethodPost, o.cfg.BaseURL+path, bytes.NewReader(bodyBytes))
+func (o *OpenAIClient) doRequest(ctx context.Context, path string, bodyBytes []byte) ([]byte, time.Duration, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.cfg.BaseURL+path, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, 0, false, fmt.Errorf("creating request: %w", err)
 	}
@@ -261,7 +273,11 @@ func (o *OpenAIClient) doRequest(path string, bodyBytes []byte) ([]byte, time.Du
 	}
 	defer resp.Body.Close()
 
-	respBytes, _ := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxProviderResponseBytes))
+	if err != nil {
+		o.lo.Error("error reading AI provider response", "error", err)
+		return nil, 0, true, fmt.Errorf("reading response body: %w", err)
+	}
 	switch {
 	case resp.StatusCode == http.StatusOK:
 		return respBytes, 0, false, nil

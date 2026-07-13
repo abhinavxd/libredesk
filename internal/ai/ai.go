@@ -3,6 +3,7 @@
 package ai
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"encoding/json"
@@ -111,7 +112,7 @@ func New(opts Opts) (*Manager, error) {
 }
 
 // Completion runs the DB-stored prompt (by key) over the user content.
-func (m *Manager) Completion(k string, prompt string) (string, error) {
+func (m *Manager) Completion(ctx context.Context, k string, prompt string) (string, error) {
 	systemPrompt, err := m.getPrompt(k)
 	if err != nil {
 		return "", err
@@ -122,7 +123,7 @@ func (m *Manager) Completion(k string, prompt string) (string, error) {
 		return "", err
 	}
 
-	response, err := client.SendPrompt(models.PromptPayload{SystemPrompt: systemPrompt, UserPrompt: prompt})
+	response, err := client.SendPrompt(ctx, models.PromptPayload{SystemPrompt: systemPrompt, UserPrompt: prompt})
 	if err != nil {
 		return "", m.providerError(err)
 	}
@@ -130,12 +131,12 @@ func (m *Manager) Completion(k string, prompt string) (string, error) {
 }
 
 // CompletionRaw runs an ad-hoc system+user prompt (no DB-stored prompt) and returns the text.
-func (m *Manager) CompletionRaw(systemPrompt, userPrompt string) (string, error) {
+func (m *Manager) CompletionRaw(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	client, err := m.getProviderClient(models.ProviderTypeCompletion)
 	if err != nil {
 		return "", err
 	}
-	response, err := client.SendPrompt(models.PromptPayload{SystemPrompt: systemPrompt, UserPrompt: userPrompt})
+	response, err := client.SendPrompt(ctx, models.PromptPayload{SystemPrompt: systemPrompt, UserPrompt: userPrompt})
 	if err != nil {
 		return "", m.providerError(err)
 	}
@@ -143,12 +144,12 @@ func (m *Manager) CompletionRaw(systemPrompt, userPrompt string) (string, error)
 }
 
 // GetEmbeddings returns the embedding vector for text using the embedding provider.
-func (m *Manager) GetEmbeddings(text string) ([]float32, error) {
+func (m *Manager) GetEmbeddings(ctx context.Context, text string) ([]float32, error) {
 	client, err := m.getProviderClient(models.ProviderTypeEmbedding)
 	if err != nil {
 		return nil, err
 	}
-	vec, err := client.GetEmbeddings(text)
+	vec, err := client.GetEmbeddings(ctx, text)
 	if err != nil {
 		return nil, m.providerError(err)
 	}
@@ -156,12 +157,12 @@ func (m *Manager) GetEmbeddings(text string) ([]float32, error) {
 }
 
 // GetEmbeddingsBatch returns embedding vectors for all texts in a single provider request.
-func (m *Manager) GetEmbeddingsBatch(texts []string) ([][]float32, error) {
+func (m *Manager) GetEmbeddingsBatch(ctx context.Context, texts []string) ([][]float32, error) {
 	client, err := m.getProviderClient(models.ProviderTypeEmbedding)
 	if err != nil {
 		return nil, err
 	}
-	vecs, err := client.GetEmbeddingsBatch(texts)
+	vecs, err := client.GetEmbeddingsBatch(ctx, texts)
 	if err != nil {
 		return nil, m.providerError(err)
 	}
@@ -268,13 +269,13 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 	client := NewOpenAIClient(cfg, m.lo)
 
 	if providerType == models.ProviderTypeCompletion {
-		if _, err := client.SendPrompt(models.PromptPayload{SystemPrompt: "You are a connection test.", UserPrompt: "Reply with OK."}); err != nil {
+		if _, err := client.SendPrompt(context.Background(), models.PromptPayload{SystemPrompt: "You are a connection test.", UserPrompt: "Reply with OK."}); err != nil {
 			return m.testProviderError(err)
 		}
 		return nil
 	}
 
-	vec, err := client.GetEmbeddings("connection test")
+	vec, err := client.GetEmbeddings(context.Background(), "connection test")
 	if err != nil {
 		return m.testProviderError(err)
 	}

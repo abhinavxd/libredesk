@@ -117,8 +117,14 @@ const input = ref('')
 const isThinking = ref(false)
 const scrollRef = ref(null)
 
+// Per-conversation operation revision: a clear bumps it so in-flight hydrate/send
+// responses for the old state are discarded instead of restoring cleared history.
+const revisions = {}
+const revision = (uuid) => revisions[uuid] || 0
+
 const clearChat = async () => {
   const uuid = conversationStore.current?.uuid || ''
+  revisions[uuid] = revision(uuid) + 1
   conversationStore.clearCopilotMessages(uuid)
   if (!uuid) return
   try {
@@ -135,8 +141,10 @@ const clearChat = async () => {
 // does not lose it. Skip if the store already has messages for it (a live session).
 const hydrate = async (uuid) => {
   if (!uuid || conversationStore.getCopilotMessages(uuid).length > 0) return
+  const rev = revision(uuid)
   try {
     const resp = await api.getCopilotMessages(uuid)
+    if (rev !== revision(uuid) || conversationStore.getCopilotMessages(uuid).length > 0) return
     const loaded = (resp.data.data || []).map((m) => ({ role: m.role, content: m.content }))
     if (loaded.length) {
       conversationStore.setCopilotMessages(uuid, loaded)
@@ -163,6 +171,7 @@ const send = async (preset) => {
   if (!text || isThinking.value) return
 
   const uuid = conversationStore.current?.uuid || ''
+  const rev = revision(uuid)
   conversationStore.setCopilotMessages(uuid, [...messages.value, { role: 'user', content: text }])
   input.value = ''
   isThinking.value = true
@@ -173,6 +182,7 @@ const send = async (preset) => {
       conversation_uuid: uuid,
       messages: conversationStore.getCopilotMessages(uuid)
     })
+    if (rev !== revision(uuid)) return
     conversationStore.setCopilotMessages(uuid, [
       ...conversationStore.getCopilotMessages(uuid),
       { role: 'assistant', content: resp.data.data || '' }

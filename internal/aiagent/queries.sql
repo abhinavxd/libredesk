@@ -124,8 +124,13 @@ ORDER BY s.created_at DESC;
 SELECT id, created_at, updated_at, conversation_id, question, answer, status, reviewed_by_id, reviewed_at
 FROM ai_faq_suggestions WHERE id = $1;
 
--- name: update-faq-suggestion-status
-UPDATE ai_faq_suggestions SET status = $2, reviewed_by_id = $3, reviewed_at = now(), updated_at = now() WHERE id = $1;
+-- name: reject-faq-suggestion-if-pending
+UPDATE ai_faq_suggestions SET status = 'rejected', reviewed_by_id = $2, reviewed_at = now(), updated_at = now()
+WHERE id = $1 AND status = 'pending';
+
+-- name: revert-faq-suggestion-to-pending
+UPDATE ai_faq_suggestions SET status = 'pending', reviewed_by_id = NULL, reviewed_at = NULL, updated_at = now()
+WHERE id = $1 AND status = 'approved';
 
 -- name: approve-faq-suggestion-if-pending
 UPDATE ai_faq_suggestions SET status = 'approved', reviewed_by_id = $2, reviewed_at = now(), updated_at = now()

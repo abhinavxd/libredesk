@@ -51,7 +51,7 @@ func handleAICompletion(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	resp, err := app.ai.Completion(req.PromptKey, req.Content)
+	resp, err := app.ai.Completion(r.RequestCtx, req.PromptKey, req.Content)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

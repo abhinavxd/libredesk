@@ -57,7 +57,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 
 	for step := 0; step < maxSteps; step++ {
 		m.lo.Debug("ai run step", "step", step, "messages", len(messages))
-		res, err := m.chatCompletion(client, models.ChatCompletionPayload{Messages: messages, Tools: defs})
+		res, err := m.chatCompletion(ctx, client, models.ChatCompletionPayload{Messages: messages, Tools: defs})
 		if err != nil {
 			return "", err
 		}
@@ -86,7 +86,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 	}
 
 	// Step budget exhausted, force a final answer by omitting tools.
-	res, err := m.chatCompletion(client, models.ChatCompletionPayload{Messages: messages})
+	res, err := m.chatCompletion(ctx, client, models.ChatCompletionPayload{Messages: messages})
 	if err != nil {
 		return "", err
 	}
@@ -113,8 +113,8 @@ func (m *Manager) executeToolCall(ctx context.Context, registry map[string]Tool,
 	return out
 }
 
-func (m *Manager) chatCompletion(client ProviderClient, payload models.ChatCompletionPayload) (models.ChatCompletionResult, error) {
-	res, err := client.SendChatCompletion(payload)
+func (m *Manager) chatCompletion(ctx context.Context, client ProviderClient, payload models.ChatCompletionPayload) (models.ChatCompletionResult, error) {
+	res, err := client.SendChatCompletion(ctx, payload)
 	if err != nil {
 		return models.ChatCompletionResult{}, m.providerError(err)
 	}

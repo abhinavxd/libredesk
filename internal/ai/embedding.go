@@ -96,7 +96,7 @@ func (ix *embeddingIndex) search(query []float32, k int) ([]models.SearchResult,
 
 // Search embeds the query and returns the top-k most similar chunks across the whole index.
 func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.SearchResult, error) {
-	qvec, err := m.GetEmbeddings(query)
+	qvec, err := m.GetEmbeddings(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -104,13 +104,9 @@ func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.Sea
 	if dimMismatch > 0 {
 		m.lo.Warn("skipped stale embeddings with mismatched dimensions; reindex the knowledge base after changing the embedding model", "count", dimMismatch, "query_dimensions", len(qvec))
 	}
-	m.lo.Debug("rag search", "query", query, "hits", len(results))
+	m.lo.Debug("rag search", "query_len", len(query), "hits", len(results))
 	for i, r := range results {
-		preview := r.ChunkText
-		if len(preview) > 120 {
-			preview = preview[:120]
-		}
-		m.lo.Debug("rag fetched chunk", "rank", i+1, "score", r.Score, "source_type", r.SourceType, "source_id", r.SourceID, "preview", preview)
+		m.lo.Debug("rag fetched chunk", "rank", i+1, "score", r.Score, "source_type", r.SourceType, "source_id", r.SourceID, "chunk_len", len(r.ChunkText))
 	}
 	return results, nil
 }
@@ -124,7 +120,7 @@ func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent st
 	}
 
 	// Generate embeddings before opening the transaction; provider calls are slow.
-	vecs, err := m.GetEmbeddingsBatch(chunks)
+	vecs, err := m.GetEmbeddingsBatch(context.Background(), chunks)
 	if err != nil {
 		m.lo.Error("error generating embeddings", "error", err)
 		return err

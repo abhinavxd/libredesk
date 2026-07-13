@@ -305,12 +305,15 @@ const handleAiPromptSelected = async (key) => {
 
 const handleGenerateReply = async () => {
   if (isGenerating.value) return
+  const uuid = currentConversationUUID.value
+  if (!uuid) return
   isGenerating.value = true
   try {
     const resp = await api.aiGenerateReply({
-      conversation_uuid: conversationStore.current?.uuid || '',
+      conversation_uuid: uuid,
       instruction: textContent.value
     })
+    if (uuid !== currentConversationUUID.value) return
     htmlContent.value = convertTextToHtml(resp.data.data || '')
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
