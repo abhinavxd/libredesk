@@ -10,7 +10,7 @@
           <p class="text-sm font-medium leading-none">{{ t('admin.ai.preset') }}</p>
           <Select v-model="selectedPreset" @update:modelValue="applyPreset">
             <SelectTrigger>
-              <SelectValue :placeholder="t('admin.ai.presetCustom')" />
+              <SelectValue :placeholder="t('globals.terms.custom')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="p in presets" :key="p.value" :value="p.value">

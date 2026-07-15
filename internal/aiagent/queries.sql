@@ -1,20 +1,20 @@
 -- name: get-assistants
 SELECT a.id, a.created_at, a.updated_at, a.user_id, u.first_name AS name, u.avatar_url,
-       a.description, a.instructions, a.guardrails, a.expectation, a.tone, a.response_length, a.max_turns, a.fallback_team_id, a.handoff_enabled, a.enabled
+       a.description, a.instructions, a.guardrails, a.expectation, a.tone, a.response_length, a.max_turns, a.fallback_team_id, a.handoff_enabled, a.languages, a.enabled
 FROM ai_assistants a
 JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
 ORDER BY a.updated_at DESC;
 
 -- name: get-assistant
 SELECT a.id, a.created_at, a.updated_at, a.user_id, u.first_name AS name, u.avatar_url,
-       a.description, a.instructions, a.guardrails, a.expectation, a.tone, a.response_length, a.max_turns, a.fallback_team_id, a.handoff_enabled, a.enabled
+       a.description, a.instructions, a.guardrails, a.expectation, a.tone, a.response_length, a.max_turns, a.fallback_team_id, a.handoff_enabled, a.languages, a.enabled
 FROM ai_assistants a
 JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
 WHERE a.id = $1;
 
 -- name: get-assistant-by-user-id
 SELECT a.id, a.created_at, a.updated_at, a.user_id, u.first_name AS name, u.avatar_url,
-       a.description, a.instructions, a.guardrails, a.expectation, a.tone, a.response_length, a.max_turns, a.fallback_team_id, a.handoff_enabled, a.enabled
+       a.description, a.instructions, a.guardrails, a.expectation, a.tone, a.response_length, a.max_turns, a.fallback_team_id, a.handoff_enabled, a.languages, a.enabled
 FROM ai_assistants a
 JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
 WHERE a.user_id = $1;
@@ -30,13 +30,13 @@ VALUES ('ai_assistant', $1, '', true)
 RETURNING id;
 
 -- name: insert-assistant
-INSERT INTO ai_assistants (user_id, description, instructions, guardrails, tone, response_length, max_turns, fallback_team_id, enabled, expectation, handoff_enabled)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO ai_assistants (user_id, description, instructions, guardrails, tone, response_length, max_turns, fallback_team_id, enabled, expectation, handoff_enabled, languages)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING id;
 
 -- name: update-assistant
 UPDATE ai_assistants
-SET description = $2, instructions = $3, guardrails = $4, tone = $5, response_length = $6, max_turns = $7, fallback_team_id = $8, enabled = $9, expectation = $10, handoff_enabled = $11, updated_at = now()
+SET description = $2, instructions = $3, guardrails = $4, tone = $5, response_length = $6, max_turns = $7, fallback_team_id = $8, enabled = $9, expectation = $10, handoff_enabled = $11, languages = $12, updated_at = now()
 WHERE id = $1;
 
 -- name: get-assistant-expectation-by-user-id

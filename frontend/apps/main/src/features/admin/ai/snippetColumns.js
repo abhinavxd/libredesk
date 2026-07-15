@@ -26,6 +26,15 @@ export const createSnippetColumns = (t, { onEdit } = {}) => [
           )
         )
       }
+      if (row.original.source === 'url') {
+        children.push(
+          h(
+            Badge,
+            { variant: 'secondary', class: 'ml-2 align-middle', title: row.original.source_url },
+            () => t('admin.ai.snippet.imported')
+          )
+        )
+      }
       return h('div', { class: 'text-center' }, children)
     }
   },

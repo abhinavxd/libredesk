@@ -48,6 +48,9 @@
             <DropdownMenuItem @click="downloadTranscript">
               {{ t('conversation.downloadTranscript') }}
             </DropdownMenuItem>
+            <DropdownMenuItem :disabled="isSummarizing" @click="summarize">
+              {{ t('conversation.summarize') }}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -62,7 +65,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useConversationStore } from '../../stores/conversation'
 import { Clock, MoreHorizontal } from 'lucide-vue-next'
 import {
@@ -120,6 +123,27 @@ const downloadTranscript = async () => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  }
+}
+
+const isSummarizing = ref(false)
+
+const summarize = async () => {
+  const conversation = conversationStore.current
+  if (!conversation || isSummarizing.value) return
+  try {
+    isSummarizing.value = true
+    await api.aiSummarizeConversation({ conversation_uuid: conversation.uuid })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('conversation.summarizeAdded')
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isSummarizing.value = false
   }
 }
 

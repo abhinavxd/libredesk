@@ -7,7 +7,7 @@
       <Spinner v-if="isLoading" />
 
       <div class="space-y-6">
-        <div class="text-sm text-gray-500 text-left">
+        <div class="text-sm text-muted-foreground text-left">
           {{ $t('globals.terms.lastUpdated') }}: {{ lastUpdateFormatted }}
         </div>
 

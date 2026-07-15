@@ -58,6 +58,23 @@
                 </span>
               </div>
             </div>
+            <div v-if="previewSources.length" class="space-y-2">
+              <div class="text-sm font-medium text-foreground">
+                {{ t('admin.ai.assistant.preview.sources') }}
+              </div>
+              <div class="rounded-md border border-border p-3 space-y-1">
+                <div
+                  v-for="source in previewSources"
+                  :key="source.id"
+                  class="flex items-center justify-between text-sm"
+                >
+                  <span class="text-foreground">{{ source.title }}</span>
+                  <span class="text-xs text-muted-foreground">
+                    {{ Math.round(source.score * 100) }}%
+                  </span>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </TabsContent>
@@ -136,6 +153,7 @@ const statsLoading = ref(false)
 const rangeOptions = [7, 30, 90]
 const previewMessage = ref('')
 const previewReply = ref('')
+const previewSources = ref([])
 const previewLoading = ref(false)
 
 const fmtNumber = (value) => Number(value ?? 0).toLocaleString()
@@ -211,7 +229,10 @@ const runPreview = async () => {
     previewLoading.value = true
     const resp = await api.previewAIAssistant(props.id, { message: previewMessage.value })
     previewReply.value = resp.data.data.reply
+    previewSources.value = resp.data.data.sources || []
   } catch (error) {
+    previewReply.value = ''
+    previewSources.value = []
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message

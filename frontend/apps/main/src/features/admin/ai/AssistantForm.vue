@@ -108,6 +108,23 @@
       </FormField>
     </div>
 
+    <FormField v-slot="{ componentField, handleChange }" name="languages">
+      <FormItem>
+        <FormLabel>{{ t('admin.ai.assistant.languages') }}</FormLabel>
+        <FormControl>
+          <TagsInput :modelValue="componentField.modelValue" @update:modelValue="handleChange">
+            <TagsInputItem v-for="item in componentField.modelValue" :key="item" :value="item">
+              <TagsInputItemText />
+              <TagsInputItemDelete />
+            </TagsInputItem>
+            <TagsInputInput :placeholder="t('admin.ai.assistant.languagesPlaceholder')" />
+          </TagsInput>
+        </FormControl>
+        <FormDescription>{{ t('admin.ai.assistant.languagesHint') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <FormField v-slot="{ componentField, handleChange }" name="handoff_enabled">
       <FormItem>
         <SwitchField
@@ -201,6 +218,13 @@ import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
 import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
+import {
+  TagsInput,
+  TagsInputInput,
+  TagsInputItem,
+  TagsInputItemDelete,
+  TagsInputItemText
+} from '@shared-ui/components/ui/tags-input'
 import { AvatarUpload } from '@shared-ui/components/ui/avatar'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import {
@@ -276,6 +300,7 @@ const form = useForm({
         .max(20, { message: t('admin.ai.assistant.maxTurnsHint') }),
       fallback_team_id: z.string().optional(),
       handoff_enabled: z.boolean().optional(),
+      languages: z.array(z.string()).optional(),
       instructions: z.string().optional(),
       guardrails: z.string().optional(),
       enabled: z.boolean().optional()
@@ -290,6 +315,7 @@ const form = useForm({
     max_turns: 6,
     fallback_team_id: 'none',
     handoff_enabled: true,
+    languages: [],
     instructions: '',
     guardrails: '',
     enabled: true
@@ -316,6 +342,7 @@ watch(
       max_turns: values.max_turns ?? 6,
       fallback_team_id: values.fallback_team_id ? String(values.fallback_team_id) : 'none',
       handoff_enabled: values.handoff_enabled ?? true,
+      languages: [...(values.languages || [])],
       instructions: values.instructions || '',
       guardrails: values.guardrails || '',
       enabled: values.enabled ?? true
@@ -357,6 +384,7 @@ const onSubmit = form.handleSubmit(async (values) => {
           ? Number(values.fallback_team_id)
           : null,
       handoff_enabled: !!values.handoff_enabled,
+      languages: values.languages || [],
       instructions: values.instructions || '',
       guardrails: values.guardrails || '',
       enabled: !!values.enabled,

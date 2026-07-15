@@ -17,13 +17,13 @@ SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE key
 SELECT id, created_at, updated_at, key, title FROM ai_prompts ORDER BY title;
 
 -- name: get-knowledge-base-items
-SELECT id, created_at, updated_at, type, title, content, enabled, source, embedded_fingerprint FROM ai_knowledge_base ORDER BY updated_at DESC;
+SELECT id, created_at, updated_at, type, title, content, enabled, source, source_url, embedded_fingerprint FROM ai_knowledge_base ORDER BY updated_at DESC;
 
 -- name: get-knowledge-base-item
-SELECT id, created_at, updated_at, type, title, content, enabled, source, embedded_fingerprint FROM ai_knowledge_base WHERE id = $1;
+SELECT id, created_at, updated_at, type, title, content, enabled, source, source_url, embedded_fingerprint FROM ai_knowledge_base WHERE id = $1;
 
 -- name: insert-knowledge-base-item
-INSERT INTO ai_knowledge_base (type, title, content, enabled, source) VALUES ($1, $2, $3, $4, $5) RETURNING *;
+INSERT INTO ai_knowledge_base (type, title, content, enabled, source, source_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 
 -- name: update-knowledge-base-item
 UPDATE ai_knowledge_base SET title = $2, content = $3, enabled = $4, updated_at = now() WHERE id = $1 RETURNING *;

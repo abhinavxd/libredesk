@@ -2,7 +2,30 @@
   <AdminSplitLayout>
     <template #content>
       <LoadingOverlay :loading="isLoading" reserve-height>
-        <div class="flex justify-end mb-4">
+        <div class="flex justify-end gap-2 mb-4">
+          <Dialog v-model:open="importDialogOpen">
+            <DialogTrigger as-child>
+              <Button variant="outline">{{ t('admin.ai.snippet.importUrl') }}</Button>
+            </DialogTrigger>
+            <DialogContent class="sm:max-w-[560px]">
+              <DialogHeader>
+                <DialogTitle>{{ t('admin.ai.snippet.importUrl') }}</DialogTitle>
+                <DialogDescription>{{ t('admin.ai.snippet.importUrlHint') }}</DialogDescription>
+              </DialogHeader>
+              <form class="space-y-4" @submit.prevent="importFromUrl">
+                <Input
+                  v-model="importUrl"
+                  type="url"
+                  :placeholder="t('admin.ai.snippet.importUrlPlaceholder')"
+                />
+                <div class="flex justify-end">
+                  <Button type="submit" :isLoading="isImporting" :disabled="!importUrl.trim()">
+                    {{ t('globals.messages.import') }}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
           <Dialog v-model:open="snippetDialogOpen">
             <DialogTrigger as-child @click="newSnippet">
               <Button>{{ t('admin.ai.snippet.new') }}</Button>
@@ -44,10 +67,12 @@ import { Button } from '@shared-ui/components/ui/button/index.js'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger
 } from '@shared-ui/components/ui/dialog/index.js'
+import { Input } from '@shared-ui/components/ui/input/index.js'
 import SnippetForm from '@/features/admin/ai/SnippetForm.vue'
 import { createSnippetColumns } from '@/features/admin/ai/snippetColumns.js'
 import { useEmitter } from '@/composables/useEmitter.js'
@@ -63,6 +88,9 @@ const isLoading = ref(false)
 const snippets = ref([])
 
 const snippetDialogOpen = ref(false)
+const importDialogOpen = ref(false)
+const importUrl = ref('')
+const isImporting = ref(false)
 const snippetEditing = ref(false)
 const snippetInitial = ref({})
 const editingSnippetId = ref(null)
@@ -98,6 +126,27 @@ const getSnippets = async () => {
     })
   } finally {
     isLoading.value = false
+  }
+}
+
+const importFromUrl = async () => {
+  if (!importUrl.value.trim() || isImporting.value) return
+  try {
+    isImporting.value = true
+    await api.importAISnippetFromURL({ url: importUrl.value.trim() })
+    importDialogOpen.value = false
+    importUrl.value = ''
+    getSnippets()
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('globals.messages.savedSuccessfully')
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isImporting.value = false
   }
 }
 

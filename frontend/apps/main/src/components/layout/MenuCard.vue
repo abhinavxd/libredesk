@@ -8,7 +8,7 @@
       <h3 class="text-lg font-medium">{{ title }}</h3>
       <Badge v-if="badge" variant="secondary" class="ml-2">{{ badge }}</Badge>
     </div>
-    <p class="text-sm text-gray-600 dark:text-gray-400">{{ subTitle }}</p>
+    <p class="text-sm text-muted-foreground">{{ subTitle }}</p>
   </div>
 </template>
 

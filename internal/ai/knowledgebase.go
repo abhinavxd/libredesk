@@ -33,12 +33,12 @@ func (m *Manager) GetKnowledgeBaseItem(id int) (models.KnowledgeBaseItem, error)
 	return item, nil
 }
 
-func (m *Manager) CreateKnowledgeBaseItem(title, content, source string, enabled bool) (models.KnowledgeBaseItem, error) {
+func (m *Manager) CreateKnowledgeBaseItem(title, content, source, sourceURL string, enabled bool) (models.KnowledgeBaseItem, error) {
 	if source == "" {
 		source = models.KnowledgeSourceManual
 	}
 	var item models.KnowledgeBaseItem
-	if err := m.q.InsertKnowledgeBaseItem.Get(&item, models.KnowledgeTypeSnippet, title, content, enabled, source); err != nil {
+	if err := m.q.InsertKnowledgeBaseItem.Get(&item, models.KnowledgeTypeSnippet, title, content, enabled, source, sourceURL); err != nil {
 		m.lo.Error("error creating knowledge base item", "error", err)
 		return item, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

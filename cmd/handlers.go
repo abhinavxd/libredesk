@@ -259,11 +259,13 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// AI knowledge base snippets.
 	g.GET("/api/v1/ai/snippets", perm(handleGetAISnippets, "ai:manage"))
 	g.POST("/api/v1/ai/snippets", perm(handleCreateAISnippet, "ai:manage"))
+	g.POST("/api/v1/ai/snippets/import-url", perm(handleImportAISnippetFromURL, "ai:manage"))
 	g.PUT("/api/v1/ai/snippets/{id}", perm(handleUpdateAISnippet, "ai:manage"))
 	g.DELETE("/api/v1/ai/snippets/{id}", perm(handleDeleteAISnippet, "ai:manage"))
 
 	// AI assistant: reply drafting + copilot chat.
 	g.POST("/api/v1/ai/generate-reply", auth(handleAIGenerateReply))
+	g.POST("/api/v1/ai/summarize", auth(handleAISummarizeConversation))
 	g.POST("/api/v1/ai/copilot", auth(handleAICopilot))
 	g.GET("/api/v1/ai/copilot/messages", auth(handleGetCopilotMessages))
 	g.DELETE("/api/v1/ai/copilot/messages", auth(handleClearCopilotMessages))

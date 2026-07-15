@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
 
@@ -21,26 +22,34 @@ var (
 
 // Assistant is one AI assistant: a persona plus the ai_assistant user that carries its identity.
 type Assistant struct {
-	ID             int         `db:"id" json:"id"`
-	CreatedAt      time.Time   `db:"created_at" json:"created_at"`
-	UpdatedAt      time.Time   `db:"updated_at" json:"updated_at"`
-	UserID         int         `db:"user_id" json:"user_id"`
-	Name           string      `db:"name" json:"name"`
-	AvatarURL      null.String `db:"avatar_url" json:"avatar_url"`
-	Description    string      `db:"description" json:"description"`
-	Instructions   string      `db:"instructions" json:"instructions"`
-	Guardrails     string      `db:"guardrails" json:"guardrails"`
-	Expectation    string      `db:"expectation" json:"expectation"`
-	Tone           string      `db:"tone" json:"tone"`
-	ResponseLength string      `db:"response_length" json:"response_length"`
-	MaxTurns       int         `db:"max_turns" json:"max_turns"`
-	FallbackTeamID null.Int    `db:"fallback_team_id" json:"fallback_team_id"`
-	HandoffEnabled bool        `db:"handoff_enabled" json:"handoff_enabled"`
-	Enabled        bool        `db:"enabled" json:"enabled"`
-	ToolIDs        []int       `db:"-" json:"tool_ids"`
+	ID             int            `db:"id" json:"id"`
+	CreatedAt      time.Time      `db:"created_at" json:"created_at"`
+	UpdatedAt      time.Time      `db:"updated_at" json:"updated_at"`
+	UserID         int            `db:"user_id" json:"user_id"`
+	Name           string         `db:"name" json:"name"`
+	AvatarURL      null.String    `db:"avatar_url" json:"avatar_url"`
+	Description    string         `db:"description" json:"description"`
+	Instructions   string         `db:"instructions" json:"instructions"`
+	Guardrails     string         `db:"guardrails" json:"guardrails"`
+	Expectation    string         `db:"expectation" json:"expectation"`
+	Tone           string         `db:"tone" json:"tone"`
+	ResponseLength string         `db:"response_length" json:"response_length"`
+	MaxTurns       int            `db:"max_turns" json:"max_turns"`
+	FallbackTeamID null.Int       `db:"fallback_team_id" json:"fallback_team_id"`
+	HandoffEnabled bool           `db:"handoff_enabled" json:"handoff_enabled"`
+	Languages      pq.StringArray `db:"languages" json:"languages"`
+	Enabled        bool           `db:"enabled" json:"enabled"`
+	ToolIDs        []int          `db:"-" json:"tool_ids"`
 
 	// RemoveAvatar, when set on a save request, clears the assistant's current avatar.
 	RemoveAvatar bool `db:"-" json:"remove_avatar"`
+}
+
+// PreviewSource is one knowledge base item a preview reply was grounded in.
+type PreviewSource struct {
+	ID    int     `json:"id"`
+	Title string  `json:"title"`
+	Score float64 `json:"score"`
 }
 
 // RecentConversation is a summary row of a contact's past conversation, fed to the assistant as context.

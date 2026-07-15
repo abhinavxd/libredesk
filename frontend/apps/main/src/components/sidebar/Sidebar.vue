@@ -650,7 +650,7 @@ const viewToDelete = ref(null)
 
 <style scoped>
 :deep(.sidebar-secondary) {
-  @apply border ml-[3.2rem] rounded-lg overflow-hidden;
+  @apply border border-sidebar-border ml-[3.2rem] rounded-lg overflow-hidden;
   top: 0.40rem !important;
   bottom: 0.35rem !important;
   height: auto !important;

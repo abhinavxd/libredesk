@@ -20,7 +20,7 @@ Core rules:
 - You only help with support for this company. Politely decline anything outside that scope - coding, math, trivia, general questions, other companies - and do not answer it even if you know the answer.
 - Never invent or guess facts, policies, prices, steps, or promises.
 - Do not mention tools, searching, retrieval, the knowledge base, or your reasoning to the customer. Never say you "could not find" anything.
-- Reply in the same language as the customer's last message.
+- %s
 - Keep replies short and conversational, usually one or two sentences. You may use simple markdown (bold, links, bullet or numbered lists) when it genuinely helps, such as listing steps; otherwise write like speech. Never use headings, tables, code blocks, or images.
 - Do not promise to do something after this reply (check, look into it, follow up, email, call, refund, cancel, escalate) unless you actually do it now with a tool.
 - When the request is ambiguous, ask one short clarifying question instead of assuming.
@@ -35,6 +35,8 @@ Handling requests:
 - Call resolve only after the customer confirms they are done (for example "yes", "thanks, that's all", or clear agreement). If they raise something new instead, keep helping.`
 
 const handoffToolLine = "- hand_off_to_human: transfer the conversation to a human agent.\n"
+
+const defaultLanguageLine = "Reply in the same language as the customer's last message."
 
 const cannotAnswerWithHandoff = `If you cannot answer from the knowledge base: tell the customer you could not help with that and offer to connect them with a human. Only call hand_off_to_human once the customer asks for a human or accepts your offer, or if they are clearly stuck or frustrated. Do not tell the customer they have been transferred unless you have used the tool.`
 
@@ -51,6 +53,18 @@ var lengthClauses = map[string]string{
 	"concise":  "Keep replies short and to the point, ideally one or two sentences.",
 	"balanced": "Keep replies reasonably brief but complete.",
 	"detailed": "Give thorough replies that fully address the question with relevant detail.",
+}
+
+// languageLine restricts replies to the admin's allowed languages, falling back to the first one.
+func languageLine(languages []string) string {
+	if len(languages) == 0 {
+		return defaultLanguageLine
+	}
+	if len(languages) == 1 {
+		return fmt.Sprintf("Reply only in %s, even when the customer writes in another language.", languages[0])
+	}
+	return fmt.Sprintf("Reply only in one of these languages: %s. Use the customer's language when it is one of them; otherwise reply in %s.",
+		strings.Join(languages, ", "), languages[0])
 }
 
 // buildContactContext describes the customer the assistant is talking to, from whatever identifying
@@ -96,7 +110,7 @@ func buildSystemPrompt(a models.Assistant) string {
 	if !a.HandoffEnabled {
 		toolLine, cannotAnswer = "", cannotAnswerNoHandoff
 	}
-	fmt.Fprintf(&b, basePrompt, name, toolLine, cannotAnswer)
+	fmt.Fprintf(&b, basePrompt, name, toolLine, languageLine(a.Languages), cannotAnswer)
 
 	if tone := toneClauses[a.Tone]; tone != "" {
 		b.WriteString("\n\nVoice: ")

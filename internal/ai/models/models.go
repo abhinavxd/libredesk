@@ -21,6 +21,7 @@ const (
 	// ai_knowledge_base.source values.
 	KnowledgeSourceManual       = "manual"
 	KnowledgeSourceConversation = "conversation"
+	KnowledgeSourceURL          = "url"
 )
 
 // Provider is a row in ai_providers (one per type: completion / embedding).
@@ -71,6 +72,7 @@ type KnowledgeBaseItem struct {
 	Content   string    `db:"content" json:"content"`
 	Enabled   bool      `db:"enabled" json:"enabled"`
 	Source    string    `db:"source" json:"source"`
+	SourceURL string    `db:"source_url" json:"source_url"`
 	// EmbeddedFingerprint is the content+model+dimensions signature last successfully embedded; empty means it needs (re)embedding.
 	EmbeddedFingerprint string `db:"embedded_fingerprint" json:"-"`
 }

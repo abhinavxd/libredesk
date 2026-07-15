@@ -116,11 +116,11 @@ func handleAIAssistantPreview(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	reply, err := app.aiAgent.PreviewReply(r.RequestCtx, id, req.Message)
+	reply, sources, err := app.aiAgent.PreviewReply(r.RequestCtx, id, req.Message)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(map[string]any{"reply": reply})
+	return r.SendEnvelope(map[string]any{"reply": reply, "sources": sources})
 }
 
 func handleGetAIAssistantStats(r *fastglue.Request) error {

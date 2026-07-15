@@ -12,7 +12,7 @@
 
         <div class="space-y-4 flex-2">
           <div class="flex items-center gap-3">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-foreground">
+            <h3 class="text-lg font-semibold text-foreground">
               {{ props.initialValues.first_name }} {{ props.initialValues.last_name }}
             </h3>
             <Badge :class="['px-2 rounded-full text-xs font-medium', availabilityStatus.color]">
@@ -22,10 +22,10 @@
 
           <div class="flex flex-wrap items-center gap-6">
             <div class="flex items-center gap-2">
-              <Clock class="w-5 h-5 text-gray-400" />
+              <Clock class="w-5 h-5 text-muted-foreground" />
               <div>
-                <p class="text-sm text-gray-500">{{ $t('globals.terms.lastActive') }}</p>
-                <p class="text-sm font-medium text-gray-700 dark:text-foreground">
+                <p class="text-sm text-muted-foreground">{{ $t('globals.terms.lastActive') }}</p>
+                <p class="text-sm font-medium text-foreground">
                   {{
                     props.initialValues.last_active_at
                       ? format(new Date(props.initialValues.last_active_at), 'PPpp')
@@ -35,10 +35,10 @@
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <LogIn class="w-5 h-5 text-gray-400" />
+              <LogIn class="w-5 h-5 text-muted-foreground" />
               <div>
-                <p class="text-sm text-gray-500">{{ $t('globals.terms.lastLogin') }}</p>
-                <p class="text-sm font-medium text-gray-700 dark:text-foreground">
+                <p class="text-sm text-muted-foreground">{{ $t('globals.terms.lastLogin') }}</p>
+                <p class="text-sm font-medium text-foreground">
                   {{
                     props.initialValues.last_login_at
                       ? format(new Date(props.initialValues.last_login_at), 'PPpp')
@@ -165,10 +165,10 @@
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-base font-semibold text-gray-900 dark:text-foreground">
+          <p class="text-base font-semibold text-foreground">
             {{ $t('globals.terms.apiKey', 2) }}
           </p>
-          <p class="text-sm text-gray-500">
+          <p class="text-sm text-muted-foreground">
             {{ $t('admin.agent.apiKey.description') }}
           </p>
         </div>
@@ -178,10 +178,10 @@
       <div v-if="apiKeyData.api_key" class="space-y-3">
         <div class="flex items-center justify-between p-3 bg-background border rounded-md">
           <div class="flex items-center gap-3">
-            <Key class="w-4 h-4 text-gray-400" />
+            <Key class="w-4 h-4 text-muted-foreground" />
             <div>
               <p class="text-sm font-medium">{{ $t('globals.terms.apiKey') }}</p>
-              <p class="text-xs text-gray-500 font-mono">{{ apiKeyData.api_key }}</p>
+              <p class="text-xs text-muted-foreground font-mono">{{ apiKeyData.api_key }}</p>
             </div>
           </div>
           <div class="flex gap-2">
@@ -209,7 +209,7 @@
         </div>
 
         <!-- Last Used Info -->
-        <div v-if="apiKeyLastUsedAt" class="text-xs text-gray-500">
+        <div v-if="apiKeyLastUsedAt" class="text-xs text-muted-foreground">
           {{ $t('globals.messages.lastUsed') }}:
           {{ format(new Date(apiKeyLastUsedAt), 'PPpp') }}
         </div>
@@ -217,8 +217,8 @@
 
       <!-- No API Key State -->
       <div v-else class="text-center py-6">
-        <Key class="w-8 h-8 text-gray-400 mx-auto mb-2" />
-        <p class="text-sm text-gray-500 mb-3">{{ $t('admin.agent.apiKey.noKey') }}</p>
+        <Key class="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+        <p class="text-sm text-muted-foreground mb-3">{{ $t('admin.agent.apiKey.noKey') }}</p>
         <Button type="button" @click="generateAPIKey" :disabled="isAPIKeyLoading">
           <Plus class="w-4 h-4" />
           {{ $t('agent.generateApiKey') }}

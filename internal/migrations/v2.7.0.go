@@ -59,9 +59,13 @@ func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			content TEXT NOT NULL,
 			enabled BOOLEAN NOT NULL DEFAULT true,
 			source TEXT NOT NULL DEFAULT 'manual',
+			source_url TEXT NOT NULL DEFAULT '',
 			embedded_fingerprint TEXT NOT NULL DEFAULT ''
 		);
 	`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE ai_knowledge_base ADD COLUMN IF NOT EXISTS source_url TEXT NOT NULL DEFAULT '';`); err != nil {
 		return err
 	}
 	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS index_ai_knowledge_base_on_type_enabled ON ai_knowledge_base(type, enabled);`); err != nil {
@@ -120,6 +124,7 @@ func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			max_turns INTEGER NOT NULL DEFAULT 6,
 			fallback_team_id INTEGER NULL REFERENCES teams(id) ON DELETE SET NULL,
 			handoff_enabled BOOLEAN NOT NULL DEFAULT true,
+			languages TEXT[] NOT NULL DEFAULT '{}',
 			enabled BOOLEAN NOT NULL DEFAULT true,
 			CONSTRAINT constraint_ai_assistants_on_tone CHECK (tone IN ('friendly', 'professional', 'neutral', 'casual')),
 			CONSTRAINT constraint_ai_assistants_on_response_length CHECK (response_length IN ('concise', 'balanced', 'detailed')),
@@ -129,6 +134,9 @@ func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 	if _, err := db.Exec(`ALTER TABLE ai_assistants ADD COLUMN IF NOT EXISTS handoff_enabled BOOLEAN NOT NULL DEFAULT true;`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE ai_assistants ADD COLUMN IF NOT EXISTS languages TEXT[] NOT NULL DEFAULT '{}';`); err != nil {
 		return err
 	}
 	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS index_ai_assistants_on_user_id ON ai_assistants(user_id);`); err != nil {

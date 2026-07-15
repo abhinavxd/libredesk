@@ -9,6 +9,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -36,10 +37,18 @@ type copilotReq struct {
 	Messages         []aimodels.ChatMessage `json:"messages"`
 }
 
+type summarizeReq struct {
+	ConversationUUID string `json:"conversation_uuid"`
+}
+
 type snippetReq struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
 	Enabled bool   `json:"enabled"`
+}
+
+type snippetImportReq struct {
+	URL string `json:"url"`
 }
 
 // handleAICompletion runs a stored prompt over the supplied content (reply-box actions).
@@ -213,7 +222,7 @@ func handleCreateAISnippet(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	item, err := app.ai.CreateKnowledgeBaseItem(req.Title, req.Content, aimodels.KnowledgeSourceManual, req.Enabled)
+	item, err := app.ai.CreateKnowledgeBaseItem(req.Title, req.Content, aimodels.KnowledgeSourceManual, "", req.Enabled)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -233,6 +242,22 @@ func handleUpdateAISnippet(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
 	item, err := app.ai.UpdateKnowledgeBaseItem(id, req.Title, req.Content, req.Enabled)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(item)
+}
+
+// handleImportAISnippetFromURL fetches a page and adds its readable content as a snippet.
+func handleImportAISnippetFromURL(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req snippetImportReq
+	)
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	item, err := app.ai.ImportKnowledgeBaseFromURL(r.RequestCtx, req.URL)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -272,6 +297,40 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(resp)
+}
+
+// handleAISummarizeConversation summarizes a conversation and posts the summary as the requesting agent's private note.
+func handleAISummarizeConversation(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req summarizeReq
+	)
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	if req.ConversationUUID == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	if _, err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	transcript := conversationTranscript(app, req.ConversationUUID)
+	if strings.TrimSpace(transcript) == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.summarizeEmptyConversation"), nil))
+	}
+	summary, err := app.ai.Summarize(r.RequestCtx, transcript)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if strings.TrimSpace(summary) == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	note := "**" + app.i18n.T("ai.summaryNoteTitle") + "**\n\n" + summary
+	if _, err := app.conversation.SendPrivateNote(nil, auser.ID, req.ConversationUUID, stringutil.Markdown2HTML(note), nil); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
 }
 
 // handleAICopilot answers an agent's copilot chat message.

@@ -4,7 +4,7 @@
   <div class="flex w-full h-screen text-foreground bg-canvas p-1.5">
     <!-- Icon sidebar always visible -->
     <SidebarProvider style="--sidebar-width: 3rem" class="w-auto z-50">
-      <ShadcnSidebar collapsible="none" class="border rounded-lg overflow-hidden">
+      <ShadcnSidebar collapsible="none" class="border border-sidebar-border rounded-lg overflow-hidden">
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>

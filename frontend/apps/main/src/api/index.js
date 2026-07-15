@@ -481,6 +481,7 @@ const getAIAssistantStats = (id, range) =>
   http.get(`/api/v1/ai/assistants/${id}/stats`, { params: range ? { range } : {} })
 const getAISnippets = () => http.get('/api/v1/ai/snippets')
 const createAISnippet = (data) => http.post('/api/v1/ai/snippets', data)
+const importAISnippetFromURL = (data) => http.post('/api/v1/ai/snippets/import-url', data)
 const updateAISnippet = (id, data) => http.put(`/api/v1/ai/snippets/${id}`, data)
 const deleteAISnippet = (id) => http.delete(`/api/v1/ai/snippets/${id}`)
 const getAIFaqSuggestions = (status) =>
@@ -491,6 +492,7 @@ const rejectAIFaqSuggestion = (id) => http.post(`/api/v1/ai/faq-suggestions/${id
 const getAIFaqLearning = () => http.get('/api/v1/ai/faq-learning')
 const updateAIFaqLearning = (data) => http.put('/api/v1/ai/faq-learning', data)
 const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data)
+const aiSummarizeConversation = (data) => http.post('/api/v1/ai/summarize', data)
 const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data)
 const getCopilotMessages = (conversationUUID) =>
   http.get('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
@@ -710,6 +712,7 @@ export default {
   getAIAssistantStats,
   getAISnippets,
   createAISnippet,
+  importAISnippetFromURL,
   updateAISnippet,
   deleteAISnippet,
   getAIFaqSuggestions,
@@ -718,6 +721,7 @@ export default {
   getAIFaqLearning,
   updateAIFaqLearning,
   aiGenerateReply,
+  aiSummarizeConversation,
   aiCopilot,
   getCopilotMessages,
   clearCopilotMessages,

@@ -612,6 +612,7 @@ CREATE TABLE ai_knowledge_base (
 	content TEXT NOT NULL,
 	enabled BOOLEAN NOT NULL DEFAULT true,
 	source TEXT NOT NULL DEFAULT 'manual',
+	source_url TEXT NOT NULL DEFAULT '',
 	embedded_fingerprint TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX index_ai_knowledge_base_on_type_enabled ON ai_knowledge_base(type, enabled);
@@ -660,6 +661,7 @@ CREATE TABLE ai_assistants (
 	max_turns INTEGER NOT NULL DEFAULT 6,
 	fallback_team_id INTEGER NULL REFERENCES teams(id) ON DELETE SET NULL,
 	handoff_enabled BOOLEAN NOT NULL DEFAULT true,
+	languages TEXT[] NOT NULL DEFAULT '{}',
 	enabled BOOLEAN NOT NULL DEFAULT true,
 	CONSTRAINT constraint_ai_assistants_on_tone CHECK (tone IN ('friendly', 'professional', 'neutral', 'casual')),
 	CONSTRAINT constraint_ai_assistants_on_response_length CHECK (response_length IN ('concise', 'balanced', 'detailed')),

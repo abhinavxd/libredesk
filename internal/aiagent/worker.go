@@ -307,29 +307,48 @@ func (m *Manager) actorUser(a models.Assistant) umodels.User {
 	return umodels.User{ID: a.UserID, FirstName: a.Name, Type: umodels.UserTypeAIAssistant}
 }
 
-// PreviewReply runs the assistant against a test message with no side effects (no reply, handoff,
-// or resolve), so admins can try it before it goes live.
-func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message string) (string, error) {
+// PreviewReply runs the assistant against a test message with no side effects and returns the reply and the knowledge base items it was grounded in.
+func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message string) (string, []models.PreviewSource, error) {
 	a, err := m.GetAssistant(assistantID)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	message = strings.TrimSpace(message)
 	if message == "" {
-		return "", nil
+		return "", nil, nil
 	}
 	history := []aimodels.ChatMessage{{Role: "user", Content: message}}
-	tools := []ai.Tool{&searchKnowledgeTool{m: m}}
+	var hits []aimodels.SearchResult
+	tools := []ai.Tool{&searchKnowledgeTool{m: m, collect: func(rs []aimodels.SearchResult) { hits = append(hits, rs...) }}}
 	// Preview is search-only: no custom tools (empty allowed set), no built-in, no side effects.
 	answer, err := m.ai.RunAgentWithTools(ctx, buildSystemPrompt(a), history, aiRunMaxSteps, ai.ToolContext{}, []int{}, false, tools)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	main, confirm := splitConfirmation(strings.TrimSpace(answer))
 	if confirm != "" {
 		main += "\n\n" + confirm
 	}
-	return main, nil
+	return main, m.previewSources(hits), nil
+}
+
+// previewSources dedupes search hits by knowledge base item, keeping each item's best score.
+func (m *Manager) previewSources(hits []aimodels.SearchResult) []models.PreviewSource {
+	sources := []models.PreviewSource{}
+	best := map[int]int{}
+	for _, h := range hits {
+		if idx, ok := best[h.SourceID]; ok {
+			sources[idx].Score = max(sources[idx].Score, h.Score)
+			continue
+		}
+		item, err := m.ai.GetKnowledgeBaseItem(h.SourceID)
+		if err != nil {
+			continue
+		}
+		best[h.SourceID] = len(sources)
+		sources = append(sources, models.PreviewSource{ID: item.ID, Title: item.Title, Score: h.Score})
+	}
+	return sources
 }
 
 func lastIsInboundContact(msgs []cmodels.Message) bool {

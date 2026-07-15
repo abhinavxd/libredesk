@@ -90,7 +90,7 @@ func (m *Manager) ApproveFAQSuggestion(id int, question, answer string, reviewer
 	if n, _ := res.RowsAffected(); n == 0 {
 		return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.faqAlreadyReviewed"), nil)
 	}
-	if _, err := m.ai.CreateKnowledgeBaseItem(question, answer, aimodels.KnowledgeSourceConversation, true); err != nil {
+	if _, err := m.ai.CreateKnowledgeBaseItem(question, answer, aimodels.KnowledgeSourceConversation, "", true); err != nil {
 		m.lo.Error("faq suggestion approved but snippet creation failed", "id", id, "error", err)
 		if _, rerr := m.q.RevertFAQSuggestionToPending.Exec(id); rerr != nil {
 			m.lo.Error("error reverting faq suggestion to pending", "id", id, "error", rerr)
