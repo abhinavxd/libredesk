@@ -38,14 +38,18 @@ type Provider struct {
 
 // ProviderConfig is the decoded ai_providers.config JSONB. OpenAI-compatible.
 type ProviderConfig struct {
-	Provider     string   `json:"provider"`
-	BaseURL      string   `json:"base_url"`
-	APIKey       string   `json:"api_key"`
-	Model        string   `json:"model"`
-	Temperature  *float64 `json:"temperature,omitempty"`
-	MaxTokens    int      `json:"max_tokens"`
-	Dimensions   int      `json:"dimensions"`
-	Instructions string   `json:"instructions"`
+	Provider    string   `json:"provider"`
+	BaseURL     string   `json:"base_url"`
+	APIKey      string   `json:"api_key"`
+	Model       string   `json:"model"`
+	Temperature *float64 `json:"temperature,omitempty"`
+	MaxTokens   int      `json:"max_tokens"`
+	Dimensions  int      `json:"dimensions"`
+	// EmbeddingMaxTokens caps each embedding input to the model's context limit; defaults to
+	// OpenAI's 8192. Lower it (e.g. 512) for local models like bge/nomic-embed served over an
+	// OpenAI-compatible endpoint so their requests don't get rejected.
+	EmbeddingMaxTokens int    `json:"embedding_max_tokens"`
+	Instructions       string `json:"instructions"`
 	// ReasoningEffort, when set, is sent as-is. Reasoning models (e.g. GPT-5.x) need "none" to use
 	// tools on /chat/completions; leave blank for models that reject the param.
 	ReasoningEffort string `json:"reasoning_effort,omitempty"`

@@ -635,6 +635,7 @@
   "conversation.couldNotFetch": "Could not fetch conversations",
   "conversation.downloadTranscript": "Download transcript",
   "conversation.summarize": "Summarize with AI",
+  "conversation.summarizing": "Summarizing conversation with AI. This may take a few seconds.",
   "conversation.summarizeAdded": "Summary added to the conversation as a private note.",
   "conversation.deletePrivateNote": "Delete note",
   "conversation.deletePrivateNoteConfirmation": "This permanently deletes the note. It can't be recovered.",

@@ -30,7 +30,7 @@
             <DialogTrigger as-child @click="newSnippet">
               <Button>{{ t('admin.ai.snippet.new') }}</Button>
             </DialogTrigger>
-            <DialogContent class="sm:max-w-[560px]">
+            <DialogContent class="sm:max-w-3xl">
               <DialogHeader>
                 <DialogTitle>
                   {{ snippetEditing ? t('admin.ai.snippet.edit') : t('admin.ai.snippet.new') }}

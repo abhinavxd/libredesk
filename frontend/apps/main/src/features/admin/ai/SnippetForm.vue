@@ -14,7 +14,7 @@
       <FormItem>
         <FormLabel>{{ t('globals.terms.content') }}</FormLabel>
         <FormControl>
-          <Textarea rows="6" v-bind="componentField" />
+          <Textarea class="min-h-[420px] max-h-[60vh]" v-bind="componentField" />
         </FormControl>
         <FormMessage />
       </FormItem>

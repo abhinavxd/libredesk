@@ -102,6 +102,7 @@ func New(opts Opts) (*Manager, error) {
 		index:         newEmbeddingIndex(),
 	}
 	m.chunkCfg.Logger = opts.Lo
+	m.chunkCfg.TokenizerFunc = newTokenCounter(opts.Lo)
 	// Search tolerates an empty index until this finishes.
 	go func() {
 		if err := m.loadIndex(); err != nil {
@@ -223,16 +224,17 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 	}
 
 	cfg := models.ProviderConfig{
-		Provider:        "openai",
-		BaseURL:         in.BaseURL,
-		APIKey:          apiKey,
-		Model:           in.Model,
-		Temperature:     in.Temperature,
-		MaxTokens:       in.MaxTokens,
-		Dimensions:      in.Dimensions,
-		Instructions:    in.Instructions,
-		Vision:          in.Vision,
-		ReasoningEffort: in.ReasoningEffort,
+		Provider:           "openai",
+		BaseURL:            in.BaseURL,
+		APIKey:             apiKey,
+		Model:              in.Model,
+		Temperature:        in.Temperature,
+		MaxTokens:          in.MaxTokens,
+		Dimensions:         in.Dimensions,
+		EmbeddingMaxTokens: in.EmbeddingMaxTokens,
+		Instructions:       in.Instructions,
+		Vision:             in.Vision,
+		ReasoningEffort:    in.ReasoningEffort,
 	}
 	b, err := json.Marshal(cfg)
 	if err != nil {

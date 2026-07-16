@@ -133,6 +133,10 @@ const summarize = async () => {
   if (!conversation || isSummarizing.value) return
   try {
     isSummarizing.value = true
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'info',
+      description: t('conversation.summarizing')
+    })
     await api.aiSummarizeConversation({ conversation_uuid: conversation.uuid })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('conversation.summarizeAdded')

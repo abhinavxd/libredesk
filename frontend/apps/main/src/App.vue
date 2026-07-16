@@ -303,6 +303,8 @@ const initToaster = () => {
       sooner.error(message.description)
     } else if (message.variant === 'warning') {
       sooner.warning(message.description)
+    } else if (message.variant === 'info') {
+      sooner.info(message.description)
     } else {
       sooner.success(message.description)
     }

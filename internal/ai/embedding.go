@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -113,10 +114,17 @@ func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.Sea
 
 // Reindex re-chunks and re-embeds a source's content, replacing its stored and in-memory vectors.
 func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent string) error {
-	chunks, err := stringutil.ChunkHTMLContent(title, htmlContent, m.chunkCfg)
+	rawChunks, err := stringutil.ChunkHTMLContent(title, htmlContent, m.chunkCfg)
 	if err != nil {
 		m.lo.Error("error chunking content for embedding", "error", err, "source_type", sourceType, "source_id", sourceID)
 		return err
+	}
+	// Drop blank chunks: they carry no signal and the embeddings API 400s on an empty input string.
+	chunks := make([]string, 0, len(rawChunks))
+	for _, c := range rawChunks {
+		if strings.TrimSpace(c) != "" {
+			chunks = append(chunks, c)
+		}
 	}
 
 	// Generate embeddings before opening the transaction; provider calls are slow.
