@@ -10,6 +10,6 @@ The permission system is a policy layer over already-trusted users, not a bounda
 ## Out of scope
 
 - An admin exercising a documented admin capability (configuring webhooks, OIDC providers, automations, templates, inboxes, etc.). It is up to the operator to grant these capabilities only to trusted users. Defects in the admin code paths (sqli, RCE, auth bypass etc.) remain in scope.
-- SSRF via admin-configured outbound URLs (webhooks, OIDC provider discovery, AI provider and custom tool calls, etc.). In single-tenant self-hosted deployments the admin already controls the host, so this is not a privilege boundary. Deployments where these URLs come from untrusted parties (e.g. multi-tenant/hosted) can enable the `[ssrf]` guard in the config to block requests to private/reserved IP ranges.
+- SSRF via admin-configured outbound URLs (webhooks, OIDC provider discovery, AI provider and custom tool calls, etc.). In single-tenant self-hosted deployments the admin already controls the host, so this is not a privilege boundary. Deployments where these URLs come from untrusted parties (e.g. multi-tenant/hosted) can enable the `[ssrf]` guard in the config to block requests to private/reserved IP ranges. See https://docs.libredesk.io/configuration/ssrf-protection.
 
 Anything else is in scope.
