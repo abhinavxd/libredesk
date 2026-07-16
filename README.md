@@ -1,6 +1,6 @@
 <a href="https://zerodha.tech"><img src="https://zerodha.tech/static/images/github-badge.svg" align="right" alt="Zerodha Tech Badge" /></a>
 
-
+<br>
 <picture>
   <source
     media="(prefers-color-scheme: dark)"
