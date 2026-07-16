@@ -503,34 +503,7 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 			"message_id", incomingMsg.SourceID.String)
 	}
 
-	// Process attachments
-	for _, att := range envelope.Attachments {
-		incomingMsg.Attachments = append(incomingMsg.Attachments, attachment.Attachment{
-			Name:        att.FileName,
-			Content:     att.Content,
-			ContentType: att.ContentType,
-			ContentID:   att.ContentID,
-			Size:        len(att.Content),
-			Disposition: attachment.DispositionAttachment,
-		})
-	}
-
-	// Process inlines - treat ones without ContentID as regular attachments
-	for _, inline := range envelope.Inlines {
-		disposition := attachment.DispositionInline
-		if inline.ContentID == "" {
-			disposition = attachment.DispositionAttachment
-		}
-
-		incomingMsg.Attachments = append(incomingMsg.Attachments, attachment.Attachment{
-			Name:        inline.FileName,
-			Content:     inline.Content,
-			ContentType: inline.ContentType,
-			ContentID:   inline.ContentID,
-			Size:        len(inline.Content),
-			Disposition: disposition,
-		})
-	}
+	incomingMsg.Attachments = collectAttachments(envelope)
 
 	incomingMsg.Content = stringutil.SanitizeUTF8(incomingMsg.Content)
 	incomingMsg.Subject = stringutil.SanitizeUTF8(incomingMsg.Subject)
@@ -544,6 +517,43 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		return err
 	}
 	return nil
+}
+
+// collectAttachments gathers all attachment and inline parts from an email
+// envelope into a single list of attachments.
+func collectAttachments(envelope *enmime.Envelope) []attachment.Attachment {
+	attachments := make([]attachment.Attachment, 0, len(envelope.Attachments)+len(envelope.Inlines))
+
+	// Attachments always use the attachment disposition.
+	for _, att := range envelope.Attachments {
+		attachments = append(attachments, attachment.Attachment{
+			Name:        att.FileName,
+			Content:     att.Content,
+			ContentType: att.ContentType,
+			ContentID:   att.ContentID,
+			Size:        len(att.Content),
+			Disposition: attachment.DispositionAttachment,
+		})
+	}
+
+	// Inlines are inline when they carry a ContentID, otherwise they are
+	// treated as regular attachments.
+	for _, inline := range envelope.Inlines {
+		disposition := attachment.DispositionInline
+		if inline.ContentID == "" {
+			disposition = attachment.DispositionAttachment
+		}
+		attachments = append(attachments, attachment.Attachment{
+			Name:        inline.FileName,
+			Content:     inline.Content,
+			ContentType: inline.ContentType,
+			ContentID:   inline.ContentID,
+			Size:        len(inline.Content),
+			Disposition: disposition,
+		})
+	}
+
+	return attachments
 }
 
 // getContactName extracts the contact's first and last name from the IMAP address.

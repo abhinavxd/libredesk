@@ -1,0 +1,28 @@
+From: Emma Johnson <emma.johnson@example.com>
+To: support@example.org
+Subject: FW: Quarterly report
+Message-ID: <outlook-inline-test@example.com>
+Date: Wed, 15 Jul 2026 14:56:44 +0200
+MIME-Version: 1.0
+Content-Type: multipart/related; boundary="----=_Outer_ABC"
+X-Mailer: Microsoft Outlook 16.0
+
+------=_Outer_ABC
+Content-Type: multipart/alternative; boundary="----=_Inner_DEF"
+
+------=_Inner_DEF
+Content-Type: text/plain; charset="utf-8"
+
+See the chart below.
+------=_Inner_DEF
+Content-Type: text/html; charset="utf-8"
+
+<html><body><p>See the chart below.</p><img src="cid:report-chart@example.com"></body></html>
+------=_Inner_DEF--
+------=_Outer_ABC
+Content-Type: image/png; name="chart.png"
+Content-Transfer-Encoding: base64
+Content-ID: <report-chart@example.com>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+------=_Outer_ABC--
