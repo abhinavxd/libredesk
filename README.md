@@ -1,7 +1,18 @@
 <a href="https://zerodha.tech"><img src="https://zerodha.tech/static/images/github-badge.svg" align="right" alt="Zerodha Tech Badge" /></a>
 
 
-# libredesk
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="https://s3.ap-south-1.amazonaws.com/libredesk.io/libredesk_white.png">
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="https://s3.ap-south-1.amazonaws.com/libredesk.io/libredesk_black.png">
+  <img
+    alt="LibreDesk"
+    src="https://s3.ap-south-1.amazonaws.com/libredesk.io/libredesk_white.png"
+    width="300">
+</picture>
 
 Modern, open source, self-hosted omnichannel customer support desk. Live chat, email, and more in a single binary.
 
