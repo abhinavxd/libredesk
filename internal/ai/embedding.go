@@ -114,10 +114,22 @@ func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.Sea
 
 // Reindex re-chunks and re-embeds a source's content, replacing its stored and in-memory vectors.
 func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent string) error {
+	indexed, err := m.embedSource(sourceType, sourceID, title, htmlContent)
+	if err != nil {
+		return err
+	}
+	m.reindexMu.Lock()
+	defer m.reindexMu.Unlock()
+	return m.commitEmbeddings(sourceType, sourceID, indexed)
+}
+
+// embedSource chunks and embeds content without touching stored state; the provider call is slow, so
+// callers run it before taking reindexMu.
+func (m *Manager) embedSource(sourceType string, sourceID int, title, htmlContent string) ([]indexedChunk, error) {
 	rawChunks, err := stringutil.ChunkHTMLContent(title, htmlContent, m.chunkCfg)
 	if err != nil {
 		m.lo.Error("error chunking content for embedding", "error", err, "source_type", sourceType, "source_id", sourceID)
-		return err
+		return nil, err
 	}
 	// Drop blank chunks: they carry no signal and the embeddings API 400s on an empty input string.
 	chunks := make([]string, 0, len(rawChunks))
@@ -127,11 +139,10 @@ func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent st
 		}
 	}
 
-	// Generate embeddings before opening the transaction; provider calls are slow.
 	vecs, err := m.GetEmbeddingsBatch(context.Background(), chunks)
 	if err != nil {
 		m.lo.Error("error generating embeddings", "error", err)
-		return err
+		return nil, err
 	}
 	indexed := make([]indexedChunk, 0, len(chunks))
 	for i, chunk := range chunks {
@@ -143,16 +154,19 @@ func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent st
 			norm:       norm(vecs[i]),
 		})
 	}
+	return indexed, nil
+}
 
-	m.reindexMu.Lock()
-	defer m.reindexMu.Unlock()
-
+// commitEmbeddings replaces a source's stored and in-memory vectors. Caller must hold reindexMu.
+func (m *Manager) commitEmbeddings(sourceType string, sourceID int, indexed []indexedChunk) error {
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		m.lo.Error("error beginning reindex transaction", "error", err)
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	if _, err := tx.Stmtx(m.q.DeleteEmbeddingsBySource).Exec(sourceType, sourceID); err != nil {
 		m.lo.Error("error clearing old embeddings", "error", err)
@@ -178,7 +192,11 @@ func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent st
 func (m *Manager) RemoveEmbeddings(sourceType string, sourceID int) error {
 	m.reindexMu.Lock()
 	defer m.reindexMu.Unlock()
+	return m.removeEmbeddings(sourceType, sourceID)
+}
 
+// removeEmbeddings drops all vectors for a source from the DB and memory. Caller must hold reindexMu.
+func (m *Manager) removeEmbeddings(sourceType string, sourceID int) error {
 	if _, err := m.q.DeleteEmbeddingsBySource.Exec(sourceType, sourceID); err != nil {
 		m.lo.Error("error deleting embeddings", "error", err)
 		return err
@@ -266,14 +284,14 @@ func (m *Manager) reconcile() {
 		if !item.Enabled {
 			// A disabled item should carry no embeddings; clean up any left behind.
 			if item.EmbeddedFingerprint != "" {
-				m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions)
+				m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions, m.nextSnippetGen(item.ID))
 			}
 			continue
 		}
 		if item.EmbeddedFingerprint == snippetFingerprint(item, cfg.Model, cfg.Dimensions) {
 			continue
 		}
-		m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions)
+		m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions, m.nextSnippetGen(item.ID))
 		reindexed++
 	}
 	if reindexed > 0 {

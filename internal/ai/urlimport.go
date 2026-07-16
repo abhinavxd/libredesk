@@ -31,7 +31,7 @@ func (m *Manager) ImportKnowledgeBaseFromURL(ctx context.Context, rawURL string)
 
 	body, contentType, err := m.fetchURL(ctx, u.String())
 	if err != nil {
-		m.lo.Error("error fetching knowledge base import url", "url", u.String(), "error", err)
+		m.lo.Error("error fetching knowledge base import url", "host", u.Hostname(), "error", err)
 		return item, envelope.NewError(envelope.InputError, m.i18n.T("ai.urlImport.fetchFailed"), nil)
 	}
 	if !isHTMLContentType(contentType) {

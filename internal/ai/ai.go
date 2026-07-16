@@ -43,6 +43,8 @@ type Manager struct {
 	index         *embeddingIndex
 	reindexMu     sync.Mutex
 	reconcileMu   sync.Mutex
+	snippetGenMu  sync.Mutex
+	snippetGen    map[int]uint64
 }
 
 // Opts contains options for initializing the Manager.
@@ -100,6 +102,7 @@ func New(opts Opts) (*Manager, error) {
 		encryptionKey: opts.EncryptionKey,
 		chunkCfg:      stringutil.DefaultChunkConfig(),
 		index:         newEmbeddingIndex(),
+		snippetGen:    make(map[int]uint64),
 	}
 	m.chunkCfg.Logger = opts.Lo
 	m.chunkCfg.TokenizerFunc = newTokenCounter(opts.Lo)

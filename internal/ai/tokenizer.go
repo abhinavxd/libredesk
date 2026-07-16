@@ -51,6 +51,9 @@ func countTokens(s string) int {
 // space (dropping any trailing partial rune left by a token prefix); without it, it byte-caps to
 // maxTokens on a rune boundary, which is safe because byte-level BPE never emits more tokens than bytes.
 func capToTokens(s string, maxTokens int) string {
+	if maxTokens <= 0 {
+		return ""
+	}
 	if encoder == nil {
 		if len(s) <= maxTokens {
 			return s

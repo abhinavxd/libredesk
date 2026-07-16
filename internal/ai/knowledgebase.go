@@ -65,12 +65,18 @@ func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
 	m.reindexMu.Lock()
 	defer m.reindexMu.Unlock()
 
+	// Supersede any in-flight reindex for this snippet so a slower embed can't re-insert its vectors
+	// after the delete commits.
+	m.dropSnippetGen(id)
+
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		m.lo.Error("error beginning knowledge base delete transaction", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	if _, err := tx.Stmtx(m.q.DeleteKnowledgeBaseItem).Exec(id); err != nil {
 		m.lo.Error("error deleting knowledge base item", "error", err)
@@ -90,33 +96,73 @@ func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
 
 // reindexSnippet embeds an enabled snippet (or drops its vectors when disabled) in the background.
 func (m *Manager) reindexSnippet(item models.KnowledgeBaseItem) {
-	go m.reindexSnippetSync(item)
+	gen := m.nextSnippetGen(item.ID)
+	go m.reindexSnippetSync(item, gen)
 }
 
-func (m *Manager) reindexSnippetSync(item models.KnowledgeBaseItem) {
+func (m *Manager) reindexSnippetSync(item models.KnowledgeBaseItem, gen uint64) {
 	cfg, err := m.getRawProviderConfig(models.ProviderTypeEmbedding)
 	if err != nil {
 		return
 	}
-	m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions)
+	m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions, gen)
 }
 
 // reindexSnippetWith embeds an enabled snippet (or drops its vectors when disabled) and records the
-// fingerprint on success. On failure the stored fingerprint stays stale, so reconcile retries later.
-func (m *Manager) reindexSnippetWith(item models.KnowledgeBaseItem, model string, dimensions int) {
+// fingerprint on success. The commit is gated by gen so a slower job from an older edit can't overwrite
+// a newer one. On failure the stored fingerprint stays stale, so reconcile retries later.
+func (m *Manager) reindexSnippetWith(item models.KnowledgeBaseItem, model string, dimensions int, gen uint64) {
 	if !item.Enabled {
-		if err := m.RemoveEmbeddings(models.SourceSnippet, item.ID); err != nil {
+		m.reindexMu.Lock()
+		defer m.reindexMu.Unlock()
+		if !m.isLatestSnippetGen(item.ID, gen) {
+			return
+		}
+		if err := m.removeEmbeddings(models.SourceSnippet, item.ID); err != nil {
 			m.lo.Error("error removing snippet embeddings", "error", err)
 			return
 		}
 		m.setSnippetFingerprint(item.ID, "")
 		return
 	}
-	if err := m.Reindex(models.SourceSnippet, item.ID, item.Title, item.Content); err != nil {
+
+	indexed, err := m.embedSource(models.SourceSnippet, item.ID, item.Title, item.Content)
+	if err != nil {
+		m.lo.Error("error indexing snippet", "error", err, "id", item.ID)
+		return
+	}
+
+	m.reindexMu.Lock()
+	defer m.reindexMu.Unlock()
+	if !m.isLatestSnippetGen(item.ID, gen) {
+		return
+	}
+	if err := m.commitEmbeddings(models.SourceSnippet, item.ID, indexed); err != nil {
 		m.lo.Error("error indexing snippet", "error", err, "id", item.ID)
 		return
 	}
 	m.setSnippetFingerprint(item.ID, snippetFingerprint(item, model, dimensions))
+}
+
+// nextSnippetGen bumps and returns the reindex generation for a snippet. Each edit gets a higher gen;
+// a reindex job only commits if its gen is still the latest when it reaches the commit.
+func (m *Manager) nextSnippetGen(id int) uint64 {
+	m.snippetGenMu.Lock()
+	defer m.snippetGenMu.Unlock()
+	m.snippetGen[id]++
+	return m.snippetGen[id]
+}
+
+func (m *Manager) isLatestSnippetGen(id int, gen uint64) bool {
+	m.snippetGenMu.Lock()
+	defer m.snippetGenMu.Unlock()
+	return m.snippetGen[id] == gen
+}
+
+func (m *Manager) dropSnippetGen(id int) {
+	m.snippetGenMu.Lock()
+	defer m.snippetGenMu.Unlock()
+	delete(m.snippetGen, id)
 }
 
 func (m *Manager) setSnippetFingerprint(id int, fingerprint string) {
@@ -133,7 +179,6 @@ func (m *Manager) ReindexAll() {
 // snippetFingerprint signs the content and embedding model a snippet was last embedded against; any
 // change (edited content, switched model, changed dimensions) yields a new value and triggers reindex.
 func snippetFingerprint(item models.KnowledgeBaseItem, model string, dimensions int) string {
-	h := sha256.New()
-	fmt.Fprintf(h, "%s\x00%s\x00%s\x00%d", item.Title, item.Content, model, dimensions)
-	return hex.EncodeToString(h.Sum(nil))
+	sum := sha256.Sum256(fmt.Appendf(nil, "%s\x00%s\x00%s\x00%d", item.Title, item.Content, model, dimensions))
+	return hex.EncodeToString(sum[:])
 }

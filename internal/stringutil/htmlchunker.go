@@ -132,7 +132,7 @@ func parseHTMLBoundaries(htmlContent string, cfg ChunkConfig) ([]htmlBoundary, e
 			tag := strings.ToLower(n.Data)
 
 			var content strings.Builder
-			html.Render(&content, n)
+			_ = html.Render(&content, n)
 			contentStr := content.String()
 
 			cleanText := HTML2Text(contentStr)
@@ -202,7 +202,7 @@ func splittableIntoBlocks(n *html.Node) bool {
 				continue
 			}
 			var buf strings.Builder
-			html.Render(&buf, c)
+			_ = html.Render(&buf, c)
 			if strings.TrimSpace(HTML2Text(buf.String())) != "" {
 				return false
 			}

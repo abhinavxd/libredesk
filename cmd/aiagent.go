@@ -171,11 +171,11 @@ func applyAssistantAvatar(r *fastglue.Request, userID int, files []*multipart.Fi
 	if user.AvatarURL.String == "" {
 		return nil
 	}
-	if err := app.media.Delete(filepath.Base(user.AvatarURL.String)); err != nil {
-		return err
-	}
 	if err := app.user.UpdateAvatar(userID, ""); err != nil {
 		return err
+	}
+	if err := app.media.Delete(filepath.Base(user.AvatarURL.String)); err != nil {
+		app.lo.Error("error deleting avatar media", "user_id", userID, "error", err)
 	}
 	app.user.InvalidateAgentCache(userID)
 	return nil
