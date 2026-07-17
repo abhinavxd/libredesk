@@ -27,7 +27,11 @@ export const createAssistantColumns = (t, { onEdit } = {}) => [
     accessorKey: 'description',
     header: () => h('div', { class: 'text-center' }, t('globals.terms.description')),
     cell: ({ row }) =>
-      h('div', { class: 'text-center break-all text-muted-foreground' }, row.getValue('description'))
+      h(
+        'div',
+        { class: 'text-center text-muted-foreground max-w-sm truncate mx-auto' },
+        row.getValue('description')
+      )
   },
   {
     accessorKey: 'enabled',
