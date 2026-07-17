@@ -195,6 +195,7 @@ SELECT
    c.priority_id,
    p.name as priority,
    s.name as status,
+   s.category as status_category,
    c.uuid,
    c.reference_number,
    c.first_reply_at,

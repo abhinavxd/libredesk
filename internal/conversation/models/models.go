@@ -170,6 +170,7 @@ type Conversation struct {
 	Priority                  null.String            `db:"priority" json:"priority"`
 	PriorityID                null.Int               `db:"priority_id" json:"priority_id"`
 	Status                    null.String            `db:"status" json:"status"`
+	StatusCategory            null.String            `db:"status_category" json:"status_category"`
 	StatusID                  null.Int               `db:"status_id" json:"status_id"`
 	FirstReplyAt              null.Time              `db:"first_reply_at" json:"first_reply_at"`
 	LastReplyAt               null.Time              `db:"last_reply_at" json:"last_reply_at"`

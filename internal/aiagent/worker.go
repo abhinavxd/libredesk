@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	statusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
 	imageutil "github.com/abhinavxd/libredesk/internal/image"
 	"time"
 
@@ -35,11 +36,12 @@ const (
 	typingRefreshInterval = 3 * time.Second
 )
 
-// terminalStatuses are conversation statuses the assistant does not act on.
-var terminalStatuses = map[string]bool{
-	cmodels.StatusResolved: true,
-	cmodels.StatusClosed:   true,
-	cmodels.StatusSnoozed:  true,
+// nonActionableCategories are status categories the assistant skips; it replies only to open
+// conversations, never waiting (e.g. snoozed) or resolved ones. Keyed by category, not status name,
+// so admin-defined custom statuses are covered too.
+var nonActionableCategories = map[string]bool{
+	statusmodels.CategoryWaiting:  true,
+	statusmodels.CategoryResolved: true,
 }
 
 // Run starts the response worker pool.
@@ -137,7 +139,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if !assistant.Enabled {
 		return
 	}
-	if terminalStatuses[conv.Status.String] {
+	if nonActionableCategories[conv.StatusCategory.String] {
 		return
 	}
 
