@@ -4,7 +4,7 @@
 <picture>
   <source
     media="(prefers-color-scheme: dark)"
-    srcset="https://s3.ap-south-1.amazonaws.com/libredesk.io/libredesk_white.png">
+    srcset="https://s3.ap-south-1.amazonaws.com/libredesk.io/libredesk_white.png?q=1">
   <source
     media="(prefers-color-scheme: light)"
     srcset="https://s3.ap-south-1.amazonaws.com/libredesk.io/libredesk_black.png">
