@@ -11,7 +11,7 @@
   <img
     alt="LibreDesk"
     src="https://s3.ap-south-1.amazonaws.com/libredesk.io/libredesk_white.png"
-    width="300">
+    width="250">
 </picture>
 
 Modern, open source, self-hosted omnichannel customer support desk. Live chat, email, and more in a single binary.
