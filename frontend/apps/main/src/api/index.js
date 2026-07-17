@@ -456,7 +456,6 @@ const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
     'Content-Type': 'application/json'
   }
 })
-const updateAIProvider = (data) => http.put('/api/v1/ai/provider', data)
 const getAIConfig = (type) => http.get(`/api/v1/ai/config/${type}`)
 const updateAIConfig = (type, data) => http.put(`/api/v1/ai/config/${type}`, data)
 const testAIConfig = (type, data) => http.post(`/api/v1/ai/config/${type}/test`, data)
@@ -639,7 +638,6 @@ export default {
   updateAutomationRule,
   updateAutomationRuleWeights,
   updateAutomationRulesExecutionMode,
-  updateAIProvider,
   createAutomationRule,
   toggleAutomationRule,
   deleteAutomationRule,

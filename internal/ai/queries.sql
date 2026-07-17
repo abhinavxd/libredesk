@@ -4,12 +4,6 @@ SELECT id, created_at, updated_at, name, provider, type, config, is_default FROM
 -- name: update-provider-config
 UPDATE ai_providers SET config = $2, updated_at = now() WHERE type = $1;
 
--- name: set-completion-key
-UPDATE ai_providers
-SET config = jsonb_set(COALESCE(config, '{}'::jsonb), '{api_key}', to_jsonb($1::text)),
-    updated_at = now()
-WHERE type = 'completion';
-
 -- name: get-prompt
 SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE key = $1;
 

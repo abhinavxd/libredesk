@@ -37,44 +37,6 @@
     </AlertDialogContent>
   </AlertDialog>
 
-  <Dialog :open="openAIKeyPrompt" @update:open="openAIKeyPrompt = false">
-    <DialogContent class="sm:max-w-lg">
-      <DialogHeader class="space-y-2">
-        <DialogTitle>{{ $t('ai.enterOpenAIAPIKey') }}</DialogTitle>
-        <DialogDescription>
-          {{
-            $t('ai.apiKey.description', {
-              provider: 'OpenAI'
-            })
-          }}
-        </DialogDescription>
-      </DialogHeader>
-      <Form v-slot="{ handleSubmit }" as="" keep-values :validation-schema="formSchema">
-        <form id="apiKeyForm" @submit="handleSubmit($event, updateProvider)">
-          <FormField v-slot="{ componentField }" name="apiKey">
-            <FormItem>
-              <FormLabel>{{ $t('globals.terms.apiKey') }}</FormLabel>
-              <FormControl>
-                <Input type="text" placeholder="sk-am1RLw7XUWGX.." v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </form>
-        <DialogFooter>
-          <Button
-            type="submit"
-            form="apiKeyForm"
-            :is-loading="isOpenAIKeyUpdating"
-            :disabled="isOpenAIKeyUpdating"
-          >
-            {{ $t('globals.messages.save') }}
-          </Button>
-        </DialogFooter>
-      </Form>
-    </DialogContent>
-  </Dialog>
-
   <div class="text-foreground bg-background">
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
@@ -175,38 +137,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { Button } from '@shared-ui/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from '@shared-ui/components/ui/dialog'
-import { Input } from '@shared-ui/components/ui/input'
+import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { convertTextToHtml } from '@shared-ui/utils/string'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage
-} from '@shared-ui/components/ui/form'
-import { toTypedSchema } from '@vee-validate/zod'
-import * as z from 'zod'
-
-const formSchema = toTypedSchema(
-  z.object({
-    apiKey: z.string().min(1, 'API key is required')
-  })
-)
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
@@ -258,8 +195,6 @@ const {
 } = useDraftManager(currentConversationUUID, messageType, mediaFiles)
 
 // Rest of existing state
-const openAIKeyPrompt = ref(false)
-const isOpenAIKeyUpdating = ref(false)
 const isEditorFullscreen = ref(false)
 const isSending = ref(false)
 const isGenerating = ref(false)
@@ -278,13 +213,9 @@ const mentions = ref([])
 
 aiPromptStore.fetchPrompts()
 
-/**
- * Handles the AI prompt selection event.
- * Sends the selected prompt key and the current text content to the server for completion.
- * Sets the response as the new content in the editor.
- * @param {String} key - The key of the selected AI prompt
- */
 const handleAiPromptSelected = async (key) => {
+  if (isGenerating.value) return
+  isGenerating.value = true
   try {
     const resp = await api.aiCompletion({
       prompt_key: key,
@@ -292,14 +223,12 @@ const handleAiPromptSelected = async (key) => {
     })
     htmlContent.value = resp.data.data.replace(/\n/g, '<br>')
   } catch (error) {
-    // Check if user needs to enter OpenAI API key and has permission to do so.
-    if (error.response?.status === 400 && userStore.can('ai:manage')) {
-      openAIKeyPrompt.value = true
-    }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  } finally {
+    isGenerating.value = false
   }
 }
 
@@ -322,28 +251,6 @@ const handleGenerateReply = async () => {
     })
   } finally {
     isGenerating.value = false
-  }
-}
-
-/**
- * updateProvider updates the OpenAI API key.
- * @param {Object} values - The form values containing the API key
- */
-const updateProvider = async (values) => {
-  try {
-    isOpenAIKeyUpdating.value = true
-    await api.updateAIProvider({ api_key: values.apiKey, provider: 'openai' })
-    openAIKeyPrompt.value = false
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
-    })
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    isOpenAIKeyUpdating.value = false
   }
 }
 

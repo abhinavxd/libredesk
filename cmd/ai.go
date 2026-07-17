@@ -22,11 +22,6 @@ type aiCompletionReq struct {
 	Content   string `json:"content"`
 }
 
-type providerUpdateReq struct {
-	Provider string `json:"provider"`
-	APIKey   string `json:"api_key"`
-}
-
 type generateReplyReq struct {
 	ConversationUUID string `json:"conversation_uuid"`
 	Instruction      string `json:"instruction"`
@@ -75,21 +70,6 @@ func handleGetAIPrompts(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(resp)
-}
-
-// handleUpdateAIProvider sets the completion provider API key (inline reply-box prompt).
-func handleUpdateAIProvider(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-		req providerUpdateReq
-	)
-	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
-	}
-	if err := app.ai.UpdateProvider(req.Provider, req.APIKey); err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	return r.SendEnvelope(true)
 }
 
 // handleGetAIConfig returns the sanitized provider config for a type (completion/embedding).

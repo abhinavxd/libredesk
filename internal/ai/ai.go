@@ -71,7 +71,6 @@ type ProviderConfigView struct {
 type queries struct {
 	GetProviderByType           *sqlx.Stmt `query:"get-provider-by-type"`
 	UpdateProviderConfig        *sqlx.Stmt `query:"update-provider-config"`
-	SetCompletionKey            *sqlx.Stmt `query:"set-completion-key"`
 	GetPrompt                   *sqlx.Stmt `query:"get-prompt"`
 	GetPrompts                  *sqlx.Stmt `query:"get-prompts"`
 	GetKnowledgeBaseItems       *sqlx.Stmt `query:"get-knowledge-base-items"`
@@ -306,23 +305,6 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 	if cfg.Dimensions > 0 && len(vec) != cfg.Dimensions {
 		return envelope.NewError(envelope.InputError, m.i18n.Ts("ai.testDimensionsMismatch",
 			"configured", strconv.Itoa(cfg.Dimensions), "returned", strconv.Itoa(len(vec))), nil)
-	}
-	return nil
-}
-
-// UpdateProvider sets the completion provider API key.
-func (m *Manager) UpdateProvider(provider, apiKey string) error {
-	if provider != "openai" {
-		return envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidProvider"), nil)
-	}
-	encryptedKey, err := crypto.Encrypt(apiKey, m.encryptionKey)
-	if err != nil {
-		m.lo.Error("error encrypting API key", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	if _, err := m.q.SetCompletionKey.Exec(encryptedKey); err != nil {
-		m.lo.Error("error setting completion API key", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
