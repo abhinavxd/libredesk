@@ -216,12 +216,12 @@ const completionPresets = [
     value: 'groq',
     label: 'Groq',
     base_url: 'https://api.groq.com/openai/v1',
-    model: 'llama-3.3-70b-versatile'
+    model: 'openai/gpt-oss-120b'
   },
   {
     value: 'together',
     label: 'Together AI',
-    base_url: 'https://api.together.xyz/v1',
+    base_url: 'https://api.together.ai/v1',
     model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo'
   },
   {
