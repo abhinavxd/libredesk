@@ -50,7 +50,7 @@ type Manager struct {
 	snippetGenMu  sync.Mutex
 	snippetGen    map[int]uint64
 	dialControl   ssrf.Control
-	toolClient    *http.Client
+	httpClient    *http.Client
 }
 
 // Opts contains options for initializing the Manager.
@@ -111,7 +111,7 @@ func New(opts Opts) (*Manager, error) {
 		index:         newEmbeddingIndex(),
 		snippetGen:    make(map[int]uint64),
 		dialControl:   opts.DialControl,
-		toolClient: &http.Client{
+		httpClient: &http.Client{
 			Timeout: 20 * time.Second,
 			Transport: &http.Transport{
 				DialContext: (&net.Dialer{

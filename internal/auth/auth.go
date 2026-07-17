@@ -137,11 +137,13 @@ func newOIDCClient(dialControl ssrf.Control) *http.Client {
 	return &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
 				Timeout:   3 * time.Second,
 				KeepAlive: 30 * time.Second,
 				Control:   dialControl,
 			}).DialContext,
+			ForceAttemptHTTP2:     true,
 			TLSHandshakeTimeout:   5 * time.Second,
 			ResponseHeaderTimeout: 5 * time.Second,
 		},

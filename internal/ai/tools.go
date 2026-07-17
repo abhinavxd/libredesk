@@ -247,7 +247,7 @@ func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, incl
 			m.lo.Warn("skipping custom tool that collides with a built-in tool", "name", ct.Name)
 			continue
 		}
-		ht := newHTTPTool(ct, m.encryptionKey, m.lo, m.toolClient, tctx)
+		ht := newHTTPTool(ct, m.encryptionKey, m.lo, m.httpClient, tctx)
 		registry[ht.Name()] = ht
 		defs = append(defs, toolDef(ht))
 	}

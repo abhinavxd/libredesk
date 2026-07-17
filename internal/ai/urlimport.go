@@ -56,7 +56,7 @@ func (m *Manager) fetchURL(ctx context.Context, pageURL string) (string, string,
 		return "", "", err
 	}
 	req.Header.Set("User-Agent", "libredesk")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := m.httpClient.Do(req)
 	if err != nil {
 		return "", "", err
 	}
