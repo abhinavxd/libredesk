@@ -40,7 +40,18 @@ func NewControl(enabled bool, allowedCIDRs []string, lo *logf.Logger) Control {
 
 // NewTransport clones http.DefaultTransport (keeping proxy and connection-pool defaults) and applies the SSRF dial guard; callers may override the returned transport's timeouts.
 func NewTransport(control Control, dialTimeout time.Duration) *http.Transport {
-	t := http.DefaultTransport.(*http.Transport).Clone()
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		base = &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	}
+	t := base.Clone()
 	t.DialContext = (&net.Dialer{
 		Timeout:   dialTimeout,
 		KeepAlive: 30 * time.Second,
