@@ -448,7 +448,11 @@ SELECT jsonb_build_object(
             'country', country,
             'avatar_url', avatar_url,
             'external_user_id', external_user_id,
-            'custom_attributes', custom_attributes
+            'custom_attributes', custom_attributes,
+            'availability_status', availability_status,
+            'last_active_at', last_active_at,
+            'last_login_at', last_login_at,
+            'enabled', enabled
         )
         FROM users
         WHERE id = $1 AND type IN ('contact', 'visitor')

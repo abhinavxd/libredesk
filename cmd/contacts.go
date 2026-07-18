@@ -204,7 +204,9 @@ func handleDeleteContact(r *fastglue.Request) error {
 
 	if contact.AvatarURL.Valid {
 		fileName := filepath.Base(contact.AvatarURL.String)
-		app.media.Delete(fileName)
+		if err := app.media.Delete(fileName); err != nil {
+			app.lo.Error("error deleting contact avatar", "contact_id", id, "file", fileName, "error", err)
+		}
 	}
 
 	if err := app.activityLog.ContactDeleted(auser.ID, auser.Email, realip.FromRequest(r.RequestCtx), id, contact.Email.String); err != nil {
