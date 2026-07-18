@@ -57,11 +57,14 @@
       </FormField>
     </div>
 
-    <FormField v-slot="{ componentField, handleChange }" name="headers">
+    <FormField v-slot="{ componentField, handleChange, meta }" name="headers">
       <FormItem>
         <FormLabel>{{ t('admin.ai.tool.headers') }}</FormLabel>
         <FormControl>
-          <ToolHeadersField :modelValue="componentField.modelValue" @update:modelValue="handleChange" />
+          <ToolHeadersField
+            :modelValue="componentField.modelValue"
+            @update:modelValue="(v) => handleChange(v, meta.validated)"
+          />
         </FormControl>
         <FormDescription>{{ t('admin.ai.tool.headersHint') }}</FormDescription>
         <FormMessage />
@@ -185,18 +188,21 @@ const form = useForm({
 watch(
   () => props.initialValues,
   (values) => {
-    form.setValues({
-      name: values.name || '',
-      description: values.description || '',
-      url: values.url || '',
-      method: values.method || 'POST',
-      headers: values.auth?.headers || [],
-      parameters:
-        values.parameters && Object.keys(values.parameters).length
-          ? JSON.stringify(values.parameters, null, 2)
-          : '',
-      enabled: values.enabled ?? true
-    })
+    form.setValues(
+      {
+        name: values.name || '',
+        description: values.description || '',
+        url: values.url || '',
+        method: values.method || 'POST',
+        headers: values.auth?.headers || [],
+        parameters:
+          values.parameters && Object.keys(values.parameters).length
+            ? JSON.stringify(values.parameters, null, 2)
+            : '',
+        enabled: values.enabled ?? true
+      },
+      false
+    )
     form.setErrors({})
   },
   { immediate: true, deep: true }

@@ -29,7 +29,7 @@
     </div>
 
     <Button type="button" variant="ghost" size="sm" class="text-foreground" @click="addHeader">
-      <Plus class="w-3 h-3 mr-1" />
+      <Plus class="w-4 h-4" />
       {{ t('admin.ai.tool.addHeader') }}
     </Button>
   </div>

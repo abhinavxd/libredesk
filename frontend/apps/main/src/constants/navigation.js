@@ -37,9 +37,10 @@ export const adminNavItems = [
     titleKey: 'admin.ai.title',
     children: [
       {
-        titleKey: 'admin.ai.providers',
+        titleKey: 'globals.terms.provider',
         href: '/admin/ai/providers',
         permission: 'ai:manage',
+        isTitleKeyPlural: true,
         icon: 'Sparkles'
       },
       {

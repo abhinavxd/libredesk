@@ -202,7 +202,7 @@ const routes = [
             path: 'ai/providers',
             name: 'ai-providers',
             component: () => import('@main/views/admin/ai/AIProviders.vue'),
-            meta: { titleKey: 'admin.ai.providers' }
+            meta: { titleKey: 'globals.terms.provider', titleCount: 2 }
           },
           {
             path: 'ai/snippets',

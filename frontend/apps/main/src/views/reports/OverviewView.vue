@@ -7,8 +7,51 @@
       <Spinner v-if="isLoading" />
 
       <div class="space-y-6">
-        <div class="text-sm text-muted-foreground text-left">
-          {{ $t('globals.terms.lastUpdated') }}: {{ lastUpdateFormatted }}
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-muted-foreground">
+              {{ $t('globals.terms.lastUpdated') }}: {{ lastUpdateFormatted }}
+            </span>
+            <template v-if="autoRefreshPaused">
+              <Separator orientation="vertical" class="h-4" />
+              <span class="text-sm text-muted-foreground">{{ $t('report.autoRefreshPaused') }}</span>
+              <Button size="sm" variant="outline" :disabled="isLoading" @click="manualRefresh">
+                {{ $t('globals.terms.refresh') }}
+              </Button>
+            </template>
+          </div>
+          <div class="flex items-center gap-1">
+            <Button
+              v-for="option in rangeOptions"
+              :key="option"
+              size="sm"
+              :variant="!isCustom && range === option ? 'default' : 'outline'"
+              :disabled="isLoading"
+              @click="selectRange(option)"
+            >
+              {{ $t('globals.messages.nDays', { days: option }) }}
+            </Button>
+            <Separator orientation="vertical" class="h-6 mx-1" />
+            <Button
+              size="sm"
+              :variant="isCustom ? 'default' : 'outline'"
+              :disabled="isLoading"
+              @click="enableCustom"
+            >
+              {{ $t('globals.terms.custom') }}
+            </Button>
+            <Input
+              v-if="isCustom"
+              v-model="customDays"
+              type="number"
+              min="1"
+              max="365"
+              class="w-20 h-8"
+              :disabled="isLoading"
+              @blur="applyCustom"
+              @keyup.enter="applyCustom"
+            />
+          </div>
         </div>
 
         <!-- Row 1: Open Conversations and Agent Status -->
@@ -33,10 +76,7 @@
         <div class="flex w-full space-x-4">
           <!-- CSAT Card -->
           <div class="flex-1 box p-5">
-            <div class="flex justify-between items-center mb-4">
-              <p class="card-title">{{ $t('report.csat.cardTitle', { days: csatDays }) }}</p>
-              <DateFilter @filter-change="(d) => handleFilterChange('csat', d)" :label="''" />
-            </div>
+            <p class="card-title mb-4">{{ $t('report.csat.cardTitle') }}</p>
             <div class="grid grid-cols-3 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{ formatRating(csatData.average_rating) }}</span>
@@ -57,15 +97,7 @@
 
           <!-- Message Volume Card -->
           <div class="flex-1 box p-5">
-            <div class="flex justify-between items-center mb-4">
-              <p class="card-title">
-                {{ $t('report.messages.cardTitle', { days: messageVolumeDays }) }}
-              </p>
-              <DateFilter
-                @filter-change="(d) => handleFilterChange('messageVolume', d)"
-                :label="''"
-              />
-            </div>
+            <p class="card-title mb-4">{{ $t('report.messages.cardTitle') }}</p>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{
@@ -97,40 +129,37 @@
 
         <!-- Row 3: SLA Card with Compliance Percentages -->
         <div class="w-full rounded box p-5">
-          <div class="flex justify-between items-center mb-6">
-            <p class="card-title">{{ slaCardTitle }}</p>
-            <DateFilter @filter-change="(d) => handleFilterChange('sla', d)" :label="''" />
-          </div>
+          <p class="card-title mb-4">{{ $t('report.sla.cardTitle') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <!-- First Response -->
             <div class="space-y-4">
               <p class="section-title">{{ $t('report.sla.firstResponse') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-green-600"
+                <span class="metric-value text-primary"
                   >{{ slaCounts.first_response_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold text-green-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-primary">{{
                     slaCounts.first_response_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
                 </div>
                 <div>
-                  <span class="text-2xl font-semibold text-red-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.first_response_breached_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
-                <span class="text-lg font-medium">{{
+                <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_first_response_time_sec
                 }}</span>
-                <p class="text-xs text-muted-foreground">{{ $t('report.sla.avgFirstResp') }}</p>
+                <p class="metric-label">{{ $t('report.sla.avgFirstResp') }}</p>
               </div>
             </div>
 
@@ -138,30 +167,30 @@
             <div class="space-y-4 border-l border-r px-8">
               <p class="section-title">{{ $t('report.sla.nextResponse') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-green-600"
+                <span class="metric-value text-primary"
                   >{{ slaCounts.next_response_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold text-green-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-primary">{{
                     slaCounts.next_response_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
                 </div>
                 <div>
-                  <span class="text-2xl font-semibold text-red-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.next_response_breached_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
-                <span class="text-lg font-medium">{{
+                <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_next_response_time_sec
                 }}</span>
-                <p class="text-xs text-muted-foreground">{{ $t('report.sla.avgNextResp') }}</p>
+                <p class="metric-label">{{ $t('report.sla.avgNextResp') }}</p>
               </div>
             </div>
 
@@ -169,30 +198,30 @@
             <div class="space-y-4">
               <p class="section-title">{{ $t('report.sla.resolution') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-green-600"
+                <span class="metric-value text-primary"
                   >{{ slaCounts.resolution_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold text-green-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-primary">{{
                     slaCounts.resolution_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
                 </div>
                 <div>
-                  <span class="text-2xl font-semibold text-red-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.resolution_breached_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
-                <span class="text-lg font-medium">{{
+                <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_resolution_time_sec
                 }}</span>
-                <p class="text-xs text-muted-foreground">{{ $t('report.sla.avgResolution') }}</p>
+                <p class="metric-label">{{ $t('report.sla.avgResolution') }}</p>
               </div>
             </div>
           </div>
@@ -200,15 +229,7 @@
 
         <!-- Row 4: Tag Distribution -->
         <div class="w-full rounded box p-5">
-          <div class="flex justify-between items-center mb-4">
-            <p class="card-title">
-              {{ $t('report.tags.cardTitle', { days: tagDistributionDays }) }}
-            </p>
-            <DateFilter
-              @filter-change="(d) => handleFilterChange('tagDistribution', d)"
-              :label="''"
-            />
-          </div>
+          <p class="card-title mb-4">{{ $t('report.tags.cardTitle') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Tagged percentage metric -->
@@ -244,10 +265,7 @@
 
         <!-- Row 5: Line Chart -->
         <div class="rounded box w-full p-5">
-          <div class="flex justify-between items-center mb-4">
-            <p class="card-title">{{ $t('report.chart.title') }}</p>
-            <DateFilter @filter-change="(d) => handleFilterChange('chart', d)" :label="''" />
-          </div>
+          <p class="card-title mb-4">{{ $t('report.chart.title') }}</p>
           <LineChart :data="processedLineData" />
         </div>
       </div>
@@ -256,7 +274,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useIntervalFn, useDocumentVisibility } from '@vueuse/core'
 import { useEmitter } from '../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -264,18 +283,25 @@ import { formatDuration } from '@shared-ui/utils/datetime.js'
 import Card from '@/features/reports/OverviewCard.vue'
 import LineChart from '@/features/reports/OverviewLineChart.vue'
 import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
-import { DateFilter } from '@shared-ui/components/ui/date-filter'
+import { Button } from '@shared-ui/components/ui/button/index.js'
+import { Input } from '@shared-ui/components/ui/input'
+import { Separator } from '@shared-ui/components/ui/separator'
 import { useI18n } from 'vue-i18n'
 import api from '../../api'
 
 const emitter = useEmitter()
 const { t } = useI18n()
 const isLoading = ref(false)
-const initialized = ref(false)
 const lastUpdate = ref(new Date())
+const rangeOptions = [7, 30, 90]
+const range = ref(7)
+const isCustom = ref(false)
+const customDays = ref('')
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000
+const MAX_POLL_DURATION_MS = 60 * 60 * 1000
+const autoRefreshPaused = ref(false)
 const cardCounts = ref({})
 const chartData = ref({ status_summary: [] })
-let updateInterval = null
 
 const agentStatusCounts = ref({
   agents_online: 0,
@@ -321,51 +347,31 @@ const tagDistributionData = ref({
 })
 
 const sections = {
-  sla: {
-    days: ref(30),
-    fetch: async (days) => {
-      const { data } = await api.getOverviewSLA({ days })
-      slaCounts.value = { ...slaCounts.value, ...data.data }
+  sla: async (days) => {
+    const { data } = await api.getOverviewSLA({ days })
+    slaCounts.value = { ...slaCounts.value, ...data.data }
+  },
+  chart: async (days) => {
+    const { data } = await api.getOverviewCharts({ days })
+    chartData.value = {
+      new_conversations: data.data.new_conversations || [],
+      resolved_conversations: data.data.resolved_conversations || [],
+      messages_sent: data.data.messages_sent || []
     }
   },
-  chart: {
-    days: ref(90),
-    fetch: async (days) => {
-      const { data } = await api.getOverviewCharts({ days })
-      chartData.value = {
-        new_conversations: data.data.new_conversations || [],
-        resolved_conversations: data.data.resolved_conversations || [],
-        messages_sent: data.data.messages_sent || []
-      }
-    }
+  csat: async (days) => {
+    const { data } = await api.getOverviewCSAT({ days })
+    csatData.value = { ...csatData.value, ...data.data }
   },
-  csat: {
-    days: ref(30),
-    fetch: async (days) => {
-      const { data } = await api.getOverviewCSAT({ days })
-      csatData.value = { ...csatData.value, ...data.data }
-    }
+  messageVolume: async (days) => {
+    const { data } = await api.getOverviewMessageVolume({ days })
+    messageVolumeData.value = { ...messageVolumeData.value, ...data.data }
   },
-  messageVolume: {
-    days: ref(30),
-    fetch: async (days) => {
-      const { data } = await api.getOverviewMessageVolume({ days })
-      messageVolumeData.value = { ...messageVolumeData.value, ...data.data }
-    }
-  },
-  tagDistribution: {
-    days: ref(30),
-    fetch: async (days) => {
-      const { data } = await api.getOverviewTagDistribution({ days })
-      tagDistributionData.value = { ...tagDistributionData.value, ...data.data }
-    }
+  tagDistribution: async (days) => {
+    const { data } = await api.getOverviewTagDistribution({ days })
+    tagDistributionData.value = { ...tagDistributionData.value, ...data.data }
   }
 }
-
-const slaDays = sections.sla.days
-const csatDays = sections.csat.days
-const messageVolumeDays = sections.messageVolume.days
-const tagDistributionDays = sections.tagDistribution.days
 
 const formatRating = (value) => {
   if (!value) return '0.0'
@@ -390,8 +396,6 @@ const formattedSlaCounts = computed(() => ({
   avg_next_response_time_sec: formatDuration(slaCounts.value.avg_next_response_time_sec, false),
   avg_resolution_time_sec: formatDuration(slaCounts.value.avg_resolution_time_sec, false)
 }))
-
-const slaCardTitle = computed(() => t('report.sla.cardTitle', { days: slaDays.value }))
 
 const lastUpdateFormatted = computed(() => lastUpdate.value.toLocaleTimeString())
 
@@ -461,22 +465,45 @@ const fetchCardStats = async () => {
 
 const runSectionFetch = async (key, days) => {
   try {
-    await sections[key].fetch(days)
+    await sections[key](days)
   } catch (error) {
     showError(error)
   }
 }
 
-const handleFilterChange = async (key, days) => {
-  if (!initialized.value) return
-  sections[key].days.value = days
+const fetchSections = async () => {
   isLoading.value = true
   try {
-    await runSectionFetch(key, days)
+    await Promise.allSettled(Object.keys(sections).map((key) => runSectionFetch(key, range.value)))
   } finally {
     isLoading.value = false
     lastUpdate.value = new Date()
   }
+}
+
+const selectRange = (option) => {
+  isCustom.value = false
+  if (option === range.value) return
+  markActive()
+  range.value = option
+  fetchSections()
+}
+
+const enableCustom = () => {
+  isCustom.value = true
+  customDays.value = String(range.value)
+}
+
+const applyCustom = () => {
+  let days = parseInt(customDays.value)
+  if (!days || days < 1 || days > 365) {
+    days = 30
+    customDays.value = '30'
+  }
+  if (days === range.value) return
+  markActive()
+  range.value = days
+  fetchSections()
 }
 
 const loadDashboardData = async () => {
@@ -484,40 +511,54 @@ const loadDashboardData = async () => {
   try {
     await Promise.allSettled([
       fetchCardStats(),
-      ...Object.keys(sections).map((key) => runSectionFetch(key, sections[key].days.value))
+      ...Object.keys(sections).map((key) => runSectionFetch(key, range.value))
     ])
   } finally {
     isLoading.value = false
     lastUpdate.value = new Date()
-    initialized.value = true
   }
 }
 
-const startRealtimeUpdates = () => {
-  if (updateInterval) clearInterval(updateInterval)
-  updateInterval = setInterval(loadDashboardData, 60000)
-}
+let pollingSince = Date.now()
 
-const stopRealtimeUpdates = () => {
-  if (updateInterval) {
-    clearInterval(updateInterval)
-    updateInterval = null
+const scheduledRefresh = () => {
+  if (Date.now() - pollingSince >= MAX_POLL_DURATION_MS) {
+    pause()
+    autoRefreshPaused.value = true
+    return
   }
-}
-
-onMounted(() => {
   loadDashboardData()
-  startRealtimeUpdates()
+}
+
+const visibility = useDocumentVisibility()
+const { pause, resume } = useIntervalFn(scheduledRefresh, REFRESH_INTERVAL_MS)
+
+const markActive = () => {
+  pollingSince = Date.now()
+  autoRefreshPaused.value = false
+  resume()
+}
+
+const manualRefresh = () => {
+  markActive()
+  loadDashboardData()
+}
+
+watch(visibility, (v) => {
+  if (v === 'visible') {
+    markActive()
+    if (Date.now() - lastUpdate.value.getTime() >= REFRESH_INTERVAL_MS) loadDashboardData()
+  } else {
+    pause()
+  }
 })
 
-onUnmounted(() => {
-  stopRealtimeUpdates()
-})
+onMounted(loadDashboardData)
 </script>
 
 <style scoped>
 .metric-value {
-  @apply text-3xl font-bold tracking-tight;
+  @apply text-3xl font-bold tracking-tight tabular-nums;
 }
 
 .metric-label {
@@ -525,7 +566,7 @@ onUnmounted(() => {
 }
 
 .card-title {
-  @apply text-xl font-medium;
+  @apply text-sm font-medium text-muted-foreground;
 }
 
 .metric-item {

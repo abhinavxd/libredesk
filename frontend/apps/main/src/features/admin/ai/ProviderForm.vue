@@ -49,7 +49,7 @@
 
           <FormField v-slot="{ componentField }" name="api_key">
             <FormItem>
-              <FormLabel>{{ t('admin.ai.apiKey') }}</FormLabel>
+              <FormLabel>{{ t('globals.terms.apiKey') }}</FormLabel>
               <FormControl>
                 <Input
                   type="password"

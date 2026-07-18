@@ -1,10 +1,10 @@
 <template>
-  <div class="flex flex-col items-center justify-center h-64 space-y-2">
-    <component :is="icon" :stroke-width="1" :size="50" />
-    <h1 class="text-md font-semibold text-foreground">
+  <div class="flex flex-col items-center justify-center h-64 px-6 text-center select-none">
+    <component :is="icon" :stroke-width="1" :size="40" class="text-muted-foreground opacity-40" />
+    <p class="text-sm font-medium text-foreground mt-5">
       {{ title }}
-    </h1>
-    <p class="text-muted-foreground text-center text-sm">
+    </p>
+    <p class="text-sm text-muted-foreground mt-1.5 max-w-[15rem] leading-relaxed">
       {{ message }}
     </p>
   </div>

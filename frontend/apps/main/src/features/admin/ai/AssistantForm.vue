@@ -119,7 +119,7 @@
 
     <FormField v-slot="{ componentField, handleChange }" name="languages">
       <FormItem>
-        <FormLabel>{{ t('admin.ai.assistant.languages') }}</FormLabel>
+        <FormLabel>{{ t('globals.terms.language', 2) }}</FormLabel>
         <FormControl>
           <TagsInput :modelValue="componentField.modelValue" @update:modelValue="handleChange">
             <TagsInputItem v-for="item in componentField.modelValue" :key="item" :value="item">

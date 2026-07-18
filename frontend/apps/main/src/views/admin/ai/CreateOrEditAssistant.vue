@@ -60,7 +60,7 @@
                     {{ t('admin.ai.assistant.preview.replyLabel') }}
                   </div>
                   <div
-                    class="rounded-md border border-border bg-muted p-3 text-sm whitespace-pre-wrap"
+                    class="rounded border border-border bg-muted p-3 text-sm whitespace-pre-wrap"
                   >
                     <span v-if="previewReply">{{ previewReply }}</span>
                     <span v-else class="text-muted-foreground">
@@ -72,7 +72,7 @@
                   <div class="text-sm font-medium text-foreground">
                     {{ t('admin.ai.assistant.preview.sources') }}
                   </div>
-                  <div class="rounded-md border border-border p-3 space-y-1">
+                  <div class="rounded border border-border p-3 space-y-1">
                     <div
                       v-for="source in previewSources"
                       :key="source.id"
@@ -102,7 +102,7 @@
                     :disabled="statsLoading"
                     @click="selectRange(option)"
                   >
-                    {{ t('admin.ai.assistant.stats.rangeDays', { days: option }) }}
+                    {{ t('globals.messages.nDays', { days: option }) }}
                   </Button>
                 </div>
               </CardHeader>
