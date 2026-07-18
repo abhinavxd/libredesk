@@ -23,3 +23,26 @@ export function downloadUrl (url) {
     if (!match) return url
     return `/uploads/${match[0]}?download=1`
 }
+
+export function downloadBlobResponse (response, filename) {
+    const url = URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+}
+
+// Blob error bodies (from responseType: 'blob' requests) hide the JSON envelope; parse it in place so the HTTP error handler can read it.
+export async function parseBlobError (err) {
+    if (err.response?.data instanceof Blob) {
+        try {
+            err.response.data = JSON.parse(await err.response.data.text())
+        } catch {
+            // keep the original blob; the error handler falls back to a generic message
+        }
+    }
+    return err
+}
