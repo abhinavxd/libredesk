@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
+	"github.com/abhinavxd/libredesk/internal/envelope"
 )
 
 const (
@@ -44,7 +45,14 @@ func (m *Manager) Copilot(ctx context.Context, conversationContext string, histo
 			Content: "Context - the conversation the agent is viewing:\n" + conversationContext,
 		})
 	}
-	msgs = append(msgs, history...)
+	// History is client-supplied; only user/assistant roles pass through, so a crafted request can't
+	// inject system prompts or orphan tool messages into the provider call.
+	for _, msg := range history {
+		if msg.Role != "user" && msg.Role != "assistant" {
+			continue
+		}
+		msgs = append(msgs, models.ChatMessage{Role: msg.Role, Content: msg.Content, Images: msg.Images})
+	}
 	return m.RunAgent(ctx, copilotSystemPrompt, msgs, defaultMaxSteps, tctx)
 }
 
@@ -57,19 +65,26 @@ func (m *Manager) Summarize(ctx context.Context, transcript string) (string, err
 func (m *Manager) GetCopilotMessages(conversationID, userID int) ([]models.CopilotMessage, error) {
 	msgs := []models.CopilotMessage{}
 	if err := m.q.GetCopilotMessages.Select(&msgs, conversationID, userID); err != nil {
-		return nil, err
+		m.lo.Error("error fetching copilot messages", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return msgs, nil
 }
 
 // SaveCopilotMessage persists one turn of an agent's copilot chat on a conversation.
 func (m *Manager) SaveCopilotMessage(conversationID, userID int, role, content string) error {
-	_, err := m.q.InsertCopilotMessage.Exec(conversationID, userID, role, content)
-	return err
+	if _, err := m.q.InsertCopilotMessage.Exec(conversationID, userID, role, content); err != nil {
+		m.lo.Error("error saving copilot message", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
 }
 
 // ClearCopilotMessages deletes an agent's copilot chat for a conversation.
 func (m *Manager) ClearCopilotMessages(conversationID, userID int) error {
-	_, err := m.q.DeleteCopilotMessages.Exec(conversationID, userID)
-	return err
+	if _, err := m.q.DeleteCopilotMessages.Exec(conversationID, userID); err != nil {
+		m.lo.Error("error clearing copilot messages", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
 }

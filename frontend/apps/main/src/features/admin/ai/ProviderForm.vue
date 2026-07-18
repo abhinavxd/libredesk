@@ -50,7 +50,7 @@
                 <Input
                   type="password"
                   autocomplete="new-password"
-                  :placeholder="t('admin.ai.apiKeyPlaceholder')"
+                  :placeholder="hasApiKey ? t('admin.ai.apiKeyPlaceholder') : ''"
                   v-bind="componentField"
                 />
               </FormControl>
@@ -349,7 +349,7 @@ const buildPayload = (values) => {
     model: values.model,
     base_url: values.base_url || ''
   }
-  if (values.api_key) payload.api_key = values.api_key
+  payload.api_key = values.api_key || ''
   if (props.showCompletionFields) {
     payload.instructions = values.instructions || ''
     payload.vision = !!values.vision
@@ -389,7 +389,7 @@ const onSubmit = form.handleSubmit(async (values) => {
   try {
     formLoading.value = true
     await api.updateAIConfig(props.type, buildPayload(values))
-    hasApiKey.value = hasApiKey.value || !!values.api_key
+    hasApiKey.value = !!values.api_key
     form.setFieldValue('api_key', hasApiKey.value ? '•'.repeat(10) : '')
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')

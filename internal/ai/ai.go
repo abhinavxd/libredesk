@@ -37,19 +37,19 @@ var (
 )
 
 type Manager struct {
-	q             queries
-	db            *sqlx.DB
-	lo            *logf.Logger
-	i18n          *i18n.I18n
-	encryptionKey string
-	chunkCfg      stringutil.ChunkConfig
-	index         *embeddingIndex
-	reindexMu     sync.Mutex
-	reconcileMu   sync.Mutex
-	snippetGenMu  sync.Mutex
-	snippetGen    map[int]uint64
-	dialControl   ssrf.Control
-	httpClient    *http.Client
+	q                  queries
+	db                 *sqlx.DB
+	lo                 *logf.Logger
+	i18n               *i18n.I18n
+	encryptionKey      string
+	chunkCfg           stringutil.ChunkConfig
+	index              *embeddingIndex
+	reindexMu          sync.Mutex
+	reconcileMu        sync.Mutex
+	snippetGenMu       sync.Mutex
+	snippetGen         map[int]uint64
+	httpClient         *http.Client
+	providerHTTPClient *http.Client
 }
 
 // Opts contains options for initializing the Manager.
@@ -74,6 +74,7 @@ type queries struct {
 	GetPrompts                  *sqlx.Stmt `query:"get-prompts"`
 	GetKnowledgeBaseItems       *sqlx.Stmt `query:"get-knowledge-base-items"`
 	GetKnowledgeBaseItem        *sqlx.Stmt `query:"get-knowledge-base-item"`
+	KnowledgeBaseItemExists     *sqlx.Stmt `query:"knowledge-base-item-exists"`
 	InsertKnowledgeBaseItem     *sqlx.Stmt `query:"insert-knowledge-base-item"`
 	UpdateKnowledgeBaseItem     *sqlx.Stmt `query:"update-knowledge-base-item"`
 	DeleteKnowledgeBaseItem     *sqlx.Stmt `query:"delete-knowledge-base-item"`
@@ -99,6 +100,7 @@ func New(opts Opts) (*Manager, error) {
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
 		return nil, err
 	}
+	transport := ssrf.NewTransport(opts.DialControl, 5*time.Second)
 	m := &Manager{
 		q:             q,
 		db:            opts.DB,
@@ -108,10 +110,13 @@ func New(opts Opts) (*Manager, error) {
 		chunkCfg:      stringutil.DefaultChunkConfig(),
 		index:         newEmbeddingIndex(),
 		snippetGen:    make(map[int]uint64),
-		dialControl:   opts.DialControl,
 		httpClient: &http.Client{
 			Timeout:   20 * time.Second,
-			Transport: ssrf.NewTransport(opts.DialControl, 5*time.Second),
+			Transport: transport,
+		},
+		providerHTTPClient: &http.Client{
+			Timeout:   60 * time.Second,
+			Transport: transport,
 		},
 	}
 	m.chunkCfg.Logger = opts.Lo
@@ -215,7 +220,7 @@ func (m *Manager) VisionEnabled() bool {
 	return cfg.Vision
 }
 
-// UpdateProviderConfig updates a provider type's config; a blank api_key keeps the stored key.
+// UpdateProviderConfig updates a provider type's config; a masked api_key keeps the stored key, a blank one clears it.
 func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderConfig) error {
 	if providerType != models.ProviderTypeCompletion && providerType != models.ProviderTypeEmbedding {
 		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -226,8 +231,15 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 		return err
 	}
 
-	apiKey := existing.APIKey
-	if in.APIKey != "" && !strings.Contains(in.APIKey, stringutil.PasswordDummy) {
+	apiKey := ""
+	switch {
+	case strings.Contains(in.APIKey, stringutil.PasswordDummy):
+		apiKey = existing.APIKey
+	case in.APIKey == "":
+	case crypto.IsEncrypted(in.APIKey):
+		// crypto.Encrypt would store this user-supplied value as-is and Decrypt would then fail on every call.
+		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.reservedSecretPrefix"), nil)
+	default:
 		enc, eerr := crypto.Encrypt(in.APIKey, m.encryptionKey)
 		if eerr != nil {
 			m.lo.Error("error encrypting API key", "error", eerr)
@@ -236,19 +248,9 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 		apiKey = enc
 	}
 
-	cfg := models.ProviderConfig{
-		Provider:           "openai",
-		BaseURL:            in.BaseURL,
-		APIKey:             apiKey,
-		Model:              in.Model,
-		Temperature:        in.Temperature,
-		MaxTokens:          in.MaxTokens,
-		Dimensions:         in.Dimensions,
-		EmbeddingMaxTokens: in.EmbeddingMaxTokens,
-		Instructions:       in.Instructions,
-		Vision:             in.Vision,
-		ReasoningEffort:    in.ReasoningEffort,
-	}
+	cfg := in
+	cfg.Provider = "openai"
+	cfg.APIKey = apiKey
 	b, err := json.Marshal(cfg)
 	if err != nil {
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -281,7 +283,7 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 		}
 		cfg.APIKey = stored.APIKey
 	}
-	client := NewOpenAIClient(cfg, m.lo, m.dialControl)
+	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient)
 
 	if providerType == models.ProviderTypeCompletion {
 		if _, err := client.SendPrompt(context.Background(), models.PromptPayload{SystemPrompt: "You are a connection test.", UserPrompt: "Reply with OK."}); err != nil {
@@ -351,7 +353,7 @@ func (m *Manager) getProviderClient(providerType string) (ProviderClient, error)
 	if err != nil {
 		return nil, err
 	}
-	return NewOpenAIClient(cfg, m.lo, m.dialControl), nil
+	return NewOpenAIClient(cfg, m.lo, m.providerHTTPClient), nil
 }
 
 func (m *Manager) providerError(err error) error {
@@ -373,7 +375,7 @@ func (m *Manager) testProviderError(err error) error {
 	}
 	msg := err.Error()
 	if len(msg) > maxTestErrorLen {
-		msg = msg[:maxTestErrorLen] + "…"
+		msg = trimToRuneBoundary(msg, maxTestErrorLen) + "…"
 	}
 	return envelope.NewError(envelope.InputError, msg, nil)
 }

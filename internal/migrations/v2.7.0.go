@@ -38,6 +38,13 @@ func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	`); err != nil {
 		return err
 	}
+	// Older releases hardcoded temperature 0.7; keep that behavior for configured providers that predate the field.
+	if _, err := db.Exec(`
+		UPDATE ai_providers SET config = config || '{"temperature": 0.7}'::jsonb
+		WHERE type = 'completion' AND COALESCE(config->>'api_key', '') <> '' AND NOT config ? 'temperature';
+	`); err != nil {
+		return err
+	}
 
 	if _, err := db.Exec(`
 		DO $$

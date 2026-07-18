@@ -128,7 +128,10 @@ func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText,
 	switch {
 	case auth.Value == "" || strings.Contains(auth.Value, stringutil.PasswordDummy):
 		auth.Value = toolAuthValue(existing)
-	case !crypto.IsEncrypted(auth.Value):
+	case crypto.IsEncrypted(auth.Value):
+		// crypto.Encrypt would store this user-supplied value as-is and Decrypt would then fail at call time.
+		return raw, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.reservedSecretPrefix"), nil)
+	default:
 		enc, err := crypto.Encrypt(auth.Value, m.encryptionKey)
 		if err != nil {
 			m.lo.Error("error encrypting tool auth", "error", err)

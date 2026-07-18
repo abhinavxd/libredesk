@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
-	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/zerodha/logf"
 )
 
@@ -25,6 +24,10 @@ const (
 	maxRequestRetries = 3
 	retryBaseBackoff  = 500 * time.Millisecond
 	retryMaxBackoff   = 5 * time.Second
+
+	// overallRequestTimeout bounds one logical request across all retry attempts; fasthttp request
+	// contexts carry no deadline, so without this a hanging provider stalls synchronous callers for minutes.
+	overallRequestTimeout = 90 * time.Second
 
 	// Reasoning models reject max_tokens and non-default temperature with structured 400s;
 	// those requests are adjusted and retried instead of surfacing the error.
@@ -54,19 +57,14 @@ type OpenAIClient struct {
 	client *http.Client
 }
 
-func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger, dialControl ssrf.Control) *OpenAIClient {
+type embeddingBatch struct{ start, end int }
+
+func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger, client *http.Client) *OpenAIClient {
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = defaultOpenAIBaseURL
 	}
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
-	return &OpenAIClient{
-		cfg: cfg,
-		lo:  lo,
-		client: &http.Client{
-			Timeout:   60 * time.Second,
-			Transport: ssrf.NewTransport(dialControl, 5*time.Second),
-		},
-	}
+	return &OpenAIClient{cfg: cfg, lo: lo, client: client}
 }
 
 // SendPrompt runs a single system+user prompt and returns the assistant text.
@@ -199,8 +197,7 @@ func (o *OpenAIClient) GetEmbeddingsBatch(ctx context.Context, texts []string) (
 	return out, nil
 }
 
-// embedBatch posts one /embeddings request already known to fit the provider's per-request limits
-// and returns the vectors placed back in input order.
+// embedBatch posts one /embeddings request already known to fit the provider's per-request limits.
 func (o *OpenAIClient) embedBatch(ctx context.Context, model string, inputs []string) ([][]float32, error) {
 	body := map[string]any{
 		"model": model,
@@ -265,6 +262,9 @@ func stripImages(msgs []models.ChatMessage) []models.ChatMessage {
 }
 
 func (o *OpenAIClient) post(ctx context.Context, path string, body map[string]any) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, overallRequestTimeout)
+	defer cancel()
+
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request body: %w", err)
@@ -403,8 +403,7 @@ func parseRetryAfter(v string) time.Duration {
 	return d
 }
 
-// embeddingTokenLimit resolves the per-input token cap, treating an unset (zero) or negative
-// config value as the default so existing provider configs keep working.
+// embeddingTokenLimit resolves the per-input token cap; an unset or negative config value means the default.
 func embeddingTokenLimit(cfg models.ProviderConfig) int {
 	if cfg.EmbeddingMaxTokens > 0 {
 		return cfg.EmbeddingMaxTokens
@@ -412,11 +411,7 @@ func embeddingTokenLimit(cfg models.ProviderConfig) int {
 	return defaultEmbeddingMaxTokens
 }
 
-type embeddingBatch struct{ start, end int }
-
-// embeddingBatches groups inputs into [start,end) spans each within the provider's per-request item
-// and summed-token caps. An input over the token budget on its own still forms a one-item batch (it
-// was already capped to the per-input limit upstream, which is below the request budget).
+// embeddingBatches groups inputs into [start,end) spans within the provider's per-request item and summed-token caps.
 func embeddingBatches(inputs []string) []embeddingBatch {
 	var batches []embeddingBatch
 	start := 0

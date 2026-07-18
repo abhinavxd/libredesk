@@ -160,11 +160,16 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 			return "", err
 		}
 		if q != "" {
-			if strings.Contains(url, "?") {
-				url += "&" + q
-			} else {
-				url += "?" + q
+			u, perr := neturl.Parse(url)
+			if perr != nil {
+				return "", fmt.Errorf("invalid tool URL: %w", perr)
 			}
+			if u.RawQuery != "" {
+				u.RawQuery += "&" + q
+			} else {
+				u.RawQuery = q
+			}
+			url = u.String()
 		}
 	} else {
 		bodyReader = bytes.NewBufferString(args)

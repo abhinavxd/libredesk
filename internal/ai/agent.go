@@ -10,15 +10,12 @@ import (
 
 const defaultMaxSteps = 5
 
-// RunAgent runs the tool-calling loop for the agent-facing callers (copilot, reply drafting):
-// built-in knowledge search only, no custom tools.
+// RunAgent runs the tool-calling loop for agent-facing callers: built-in knowledge search only, no custom tools.
 func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext) (string, error) {
 	return m.RunAgentWithTools(ctx, systemPrompt, history, maxSteps, tctx, nil, true, nil)
 }
 
-// RunAgentWithTools runs the tool-calling loop. allowedToolIDs nil marks an agent-facing surface: no
-// custom tools, workspace admin instructions appended; non-nil restricts custom tools to that explicit
-// set. includeBuiltinSearch adds the global knowledge search. extra are always included.
+// RunAgentWithTools runs the tool-calling loop; allowedToolIDs nil marks an agent-facing surface (no custom tools, workspace admin instructions appended), non-nil restricts custom tools to that set.
 func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext, allowedToolIDs []int, includeBuiltinSearch bool, extra []Tool) (string, error) {
 	if maxSteps <= 0 {
 		maxSteps = defaultMaxSteps
@@ -28,7 +25,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 	if err != nil {
 		return "", err
 	}
-	client := NewOpenAIClient(cfg, m.lo, m.dialControl)
+	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient)
 	if instructions := strings.TrimSpace(cfg.Instructions); allowedToolIDs == nil && instructions != "" && systemPrompt != "" {
 		systemPrompt += "\n\nWorkspace admin instructions (follow these, they take precedence on tone and format):\n" + instructions
 	}

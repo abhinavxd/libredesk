@@ -123,8 +123,7 @@ func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent st
 	return m.commitEmbeddings(sourceType, sourceID, indexed)
 }
 
-// embedSource chunks and embeds content without touching stored state; the provider call is slow, so
-// callers run it before taking reindexMu.
+// embedSource chunks and embeds content without touching stored state, so it can run before taking reindexMu.
 func (m *Manager) embedSource(sourceType string, sourceID int, title, htmlContent string) ([]indexedChunk, error) {
 	rawChunks, err := stringutil.ChunkHTMLContent(title, htmlContent, m.chunkCfg)
 	if err != nil {
@@ -242,8 +241,7 @@ func (m *Manager) loadIndex() error {
 	return nil
 }
 
-// Run periodically reconciles knowledge base embeddings so content that failed to embed, or predates
-// a model change, is retried without a manual re-save.
+// Run periodically reconciles knowledge base embeddings.
 func (m *Manager) Run(ctx context.Context) {
 	ticker := time.NewTicker(reconcileInterval)
 	defer ticker.Stop()
@@ -258,8 +256,7 @@ func (m *Manager) Run(ctx context.Context) {
 	}
 }
 
-// reconcile re-embeds every enabled snippet whose stored fingerprint no longer matches its current
-// content and the active embedding model. A skipped run (already in progress) is retried on the next tick.
+// reconcile re-embeds every enabled snippet whose stored fingerprint no longer matches its content and the active model.
 func (m *Manager) reconcile() {
 	if !m.reconcileMu.TryLock() {
 		return

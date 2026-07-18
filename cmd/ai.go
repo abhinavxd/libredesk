@@ -276,6 +276,9 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if strings.TrimSpace(resp) == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
 	return r.SendEnvelope(resp)
 }
 
@@ -339,6 +342,9 @@ func handleAICopilot(r *fastglue.Request) error {
 	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, ai.ToolContext{})
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+	if strings.TrimSpace(resp) == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	// Persist this exchange (agent's last message + the reply) so the chat survives a refresh.
 	if conv != nil {

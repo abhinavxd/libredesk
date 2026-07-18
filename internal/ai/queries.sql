@@ -16,6 +16,9 @@ SELECT id, created_at, updated_at, type, title, content, enabled, source, source
 -- name: get-knowledge-base-item
 SELECT id, created_at, updated_at, type, title, content, enabled, source, source_url, embedded_fingerprint FROM ai_knowledge_base WHERE id = $1;
 
+-- name: knowledge-base-item-exists
+SELECT EXISTS(SELECT 1 FROM ai_knowledge_base WHERE id = $1);
+
 -- name: insert-knowledge-base-item
 INSERT INTO ai_knowledge_base (type, title, content, enabled, source, source_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 

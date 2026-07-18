@@ -18,8 +18,7 @@ var (
 	encoder     *tiktoken.Tiktoken
 )
 
-// initEncoder loads tiktoken's BPE vocab from files embedded in the binary, so no network fetch
-// happens at runtime. On failure encoder stays nil and callers fall back to a rune estimate.
+// initEncoder loads tiktoken's BPE vocab from the binary (no network fetch); on failure encoder stays nil and callers fall back to a rune estimate.
 func initEncoder(lo *logf.Logger) {
 	encoderOnce.Do(func() {
 		tiktoken.SetBpeLoader(tiktokenloader.NewOfflineLoader())
@@ -47,9 +46,7 @@ func countTokens(s string) int {
 	return len(encoder.Encode(s, nil, nil))
 }
 
-// capToTokens truncates s to at most maxTokens. With the encoder loaded it truncates in token
-// space (dropping any trailing partial rune left by a token prefix); without it, it byte-caps to
-// maxTokens on a rune boundary, which is safe because byte-level BPE never emits more tokens than bytes.
+// capToTokens truncates s to at most maxTokens, byte-capping on a rune boundary when the encoder is unavailable.
 func capToTokens(s string, maxTokens int) string {
 	if maxTokens <= 0 {
 		return ""

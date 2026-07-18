@@ -59,8 +59,7 @@ func (m *Manager) UpdateKnowledgeBaseItem(id int, title, content string, enabled
 	return item, nil
 }
 
-// DeleteKnowledgeBaseItem removes the snippet and its embeddings in one transaction so a failure
-// can't leave deleted content searchable.
+// DeleteKnowledgeBaseItem removes the snippet and its embeddings in one transaction.
 func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
 	m.reindexMu.Lock()
 	defer m.reindexMu.Unlock()
@@ -108,14 +107,12 @@ func (m *Manager) reindexSnippetSync(item models.KnowledgeBaseItem, gen uint64) 
 	m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions, gen)
 }
 
-// reindexSnippetWith embeds an enabled snippet (or drops its vectors when disabled) and records the
-// fingerprint on success. The commit is gated by gen so a slower job from an older edit can't overwrite
-// a newer one. On failure the stored fingerprint stays stale, so reconcile retries later.
+// reindexSnippetWith embeds an enabled snippet (or drops its vectors when disabled), gated by gen so an older job can't overwrite a newer one.
 func (m *Manager) reindexSnippetWith(item models.KnowledgeBaseItem, model string, dimensions int, gen uint64) {
 	if !item.Enabled {
 		m.reindexMu.Lock()
 		defer m.reindexMu.Unlock()
-		if !m.isLatestSnippetGen(item.ID, gen) {
+		if !m.canCommitSnippet(item.ID, gen) {
 			return
 		}
 		if err := m.removeEmbeddings(models.SourceSnippet, item.ID); err != nil {
@@ -134,7 +131,7 @@ func (m *Manager) reindexSnippetWith(item models.KnowledgeBaseItem, model string
 
 	m.reindexMu.Lock()
 	defer m.reindexMu.Unlock()
-	if !m.isLatestSnippetGen(item.ID, gen) {
+	if !m.canCommitSnippet(item.ID, gen) {
 		return
 	}
 	if err := m.commitEmbeddings(models.SourceSnippet, item.ID, indexed); err != nil {
@@ -144,8 +141,7 @@ func (m *Manager) reindexSnippetWith(item models.KnowledgeBaseItem, model string
 	m.setSnippetFingerprint(item.ID, snippetFingerprint(item, model, dimensions))
 }
 
-// nextSnippetGen bumps and returns the reindex generation for a snippet. Each edit gets a higher gen;
-// a reindex job only commits if its gen is still the latest when it reaches the commit.
+// nextSnippetGen bumps and returns the reindex generation for a snippet; a job only commits if its gen is still the latest.
 func (m *Manager) nextSnippetGen(id int) uint64 {
 	m.snippetGenMu.Lock()
 	defer m.snippetGenMu.Unlock()
@@ -157,6 +153,23 @@ func (m *Manager) isLatestSnippetGen(id int, gen uint64) bool {
 	m.snippetGenMu.Lock()
 	defer m.snippetGenMu.Unlock()
 	return m.snippetGen[id] == gen
+}
+
+// canCommitSnippet reports whether a reindex commit may proceed: gen is still the latest and the row still exists (a delete between snapshot and commit would otherwise be resurrected). Caller must hold reindexMu.
+func (m *Manager) canCommitSnippet(id int, gen uint64) bool {
+	if !m.isLatestSnippetGen(id, gen) {
+		return false
+	}
+	var exists bool
+	if err := m.q.KnowledgeBaseItemExists.Get(&exists, id); err != nil {
+		m.lo.Error("error checking knowledge base item existence", "error", err, "id", id)
+		return false
+	}
+	if !exists {
+		m.dropSnippetGen(id)
+		return false
+	}
+	return true
 }
 
 func (m *Manager) dropSnippetGen(id int) {
@@ -176,8 +189,7 @@ func (m *Manager) ReindexAll() {
 	go m.reconcile()
 }
 
-// snippetFingerprint signs the content and embedding model a snippet was last embedded against; any
-// change (edited content, switched model, changed dimensions) yields a new value and triggers reindex.
+// snippetFingerprint signs the content and embedding model a snippet was last embedded against; any change triggers reindex.
 func snippetFingerprint(item models.KnowledgeBaseItem, model string, dimensions int) string {
 	sum := sha256.Sum256(fmt.Appendf(nil, "%s\x00%s\x00%s\x00%d", item.Title, item.Content, model, dimensions))
 	return hex.EncodeToString(sum[:])
