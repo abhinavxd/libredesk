@@ -26,7 +26,11 @@
             <FormItem>
               <FormLabel>{{ t('globals.terms.model') }}</FormLabel>
               <FormControl>
-                <Input type="text" v-bind="componentField" />
+                <Input
+                  type="text"
+                  :placeholder="showEmbeddingFields ? 'text-embedding-3-small' : 'gpt-4o-mini'"
+                  v-bind="componentField"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -36,7 +40,7 @@
             <FormItem>
               <FormLabel>{{ t('admin.ai.baseUrl') }}</FormLabel>
               <FormControl>
-                <Input type="text" v-bind="componentField" />
+                <Input type="text" placeholder="https://api.openai.com/v1" v-bind="componentField" />
               </FormControl>
               <FormDescription>{{ t('admin.ai.baseUrlHint') }}</FormDescription>
               <FormMessage />
@@ -118,8 +122,9 @@
               <FormItem>
                 <FormLabel>{{ t('admin.ai.dimensions') }}</FormLabel>
                 <FormControl>
-                  <Input type="number" min="1" step="1" v-bind="componentField" />
+                  <Input type="number" min="1" step="1" placeholder="1536" v-bind="componentField" />
                 </FormControl>
+                <FormDescription>{{ t('admin.ai.dimensionsHint') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>

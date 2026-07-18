@@ -1,10 +1,26 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
-  <LoadingOverlay :loading="isLoading">
-    <ToolForm :initial-values="tool" :is-editing="!!id" :submit-form="submitForm" />
-  </LoadingOverlay>
+  <AdminSplitLayout>
+    <template #content>
+      <div class="mb-5">
+        <CustomBreadcrumb :links="breadcrumbLinks" />
+      </div>
+      <LoadingOverlay :loading="isLoading">
+        <ToolForm :initial-values="tool" :is-editing="!!id" :submit-form="submitForm" />
+      </LoadingOverlay>
+    </template>
+
+    <template #help>
+      <p>{{ t('admin.ai.tool.editHelp') }}</p>
+      <a
+        href="https://docs.libredesk.io/configuration/ai"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="link-style"
+      >
+        {{ t('globals.terms.learnMore') }}
+      </a>
+    </template>
+  </AdminSplitLayout>
 </template>
 
 <script setup>
@@ -12,6 +28,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import ToolForm from '@/features/admin/ai/ToolForm.vue'
+import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useEmitter } from '@/composables/useEmitter.js'

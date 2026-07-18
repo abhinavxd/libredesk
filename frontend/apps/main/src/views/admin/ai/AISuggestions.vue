@@ -3,7 +3,9 @@
     <template #content>
       <LoadingOverlay :loading="isLoading" reserve-height>
         <div class="mb-6">
+          <DotLoader v-if="isLoadingLearning" />
           <SwitchField
+            v-else
             :title="t('admin.ai.faqLearning.title')"
             :description="t('admin.ai.faqLearning.description')"
             :checked="learningEnabled"
@@ -50,13 +52,20 @@
           :columns="createSuggestionColumns(t, { onReview: openReview })"
           :data="suggestions"
           :loading="isLoading"
-          :empty-text="t('admin.ai.suggestion.empty')"
         />
       </LoadingOverlay>
     </template>
 
     <template #help>
       <p>{{ t('admin.ai.faqLearning.help') }}</p>
+      <a
+        href="https://docs.libredesk.io/configuration/ai"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="link-style"
+      >
+        {{ t('globals.terms.learnMore') }}
+      </a>
     </template>
   </AdminSplitLayout>
 </template>
@@ -79,6 +88,7 @@ import {
 } from '@shared-ui/components/ui/dialog/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { createSuggestionColumns } from '@/features/admin/ai/suggestionColumns.js'
+import { DotLoader } from '@shared-ui/components/ui/loader'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -98,6 +108,7 @@ const reviewId = ref(null)
 const reviewQuestion = ref('')
 const reviewAnswer = ref('')
 const reviewUUID = ref('')
+const isLoadingLearning = ref(false)
 
 onMounted(() => {
   getSuggestions()
@@ -121,6 +132,7 @@ const getSuggestions = async () => {
 
 const getLearning = async () => {
   try {
+    isLoadingLearning.value = true
     const resp = await api.getAIFaqLearning()
     learningEnabled.value = !!resp.data.data?.enabled
   } catch (error) {
@@ -128,6 +140,8 @@ const getLearning = async () => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  } finally {
+    isLoadingLearning.value = false
   }
 }
 

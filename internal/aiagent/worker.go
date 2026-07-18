@@ -34,6 +34,23 @@ const (
 
 	// typingRefreshInterval must stay under the widget's 5s typing expiry (TYPING_RECEIVE_TIMEOUT).
 	typingRefreshInterval = 3 * time.Second
+
+	// Timeout model: two nested clocks.
+	//
+	// Run clock (below): caps one full agent run - every completion call, retry, backoff
+	// wait, and tool call combined. Livechat gets a tighter cap since the customer is
+	// watching a typing indicator; email can afford to keep trying.
+	//
+	// Call clock (ai.overallRequestTimeout, 60s): each individual provider HTTP call gets
+	// its own fresh 60s, and that call's retries must fit inside it. Custom tool calls get
+	// their own 20s each.
+	//
+	// The call clock nests inside the run clock, so whichever expires first wins. E.g. on
+	// livechat: completion 1 takes 50s (slow model + retries), so completion 2 starts with
+	// only 40s of run budget - if it needs more, the run is cancelled and the conversation
+	// hands off to a human.
+	emailRunTimeout    = 3 * time.Minute
+	livechatRunTimeout = 90 * time.Second
 )
 
 // nonActionableCategories are status categories the assistant skips; it replies only to open
@@ -204,8 +221,14 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if conv.Contact.Type == umodels.UserTypeContact {
 		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
 	}
+	timeout := emailRunTimeout
+	if conv.InboxChannel != channelEmail {
+		timeout = livechatRunTimeout
+	}
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	stopTyping := m.keepTyping(conv.UUID)
-	answer, err := m.ai.RunAgentWithTools(ctx, systemPrompt, history, aiRunMaxSteps, tctx, assistant.ToolIDs, false, tools)
+	answer, err := m.ai.RunAgentWithTools(runCtx, systemPrompt, history, aiRunMaxSteps, tctx, assistant.ToolIDs, false, tools)
 	stopTyping()
 	if err != nil {
 		m.lo.Error("error running ai agent", "conversation_uuid", conv.UUID, "error", err)

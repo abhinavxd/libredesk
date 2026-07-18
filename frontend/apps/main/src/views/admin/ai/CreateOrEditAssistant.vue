@@ -1,119 +1,143 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
-  <LoadingOverlay :loading="isLoading">
-    <AssistantForm
-      v-if="!id"
-      :initial-values="assistant"
-      :is-editing="false"
-      :submit-form="submitForm"
-    />
+  <AdminSplitLayout>
+    <template #content>
+      <div class="mb-5">
+        <CustomBreadcrumb :links="breadcrumbLinks" />
+      </div>
+      <LoadingOverlay :loading="isLoading">
+        <AssistantForm
+          v-if="!id"
+          :initial-values="assistant"
+          :is-editing="false"
+          :submit-form="submitForm"
+        />
 
-    <Tabs v-else default-value="settings">
-      <TabsList class="grid w-full grid-cols-3 mb-5">
-        <TabsTrigger value="settings">{{ t('admin.ai.assistant.tabs.settings') }}</TabsTrigger>
-        <TabsTrigger value="test">{{ t('admin.ai.assistant.tabs.test') }}</TabsTrigger>
-        <TabsTrigger value="performance">{{ t('admin.ai.assistant.tabs.performance') }}</TabsTrigger>
-      </TabsList>
+        <Tabs v-else default-value="settings">
+          <TabsList class="grid w-full grid-cols-3 mb-5">
+            <TabsTrigger value="settings">{{ t('admin.ai.assistant.tabs.settings') }}</TabsTrigger>
+            <TabsTrigger value="test">{{ t('admin.ai.assistant.tabs.test') }}</TabsTrigger>
+            <TabsTrigger value="performance">{{
+              t('admin.ai.assistant.tabs.performance')
+            }}</TabsTrigger>
+          </TabsList>
 
-      <TabsContent value="settings">
-        <AssistantForm :initial-values="assistant" :is-editing="true" :submit-form="submitForm" />
-      </TabsContent>
-
-      <TabsContent value="test">
-        <Card>
-          <CardHeader>
-            <CardTitle>{{ t('admin.ai.assistant.preview.title') }}</CardTitle>
-            <CardDescription>{{ t('admin.ai.assistant.preview.description') }}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <Textarea
-              v-model="previewMessage"
-              rows="3"
-              :placeholder="t('admin.ai.assistant.preview.placeholder')"
-              @keydown.enter.ctrl.prevent="submitPreview"
-              @keydown.enter.meta.prevent="submitPreview"
+          <TabsContent value="settings">
+            <AssistantForm
+              :initial-values="assistant"
+              :is-editing="true"
+              :submit-form="submitForm"
             />
-            <div class="flex items-center justify-end gap-3">
-              <span class="text-xs text-muted-foreground">{{
-                t('admin.ai.assistant.preview.shortcutHint')
-              }}</span>
-              <Button
-                :isLoading="previewLoading"
-                :disabled="!previewMessage.trim()"
-                @click="runPreview"
-              >
-                {{ t('admin.ai.assistant.preview.run') }}
-              </Button>
-            </div>
-            <div class="space-y-2">
-              <div class="text-sm font-medium text-foreground">
-                {{ t('admin.ai.assistant.preview.replyLabel') }}
-              </div>
-              <div class="rounded-md border border-border bg-muted p-3 text-sm whitespace-pre-wrap">
-                <span v-if="previewReply">{{ previewReply }}</span>
-                <span v-else class="text-muted-foreground">
-                  {{ t('admin.ai.assistant.preview.empty') }}
-                </span>
-              </div>
-            </div>
-            <div v-if="previewSources.length" class="space-y-2">
-              <div class="text-sm font-medium text-foreground">
-                {{ t('admin.ai.assistant.preview.sources') }}
-              </div>
-              <div class="rounded-md border border-border p-3 space-y-1">
-                <div
-                  v-for="source in previewSources"
-                  :key="source.id"
-                  class="flex items-center justify-between text-sm"
-                >
-                  <span class="text-foreground">{{ source.title }}</span>
-                  <span class="text-xs text-muted-foreground">
-                    {{ Math.round(source.score * 100) }}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
+          </TabsContent>
 
-      <TabsContent value="performance">
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>{{ t('admin.ai.assistant.stats.title') }}</CardTitle>
-            <div class="flex gap-1">
-              <Button
-                v-for="option in rangeOptions"
-                :key="option"
-                size="sm"
-                :variant="range === option ? 'default' : 'outline'"
-                :disabled="statsLoading"
-                @click="selectRange(option)"
-              >
-                {{ t('admin.ai.assistant.stats.rangeDays', { days: option }) }}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div
-              class="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-5 transition-opacity"
-              :class="{ 'opacity-50 pointer-events-none': statsLoading }"
-            >
-              <div v-for="tile in tiles" :key="tile.label">
-                <div class="text-sm text-muted-foreground">{{ tile.label }}</div>
-                <div class="text-2xl font-semibold text-foreground">{{ tile.value }}</div>
-                <div v-if="tile.delta !== null" class="text-xs" :class="tile.deltaClass">
-                  {{ tile.deltaText }}
+          <TabsContent value="test">
+            <Card>
+              <CardHeader>
+                <CardTitle>{{ t('admin.ai.assistant.preview.title') }}</CardTitle>
+                <CardDescription>{{ t('admin.ai.assistant.preview.description') }}</CardDescription>
+              </CardHeader>
+              <CardContent class="space-y-4">
+                <Textarea
+                  v-model="previewMessage"
+                  rows="3"
+                  :placeholder="t('admin.ai.assistant.preview.placeholder')"
+                  @keydown.enter.ctrl.prevent="submitPreview"
+                  @keydown.enter.meta.prevent="submitPreview"
+                />
+                <div class="flex items-center justify-end gap-3">
+                  <span class="text-xs text-muted-foreground">{{
+                    t('admin.ai.assistant.preview.shortcutHint')
+                  }}</span>
+                  <Button
+                    :isLoading="previewLoading"
+                    :disabled="!previewMessage.trim()"
+                    @click="runPreview"
+                  >
+                    {{ t('admin.ai.assistant.preview.run') }}
+                  </Button>
                 </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
-  </LoadingOverlay>
+                <div class="space-y-2">
+                  <div class="text-sm font-medium text-foreground">
+                    {{ t('admin.ai.assistant.preview.replyLabel') }}
+                  </div>
+                  <div
+                    class="rounded-md border border-border bg-muted p-3 text-sm whitespace-pre-wrap"
+                  >
+                    <span v-if="previewReply">{{ previewReply }}</span>
+                    <span v-else class="text-muted-foreground">
+                      {{ t('admin.ai.assistant.preview.empty') }}
+                    </span>
+                  </div>
+                </div>
+                <div v-if="previewSources.length" class="space-y-2">
+                  <div class="text-sm font-medium text-foreground">
+                    {{ t('admin.ai.assistant.preview.sources') }}
+                  </div>
+                  <div class="rounded-md border border-border p-3 space-y-1">
+                    <div
+                      v-for="source in previewSources"
+                      :key="source.id"
+                      class="flex items-center justify-between text-sm"
+                    >
+                      <span class="text-foreground">{{ source.title }}</span>
+                      <span class="text-xs text-muted-foreground">
+                        {{ Math.round(source.score * 100) }}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="performance">
+            <Card>
+              <CardHeader class="flex flex-row items-center justify-between space-y-0">
+                <CardTitle>{{ t('admin.ai.assistant.stats.title') }}</CardTitle>
+                <div class="flex gap-1">
+                  <Button
+                    v-for="option in rangeOptions"
+                    :key="option"
+                    size="sm"
+                    :variant="range === option ? 'default' : 'outline'"
+                    :disabled="statsLoading"
+                    @click="selectRange(option)"
+                  >
+                    {{ t('admin.ai.assistant.stats.rangeDays', { days: option }) }}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div
+                  class="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-5 transition-opacity"
+                  :class="{ 'opacity-50 pointer-events-none': statsLoading }"
+                >
+                  <div v-for="tile in tiles" :key="tile.label">
+                    <div class="text-sm text-muted-foreground">{{ tile.label }}</div>
+                    <div class="text-2xl font-semibold text-foreground">{{ tile.value }}</div>
+                    <div v-if="tile.delta !== null" class="text-xs" :class="tile.deltaClass">
+                      {{ tile.deltaText }}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </LoadingOverlay>
+    </template>
+
+    <template #help>
+      <p>{{ t('admin.ai.assistant.editHelp') }}</p>
+      <a
+        href="https://docs.libredesk.io/configuration/ai"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="link-style"
+      >
+        {{ t('globals.terms.learnMore') }}
+      </a>
+    </template>
+  </AdminSplitLayout>
 </template>
 
 <script setup>
@@ -121,6 +145,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import AssistantForm from '@/features/admin/ai/AssistantForm.vue'
+import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { Button } from '@shared-ui/components/ui/button/index.js'

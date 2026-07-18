@@ -256,7 +256,7 @@ func main() {
 	go user.MonitorUserAvailability(ctx, onUsersOffline(conversation))
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
-	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 2))
+	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
 	go ai.Run(ctx)
 
 	var app = &App{

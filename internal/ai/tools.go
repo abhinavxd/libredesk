@@ -185,14 +185,19 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 
 	if len(t.tool.Auth) > 0 {
 		var auth models.ToolAuth
-		if err := json.Unmarshal(t.tool.Auth, &auth); err == nil && auth.Header != "" {
-			value, derr := crypto.Decrypt(auth.Value, t.encryptionKey)
-			if derr != nil {
-				// A failed decrypt means a corrupted or re-keyed secret; sending the raw stored value
-				// would leak ciphertext and fail auth confusingly. Skip the header and let the call 401.
-				t.lo.Error("could not decrypt custom tool auth secret; sending request without it", "tool", t.tool.Name, "error", derr)
-			} else {
-				req.Header.Set(auth.Header, value)
+		if err := json.Unmarshal(t.tool.Auth, &auth); err == nil {
+			for _, h := range auth.Headers {
+				if h.Key == "" {
+					continue
+				}
+				value, derr := crypto.Decrypt(h.Value, t.encryptionKey)
+				if derr != nil {
+					// A failed decrypt means a corrupted or re-keyed secret; sending the raw stored value
+					// would leak ciphertext and fail auth confusingly. Skip this header and let the call 401.
+					t.lo.Error("could not decrypt custom tool auth secret; sending request without it", "tool", t.tool.Name, "header", h.Key, "error", derr)
+					continue
+				}
+				req.Header.Set(h.Key, value)
 			}
 		}
 	}

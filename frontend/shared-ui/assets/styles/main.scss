@@ -363,8 +363,7 @@
 // Components
 @layer components {
   .link-style {
-    color: #0066cc;
-    @apply hover:underline;
+    @apply text-primary hover:underline;
   }
 }
 

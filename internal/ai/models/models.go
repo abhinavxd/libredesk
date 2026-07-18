@@ -95,10 +95,15 @@ type Tool struct {
 	Enabled     bool           `db:"enabled" json:"enabled"`
 }
 
-// ToolAuth is the decoded ai_tools.auth JSONB: a single header injected on the request.
+// ToolAuth is the decoded ai_tools.auth JSONB: headers injected on every request.
 type ToolAuth struct {
-	Header string `json:"header"`
-	Value  string `json:"value"`
+	Headers []ToolAuthHeader `json:"headers"`
+}
+
+// ToolAuthHeader is a single HTTP header name/value pair sent with a tool request.
+type ToolAuthHeader struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // Embedding is a stored chunk vector row.

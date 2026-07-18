@@ -36,8 +36,13 @@
       <FormItem>
         <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
         <FormControl>
-          <Textarea rows="3" v-bind="componentField" />
+          <Textarea
+            rows="3"
+            :placeholder="t('admin.ai.assistant.descriptionPlaceholder')"
+            v-bind="componentField"
+          />
         </FormControl>
+        <FormDescription>{{ t('admin.ai.assistant.descriptionHint') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -46,7 +51,11 @@
       <FormItem>
         <FormLabel>{{ t('admin.ai.assistant.expectation') }}</FormLabel>
         <FormControl>
-          <Textarea rows="2" v-bind="componentField" />
+          <Textarea
+            rows="2"
+            :placeholder="t('admin.ai.assistant.expectationPlaceholder')"
+            v-bind="componentField"
+          />
         </FormControl>
         <FormDescription>{{ t('admin.ai.assistant.expectationHint') }}</FormDescription>
         <FormMessage />
@@ -163,7 +172,11 @@
       <FormItem>
         <FormLabel>{{ t('admin.ai.assistant.instructions') }}</FormLabel>
         <FormControl>
-          <Textarea rows="6" v-bind="componentField" />
+          <Textarea
+            rows="6"
+            :placeholder="t('admin.ai.assistant.instructionsPlaceholder')"
+            v-bind="componentField"
+          />
         </FormControl>
         <FormDescription>{{ t('admin.ai.assistant.instructionsHint') }}</FormDescription>
         <FormMessage />
@@ -174,7 +187,11 @@
       <FormItem>
         <FormLabel>{{ t('admin.ai.assistant.guardrails') }}</FormLabel>
         <FormControl>
-          <Textarea rows="6" v-bind="componentField" />
+          <Textarea
+            rows="6"
+            :placeholder="t('admin.ai.assistant.guardrailsPlaceholder')"
+            v-bind="componentField"
+          />
         </FormControl>
         <FormDescription>{{ t('admin.ai.assistant.guardrailsHint') }}</FormDescription>
         <FormMessage />

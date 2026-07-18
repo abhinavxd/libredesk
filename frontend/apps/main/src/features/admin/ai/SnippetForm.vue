@@ -4,7 +4,7 @@
       <FormItem>
         <FormLabel>{{ t('globals.terms.title') }}</FormLabel>
         <FormControl>
-          <Input type="text" v-bind="componentField" />
+          <Input type="text" :placeholder="t('admin.ai.snippet.titlePlaceholder')" v-bind="componentField" />
         </FormControl>
         <FormMessage />
       </FormItem>
@@ -14,8 +14,13 @@
       <FormItem>
         <FormLabel>{{ t('globals.terms.content') }}</FormLabel>
         <FormControl>
-          <Textarea class="min-h-[420px] max-h-[60vh]" v-bind="componentField" />
+          <Textarea
+            class="min-h-[420px] max-h-[60vh]"
+            :placeholder="t('admin.ai.snippet.contentPlaceholder')"
+            v-bind="componentField"
+          />
         </FormControl>
+        <FormDescription>{{ t('admin.ai.snippet.contentHint') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -50,6 +55,7 @@ import { DialogFooter } from '@shared-ui/components/ui/dialog/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import {
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,

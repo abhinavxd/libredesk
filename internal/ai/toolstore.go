@@ -12,6 +12,8 @@ import (
 	"github.com/jmoiron/sqlx/types"
 )
 
+var emptyToolAuth = types.JSONText(`{"headers":[]}`)
+
 // GetTools returns all custom tools (auth values masked - never returned to the client).
 func (m *Manager) GetTools() ([]models.Tool, error) {
 	tools := make([]models.Tool, 0)
@@ -116,28 +118,36 @@ func (m *Manager) DeleteTool(id int) error {
 	return nil
 }
 
-// prepareToolAuth returns the auth JSON to store: a blank or dummy-masked value keeps the existing secret, a new plaintext value is encrypted.
+// prepareToolAuth returns the auth JSON to store: per header, a blank or dummy-masked value keeps
+// the existing secret (matched by key), a new plaintext value is encrypted.
 func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText, error) {
 	if len(raw) == 0 {
-		return types.JSONText("{}"), nil
+		return emptyToolAuth, nil
 	}
 	var auth models.ToolAuth
 	if err := json.Unmarshal(raw, &auth); err != nil {
 		return raw, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	switch {
-	case auth.Value == "" || strings.Contains(auth.Value, stringutil.PasswordDummy):
-		auth.Value = toolAuthValue(existing)
-	case crypto.IsEncrypted(auth.Value):
-		// crypto.Encrypt would store this user-supplied value as-is and Decrypt would then fail at call time.
-		return raw, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.reservedSecretPrefix"), nil)
-	default:
-		enc, err := crypto.Encrypt(auth.Value, m.encryptionKey)
-		if err != nil {
-			m.lo.Error("error encrypting tool auth", "error", err)
-			return raw, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	existingByKey := toolAuthByKey(existing)
+	for i, h := range auth.Headers {
+		switch {
+		case h.Value == "" || strings.Contains(h.Value, stringutil.PasswordDummy):
+			existingValue, ok := existingByKey[h.Key]
+			if !ok {
+				return raw, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.headersInvalid"), nil)
+			}
+			auth.Headers[i].Value = existingValue
+		case crypto.IsEncrypted(h.Value):
+			// crypto.Encrypt would store this user-supplied value as-is and Decrypt would then fail at call time.
+			return raw, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.reservedSecretPrefix"), nil)
+		default:
+			enc, err := crypto.Encrypt(h.Value, m.encryptionKey)
+			if err != nil {
+				m.lo.Error("error encrypting tool auth", "error", err)
+				return raw, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			}
+			auth.Headers[i].Value = enc
 		}
-		auth.Value = enc
 	}
 	b, err := json.Marshal(auth)
 	if err != nil {
@@ -146,33 +156,39 @@ func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText,
 	return types.JSONText(b), nil
 }
 
-// maskToolAuth replaces the stored secret with a dummy value.
+// maskToolAuth replaces every header's stored secret with a dummy value.
 func maskToolAuth(raw types.JSONText) types.JSONText {
 	if len(raw) == 0 {
-		return types.JSONText("{}")
+		return emptyToolAuth
 	}
 	var auth models.ToolAuth
 	if err := json.Unmarshal(raw, &auth); err != nil {
-		return types.JSONText("{}")
+		return emptyToolAuth
 	}
-	if auth.Value != "" {
-		auth.Value = strings.Repeat(stringutil.PasswordDummy, 10)
+	for i, h := range auth.Headers {
+		if h.Value != "" {
+			auth.Headers[i].Value = strings.Repeat(stringutil.PasswordDummy, 10)
+		}
 	}
 	b, err := json.Marshal(auth)
 	if err != nil {
-		return types.JSONText("{}")
+		return emptyToolAuth
 	}
 	return types.JSONText(b)
 }
 
-// toolAuthValue returns the stored (encrypted) auth value from a raw auth JSON.
-func toolAuthValue(raw types.JSONText) string {
+// toolAuthByKey returns the stored (encrypted) header values from a raw auth JSON, keyed by header name.
+func toolAuthByKey(raw types.JSONText) map[string]string {
+	byKey := make(map[string]string)
 	if len(raw) == 0 {
-		return ""
+		return byKey
 	}
 	var auth models.ToolAuth
 	if err := json.Unmarshal(raw, &auth); err != nil {
-		return ""
+		return byKey
 	}
-	return auth.Value
+	for _, h := range auth.Headers {
+		byKey[h.Key] = h.Value
+	}
+	return byKey
 }

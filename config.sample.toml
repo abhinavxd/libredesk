@@ -118,7 +118,7 @@ worker_count = 10
 
 [ai_agent]
 # Number of workers running autonomous AI assistant responses
-worker_count = 2
+worker_count = 10
 # Maximum number of AI assistant response jobs that can be queued
 queue_size = 1000
 
