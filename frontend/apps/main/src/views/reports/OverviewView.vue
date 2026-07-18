@@ -43,6 +43,7 @@
             <Input
               v-if="isCustom"
               v-model="customDays"
+              :aria-label="$t('report.customRangeDays')"
               type="number"
               min="1"
               max="365"
@@ -458,26 +459,32 @@ const fetchCardStats = async () => {
       agents_away: data.data.agents_away || 0,
       agents_reassigning: data.data.agents_reassigning || 0
     }
+    return true
   } catch (error) {
     showError(error)
+    return false
   }
 }
 
 const runSectionFetch = async (key, days) => {
   try {
     await sections[key](days)
+    return true
   } catch (error) {
     showError(error)
+    return false
   }
 }
 
 const fetchSections = async () => {
   isLoading.value = true
   try {
-    await Promise.allSettled(Object.keys(sections).map((key) => runSectionFetch(key, range.value)))
+    const results = await Promise.all(
+      Object.keys(sections).map((key) => runSectionFetch(key, range.value))
+    )
+    if (results.every(Boolean)) lastUpdate.value = new Date()
   } finally {
     isLoading.value = false
-    lastUpdate.value = new Date()
   }
 }
 
@@ -509,13 +516,13 @@ const applyCustom = () => {
 const loadDashboardData = async () => {
   isLoading.value = true
   try {
-    await Promise.allSettled([
+    const results = await Promise.all([
       fetchCardStats(),
       ...Object.keys(sections).map((key) => runSectionFetch(key, range.value))
     ])
+    if (results.every(Boolean)) lastUpdate.value = new Date()
   } finally {
     isLoading.value = false
-    lastUpdate.value = new Date()
   }
 }
 

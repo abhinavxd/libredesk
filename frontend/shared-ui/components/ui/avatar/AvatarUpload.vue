@@ -1,5 +1,9 @@
 <template>
-  <div class="relative group w-28 h-28 cursor-pointer" @click="triggerFileInput">
+  <div
+    class="relative group w-28 h-28"
+    :class="disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'"
+    @click="triggerFileInput"
+  >
     <Avatar class="size-28">
       <AvatarImage :src="src || ''" />
       <AvatarFallback>{{ initials }}</AvatarFallback>
@@ -16,7 +20,8 @@
     <button
       v-if="src"
       type="button"
-      class="absolute top-1 right-1 rounded-full p-0.5 bg-destructive text-destructive-foreground shadow-md z-10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+      :disabled="disabled"
+      class="absolute top-1 right-1 rounded-full p-0.5 bg-destructive text-destructive-foreground shadow-md z-10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
       aria-label="Remove avatar"
       @click.stop="emit('remove')"
     >
@@ -78,12 +83,16 @@ import {
   DialogDescription
 } from '../dialog'
 
-defineProps({
+const props = defineProps({
   src: String,
   initials: String,
   label: {
     type: String,
     default: 'Upload'
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -94,6 +103,7 @@ const showCropper = ref(false)
 const cropSource = ref('')
 
 function triggerFileInput() {
+  if (props.disabled) return
   fileInput.value?.click()
 }
 

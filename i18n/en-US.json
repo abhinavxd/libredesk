@@ -1153,6 +1153,7 @@
   "report.csat.cardTitle": "Customer satisfaction",
   "report.csat.responseRate": "Response Rate",
   "report.csat.responses": "Responses",
+  "report.customRangeDays": "Custom range in days",
   "report.messages.cardTitle": "Message volume",
   "report.messages.incoming": "Incoming",
   "report.messages.outgoing": "Outgoing",

@@ -9,6 +9,7 @@
         :src="userStore.avatar"
         :initials="userStore.getInitials"
         :label="$t('globals.messages.upload')"
+        :disabled="isSaving"
         @upload="onCropped"
         @remove="removeAvatar"
       />
@@ -43,6 +44,7 @@ const userStore = useUserStore()
 const pendingFile = ref(null)
 
 const onCropped = (file) => {
+  if (isSaving.value) return
   pendingFile.value = file
   userStore.setAvatar(URL.createObjectURL(file))
 }
@@ -69,9 +71,10 @@ const saveUser = async () => {
 }
 
 const removeAvatar = async () => {
-  pendingFile.value = null
+  if (isSaving.value) return
   try {
     await api.deleteUserAvatar()
+    pendingFile.value = null
     userStore.clearAvatar()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('account.avatarRemoved')
