@@ -20,9 +20,9 @@ JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
 WHERE a.user_id = $1;
 
 -- name: get-assistant-user-ids
-SELECT a.user_id
-FROM ai_assistants a
-JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL;
+-- Includes deleted assistants: their old replies must still be recognized as AI-authored
+-- (e.g. FAQ mining must never treat them as human answers).
+SELECT id FROM users WHERE type = 'ai_assistant';
 
 -- name: insert-assistant-user
 INSERT INTO users (type, first_name, last_name, enabled)

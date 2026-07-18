@@ -115,7 +115,9 @@ func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaMan
 		miningInflight:   map[int]bool{},
 		assistantUserIDs: map[int]bool{},
 	}
-	m.refreshAssistantUserIDs()
+	if err := m.refreshAssistantUserIDs(); err != nil {
+		return nil, err
+	}
 	return m, nil
 }
 
@@ -396,11 +398,11 @@ func normalizeLanguages(langs []string) []string {
 	return out
 }
 
-func (m *Manager) refreshAssistantUserIDs() {
+func (m *Manager) refreshAssistantUserIDs() error {
 	var ids []int
 	if err := m.q.GetAssistantUserIDs.Select(&ids); err != nil {
 		m.lo.Error("error loading assistant user ids", "error", err)
-		return
+		return err
 	}
 	set := make(map[int]bool, len(ids))
 	for _, id := range ids {
@@ -409,6 +411,7 @@ func (m *Manager) refreshAssistantUserIDs() {
 	m.userIDsMu.Lock()
 	m.assistantUserIDs = set
 	m.userIDsMu.Unlock()
+	return nil
 }
 
 func (m *Manager) isAssistantUser(userID int) bool {

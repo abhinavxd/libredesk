@@ -166,7 +166,10 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	var turns int
 	if err := m.q.CountAITurns.Get(&turns, conv.ID, assistant.UserID); err != nil {
 		m.lo.Error("error counting ai turns", "conversation_id", conv.ID, "error", err)
-	} else if turns >= assistant.MaxTurns {
+		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+		return
+	}
+	if turns >= assistant.MaxTurns {
 		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffMaxTurns"))
 		return
 	}
@@ -206,7 +209,9 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	stopTyping()
 	if err != nil {
 		m.lo.Error("error running ai agent", "conversation_uuid", conv.UUID, "error", err)
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+		if !outcome.handedOff {
+			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+		}
 		return
 	}
 	// The assistant escalated; the handoff tool already reassigned and noted it.
@@ -222,7 +227,10 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	if answer != "" {
 		m.lo.Debug("ai agent replying", "conversation_uuid", conv.UUID, "reply_len", len(answer), "resolved", outcome.resolved)
-		m.postReply(conv, assistant, answer, nil)
+		if err := m.postReply(conv, assistant, answer, nil); err != nil {
+			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			return
+		}
 	}
 	if confirm != "" {
 		m.postReply(conv, assistant, confirm, map[string]any{"is_confirmation": true})
@@ -268,7 +276,7 @@ func (m *Manager) keepTyping(conversationUUID string) func() {
 	}
 }
 
-func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistant, text string, meta map[string]any) {
+func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistant, text string, meta map[string]any) error {
 	var to []string
 	if conv.InboxChannel == channelEmail && conv.Contact.Email.String != "" {
 		to = []string{conv.Contact.Email.String}
@@ -278,7 +286,9 @@ func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistan
 	}
 	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(text), to, nil, nil, meta); err != nil {
 		m.lo.Error("error sending assistant reply", "conversation_uuid", conv.UUID, "error", err)
+		return err
 	}
+	return nil
 }
 
 // handoff notes the reason and moves the conversation to the fallback team, or unassigns if none is set.
@@ -293,12 +303,13 @@ func (m *Manager) handoff(conv cmodels.Conversation, assistant models.Assistant,
 		m.lo.Error("error posting handoff note", "conversation_uuid", conv.UUID, "error", err)
 	}
 	if assistant.FallbackTeamID.Valid {
-		fallbackTeamID := int(assistant.FallbackTeamID.Int)
-		if err := m.convo.UpdateConversationTeamAssignee(conv.UUID, fallbackTeamID, actor); err != nil {
+		if err := m.convo.UpdateConversationTeamAssignee(conv.UUID, int(assistant.FallbackTeamID.Int), actor); err != nil {
 			m.lo.Error("error assigning fallback team", "conversation_uuid", conv.UUID, "error", err)
 		}
-		// A same-team assignment keeps the assigned user, so the assistant must be removed explicitly.
-		if int(conv.AssignedTeamID.Int) != fallbackTeamID {
+		// A same-team assignment keeps the assigned user, and a failed one removes nothing, so
+		// re-check who is assigned instead of trusting the pre-run snapshot.
+		fresh, err := m.convo.GetConversation(conv.ID, "", "")
+		if err == nil && (!fresh.AssignedUserID.Valid || int(fresh.AssignedUserID.Int) != assistant.UserID) {
 			return
 		}
 	}
@@ -368,8 +379,30 @@ func (m *Manager) buildHistory(msgs []cmodels.Message) []aimodels.ChatMessage {
 		msgs = msgs[len(msgs)-maxHistoryMessages:]
 	}
 	vision := m.ai.VisionEnabled()
-	imagesLeft := maxImagesTotal
 	m.lo.Debug("ai agent building history", "messages", len(msgs), "vision", vision)
+	// Spend the image budget newest-first so the message being answered never loses its
+	// attachments to older ones.
+	allowedImages := map[string]bool{}
+	if vision {
+		imagesLeft := maxImagesTotal
+		for i := len(msgs) - 1; i >= 0 && imagesLeft > 0; i-- {
+			if msgs[i].SenderType != cmodels.SenderTypeContact {
+				continue
+			}
+			perMsg := 0
+			for _, att := range msgs[i].Attachments {
+				if imagesLeft <= 0 || perMsg >= maxImagesPerMessage {
+					break
+				}
+				if !strings.HasPrefix(att.ContentType, "image/") || att.Size > maxImageBytes {
+					continue
+				}
+				allowedImages[att.UUID] = true
+				perMsg++
+				imagesLeft--
+			}
+		}
+	}
 	history := make([]aimodels.ChatMessage, 0, len(msgs))
 	for _, msg := range msgs {
 		role := "assistant"
@@ -382,15 +415,14 @@ func (m *Manager) buildHistory(msgs []cmodels.Message) []aimodels.ChatMessage {
 		var markers []string
 		// Only the customer's own attachments are worth showing the assistant.
 		if role == "user" {
-			perMsg := 0
 			for _, att := range msg.Attachments {
 				if !strings.HasPrefix(att.ContentType, "image/") {
 					m.lo.Debug("ai agent attachment not an image", "uuid", att.UUID, "content_type", att.ContentType)
 					markers = append(markers, unreadableFileMarker(att))
 					continue
 				}
-				if !vision || imagesLeft <= 0 || perMsg >= maxImagesPerMessage || att.Size > maxImageBytes {
-					m.lo.Debug("ai agent image not sent", "uuid", att.UUID, "size", att.Size, "vision", vision, "images_left", imagesLeft, "per_msg", perMsg)
+				if !allowedImages[att.UUID] {
+					m.lo.Debug("ai agent image not sent", "uuid", att.UUID, "size", att.Size, "vision", vision)
 					markers = append(markers, unreadableImageMarker(att))
 					continue
 				}
@@ -401,8 +433,6 @@ func (m *Manager) buildHistory(msgs []cmodels.Message) []aimodels.ChatMessage {
 				}
 				m.lo.Debug("ai agent attached image", "uuid", att.UUID, "content_type", att.ContentType, "size", att.Size)
 				images = append(images, img)
-				perMsg++
-				imagesLeft--
 			}
 		}
 
