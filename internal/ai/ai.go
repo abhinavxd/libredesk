@@ -8,7 +8,6 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -111,15 +110,8 @@ func New(opts Opts) (*Manager, error) {
 		snippetGen:    make(map[int]uint64),
 		dialControl:   opts.DialControl,
 		httpClient: &http.Client{
-			Timeout: 20 * time.Second,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   5 * time.Second,
-					KeepAlive: 30 * time.Second,
-					Control:   opts.DialControl,
-				}).DialContext,
-				ForceAttemptHTTP2: true,
-			},
+			Timeout:   20 * time.Second,
+			Transport: ssrf.NewTransport(opts.DialControl, 5*time.Second),
 		},
 	}
 	m.chunkCfg.Logger = opts.Lo

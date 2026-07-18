@@ -5,9 +5,12 @@
 package ssrf
 
 import (
+	"net"
+	"net/http"
 	"net/netip"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/abhinavxd/ssrfguard"
 	"github.com/zerodha/logf"
@@ -33,4 +36,15 @@ func NewControl(enabled bool, allowedCIDRs []string, lo *logf.Logger) Control {
 		allowed = append(allowed, prefix)
 	}
 	return ssrfguard.New(allowed...).Control
+}
+
+// NewTransport clones http.DefaultTransport (keeping proxy and connection-pool defaults) and applies the SSRF dial guard; callers may override the returned transport's timeouts.
+func NewTransport(control Control, dialTimeout time.Duration) *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.DialContext = (&net.Dialer{
+		Timeout:   dialTimeout,
+		KeepAlive: 30 * time.Second,
+		Control:   control,
+	}).DialContext
+	return t
 }

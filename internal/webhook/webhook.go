@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -90,6 +89,10 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 
+	transport := ssrf.NewTransport(opts.DialControl, 3*time.Second)
+	transport.TLSHandshakeTimeout = 3 * time.Second
+	transport.ResponseHeaderTimeout = 3 * time.Second
+
 	return &Manager{
 		q:             q,
 		lo:            opts.Lo,
@@ -97,16 +100,8 @@ func New(opts Opts) (*Manager, error) {
 		db:            opts.DB,
 		deliveryQueue: make(chan DeliveryTask, opts.QueueSize),
 		httpClient: &http.Client{
-			Timeout: opts.Timeout,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   3 * time.Second,
-					KeepAlive: 30 * time.Second,
-					Control:   opts.DialControl,
-				}).DialContext,
-				TLSHandshakeTimeout:   3 * time.Second,
-				ResponseHeaderTimeout: 3 * time.Second,
-			},
+			Timeout:   opts.Timeout,
+			Transport: transport,
 		},
 		workers:       opts.Workers,
 		encryptionKey: opts.EncryptionKey,

@@ -215,13 +215,16 @@ aiPromptStore.fetchPrompts()
 
 const handleAiPromptSelected = async (key) => {
   if (isGenerating.value) return
+  const uuid = currentConversationUUID.value
+  if (!uuid) return
   isGenerating.value = true
   try {
     const resp = await api.aiCompletion({
       prompt_key: key,
       content: textContent.value
     })
-    htmlContent.value = resp.data.data.replace(/\n/g, '<br>')
+    if (uuid !== currentConversationUUID.value) return
+    htmlContent.value = convertTextToHtml(resp.data.data || '')
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

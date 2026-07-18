@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -64,15 +63,8 @@ func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger, dialControl ssr
 		cfg: cfg,
 		lo:  lo,
 		client: &http.Client{
-			Timeout: 60 * time.Second,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   5 * time.Second,
-					KeepAlive: 30 * time.Second,
-					Control:   dialControl,
-				}).DialContext,
-				ForceAttemptHTTP2: true,
-			},
+			Timeout:   60 * time.Second,
+			Transport: ssrf.NewTransport(dialControl, 5*time.Second),
 		},
 	}
 }

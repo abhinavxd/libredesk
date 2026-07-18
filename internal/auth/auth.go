@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -134,19 +133,12 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 
 // newOIDCClient builds the HTTP client used for OIDC discovery.
 func newOIDCClient(dialControl ssrf.Control) *http.Client {
+	transport := ssrf.NewTransport(dialControl, 3*time.Second)
+	transport.TLSHandshakeTimeout = 5 * time.Second
+	transport.ResponseHeaderTimeout = 5 * time.Second
 	return &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   3 * time.Second,
-				KeepAlive: 30 * time.Second,
-				Control:   dialControl,
-			}).DialContext,
-			ForceAttemptHTTP2:     true,
-			TLSHandshakeTimeout:   5 * time.Second,
-			ResponseHeaderTimeout: 5 * time.Second,
-		},
+		Timeout:   10 * time.Second,
+		Transport: transport,
 	}
 }
 
