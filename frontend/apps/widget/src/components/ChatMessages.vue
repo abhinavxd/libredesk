@@ -73,6 +73,9 @@
             <div
               v-if="containsQuoteMarkers(message.content)"
               @click="toggleQuote(message.uuid)"
+              @keydown.enter.prevent="toggleQuote(message.uuid)"
+              @keydown.space.prevent="toggleQuote(message.uuid)"
+              tabindex="0"
               role="button"
               :aria-expanded="isQuotedTextVisible(message.uuid)"
               :class="[
