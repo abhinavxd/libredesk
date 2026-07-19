@@ -223,6 +223,7 @@ func (m *Manager) VisionEnabled() bool {
 // UpdateProviderConfig updates a provider type's config; a masked api_key keeps the stored key, a blank one clears it.
 func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderConfig) error {
 	if providerType != models.ProviderTypeCompletion && providerType != models.ProviderTypeEmbedding {
+		m.lo.Warn("invalid provider type", "providerType", providerType)
 		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 

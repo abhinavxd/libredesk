@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/oidc/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
@@ -138,8 +140,8 @@ func (o *Manager) Update(id int, oidc models.OIDC) (models.OIDC, error) {
 		return models.OIDC{}, err
 	}
 
-	// If client secret is not provided, use the current one (already decrypted from Get)
-	if oidc.ClientSecret == "" {
+	// A masked secret keeps the stored one; a blank secret clears it.
+	if strings.Contains(oidc.ClientSecret, stringutil.PasswordDummy) {
 		oidc.ClientSecret = current.ClientSecret
 	}
 
