@@ -58,7 +58,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 		if err != nil {
 			return "", err
 		}
-		m.lo.Debug("ai run model response", "step", step, "content_len", len(res.Content), "tool_calls", len(res.ToolCalls))
+		m.lo.Debug("ai run model response", "step", step, "content_len", len(res.Content), "tool_calls", len(res.ToolCalls), "content", res.Content, "prompt_tokens", res.Usage.PromptTokens, "completion_tokens", res.Usage.CompletionTokens)
 
 		if len(res.ToolCalls) == 0 {
 			m.lo.Debug("ai run final answer", "answer", res.Content)
@@ -91,6 +91,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 		m.lo.Warn("agent produced no answer within the step budget", "max_steps", maxSteps)
 		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	m.lo.Debug("ai run final answer", "answer", res.Content, "forced", true)
 	return res.Content, nil
 }
 
@@ -106,7 +107,7 @@ func (m *Manager) executeToolCall(ctx context.Context, registry map[string]Tool,
 		m.lo.Error("error executing tool", "tool", tc.Function.Name, "error", err)
 		return "error executing tool: " + err.Error()
 	}
-	m.lo.Debug("ai run tool result", "tool", tc.Function.Name, "result_len", len(out))
+	m.lo.Debug("ai run tool result", "tool", tc.Function.Name, "result_len", len(out), "result", out)
 	return out
 }
 

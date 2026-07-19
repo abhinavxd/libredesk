@@ -214,4 +214,12 @@ type ChatCompletionPayload struct {
 type ChatCompletionResult struct {
 	Content   string     `json:"content"`
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	Usage     TokenUsage `json:"usage"`
+}
+
+// TokenUsage carries the provider's token accounting for one completion.
+type TokenUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }

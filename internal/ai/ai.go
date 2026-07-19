@@ -254,6 +254,7 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 	cfg.APIKey = apiKey
 	b, err := json.Marshal(cfg)
 	if err != nil {
+		m.lo.Error("error marshaling provider config", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if _, err := m.q.UpdateProviderConfig.Exec(providerType, b); err != nil {

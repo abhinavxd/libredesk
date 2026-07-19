@@ -35,6 +35,7 @@ func (m *Manager) ImportKnowledgeBaseFromURL(ctx context.Context, rawURL string)
 		return item, envelope.NewError(envelope.InputError, m.i18n.T("ai.urlImport.fetchFailed"), nil)
 	}
 	if !isHTMLContentType(contentType) {
+		m.lo.Warn("unsupported content type", "contentType", contentType)
 		return item, envelope.NewError(envelope.InputError, m.i18n.T("ai.urlImport.unsupportedContentType"), nil)
 	}
 

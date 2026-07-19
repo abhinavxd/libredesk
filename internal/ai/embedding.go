@@ -107,7 +107,7 @@ func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.Sea
 	}
 	m.lo.Debug("rag search", "query_len", len(query), "hits", len(results))
 	for i, r := range results {
-		m.lo.Debug("rag fetched chunk", "rank", i+1, "score", r.Score, "source_type", r.SourceType, "source_id", r.SourceID, "chunk_len", len(r.ChunkText))
+		m.lo.Debug("rag fetched chunk", "rank", i+1, "score", r.Score, "source_type", r.SourceType, "source_id", r.SourceID, "chunk_len", len(r.ChunkText), "chunk_text", r.ChunkText)
 	}
 	return results, nil
 }

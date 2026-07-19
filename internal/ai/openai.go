@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
@@ -49,6 +50,9 @@ const (
 	// whole batch; a lone space is a harmless stand-in that keeps input/output indices aligned.
 	emptyEmbeddingPlaceholder = " "
 )
+
+// Endpoints (baseURL+model) that rejected max_tokens and require max_completion_tokens.
+var wantsMaxCompletionTokens sync.Map
 
 // OpenAIClient talks to any OpenAI-compatible API (base URL selects the host).
 type OpenAIClient struct {
@@ -106,10 +110,14 @@ func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.Ch
 	}
 	o.lo.Debug("chat completion request", "model", model, "messages", len(messages), "images", sentImages, "vision", o.cfg.Vision, "tools", len(payload.Tools))
 
+	tokensParam := "max_tokens"
+	if _, ok := wantsMaxCompletionTokens.Load(o.cfg.BaseURL + "|" + model); ok {
+		tokensParam = "max_completion_tokens"
+	}
 	body := map[string]any{
-		"model":      model,
-		"messages":   messages,
-		"max_tokens": maxTokens,
+		"model":     model,
+		"messages":  messages,
+		tokensParam: maxTokens,
 	}
 	if o.cfg.Temperature != nil {
 		body["temperature"] = *o.cfg.Temperature
@@ -134,6 +142,7 @@ func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.Ch
 				ToolCalls []models.ToolCall `json:"tool_calls"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage json.RawMessage `json:"usage"`
 	}
 	if err := json.Unmarshal(respBytes, &parsed); err != nil {
 		return models.ChatCompletionResult{}, fmt.Errorf("decoding response body: %w", err)
@@ -141,9 +150,18 @@ func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.Ch
 	if len(parsed.Choices) == 0 {
 		return models.ChatCompletionResult{}, fmt.Errorf("no response found")
 	}
+
+	var usage models.TokenUsage
+	if len(parsed.Usage) > 0 {
+		if err := json.Unmarshal(parsed.Usage, &usage); err != nil {
+			o.lo.Warn("could not parse token usage from provider response", "error", err)
+		}
+	}
+	o.lo.Debug("chat completion response", "model", model, "prompt_tokens", usage.PromptTokens, "completion_tokens", usage.CompletionTokens, "total_tokens", usage.TotalTokens)
 	return models.ChatCompletionResult{
 		Content:   parsed.Choices[0].Message.Content,
 		ToolCalls: parsed.Choices[0].Message.ToolCalls,
+		Usage:     usage,
 	}, nil
 }
 
@@ -280,11 +298,16 @@ func (o *OpenAIClient) post(ctx context.Context, path string, body map[string]an
 			if adaptations < maxParamAdaptations {
 				if param, ok := adaptUnsupportedParam(body, respBytes); ok {
 					adaptations++
+					if param == "max_tokens" {
+						if m, ok := body["model"].(string); ok {
+							wantsMaxCompletionTokens.Store(o.cfg.BaseURL+"|"+m, true)
+						}
+					}
 					bodyBytes, err = json.Marshal(body)
 					if err != nil {
 						return nil, fmt.Errorf("marshalling request body: %w", err)
 					}
-					o.lo.Warn("AI provider rejected a request parameter, retrying without it; clear the field in the provider settings to avoid the extra round trip", "param", param)
+					o.lo.Warn("AI provider rejected a request parameter, retrying without it; later requests will adapt it automatically", "param", param)
 					continue
 				}
 			}
@@ -370,7 +393,7 @@ func adaptUnsupportedParam(body map[string]any, resp []byte) (string, bool) {
 	switch parsed.Error.Param {
 	case "max_tokens":
 		v, ok := body["max_tokens"]
-		if !ok {
+		if !ok || parsed.Error.Code != "unsupported_parameter" {
 			return "", false
 		}
 		delete(body, "max_tokens")
