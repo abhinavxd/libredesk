@@ -205,7 +205,10 @@ const messages = computed(() =>
     .map((m) => ({ ...m, isUser: m.role === 'user' }))
 )
 const input = ref('')
-const isThinking = ref(false)
+// Thinking state is per conversation so an in-flight send for one conversation does not show or
+// block the panel after the agent switches to another.
+const thinkingByUUID = ref({})
+const isThinking = computed(() => !!thinkingByUUID.value[conversationStore.current?.uuid || ''])
 const scrollRef = ref(null)
 
 // Persona selection is global per agent (a stored assistant whose instructions Copilot borrows for
@@ -298,7 +301,7 @@ const send = async (preset) => {
   const rev = revision(uuid)
   copilotStore.setMessages(uuid, [...copilotStore.getMessages(uuid), { role: 'user', content: text }])
   input.value = ''
-  isThinking.value = true
+  thinkingByUUID.value[uuid] = true
   await scrollToBottom()
 
   try {
@@ -321,7 +324,7 @@ const send = async (preset) => {
       description: handleHTTPError(error).message
     })
   } finally {
-    isThinking.value = false
+    delete thinkingByUUID.value[uuid]
     await scrollToBottom()
   }
 }
