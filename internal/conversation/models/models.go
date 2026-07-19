@@ -251,6 +251,20 @@ type PreviousConversationContact struct {
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
 }
 
+// AIConversationSummary is a bounded conversation row for agent-facing AI tools. AssignedUserID and
+// AssignedTeamID carry the fields EnforceConversationAccess reads so per-row access filtering runs in Go.
+type AIConversationSummary struct {
+	ID              int         `db:"id"`
+	ReferenceNumber string      `db:"reference_number"`
+	Subject         string      `db:"subject"`
+	Status          null.String `db:"status"`
+	CreatedAt       time.Time   `db:"created_at"`
+	LastMessageAt   null.Time   `db:"last_message_at"`
+	AssignedUserID  null.Int    `db:"assigned_user_id"`
+	AssignedTeamID  null.Int    `db:"assigned_team_id"`
+	ContactName     string      `db:"contact_name"`
+}
+
 type ConversationParticipant struct {
 	ID        int         `db:"id" json:"id"`
 	FirstName string      `db:"first_name" json:"first_name"`

@@ -1,11 +1,11 @@
 <template>
   <Tabs v-model="activeTab" class="flex flex-col h-full">
-    <TabsList class="grid grid-cols-2 mx-4 mt-3 h-8 p-0">
+    <TabsList class="grid grid-cols-2 mx-4 mt-3">
       <TabsTrigger value="details" class="text-xs">{{ $t('copilot.details') }}</TabsTrigger>
       <TabsTrigger value="copilot" class="text-xs">{{ appSettingsStore.copilotName }}</TabsTrigger>
     </TabsList>
 
-    <TabsContent value="details" class="mt-0 motion-safe:animate-slide-in">
+    <TabsContent value="details" class="mt-0">
       <ConversationSideBarContact class="p-4" />
       <Accordion type="multiple" collapsible v-model="accordionState">
         <AccordionItem value="actions" class="accordion-item">
@@ -45,14 +45,37 @@
               />
             </div>
 
-            <div>
+            <div v-if="conversationStore.current">
               <SelectTag
-                v-if="conversationStore.current"
                 :model-value="conversationStore.current.tags || []"
                 @update:modelValue="onTagsChange"
                 :items="tags.map((tag) => ({ label: tag, value: tag }))"
                 :placeholder="t('placeholders.selectTags')"
               />
+              <div class="mt-2 flex flex-wrap items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  class="h-6 gap-1 px-2 text-xs text-muted-foreground"
+                  :disabled="isSuggestingTags"
+                  @click="suggestTags"
+                >
+                  <Loader2 v-if="isSuggestingTags" class="h-3 w-3 animate-spin" />
+                  <Sparkles v-else class="h-3 w-3" />
+                  {{ t('conversation.sidebar.suggestTags') }}
+                </Button>
+                <button
+                  v-for="suggestion in tagSuggestions"
+                  :key="suggestion"
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-xs text-accent-foreground hover:bg-accent/80"
+                  @click="applySuggestedTag(suggestion)"
+                >
+                  <Plus class="h-3 w-3" />
+                  {{ suggestion }}
+                </button>
+              </div>
             </div>
           </AccordionContent>
         </AccordionItem>
@@ -126,14 +149,16 @@
       </Accordion>
     </TabsContent>
 
-    <TabsContent value="copilot" class="flex-1 min-h-0 mt-0 motion-safe:animate-slide-in">
+    <TabsContent value="copilot" class="flex-1 min-h-0 mt-0">
       <CopilotPanel />
     </TabsContent>
   </Tabs>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { Sparkles, Loader2, Plus } from 'lucide-vue-next'
+import { Button } from '@shared-ui/components/ui/button'
 import { useConversationStore } from '@/stores/conversation'
 import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
@@ -189,6 +214,53 @@ const onTagsChange = (newTags) => {
   const current = conv.tags || []
   if (newTags.length === current.length && newTags.every((t) => current.includes(t))) return
   conversationStore.updateConversationTags(conv.uuid, TAG_ACTION.SET, newTags)
+}
+
+const isSuggestingTags = ref(false)
+const tagSuggestions = ref([])
+
+// Suggestions belong to one conversation; drop them when the sidebar switches so they never leak.
+watch(
+  () => conversationStore.current?.uuid,
+  () => {
+    tagSuggestions.value = []
+  }
+)
+
+const suggestTags = async () => {
+  const conv = conversationStore.current
+  if (!conv || isSuggestingTags.value) return
+  const uuid = conv.uuid
+  isSuggestingTags.value = true
+  try {
+    const resp = await api.aiSuggestTags({ conversation_uuid: uuid })
+    if (conversationStore.current?.uuid !== uuid) return
+    const current = conversationStore.current.tags || []
+    const suggestions = (resp.data.data || []).filter((tag) => !current.includes(tag))
+    if (suggestions.length === 0) {
+      tagSuggestions.value = []
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        description: t('conversation.sidebar.noTagSuggestions')
+      })
+      return
+    }
+    tagSuggestions.value = suggestions
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isSuggestingTags.value = false
+  }
+}
+
+const applySuggestedTag = (tag) => {
+  const conv = conversationStore.current
+  if (!conv) return
+  const current = conv.tags || []
+  if (!current.includes(tag)) onTagsChange([...current, tag])
+  tagSuggestions.value = tagSuggestions.value.filter((suggestion) => suggestion !== tag)
 }
 
 const priorityOptions = computed(() => conversationStore.priorityOptions)
@@ -273,6 +345,6 @@ const updateContactCustomAttributes = async (attributes) => {
 }
 
 :deep(.accordion-content--actions) {
-  @apply space-y-3 p-4;
+  @apply space-y-3 px-4 pt-4 pb-0;
 }
 </style>

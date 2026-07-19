@@ -10,6 +10,7 @@ import (
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	statusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
 	imageutil "github.com/abhinavxd/libredesk/internal/image"
@@ -69,10 +70,7 @@ func (m *Manager) Run(ctx context.Context, workers int) {
 	for range workers {
 		go m.worker(ctx)
 	}
-	miners := workers
-	if miners > 2 {
-		miners = 2
-	}
+	miners := min(workers, 2)
 	for range miners {
 		go m.miningWorker(ctx)
 	}
@@ -161,7 +159,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 
 	private := false
-	msgs, err := m.convo.GetAllConversationMessages(conv.UUID, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	msgs, err := m.convo.GetAllConversationMessages(conv.UUID, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, conversation.MaxAllMessages)
 	if err != nil {
 		m.lo.Error("error fetching messages for ai agent", "conversation_uuid", conv.UUID, "error", err)
 		return
@@ -199,7 +197,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	// Keep customer-controlled data (contact fields, subject, attributes) out of the system prompt; it
 	// stays in a user-role block so it ranks below the assistant's instructions, not beside them.
 	if block := customerContextBlock(conv); block != "" {
-		history = append([]aimodels.ChatMessage{{Role: "user", Content: block}}, history...)
+		history = append([]aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: block}}, history...)
 	}
 	m.lo.Debug("ai agent running", "conversation_uuid", conv.UUID, "history_messages", len(history), "turns", turns)
 	outcome := &runOutcome{}
@@ -258,7 +256,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if confirm != "" {
 		m.postReply(conv, assistant, confirm, map[string]any{"is_confirmation": true})
 	}
-	if outcome.resolved {
+	if outcome.resolved && (answer != "" || turns > 0) {
 		m.resolve(conv, assistant)
 		return
 	}
@@ -317,7 +315,6 @@ func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistan
 // handoff notes the reason and moves the conversation to the fallback team, or unassigns if none is set.
 func (m *Manager) handoff(conv cmodels.Conversation, assistant models.Assistant, reason string) {
 	actor := m.actorUser(assistant)
-	m.recordEvent(assistant.ID, conv.ID, "handoff")
 	note := strings.TrimSpace(reason)
 	if note == "" {
 		note = m.i18n.T("ai.agent.handoffDefault")
@@ -325,20 +322,28 @@ func (m *Manager) handoff(conv cmodels.Conversation, assistant models.Assistant,
 	if _, err := m.convo.SendPrivateNote(nil, assistant.UserID, conv.UUID, note, nil); err != nil {
 		m.lo.Error("error posting handoff note", "conversation_uuid", conv.UUID, "error", err)
 	}
+	movedToTeam := false
 	if assistant.FallbackTeamID.Valid {
 		if err := m.convo.UpdateConversationTeamAssignee(conv.UUID, int(assistant.FallbackTeamID.Int), actor); err != nil {
 			m.lo.Error("error assigning fallback team", "conversation_uuid", conv.UUID, "error", err)
+		} else {
+			movedToTeam = true
 		}
 		// A same-team assignment keeps the assigned user, and a failed one removes nothing, so
 		// re-check who is assigned instead of trusting the pre-run snapshot.
 		fresh, err := m.convo.GetConversation(conv.ID, "", "")
 		if err == nil && (!fresh.AssignedUserID.Valid || int(fresh.AssignedUserID.Int) != assistant.UserID) {
+			m.recordEvent(assistant.ID, conv.ID, "handoff")
 			return
 		}
 	}
 	if err := m.convo.RemoveConversationAssignee(conv.UUID, cmodels.AssigneeTypeUser, actor); err != nil {
 		m.lo.Error("error unassigning assistant on handoff", "conversation_uuid", conv.UUID, "error", err)
+		if !movedToTeam {
+			return
+		}
 	}
+	m.recordEvent(assistant.ID, conv.ID, "handoff")
 }
 
 func (m *Manager) actorUser(a models.Assistant) umodels.User {
@@ -355,7 +360,7 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 	if message == "" {
 		return "", nil, nil
 	}
-	history := []aimodels.ChatMessage{{Role: "user", Content: message}}
+	history := []aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: message}}
 	var hits []aimodels.SearchResult
 	tools := []ai.Tool{&searchKnowledgeTool{m: m, collect: func(rs []aimodels.SearchResult) { hits = append(hits, rs...) }}}
 	// Preview is search-only: no custom tools (empty allowed set), no built-in, no side effects.
@@ -428,16 +433,16 @@ func (m *Manager) buildHistory(msgs []cmodels.Message) []aimodels.ChatMessage {
 	}
 	history := make([]aimodels.ChatMessage, 0, len(msgs))
 	for _, msg := range msgs {
-		role := "assistant"
+		role := aimodels.RoleAssistant
 		if msg.SenderType == cmodels.SenderTypeContact {
-			role = "user"
+			role = aimodels.RoleUser
 		}
 		text := strings.TrimSpace(msg.TextContent)
 
 		var images []aimodels.ChatImage
 		var markers []string
 		// Only the customer's own attachments are worth showing the assistant.
-		if role == "user" {
+		if role == aimodels.RoleUser {
 			for _, att := range msg.Attachments {
 				if !strings.HasPrefix(att.ContentType, "image/") {
 					m.lo.Debug("ai agent attachment not an image", "uuid", att.UUID, "content_type", att.ContentType)

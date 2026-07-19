@@ -6,6 +6,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -87,6 +88,10 @@ func handleOIDCCallback(r *fastglue.Request) error {
 	user, err := app.user.GetAgent(0, claims.Email)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+	// Only agents can log in; GetAgent also resolves ai_assistant identity users.
+	if user.Type != models.UserTypeAgent {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.PermissionError)
 	}
 
 	if err := app.auth.SaveSession(amodels.User{

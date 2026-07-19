@@ -41,7 +41,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 
 	messages := make([]models.ChatMessage, 0, len(history)+2)
 	if systemPrompt != "" {
-		messages = append(messages, models.ChatMessage{Role: "system", Content: systemPrompt})
+		messages = append(messages, models.ChatMessage{Role: models.RoleSystem, Content: systemPrompt})
 	}
 	messages = append(messages, history...)
 
@@ -66,7 +66,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 		}
 
 		messages = append(messages, models.ChatMessage{
-			Role:      "assistant",
+			Role:      models.RoleAssistant,
 			Content:   res.Content,
 			ToolCalls: res.ToolCalls,
 		})
@@ -74,7 +74,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 		for _, tc := range res.ToolCalls {
 			result := m.executeToolCall(ctx, registry, tc)
 			messages = append(messages, models.ChatMessage{
-				Role:       "tool",
+				Role:       models.RoleTool,
 				ToolCallID: tc.ID,
 				Name:       tc.Function.Name,
 				Content:    result,

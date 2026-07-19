@@ -465,6 +465,7 @@ const createAITool = (data) => http.post('/api/v1/ai/tools', data)
 const updateAITool = (id, data) => http.put(`/api/v1/ai/tools/${id}`, data)
 const deleteAITool = (id) => http.delete(`/api/v1/ai/tools/${id}`)
 const getAIAssistants = () => http.get('/api/v1/ai/assistants')
+const getAIAssistantsCompact = () => http.get('/api/v1/ai/assistants/compact')
 const getAIAssistant = (id) => http.get(`/api/v1/ai/assistants/${id}`)
 const createAIAssistant = (data) =>
   http.post('/api/v1/ai/assistants', data, {
@@ -492,6 +493,7 @@ const getAIFaqLearning = () => http.get('/api/v1/ai/faq-learning')
 const updateAIFaqLearning = (data) => http.put('/api/v1/ai/faq-learning', data)
 const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data)
 const aiSummarizeConversation = (data) => http.post('/api/v1/ai/summarize', data)
+const aiSuggestTags = (data) => http.post('/api/v1/ai/suggest-tags', data)
 const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data)
 const getCopilotMessages = (conversationUUID) =>
   http.get('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
@@ -702,6 +704,7 @@ export default {
   updateAITool,
   deleteAITool,
   getAIAssistants,
+  getAIAssistantsCompact,
   getAIAssistant,
   createAIAssistant,
   updateAIAssistant,
@@ -720,6 +723,7 @@ export default {
   updateAIFaqLearning,
   aiGenerateReply,
   aiSummarizeConversation,
+  aiSuggestTags,
   aiCopilot,
   getCopilotMessages,
   clearCopilotMessages,

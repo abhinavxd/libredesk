@@ -115,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, toRaw } from 'vue'
+import { ref, watch, computed, toRaw, onMounted, onUnmounted } from 'vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
@@ -256,6 +256,22 @@ const handleGenerateReply = async () => {
     isGenerating.value = false
   }
 }
+
+// Copilot's "Insert into reply" replaces the draft with its answer (already HTML from the panel),
+// forcing reply mode so a private note in progress does not silently receive customer-facing text.
+const handleCopilotInsertReply = (html) => {
+  if (!html) return
+  if (messageType.value === 'private_note') messageType.value = 'reply'
+  htmlContent.value = html
+}
+
+onMounted(() => {
+  emitter.on(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
+})
+
+onUnmounted(() => {
+  emitter.off(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
+})
 
 /**
  * Returns true if the editor has text content.

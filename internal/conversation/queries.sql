@@ -310,6 +310,43 @@ WHERE c.contact_id = $1
 ORDER BY c.created_at DESC
 LIMIT $2;
 
+-- name: get-contact-conversations-for-ai
+SELECT
+    c.id,
+    c.reference_number,
+    c.subject,
+    cs.name AS status,
+    c.created_at,
+    c.last_message_at,
+    c.assigned_user_id,
+    c.assigned_team_id
+FROM conversations c
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE c.contact_id = $1
+  AND c.id != $2
+ORDER BY c.created_at DESC
+LIMIT 10;
+
+-- name: get-conversations-by-contact-email-for-ai
+SELECT
+    c.id,
+    c.reference_number,
+    c.subject,
+    cs.name AS status,
+    c.created_at,
+    c.last_message_at,
+    c.assigned_user_id,
+    c.assigned_team_id,
+    TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) AS contact_name
+FROM conversations c
+JOIN users u ON c.contact_id = u.id
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE LOWER(u.email) = LOWER($1)
+  AND u.type = 'contact'
+  AND u.deleted_at IS NULL
+ORDER BY c.created_at DESC
+LIMIT 10;
+
 -- name: get-chat-conversation
 SELECT
     c.created_at,

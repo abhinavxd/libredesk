@@ -8,6 +8,7 @@ import (
 
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
+	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 )
@@ -180,7 +181,7 @@ func (m *Manager) mine(ctx context.Context, convID int) {
 	}
 
 	private := false
-	msgs, err := m.convo.GetAllConversationMessages(conv.UUID, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	msgs, err := m.convo.GetAllConversationMessages(conv.UUID, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, conversation.MaxAllMessages)
 	if err != nil {
 		m.lo.Error("error fetching messages for faq mining", "conversation_uuid", conv.UUID, "error", err)
 		return
@@ -207,6 +208,13 @@ func (m *Manager) mine(ctx context.Context, convID int) {
 			m.lo.Warn("faq dedup check failed, keeping candidate", "error", err)
 		} else if dup {
 			m.lo.Debug("faq candidate near-duplicate of existing snippet, skipping", "question", q)
+			continue
+		}
+		var pendingDup bool
+		if err := m.q.PendingFAQQuestionExists.Get(&pendingDup, q); err != nil {
+			m.lo.Warn("pending faq dedup check failed, keeping candidate", "error", err)
+		} else if pendingDup {
+			m.lo.Debug("faq candidate already pending review, skipping", "question", q)
 			continue
 		}
 		if _, err := m.q.InsertFAQSuggestion.Exec(convID, q, a); err != nil {

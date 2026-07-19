@@ -75,8 +75,8 @@ func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger, client *http.Cl
 func (o *OpenAIClient) SendPrompt(ctx context.Context, payload models.PromptPayload) (string, error) {
 	res, err := o.SendChatCompletion(ctx, models.ChatCompletionPayload{
 		Messages: []models.ChatMessage{
-			{Role: "system", Content: payload.SystemPrompt},
-			{Role: "user", Content: payload.UserPrompt},
+			{Role: models.RoleSystem, Content: payload.SystemPrompt},
+			{Role: models.RoleUser, Content: payload.UserPrompt},
 		},
 	})
 	if err != nil {
@@ -419,11 +419,7 @@ func parseRetryAfter(v string) time.Duration {
 	if err != nil || secs < 0 {
 		return 0
 	}
-	d := time.Duration(secs) * time.Second
-	if d > retryMaxBackoff {
-		d = retryMaxBackoff
-	}
-	return d
+	return min(time.Duration(secs)*time.Second, retryMaxBackoff)
 }
 
 // embeddingTokenLimit resolves the per-input token cap; an unset or negative config value means the default.

@@ -3,6 +3,7 @@ package ai
 import (
 	"database/sql"
 	"encoding/json"
+	neturl "net/url"
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
@@ -58,6 +59,9 @@ func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
 		return t, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	if err := m.validateToolDefinition(&t); err != nil {
+		return t, err
+	}
 	auth, err := m.prepareToolAuth(t.Auth, nil)
 	if err != nil {
 		return t, err
@@ -81,6 +85,9 @@ func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 	}
 	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
 		return t, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if err := m.validateToolDefinition(&t); err != nil {
+		return t, err
 	}
 	var existing types.JSONText
 	if err := m.q.GetToolAuth.Get(&existing, id); err != nil {
@@ -154,6 +161,25 @@ func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText,
 		return raw, err
 	}
 	return types.JSONText(b), nil
+}
+
+// validateToolDefinition rejects a tool whose URL or parameters schema would fail every agent run at request time.
+func (m *Manager) validateToolDefinition(t *models.Tool) error {
+	t.URL = strings.TrimSpace(t.URL)
+	u, err := neturl.Parse(t.URL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	params := strings.TrimSpace(string(t.Parameters))
+	if params == "" || params == "null" {
+		t.Parameters = nil
+		return nil
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(params), &obj); err != nil {
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
 }
 
 // maskToolAuth replaces every header's stored secret with a dummy value.

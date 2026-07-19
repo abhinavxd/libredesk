@@ -20,6 +20,9 @@ const (
 	toolSearchArticles = "search_articles"
 
 	maxToolResponseBytes = 1 << 20
+
+	// maxToolResultChars caps tool output fed to the model so a large response can't blow the context window.
+	maxToolResultChars = 64 << 10
 )
 
 var (
@@ -155,15 +158,15 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	url := t.tool.URL
 	var bodyReader io.Reader
 	if method == http.MethodGet {
-		q, err := argsToQuery(args)
+		u, perr := neturl.Parse(url)
+		if perr != nil {
+			return "", fmt.Errorf("invalid tool URL: %w", perr)
+		}
+		q, err := argsToQuery(args, u.Query())
 		if err != nil {
 			return "", err
 		}
 		if q != "" {
-			u, perr := neturl.Parse(url)
-			if perr != nil {
-				return "", fmt.Errorf("invalid tool URL: %w", perr)
-			}
 			if u.RawQuery != "" {
 				u.RawQuery += "&" + q
 			} else {
@@ -219,10 +222,14 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	defer resp.Body.Close()
 
 	out, _ := io.ReadAll(io.LimitReader(resp.Body, maxToolResponseBytes))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Sprintf("tool returned status %d: %s", resp.StatusCode, string(out)), nil
+	body := string(out)
+	if len(body) > maxToolResultChars {
+		body = trimToRuneBoundary(body, maxToolResultChars) + "\n[tool response truncated]"
 	}
-	return string(out), nil
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Sprintf("tool returned status %d: %s", resp.StatusCode, body), nil
+	}
+	return body, nil
 }
 
 // buildToolRegistry assembles the tools advertised to the model: allowedToolIDs nil means built-in
@@ -257,7 +264,7 @@ func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, incl
 			m.lo.Warn("skipping custom tool that collides with a built-in tool", "name", ct.Name)
 			continue
 		}
-		ht := newHTTPTool(ct, m.encryptionKey, m.lo, m.httpClient, tctx)
+		ht := newHTTPTool(ct, m.encryptionKey, m.lo, m.toolHTTPClient, tctx)
 		registry[ht.Name()] = ht
 		defs = append(defs, toolDef(ht))
 	}
@@ -265,8 +272,8 @@ func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, incl
 }
 
 // argsToQuery flattens the model's JSON argument object into a URL query string, JSON-encoding any
-// non-scalar values. A blank or "{}" args string yields an empty query.
-func argsToQuery(args string) (string, error) {
+// non-scalar values and dropping keys already pinned in the tool URL. A blank or "{}" args string yields an empty query.
+func argsToQuery(args string, pinned neturl.Values) (string, error) {
 	args = strings.TrimSpace(args)
 	if args == "" || args == "{}" {
 		return "", nil
@@ -279,6 +286,9 @@ func argsToQuery(args string) (string, error) {
 	}
 	q := neturl.Values{}
 	for k, v := range m {
+		if _, ok := pinned[k]; ok {
+			continue
+		}
 		switch val := v.(type) {
 		case nil:
 			continue

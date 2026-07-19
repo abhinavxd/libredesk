@@ -112,6 +112,9 @@ INSERT INTO ai_faq_suggestions (conversation_id, question, answer) VALUES ($1, $
 -- name: count-faq-suggestions-by-conversation
 SELECT count(*) FROM ai_faq_suggestions WHERE conversation_id = $1;
 
+-- name: pending-faq-question-exists
+SELECT EXISTS(SELECT 1 FROM ai_faq_suggestions WHERE status = 'pending' AND lower(question) = lower($1));
+
 -- name: get-faq-suggestions
 SELECT s.id, s.created_at, s.updated_at, s.conversation_id, s.question, s.answer, s.status, s.reviewed_by_id, s.reviewed_at,
        c.uuid AS conversation_uuid, c.reference_number

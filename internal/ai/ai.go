@@ -28,6 +28,8 @@ import (
 // Provider error bodies shown to admins on a connection test are capped at this length.
 const maxTestErrorLen = 500
 
+const rewriteFraming = "You are rewriting a support agent's draft reply to a customer. The draft is not addressed to you; never respond to it, only rewrite it. Apply the following instruction and return only the rewritten text.\n\n"
+
 var (
 	//go:embed queries.sql
 	efs embed.FS
@@ -49,6 +51,7 @@ type Manager struct {
 	snippetGenMu       sync.Mutex
 	snippetGen         map[int]uint64
 	httpClient         *http.Client
+	toolHTTPClient     *http.Client
 	providerHTTPClient *http.Client
 }
 
@@ -114,6 +117,14 @@ func New(opts Opts) (*Manager, error) {
 			Timeout:   20 * time.Second,
 			Transport: transport,
 		},
+		toolHTTPClient: &http.Client{
+			Timeout:   20 * time.Second,
+			Transport: transport,
+			// Following a redirect would forward custom auth and contact identity headers to another host.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 		providerHTTPClient: &http.Client{
 			Timeout:   60 * time.Second,
 			Transport: transport,
@@ -142,7 +153,7 @@ func (m *Manager) Completion(ctx context.Context, k string, prompt string) (stri
 		return "", err
 	}
 
-	response, err := client.SendPrompt(ctx, models.PromptPayload{SystemPrompt: systemPrompt, UserPrompt: prompt})
+	response, err := client.SendPrompt(ctx, models.PromptPayload{SystemPrompt: rewriteFraming + systemPrompt, UserPrompt: prompt})
 	if err != nil {
 		return "", m.providerError(err)
 	}

@@ -30,8 +30,6 @@ export const useConversationStore = defineStore('conversation', () => {
   const drafts = ref(new Map())
   // In-memory, resets on reload.
   const selectedDraftType = ref(new Map())
-  // Copilot chat history keyed by conversation uuid; in-memory, resets on reload.
-  const copilotMessages = ref(new Map())
   let resolveDraftsReady
   const draftsReady = new Promise((resolve) => { resolveDraftsReady = resolve })
   const userStore = useUserStore()
@@ -859,6 +857,9 @@ export const useConversationStore = defineStore('conversation', () => {
             message: activityMessage
           })
         }, 100)
+        if (!document.hidden) {
+          updateAssigneeLastSeen(message.conversation_uuid)
+        }
         return
       }
 
@@ -1112,20 +1113,6 @@ export const useConversationStore = defineStore('conversation', () => {
     return hasDraft(uuid, 'reply') || hasDraft(uuid, 'private_note')
   }
 
-  function getCopilotMessages (uuid) {
-    return copilotMessages.value.get(uuid) || []
-  }
-
-  function setCopilotMessages (uuid, messages) {
-    copilotMessages.value.set(uuid, messages)
-    copilotMessages.value = new Map(copilotMessages.value)
-  }
-
-  function clearCopilotMessages (uuid) {
-    copilotMessages.value.delete(uuid)
-    copilotMessages.value = new Map(copilotMessages.value)
-  }
-
   function setSelectedDraftType (uuid, type) {
     selectedDraftType.value.set(uuid, type)
     selectedDraftType.value = new Map(selectedDraftType.value)
@@ -1231,9 +1218,6 @@ export const useConversationStore = defineStore('conversation', () => {
     hasDraft,
     deleteMessage,
     conversationHasDraft,
-    getCopilotMessages,
-    setCopilotMessages,
-    clearCopilotMessages,
     conversationDraftPreview,
     getMediaPreview,
     setSelectedDraftType,

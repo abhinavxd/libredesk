@@ -154,3 +154,22 @@ func buildSystemPrompt(a models.Assistant) string {
 	}
 	return b.String()
 }
+
+// BuildCopilotPersona renders the assistant's voice, language and instructions for Copilot to borrow,
+// or "" when the assistant carries no persona settings worth injecting.
+func BuildCopilotPersona(a models.Assistant) string {
+	var parts []string
+	if voice := strings.TrimSpace(toneClauses[a.Tone] + " " + lengthClauses[a.ResponseLength]); voice != "" {
+		parts = append(parts, "Voice: "+voice)
+	}
+	if len(a.Languages) > 0 {
+		parts = append(parts, languageLine(a.Languages))
+	}
+	if desc := strings.TrimSpace(a.Description); desc != "" {
+		parts = append(parts, "About the assistant: "+desc)
+	}
+	if instr := strings.TrimSpace(a.Instructions); instr != "" {
+		parts = append(parts, "Instructions from the workspace admin (follow these):\n"+instr)
+	}
+	return strings.Join(parts, "\n\n")
+}

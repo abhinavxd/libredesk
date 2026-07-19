@@ -13,6 +13,11 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+type compactAssistant struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 // handleGetAIAssistants returns all AI assistants.
 func handleGetAIAssistants(r *fastglue.Request) error {
 	app := r.Context.(*App)
@@ -21,6 +26,23 @@ func handleGetAIAssistants(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(assistants)
+}
+
+// handleGetAIAssistantsCompact returns enabled assistants as {id, name} for the copilot persona picker.
+// It exposes neither instructions nor tool ids, so it is safe behind auth rather than ai:manage.
+func handleGetAIAssistantsCompact(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	assistants, err := app.aiAgent.GetAssistants()
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	out := make([]compactAssistant, 0, len(assistants))
+	for _, a := range assistants {
+		if a.Enabled {
+			out = append(out, compactAssistant{ID: a.ID, Name: a.Name})
+		}
+	}
+	return r.SendEnvelope(out)
 }
 
 func handleGetAIAssistant(r *fastglue.Request) error {
@@ -50,7 +72,7 @@ func handleCreateAIAssistant(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if err := applyAssistantAvatar(r, assistant.UserID, files, req.RemoveAvatar); err != nil {
-		if delErr := app.aiAgent.DeleteAssistant(assistant.ID); delErr != nil {
+		if _, delErr := app.aiAgent.DeleteAssistant(assistant.ID); delErr != nil {
 			app.lo.Error("error rolling back assistant after avatar failure", "assistant_id", assistant.ID, "error", delErr)
 		}
 		return sendErrorEnvelope(r, err)
@@ -79,6 +101,7 @@ func handleUpdateAIAssistant(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.user.InvalidateAgentCache(assistant.UserID)
 	if err := applyAssistantAvatar(r, assistant.UserID, files, req.RemoveAvatar); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -95,9 +118,11 @@ func handleDeleteAIAssistant(r *fastglue.Request) error {
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
-	if err := app.aiAgent.DeleteAssistant(id); err != nil {
+	userID, err := app.aiAgent.DeleteAssistant(id)
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.user.InvalidateAgentCache(userID)
 	return r.SendEnvelope(true)
 }
 

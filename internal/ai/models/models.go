@@ -10,6 +10,12 @@ import (
 )
 
 const (
+	// OpenAI-compatible chat message roles.
+	RoleSystem    = "system"
+	RoleUser      = "user"
+	RoleAssistant = "assistant"
+	RoleTool      = "tool"
+
 	ProviderTypeCompletion = "completion"
 	ProviderTypeEmbedding  = "embedding"
 

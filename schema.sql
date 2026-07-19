@@ -835,7 +835,8 @@ VALUES
 ('make_concise', 'Simplify the text to make it more concise and to the point.', 'Make Concise'),
 ('add_empathy', 'Add empathy to the text while retaining the original meaning.', 'Add Empathy'),
 ('adjust_positive_tone', 'Adjust the tone of the text to make it sound more positive and reassuring.', 'Adjust Positive Tone'),
-('make_professional', 'Rephrase the text to make it sound more formal and professional and to the point.', 'Make Professional');
+('make_professional', 'Rephrase the text to make it sound more formal and professional and to the point.', 'Make Professional'),
+('fix_grammar_spelling', 'Fix any spelling and grammar mistakes in the text while retaining the original meaning and tone.', 'Fix Grammar & Spelling');
 
 -- Default settings
 INSERT INTO settings ("key", value)

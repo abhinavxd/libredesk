@@ -265,11 +265,13 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// AI assistant: reply drafting + copilot chat.
 	g.POST("/api/v1/ai/generate-reply", auth(handleAIGenerateReply))
 	g.POST("/api/v1/ai/summarize", auth(handleAISummarizeConversation))
+	g.POST("/api/v1/ai/suggest-tags", auth(handleAISuggestTags))
 	g.POST("/api/v1/ai/copilot", auth(handleAICopilot))
 	g.GET("/api/v1/ai/copilot/messages", auth(handleGetCopilotMessages))
 	g.DELETE("/api/v1/ai/copilot/messages", auth(handleClearCopilotMessages))
 
 	// Autonomous AI agents (assistants).
+	g.GET("/api/v1/ai/assistants/compact", auth(handleGetAIAssistantsCompact))
 	g.GET("/api/v1/ai/assistants", perm(handleGetAIAssistants, "ai:manage"))
 	g.GET("/api/v1/ai/assistants/{id}", perm(handleGetAIAssistant, "ai:manage"))
 	g.POST("/api/v1/ai/assistants", perm(handleCreateAIAssistant, "ai:manage"))

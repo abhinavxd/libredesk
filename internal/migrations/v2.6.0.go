@@ -6,7 +6,7 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+func V2_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	// ALTER TYPE ADD VALUE cannot run inside a transaction; each Exec here is autocommit.
 	if _, err := db.Exec(`ALTER TYPE user_type ADD VALUE IF NOT EXISTS 'ai_assistant';`); err != nil {
 		return err
@@ -231,6 +231,14 @@ func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	}
 
 	if _, err := db.Exec(`INSERT INTO settings ("key", value) VALUES ('ai_agent.faq_learning_enabled', 'false'::jsonb) ON CONFLICT ("key") DO NOTHING;`); err != nil {
+		return err
+	}
+
+	if _, err := db.Exec(`
+		INSERT INTO ai_prompts ("key", content, title)
+		VALUES ('fix_grammar_spelling', 'Fix any spelling and grammar mistakes in the text while retaining the original meaning and tone.', 'Fix Grammar & Spelling')
+		ON CONFLICT ("key") DO NOTHING;
+	`); err != nil {
 		return err
 	}
 

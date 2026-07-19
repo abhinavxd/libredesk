@@ -6,6 +6,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/ai"
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
+	"github.com/abhinavxd/libredesk/internal/aiagent"
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
@@ -16,6 +17,9 @@ import (
 
 // maxTranscriptMessages bounds how many recent messages are fed to the LLM as context.
 const maxTranscriptMessages = 50
+
+// maxCopilotHistoryMessages bounds how many persisted copilot turns are fed back to the LLM.
+const maxCopilotHistoryMessages = 50
 
 type aiCompletionReq struct {
 	PromptKey string `json:"prompt_key"`
@@ -28,11 +32,16 @@ type generateReplyReq struct {
 }
 
 type copilotReq struct {
-	ConversationUUID string                 `json:"conversation_uuid"`
-	Messages         []aimodels.ChatMessage `json:"messages"`
+	ConversationUUID string `json:"conversation_uuid"`
+	Message          string `json:"message"`
+	AssistantID      int    `json:"assistant_id"`
 }
 
 type summarizeReq struct {
+	ConversationUUID string `json:"conversation_uuid"`
+}
+
+type suggestTagsReq struct {
 	ConversationUUID string `json:"conversation_uuid"`
 }
 
@@ -265,14 +274,21 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	transcript := ""
+	var conv *cmodels.Conversation
 	if req.ConversationUUID != "" {
-		if _, err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+		conv, err = enforceAIConversationAccess(r, req.ConversationUUID)
+		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 		transcript = conversationTranscript(app, req.ConversationUUID)
 	}
-	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, ai.ToolContext{})
+	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, ai.ToolContext{}, agentSurfaceTools(app, user, conv))
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -316,6 +332,47 @@ func handleAISummarizeConversation(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
+// handleAISuggestTags suggests up to 3 existing tags for a conversation. Read-only: it never applies them.
+func handleAISuggestTags(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req suggestTagsReq
+	)
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	if req.ConversationUUID == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	if _, err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	tags, err := app.tag.GetAll()
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if len(tags) == 0 {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.noTagsConfigured"), nil))
+	}
+
+	transcript := conversationTranscript(app, req.ConversationUUID)
+	if strings.TrimSpace(transcript) == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.tagSuggestEmptyConversation"), nil))
+	}
+
+	names := make([]string, 0, len(tags))
+	for _, t := range tags {
+		names = append(names, t.Name)
+	}
+
+	suggestions, err := app.ai.SuggestTags(r.RequestCtx, transcript, names)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(suggestions)
+}
+
 // handleAICopilot answers an agent's copilot chat message.
 func handleAICopilot(r *fastglue.Request) error {
 	var (
@@ -325,41 +382,55 @@ func handleAICopilot(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if len(req.Messages) == 0 {
+	req.Message = strings.TrimSpace(req.Message)
+	if req.Message == "" || req.ConversationUUID == "" {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-
-	convoContext := ""
-	var conv *cmodels.Conversation
-	if req.ConversationUUID != "" {
-		c, err := enforceAIConversationAccess(r, req.ConversationUUID)
-		if err != nil {
-			return sendErrorEnvelope(r, err)
-		}
-		conv = c
-		convoContext = conversationTranscript(app, req.ConversationUUID)
+	conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
 	}
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, req.Messages, ai.ToolContext{})
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	persona := ""
+	if req.AssistantID > 0 {
+		assistant, err := app.aiAgent.GetAssistant(req.AssistantID)
+		if err != nil || !assistant.Enabled {
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.assistantUnavailable"), nil))
+		}
+		persona = aiagent.BuildCopilotPersona(assistant)
+	}
+
+	saved, err := app.ai.GetCopilotMessages(conv.ID, auser.ID, maxCopilotHistoryMessages)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	history := make([]aimodels.ChatMessage, 0, len(saved)+1)
+	for _, m := range saved {
+		history = append(history, aimodels.ChatMessage{Role: m.Role, Content: m.Content})
+	}
+	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: req.Message})
+
+	convoContext := conversationTranscript(app, req.ConversationUUID)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, ai.ToolContext{}, agentSurfaceTools(app, user, conv), persona)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	if strings.TrimSpace(resp) == "" {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
-	// Persist this exchange (agent's last message + the reply) so the chat survives a refresh.
-	if conv != nil {
-		auser := r.RequestCtx.UserValue("user").(amodels.User)
-		last := req.Messages[len(req.Messages)-1]
-		if last.Role == "user" {
-			if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, "user", last.Content); err != nil {
-				app.lo.Error("error saving copilot user message", "error", err)
-			}
-		}
-		if strings.TrimSpace(resp) != "" {
-			if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, "assistant", resp); err != nil {
-				app.lo.Error("error saving copilot reply", "error", err)
-			}
-		}
+	// Copilot answers in markdown; store and return HTML so the panel, reply editor and private notes consume it as is.
+	resp = stringutil.Markdown2HTML(resp)
+	// Persist the exchange only after a successful reply, so a failed or empty call leaves no orphaned turn.
+	if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleUser, req.Message); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleAssistant, resp); err != nil {
+		app.lo.Error("error saving copilot reply", "error", err)
 	}
 	return r.SendEnvelope(resp)
 }
@@ -376,7 +447,7 @@ func handleGetCopilotMessages(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
-	msgs, err := app.ai.GetCopilotMessages(conv.ID, auser.ID)
+	msgs, err := app.ai.GetCopilotMessages(conv.ID, auser.ID, maxCopilotHistoryMessages)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -415,7 +486,7 @@ func enforceAIConversationAccess(r *fastglue.Request, uuid string) (*cmodels.Con
 // conversationTranscript builds a plaintext transcript of a conversation's public messages for use as AI context.
 func conversationTranscript(app *App, uuid string) string {
 	private := false
-	msgs, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	msgs, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, maxTranscriptMessages)
 	if err != nil {
 		app.lo.Error("error building conversation transcript for AI", "error", err)
 		return ""

@@ -288,40 +288,42 @@ func New(
 
 type queries struct {
 	// Conversation queries.
-	GetConversationUUID                *sqlx.Stmt `query:"get-conversation-uuid"`
-	GetConversation                    *sqlx.Stmt `query:"get-conversation"`
-	GetConversationListItem            *sqlx.Stmt `query:"get-conversation-list-item"`
-	GetConversationsCreatedAfter       *sqlx.Stmt `query:"get-conversations-created-after"`
-	GetUnassignedConversations         *sqlx.Stmt `query:"get-unassigned-conversations"`
-	GetConversations                   string     `query:"get-conversations"`
-	GetContactChatConversations        *sqlx.Stmt `query:"get-contact-chat-conversations"`
-	GetChatConversation                *sqlx.Stmt `query:"get-chat-conversation"`
-	GetContactPreviousConversations    *sqlx.Stmt `query:"get-contact-previous-conversations"`
-	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
-	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
-	UpdateConversationWaitingSince     *sqlx.Stmt `query:"update-conversation-waiting-since"`
-	UpdateConversationReplyTimestamps  *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
-	UpdateConversationContactLastSeen  *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
-	UpsertUserLastSeen                 *sqlx.Stmt `query:"upsert-user-last-seen"`
-	MarkConversationUnread             *sqlx.Stmt `query:"mark-conversation-unread"`
-	UpdateConversationAssignedUser     *sqlx.Stmt `query:"update-conversation-assigned-user"`
-	ClaimUnassignedConversation        *sqlx.Stmt `query:"claim-unassigned-conversation"`
-	UpdateConversationAssignedTeam     *sqlx.Stmt `query:"update-conversation-assigned-team"`
-	UpdateConversationCustomAttributes *sqlx.Stmt `query:"update-conversation-custom-attributes"`
-	UpdateConversationPriority         *sqlx.Stmt `query:"update-conversation-priority"`
-	UpdateConversationStatus           *sqlx.Stmt `query:"update-conversation-status"`
-	UpdateConversationLastMessage      *sqlx.Stmt `query:"update-conversation-last-message"`
-	InsertConversationParticipant      *sqlx.Stmt `query:"insert-conversation-participant"`
-	InsertConversation                 *sqlx.Stmt `query:"insert-conversation"`
-	AddConversationTags                *sqlx.Stmt `query:"add-conversation-tags"`
-	SetConversationTags                *sqlx.Stmt `query:"set-conversation-tags"`
-	RemoveConversationTags             *sqlx.Stmt `query:"remove-conversation-tags"`
-	GetConversationTags                *sqlx.Stmt `query:"get-conversation-tags"`
-	UnassignOpenConversations          *sqlx.Stmt `query:"unassign-open-conversations"`
-	ReOpenConversation                 *sqlx.Stmt `query:"re-open-conversation"`
-	UnsnoozeAll                        *sqlx.Stmt `query:"unsnooze-all"`
-	DeleteConversation                 *sqlx.Stmt `query:"delete-conversation"`
-	RemoveConversationAssignee         *sqlx.Stmt `query:"remove-conversation-assignee"`
+	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
+	GetConversation                     *sqlx.Stmt `query:"get-conversation"`
+	GetConversationListItem             *sqlx.Stmt `query:"get-conversation-list-item"`
+	GetConversationsCreatedAfter        *sqlx.Stmt `query:"get-conversations-created-after"`
+	GetUnassignedConversations          *sqlx.Stmt `query:"get-unassigned-conversations"`
+	GetConversations                    string     `query:"get-conversations"`
+	GetContactChatConversations         *sqlx.Stmt `query:"get-contact-chat-conversations"`
+	GetChatConversation                 *sqlx.Stmt `query:"get-chat-conversation"`
+	GetContactPreviousConversations     *sqlx.Stmt `query:"get-contact-previous-conversations"`
+	GetContactConversationsForAI        *sqlx.Stmt `query:"get-contact-conversations-for-ai"`
+	GetConversationsByContactEmailForAI *sqlx.Stmt `query:"get-conversations-by-contact-email-for-ai"`
+	GetConversationParticipants         *sqlx.Stmt `query:"get-conversation-participants"`
+	GetUserActiveConversationsCount     *sqlx.Stmt `query:"get-user-active-conversations-count"`
+	UpdateConversationWaitingSince      *sqlx.Stmt `query:"update-conversation-waiting-since"`
+	UpdateConversationReplyTimestamps   *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
+	UpdateConversationContactLastSeen   *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
+	UpsertUserLastSeen                  *sqlx.Stmt `query:"upsert-user-last-seen"`
+	MarkConversationUnread              *sqlx.Stmt `query:"mark-conversation-unread"`
+	UpdateConversationAssignedUser      *sqlx.Stmt `query:"update-conversation-assigned-user"`
+	ClaimUnassignedConversation         *sqlx.Stmt `query:"claim-unassigned-conversation"`
+	UpdateConversationAssignedTeam      *sqlx.Stmt `query:"update-conversation-assigned-team"`
+	UpdateConversationCustomAttributes  *sqlx.Stmt `query:"update-conversation-custom-attributes"`
+	UpdateConversationPriority          *sqlx.Stmt `query:"update-conversation-priority"`
+	UpdateConversationStatus            *sqlx.Stmt `query:"update-conversation-status"`
+	UpdateConversationLastMessage       *sqlx.Stmt `query:"update-conversation-last-message"`
+	InsertConversationParticipant       *sqlx.Stmt `query:"insert-conversation-participant"`
+	InsertConversation                  *sqlx.Stmt `query:"insert-conversation"`
+	AddConversationTags                 *sqlx.Stmt `query:"add-conversation-tags"`
+	SetConversationTags                 *sqlx.Stmt `query:"set-conversation-tags"`
+	RemoveConversationTags              *sqlx.Stmt `query:"remove-conversation-tags"`
+	GetConversationTags                 *sqlx.Stmt `query:"get-conversation-tags"`
+	UnassignOpenConversations           *sqlx.Stmt `query:"unassign-open-conversations"`
+	ReOpenConversation                  *sqlx.Stmt `query:"re-open-conversation"`
+	UnsnoozeAll                         *sqlx.Stmt `query:"unsnooze-all"`
+	DeleteConversation                  *sqlx.Stmt `query:"delete-conversation"`
+	RemoveConversationAssignee          *sqlx.Stmt `query:"remove-conversation-assignee"`
 
 	// Draft queries.
 	UpsertConversationDraft *sqlx.Stmt `query:"upsert-conversation-draft"`
@@ -441,6 +443,26 @@ func (c *Manager) GetContactPreviousConversations(contactID int, limit int) ([]m
 	var conversations = make([]models.PreviousConversation, 0)
 	if err := c.q.GetContactPreviousConversations.Select(&conversations, contactID, limit); err != nil {
 		c.lo.Error("error fetching previous conversations", "error", err)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return conversations, nil
+}
+
+// GetContactConversationsForAI returns up to 10 recent conversations of a contact, excluding excludeID, for agent-facing AI tools.
+func (c *Manager) GetContactConversationsForAI(contactID, excludeID int) ([]models.AIConversationSummary, error) {
+	conversations := make([]models.AIConversationSummary, 0)
+	if err := c.q.GetContactConversationsForAI.Select(&conversations, contactID, excludeID); err != nil {
+		c.lo.Error("error fetching contact conversations for ai", "error", err)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return conversations, nil
+}
+
+// GetConversationsByContactEmailForAI returns up to 10 recent conversations of the contact matching email exactly, for agent-facing AI tools.
+func (c *Manager) GetConversationsByContactEmailForAI(email string) ([]models.AIConversationSummary, error) {
+	conversations := make([]models.AIConversationSummary, 0)
+	if err := c.q.GetConversationsByContactEmailForAI.Select(&conversations, email); err != nil {
+		c.lo.Error("error fetching conversations by contact email for ai", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return conversations, nil

@@ -54,6 +54,7 @@ type queries struct {
 
 	InsertFAQSuggestion           *sqlx.Stmt `query:"insert-faq-suggestion"`
 	CountFAQByConversation        *sqlx.Stmt `query:"count-faq-suggestions-by-conversation"`
+	PendingFAQQuestionExists      *sqlx.Stmt `query:"pending-faq-question-exists"`
 	GetFAQSuggestions             *sqlx.Stmt `query:"get-faq-suggestions"`
 	GetFAQSuggestion              *sqlx.Stmt `query:"get-faq-suggestion"`
 	RejectFAQSuggestionIfPending  *sqlx.Stmt `query:"reject-faq-suggestion-if-pending"`
@@ -322,34 +323,34 @@ func (m *Manager) UpdateAssistant(id int, a models.Assistant) (models.Assistant,
 }
 
 // DeleteAssistant removes the assistant config and soft-deletes its identity user so past messages keep its name.
-func (m *Manager) DeleteAssistant(id int) error {
+func (m *Manager) DeleteAssistant(id int) (int, error) {
 	a, err := m.GetAssistant(id)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
 
 	if _, err := tx.Stmtx(m.q.DeleteAssistant).Exec(id); err != nil {
 		m.lo.Error("error deleting assistant", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if _, err := tx.Stmtx(m.q.SoftDeleteAssistantUser).Exec(a.UserID); err != nil {
 		m.lo.Error("error soft-deleting assistant user", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing assistant delete", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	m.refreshAssistantUserIDs()
-	return nil
+	return a.UserID, nil
 }
 
 func (m *Manager) getTools(assistantID int) ([]int, error) {

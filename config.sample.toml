@@ -24,8 +24,8 @@ disable_secure_cookies = false
 # Session lifetime duration.
 session_lifetime = "9h"
 # Request read and write timeouts.
-read_timeout = "5s"
-write_timeout = "5s"
+read_timeout = "8s"
+write_timeout = "8s"
 # Maximum request body size in bytes (100MB)
 # If you are using proxy, you may need to configure them to allow larger request bodies.
 max_body_size = 104857600
