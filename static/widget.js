@@ -158,6 +158,9 @@
         contrastColor (hex) {
             try {
                 hex = hex.replace(/^#/, '');
+                if (hex.length === 3) {
+                    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+                }
                 var toLinear = function (channel) {
                     var c = parseInt(channel, 16) / 255;
                     return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
