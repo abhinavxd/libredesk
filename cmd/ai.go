@@ -288,7 +288,7 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		}
 		transcript = conversationTranscript(app, req.ConversationUUID)
 	}
-	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, ai.ToolContext{}, agentSurfaceTools(app, user, conv))
+	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, ai.ToolContext{}, generateReplyTools(app, user, conv))
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -416,7 +416,7 @@ func handleAICopilot(r *fastglue.Request) error {
 	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: req.Message})
 
 	convoContext := conversationTranscript(app, req.ConversationUUID)
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, ai.ToolContext{}, agentSurfaceTools(app, user, conv), persona)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, ai.ToolContext{}, copilotTools(app, user, conv), persona)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

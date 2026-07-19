@@ -67,10 +67,11 @@ type searchConversationsByEmailTool struct {
 	user umodels.User
 }
 
-// fetchConversationTool returns one conversation's header and public transcript by reference number.
+// fetchConversationTool returns one conversation's header and public transcript by reference number; a non-zero contactID restricts it to that contact.
 type fetchConversationTool struct {
-	app  *App
-	user umodels.User
+	app       *App
+	user      umodels.User
+	contactID int
 }
 
 // searchContactsTool searches contacts by email fragment.
@@ -79,10 +80,8 @@ type searchContactsTool struct {
 	user umodels.User
 }
 
-// agentSurfaceTools builds the read-only tools attached to Copilot and Generate Reply for one request.
-// conv is nil when there is no conversation in context (Generate Reply without a uuid), which drops
-// the contact-scoped tool.
-func agentSurfaceTools(app *App, user umodels.User, conv *cmodels.Conversation) []ai.Tool {
+// copilotTools builds the read-only tools attached to Copilot; a nil conv drops the contact-scoped tool.
+func copilotTools(app *App, user umodels.User, conv *cmodels.Conversation) []ai.Tool {
 	tools := []ai.Tool{
 		&searchConversationsByEmailTool{app: app, user: user},
 		&fetchConversationTool{app: app, user: user},
@@ -97,6 +96,23 @@ func agentSurfaceTools(app *App, user umodels.User, conv *cmodels.Conversation) 
 		})
 	}
 	return tools
+}
+
+// generateReplyTools builds the tools attached to Generate Reply, all scoped to the current conversation's contact.
+func generateReplyTools(app *App, user umodels.User, conv *cmodels.Conversation) []ai.Tool {
+	// Fail closed: a zero ContactID would make the fetch tool unscoped.
+	if conv == nil || conv.ContactID == 0 {
+		return nil
+	}
+	return []ai.Tool{
+		&fetchConversationTool{app: app, user: user, contactID: conv.ContactID},
+		&listContactConversationsTool{
+			app:       app,
+			user:      user,
+			contactID: conv.ContactID,
+			convID:    conv.ID,
+		},
+	}
 }
 
 func (t *listContactConversationsTool) Name() string { return toolListContactConversations }
@@ -174,6 +190,9 @@ func (t *fetchConversationTool) Execute(ctx context.Context, args string) (strin
 	}
 	allowed, err := t.app.authz.EnforceConversationAccess(t.user, conv)
 	if err != nil || !allowed {
+		return notFound, nil
+	}
+	if t.contactID != 0 && conv.ContactID != t.contactID {
 		return notFound, nil
 	}
 
