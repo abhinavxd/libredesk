@@ -158,9 +158,18 @@
         contrastColor (hex) {
             try {
                 hex = hex.replace(/^#/, '');
-                var r = parseInt(hex.substring(0, 2), 16) / 255;
-                var g = parseInt(hex.substring(2, 4), 16) / 255;
-                var b = parseInt(hex.substring(4, 6), 16) / 255;
+                if (hex.length === 3) {
+                    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+                }
+                var toLinear = function (channel) {
+                    var c = parseInt(channel, 16) / 255;
+                    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+                };
+                var r = toLinear(hex.substring(0, 2));
+                var g = toLinear(hex.substring(2, 4));
+                var b = toLinear(hex.substring(4, 6));
+                // Relative luminance per WCAG, gamma-corrected so the 0.179 threshold
+                // reflects perceived brightness instead of raw sRGB values.
                 var L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
                 return L > 0.179 ? '#000000' : '#ffffff';
             } catch (e) {
