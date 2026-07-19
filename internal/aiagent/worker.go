@@ -193,7 +193,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if len(contactFieldLines(conv.Contact)) == 0 {
 		systemPrompt += "\n\n" + noContactIdentityNote
 	}
-	history := m.buildHistory(msgs)
+	history := m.buildHistory(msgs, conv.ContactID)
 	// Keep customer-controlled data (contact fields, subject, attributes) out of the system prompt; it
 	// stays in a user-role block so it ranks below the assistant's instructions, not beside them.
 	if block := customerContextBlock(conv); block != "" {
@@ -402,7 +402,18 @@ func lastIsInboundContact(msgs []cmodels.Message) bool {
 	return last.Type == cmodels.MessageIncoming && last.SenderType == cmodels.SenderTypeContact
 }
 
-func (m *Manager) buildHistory(msgs []cmodels.Message) []aimodels.ChatMessage {
+func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels.ChatMessage {
+	// Tools act as the primary contact, so a CC'd participant's message must never enter the prompt
+	// as a trusted user turn - it could inject instructions that drive those tools under the
+	// contact's identity. Keep the contact's own messages and the agent's replies; drop other contacts.
+	kept := make([]cmodels.Message, 0, len(msgs))
+	for _, msg := range msgs {
+		if msg.SenderType == cmodels.SenderTypeContact && msg.SenderID != contactID {
+			continue
+		}
+		kept = append(kept, msg)
+	}
+	msgs = kept
 	if len(msgs) > maxHistoryMessages {
 		msgs = msgs[len(msgs)-maxHistoryMessages:]
 	}
