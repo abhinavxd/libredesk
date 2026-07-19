@@ -14,6 +14,22 @@ func handleGetActivityLogs(r *fastglue.Request) error {
 		filters = string(r.RequestCtx.QueryArgs().Peek("filters"))
 		total   = 0
 	)
+
+	allowedOrderBy := map[string]bool{
+		"id":          true,
+		"created_at":  true,
+		"updated_at":  true,
+		"user_id":     true,
+		"action":      true,
+		"entity_type": true,
+		"entity_id":   true,
+	}
+	if !allowedOrderBy[orderBy] {
+		orderBy = "id"
+	}
+	if order != "asc" && order != "desc" {
+		order = "desc"
+	}
 	page, pageSize := getPagination(r)
 	logs, err := app.activityLog.GetAll(order, orderBy, filters, page, pageSize, app.setting.GetAppTimezone())
 	if err != nil {
