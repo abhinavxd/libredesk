@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"strconv"
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
@@ -35,6 +36,9 @@ var (
 		"hand_off_to_human":          true,
 		"resolve":                    true,
 		"get_previous_conversations": true,
+		"send_email_verification":    true,
+		"check_email_verification":   true,
+		"set_contact_email":          true,
 	}
 
 	// allowedToolMethods are the HTTP methods a custom tool may use: GET reads, POST writes.
@@ -115,7 +119,12 @@ func (t *searchArticlesTool) Execute(ctx context.Context, args string) (string, 
 type ToolContext struct {
 	ContactExternalID string
 	ContactEmail      string
+	// Verified is evaluated live per tool call (never snapshotted) so a contact who verifies
+	// mid-turn passes on the same turn. A nil func is treated as unverified (fail closed).
+	Verified func() bool
 }
+
+func (c ToolContext) verified() bool { return c.Verified != nil && c.Verified() }
 
 // httpTool is an admin-defined custom tool that calls an external HTTP endpoint.
 type httpTool struct {
@@ -148,6 +157,11 @@ func (t *httpTool) Parameters() types.JSONText {
 }
 
 func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
+	if t.tool.RequiresVerification && !t.tctx.verified() {
+		t.lo.Debug("custom tool blocked, contact not verified", "tool", t.tool.Name)
+		return "The contact is not verified. Call send_email_verification first, then ask them for the code and call check_email_verification before retrying this tool.", nil
+	}
+
 	method := strings.ToUpper(t.tool.Method)
 	if method == "" {
 		method = http.MethodPost
@@ -206,13 +220,15 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	}
 
 	// Inject the contact's identity so tools (e.g. a CRM lookup) know who this is. Server-side
-	// only, never advertised to the model.
+	// only, never advertised to the model. The verified header is always sent (defaulting to
+	// false) so a tool can distinguish an OTP-verified contact from a self-claimed one.
 	if t.tctx.ContactExternalID != "" {
 		req.Header.Set("X-Libredesk-Contact-External-Id", t.tctx.ContactExternalID)
 	}
 	if t.tctx.ContactEmail != "" {
 		req.Header.Set("X-Libredesk-Contact-Email", t.tctx.ContactEmail)
 	}
+	req.Header.Set("X-Libredesk-Contact-Verified", strconv.FormatBool(t.tctx.verified()))
 
 	resp, err := t.client.Do(req)
 	if err != nil {

@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/mail"
 	"slices"
 	"strings"
 
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/jmoiron/sqlx/types"
 )
 
@@ -42,6 +44,22 @@ var (
 	}`)
 
 	emptyParams = types.JSONText(`{"type": "object", "properties": {}}`)
+
+	codeParams = types.JSONText(`{
+		"type": "object",
+		"properties": {
+			"code": {"type": "string", "description": "The verification code the customer entered."}
+		},
+		"required": ["code"]
+	}`)
+
+	emailParams = types.JSONText(`{
+		"type": "object",
+		"properties": {
+			"email": {"type": "string", "description": "The email address the customer provided."}
+		},
+		"required": ["email"]
+	}`)
 )
 
 // runOutcome records which terminal tool action the assistant took during one response run.
@@ -193,4 +211,130 @@ func (t *previousConversationsTool) Execute(ctx context.Context, args string) (s
 		return "No previous conversations could be retrieved.", nil
 	}
 	return b.String(), nil
+}
+
+// sendEmailVerificationTool emails a one-time code to the contact's on-file email. The code is sent
+// out of band via the notification transport, never posted into the conversation transcript.
+type sendEmailVerificationTool struct {
+	m    *Manager
+	conv *cmodels.Conversation
+}
+
+func (t *sendEmailVerificationTool) Name() string { return "send_email_verification" }
+
+func (t *sendEmailVerificationTool) Description() string {
+	return "Email a one-time verification code to the customer's email on file. Call this to start verifying the customer, then ask them to reply with the code."
+}
+
+func (t *sendEmailVerificationTool) Parameters() types.JSONText { return emptyParams }
+
+func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (string, error) {
+	email := strings.TrimSpace(t.conv.Contact.Email.String)
+	if email == "" {
+		return "The customer has no email on file. Ask them for their email and call set_contact_email first.", nil
+	}
+	exceeded, err := t.m.incrOTPSends(t.conv.UUID)
+	if err != nil {
+		return "", err
+	}
+	if exceeded {
+		t.m.lo.Debug("ai agent verification resend cap reached", "conversation_uuid", t.conv.UUID)
+		return "The verification code has already been sent several times. Ask the customer to check their inbox and spam folder, or hand off to a human if they cannot find it.", nil
+	}
+	code, err := generateOTP()
+	if err != nil {
+		return "", err
+	}
+	if err := t.m.storePendingOTP(t.conv.UUID, code); err != nil {
+		return "", err
+	}
+	body := t.m.i18n.Ts("ai.agent.verificationEmailBody", "code", code)
+	if err := t.m.notifier.Send(notifier.Message{
+		RecipientEmails: []string{email},
+		Subject:         t.m.i18n.T("ai.agent.verificationEmailSubject"),
+		Content:         body,
+		Provider:        notifier.ProviderEmail,
+	}); err != nil {
+		t.m.lo.Error("error sending verification code email", "conversation_uuid", t.conv.UUID, "error", err)
+		return "", err
+	}
+	t.m.lo.Debug("ai agent sent verification code", "conversation_uuid", t.conv.UUID)
+	return "A verification code has been emailed to the customer. Tell them you have sent a code to their email and ask them to reply with it.", nil
+}
+
+// checkEmailVerificationTool verifies the code the customer entered against the pending one.
+type checkEmailVerificationTool struct {
+	m    *Manager
+	conv *cmodels.Conversation
+}
+
+func (t *checkEmailVerificationTool) Name() string { return "check_email_verification" }
+
+func (t *checkEmailVerificationTool) Description() string {
+	return "Check the verification code the customer entered. Call this once they reply with the code you emailed them."
+}
+
+func (t *checkEmailVerificationTool) Parameters() types.JSONText { return codeParams }
+
+func (t *checkEmailVerificationTool) Execute(ctx context.Context, args string) (string, error) {
+	var in struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal([]byte(args), &in); err != nil {
+		return "", fmt.Errorf("invalid arguments: %w", err)
+	}
+	code := strings.TrimSpace(in.Code)
+	if code == "" {
+		return "No code provided. Ask the customer for the code you emailed them.", nil
+	}
+	ok, err := t.m.checkPendingOTP(t.conv.UUID, code)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		t.m.lo.Debug("ai agent verification code rejected", "conversation_uuid", t.conv.UUID)
+		return "That code is incorrect or expired. Ask the customer to re-enter it, or call send_email_verification to send a new one.", nil
+	}
+	t.m.lo.Debug("ai agent verified contact", "conversation_uuid", t.conv.UUID)
+	return "The customer is now verified. You can retry the tool you needed.", nil
+}
+
+// setContactEmailTool sets an anonymous visitor's email so a code can be sent. It refuses if an email
+// is already on file, so a known contact's email can never be swapped for one supplied in chat.
+type setContactEmailTool struct {
+	m    *Manager
+	conv *cmodels.Conversation
+}
+
+func (t *setContactEmailTool) Name() string { return "set_contact_email" }
+
+func (t *setContactEmailTool) Description() string {
+	return "Set the customer's email address when none is on file, so a verification code can be sent to it."
+}
+
+func (t *setContactEmailTool) Parameters() types.JSONText { return emailParams }
+
+func (t *setContactEmailTool) Execute(ctx context.Context, args string) (string, error) {
+	if strings.TrimSpace(t.conv.Contact.Email.String) != "" {
+		return "This customer already has an email on file; it cannot be changed here. Call send_email_verification to send them a code.", nil
+	}
+	var in struct {
+		Email string `json:"email"`
+	}
+	if err := json.Unmarshal([]byte(args), &in); err != nil {
+		return "", fmt.Errorf("invalid arguments: %w", err)
+	}
+	addr, err := mail.ParseAddress(strings.TrimSpace(in.Email))
+	if err != nil {
+		return "That does not look like a valid email address. Ask the customer to provide a valid one.", nil
+	}
+	email := strings.ToLower(addr.Address)
+	if err := t.m.user.UpdateContactBasicInfo(t.conv.ContactID, "", "", email, "", ""); err != nil {
+		t.m.lo.Error("error setting contact email for ai agent", "conversation_uuid", t.conv.UUID, "error", err)
+		return "", err
+	}
+	t.conv.Contact.Email.String = email
+	t.conv.Contact.Email.Valid = true
+	t.m.lo.Debug("ai agent set contact email", "conversation_uuid", t.conv.UUID)
+	return "The customer's email has been saved. Now call send_email_verification to email them a code.", nil
 }

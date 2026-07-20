@@ -71,7 +71,7 @@ func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 		params = types.JSONText("{}")
 	}
 	var created models.Tool
-	if err := m.q.InsertTool.Get(&created, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled); err != nil {
+	if err := m.q.InsertTool.Get(&created, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification); err != nil {
 		m.lo.Error("error creating tool", "error", err)
 		return created, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -106,7 +106,7 @@ func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 		params = types.JSONText("{}")
 	}
 	var updated models.Tool
-	if err := m.q.UpdateTool.Get(&updated, id, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled); err != nil {
+	if err := m.q.UpdateTool.Get(&updated, id, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification); err != nil {
 		if err == sql.ErrNoRows {
 			return updated, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
 		}

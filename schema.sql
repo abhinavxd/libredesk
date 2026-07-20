@@ -643,6 +643,7 @@ CREATE TABLE ai_tools (
 	auth JSONB NOT NULL DEFAULT '{}',
 	parameters JSONB NOT NULL DEFAULT '{}',
 	enabled BOOLEAN NOT NULL DEFAULT true,
+	requires_verification BOOLEAN NOT NULL DEFAULT true,
 	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64)
 );
 

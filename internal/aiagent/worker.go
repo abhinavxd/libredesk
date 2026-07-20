@@ -200,6 +200,20 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		history = append([]aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: block}}, history...)
 	}
 	m.lo.Debug("ai agent running", "conversation_uuid", conv.UUID, "history_messages", len(history), "turns", turns)
+
+	// A JWT livechat contact is trusted by login; everyone else (email channel, anonymous visitor)
+	// is trusted only within an OTP verification window. Read live so mid-turn verification counts.
+	verified := func() bool {
+		if conv.InboxChannel != channelEmail && conv.Contact.Type == umodels.UserTypeContact {
+			return true
+		}
+		return m.isConversationVerified(conv.UUID)
+	}
+	// Snapshot for the run-start registration decisions (one Redis read); tctx still gets the live
+	// closure so mid-turn verification is picked up per tool call.
+	runVerified := verified()
+	m.lo.Debug("ai agent verification state", "conversation_uuid", conv.UUID, "channel", conv.InboxChannel, "contact_type", conv.Contact.Type, "has_email", conv.Contact.Email.String != "", "verified", runVerified)
+
 	outcome := &runOutcome{}
 	tools := []ai.Tool{
 		&searchKnowledgeTool{m: m},
@@ -208,16 +222,28 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if assistant.HandoffEnabled {
 		tools = append(tools, &handoffTool{m: m, conv: conv, assistant: assistant, outcome: outcome})
 	}
-	if recent := m.recentContactConversations(conv); len(recent) > 0 {
+	if recent := m.recentContactConversations(conv, runVerified); len(recent) > 0 {
 		systemPrompt += fmt.Sprintf("\n\nThis customer has %d other conversation(s) from the last %d days. Call get_previous_conversations if the current issue might be a follow-up or related to them.", len(recent), recentConversationDays)
 		tools = append(tools, &previousConversationsTool{m: m, conversations: recent})
 	}
 
-	// Only a JWT-verified contact has a trustworthy identity; a visitor's email/external ID is
-	// self-claimed, so never hand it to tools - that would let them impersonate anyone.
-	var tctx ai.ToolContext
-	if conv.Contact.Type == umodels.UserTypeContact {
-		tctx = ai.ToolContext{ContactExternalID: conv.Contact.ExternalUserID.String, ContactEmail: conv.Contact.Email.String}
+	// Offer the verification tools only while unverified. set_contact_email is visitor-only and only
+	// when there's no email on file to send the code to.
+	if !runVerified {
+		offerSetEmail := conv.Contact.Type == umodels.UserTypeVisitor && conv.Contact.Email.String == ""
+		tools = append(tools, &sendEmailVerificationTool{m: m, conv: &conv})
+		tools = append(tools, &checkEmailVerificationTool{m: m, conv: &conv})
+		if offerSetEmail {
+			tools = append(tools, &setContactEmailTool{m: m, conv: &conv})
+		}
+		systemPrompt += "\n\n" + verificationNote
+		m.lo.Debug("ai agent offering verification tools", "conversation_uuid", conv.UUID, "set_contact_email_offered", offerSetEmail)
+	}
+
+	tctx := ai.ToolContext{
+		ContactExternalID: conv.Contact.ExternalUserID.String,
+		ContactEmail:      conv.Contact.Email.String,
+		Verified:          verified,
 	}
 	timeout := emailRunTimeout
 	if conv.InboxChannel != channelEmail {
@@ -489,9 +515,10 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 	return history
 }
 
-// recentContactConversations lists a verified contact's other recent conversations; a visitor's self-claimed identity gets none.
-func (m *Manager) recentContactConversations(conv cmodels.Conversation) []models.RecentConversation {
-	if conv.Contact.Type != umodels.UserTypeContact {
+// recentContactConversations lists the contact's other recent conversations, only once verified so
+// past-conversation PII never reaches an unverified/self-claimed identity.
+func (m *Manager) recentContactConversations(conv cmodels.Conversation, verified bool) []models.RecentConversation {
+	if !verified {
 		return nil
 	}
 	recent := []models.RecentConversation{}

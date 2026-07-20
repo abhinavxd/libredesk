@@ -41,23 +41,23 @@ DELETE FROM embeddings WHERE source_type = $1 AND source_id = $2;
 SELECT id, source_type, source_id, chunk_text, embedding, dimensions FROM embeddings;
 
 -- name: get-tools
-SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled FROM ai_tools ORDER BY updated_at DESC;
+SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools ORDER BY updated_at DESC;
 
 -- name: get-enabled-tools
-SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled FROM ai_tools WHERE enabled = true;
+SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools WHERE enabled = true;
 
 -- name: get-tool
-SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled FROM ai_tools WHERE id = $1;
+SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools WHERE id = $1;
 
 -- name: get-tool-auth
 SELECT auth FROM ai_tools WHERE id = $1;
 
 -- name: insert-tool
-INSERT INTO ai_tools (name, description, url, method, auth, parameters, enabled)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO ai_tools (name, description, url, method, auth, parameters, enabled, requires_verification)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
 
 -- name: update-tool
-UPDATE ai_tools SET name = $2, description = $3, url = $4, method = $5, auth = $6, parameters = $7, enabled = $8, updated_at = now()
+UPDATE ai_tools SET name = $2, description = $3, url = $4, method = $5, auth = $6, parameters = $7, enabled = $8, requires_verification = $9, updated_at = now()
 WHERE id = $1 RETURNING *;
 
 -- name: delete-tool

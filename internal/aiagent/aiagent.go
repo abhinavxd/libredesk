@@ -17,9 +17,12 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/media"
+	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/setting"
+	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -63,14 +66,17 @@ type queries struct {
 }
 
 type Manager struct {
-	q       queries
-	db      *sqlx.DB
-	lo      *logf.Logger
-	i18n    *i18n.I18n
-	ai      *ai.Manager
-	convo   *conversation.Manager
-	media   *media.Manager
-	setting *setting.Manager
+	q        queries
+	db       *sqlx.DB
+	lo       *logf.Logger
+	i18n     *i18n.I18n
+	ai       *ai.Manager
+	convo    *conversation.Manager
+	media    *media.Manager
+	setting  *setting.Manager
+	user     *user.Manager
+	notifier *notifier.Service
+	redis    *redis.Client
 
 	queue    chan int
 	inflight map[int]bool
@@ -95,7 +101,7 @@ type Opts struct {
 }
 
 // New creates the AI agent manager.
-func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager) (*Manager, error) {
+func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
 		return nil, err
@@ -109,6 +115,9 @@ func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaMan
 		convo:            convo,
 		media:            mediaManager,
 		setting:          settingManager,
+		user:             userManager,
+		notifier:         notifierService,
+		redis:            rdb,
 		queue:            make(chan int, opts.QueueSize),
 		inflight:         map[int]bool{},
 		pending:          map[int]bool{},

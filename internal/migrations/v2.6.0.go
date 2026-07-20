@@ -110,9 +110,13 @@ func V2_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			auth JSONB NOT NULL DEFAULT '{}',
 			parameters JSONB NOT NULL DEFAULT '{}',
 			enabled BOOLEAN NOT NULL DEFAULT true,
+			requires_verification BOOLEAN NOT NULL DEFAULT true,
 			CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64)
 		);
 	`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE ai_tools ADD COLUMN IF NOT EXISTS requires_verification BOOLEAN NOT NULL DEFAULT true;`); err != nil {
 		return err
 	}
 

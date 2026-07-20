@@ -232,7 +232,7 @@ func main() {
 		ai                          = initAI(db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
-		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings)
+		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings, user, notifier, rdb)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
 	)

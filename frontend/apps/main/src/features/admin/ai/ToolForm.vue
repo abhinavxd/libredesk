@@ -97,12 +97,42 @@
       </FormItem>
     </FormField>
 
+    <FormField v-slot="{ componentField, handleChange }" name="requires_verification">
+      <FormItem>
+        <SwitchField
+          :title="t('admin.ai.tool.requireVerification')"
+          :description="t('admin.ai.tool.requireVerificationHint')"
+          :checked="componentField.modelValue"
+          @update:checked="(v) => onToggleVerification(v, handleChange)"
+        />
+      </FormItem>
+    </FormField>
+
     <div class="flex justify-end mt-10">
       <Button type="submit" :isLoading="formLoading">
         {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
       </Button>
     </div>
   </form>
+
+  <AlertDialog :open="confirmTurnOffOpen" @update:open="onConfirmDialogOpenChange">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ t('admin.ai.tool.turnOffVerificationTitle') }}</AlertDialogTitle>
+        <AlertDialogDescription class="whitespace-pre-line">
+          {{ t('admin.ai.tool.turnOffVerificationBody') }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel @click="cancelTurnOff">
+          {{ t('admin.ai.tool.keepVerificationOn') }}
+        </AlertDialogCancel>
+        <AlertDialogAction @click="confirmTurnOff">
+          {{ t('admin.ai.tool.turnOffVerification') }}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>
 
 <script setup>
@@ -131,6 +161,16 @@ import {
   FormLabel,
   FormMessage
 } from '@shared-ui/components/ui/form/index.js'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog/index.js'
 import { useI18n } from 'vue-i18n'
 
 const methods = ['GET', 'POST']
@@ -171,7 +211,8 @@ const form = useForm({
           message: t('admin.ai.tool.headersInvalid')
         }),
       parameters: z.string().optional(),
-      enabled: z.boolean().optional()
+      enabled: z.boolean().optional(),
+      requires_verification: z.boolean().optional()
     })
   ),
   initialValues: {
@@ -181,9 +222,37 @@ const form = useForm({
     method: 'POST',
     headers: [],
     parameters: '',
-    enabled: true
+    enabled: true,
+    requires_verification: true
   }
 })
+
+const confirmTurnOffOpen = ref(false)
+let pendingVerificationChange = null
+
+const onToggleVerification = (checked, handleChange) => {
+  if (!checked) {
+    pendingVerificationChange = handleChange
+    confirmTurnOffOpen.value = true
+    return
+  }
+  handleChange(true)
+}
+
+const confirmTurnOff = () => {
+  if (pendingVerificationChange) pendingVerificationChange(false)
+  pendingVerificationChange = null
+  confirmTurnOffOpen.value = false
+}
+
+const cancelTurnOff = () => {
+  pendingVerificationChange = null
+  confirmTurnOffOpen.value = false
+}
+
+const onConfirmDialogOpenChange = (open) => {
+  if (!open) cancelTurnOff()
+}
 
 watch(
   () => props.initialValues,
@@ -199,7 +268,8 @@ watch(
           values.parameters && Object.keys(values.parameters).length
             ? JSON.stringify(values.parameters, null, 2)
             : '',
-        enabled: values.enabled ?? true
+        enabled: values.enabled ?? true,
+        requires_verification: values.requires_verification ?? true
       },
       false
     )
@@ -231,6 +301,7 @@ const onSubmit = form.handleSubmit(async (values) => {
       url: values.url,
       method: values.method || 'POST',
       enabled: !!values.enabled,
+      requires_verification: values.requires_verification !== false,
       auth: { headers },
       parameters
     })

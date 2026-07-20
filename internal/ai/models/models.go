@@ -99,6 +99,8 @@ type Tool struct {
 	Auth        types.JSONText `db:"auth" json:"auth"`
 	Parameters  types.JSONText `db:"parameters" json:"parameters"`
 	Enabled     bool           `db:"enabled" json:"enabled"`
+	// RequiresVerification fails closed: a flagged tool is blocked until the contact is verified for the conversation.
+	RequiresVerification bool `db:"requires_verification" json:"requires_verification"`
 }
 
 // ToolAuth is the decoded ai_tools.auth JSONB: headers injected on every request.

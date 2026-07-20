@@ -992,13 +992,13 @@ func initAI(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager 
 }
 
 // initAIAgent inits the autonomous AI agent manager.
-func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager) *aiagent.Manager {
+func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
 	m, err := aiagent.New(aiagent.Opts{
 		DB:        db,
 		Lo:        initLogger("ai_agent"),
 		I18n:      i18n,
 		QueueSize: cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
-	}, aiManager, convo, mediaManager, settingManager)
+	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
 	if err != nil {
 		log.Fatalf("error initializing AI agent manager: %v", err)
 	}
