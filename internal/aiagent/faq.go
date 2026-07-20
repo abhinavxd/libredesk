@@ -132,10 +132,19 @@ func (m *Manager) miningWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case convID := <-m.miningQueue:
-			m.mine(ctx, convID)
+			m.mineWithRecover(ctx, convID)
 			m.markMiningDone(convID)
 		}
 	}
+}
+
+func (m *Manager) mineWithRecover(ctx context.Context, convID int) {
+	defer func() {
+		if r := recover(); r != nil {
+			m.lo.Error("recovered from panic in ai agent mining worker", "conversation_id", convID, "panic", r)
+		}
+	}()
+	m.mine(ctx, convID)
 }
 
 func (m *Manager) enqueueMining(convID int) {

@@ -83,10 +83,21 @@ func (m *Manager) worker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case convID := <-m.queue:
-			m.handle(ctx, convID)
+			m.handleWithRecover(ctx, convID)
 			m.markDone(convID)
 		}
 	}
+}
+
+// handleWithRecover runs handle and recovers from panics so a single bad run (LLM chain or tool
+// execution) can't crash the whole process and take down every channel.
+func (m *Manager) handleWithRecover(ctx context.Context, convID int) {
+	defer func() {
+		if r := recover(); r != nil {
+			m.lo.Error("recovered from panic in ai agent worker", "conversation_id", convID, "panic", r)
+		}
+	}()
+	m.handle(ctx, convID)
 }
 
 // HandleConversationEvent enqueues a response when the assignee is an AI assistant.
@@ -280,7 +291,10 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		}
 	}
 	if confirm != "" {
-		m.postReply(conv, assistant, confirm, map[string]any{"is_confirmation": true})
+		if err := m.postReply(conv, assistant, confirm, map[string]any{"is_confirmation": true}); err != nil {
+			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			return
+		}
 	}
 	if outcome.resolved && (answer != "" || turns > 0) {
 		m.resolve(conv, assistant)

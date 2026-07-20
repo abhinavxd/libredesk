@@ -141,7 +141,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import AssistantForm from '@/features/admin/ai/AssistantForm.vue'
@@ -288,7 +288,7 @@ const selectRange = (option) => {
   fetchStats()
 }
 
-onMounted(async () => {
+const loadAssistant = async () => {
   if (!props.id) return
   try {
     isLoading.value = true
@@ -302,5 +302,18 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
-})
+}
+
+onMounted(loadAssistant)
+
+// The router reuses this view across ai/assistants/:id/edit, so refetch when the id changes.
+watch(
+  () => props.id,
+  () => {
+    previewMessage.value = ''
+    previewReply.value = ''
+    previewSources.value = []
+    loadAssistant()
+  }
+)
 </script>

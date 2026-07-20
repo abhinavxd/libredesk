@@ -285,7 +285,9 @@ func (m *Manager) CreateAssistant(a models.Assistant) (models.Assistant, error) 
 		m.lo.Error("error committing assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	m.refreshAssistantUserIDs()
+	if err := m.refreshAssistantUserIDs(); err != nil {
+		m.lo.Error("error refreshing assistant user ids cache", "error", err)
+	}
 	return m.GetAssistant(id)
 }
 
@@ -327,7 +329,9 @@ func (m *Manager) UpdateAssistant(id int, a models.Assistant) (models.Assistant,
 		m.lo.Error("error committing assistant update", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	m.refreshAssistantUserIDs()
+	if err := m.refreshAssistantUserIDs(); err != nil {
+		m.lo.Error("error refreshing assistant user ids cache", "error", err)
+	}
 	return m.GetAssistant(id)
 }
 
@@ -358,7 +362,9 @@ func (m *Manager) DeleteAssistant(id int) (int, error) {
 		m.lo.Error("error committing assistant delete", "error", err)
 		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	m.refreshAssistantUserIDs()
+	if err := m.refreshAssistantUserIDs(); err != nil {
+		m.lo.Error("error refreshing assistant user ids cache", "error", err)
+	}
 	return a.UserID, nil
 }
 

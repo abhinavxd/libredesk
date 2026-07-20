@@ -5,6 +5,8 @@ package image
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
+	"image"
 	"io"
 
 	"github.com/disintegration/imaging"
@@ -15,6 +17,9 @@ const (
 	// llmMaxDim caps an image's longest edge before it is sent to a vision model.
 	llmMaxDim      = 1568
 	llmJPEGQuality = 85
+	// maxDecodePixels bounds width*height read from the header before decoding, blocking image bombs
+	// that declare huge dimensions in a small file.
+	maxDecodePixels = 100_000_000
 )
 
 var (
@@ -78,6 +83,13 @@ func CreateThumb(thumbPxSize int, r io.Reader) (*bytes.Reader, error) {
 // EncodeForLLM decodes an image, downscales its longest edge to at most llmMaxDim, re-encodes it as
 // JPEG, and returns the base64 payload plus media type for a vision model request.
 func EncodeForLLM(content []byte) (data string, mediaType string, err error) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(content))
+	if err != nil {
+		return "", "", err
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > maxDecodePixels {
+		return "", "", fmt.Errorf("image dimensions %dx%d exceed decode limit", cfg.Width, cfg.Height)
+	}
 	img, err := imaging.Decode(bytes.NewReader(content))
 	if err != nil {
 		return "", "", err

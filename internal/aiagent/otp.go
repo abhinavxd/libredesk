@@ -88,7 +88,9 @@ func (m *Manager) incrOTPSends(convUUID string) (bool, error) {
 		return false, err
 	}
 	if n == 1 {
-		m.redis.Expire(ctx, key, otpVerifiedTTL)
+		if err := m.redis.Expire(ctx, key, otpVerifiedTTL).Err(); err != nil {
+			m.lo.Error("error setting ttl on otp sends key", "conversation_uuid", convUUID, "error", err)
+		}
 	}
 	return n > otpMaxSends, nil
 }

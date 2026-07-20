@@ -105,7 +105,7 @@ func (m *Manager) executeToolCall(ctx context.Context, registry map[string]Tool,
 	out, err := tool.Execute(ctx, tc.Function.Arguments)
 	if err != nil {
 		m.lo.Error("error executing tool", "tool", tc.Function.Name, "error", err)
-		return "error executing tool: " + err.Error()
+		return "the tool call failed"
 	}
 	m.lo.Debug("ai run tool result", "tool", tc.Function.Name, "result_len", len(out), "result", out)
 	return out
