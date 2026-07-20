@@ -271,6 +271,8 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 		// doubles as a polled inbox.
 		if noReply := t.m.noReplyAddress(); noReply != "" {
 			msg.Headers = map[string][]string{"Reply-To": {noReply}}
+		} else {
+			t.m.lo.Warn("no-reply address unavailable, sending verification email without reply-to guard; check notification.email.email_address setting", "conversation_uuid", t.conv.UUID)
 		}
 		sendErr = t.m.notifier.Send(msg)
 	}
