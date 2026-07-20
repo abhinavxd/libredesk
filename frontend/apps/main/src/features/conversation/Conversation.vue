@@ -81,6 +81,7 @@ import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
 import api from '@main/api'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
@@ -100,25 +101,11 @@ const downloadTranscript = async () => {
   if (!conversation) return
   try {
     const response = await api.getConversationTranscript(conversation.uuid)
-    const url = URL.createObjectURL(response.data)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `transcript-${conversation.reference_number}.txt`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 0)
+    downloadBlobResponse(response, `transcript-${conversation.reference_number}.txt`)
   } catch (error) {
-    if (error.response?.data instanceof Blob) {
-      try {
-        error.response.data = JSON.parse(await error.response.data.text())
-      } catch {
-        // keep the original blob, handleHTTPError falls back to a generic message
-      }
-    }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: handleHTTPError(error).message
+      description: handleHTTPError(await parseBlobError(error)).message
     })
   }
 }
