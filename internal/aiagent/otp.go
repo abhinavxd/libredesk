@@ -23,6 +23,32 @@ const (
 	otpMaxSends    = 3
 )
 
+// checkOTPScript atomically reads the pending code, compares it, and either clears it (match or cap
+// reached) or increments the attempt count, so concurrent guesses cannot race past otpMaxAttempts.
+// Returns 1 on match, 0 on miss/expiry, -1 on corrupt data (key cleared).
+var checkOTPScript = redis.NewScript(`
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+	return 0
+end
+local ok, p = pcall(cjson.decode, raw)
+if not ok or type(p) ~= 'table' then
+	redis.call('DEL', KEYS[1])
+	return -1
+end
+if p.code == ARGV[1] then
+	redis.call('DEL', KEYS[1])
+	return 1
+end
+p.attempts = (p.attempts or 0) + 1
+if p.attempts >= tonumber(ARGV[2]) then
+	redis.call('DEL', KEYS[1])
+else
+	redis.call('SET', KEYS[1], cjson.encode(p), 'KEEPTTL')
+end
+return 0
+`)
+
 // pendingOTP is the JSON stored at otpPendingKeyPrefix while a code awaits entry.
 type pendingOTP struct {
 	Code     string `json:"code"`
@@ -83,38 +109,21 @@ func (m *Manager) storePendingOTP(convUUID, code string) error {
 func (m *Manager) checkPendingOTP(convUUID, code string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	key := otpPendingKey(convUUID)
-	raw, err := m.redis.Get(ctx, key).Result()
+	res, err := checkOTPScript.Run(ctx, m.redis, []string{otpPendingKey(convUUID)}, code, otpMaxAttempts).Int()
 	if err != nil {
-		if err == redis.Nil {
-			return false, nil
-		}
 		return false, err
 	}
-	var p pendingOTP
-	if err := json.Unmarshal([]byte(raw), &p); err != nil {
-		m.redis.Del(ctx, key)
-		return false, err
-	}
-	if p.Code == code {
-		m.redis.Del(ctx, key)
+	switch res {
+	case 1:
 		if err := m.setConversationVerified(convUUID); err != nil {
 			return false, err
 		}
 		return true, nil
-	}
-	p.Attempts++
-	if p.Attempts >= otpMaxAttempts {
-		m.redis.Del(ctx, key)
+	case -1:
+		return false, fmt.Errorf("corrupt pending otp for conversation %s", convUUID)
+	default:
 		return false, nil
 	}
-	b, err := json.Marshal(p)
-	if err != nil {
-		return false, err
-	}
-	// Preserve the original TTL so a wrong guess doesn't extend the code's life.
-	m.redis.Set(ctx, key, b, redis.KeepTTL)
-	return false, nil
 }
 
 // generateOTP returns a random 6-digit numeric code.
