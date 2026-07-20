@@ -260,12 +260,19 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 		}
 		sendErr = t.m.convo.SendTransientEmail(t.conv.InboxID, t.conv.ID, t.conv.UUID, []string{email}, subject, body)
 	} else {
-		sendErr = t.m.notifier.Send(notifier.Message{
+		msg := notifier.Message{
 			RecipientEmails: []string{email},
 			Subject:         t.m.i18n.T("ai.agent.verificationEmailSubject"),
 			Content:         body,
 			Provider:        notifier.ProviderEmail,
-		})
+		}
+		// Livechat verification happens in chat, not email. Point replies at a no-reply address so a
+		// stray email reply can't be ingested as a new conversation when the notification sender
+		// doubles as a polled inbox.
+		if noReply := t.m.noReplyAddress(); noReply != "" {
+			msg.Headers = map[string][]string{"Reply-To": {noReply}}
+		}
+		sendErr = t.m.notifier.Send(msg)
 	}
 	if sendErr != nil {
 		t.m.lo.Error("error sending verification code email", "conversation_uuid", t.conv.UUID, "error", sendErr)
@@ -273,6 +280,27 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 	}
 	t.m.lo.Debug("ai agent sent verification code", "conversation_uuid", t.conv.UUID)
 	return "A verification code has been emailed to the customer. Tell them you have sent a code to their email and ask them to reply with it.", nil
+}
+
+// noReplyAddress returns a no-reply address on the notification sender's domain, or "" if unavailable.
+func (m *Manager) noReplyAddress() string {
+	raw, err := m.setting.Get("notification.email.email_address")
+	if err != nil {
+		return ""
+	}
+	var addr string
+	if err := json.Unmarshal(raw, &addr); err != nil || addr == "" {
+		return ""
+	}
+	parsed, err := mail.ParseAddress(addr)
+	if err != nil {
+		return ""
+	}
+	at := strings.LastIndex(parsed.Address, "@")
+	if at < 0 {
+		return ""
+	}
+	return "noreply@" + parsed.Address[at+1:]
 }
 
 // checkEmailVerificationTool verifies the code the customer entered against the pending one.
