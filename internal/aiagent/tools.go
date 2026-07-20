@@ -249,14 +249,27 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 		return "", err
 	}
 	body := t.m.i18n.Ts("ai.agent.verificationEmailBody", "code", code)
-	if err := t.m.notifier.Send(notifier.Message{
-		RecipientEmails: []string{email},
-		Subject:         t.m.i18n.T("ai.agent.verificationEmailSubject"),
-		Content:         body,
-		Provider:        notifier.ProviderEmail,
-	}); err != nil {
-		t.m.lo.Error("error sending verification code email", "conversation_uuid", t.conv.UUID, "error", err)
-		return "", err
+	// Livechat inboxes can't send email, so those fall back to the notification email channel.
+	var sendErr error
+	if t.conv.InboxChannel == channelEmail {
+		// Reuse the conversation's subject so the code threads into the same email thread instead of
+		// landing in a separate one the customer might reply to.
+		subject := t.conv.Subject.String
+		if subject == "" {
+			subject = t.m.i18n.T("ai.agent.verificationEmailSubject")
+		}
+		sendErr = t.m.convo.SendTransientEmail(t.conv.InboxID, t.conv.ID, t.conv.UUID, []string{email}, subject, body)
+	} else {
+		sendErr = t.m.notifier.Send(notifier.Message{
+			RecipientEmails: []string{email},
+			Subject:         t.m.i18n.T("ai.agent.verificationEmailSubject"),
+			Content:         body,
+			Provider:        notifier.ProviderEmail,
+		})
+	}
+	if sendErr != nil {
+		t.m.lo.Error("error sending verification code email", "conversation_uuid", t.conv.UUID, "error", sendErr)
+		return "", sendErr
 	}
 	t.m.lo.Debug("ai agent sent verification code", "conversation_uuid", t.conv.UUID)
 	return "A verification code has been emailed to the customer. Tell them you have sent a code to their email and ask them to reply with it.", nil

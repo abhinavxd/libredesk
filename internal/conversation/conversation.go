@@ -1140,6 +1140,27 @@ func (m *Manager) BuildEmailThreadingHeaders(conversationID int, selfSourceID st
 	return references, inReplyTo
 }
 
+// SendTransientEmail sends a one-off email through the conversation's inbox, threaded like a reply, without recording it as a conversation message.
+func (m *Manager) SendTransientEmail(inboxID, conversationID int, conversationUUID string, to []string, subject, htmlContent string) error {
+	inb, err := m.inboxStore.Get(inboxID)
+	if err != nil {
+		return fmt.Errorf("fetching inbox: %w", err)
+	}
+	if inb.Channel() != inbox.ChannelEmail {
+		return fmt.Errorf("cannot send email through non-email inbox %d", inboxID)
+	}
+	references, inReplyTo := m.BuildEmailThreadingHeaders(conversationID, "")
+	return inb.Send(models.OutboundMessage{
+		From:             inb.FromAddress(),
+		To:               to,
+		Subject:          subject,
+		Content:          htmlContent,
+		ConversationUUID: conversationUUID,
+		References:       references,
+		InReplyTo:        inReplyTo,
+	})
+}
+
 // NotifyAssignment sends notifications (in-app, WebSocket, email) for an assigned conversation.
 func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversation) error {
 	agent, err := m.userStore.GetAgent(userIDs[0], "")
