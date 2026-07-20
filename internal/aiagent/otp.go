@@ -49,6 +49,16 @@ end
 return 0
 `)
 
+// incrOTPSendsScript increments the send counter and sets its TTL on first increment in one atomic
+// step, so the key can never persist without an expiry and lock a conversation out of resends.
+var incrOTPSendsScript = redis.NewScript(`
+local n = redis.call('INCR', KEYS[1])
+if n == 1 then
+	redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return n
+`)
+
 // pendingOTP is the JSON stored at otpPendingKeyPrefix while a code awaits entry.
 type pendingOTP struct {
 	Code     string `json:"code"`
@@ -82,15 +92,9 @@ func (m *Manager) setConversationVerified(convUUID string) error {
 func (m *Manager) incrOTPSends(convUUID string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	key := otpSendsKey(convUUID)
-	n, err := m.redis.Incr(ctx, key).Result()
+	n, err := incrOTPSendsScript.Run(ctx, m.redis, []string{otpSendsKey(convUUID)}, int(otpVerifiedTTL.Seconds())).Int64()
 	if err != nil {
 		return false, err
-	}
-	if n == 1 {
-		if err := m.redis.Expire(ctx, key, otpVerifiedTTL).Err(); err != nil {
-			m.lo.Error("error setting ttl on otp sends key", "conversation_uuid", convUUID, "error", err)
-		}
 	}
 	return n > otpMaxSends, nil
 }
