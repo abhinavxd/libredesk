@@ -87,8 +87,8 @@ func EncodeForLLM(content []byte) (data string, mediaType string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	if int64(cfg.Width)*int64(cfg.Height) > maxDecodePixels {
-		return "", "", fmt.Errorf("image dimensions %dx%d exceed decode limit", cfg.Width, cfg.Height)
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxDecodePixels/cfg.Height {
+		return "", "", fmt.Errorf("invalid or too-large image dimensions %dx%d", cfg.Width, cfg.Height)
 	}
 	img, err := imaging.Decode(bytes.NewReader(content))
 	if err != nil {
