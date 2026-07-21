@@ -551,7 +551,7 @@
   "agent.generateApiKey": "Generate API key",
   "agent.new": "New agent",
   "agent.selectAvailabilityStatus": "Select availability status",
-  "ai.apiKeyNotSet": "{provider} API Key is not set. Please ask your administrator to set it up",
+  "ai.apiKeyNotSet": "The AI provider API key is not set. Please ask your administrator to set it up",
   "ai.faqAlreadyReviewed": "This suggestion has already been reviewed.",
   "ai.agent.handoffDefault": "The AI assistant handed this conversation off to a human.",
   "ai.agent.handoffMaxTurns": "The AI assistant reached its response limit for this conversation and handed it off to a human.",

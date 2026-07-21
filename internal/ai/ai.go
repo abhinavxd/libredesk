@@ -379,7 +379,7 @@ func (m *Manager) providerError(err error) error {
 		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if errors.Is(err, ErrApiKeyNotSet) {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("ai.apiKeyNotSet", "provider", "OpenAI"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.T("ai.apiKeyNotSet"), nil)
 	}
 	m.lo.Error("error from AI provider", "error", err)
 	return envelope.NewError(envelope.GeneralError, capProviderErrorMessage(err), nil)
@@ -388,7 +388,7 @@ func (m *Manager) providerError(err error) error {
 // testProviderError surfaces the provider's own error message so the admin can act on it.
 func (m *Manager) testProviderError(err error) error {
 	if errors.Is(err, ErrApiKeyNotSet) {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("ai.apiKeyNotSet", "provider", "OpenAI"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.T("ai.apiKeyNotSet"), nil)
 	}
 	return envelope.NewError(envelope.InputError, capProviderErrorMessage(err), nil)
 }
