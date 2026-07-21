@@ -35,6 +35,7 @@ export const adminNavItems = [
   },
   {
     titleKey: 'admin.ai.title',
+    badge: 'BETA',
     children: [
       {
         titleKey: 'globals.terms.provider',

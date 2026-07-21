@@ -7,6 +7,7 @@ import {
 } from '../../constants/navigation'
 import { useRoute, useRouter } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
+import { Badge } from '@shared-ui/components/ui/badge'
 import {
   Sidebar,
   SidebarContent,
@@ -361,6 +362,12 @@ const viewToDelete = ref(null)
                   <CollapsibleTrigger as-child>
                     <SidebarMenuButton :isActive="isActiveParent(item.href)">
                       <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
+                      <Badge
+                        v-if="item.badge"
+                        class="ml-1.5 px-1.5 py-0 text-[10px] font-medium leading-normal"
+                      >
+                        {{ item.badge }}
+                      </Badge>
                       <ChevronRight
                         class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                       />
