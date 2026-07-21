@@ -345,6 +345,7 @@ func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistan
 	if meta == nil {
 		meta = map[string]any{}
 	}
+	meta["ai_assistant_id"] = assistant.ID
 	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(text), to, nil, nil, meta); err != nil {
 		m.lo.Error("error sending assistant reply", "conversation_uuid", conv.UUID, "error", err)
 		return err

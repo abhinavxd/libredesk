@@ -788,19 +788,10 @@ func initAuthz(i18n *i18n.I18n) *authz.Enforcer {
 	return enforcer
 }
 
-// initSSRFControl builds the shared outbound-request guard from config, still honoring the deprecated `webhook.allowed_hosts` key.
+// initSSRFControl builds the shared outbound-request guard from config.
 func initSSRFControl() ssrf.Control {
 	lo := initLogger("ssrf")
-	enabled := ko.Bool("ssrf.enabled")
-	cidrs := ko.Strings("ssrf.allowed_cidrs")
-
-	if legacy := ko.Strings("webhook.allowed_hosts"); len(legacy) > 0 {
-		lo.Warn("`webhook.allowed_hosts` is deprecated; use the [ssrf] config block instead")
-		enabled = true
-		cidrs = append(cidrs, legacy...)
-	}
-
-	return ssrf.NewControl(enabled, cidrs, lo)
+	return ssrf.NewControl(ko.Bool("ssrf.enabled"), ko.Strings("ssrf.allowed_cidrs"), lo)
 }
 
 // initAuth initializes the authentication manager.

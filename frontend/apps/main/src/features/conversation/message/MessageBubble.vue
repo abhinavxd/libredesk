@@ -15,7 +15,7 @@
       </router-link>
       <router-link
         v-else-if="canManageAI"
-        :to="{ name: 'ai-assistants' }"
+        :to="aiAssistantRoute"
         class="cursor-pointer text-muted-foreground text-sm font-medium hover:underline hover:text-primary transition-colors duration-200"
       >
         {{ getFullName }}
@@ -190,7 +190,7 @@
         <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
         <router-link
           v-else-if="canManageAI"
-          :to="{ name: 'ai-assistants' }"
+          :to="aiAssistantRoute"
           class="flex-shrink-0"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
@@ -348,6 +348,10 @@ const canManageUsers = computed(
   () => !isSystemUser.value && !isAIAssistant.value && userStore.can('users:manage')
 )
 const canManageAI = computed(() => isAIAssistant.value && userStore.can('ai:manage'))
+const aiAssistantRoute = computed(() => {
+  const id = props.message.meta?.ai_assistant_id
+  return id ? { name: 'edit-ai-assistant', params: { id } } : { name: 'ai-assistants' }
+})
 
 const isOutgoing = computed(() => props.direction === 'outgoing')
 
