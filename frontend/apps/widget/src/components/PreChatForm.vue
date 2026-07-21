@@ -314,7 +314,7 @@ const submitForm = handleSubmit((values) => {
     const field = sortedFields.value.find((f) => f.key === key)
     const value = values[key]
     if (
-      field?.type === 'checkbox' ||
+      (field?.type === 'checkbox' && value === true) ||
       (value !== undefined && value !== null && String(value).trim() !== '')
     ) {
       filteredValues[key] = value
