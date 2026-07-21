@@ -87,6 +87,14 @@ func (m *Manager) setConversationVerified(convUUID string) error {
 	return m.redis.Set(ctx, otpVerifiedKey(convUUID), "1", otpVerifiedTTL).Err()
 }
 
+// clearConversationVerified drops the verified flag and any pending code so a changed email must be
+// verified afresh.
+func (m *Manager) clearConversationVerified(convUUID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return m.redis.Del(ctx, otpVerifiedKey(convUUID), otpPendingKey(convUUID)).Err()
+}
+
 // incrOTPSends bumps the per-conversation send counter and reports whether the cap is now exceeded.
 func (m *Manager) incrOTPSends(convUUID string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

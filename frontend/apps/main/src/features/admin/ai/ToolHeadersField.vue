@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-2">
-    <div v-for="(header, index) in headers" :key="index" class="flex items-start gap-2">
+    <div v-for="(header, index) in rows" :key="header.id" class="flex items-start gap-2">
       <Input
         :model-value="header.key"
         type="text"
@@ -36,23 +36,47 @@
 </template>
 
 <script setup>
+import { ref, watch } from 'vue'
 import { Plus, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 
-const headers = defineModel({ type: Array, required: true })
+const model = defineModel({ type: Array, required: true })
 const { t } = useI18n()
 
+// Local rows carry a stable id so v-for keys survive removals; the emitted model stays {key,value}.
+let seq = 0
+const rows = ref([])
+
+const emit = () => {
+  model.value = rows.value.map(({ key, value }) => ({ key, value }))
+}
+
+watch(
+  model,
+  (val) => {
+    const incoming = val || []
+    const same =
+      incoming.length === rows.value.length &&
+      incoming.every((h, i) => h.key === rows.value[i].key && h.value === rows.value[i].value)
+    if (!same) rows.value = incoming.map((h) => ({ id: ++seq, key: h.key, value: h.value }))
+  },
+  { immediate: true, deep: true }
+)
+
 const addHeader = () => {
-  headers.value = [...headers.value, { key: '', value: '' }]
+  rows.value.push({ id: ++seq, key: '', value: '' })
+  emit()
 }
 
 const removeHeader = (index) => {
-  headers.value = headers.value.filter((_, i) => i !== index)
+  rows.value.splice(index, 1)
+  emit()
 }
 
 const updateHeader = (index, field, value) => {
-  headers.value = headers.value.map((h, i) => (i === index ? { ...h, [field]: value } : h))
+  rows.value[index][field] = value
+  emit()
 }
 </script>

@@ -302,8 +302,8 @@ const requiredFieldsFilled = computed(() => {
     .filter((field) => field.required)
     .every((field) => {
       const value = values[field.key]
-      if (field.type === 'checkbox') return true
-      return value && String(value).trim() !== ''
+      if (field.type === 'checkbox') return value === true
+      return value !== undefined && value !== null && String(value).trim() !== ''
     })
 })
 
@@ -312,8 +312,12 @@ const submitForm = handleSubmit((values) => {
   const filteredValues = {}
   Object.keys(values).forEach((key) => {
     const field = sortedFields.value.find((f) => f.key === key)
-    if (field?.type === 'checkbox' || (values[key] && String(values[key]).trim())) {
-      filteredValues[key] = values[key]
+    const value = values[key]
+    if (
+      field?.type === 'checkbox' ||
+      (value !== undefined && value !== null && String(value).trim() !== '')
+    ) {
+      filteredValues[key] = value
     }
   })
 

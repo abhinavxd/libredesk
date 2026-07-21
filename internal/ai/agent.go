@@ -52,7 +52,11 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 	for _, msg := range messages {
 		imageCount += len(msg.Images)
 	}
-	m.lo.Debug("ai run starting", "model", cfg.Model, "vision", cfg.Vision, "max_steps", maxSteps, "history_messages", len(history), "images", imageCount, "tools", len(defs))
+	toolNames := make([]string, len(defs))
+	for i, d := range defs {
+		toolNames[i] = d.Function.Name
+	}
+	m.lo.Debug("ai run starting", "model", cfg.Model, "vision", cfg.Vision, "max_steps", maxSteps, "history_messages", len(history), "images", imageCount, "tools", len(defs), "tool_names", strings.Join(toolNames, ","))
 	m.lo.Debug("ai run system prompt", "prompt", systemPrompt)
 
 	for step := 0; step < maxSteps; step++ {

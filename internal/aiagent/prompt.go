@@ -49,8 +49,9 @@ const noContactIdentityNote = "You do not have any identifying details for this 
 // verificationNote guides the OTP flow; the actual gate is enforced server-side, this only shapes UX.
 const verificationNote = `This customer is not verified yet. Some tools need a verified customer and will tell you so if you call them too early. To verify:
 - If a tool reports the customer is not verified, or you need to act on their account, verify them first.
-- If the customer has no email on file, ask for their email and call set_contact_email with it.
+- If the customer has no email yet, ask for their email and call set_contact_email with it.
 - Call send_email_verification to email them a one-time code, then tell them you have sent a code and ask them to reply with it. Never ask for or accept the code by any other means, and never state the code yourself.
+- If the customer gives a different email from the one the code went to (for example after their account could not be located), call set_contact_email with the new email, then send_email_verification again.
 - When they reply with the code, call check_email_verification with it. Once it succeeds, retry the tool you needed.
 Do not claim the customer is verified until check_email_verification has succeeded.`
 

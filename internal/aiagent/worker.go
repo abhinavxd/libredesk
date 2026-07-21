@@ -271,10 +271,10 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 
 	// Register the verification tools whenever verification is OTP-based, even if the run starts
 	// verified: the 30-min window can expire mid-run and a blocked tool then points the model at
-	// them. set_contact_email is visitor-only and only when there's no email on file to send the
-	// code to.
+	// them. set_contact_email is visitor-only, so a self-claimed email can be corrected in chat; a
+	// known contact's email is never swappable this way.
 	if conv.InboxChannel == channelEmail || conv.Contact.Type != umodels.UserTypeContact {
-		offerSetEmail := conv.Contact.Type == umodels.UserTypeVisitor && conv.Contact.Email.String == ""
+		offerSetEmail := conv.Contact.Type == umodels.UserTypeVisitor
 		tools = append(tools, &sendEmailVerificationTool{m: m, conv: &conv})
 		tools = append(tools, &checkEmailVerificationTool{m: m, conv: &conv})
 		if offerSetEmail {
@@ -287,8 +287,12 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 
 	tctx := ai.ToolContext{
+		ContactID:         conv.Contact.ID,
 		ContactExternalID: conv.Contact.ExternalUserID.String,
-		ContactEmail:      conv.Contact.Email.String,
+		ContactType:       conv.Contact.Type,
+		ConversationUUID:  conv.UUID,
+		InboxID:           conv.InboxID,
+		ContactEmail:      func() string { return conv.Contact.Email.String },
 		Verified:          verified,
 	}
 	timeout := emailRunTimeout

@@ -97,13 +97,13 @@
       </FormItem>
     </FormField>
 
-    <FormField v-slot="{ componentField, handleChange }" name="requires_verification">
+    <FormField v-slot="{ componentField }" name="requires_verification">
       <FormItem>
         <SwitchField
           :title="t('admin.ai.tool.requireVerification')"
           :description="t('admin.ai.tool.requireVerificationHint')"
           :checked="componentField.modelValue"
-          @update:checked="(v) => onToggleVerification(v, handleChange)"
+          @update:checked="onToggleVerification"
         />
       </FormItem>
     </FormField>
@@ -124,7 +124,7 @@
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel @click="cancelTurnOff">
+        <AlertDialogCancel>
           {{ t('admin.ai.tool.keepVerificationOn') }}
         </AlertDialogCancel>
         <AlertDialogAction @click="confirmTurnOff">
@@ -212,7 +212,7 @@ const form = useForm({
         }),
       parameters: z.string().optional(),
       enabled: z.boolean().optional(),
-      requires_verification: z.boolean().optional()
+      requires_verification: z.boolean().default(true)
     })
   ),
   initialValues: {
@@ -228,30 +228,22 @@ const form = useForm({
 })
 
 const confirmTurnOffOpen = ref(false)
-let pendingVerificationChange = null
 
-const onToggleVerification = (checked, handleChange) => {
+const onToggleVerification = (checked) => {
   if (!checked) {
-    pendingVerificationChange = handleChange
     confirmTurnOffOpen.value = true
     return
   }
-  handleChange(true)
+  form.setFieldValue('requires_verification', true, false)
 }
 
 const confirmTurnOff = () => {
-  if (pendingVerificationChange) pendingVerificationChange(false)
-  pendingVerificationChange = null
-  confirmTurnOffOpen.value = false
-}
-
-const cancelTurnOff = () => {
-  pendingVerificationChange = null
+  form.setFieldValue('requires_verification', false, false)
   confirmTurnOffOpen.value = false
 }
 
 const onConfirmDialogOpenChange = (open) => {
-  if (!open) cancelTurnOff()
+  confirmTurnOffOpen.value = open
 }
 
 watch(

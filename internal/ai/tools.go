@@ -117,14 +117,27 @@ func (t *searchArticlesTool) Execute(ctx context.Context, args string) (string, 
 // ToolContext is per-run context injected into custom tool calls server-side. It is never part
 // of the model-facing schema, so the model cannot see or spoof it (e.g. the contact's identity).
 type ToolContext struct {
+	ContactID         int
 	ContactExternalID string
-	ContactEmail      string
+	ContactType       string
+	ConversationUUID  string
+	InboxID           int
+	// ContactEmail is evaluated live per tool call (never snapshotted) so a contact whose email is
+	// set or corrected mid-turn is identified by the current address, not the one at run start.
+	ContactEmail func() string
 	// Verified is evaluated live per tool call (never snapshotted) so a contact who verifies
 	// mid-turn passes on the same turn. A nil func is treated as unverified (fail closed).
 	Verified func() bool
 }
 
 func (c ToolContext) verified() bool { return c.Verified != nil && c.Verified() }
+
+func (c ToolContext) contactEmail() string {
+	if c.ContactEmail == nil {
+		return ""
+	}
+	return c.ContactEmail()
+}
 
 // httpTool is an admin-defined custom tool that calls an external HTTP endpoint.
 type httpTool struct {
@@ -222,13 +235,25 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	// Inject the contact's identity so tools (e.g. a CRM lookup) know who this is. Server-side
 	// only, never advertised to the model. The verified header is always sent (defaulting to
 	// false) so a tool can distinguish an OTP-verified contact from a self-claimed one.
+	if t.tctx.ContactID != 0 {
+		req.Header.Set("X-Libredesk-Contact-Id", strconv.Itoa(t.tctx.ContactID))
+	}
 	if t.tctx.ContactExternalID != "" {
 		req.Header.Set("X-Libredesk-Contact-External-Id", t.tctx.ContactExternalID)
 	}
-	if t.tctx.ContactEmail != "" {
-		req.Header.Set("X-Libredesk-Contact-Email", t.tctx.ContactEmail)
+	if t.tctx.ContactType != "" {
+		req.Header.Set("X-Libredesk-Contact-Type", t.tctx.ContactType)
+	}
+	if email := t.tctx.contactEmail(); email != "" {
+		req.Header.Set("X-Libredesk-Contact-Email", email)
 	}
 	req.Header.Set("X-Libredesk-Contact-Verified", strconv.FormatBool(t.tctx.verified()))
+	if t.tctx.ConversationUUID != "" {
+		req.Header.Set("X-Libredesk-Conversation-UUID", t.tctx.ConversationUUID)
+	}
+	if t.tctx.InboxID != 0 {
+		req.Header.Set("X-Libredesk-Inbox-Id", strconv.Itoa(t.tctx.InboxID))
+	}
 
 	resp, err := t.client.Do(req)
 	if err != nil {

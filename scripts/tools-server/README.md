@@ -13,6 +13,24 @@ go run ./scripts/tools-server
 Listens on `:7070` by default (`-addr` to change). Every request logs the contact
 headers and the raw args JSON the model sent.
 
+## Headers libredesk sends
+
+On every custom tool call libredesk injects the contact and conversation context
+server-side (the model never sees or controls these):
+
+| Header                            | Value                                              |
+| --------------------------------- | -------------------------------------------------- |
+| `X-Libredesk-Contact-Id`          | internal contact id                                |
+| `X-Libredesk-Contact-External-Id` | external user id (from the livechat JWT), if any    |
+| `X-Libredesk-Contact-Type`        | `contact` or `visitor`                             |
+| `X-Libredesk-Contact-Email`       | contact email, if known                            |
+| `X-Libredesk-Contact-Verified`    | `true` only after OTP/JWT identity verification    |
+| `X-Libredesk-Conversation-UUID`   | conversation uuid                                  |
+| `X-Libredesk-Inbox-Id`            | inbox id                                           |
+
+Trust `X-Libredesk-Contact-Email` for sensitive lookups only when
+`X-Libredesk-Contact-Verified` is `true`; a `visitor` can self-claim any address.
+
 ## Endpoints
 
 | Endpoint   | Returns                       |
