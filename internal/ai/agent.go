@@ -26,8 +26,11 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 		return "", err
 	}
 	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient)
-	if instructions := strings.TrimSpace(cfg.Instructions); appendWorkspaceInstructions && instructions != "" && systemPrompt != "" {
-		systemPrompt += "\n\nWorkspace admin instructions (follow these, they take precedence on tone and format):\n" + instructions
+	if instructions := strings.TrimSpace(cfg.Instructions); appendWorkspaceInstructions && instructions != "" {
+		if systemPrompt != "" {
+			systemPrompt += "\n\n"
+		}
+		systemPrompt += "Workspace admin instructions (follow these, they take precedence on tone and format):\n" + instructions
 	}
 
 	registry, defs, err := m.buildToolRegistry(tctx, allowedToolIDs, includeBuiltinSearch)
