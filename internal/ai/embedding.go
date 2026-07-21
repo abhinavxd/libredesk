@@ -243,6 +243,17 @@ func (m *Manager) loadIndex() error {
 
 // Run periodically reconciles knowledge base embeddings.
 func (m *Manager) Run(ctx context.Context) {
+	m.wg.Add(1)
+	go m.reconcileLoop(ctx)
+}
+
+// Close waits for an in-flight reconcile to finish.
+func (m *Manager) Close() {
+	m.wg.Wait()
+}
+
+func (m *Manager) reconcileLoop(ctx context.Context) {
+	defer m.wg.Done()
 	ticker := time.NewTicker(reconcileInterval)
 	defer ticker.Stop()
 	m.reconcile()

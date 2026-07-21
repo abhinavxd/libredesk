@@ -68,13 +68,34 @@ func (m *Manager) Run(ctx context.Context, workers int) {
 		workers = 1
 	}
 	for range workers {
-		go m.worker(ctx)
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			m.worker(ctx)
+		}()
 	}
 	miners := min(workers, 2)
 	for range miners {
-		go m.miningWorker(ctx)
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			m.miningWorker(ctx)
+		}()
 	}
-	<-ctx.Done()
+}
+
+// Close signals the manager to stop processing and waits for all workers to finish.
+func (m *Manager) Close() {
+	m.closedMu.Lock()
+	if m.closed {
+		m.closedMu.Unlock()
+		return
+	}
+	m.closed = true
+	close(m.queue)
+	close(m.miningQueue)
+	m.closedMu.Unlock()
+	m.wg.Wait()
 }
 
 func (m *Manager) worker(ctx context.Context) {
@@ -82,7 +103,10 @@ func (m *Manager) worker(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case convID := <-m.queue:
+		case convID, ok := <-m.queue:
+			if !ok {
+				return
+			}
 			m.handleWithRecover(ctx, convID)
 			m.markDone(convID)
 		}
@@ -112,6 +136,11 @@ func (m *Manager) HandleConversationEvent(conversationID, assigneeUserID int) {
 }
 
 func (m *Manager) enqueue(convID int) {
+	m.closedMu.RLock()
+	defer m.closedMu.RUnlock()
+	if m.closed {
+		return
+	}
 	m.mu.Lock()
 	if m.inflight[convID] {
 		// A response is already running; remember to run again so a message that arrives mid-response

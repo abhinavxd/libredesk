@@ -91,6 +91,10 @@ type Manager struct {
 
 	assistantUserIDs map[int]bool
 	userIDsMu        sync.RWMutex
+
+	closed   bool
+	closedMu sync.RWMutex
+	wg       sync.WaitGroup
 }
 
 type Opts struct {

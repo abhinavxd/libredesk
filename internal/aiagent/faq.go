@@ -131,7 +131,10 @@ func (m *Manager) miningWorker(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case convID := <-m.miningQueue:
+		case convID, ok := <-m.miningQueue:
+			if !ok {
+				return
+			}
 			m.mineWithRecover(ctx, convID)
 			m.markMiningDone(convID)
 		}
@@ -148,6 +151,11 @@ func (m *Manager) mineWithRecover(ctx context.Context, convID int) {
 }
 
 func (m *Manager) enqueueMining(convID int) {
+	m.closedMu.RLock()
+	defer m.closedMu.RUnlock()
+	if m.closed {
+		return
+	}
 	m.miningMu.Lock()
 	if m.miningInflight[convID] {
 		m.miningMu.Unlock()

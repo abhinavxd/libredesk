@@ -53,6 +53,7 @@ type Manager struct {
 	httpClient         *http.Client
 	toolHTTPClient     *http.Client
 	providerHTTPClient *http.Client
+	wg                 sync.WaitGroup
 }
 
 // Opts contains options for initializing the Manager.
