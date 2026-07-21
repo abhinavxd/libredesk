@@ -96,7 +96,11 @@ func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
 // reindexSnippet embeds an enabled snippet (or drops its vectors when disabled) in the background.
 func (m *Manager) reindexSnippet(item models.KnowledgeBaseItem) {
 	gen := m.nextSnippetGen(item.ID)
-	go m.reindexSnippetSync(item, gen)
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.reindexSnippetSync(item, gen)
+	}()
 }
 
 func (m *Manager) reindexSnippetSync(item models.KnowledgeBaseItem, gen uint64) {
@@ -186,7 +190,11 @@ func (m *Manager) setSnippetFingerprint(id int, fingerprint string) {
 
 // ReindexAll triggers a reconcile so snippets are re-embedded against the current model, e.g. after the embedding model changed.
 func (m *Manager) ReindexAll() {
-	go m.reconcile()
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.reconcile()
+	}()
 }
 
 // snippetFingerprint signs the content and embedding model a snippet was last embedded against; any change triggers reindex.

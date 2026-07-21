@@ -97,6 +97,12 @@ func (ix *embeddingIndex) search(query []float32, k int) ([]models.SearchResult,
 
 // Search embeds the query and returns the top-k most similar chunks across the whole index.
 func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.SearchResult, error) {
+	// A run arriving right after boot must not search the index before it has loaded.
+	select {
+	case <-m.indexReady:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	qvec, err := m.GetEmbeddings(ctx, query)
 	if err != nil {
 		return nil, err

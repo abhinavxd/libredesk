@@ -43,6 +43,17 @@ const cannotAnswerWithHandoff = `If you cannot answer from the knowledge base: t
 
 const cannotAnswerNoHandoff = `If you cannot answer from the knowledge base: tell the customer you could not help with that. There is no human agent to transfer to - never offer to connect them with a human, transfer the conversation, or promise that someone will follow up.`
 
+// noContactIdentityNote is a trusted, data-free system-prompt line for when nothing identifies the contact.
+const noContactIdentityNote = "You do not have any identifying details for this customer yet. If you need to identify them for a request, ask."
+
+// verificationNote guides the OTP flow; the actual gate is enforced server-side, this only shapes UX.
+const verificationNote = `This customer is not verified yet. Some tools need a verified customer and will tell you so if you call them too early. To verify:
+- If a tool reports the customer is not verified, or you need to act on their account, verify them first.
+- If the customer has no email on file, ask for their email and call set_contact_email with it.
+- Call send_email_verification to email them a one-time code, then tell them you have sent a code and ask them to reply with it. Never ask for or accept the code by any other means, and never state the code yourself.
+- When they reply with the code, call check_email_verification with it. Once it succeeds, retry the tool you needed.
+Do not claim the customer is verified until check_email_verification has succeeded.`
+
 var toneClauses = map[string]string{
 	"friendly":     "Use a warm, friendly and approachable voice.",
 	"professional": "Use a professional, polished and courteous voice.",
@@ -67,17 +78,6 @@ func languageLine(languages []string) string {
 	return fmt.Sprintf("Reply only in one of these languages: %s. Use the customer's language when it is one of them; otherwise reply in %s.",
 		strings.Join(languages, ", "), languages[0])
 }
-
-// noContactIdentityNote is a trusted, data-free system-prompt line used when nothing identifies the contact.
-const noContactIdentityNote = "You do not have any identifying details for this customer yet. If you need to identify them for a request, ask."
-
-// verificationNote guides the OTP flow; the actual gate is enforced server-side, this only shapes UX.
-const verificationNote = `This customer is not verified yet. Some tools need a verified customer and will tell you so if you call them too early. To verify:
-- If a tool reports the customer is not verified, or you need to act on their account, verify them first.
-- If the customer has no email on file, ask for their email and call set_contact_email with it.
-- Call send_email_verification to email them a one-time code, then tell them you have sent a code and ask them to reply with it. Never ask for or accept the code by any other means, and never state the code yourself.
-- When they reply with the code, call check_email_verification with it. Once it succeeds, retry the tool you needed.
-Do not claim the customer is verified until check_email_verification has succeeded.`
 
 // contactFieldLines returns the contact's known identifying fields as "- Label: value" lines.
 func contactFieldLines(c cmodels.ConversationContact) []string {

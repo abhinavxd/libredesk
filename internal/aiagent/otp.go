@@ -2,12 +2,11 @@ package aiagent
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -134,9 +133,5 @@ func (m *Manager) checkPendingOTP(convUUID, code string) (bool, error) {
 
 // generateOTP returns a random 6-digit numeric code.
 func generateOTP() (string, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
+	return stringutil.RandomNumeric(6)
 }

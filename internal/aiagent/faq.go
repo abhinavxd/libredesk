@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"slices"
 	"strings"
 
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
-	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 )
@@ -198,11 +198,12 @@ func (m *Manager) mine(ctx context.Context, convID int) {
 	}
 
 	private := false
-	msgs, err := m.convo.GetAllConversationMessages(conv.UUID, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, conversation.MaxAllMessages)
+	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, maxMiningMessages, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
 	if err != nil {
 		m.lo.Error("error fetching messages for faq mining", "conversation_uuid", conv.UUID, "error", err)
 		return
 	}
+	slices.Reverse(msgs)
 
 	transcript, hasHumanReply := m.buildMiningTranscript(msgs)
 	if !hasHumanReply || strings.TrimSpace(transcript) == "" {

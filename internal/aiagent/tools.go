@@ -284,27 +284,6 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 	return "A verification code has been emailed to the customer. Tell them you have sent a code to their email and ask them to reply with it.", nil
 }
 
-// noReplyAddress returns a no-reply address on the notification sender's domain, or "" if unavailable.
-func (m *Manager) noReplyAddress() string {
-	raw, err := m.setting.Get("notification.email.email_address")
-	if err != nil {
-		return ""
-	}
-	var addr string
-	if err := json.Unmarshal(raw, &addr); err != nil || addr == "" {
-		return ""
-	}
-	parsed, err := mail.ParseAddress(addr)
-	if err != nil {
-		return ""
-	}
-	at := strings.LastIndex(parsed.Address, "@")
-	if at < 0 {
-		return ""
-	}
-	return "noreply@" + parsed.Address[at+1:]
-}
-
 // checkEmailVerificationTool verifies the code the customer entered against the pending one.
 type checkEmailVerificationTool struct {
 	m    *Manager
@@ -380,4 +359,25 @@ func (t *setContactEmailTool) Execute(ctx context.Context, args string) (string,
 	t.conv.Contact.Email.Valid = true
 	t.m.lo.Debug("ai agent set contact email", "conversation_uuid", t.conv.UUID)
 	return "The customer's email has been saved. Now call send_email_verification to email them a code.", nil
+}
+
+// noReplyAddress returns a no-reply address on the notification sender's domain, or "" if unavailable.
+func (m *Manager) noReplyAddress() string {
+	raw, err := m.setting.Get("notification.email.email_address")
+	if err != nil {
+		return ""
+	}
+	var addr string
+	if err := json.Unmarshal(raw, &addr); err != nil || addr == "" {
+		return ""
+	}
+	parsed, err := mail.ParseAddress(addr)
+	if err != nil {
+		return ""
+	}
+	at := strings.LastIndex(parsed.Address, "@")
+	if at < 0 {
+		return ""
+	}
+	return "noreply@" + parsed.Address[at+1:]
 }

@@ -45,6 +45,7 @@ type queries struct {
 	UpdateAssistantUser     *sqlx.Stmt `query:"update-assistant-user"`
 	SoftDeleteAssistantUser *sqlx.Stmt `query:"soft-delete-assistant-user"`
 	DeleteAssistant         *sqlx.Stmt `query:"delete-assistant"`
+	UnassignAssistantConvos *sqlx.Stmt `query:"unassign-assistant-conversations"`
 	GetAssistantTools       *sqlx.Stmt `query:"get-assistant-tools"`
 	GetAllAssistantTools    *sqlx.Stmt `query:"get-all-assistant-tools"`
 	DeleteAssistantTools    *sqlx.Stmt `query:"delete-assistant-tools"`
@@ -83,7 +84,9 @@ type Manager struct {
 	// pending marks a conversation that received a fresh event while its response was in flight, so
 	// markDone re-enqueues it instead of dropping the follow-up.
 	pending map[int]bool
-	mu      sync.Mutex
+	// lastSeen holds the newest message ID a run's history included, per in-flight conversation.
+	lastSeen map[int]int
+	mu       sync.Mutex
 
 	miningQueue    chan int
 	miningInflight map[int]bool
@@ -125,6 +128,7 @@ func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaMan
 		queue:            make(chan int, opts.QueueSize),
 		inflight:         map[int]bool{},
 		pending:          map[int]bool{},
+		lastSeen:         map[int]int{},
 		miningQueue:      make(chan int, opts.QueueSize),
 		miningInflight:   map[int]bool{},
 		assistantUserIDs: map[int]bool{},
@@ -175,13 +179,9 @@ func (m *Manager) allAssistantTools() (map[int][]int, error) {
 
 // GetAssistant returns one assistant with its knowledge links.
 func (m *Manager) GetAssistant(id int) (models.Assistant, error) {
-	var a models.Assistant
-	if err := m.q.GetAssistant.Get(&a, id); err != nil {
-		if err == sql.ErrNoRows {
-			return a, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
-		}
-		m.lo.Error("error fetching assistant", "error", err)
-		return a, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	a, err := m.getAssistantRow(id)
+	if err != nil {
+		return a, err
 	}
 	toolIDs, err := m.getTools(a.ID)
 	if err != nil {
@@ -194,7 +194,7 @@ func (m *Manager) GetAssistant(id int) (models.Assistant, error) {
 // GetAssistantStats returns windowed metrics over the last rangeDays with rates and trend deltas
 // versus the previous equal-length window.
 func (m *Manager) GetAssistantStats(id, rangeDays int) (models.AssistantStats, error) {
-	a, err := m.GetAssistant(id)
+	a, err := m.getAssistantRow(id)
 	if err != nil {
 		return models.AssistantStats{}, err
 	}
@@ -361,6 +361,12 @@ func (m *Manager) DeleteAssistant(id int) (int, error) {
 		m.lo.Error("error soft-deleting assistant user", "error", err)
 		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	// Conversations left assigned to the deleted assistant would never get a reply from anyone;
+	// move them to the fallback team, or the unassigned queue when none is set.
+	if _, err := tx.Stmtx(m.q.UnassignAssistantConvos).Exec(a.UserID, a.FallbackTeamID); err != nil {
+		m.lo.Error("error unassigning deleted assistant conversations", "error", err)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing assistant delete", "error", err)
@@ -370,6 +376,18 @@ func (m *Manager) DeleteAssistant(id int) (int, error) {
 		m.lo.Error("error refreshing assistant user ids cache", "error", err)
 	}
 	return a.UserID, nil
+}
+
+func (m *Manager) getAssistantRow(id int) (models.Assistant, error) {
+	var a models.Assistant
+	if err := m.q.GetAssistant.Get(&a, id); err != nil {
+		if err == sql.ErrNoRows {
+			return a, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		m.lo.Error("error fetching assistant", "error", err)
+		return a, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return a, nil
 }
 
 func (m *Manager) getTools(assistantID int) ([]int, error) {
@@ -491,11 +509,12 @@ func pctChange(cur, prev int) float64 {
 func round1(v float64) float64 { return math.Round(v*10) / 10 }
 
 func insertTools(tx *sqlx.Tx, stmt *sqlx.Stmt, assistantID int, toolIDs []int) error {
+	insert := tx.Stmtx(stmt)
 	for _, id := range toolIDs {
 		if id == 0 {
 			continue
 		}
-		if _, err := tx.Stmtx(stmt).Exec(assistantID, id); err != nil {
+		if _, err := insert.Exec(assistantID, id); err != nil {
 			return err
 		}
 	}

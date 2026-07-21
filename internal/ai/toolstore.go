@@ -53,23 +53,14 @@ func (m *Manager) GetEnabledTools() ([]models.Tool, error) {
 }
 
 func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
-	if reservedToolNames[t.Name] {
-		return t, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.reservedName"), nil)
-	}
-	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
-		return t, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	if err := m.validateToolDefinition(&t); err != nil {
+	if err := m.validateToolInput(&t); err != nil {
 		return t, err
 	}
 	auth, err := m.prepareToolAuth(t.Auth, nil)
 	if err != nil {
 		return t, err
 	}
-	params := t.Parameters
-	if len(params) == 0 {
-		params = types.JSONText("{}")
-	}
+	params := toolParametersOrEmpty(t)
 	var created models.Tool
 	if err := m.q.InsertTool.Get(&created, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification); err != nil {
 		m.lo.Error("error creating tool", "error", err)
@@ -80,13 +71,7 @@ func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 }
 
 func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
-	if reservedToolNames[t.Name] {
-		return t, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.reservedName"), nil)
-	}
-	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
-		return t, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	if err := m.validateToolDefinition(&t); err != nil {
+	if err := m.validateToolInput(&t); err != nil {
 		return t, err
 	}
 	var existing types.JSONText
@@ -101,10 +86,7 @@ func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 	if err != nil {
 		return t, err
 	}
-	params := t.Parameters
-	if len(params) == 0 {
-		params = types.JSONText("{}")
-	}
+	params := toolParametersOrEmpty(t)
 	var updated models.Tool
 	if err := m.q.UpdateTool.Get(&updated, id, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification); err != nil {
 		if err == sql.ErrNoRows {
@@ -163,6 +145,17 @@ func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText,
 	return types.JSONText(b), nil
 }
 
+// validateToolInput runs the shared create/update checks: reserved name, allowed HTTP method, valid definition.
+func (m *Manager) validateToolInput(t *models.Tool) error {
+	if reservedToolNames[t.Name] {
+		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.reservedName"), nil)
+	}
+	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return m.validateToolDefinition(t)
+}
+
 // validateToolDefinition rejects a tool whose URL or parameters schema would fail every agent run at request time.
 func (m *Manager) validateToolDefinition(t *models.Tool) error {
 	t.URL = strings.TrimSpace(t.URL)
@@ -180,6 +173,13 @@ func (m *Manager) validateToolDefinition(t *models.Tool) error {
 		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
+}
+
+func toolParametersOrEmpty(t models.Tool) types.JSONText {
+	if len(t.Parameters) == 0 {
+		return types.JSONText("{}")
+	}
+	return t.Parameters
 }
 
 // maskToolAuth replaces every header's stored secret with a dummy value.

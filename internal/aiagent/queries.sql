@@ -20,8 +20,7 @@ JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
 WHERE a.user_id = $1;
 
 -- name: get-assistant-user-ids
--- Includes deleted assistants: their old replies must still be recognized as AI-authored
--- (e.g. FAQ mining must never treat them as human answers).
+-- Deleted assistants stay included: their old replies must still be recognized as AI-authored.
 SELECT id FROM users WHERE type = 'ai_assistant';
 
 -- name: insert-assistant-user
@@ -52,6 +51,11 @@ WHERE id = $1 AND type = 'ai_assistant';
 
 -- name: delete-assistant
 DELETE FROM ai_assistants WHERE id = $1;
+
+-- name: unassign-assistant-conversations
+UPDATE conversations
+SET assigned_user_id = NULL, assigned_team_id = COALESCE($2, assigned_team_id), updated_at = now()
+WHERE assigned_user_id = $1;
 
 -- name: get-assistant-tools
 SELECT tool_id FROM ai_assistant_tools WHERE assistant_id = $1 ORDER BY tool_id;

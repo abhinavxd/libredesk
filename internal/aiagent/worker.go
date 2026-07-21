@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/ai"
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
 	"github.com/abhinavxd/libredesk/internal/attachment"
-	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	statusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
 	imageutil "github.com/abhinavxd/libredesk/internal/image"
@@ -36,20 +36,8 @@ const (
 	// typingRefreshInterval must stay under the widget's 5s typing expiry (TYPING_RECEIVE_TIMEOUT).
 	typingRefreshInterval = 3 * time.Second
 
-	// Timeout model: two nested clocks.
-	//
-	// Run clock (below): caps one full agent run - every completion call, retry, backoff
-	// wait, and tool call combined. Livechat gets a tighter cap since the customer is
-	// watching a typing indicator; email can afford to keep trying.
-	//
-	// Call clock (ai.overallRequestTimeout, 60s): each individual provider HTTP call gets
-	// its own fresh 60s, and that call's retries must fit inside it. Custom tool calls get
-	// their own 20s each.
-	//
-	// The call clock nests inside the run clock, so whichever expires first wins. E.g. on
-	// livechat: completion 1 takes 50s (slow model + retries), so completion 2 starts with
-	// only 40s of run budget - if it needs more, the run is cancelled and the conversation
-	// hands off to a human.
+	// Run clock: caps one full agent run - every completion call, retry, and tool call
+	// combined. The per-call 60s clock (ai.overallRequestTimeout) nests inside it.
 	emailRunTimeout    = 3 * time.Minute
 	livechatRunTimeout = 90 * time.Second
 )
@@ -168,6 +156,9 @@ func (m *Manager) markDone(convID int) {
 	requeue := m.pending[convID]
 	delete(m.pending, convID)
 	delete(m.inflight, convID)
+	if !requeue {
+		delete(m.lastSeen, convID)
+	}
 	m.mu.Unlock()
 	if requeue {
 		m.enqueue(convID)
@@ -199,20 +190,31 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 
 	private := false
-	msgs, err := m.convo.GetAllConversationMessages(conv.UUID, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, conversation.MaxAllMessages)
+	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, maxHistoryMessages, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
 	if err != nil {
 		m.lo.Error("error fetching messages for ai agent", "conversation_uuid", conv.UUID, "error", err)
 		return
 	}
-	// Only respond to a fresh inbound customer message, never to the assistant's own or automated replies.
-	if !lastIsInboundContact(msgs) {
+	slices.Reverse(msgs)
+	inbound := latestInboundContact(msgs)
+	if inbound == nil {
+		return
+	}
+	// Only respond to a fresh inbound customer message, never to the assistant's own or automated
+	// replies. A requeued run sees the previous run's just-posted reply as the last message, so it
+	// instead checks for an inbound message the previous run's history never included.
+	m.mu.Lock()
+	prevSeen, hasPrev := m.lastSeen[convID]
+	m.lastSeen[convID] = msgs[len(msgs)-1].ID
+	m.mu.Unlock()
+	if !lastIsInboundContact(msgs) && (!hasPrev || inbound.ID <= prevSeen) {
 		return
 	}
 	// The reply and any identity-scoped tools act as the primary contact. An email thread can carry
 	// messages from other participants (CC'd, or joined via plus-address, each a distinct contact), so
 	// only act on a turn the primary contact authored - otherwise a participant's message could drive
 	// tool actions under the contact's identity. Anyone else gets a human.
-	if msgs[len(msgs)-1].SenderID != conv.ContactID {
+	if inbound.SenderID != conv.ContactID {
 		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffOtherParticipant"))
 		return
 	}
@@ -267,17 +269,21 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		tools = append(tools, &previousConversationsTool{m: m, conversations: recent})
 	}
 
-	// Offer the verification tools only while unverified. set_contact_email is visitor-only and only
-	// when there's no email on file to send the code to.
-	if !runVerified {
+	// Register the verification tools whenever verification is OTP-based, even if the run starts
+	// verified: the 30-min window can expire mid-run and a blocked tool then points the model at
+	// them. set_contact_email is visitor-only and only when there's no email on file to send the
+	// code to.
+	if conv.InboxChannel == channelEmail || conv.Contact.Type != umodels.UserTypeContact {
 		offerSetEmail := conv.Contact.Type == umodels.UserTypeVisitor && conv.Contact.Email.String == ""
 		tools = append(tools, &sendEmailVerificationTool{m: m, conv: &conv})
 		tools = append(tools, &checkEmailVerificationTool{m: m, conv: &conv})
 		if offerSetEmail {
 			tools = append(tools, &setContactEmailTool{m: m, conv: &conv})
 		}
-		systemPrompt += "\n\n" + verificationNote
 		m.lo.Debug("ai agent offering verification tools", "conversation_uuid", conv.UUID, "set_contact_email_offered", offerSetEmail)
+	}
+	if !runVerified {
+		systemPrompt += "\n\n" + verificationNote
 	}
 
 	tctx := ai.ToolContext{
@@ -292,8 +298,16 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	stopTyping := m.keepTyping(conv.UUID)
-	answer, err := m.ai.RunAgentWithTools(runCtx, systemPrompt, history, aiRunMaxSteps, tctx, assistant.ToolIDs, false, tools)
+	answer, err := m.ai.RunAgentWithTools(runCtx, systemPrompt, history, aiRunMaxSteps, tctx, assistant.ToolIDs, false, false, tools)
 	stopTyping()
+	// A human agent may have taken over or resolved the conversation mid-run; if so, drop this
+	// run's reply and status actions instead of talking over them.
+	if fresh, ferr := m.convo.GetConversation(convID, "", ""); ferr == nil {
+		if !fresh.AssignedUserID.Valid || int(fresh.AssignedUserID.Int) != assistant.UserID || nonActionableCategories[fresh.StatusCategory.String] {
+			m.lo.Debug("ai agent conversation changed mid-run, dropping reply", "conversation_uuid", conv.UUID)
+			return
+		}
+	}
 	if err != nil {
 		m.lo.Error("error running ai agent", "conversation_uuid", conv.UUID, "error", err)
 		if !outcome.handedOff {
@@ -433,8 +447,10 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 	history := []aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: message}}
 	var hits []aimodels.SearchResult
 	tools := []ai.Tool{&searchKnowledgeTool{m: m, collect: func(rs []aimodels.SearchResult) { hits = append(hits, rs...) }}}
+	runCtx, cancel := context.WithTimeout(ctx, livechatRunTimeout)
+	defer cancel()
 	// Preview is search-only: no custom tools (empty allowed set), no built-in, no side effects.
-	answer, err := m.ai.RunAgentWithTools(ctx, buildSystemPrompt(a), history, aiRunMaxSteps, ai.ToolContext{}, []int{}, false, tools)
+	answer, err := m.ai.RunAgentWithTools(runCtx, buildSystemPrompt(a), history, aiRunMaxSteps, ai.ToolContext{}, []int{}, false, false, tools)
 	if err != nil {
 		return "", nil, err
 	}
@@ -470,6 +486,15 @@ func lastIsInboundContact(msgs []cmodels.Message) bool {
 	}
 	last := msgs[len(msgs)-1]
 	return last.Type == cmodels.MessageIncoming && last.SenderType == cmodels.SenderTypeContact
+}
+
+func latestInboundContact(msgs []cmodels.Message) *cmodels.Message {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Type == cmodels.MessageIncoming && msgs[i].SenderType == cmodels.SenderTypeContact {
+			return &msgs[i]
+		}
+	}
+	return nil
 }
 
 func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels.ChatMessage {
