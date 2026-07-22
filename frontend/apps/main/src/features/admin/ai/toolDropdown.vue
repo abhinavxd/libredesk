@@ -3,12 +3,15 @@
     <DropdownMenuTrigger as-child>
       <Button variant="ghost" class="w-8 h-8 p-0">
         <span class="sr-only">{{ t('globals.terms.openMenu') }}</span>
-        <MoreHorizontal class="w-4 h-4" />
+        <MoreVertical class="w-4 h-4" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>
       <DropdownMenuItem @click="editTool">
         {{ t('globals.messages.edit') }}
+      </DropdownMenuItem>
+      <DropdownMenuItem @click="toggleEnabled">
+        {{ tool.enabled ? t('globals.messages.disable') : t('globals.messages.enable') }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="() => (alertOpen = true)">
         {{ t('globals.messages.delete') }}
@@ -36,7 +39,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreHorizontal } from 'lucide-vue-next'
+import { MoreVertical } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,6 +73,18 @@ const props = defineProps({
 
 const editTool = () => {
   emitter.emit(EMITTER_EVENTS.EDIT_MODEL, { model: 'ai_tools', data: props.tool })
+}
+
+const toggleEnabled = async () => {
+  try {
+    await api.updateAITool(props.tool.id, { ...props.tool, enabled: !props.tool.enabled })
+    emitter.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'ai_tools' })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  }
 }
 
 const deleteTool = async () => {
