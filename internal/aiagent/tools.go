@@ -114,7 +114,7 @@ func (t *searchKnowledgeTool) Execute(ctx context.Context, args string) (string,
 		if t.collect != nil {
 			used = append(used, r)
 		}
-		fmt.Fprintf(&b, "<<result %d>>\n%s\n<<end result %d>>\n\n", i+1, r.ChunkText, i+1)
+		fmt.Fprintf(&b, "<<result %d>>\n%s\n<<end result %d>>\n\n", i+1, neutralizeMarkers(r.ChunkText), i+1)
 	}
 	if t.collect != nil {
 		t.collect(used)
@@ -201,9 +201,9 @@ func (t *previousConversationsTool) Execute(ctx context.Context, args string) (s
 		}
 		fmt.Fprintf(&b, "<<conversation %s | %s | started %s>>\n", rc.ReferenceNumber, rc.Status, rc.CreatedAt.Format("Jan 2, 2006"))
 		if subject := strings.TrimSpace(rc.Subject); subject != "" {
-			fmt.Fprintf(&b, "Subject: %s\n", subject)
+			fmt.Fprintf(&b, "Subject: %s\n", neutralizeMarkers(subject))
 		}
-		b.WriteString(transcript)
+		b.WriteString(neutralizeMarkers(transcript))
 		fmt.Fprintf(&b, "<<end conversation %s>>\n\n", rc.ReferenceNumber)
 		rendered++
 	}
@@ -233,11 +233,11 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 	if email == "" {
 		return "The customer has no email yet. Ask them for their email and call set_contact_email first.", nil
 	}
-	exceeded, err := t.m.incrOTPSends(t.conv.UUID)
+	capReached, err := t.m.otpSendCapReached(t.conv.UUID)
 	if err != nil {
 		return "", err
 	}
-	if exceeded {
+	if capReached {
 		t.m.lo.Debug("ai agent verification resend cap reached", "conversation_uuid", t.conv.UUID)
 		return "The verification code has already been sent several times. Ask the customer to check their inbox and spam folder, or hand off to a human if they cannot find it.", nil
 	}
@@ -279,6 +279,9 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 	if sendErr != nil {
 		t.m.lo.Error("error sending verification code email", "conversation_uuid", t.conv.UUID, "error", sendErr)
 		return "", sendErr
+	}
+	if err := t.m.incrOTPSends(t.conv.UUID); err != nil {
+		t.m.lo.Error("error recording verification send count", "conversation_uuid", t.conv.UUID, "error", err)
 	}
 	t.m.lo.Debug("ai agent sent verification code", "conversation_uuid", t.conv.UUID, "email", email)
 	return "A verification code has been emailed to the customer. Tell them you have sent a code to their email and ask them to reply with it.", nil

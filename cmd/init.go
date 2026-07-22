@@ -967,9 +967,10 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
+func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
+		Ctx:           ctx,
 		DB:            db,
 		Lo:            lo,
 		I18n:          i18n,

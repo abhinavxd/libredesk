@@ -350,20 +350,23 @@ const toggleTool = (id, checked) => {
 watch(
   () => props.initialValues,
   (values) => {
-    form.setValues({
-      name: values.name || '',
-      description: values.description || '',
-      expectation: values.expectation || '',
-      tone: values.tone || 'friendly',
-      response_length: values.response_length || 'balanced',
-      max_turns: values.max_turns ?? 6,
-      fallback_team_id: values.fallback_team_id ? String(values.fallback_team_id) : 'none',
-      handoff_enabled: values.handoff_enabled ?? true,
-      languages: [...(values.languages || [])],
-      instructions: values.instructions || '',
-      guardrails: values.guardrails || '',
-      enabled: values.enabled ?? true
-    })
+    form.setValues(
+      {
+        name: values.name || '',
+        description: values.description || '',
+        expectation: values.expectation || '',
+        tone: values.tone || 'friendly',
+        response_length: values.response_length || 'balanced',
+        max_turns: values.max_turns ?? 6,
+        fallback_team_id: values.fallback_team_id ? String(values.fallback_team_id) : 'none',
+        handoff_enabled: values.handoff_enabled ?? true,
+        languages: [...(values.languages || [])],
+        instructions: values.instructions || '',
+        guardrails: values.guardrails || '',
+        enabled: values.enabled ?? true
+      },
+      false
+    )
     selectedToolIds.value = [...(values.tool_ids || [])]
     avatarFile.value = null
     avatarPreview.value = values.avatar_url || ''

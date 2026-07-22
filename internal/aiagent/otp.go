@@ -22,8 +22,7 @@ const (
 	otpMaxSends    = 3
 )
 
-// checkOTPScript atomically reads the pending code, compares it, and either clears it (match or cap
-// reached) or increments the attempt count, so concurrent guesses cannot race past otpMaxAttempts.
+// checkOTPScript matches the pending code and sets the verified flag on match, all in one step.
 // Returns 1 on match, 0 on miss/expiry, -1 on corrupt data (key cleared).
 var checkOTPScript = redis.NewScript(`
 local raw = redis.call('GET', KEYS[1])
@@ -37,6 +36,7 @@ if not ok or type(p) ~= 'table' then
 end
 if p.code == ARGV[1] then
 	redis.call('DEL', KEYS[1])
+	redis.call('SET', KEYS[2], '1', 'EX', ARGV[3])
 	return 1
 end
 p.attempts = (p.attempts or 0) + 1
@@ -48,8 +48,7 @@ end
 return 0
 `)
 
-// incrOTPSendsScript increments the send counter and sets its TTL on first increment in one atomic
-// step, so the key can never persist without an expiry and lock a conversation out of resends.
+// incrOTPSendsScript increments the send counter and sets its TTL on first increment.
 var incrOTPSendsScript = redis.NewScript(`
 local n = redis.call('INCR', KEYS[1])
 if n == 1 then
@@ -81,12 +80,6 @@ func (m *Manager) isConversationVerified(convUUID string) bool {
 	return v == "1"
 }
 
-func (m *Manager) setConversationVerified(convUUID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	return m.redis.Set(ctx, otpVerifiedKey(convUUID), "1", otpVerifiedTTL).Err()
-}
-
 // clearConversationVerified drops the verified flag and any pending code so a changed email must be
 // verified afresh.
 func (m *Manager) clearConversationVerified(convUUID string) error {
@@ -95,15 +88,26 @@ func (m *Manager) clearConversationVerified(convUUID string) error {
 	return m.redis.Del(ctx, otpVerifiedKey(convUUID), otpPendingKey(convUUID)).Err()
 }
 
-// incrOTPSends bumps the per-conversation send counter and reports whether the cap is now exceeded.
-func (m *Manager) incrOTPSends(convUUID string) (bool, error) {
+// otpSendCapReached reports whether otpMaxSends codes have already been emailed for the conversation.
+func (m *Manager) otpSendCapReached(convUUID string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	n, err := incrOTPSendsScript.Run(ctx, m.redis, []string{otpSendsKey(convUUID)}, int(otpVerifiedTTL.Seconds())).Int64()
+	n, err := m.redis.Get(ctx, otpSendsKey(convUUID)).Int64()
 	if err != nil {
+		if err == redis.Nil {
+			return false, nil
+		}
 		return false, err
 	}
-	return n > otpMaxSends, nil
+	return n >= otpMaxSends, nil
+}
+
+// incrOTPSends records a code that was actually emailed, bumping the send counter and setting its TTL
+// on the first send.
+func (m *Manager) incrOTPSends(convUUID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return incrOTPSendsScript.Run(ctx, m.redis, []string{otpSendsKey(convUUID)}, int(otpVerifiedTTL.Seconds())).Err()
 }
 
 func (m *Manager) storePendingOTP(convUUID, code string) error {
@@ -116,21 +120,19 @@ func (m *Manager) storePendingOTP(convUUID, code string) error {
 	return m.redis.Set(ctx, otpPendingKey(convUUID), b, otpPendingTTL).Err()
 }
 
-// checkPendingOTP compares code against the pending code, counting attempts. It returns whether the
-// code matched. On a match, expiry, too many attempts, or no pending code, the pending key is cleared
-// so a code is single-use and attempts cannot be retried past the cap.
+// checkPendingOTP matches code against the pending code and, on match, marks the conversation
+// verified atomically; the pending key is cleared on match, expiry, or the attempt cap.
 func (m *Manager) checkPendingOTP(convUUID, code string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	res, err := checkOTPScript.Run(ctx, m.redis, []string{otpPendingKey(convUUID)}, code, otpMaxAttempts).Int()
+	res, err := checkOTPScript.Run(ctx, m.redis,
+		[]string{otpPendingKey(convUUID), otpVerifiedKey(convUUID)},
+		code, otpMaxAttempts, int(otpVerifiedTTL.Seconds())).Int()
 	if err != nil {
 		return false, err
 	}
 	switch res {
 	case 1:
-		if err := m.setConversationVerified(convUUID); err != nil {
-			return false, err
-		}
 		return true, nil
 	case -1:
 		return false, fmt.Errorf("corrupt pending otp for conversation %s", convUUID)

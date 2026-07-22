@@ -33,13 +33,9 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 		systemPrompt += "Workspace admin instructions (follow these, they take precedence on tone and format):\n" + instructions
 	}
 
-	registry, defs, err := m.buildToolRegistry(tctx, allowedToolIDs, includeBuiltinSearch)
+	registry, defs, err := m.buildToolRegistry(tctx, allowedToolIDs, includeBuiltinSearch, extra)
 	if err != nil {
 		return "", err
-	}
-	for _, t := range extra {
-		registry[t.Name()] = t
-		defs = append(defs, toolDef(t))
 	}
 
 	messages := make([]models.ChatMessage, 0, len(history)+2)

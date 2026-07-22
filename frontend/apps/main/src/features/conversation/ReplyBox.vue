@@ -213,16 +213,13 @@ const mentions = ref([])
 
 aiPromptStore.fetchPrompts()
 
-const handleAiPromptSelected = async (key) => {
+const runAiGeneration = async (requestFn) => {
   if (isGenerating.value) return
   const uuid = currentConversationUUID.value
   if (!uuid) return
   isGenerating.value = true
   try {
-    const resp = await api.aiCompletion({
-      prompt_key: key,
-      content: textContent.value
-    })
+    const resp = await requestFn(uuid)
     if (uuid !== currentConversationUUID.value) return
     htmlContent.value = convertTextToHtml(resp.data.data || '')
   } catch (error) {
@@ -235,27 +232,11 @@ const handleAiPromptSelected = async (key) => {
   }
 }
 
-const handleGenerateReply = async () => {
-  if (isGenerating.value) return
-  const uuid = currentConversationUUID.value
-  if (!uuid) return
-  isGenerating.value = true
-  try {
-    const resp = await api.aiGenerateReply({
-      conversation_uuid: uuid,
-      instruction: textContent.value
-    })
-    if (uuid !== currentConversationUUID.value) return
-    htmlContent.value = convertTextToHtml(resp.data.data || '')
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    isGenerating.value = false
-  }
-}
+const handleAiPromptSelected = (key) =>
+  runAiGeneration(() => api.aiCompletion({ prompt_key: key, content: textContent.value }))
+
+const handleGenerateReply = () =>
+  runAiGeneration((uuid) => api.aiGenerateReply({ conversation_uuid: uuid, instruction: textContent.value }))
 
 // Copilot's "Insert into reply" replaces the draft with its answer (already HTML from the panel),
 // forcing reply mode so a private note in progress does not silently receive customer-facing text.

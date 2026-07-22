@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx/types"
+	"github.com/lib/pq"
 )
 
 var emptyToolAuth = types.JSONText(`{"headers":[]}`)
@@ -42,11 +43,11 @@ func (m *Manager) GetTool(id int) (models.Tool, error) {
 	return tool, nil
 }
 
-// GetEnabledTools returns enabled custom tools for the agent registry (auth intact).
-func (m *Manager) GetEnabledTools() ([]models.Tool, error) {
+// GetEnabledToolsByIDs returns the enabled custom tools among ids for the agent registry (auth intact).
+func (m *Manager) GetEnabledToolsByIDs(ids []int) ([]models.Tool, error) {
 	tools := make([]models.Tool, 0)
-	if err := m.q.GetEnabledTools.Select(&tools); err != nil {
-		m.lo.Error("error fetching enabled tools", "error", err)
+	if err := m.q.GetEnabledToolsByIDs.Select(&tools, pq.Array(ids)); err != nil {
+		m.lo.Error("error fetching enabled tools by ids", "error", err)
 		return nil, err
 	}
 	return tools, nil

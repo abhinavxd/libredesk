@@ -1,5 +1,5 @@
 // Package aiagent runs autonomous AI assistants that reply to customers on conversations
-// assigned to them, grounded only on the knowledge each assistant is given.
+// assigned to them, grounded on the shared knowledge base snippet library (there is no per-assistant knowledge).
 package aiagent
 
 import (

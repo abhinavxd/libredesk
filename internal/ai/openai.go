@@ -39,10 +39,7 @@ const (
 	// OpenAI embedding models accept up to 8192 tokens; used when a provider doesn't set its own limit.
 	defaultEmbeddingMaxTokens = 8192
 
-	// OpenAI's /embeddings caps a request at 2048 array items and ~300k tokens summed across inputs;
-	// a batch that breaches either returns 400 and fails wholesale. Stay well under both so a large
-	// snippet or URL import (many chunks) is split into several requests instead of silently never
-	// indexing. The token budget keeps a margin because the server counts pessimistically.
+	// OpenAI /embeddings caps a request at 2048 items and ~300k tokens; batches stay well under both.
 	maxEmbeddingBatchItems  = 512
 	maxEmbeddingBatchTokens = 250000
 
@@ -308,6 +305,8 @@ func (o *OpenAIClient) post(ctx context.Context, path string, body map[string]an
 						return nil, fmt.Errorf("marshalling request body: %w", err)
 					}
 					o.lo.Warn("AI provider rejected a request parameter, retrying without it; later requests will adapt it automatically", "param", param)
+					// Param adaptations have their own budget; don't spend a transient-retry slot on them.
+					attempt--
 					continue
 				}
 			}

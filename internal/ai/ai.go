@@ -47,19 +47,24 @@ type Manager struct {
 	chunkCfg      stringutil.ChunkConfig
 	index         *embeddingIndex
 	// indexReady is closed once the boot-time index load finishes; Search blocks on it.
-	indexReady         chan struct{}
-	reindexMu          sync.Mutex
-	reconcileMu        sync.Mutex
-	snippetGenMu       sync.Mutex
-	snippetGen         map[int]uint64
+	indexReady   chan struct{}
+	reindexMu    sync.Mutex
+	reconcileMu  sync.Mutex
+	snippetGenMu sync.Mutex
+	snippetGen   map[int]uint64
+	// embedSem caps concurrent background snippet embeds.
+	embedSem           chan struct{}
 	httpClient         *http.Client
 	toolHTTPClient     *http.Client
 	providerHTTPClient *http.Client
 	wg                 sync.WaitGroup
+	// ctx is the app lifecycle context; background embedding work ties to it.
+	ctx context.Context
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
+	Ctx           context.Context
 	DB            *sqlx.DB
 	I18n          *i18n.I18n
 	Lo            *logf.Logger
@@ -90,7 +95,7 @@ type queries struct {
 	GetAllEmbeddings            *sqlx.Stmt `query:"get-all-embeddings"`
 	GetTools                    *sqlx.Stmt `query:"get-tools"`
 	GetTool                     *sqlx.Stmt `query:"get-tool"`
-	GetEnabledTools             *sqlx.Stmt `query:"get-enabled-tools"`
+	GetEnabledToolsByIDs        *sqlx.Stmt `query:"get-enabled-tools-by-ids"`
 	GetToolAuth                 *sqlx.Stmt `query:"get-tool-auth"`
 	InsertTool                  *sqlx.Stmt `query:"insert-tool"`
 	UpdateTool                  *sqlx.Stmt `query:"update-tool"`
@@ -109,6 +114,7 @@ func New(opts Opts) (*Manager, error) {
 	transport := ssrf.NewTransport(opts.DialControl, 5*time.Second)
 	m := &Manager{
 		q:             q,
+		ctx:           opts.Ctx,
 		db:            opts.DB,
 		lo:            opts.Lo,
 		i18n:          opts.I18n,
@@ -117,6 +123,7 @@ func New(opts Opts) (*Manager, error) {
 		index:         newEmbeddingIndex(),
 		indexReady:    make(chan struct{}),
 		snippetGen:    make(map[int]uint64),
+		embedSem:      make(chan struct{}, maxConcurrentEmbeds),
 		httpClient: &http.Client{
 			Timeout:   20 * time.Second,
 			Transport: transport,
@@ -277,9 +284,9 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// A changed embedding model produces vectors incomparable to the stored ones.
-	if providerType == models.ProviderTypeEmbedding && (existing.Model != cfg.Model || existing.Dimensions != cfg.Dimensions) {
-		m.lo.Info("embedding model changed, reindexing knowledge base", "old_model", existing.Model, "new_model", cfg.Model)
+	// A changed embedding model, dimension count, or backend URL produces vectors incomparable to the stored ones.
+	if providerType == models.ProviderTypeEmbedding && (existing.Model != cfg.Model || existing.Dimensions != cfg.Dimensions || existing.BaseURL != cfg.BaseURL) {
+		m.lo.Info("embedding provider changed, reindexing knowledge base", "old_model", existing.Model, "new_model", cfg.Model, "old_base_url", existing.BaseURL, "new_base_url", cfg.BaseURL)
 		m.ReindexAll()
 	}
 	return nil

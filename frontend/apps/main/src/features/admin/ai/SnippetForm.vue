@@ -92,11 +92,14 @@ const form = useForm({
 watch(
   () => props.initialValues,
   (values) => {
-    form.setValues({
-      title: values.title || '',
-      content: values.content || '',
-      enabled: values.enabled ?? true
-    })
+    form.setValues(
+      {
+        title: values.title || '',
+        content: values.content || '',
+        enabled: values.enabled ?? true
+      },
+      false
+    )
     form.setErrors({})
   },
   { immediate: true, deep: true }

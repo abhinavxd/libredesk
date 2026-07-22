@@ -43,8 +43,8 @@ SELECT id, source_type, source_id, chunk_text, embedding, dimensions FROM embedd
 -- name: get-tools
 SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools ORDER BY updated_at DESC;
 
--- name: get-enabled-tools
-SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools WHERE enabled = true;
+-- name: get-enabled-tools-by-ids
+SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools WHERE enabled = true AND id = ANY($1);
 
 -- name: get-tool
 SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools WHERE id = $1;

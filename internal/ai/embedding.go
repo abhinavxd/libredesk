@@ -17,6 +17,9 @@ import (
 // reconcileInterval is how often knowledge base content that failed to embed is retried.
 const reconcileInterval = 1 * time.Minute
 
+// maxConcurrentEmbeds caps background snippet embed jobs hitting the provider at once.
+const maxConcurrentEmbeds = 4
+
 // indexedChunk is one embedded chunk held in memory for brute-force search.
 type indexedChunk struct {
 	sourceType string
@@ -120,7 +123,7 @@ func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.Sea
 
 // Reindex re-chunks and re-embeds a source's content, replacing its stored and in-memory vectors.
 func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent string) error {
-	indexed, err := m.embedSource(sourceType, sourceID, title, htmlContent)
+	indexed, err := m.embedSource(m.ctx, sourceType, sourceID, title, htmlContent)
 	if err != nil {
 		return err
 	}
@@ -130,7 +133,7 @@ func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent st
 }
 
 // embedSource chunks and embeds content without touching stored state, so it can run before taking reindexMu.
-func (m *Manager) embedSource(sourceType string, sourceID int, title, htmlContent string) ([]indexedChunk, error) {
+func (m *Manager) embedSource(ctx context.Context, sourceType string, sourceID int, title, htmlContent string) ([]indexedChunk, error) {
 	rawChunks, err := stringutil.ChunkHTMLContent(title, htmlContent, m.chunkCfg)
 	if err != nil {
 		m.lo.Error("error chunking content for embedding", "error", err, "source_type", sourceType, "source_id", sourceID)
@@ -144,7 +147,7 @@ func (m *Manager) embedSource(sourceType string, sourceID int, title, htmlConten
 		}
 	}
 
-	vecs, err := m.GetEmbeddingsBatch(context.Background(), chunks)
+	vecs, err := m.GetEmbeddingsBatch(ctx, chunks)
 	if err != nil {
 		m.lo.Error("error generating embeddings", "error", err)
 		return nil, err
@@ -262,19 +265,19 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 	defer m.wg.Done()
 	ticker := time.NewTicker(reconcileInterval)
 	defer ticker.Stop()
-	m.reconcile()
+	m.reconcile(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			m.reconcile()
+			m.reconcile(ctx)
 		}
 	}
 }
 
 // reconcile re-embeds every enabled snippet whose stored fingerprint no longer matches its content and the active model.
-func (m *Manager) reconcile() {
+func (m *Manager) reconcile(ctx context.Context) {
 	if !m.reconcileMu.TryLock() {
 		return
 	}
@@ -298,14 +301,14 @@ func (m *Manager) reconcile() {
 		if !item.Enabled {
 			// A disabled item should carry no embeddings; clean up any left behind.
 			if item.EmbeddedFingerprint != "" {
-				m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions, m.nextSnippetGen(item.ID))
+				m.reindexSnippetWith(ctx, item, cfg.BaseURL, cfg.Model, cfg.Dimensions, m.nextSnippetGen(item.ID))
 			}
 			continue
 		}
-		if item.EmbeddedFingerprint == snippetFingerprint(item, cfg.Model, cfg.Dimensions) {
+		if item.EmbeddedFingerprint == snippetFingerprint(item, cfg.BaseURL, cfg.Model, cfg.Dimensions) {
 			continue
 		}
-		m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions, m.nextSnippetGen(item.ID))
+		m.reindexSnippetWith(ctx, item, cfg.BaseURL, cfg.Model, cfg.Dimensions, m.nextSnippetGen(item.ID))
 		reindexed++
 	}
 	if reindexed > 0 {

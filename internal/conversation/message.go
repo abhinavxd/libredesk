@@ -33,8 +33,6 @@ import (
 
 const (
 	maxMessagesPerPage = 500
-	// MaxAllMessages is the hard cap on messages returned by GetAllConversationMessages.
-	MaxAllMessages = 1000
 	// Only allow visitor-to-contact upgrade within this window after the last continuity email.
 	upgradeWindowTTL = 7 * 24 * time.Hour
 )
@@ -361,21 +359,24 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	return messages, pageSize, nil
 }
 
-// GetAllConversationMessages returns up to limit of the newest messages in a conversation in chronological order.
+// GetAllConversationMessages returns the newest messages in a conversation in chronological order, capped at limit; a non-positive limit returns them all.
 func (m *Manager) GetAllConversationMessages(conversationUUID string, private *bool, msgTypes []string, limit int) ([]models.Message, error) {
 	var all []models.Message
-	pageSize := min(maxMessagesPerPage, limit)
+	pageSize := maxMessagesPerPage
+	if limit > 0 && limit < pageSize {
+		pageSize = limit
+	}
 	for page := 1; ; page++ {
 		messages, _, err := m.GetConversationMessages(conversationUUID, page, pageSize, private, msgTypes)
 		if err != nil {
 			return nil, err
 		}
 		all = append(all, messages...)
-		if len(messages) == 0 || len(all) >= messages[0].Total || len(all) >= limit {
+		if len(messages) == 0 || len(all) >= messages[0].Total || (limit > 0 && len(all) >= limit) {
 			break
 		}
 	}
-	if len(all) > limit {
+	if limit > 0 && len(all) > limit {
 		all = all[:limit]
 	}
 	slices.Reverse(all)

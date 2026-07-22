@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
@@ -34,6 +35,9 @@ func (m *Manager) GetKnowledgeBaseItem(id int) (models.KnowledgeBaseItem, error)
 }
 
 func (m *Manager) CreateKnowledgeBaseItem(title, content, source, sourceURL string, enabled bool) (models.KnowledgeBaseItem, error) {
+	if strings.TrimSpace(content) == "" {
+		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.content")), nil)
+	}
 	if source == "" {
 		source = models.KnowledgeSourceManual
 	}
@@ -47,6 +51,9 @@ func (m *Manager) CreateKnowledgeBaseItem(title, content, source, sourceURL stri
 }
 
 func (m *Manager) UpdateKnowledgeBaseItem(id int, title, content string, enabled bool) (models.KnowledgeBaseItem, error) {
+	if strings.TrimSpace(content) == "" {
+		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.content")), nil)
+	}
 	var item models.KnowledgeBaseItem
 	if err := m.q.UpdateKnowledgeBaseItem.Get(&item, id, title, content, enabled); err != nil {
 		if err == sql.ErrNoRows {
@@ -99,20 +106,22 @@ func (m *Manager) reindexSnippet(item models.KnowledgeBaseItem) {
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
-		m.reindexSnippetSync(item, gen)
+		m.embedSem <- struct{}{}
+		defer func() { <-m.embedSem }()
+		m.reindexSnippetSync(m.ctx, item, gen)
 	}()
 }
 
-func (m *Manager) reindexSnippetSync(item models.KnowledgeBaseItem, gen uint64) {
+func (m *Manager) reindexSnippetSync(ctx context.Context, item models.KnowledgeBaseItem, gen uint64) {
 	cfg, err := m.getRawProviderConfig(models.ProviderTypeEmbedding)
 	if err != nil {
 		return
 	}
-	m.reindexSnippetWith(item, cfg.Model, cfg.Dimensions, gen)
+	m.reindexSnippetWith(ctx, item, cfg.BaseURL, cfg.Model, cfg.Dimensions, gen)
 }
 
 // reindexSnippetWith embeds an enabled snippet (or drops its vectors when disabled), gated by gen so an older job can't overwrite a newer one.
-func (m *Manager) reindexSnippetWith(item models.KnowledgeBaseItem, model string, dimensions int, gen uint64) {
+func (m *Manager) reindexSnippetWith(ctx context.Context, item models.KnowledgeBaseItem, baseURL, model string, dimensions int, gen uint64) {
 	if !item.Enabled {
 		m.reindexMu.Lock()
 		defer m.reindexMu.Unlock()
@@ -127,7 +136,7 @@ func (m *Manager) reindexSnippetWith(item models.KnowledgeBaseItem, model string
 		return
 	}
 
-	indexed, err := m.embedSource(models.SourceSnippet, item.ID, item.Title, item.Content)
+	indexed, err := m.embedSource(ctx, models.SourceSnippet, item.ID, item.Title, item.Content)
 	if err != nil {
 		m.lo.Error("error indexing snippet", "error", err, "id", item.ID)
 		return
@@ -142,7 +151,7 @@ func (m *Manager) reindexSnippetWith(item models.KnowledgeBaseItem, model string
 		m.lo.Error("error indexing snippet", "error", err, "id", item.ID)
 		return
 	}
-	m.setSnippetFingerprint(item.ID, snippetFingerprint(item, model, dimensions))
+	m.setSnippetFingerprint(item.ID, snippetFingerprint(item, baseURL, model, dimensions))
 }
 
 // nextSnippetGen bumps and returns the reindex generation for a snippet; a job only commits if its gen is still the latest.
@@ -193,12 +202,12 @@ func (m *Manager) ReindexAll() {
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
-		m.reconcile()
+		m.reconcile(m.ctx)
 	}()
 }
 
-// snippetFingerprint signs the content and embedding model a snippet was last embedded against; any change triggers reindex.
-func snippetFingerprint(item models.KnowledgeBaseItem, model string, dimensions int) string {
-	sum := sha256.Sum256(fmt.Appendf(nil, "%s\x00%s\x00%s\x00%d", item.Title, item.Content, model, dimensions))
+// snippetFingerprint signs the content and the full embedding provider identity (base URL, model, dimensions); base URL is included so re-pointing the provider triggers reindex even when the model name is unchanged.
+func snippetFingerprint(item models.KnowledgeBaseItem, baseURL, model string, dimensions int) string {
+	sum := sha256.Sum256(fmt.Appendf(nil, "%s\x00%s\x00%s\x00%s\x00%d", item.Title, item.Content, baseURL, model, dimensions))
 	return hex.EncodeToString(sum[:])
 }

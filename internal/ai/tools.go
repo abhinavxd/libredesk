@@ -273,40 +273,37 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	return body, nil
 }
 
-// buildToolRegistry assembles the tools advertised to the model: custom tools are restricted to allowedToolIDs (empty loads none).
-func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, includeBuiltinSearch bool) (map[string]Tool, []models.ToolDef, error) {
+// buildToolRegistry assembles the tools advertised to the model; earlier registrations win, so custom tools (restricted to allowedToolIDs, empty loads none) can't shadow built-ins.
+func (m *Manager) buildToolRegistry(tctx ToolContext, allowedToolIDs []int, includeBuiltinSearch bool, extra []Tool) (map[string]Tool, []models.ToolDef, error) {
 	registry := map[string]Tool{}
 	var defs []models.ToolDef
 
+	register := func(t Tool) {
+		if _, exists := registry[t.Name()]; exists {
+			m.lo.Warn("skipping tool that collides with an already-registered tool", "name", t.Name())
+			return
+		}
+		registry[t.Name()] = t
+		defs = append(defs, toolDef(t))
+	}
+
 	if includeBuiltinSearch {
-		builtin := &searchArticlesTool{m: m}
-		registry[builtin.Name()] = builtin
-		defs = append(defs, toolDef(builtin))
+		register(&searchArticlesTool{m: m})
+	}
+	for _, t := range extra {
+		register(t)
 	}
 
 	if len(allowedToolIDs) == 0 {
 		return registry, defs, nil
 	}
 
-	customTools, err := m.GetEnabledTools()
+	customTools, err := m.GetEnabledToolsByIDs(allowedToolIDs)
 	if err != nil {
 		return nil, nil, err
 	}
-	allowed := make(map[int]bool, len(allowedToolIDs))
-	for _, id := range allowedToolIDs {
-		allowed[id] = true
-	}
 	for _, ct := range customTools {
-		if !allowed[ct.ID] {
-			continue
-		}
-		if _, exists := registry[ct.Name]; exists {
-			m.lo.Warn("skipping custom tool that collides with a built-in tool", "name", ct.Name)
-			continue
-		}
-		ht := newHTTPTool(ct, m.encryptionKey, m.lo, m.toolHTTPClient, tctx)
-		registry[ht.Name()] = ht
-		defs = append(defs, toolDef(ht))
+		register(newHTTPTool(ct, m.encryptionKey, m.lo, m.toolHTTPClient, tctx))
 	}
 	return registry, defs, nil
 }

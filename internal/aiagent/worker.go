@@ -147,8 +147,41 @@ func (m *Manager) enqueue(convID int) {
 		delete(m.inflight, convID)
 		delete(m.pending, convID)
 		m.mu.Unlock()
-		m.lo.Warn("ai agent queue full, dropping response job", "conversation_id", convID)
+		// A dropped job must still land on a human; leaving it assigned to the assistant with no reply
+		// strands the customer. wg.Add happens under closedMu.RLock so Close waits for this handoff.
+		m.lo.Warn("ai agent queue full, handing off response job", "conversation_id", convID)
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			m.handoffByConvID(convID, m.i18n.T("ai.agent.handoffError"))
+		}()
 	}
+}
+
+// handoffByConvID loads a conversation and its assistant, then hands it to a human. Used when a
+// response job can't be queued, so an overloaded queue never leaves a customer without a reply.
+func (m *Manager) handoffByConvID(convID int, reason string) {
+	defer func() {
+		if r := recover(); r != nil {
+			m.lo.Error("recovered from panic handing off dropped ai job", "conversation_id", convID, "panic", r)
+		}
+	}()
+	conv, err := m.convo.GetConversation(convID, "", "")
+	if err != nil {
+		m.lo.Error("error loading conversation to hand off dropped ai job", "conversation_id", convID, "error", err)
+		return
+	}
+	if !conv.AssignedUserID.Valid {
+		return
+	}
+	assistant, err := m.GetAssistantByUserID(int(conv.AssignedUserID.Int))
+	if err != nil {
+		if err != sql.ErrNoRows {
+			m.lo.Error("error loading assistant to hand off dropped ai job", "conversation_id", convID, "error", err)
+		}
+		return
+	}
+	m.handoff(conv, assistant, reason)
 }
 
 func (m *Manager) markDone(convID int) {
@@ -231,14 +264,15 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		return
 	}
 
+	contactLines := contactFieldLines(conv.Contact)
 	systemPrompt := buildSystemPrompt(assistant)
-	if len(contactFieldLines(conv.Contact)) == 0 {
+	if len(contactLines) == 0 {
 		systemPrompt += "\n\n" + noContactIdentityNote
 	}
 	history := m.buildHistory(msgs, conv.ContactID)
 	// Keep customer-controlled data (contact fields, subject, attributes) out of the system prompt; it
 	// stays in a user-role block so it ranks below the assistant's instructions, not beside them.
-	if block := customerContextBlock(conv); block != "" {
+	if block := customerContextBlock(conv, contactLines); block != "" {
 		history = append([]aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: block}}, history...)
 	}
 	m.lo.Debug("ai agent running", "conversation_uuid", conv.UUID, "history_messages", len(history), "turns", turns)
