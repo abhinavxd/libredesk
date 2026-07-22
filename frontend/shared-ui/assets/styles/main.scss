@@ -265,6 +265,10 @@
   @apply text-sm text-foreground;
 }
 
+.sidebar-section-label {
+  @apply text-xs font-medium uppercase tracking-wider text-muted-foreground;
+}
+
 .box {
   @apply border shadow-sm rounded-lg;
 }

@@ -500,7 +500,7 @@ const viewToDelete = ref(null)
                 <SidebarMenuItem>
                   <CollapsibleTrigger as-child>
                     <SidebarMenuButton>
-                        <span>
+                        <span class="sidebar-section-label">
                           {{ t('globals.terms.teamInbox', 2) }}
                         </span>
                         <ChevronRight
@@ -529,7 +529,7 @@ const viewToDelete = ref(null)
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton class="group/item !p-2">
-                        <span>
+                        <span class="sidebar-section-label">
                           {{ t('globals.terms.view', 2) }}
                         </span>
                         <div>
@@ -598,7 +598,7 @@ const viewToDelete = ref(null)
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton class="!p-2">
-                        <span>
+                        <span class="sidebar-section-label">
                           {{ t('globals.terms.sharedView', 2) }}
                         </span>
                         <ChevronRight
