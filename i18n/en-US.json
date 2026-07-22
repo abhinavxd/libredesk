@@ -138,7 +138,7 @@
   "admin.ai.positiveNumber": "Enter a whole number greater than 0.",
   "admin.ai.maxTokens": "Max tokens",
   "admin.ai.reasoningEffort": "Reasoning effort",
-  "admin.ai.reasoningEffortHint": "Leave blank for most models. Reasoning models such as GPT-5.x require 'none' to use tools; other values are 'low', 'medium' or 'high'.",
+  "admin.ai.reasoningEffortHint": "Leave blank for most models. Values: 'none', 'low', 'medium' or 'high'.",
   "admin.ai.instructions": "Custom instructions",
   "admin.ai.instructionsHint": "Added to AI prompts. Use it to set tone and format, e.g. keep replies under 3 sentences, match the brand voice, always reply in the customer's language.",
   "admin.ai.vision": "Model supports image input",

@@ -337,7 +337,7 @@ const updateContactCustomAttributes = async (attributes) => {
 }
 
 :deep(.accordion-trigger) {
-  @apply bg-muted p-2 text-sm font-medium rounded mx-2;
+  @apply bg-muted p-2 text-sm font-medium rounded-md mx-2;
 }
 
 :deep(.accordion-content) {

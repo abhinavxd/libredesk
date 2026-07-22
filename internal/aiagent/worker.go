@@ -544,6 +544,9 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 		if msg.SenderType == cmodels.SenderTypeContact && msg.SenderID != contactID {
 			continue
 		}
+		if msg.IsContinuityMessage() || msg.HasCSAT() {
+			continue
+		}
 		kept = append(kept, msg)
 	}
 	msgs = kept

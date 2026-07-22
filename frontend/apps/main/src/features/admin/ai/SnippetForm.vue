@@ -78,7 +78,9 @@ const form = useForm({
       title: z.string({ required_error: t('globals.messages.required') }).min(1, {
         message: t('globals.messages.required')
       }),
-      content: z.string().optional(),
+      content: z.string({ required_error: t('globals.messages.required') }).min(1, {
+        message: t('globals.messages.required')
+      }),
       enabled: z.boolean().optional()
     })
   ),

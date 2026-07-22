@@ -148,7 +148,7 @@
             <div
               v-if="!isOutgoing && hasQuotedContent"
               @click="toggleQuote"
-              class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded transition-colors duration-200"
+              class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded-md transition-colors duration-200"
             >
               {{ showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText') }}
             </div>
@@ -165,7 +165,7 @@
             <!-- Status Icons (outgoing only) -->
             <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
               <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
-              <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
+              <Check :size="14" v-if="showCheckCheck" class="text-success" />
               <Tooltip v-if="message.meta?.continuity_emailed">
                 <TooltipTrigger>
                   <Mail :size="12" class="text-muted-foreground" />
@@ -388,6 +388,8 @@ const bubbleClasses = computed(() => ({
   'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
   'border-destructive': isOutgoing.value && props.message.status === 'failed',
   relative: isOutgoing.value,
+  'corner-flat-tr': isOutgoing.value && !props.groupWithPrev,
+  'corner-flat-tl': !isOutgoing.value && !props.groupWithPrev,
   'show-quoted-text': !isOutgoing.value && showQuotedText.value,
   'hide-quoted-text': !isOutgoing.value && !showQuotedText.value
 }))
@@ -465,5 +467,13 @@ const showEnvelope = computed(() => {
   max-width: 100%;
   height: auto;
   cursor: zoom-in;
+}
+
+.message-bubble.corner-flat-tr {
+  border-top-right-radius: 0;
+}
+
+.message-bubble.corner-flat-tl {
+  border-top-left-radius: 0;
 }
 </style>

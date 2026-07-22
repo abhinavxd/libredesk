@@ -8,7 +8,7 @@
       </TabsList>
 
       <TabsContent v-for="(items, type) in results" :key="type" :value="type" class="mt-0">
-        <div class="bg-background rounded border overflow-hidden">
+        <div class="bg-background rounded-md border overflow-hidden">
           <!-- No results message -->
           <div v-if="items.length === 0" class="p-8 text-center text-muted-foreground">
             <div class="text-lg font-medium mb-2">

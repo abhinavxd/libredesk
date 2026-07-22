@@ -4,7 +4,7 @@
       <div
         v-for="action in actions"
         :key="action.type"
-        class="flex items-center border bg-background rounded transition-colors duration-150 hover:bg-accent/50 group gap-2"
+        class="flex items-center border bg-background rounded-md transition-colors duration-150 hover:bg-accent/50 group gap-2"
       >
         <div class="flex items-center space-x-2 px-2">
           <component
@@ -26,7 +26,7 @@
         </div>
         <button
           @click.prevent="onRemove(action)"
-          class="p-2 text-muted-foreground hover:text-destructive focus:outline-none rounded transition-colors duration-150"
+          class="p-2 text-muted-foreground hover:text-destructive focus:outline-none rounded-md transition-colors duration-150"
           title="Remove action"
         >
           <X size="14" />

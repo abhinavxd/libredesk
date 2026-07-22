@@ -3,7 +3,7 @@
     <Popover :open="showAudio" @update:open="showAudio = $event">
       <PopoverTrigger as-child>
         <div
-          class="relative w-36 h-28 rounded border overflow-hidden cursor-pointer transition-colors"
+          class="relative w-36 h-28 rounded-md border overflow-hidden cursor-pointer transition-colors"
           :class="
             isImage
               ? ''

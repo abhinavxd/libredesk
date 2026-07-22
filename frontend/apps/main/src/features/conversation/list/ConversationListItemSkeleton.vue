@@ -27,7 +27,7 @@
         <span
           v-for="(w, n) in slaBadges"
           :key="n"
-          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border"
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-border"
         >
           <span class="skel-bar w-2.5 h-2.5 rounded-full" />
           <span class="skel-bar h-2 rounded-sm" :style="{ width: w }" />

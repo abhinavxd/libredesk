@@ -129,7 +129,7 @@
         </div>
 
         <!-- Row 3: SLA Card with Compliance Percentages -->
-        <div class="w-full rounded box p-5">
+        <div class="w-full box p-5">
           <p class="card-title mb-4">{{ $t('report.sla.cardTitle') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -137,14 +137,14 @@
             <div class="space-y-4">
               <p class="section-title">{{ $t('report.sla.firstResponse') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-primary"
+                <span class="metric-value"
                   >{{ slaCounts.first_response_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold tabular-nums text-primary">{{
+                  <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.first_response_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
@@ -168,14 +168,14 @@
             <div class="space-y-4 border-l border-r px-8">
               <p class="section-title">{{ $t('report.sla.nextResponse') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-primary"
+                <span class="metric-value"
                   >{{ slaCounts.next_response_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold tabular-nums text-primary">{{
+                  <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.next_response_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
@@ -199,14 +199,14 @@
             <div class="space-y-4">
               <p class="section-title">{{ $t('report.sla.resolution') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-primary"
+                <span class="metric-value"
                   >{{ slaCounts.resolution_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold tabular-nums text-primary">{{
+                  <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.resolution_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
@@ -229,7 +229,7 @@
         </div>
 
         <!-- Row 4: Tag Distribution -->
-        <div class="w-full rounded box p-5">
+        <div class="w-full box p-5">
           <p class="card-title mb-4">{{ $t('report.tags.cardTitle') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -265,7 +265,7 @@
         </div>
 
         <!-- Row 5: Line Chart -->
-        <div class="rounded box w-full p-5">
+        <div class="box w-full p-5">
           <p class="card-title mb-4">{{ $t('report.chart.title') }}</p>
           <LineChart :data="processedLineData" />
         </div>

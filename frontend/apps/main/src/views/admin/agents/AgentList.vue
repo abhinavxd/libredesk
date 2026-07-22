@@ -8,7 +8,7 @@
         @import-complete="getData"
       >
         <template #csv-example>
-          <div class="bg-muted p-3 rounded text-xs font-mono overflow-x-auto leading-relaxed">
+          <div class="bg-muted p-3 rounded-md text-xs font-mono overflow-x-auto leading-relaxed">
             <div>first_name,last_name,email,roles,teams</div>
             <div>John,Doe,john@example.com,Agent,Sales</div>
             <div>Jane,Smith,jane@example.com,Admin,Support</div>

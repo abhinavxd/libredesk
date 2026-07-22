@@ -24,8 +24,8 @@
           <span
             class="inline-block w-2 h-2 rounded-full mr-1"
             :class="{
-              'bg-green-500': chatTitle.availability_status === 'online',
-              'bg-amber-500': chatTitle.availability_status === 'away'
+              'bg-success': chatTitle.availability_status === 'online',
+              'bg-warning': chatTitle.availability_status === 'away'
             }"
           ></span>
           {{ chatTitle.availability_status === 'online' ? $t('globals.terms.online') : $t('globals.terms.away') }}

@@ -25,7 +25,7 @@
       </RadioGroup>
     </div>
 
-    <div class="space-y-5 rounded" :class="{ 'box p-5': ruleGroup.rules?.length > 0 }">
+    <div class="space-y-5" :class="{ 'box p-5': ruleGroup.rules?.length > 0 }">
       <div class="space-y-5">
         <div v-for="(rule, index) in ruleGroup.rules" :key="rule" class="space-y-5">
           <div v-if="index > 0">

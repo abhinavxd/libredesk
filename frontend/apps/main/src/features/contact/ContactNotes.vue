@@ -51,7 +51,7 @@
       <Card
         v-for="note in visibleNotes"
         :key="note.id"
-        class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow"
+        class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow-md"
       >
         <!-- Header -->
         <CardHeader :class="compact ? 'p-3 pb-2' : 'bg-background border-b p-2'">

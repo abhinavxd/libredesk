@@ -34,7 +34,7 @@
           }}
         </p>
         <div v-else class="mt-16 text-center">
-          <h2 class="text-2xl font-semibold text-primary mb-4">
+          <h2 class="text-xl font-semibold text-primary mb-4">
             {{
               $t('conversation.search')
             }}

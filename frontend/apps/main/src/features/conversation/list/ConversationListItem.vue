@@ -99,7 +99,7 @@
                 </template>
                 <template v-else>
                   <Reply
-                    class="text-green-600 inline-block align-text-bottom mr-0.5"
+                    class="text-success inline-block align-text-bottom mr-0.5"
                     :size="14"
                     v-if="conversation.last_message_sender === 'agent'"
                   />{{ trimmedLastMessage }}
@@ -107,7 +107,7 @@
               </p>
               <div
                 v-if="isUnread"
-                class="flex items-center justify-center w-5 h-5 bg-green-600 text-white text-xs font-medium rounded-full flex-shrink-0"
+                class="flex items-center justify-center w-5 h-5 bg-primary text-primary-foreground text-xs font-medium rounded-full flex-shrink-0"
               >
                 {{ conversation.unread_message_count > 9 ? '9+' : conversation.unread_message_count }}
               </div>

@@ -195,6 +195,9 @@ func (t *previousConversationsTool) Execute(ctx context.Context, args string) (s
 			continue
 		}
 		slices.Reverse(msgs)
+		msgs = slices.DeleteFunc(msgs, func(msg cmodels.Message) bool {
+			return msg.IsContinuityMessage() || msg.HasCSAT()
+		})
 		transcript := cmodels.Transcript(msgs, maxPrevConversationMessages)
 		if transcript == "" {
 			continue

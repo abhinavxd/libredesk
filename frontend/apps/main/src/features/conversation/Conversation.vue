@@ -21,7 +21,7 @@
           <DropdownMenuTrigger>
             <div
               v-if="conversationStore.current?.status"
-              class="flex items-center space-x-1 cursor-pointer bg-primary px-2 py-1 rounded text-sm"
+              class="flex items-center space-x-1 cursor-pointer bg-primary px-2 py-1 rounded-md text-sm"
             >
               <span class="text-secondary font-medium inline-block">
                 {{ conversationStore.current?.status }}

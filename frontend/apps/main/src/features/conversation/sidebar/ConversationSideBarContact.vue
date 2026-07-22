@@ -44,8 +44,8 @@
       <Mail size="16" class="text-muted-foreground flex-shrink-0" />
       <Tooltip v-if="isLivechat">
         <TooltipTrigger as-child>
-          <ShieldCheck v-if="isVerified" size="14" class="flex-shrink-0 text-green-600" />
-          <ShieldQuestion v-else size="14" class="flex-shrink-0 text-amber-500" />
+          <ShieldCheck v-if="isVerified" size="14" class="flex-shrink-0 text-success" />
+          <ShieldQuestion v-else size="14" class="flex-shrink-0 text-warning" />
         </TooltipTrigger>
         <TooltipContent>{{
           isVerified ? t('contact.identityVerified') : t('contact.identityNotVerified')

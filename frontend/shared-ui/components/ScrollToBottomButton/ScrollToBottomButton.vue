@@ -16,7 +16,7 @@
       </button>
       <span
         v-if="unreadCount > 0"
-        class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-green-500 text-primary-foreground text-xs font-medium flex items-center justify-center"
+        class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center"
       >
         {{ unreadCount }}
       </span>

@@ -10,7 +10,7 @@
         :href="page.url"
         target="_blank"
         rel="noopener noreferrer"
-        class="block p-2 rounded hover:bg-muted"
+        class="block p-2 rounded-md hover:bg-muted"
       >
         <div class="flex items-start justify-between gap-2">
           <Tooltip>

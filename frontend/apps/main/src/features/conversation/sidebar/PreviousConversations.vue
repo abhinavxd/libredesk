@@ -19,7 +19,7 @@
           type: 'assigned'
         }
       }"
-      class="block p-2 rounded hover:bg-muted"
+      class="block p-2 rounded-md hover:bg-muted"
     >
       <div class="flex flex-wrap items-start justify-between gap-1">
         <div class="flex flex-col flex-1 min-w-[120px]">

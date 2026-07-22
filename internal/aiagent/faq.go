@@ -251,6 +251,9 @@ func (m *Manager) buildMiningTranscript(msgs []cmodels.Message) (string, bool) {
 	var b strings.Builder
 	hasHumanReply := false
 	for _, msg := range msgs {
+		if msg.IsContinuityMessage() || msg.HasCSAT() {
+			continue
+		}
 		text := m.messageText(msg)
 		if text == "" {
 			continue
