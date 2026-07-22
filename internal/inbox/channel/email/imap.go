@@ -503,9 +503,31 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 			"message_id", incomingMsg.SourceID.String)
 	}
 
-	// Process attachments
+	incomingMsg.Attachments = collectAttachments(envelope)
+
+	incomingMsg.Content = stringutil.SanitizeUTF8(incomingMsg.Content)
+	incomingMsg.Subject = stringutil.SanitizeUTF8(incomingMsg.Subject)
+	incomingMsg.Contact.FirstName = stringutil.SanitizeUTF8(incomingMsg.Contact.FirstName)
+	incomingMsg.Contact.LastName = stringutil.SanitizeUTF8(incomingMsg.Contact.LastName)
+
+	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.SourceID.String,
+		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines),
+		"other_parts", len(envelope.OtherParts))
+
+	if err := e.messageStore.EnqueueIncoming(incomingMsg); err != nil {
+		return err
+	}
+	return nil
+}
+
+// collectAttachments gathers all attachment and inline parts from an email
+// envelope into a single list of attachments.
+func collectAttachments(envelope *enmime.Envelope) []attachment.Attachment {
+	attachments := make([]attachment.Attachment, 0, len(envelope.Attachments)+len(envelope.Inlines)+len(envelope.OtherParts))
+
+	// Attachments always use the attachment disposition.
 	for _, att := range envelope.Attachments {
-		incomingMsg.Attachments = append(incomingMsg.Attachments, attachment.Attachment{
+		attachments = append(attachments, attachment.Attachment{
 			Name:        att.FileName,
 			Content:     att.Content,
 			ContentType: att.ContentType,
@@ -515,35 +537,24 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		})
 	}
 
-	// Process inlines - treat ones without ContentID as regular attachments
-	for _, inline := range envelope.Inlines {
+	// Inlines and other (unclassified) parts are inline when they carry a
+	// ContentID, otherwise they are treated as regular attachments.
+	for _, part := range append(append([]*enmime.Part{}, envelope.Inlines...), envelope.OtherParts...) {
 		disposition := attachment.DispositionInline
-		if inline.ContentID == "" {
+		if part.ContentID == "" {
 			disposition = attachment.DispositionAttachment
 		}
-
-		incomingMsg.Attachments = append(incomingMsg.Attachments, attachment.Attachment{
-			Name:        inline.FileName,
-			Content:     inline.Content,
-			ContentType: inline.ContentType,
-			ContentID:   inline.ContentID,
-			Size:        len(inline.Content),
+		attachments = append(attachments, attachment.Attachment{
+			Name:        part.FileName,
+			Content:     part.Content,
+			ContentType: part.ContentType,
+			ContentID:   part.ContentID,
+			Size:        len(part.Content),
 			Disposition: disposition,
 		})
 	}
 
-	incomingMsg.Content = stringutil.SanitizeUTF8(incomingMsg.Content)
-	incomingMsg.Subject = stringutil.SanitizeUTF8(incomingMsg.Subject)
-	incomingMsg.Contact.FirstName = stringutil.SanitizeUTF8(incomingMsg.Contact.FirstName)
-	incomingMsg.Contact.LastName = stringutil.SanitizeUTF8(incomingMsg.Contact.LastName)
-
-	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.SourceID.String,
-		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines))
-
-	if err := e.messageStore.EnqueueIncoming(incomingMsg); err != nil {
-		return err
-	}
-	return nil
+	return attachments
 }
 
 // getContactName extracts the contact's first and last name from the IMAP address.
