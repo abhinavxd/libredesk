@@ -939,3 +939,11 @@ VALUES (
   '',
   true
 );
+
+-- Default business hours
+INSERT INTO business_hours ("name", description, is_always_open, hours, holidays) VALUES
+('Default', 'Default business hours, Monday to Friday, 09:00 to 17:00.', false, '{"Monday": {"open": "09:00", "close": "17:00"}, "Tuesday": {"open": "09:00", "close": "17:00"}, "Wednesday": {"open": "09:00", "close": "17:00"}, "Thursday": {"open": "09:00", "close": "17:00"}, "Friday": {"open": "09:00", "close": "17:00"}}'::jsonb, '[]'::jsonb);
+
+-- Default SLA policy
+INSERT INTO sla_policies ("name", description, first_response_time, resolution_time, next_response_time, notifications) VALUES
+('Default', 'Default SLA policy, first response within 1 hour and resolution within 24 hours.', '1h', '24h', NULL, '[]'::jsonb);
