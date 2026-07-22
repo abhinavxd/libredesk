@@ -7,7 +7,7 @@
         v-if="!CONVERSATION_DEFAULT_STATUSES_LIST.includes(props.status.name)"
       >
         <span class="sr-only"></span>
-        <MoreHorizontal class="w-4 h-4" />
+        <MoreVertical class="w-4 h-4" />
       </Button>
       <div v-else class="w-8 h-8 p-0 invisible"></div>
     </DropdownMenuTrigger>
@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreHorizontal } from 'lucide-vue-next'
+import { MoreVertical } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,

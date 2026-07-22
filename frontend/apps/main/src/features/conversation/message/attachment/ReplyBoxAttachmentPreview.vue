@@ -4,7 +4,7 @@
       <div
         v-for="attachment in allAttachments"
         :key="attachment.uuid || attachment.tempId"
-        class="flex items-center bg-background border rounded transition-colors duration-150 hover:bg-accent/50 group px-2 gap-2"
+        class="flex items-center bg-background border rounded-md transition-colors duration-150 hover:bg-accent/50 group px-2 gap-2"
       >
         <div class="flex items-center space-x-1 py-1">
           <DotLoader v-if="attachment.loading"/>
@@ -30,7 +30,7 @@
         <button
           v-if="!attachment.loading"
           @click.prevent="onDelete(attachment.uuid)"
-          class="text-muted-foreground hover:text-destructive focus:outline-none rounded transition-colors duration-150"
+          class="text-muted-foreground hover:text-destructive focus:outline-none rounded-md transition-colors duration-150"
           title="Remove attachment"
         >
           <X size="14" />

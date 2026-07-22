@@ -12,7 +12,7 @@
                 @import-complete="getTags"
               >
                 <template #csv-example>
-                  <div class="bg-muted p-3 rounded text-xs font-mono overflow-x-auto leading-relaxed">
+                  <div class="bg-muted p-3 rounded-md text-xs font-mono overflow-x-auto leading-relaxed">
                     <div>name</div>
                     <div>Bug</div>
                     <div>Feature Request</div>

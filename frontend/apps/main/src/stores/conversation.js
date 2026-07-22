@@ -857,6 +857,9 @@ export const useConversationStore = defineStore('conversation', () => {
             message: activityMessage
           })
         }, 100)
+        if (!document.hidden) {
+          updateAssigneeLastSeen(message.conversation_uuid)
+        }
         return
       }
 

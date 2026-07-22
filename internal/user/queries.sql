@@ -1,7 +1,8 @@
 -- name: get-users-compact
 SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
-WHERE users.email != 'System' AND users.deleted_at IS NULL AND type = ANY($1)
+-- email != 'System' also drops NULL-email users (anonymous visitors); AI assistants have no email and must still be listed.
+WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND type = ANY($1)
 
 -- name: soft-delete-agent
 WITH soft_delete AS (
@@ -21,7 +22,7 @@ delete_user_roles AS (
     WHERE user_id IN (SELECT id FROM soft_delete)
     RETURNING 1
 )
-SELECT 1;
+SELECT count(*) FROM soft_delete;
 
 -- name: get-user
 SELECT

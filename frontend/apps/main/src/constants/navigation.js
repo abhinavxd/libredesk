@@ -34,6 +34,47 @@ export const adminNavItems = [
     ]
   },
   {
+    titleKey: 'admin.ai.title',
+    badge: 'BETA',
+    children: [
+      {
+        titleKey: 'globals.terms.provider',
+        href: '/admin/ai/providers',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'Sparkles'
+      },
+      {
+        titleKey: 'admin.ai.snippets',
+        href: '/admin/ai/snippets',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'NotebookText'
+      },
+      {
+        titleKey: 'admin.ai.suggestions',
+        href: '/admin/ai/suggestions',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'Lightbulb'
+      },
+      {
+        titleKey: 'admin.ai.tools',
+        href: '/admin/ai/tools',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'Wrench'
+      },
+      {
+        titleKey: 'admin.ai.assistants',
+        href: '/admin/ai/assistants',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'Bot'
+      }
+    ]
+  },
+  {
     titleKey: 'globals.terms.channel',
     isTitleKeyPlural: true,
     children: [

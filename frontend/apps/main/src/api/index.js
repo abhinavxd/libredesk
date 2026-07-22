@@ -456,11 +456,49 @@ const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
     'Content-Type': 'application/json'
   }
 })
-const updateAIProvider = (data) => http.put('/api/v1/ai/provider', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const getAIConfig = (type) => http.get(`/api/v1/ai/config/${type}`)
+const updateAIConfig = (type, data) => http.put(`/api/v1/ai/config/${type}`, data)
+const testAIConfig = (type, data) => http.post(`/api/v1/ai/config/${type}/test`, data)
+const getAITools = () => http.get('/api/v1/ai/tools')
+const getAITool = (id) => http.get(`/api/v1/ai/tools/${id}`)
+const createAITool = (data) => http.post('/api/v1/ai/tools', data)
+const updateAITool = (id, data) => http.put(`/api/v1/ai/tools/${id}`, data)
+const deleteAITool = (id) => http.delete(`/api/v1/ai/tools/${id}`)
+const getAIAssistants = () => http.get('/api/v1/ai/assistants')
+const getAIAssistantsCompact = () => http.get('/api/v1/ai/assistants/compact')
+const getAIAssistant = (id) => http.get(`/api/v1/ai/assistants/${id}`)
+const createAIAssistant = (data) =>
+  http.post('/api/v1/ai/assistants', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+const updateAIAssistant = (id, data) =>
+  http.put(`/api/v1/ai/assistants/${id}`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+const deleteAIAssistant = (id) => http.delete(`/api/v1/ai/assistants/${id}`)
+const previewAIAssistant = (id, data) => http.post(`/api/v1/ai/assistants/${id}/preview`, data)
+const getAIAssistantStats = (id, range) =>
+  http.get(`/api/v1/ai/assistants/${id}/stats`, { params: range ? { range } : {} })
+const getAISnippets = () => http.get('/api/v1/ai/snippets')
+const createAISnippet = (data) => http.post('/api/v1/ai/snippets', data)
+const importAISnippetFromURL = (data) => http.post('/api/v1/ai/snippets/import-url', data)
+const updateAISnippet = (id, data) => http.put(`/api/v1/ai/snippets/${id}`, data)
+const deleteAISnippet = (id) => http.delete(`/api/v1/ai/snippets/${id}`)
+const getAIFaqSuggestions = (status) =>
+  http.get('/api/v1/ai/faq-suggestions', { params: status ? { status } : {} })
+const approveAIFaqSuggestion = (id, data) =>
+  http.post(`/api/v1/ai/faq-suggestions/${id}/approve`, data)
+const rejectAIFaqSuggestion = (id) => http.post(`/api/v1/ai/faq-suggestions/${id}/reject`)
+const getAIFaqLearning = () => http.get('/api/v1/ai/faq-learning')
+const updateAIFaqLearning = (data) => http.put('/api/v1/ai/faq-learning', data)
+const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data)
+const aiSummarizeConversation = (data) => http.post('/api/v1/ai/summarize', data)
+const aiSuggestTags = (data) => http.post('/api/v1/ai/suggest-tags', data)
+const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data)
+const getCopilotMessages = (conversationUUID) =>
+  http.get('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
+const clearCopilotMessages = (conversationUUID) =>
+  http.delete('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
   headers: {
@@ -602,7 +640,6 @@ export default {
   updateAutomationRule,
   updateAutomationRuleWeights,
   updateAutomationRulesExecutionMode,
-  updateAIProvider,
   createAutomationRule,
   toggleAutomationRule,
   deleteAutomationRule,
@@ -658,6 +695,38 @@ export default {
   deleteSharedView,
   getAiPrompts,
   aiCompletion,
+  getAIConfig,
+  updateAIConfig,
+  testAIConfig,
+  getAITools,
+  getAITool,
+  createAITool,
+  updateAITool,
+  deleteAITool,
+  getAIAssistants,
+  getAIAssistantsCompact,
+  getAIAssistant,
+  createAIAssistant,
+  updateAIAssistant,
+  deleteAIAssistant,
+  previewAIAssistant,
+  getAIAssistantStats,
+  getAISnippets,
+  createAISnippet,
+  importAISnippetFromURL,
+  updateAISnippet,
+  deleteAISnippet,
+  getAIFaqSuggestions,
+  approveAIFaqSuggestion,
+  rejectAIFaqSuggestion,
+  getAIFaqLearning,
+  updateAIFaqLearning,
+  aiGenerateReply,
+  aiSummarizeConversation,
+  aiSuggestTags,
+  aiCopilot,
+  getCopilotMessages,
+  clearCopilotMessages,
   searchConversations,
   searchMessages,
   searchContacts,

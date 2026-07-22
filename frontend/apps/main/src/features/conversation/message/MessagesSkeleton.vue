@@ -18,7 +18,7 @@
 
         <div class="w-4/5" :class="{ 'flex justify-end': row.outgoing }">
           <div
-            class="skel-bubble flex flex-col gap-2 px-4 pt-3 pb-3 rounded border border-border shadow-sm"
+            class="skel-bubble flex flex-col gap-2 px-4 pt-3 pb-3 rounded-md border border-border shadow-sm"
             :style="{ width: row.width }"
           >
             <div

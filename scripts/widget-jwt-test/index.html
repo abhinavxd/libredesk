@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Libredesk widget - JWT test</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 18px; }
+  label { display: block; margin-top: 14px; font-size: 13px; font-weight: 600; color: #444; }
+  input, textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 13px; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 6px; }
+  textarea { min-height: 220px; resize: vertical; }
+  button { margin-top: 14px; padding: 8px 16px; font-size: 14px; border-radius: 6px; border: 1px solid #333; background: #222; color: #fff; cursor: pointer; }
+  button:hover { background: #000; }
+  #status { margin-top: 10px; font-size: 13px; white-space: pre-wrap; }
+  #jwtOut { min-height: 70px; font-size: 11px; }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  .hint { font-size: 12px; color: #777; font-weight: 400; }
+</style>
+</head>
+<body>
+
+<h1>Libredesk widget - JWT auth test</h1>
+<p class="hint">Edit the payload below, click "Sign JWT &amp; load widget". <code>exp</code> is auto-set to now + 1 hour on every generate so the token never shows up expired. The signing secret must match the "Secret Key" configured on this inbox's Security tab in Libredesk admin.</p>
+
+<div class="row">
+  <div>
+    <label>baseURL</label>
+    <input id="baseURL" value="http://localhost:8001">
+  </div>
+  <div>
+    <label>inboxID</label>
+    <input id="inboxID" placeholder="livechat inbox UUID from inbox form" value="">
+  </div>
+</div>
+
+<label style="display: flex; align-items: center; gap: 8px; margin-top: 18px;">
+  <input type="checkbox" id="useJwt" style="width: auto; margin: 0;" checked>
+  Authenticate with JWT <span class="hint">(uncheck to start chat as an anonymous visitor, no JWT)</span>
+</label>
+
+<div id="jwtFields">
+  <label>Signing secret <span class="hint">(inbox's Secret Key, HS256)</span></label>
+  <input id="secret" placeholder="inbox Secret Key" value="">
+
+  <label>JWT payload <span class="hint">(edit freely - exp is overwritten automatically)</span></label>
+  <textarea id="payload">{
+  "external_user_id": "your_app_user_123",
+  "email": "user@example.com",
+  "first_name": "John",
+  "last_name": "Doe",
+  "phone_number": "9876543210",
+  "phone_number_country_code": "IN",
+  "contact_custom_attributes": {
+    "plan": "premium",
+    "company": "Acme Inc"
+  }
+}</textarea>
+</div>
+
+<div class="row">
+  <button id="genBtn">Load widget</button>
+  <button id="clearBtn" style="background: #fff; color: #333;">Clear session</button>
+</div>
+<p class="hint">The widget stores its session/visitor tokens as cookies on this page (plus in-memory state inside the iframe) - reloading the widget alone does not drop them. Use "Clear session" first to actually start over as a brand-new visitor.</p>
+
+<div id="status"></div>
+
+<label>Generated JWT</label>
+<textarea id="jwtOut" readonly></textarea>
+
+<script>
+  function base64url(bytes) {
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  async function signJWT(payload, secret) {
+    const enc = new TextEncoder();
+    const header = { alg: 'HS256', typ: 'JWT' };
+    const headerB64 = base64url(enc.encode(JSON.stringify(header)));
+    const payloadB64 = base64url(enc.encode(JSON.stringify(payload)));
+    const signingInput = headerB64 + '.' + payloadB64;
+    const key = await crypto.subtle.importKey(
+      'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, enc.encode(signingInput));
+    return signingInput + '.' + base64url(new Uint8Array(sig));
+  }
+
+  function loadWidgetScript(baseURL) {
+    return new Promise((resolve, reject) => {
+      if (window.__widgetScriptLoaded) return resolve();
+      const s = document.createElement('script');
+      s.src = baseURL + '/widget.js';
+      s.onload = () => { window.__widgetScriptLoaded = true; resolve(); };
+      s.onerror = reject;
+      document.body.appendChild(s);
+    });
+  }
+
+  function deleteWidgetCookies(inboxID) {
+    ['session', 'visitor'].forEach(type => {
+      document.cookie = `libredesk-${type}-${inboxID}=;path=/;max-age=0;SameSite=Lax`;
+    });
+  }
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    const inboxID = document.getElementById('inboxID').value.trim();
+    if (window.Libredesk && typeof window.Libredesk.logout === 'function') {
+      window.Libredesk.logout();
+    }
+    deleteWidgetCookies(inboxID);
+    if (window.Libredesk && typeof window.Libredesk.destroy === 'function') {
+      window.Libredesk.destroy();
+      window.Libredesk = undefined;
+    }
+    document.getElementById('status').textContent = 'Session cleared. Click "Load widget" to start fresh.';
+  });
+
+  const useJwtEl = document.getElementById('useJwt');
+  const jwtFieldsEl = document.getElementById('jwtFields');
+
+  function syncJwtFieldsVisibility () {
+    jwtFieldsEl.style.display = useJwtEl.checked ? '' : 'none';
+  }
+  useJwtEl.checked = localStorage.getItem('libredesk-jwt-test-use-jwt') !== 'false';
+  useJwtEl.addEventListener('change', () => {
+    localStorage.setItem('libredesk-jwt-test-use-jwt', useJwtEl.checked);
+    syncJwtFieldsVisibility();
+  });
+  syncJwtFieldsVisibility();
+
+  // Remember every field's last value across reloads so a refresh doesn't wipe the form.
+  ['baseURL', 'inboxID', 'secret', 'payload'].forEach(id => {
+    const el = document.getElementById(id);
+    const saved = localStorage.getItem('libredesk-jwt-test-' + id);
+    if (saved !== null) el.value = saved;
+    el.addEventListener('input', () => {
+      localStorage.setItem('libredesk-jwt-test-' + id, el.value);
+    });
+  });
+
+  document.getElementById('genBtn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('status');
+    const jwtOut = document.getElementById('jwtOut');
+    statusEl.textContent = '';
+    try {
+      const baseURL = document.getElementById('baseURL').value.trim();
+      const inboxID = document.getElementById('inboxID').value.trim();
+      const config = { baseURL, inboxID };
+      let statusMsg = 'Widget loaded as anonymous visitor (no JWT).';
+
+      if (useJwtEl.checked) {
+        const secret = document.getElementById('secret').value;
+        const payload = JSON.parse(document.getElementById('payload').value);
+        payload.exp = Math.floor(Date.now() / 1000) + 3600;
+
+        const jwt = await signJWT(payload, secret);
+        jwtOut.value = jwt;
+        config.userJWT = jwt;
+        statusMsg = 'Widget loaded with new JWT. exp=' + new Date(payload.exp * 1000).toLocaleTimeString();
+      } else {
+        jwtOut.value = '';
+      }
+
+      await loadWidgetScript(baseURL);
+
+      if (window.Libredesk && typeof window.Libredesk.destroy === 'function') {
+        window.Libredesk.destroy();
+        window.Libredesk = undefined;
+      }
+      window.initLibredesk(config);
+
+      statusEl.textContent = statusMsg;
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -109,7 +109,7 @@
           v-if="errorMessage"
           :errorMessage="errorMessage"
           :border="true"
-          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded text-sm"
+          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded-md text-sm"
         />
       </CardContent>
     </Card>

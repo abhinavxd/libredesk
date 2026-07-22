@@ -12,9 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -22,10 +20,10 @@ import (
 	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/version"
 	"github.com/abhinavxd/libredesk/internal/webhook/models"
-	"github.com/abhinavxd/ssrfguard"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
@@ -61,7 +59,7 @@ type Opts struct {
 	QueueSize     int
 	Timeout       time.Duration
 	EncryptionKey string
-	AllowedHosts  []string // CIDR prefixes allowed to bypass SSRF protection
+	DialControl   ssrf.Control
 }
 
 // DeliveryTask represents a webhook delivery task
@@ -91,9 +89,9 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 
-	// Parse allowed host CIDRs for SSRF exceptions.
-	allowed := parseAllowedHosts(opts.AllowedHosts, opts.Lo)
-	guard := ssrfguard.New(allowed...)
+	transport := ssrf.NewTransport(opts.DialControl, 3*time.Second)
+	transport.TLSHandshakeTimeout = 3 * time.Second
+	transport.ResponseHeaderTimeout = 3 * time.Second
 
 	return &Manager{
 		q:             q,
@@ -102,16 +100,8 @@ func New(opts Opts) (*Manager, error) {
 		db:            opts.DB,
 		deliveryQueue: make(chan DeliveryTask, opts.QueueSize),
 		httpClient: &http.Client{
-			Timeout: opts.Timeout,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   3 * time.Second,
-					KeepAlive: 30 * time.Second,
-					Control:   guard.Control,
-				}).DialContext,
-				TLSHandshakeTimeout:   3 * time.Second,
-				ResponseHeaderTimeout: 3 * time.Second,
-			},
+			Timeout:   opts.Timeout,
+			Transport: transport,
 		},
 		workers:       opts.Workers,
 		encryptionKey: opts.EncryptionKey,
@@ -413,18 +403,4 @@ func (m *Manager) getWebhooksByEvent(event string) ([]models.Webhook, error) {
 	m.decryptWebhooks(webhooks)
 
 	return webhooks, nil
-}
-
-// parseAllowedHosts parses CIDR strings into netip.Prefix slices.
-func parseAllowedHosts(hosts []string, lo *logf.Logger) []netip.Prefix {
-	var prefixes []netip.Prefix
-	for _, h := range hosts {
-		prefix, err := netip.ParsePrefix(h)
-		if err != nil {
-			lo.Warn("ignoring invalid webhook `allowed_hosts` entry", "entry", h, "error", err)
-			continue
-		}
-		prefixes = append(prefixes, prefix)
-	}
-	return prefixes
 }

@@ -12,6 +12,7 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -57,23 +58,26 @@ const defaultSessionLifetime = 9 * time.Hour
 
 // Auth is the auth service it manages OIDC authentication and sessions
 type Auth struct {
-	mu        sync.RWMutex
-	cfg       Config
-	i18n      *i18n.I18n
-	oauthCfgs map[int]oauth2.Config
-	verifiers map[int]*oidc.IDTokenVerifier
-	sess      *simplesessions.Manager
-	logger    *logf.Logger
-	rd        *redis.Client
+	mu         sync.RWMutex
+	cfg        Config
+	i18n       *i18n.I18n
+	oauthCfgs  map[int]oauth2.Config
+	verifiers  map[int]*oidc.IDTokenVerifier
+	sess       *simplesessions.Manager
+	logger     *logf.Logger
+	rd         *redis.Client
+	oidcClient *http.Client
 }
 
-// New creates an Auth service with configured OIDC providers
-func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*Auth, error) {
+// New creates an Auth service with configured OIDC providers.
+func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control) (*Auth, error) {
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
 
+	oidcClient := newOIDCClient(dialControl)
+
 	for _, provider := range cfg.Providers {
-		oidcProv, err := oidc.NewProvider(context.Background(), provider.ProviderURL)
+		oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), oidcClient), provider.ProviderURL)
 		if err != nil {
 			logger.Error("error initializing oidc provider", "error", err, "provider", provider.Provider)
 			continue
@@ -116,19 +120,31 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
 
 	return &Auth{
-		cfg:       cfg,
-		i18n:      i18n,
-		oauthCfgs: oauthCfgs,
-		verifiers: verifiers,
-		sess:      sess,
-		logger:    logger,
-		rd:        rd,
+		cfg:        cfg,
+		i18n:       i18n,
+		oauthCfgs:  oauthCfgs,
+		verifiers:  verifiers,
+		sess:       sess,
+		logger:     logger,
+		rd:         rd,
+		oidcClient: oidcClient,
 	}, nil
+}
+
+// newOIDCClient builds the HTTP client used for OIDC discovery.
+func newOIDCClient(dialControl ssrf.Control) *http.Client {
+	transport := ssrf.NewTransport(dialControl, 3*time.Second)
+	transport.TLSHandshakeTimeout = 5 * time.Second
+	transport.ResponseHeaderTimeout = 5 * time.Second
+	return &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: transport,
+	}
 }
 
 // TestProvider tests the OIDC provider url by doing a discovery on it.
 func (a *Auth) TestProvider(url string) error {
-	_, err := oidc.NewProvider(context.Background(), url)
+	_, err := oidc.NewProvider(oidc.ClientContext(context.Background(), a.oidcClient), url)
 	if err != nil {
 		a.logger.Error("error testing oidc provider", "provider_url", url, "error", err)
 		return envelope.NewError(envelope.GeneralError, err.Error(), nil)
@@ -145,7 +161,7 @@ func (a *Auth) Reload(cfg Config) error {
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
 
 	for _, provider := range cfg.Providers {
-		oidcProv, err := oidc.NewProvider(context.Background(), provider.ProviderURL)
+		oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), a.oidcClient), provider.ProviderURL)
 		if err != nil {
 			a.logger.Error("error initializing oidc provider", "provider", provider.Provider, "provider_url", provider.ProviderURL, "error", err)
 			return envelope.NewError(envelope.GeneralError, err.Error(), nil)

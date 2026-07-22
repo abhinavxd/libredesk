@@ -360,7 +360,7 @@
                 <div class="space-y-3">
                   <Draggable v-model="homeApps" item-key="index" :animation="200" handle=".drag-handle" class="space-y-3" @change="updateHomeApps">
                     <template #item="{ element: item, index }">
-                      <div class="flex items-start gap-2 p-3 border rounded">
+                      <div class="flex items-start gap-2 p-3 border rounded-md">
                         <div class="drag-handle cursor-move text-muted-foreground pt-2">
                           <GripVertical class="w-4 h-4" />
                         </div>

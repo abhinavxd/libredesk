@@ -102,6 +102,19 @@ type Manager struct {
 	wg                         sync.WaitGroup
 	continuityConfig           ContinuityConfig
 	subjectRefFormat           string
+	aiAgent                    AIAgentEngine
+}
+
+// AIAgentEngine is notified when a conversation assigned to an AI assistant may need a response.
+type AIAgentEngine interface {
+	HandleConversationEvent(conversationID, assigneeUserID int)
+	HandleConversationResolved(conversationID int)
+	AssistantExpectation(userID int) string
+}
+
+// SetAIAgent wires the AI agent engine after construction to avoid an import cycle.
+func (c *Manager) SetAIAgent(e AIAgentEngine) {
+	c.aiAgent = e
 }
 
 // WidgetConversationView represents the conversation data for widget clients
@@ -275,40 +288,42 @@ func New(
 
 type queries struct {
 	// Conversation queries.
-	GetConversationUUID                *sqlx.Stmt `query:"get-conversation-uuid"`
-	GetConversation                    *sqlx.Stmt `query:"get-conversation"`
-	GetConversationListItem            *sqlx.Stmt `query:"get-conversation-list-item"`
-	GetConversationsCreatedAfter       *sqlx.Stmt `query:"get-conversations-created-after"`
-	GetUnassignedConversations         *sqlx.Stmt `query:"get-unassigned-conversations"`
-	GetConversations                   string     `query:"get-conversations"`
-	GetContactChatConversations        *sqlx.Stmt `query:"get-contact-chat-conversations"`
-	GetChatConversation                *sqlx.Stmt `query:"get-chat-conversation"`
-	GetContactPreviousConversations    *sqlx.Stmt `query:"get-contact-previous-conversations"`
-	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
-	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
-	UpdateConversationWaitingSince     *sqlx.Stmt `query:"update-conversation-waiting-since"`
-	UpdateConversationReplyTimestamps  *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
-	UpdateConversationContactLastSeen  *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
-	UpsertUserLastSeen                 *sqlx.Stmt `query:"upsert-user-last-seen"`
-	MarkConversationUnread             *sqlx.Stmt `query:"mark-conversation-unread"`
-	UpdateConversationAssignedUser     *sqlx.Stmt `query:"update-conversation-assigned-user"`
-	ClaimUnassignedConversation        *sqlx.Stmt `query:"claim-unassigned-conversation"`
-	UpdateConversationAssignedTeam     *sqlx.Stmt `query:"update-conversation-assigned-team"`
-	UpdateConversationCustomAttributes *sqlx.Stmt `query:"update-conversation-custom-attributes"`
-	UpdateConversationPriority         *sqlx.Stmt `query:"update-conversation-priority"`
-	UpdateConversationStatus           *sqlx.Stmt `query:"update-conversation-status"`
-	UpdateConversationLastMessage      *sqlx.Stmt `query:"update-conversation-last-message"`
-	InsertConversationParticipant      *sqlx.Stmt `query:"insert-conversation-participant"`
-	InsertConversation                 *sqlx.Stmt `query:"insert-conversation"`
-	AddConversationTags                *sqlx.Stmt `query:"add-conversation-tags"`
-	SetConversationTags                *sqlx.Stmt `query:"set-conversation-tags"`
-	RemoveConversationTags             *sqlx.Stmt `query:"remove-conversation-tags"`
-	GetConversationTags                *sqlx.Stmt `query:"get-conversation-tags"`
-	UnassignOpenConversations          *sqlx.Stmt `query:"unassign-open-conversations"`
-	ReOpenConversation                 *sqlx.Stmt `query:"re-open-conversation"`
-	UnsnoozeAll                        *sqlx.Stmt `query:"unsnooze-all"`
-	DeleteConversation                 *sqlx.Stmt `query:"delete-conversation"`
-	RemoveConversationAssignee         *sqlx.Stmt `query:"remove-conversation-assignee"`
+	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
+	GetConversation                     *sqlx.Stmt `query:"get-conversation"`
+	GetConversationListItem             *sqlx.Stmt `query:"get-conversation-list-item"`
+	GetConversationsCreatedAfter        *sqlx.Stmt `query:"get-conversations-created-after"`
+	GetUnassignedConversations          *sqlx.Stmt `query:"get-unassigned-conversations"`
+	GetConversations                    string     `query:"get-conversations"`
+	GetContactChatConversations         *sqlx.Stmt `query:"get-contact-chat-conversations"`
+	GetChatConversation                 *sqlx.Stmt `query:"get-chat-conversation"`
+	GetContactPreviousConversations     *sqlx.Stmt `query:"get-contact-previous-conversations"`
+	GetContactConversationsForAI        *sqlx.Stmt `query:"get-contact-conversations-for-ai"`
+	GetConversationsByContactEmailForAI *sqlx.Stmt `query:"get-conversations-by-contact-email-for-ai"`
+	GetConversationParticipants         *sqlx.Stmt `query:"get-conversation-participants"`
+	GetUserActiveConversationsCount     *sqlx.Stmt `query:"get-user-active-conversations-count"`
+	UpdateConversationWaitingSince      *sqlx.Stmt `query:"update-conversation-waiting-since"`
+	UpdateConversationReplyTimestamps   *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
+	UpdateConversationContactLastSeen   *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
+	UpsertUserLastSeen                  *sqlx.Stmt `query:"upsert-user-last-seen"`
+	MarkConversationUnread              *sqlx.Stmt `query:"mark-conversation-unread"`
+	UpdateConversationAssignedUser      *sqlx.Stmt `query:"update-conversation-assigned-user"`
+	ClaimUnassignedConversation         *sqlx.Stmt `query:"claim-unassigned-conversation"`
+	UpdateConversationAssignedTeam      *sqlx.Stmt `query:"update-conversation-assigned-team"`
+	UpdateConversationCustomAttributes  *sqlx.Stmt `query:"update-conversation-custom-attributes"`
+	UpdateConversationPriority          *sqlx.Stmt `query:"update-conversation-priority"`
+	UpdateConversationStatus            *sqlx.Stmt `query:"update-conversation-status"`
+	UpdateConversationLastMessage       *sqlx.Stmt `query:"update-conversation-last-message"`
+	InsertConversationParticipant       *sqlx.Stmt `query:"insert-conversation-participant"`
+	InsertConversation                  *sqlx.Stmt `query:"insert-conversation"`
+	AddConversationTags                 *sqlx.Stmt `query:"add-conversation-tags"`
+	SetConversationTags                 *sqlx.Stmt `query:"set-conversation-tags"`
+	RemoveConversationTags              *sqlx.Stmt `query:"remove-conversation-tags"`
+	GetConversationTags                 *sqlx.Stmt `query:"get-conversation-tags"`
+	UnassignOpenConversations           *sqlx.Stmt `query:"unassign-open-conversations"`
+	ReOpenConversation                  *sqlx.Stmt `query:"re-open-conversation"`
+	UnsnoozeAll                         *sqlx.Stmt `query:"unsnooze-all"`
+	DeleteConversation                  *sqlx.Stmt `query:"delete-conversation"`
+	RemoveConversationAssignee          *sqlx.Stmt `query:"remove-conversation-assignee"`
 
 	// Draft queries.
 	UpsertConversationDraft *sqlx.Stmt `query:"upsert-conversation-draft"`
@@ -428,6 +443,26 @@ func (c *Manager) GetContactPreviousConversations(contactID int, limit int) ([]m
 	var conversations = make([]models.PreviousConversation, 0)
 	if err := c.q.GetContactPreviousConversations.Select(&conversations, contactID, limit); err != nil {
 		c.lo.Error("error fetching previous conversations", "error", err)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return conversations, nil
+}
+
+// GetContactConversationsForAI returns up to 10 recent conversations of a contact, excluding excludeID, for agent-facing AI tools.
+func (c *Manager) GetContactConversationsForAI(contactID, excludeID int) ([]models.AIConversationSummary, error) {
+	conversations := make([]models.AIConversationSummary, 0)
+	if err := c.q.GetContactConversationsForAI.Select(&conversations, contactID, excludeID); err != nil {
+		c.lo.Error("error fetching contact conversations for ai", "error", err)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return conversations, nil
+}
+
+// GetConversationsByContactEmailForAI returns up to 10 recent conversations of the contact matching email exactly, for agent-facing AI tools.
+func (c *Manager) GetConversationsByContactEmailForAI(email string) ([]models.AIConversationSummary, error) {
+	conversations := make([]models.AIConversationSummary, 0)
+	if err := c.q.GetConversationsByContactEmailForAI.Select(&conversations, email); err != nil {
+		c.lo.Error("error fetching conversations by contact email for ai", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return conversations, nil
@@ -752,6 +787,11 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 	agent, err := c.userStore.GetAgent(assigneeID, "")
 	if err == nil {
 		c.SignAvatarURL(&agent.AvatarURL)
+		// Always send expectation (empty for humans) so it clears when the AI hands off to an agent.
+		expectation := ""
+		if c.aiAgent != nil {
+			expectation = c.aiAgent.AssistantExpectation(assigneeID)
+		}
 		c.BroadcastConversationToWidget(uuid, conversation.ContactID, conversation.InboxID, map[string]any{
 			"assignee": map[string]any{
 				"id":                  agent.ID,
@@ -759,8 +799,13 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 				"last_name":           agent.LastName,
 				"avatar_url":          agent.AvatarURL,
 				"availability_status": agent.AvailabilityStatus,
+				"expectation":         expectation,
 			},
 		})
+	}
+
+	if c.aiAgent != nil {
+		c.aiAgent.HandleConversationEvent(conversation.ID, assigneeID)
 	}
 
 	return nil
@@ -941,6 +986,19 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 			resolvedAt = time.Now()
 		}
 		agentData["resolved_at"] = resolvedAt.Format(time.RFC3339)
+		if c.aiAgent != nil {
+			c.aiAgent.HandleConversationResolved(conversationBeforeChange.ID)
+		}
+		// Send the CSAT survey here so every resolve path (agent UI, AI assistant, automation) triggers
+		// it - a caller that resolves without going through the HTTP handler would otherwise skip it.
+		// SendCSATReply is idempotent and no-ops when the contact has no email.
+		if inb, err := c.inboxStore.GetDBRecord(conversationBeforeChange.InboxID); err != nil {
+			c.lo.Error("error fetching inbox for CSAT on resolve", "conversation_uuid", uuid, "error", err)
+		} else if inb.CSATEnabled {
+			if err := c.SendCSATReply(actor.ID, conversationBeforeChange); err != nil {
+				c.lo.Error("error sending CSAT on resolve", "conversation_uuid", uuid, "error", err)
+			}
+		}
 	}
 	if status == models.StatusClosed {
 		closedAt := time.Now()
@@ -1080,6 +1138,27 @@ func (m *Manager) BuildEmailThreadingHeaders(conversationID int, selfSourceID st
 		inReplyTo = references[len(references)-1]
 	}
 	return references, inReplyTo
+}
+
+// SendTransientEmail sends a one-off email through the conversation's inbox, threaded like a reply, without recording it as a conversation message.
+func (m *Manager) SendTransientEmail(inboxID, conversationID int, conversationUUID string, to []string, subject, htmlContent string) error {
+	inb, err := m.inboxStore.Get(inboxID)
+	if err != nil {
+		return fmt.Errorf("fetching inbox: %w", err)
+	}
+	if inb.Channel() != inbox.ChannelEmail {
+		return fmt.Errorf("cannot send email through non-email inbox %d", inboxID)
+	}
+	references, inReplyTo := m.BuildEmailThreadingHeaders(conversationID, "")
+	return inb.Send(models.OutboundMessage{
+		From:             inb.FromAddress(),
+		To:               to,
+		Subject:          subject,
+		Content:          htmlContent,
+		ConversationUUID: conversationUUID,
+		References:       references,
+		InReplyTo:        inReplyTo,
+	})
 }
 
 // NotifyAssignment sends notifications (in-app, WebSocket, email) for an assigned conversation.
@@ -1694,6 +1773,10 @@ func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) 
 				}
 			}
 
+			expectation := ""
+			if m.aiAgent != nil {
+				expectation = m.aiAgent.AssistantExpectation(assignee.ID)
+			}
 			view.Assignee = map[string]any{
 				"id":                  assignee.ID,
 				"first_name":          assignee.FirstName,
@@ -1702,6 +1785,7 @@ func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) 
 				"availability_status": assignee.AvailabilityStatus,
 				"type":                assignee.Type,
 				"active_at":           assignee.LastActiveAt,
+				"expectation":         expectation,
 			}
 		}
 	}

@@ -6,18 +6,18 @@
       class="flex justify-between items-center"
       :class="{ 'mb-4': !isFullscreen, 'border-b border-border pb-4': isFullscreen }"
     >
-      <Tabs v-model="messageType" class="rounded border">
-        <TabsList class="bg-muted p-1 rounded">
+      <Tabs v-model="messageType" class="rounded-md border">
+        <TabsList class="bg-muted p-1 rounded-md">
           <TabsTrigger
             value="reply"
-            class="px-3 py-1 rounded transition-colors duration-200"
+            class="px-3 py-1 rounded-md transition-colors duration-200"
             :class="{ 'bg-background text-foreground': messageType === 'reply' }"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
           <TabsTrigger
             value="private_note"
-            class="px-3 py-1 rounded transition-colors duration-200"
+            class="px-3 py-1 rounded-md transition-colors duration-200"
             :class="{ 'bg-background text-foreground': messageType === 'private_note' }"
           >
             {{ $t('globals.terms.privateNote') }}
@@ -41,7 +41,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="to"
-            class="flex-grow px-3 py-2 text-sm border rounded focus:ring-2 focus:ring-ring"
+            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
             @blur="validateEmails"
           />
         </div>
@@ -51,7 +51,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="cc"
-            class="flex-grow px-3 py-2 text-sm border rounded focus:ring-2 focus:ring-ring"
+            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
             @blur="validateEmails"
           />
           <Button
@@ -68,7 +68,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="bcc"
-            class="flex-grow px-3 py-2 text-sm border rounded focus:ring-2 focus:ring-ring"
+            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
             @blur="validateEmails"
           />
         </div>
@@ -77,7 +77,7 @@
       <!-- email errors -->
       <div
         v-if="emailErrors.length > 0"
-        class="mb-4 px-2 py-1 bg-destructive/10 border border-destructive text-destructive rounded"
+        class="mb-4 px-2 py-1 bg-destructive/10 border border-destructive text-destructive rounded-md"
       >
         <p v-for="error in emailErrors" :key="error" class="text-sm">{{ error }}</p>
       </div>
@@ -131,7 +131,10 @@
       :enableSend="enableSend"
       :handleSend="handleSend"
       :handleSendAndSetStatus="handleSendAndSetStatus"
+      :isGenerating="isGenerating"
+      :showGenerateReply="messageType !== 'private_note'"
       @emojiSelect="handleEmojiSelect"
+      @generateReply="$emit('generateReply')"
     />
   </div>
 </template>
@@ -182,7 +185,7 @@ const getSuggestions = async (query) => {
   const q = query.toLowerCase()
 
   const users = usersStore.users
-    .filter((u) => u.enabled)
+    .filter((u) => u.enabled && u.type !== 'ai_assistant')
     .filter((u) => `${u.first_name} ${u.last_name}`.toLowerCase().includes(q))
     .map((u) => ({
       id: u.id,
@@ -234,6 +237,10 @@ const props = defineProps({
     type: Boolean,
     required: false,
     default: false
+  },
+  isGenerating: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -245,7 +252,8 @@ const emit = defineEmits([
   'inlineImageUpload',
   'fileDelete',
   'filesDropped',
-  'aiPromptSelected'
+  'aiPromptSelected',
+  'generateReply'
 ])
 
 const conversationStore = useConversationStore()

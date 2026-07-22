@@ -11,6 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
@@ -282,6 +283,9 @@ func (m *Manager) buildContinuityEmailContent(unreadMessages []models.Continuity
 			if fullName != "" {
 				senderName = fullName
 			}
+		}
+		if msg.SenderType == umodels.UserTypeAIAssistant {
+			senderName += " (AI)"
 		}
 
 		timestamp := msg.CreatedAt.Format("3:04 PM")

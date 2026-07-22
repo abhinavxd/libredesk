@@ -55,14 +55,14 @@
           </span>
           <div class="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 flex-shrink-0">
             <button
-              class="p-1 rounded hover:bg-muted cursor-pointer transition-colors"
+              class="p-1 rounded-md hover:bg-muted cursor-pointer transition-colors"
               @click="startEditing(attribute)"
             >
               <Pencil size="12" class="text-muted-foreground" />
             </button>
             <button
               v-if="customAttributes?.[attribute.key]"
-              class="p-1 rounded hover:bg-destructive/10 cursor-pointer transition-colors"
+              class="p-1 rounded-md hover:bg-destructive/10 cursor-pointer transition-colors"
               @click="deleteAttribute(attribute)"
             >
               <Trash2 size="12" class="text-muted-foreground hover:text-destructive" />

@@ -3,7 +3,7 @@
     <ContextMenuTrigger asChild>
       <router-link
         :to="conversationRoute"
-        class="group relative block px-3 py-3 transition-all duration-200 ease-in-out cursor-pointer"
+        class="group relative block px-3 py-2.5 transition-colors duration-150 ease-in-out cursor-pointer"
         :class="{
           'bg-accent': isCurrent,
           'bg-primary/5 hover:bg-primary/10': isItemSelected && !isCurrent,
@@ -46,7 +46,7 @@
           </div>
 
           <!-- Content container -->
-          <div class="flex-1 min-w-0 space-y-2">
+          <div class="flex-1 min-w-0 space-y-1.5">
             <!-- Name + Subject group -->
             <div>
               <!-- Contact name + inbox + time -->
@@ -54,7 +54,10 @@
                 <div class="flex items-baseline gap-1.5 min-w-0">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <h3 class="text-sm font-semibold truncate text-foreground">
+                      <h3
+                        class="text-sm truncate text-foreground"
+                        :class="isUnread ? 'font-semibold' : 'font-medium'"
+                      >
                         {{ contactFullName }}
                       </h3>
                     </TooltipTrigger>
@@ -83,7 +86,10 @@
 
             <!-- Message preview + unread count -->
             <div class="flex items-center justify-between gap-2">
-              <p class="text-sm flex-1 min-w-0 truncate text-muted-foreground">
+              <p
+                class="text-sm flex-1 min-w-0 truncate"
+                :class="isUnread ? 'text-foreground font-medium' : 'text-muted-foreground'"
+              >
                 <template v-if="isTyping">
                   <span class="italic text-primary">{{ $t('globals.terms.typing') }}</span>
                 </template>
@@ -93,15 +99,15 @@
                 </template>
                 <template v-else>
                   <Reply
-                    class="text-green-600 inline-block align-text-bottom mr-0.5"
+                    class="text-success inline-block align-text-bottom mr-0.5"
                     :size="14"
                     v-if="conversation.last_message_sender === 'agent'"
                   />{{ trimmedLastMessage }}
                 </template>
               </p>
               <div
-                v-if="conversation.unread_message_count > 0"
-                class="flex items-center justify-center w-5 h-5 bg-green-600 text-white text-xs font-medium rounded-full flex-shrink-0"
+                v-if="isUnread"
+                class="flex items-center justify-center w-5 h-5 bg-primary text-primary-foreground text-xs font-medium rounded-full flex-shrink-0"
               >
                 {{ conversation.unread_message_count > 9 ? '9+' : conversation.unread_message_count }}
               </div>
@@ -252,6 +258,8 @@ const draftPreview = computed(() => {
 const showSubject = computed(
   () => appSettingsStore.settings['app.show_conversation_subject'] !== false
 )
+
+const isUnread = computed(() => props.conversation.unread_message_count > 0)
 
 const isCurrent = computed(() => props.conversation.uuid === props.currentConversation?.uuid)
 

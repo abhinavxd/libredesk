@@ -178,19 +178,19 @@
     <!-- OAuth Connected Status -->
     <div
       v-show="isOAuthInbox"
-      class="box p-4 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+      class="box p-4 bg-success/10 border-success/20"
     >
       <div class="flex items-start justify-between">
         <div class="flex items-center space-x-3 flex-1">
-          <CheckCircle2 class="w-5 h-5 text-green-600 flex-shrink-0" />
+          <CheckCircle2 class="w-5 h-5 text-success flex-shrink-0" />
           <div class="flex-1">
-            <p class="font-semibold text-green-900 dark:text-green-100">
+            <p class="font-semibold text-success">
               {{ $t('admin.inbox.oauth.connectedVia', { provider: oauthProvider }) }}
             </p>
-            <p class="text-sm text-green-700 dark:text-green-300">{{ oauthEmail }}</p>
+            <p class="text-sm text-success">{{ oauthEmail }}</p>
             <p
               v-show="oauthClientId"
-              class="text-xs text-green-600 dark:text-green-400 font-mono mt-1"
+              class="text-xs text-success font-mono mt-1"
             >
               {{ $t('globals.terms.clientID') }}: {{ oauthClientId.substring(0, 20) }}...{{
                 oauthClientId.slice(-8)

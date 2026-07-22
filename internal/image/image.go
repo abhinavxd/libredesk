@@ -4,10 +4,22 @@ package image
 
 import (
 	"bytes"
+	"encoding/base64"
+	"fmt"
+	"image"
 	"io"
 
 	"github.com/disintegration/imaging"
 	"github.com/gabriel-vasile/mimetype"
+)
+
+const (
+	// llmMaxDim caps an image's longest edge before it is sent to a vision model.
+	llmMaxDim      = 1568
+	llmJPEGQuality = 85
+	// maxDecodePixels bounds width*height read from the header before decoding, blocking image bombs
+	// that declare huge dimensions in a small file.
+	maxDecodePixels = 100_000_000
 )
 
 var (
@@ -66,4 +78,26 @@ func CreateThumb(thumbPxSize int, r io.Reader) (*bytes.Reader, error) {
 	}
 
 	return bytes.NewReader(out.Bytes()), nil
+}
+
+// EncodeForLLM decodes an image, downscales its longest edge to at most llmMaxDim, re-encodes it as
+// JPEG, and returns the base64 payload plus media type for a vision model request.
+func EncodeForLLM(content []byte) (data string, mediaType string, err error) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(content))
+	if err != nil {
+		return "", "", err
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxDecodePixels/cfg.Height {
+		return "", "", fmt.Errorf("invalid or too-large image dimensions %dx%d", cfg.Width, cfg.Height)
+	}
+	img, err := imaging.Decode(bytes.NewReader(content))
+	if err != nil {
+		return "", "", err
+	}
+	img = imaging.Fit(img, llmMaxDim, llmMaxDim, imaging.Lanczos)
+	var out bytes.Buffer
+	if err := imaging.Encode(&out, img, imaging.JPEG, imaging.JPEGQuality(llmJPEGQuality)); err != nil {
+		return "", "", err
+	}
+	return base64.StdEncoding.EncodeToString(out.Bytes()), "image/jpeg", nil
 }

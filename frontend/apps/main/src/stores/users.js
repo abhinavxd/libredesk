@@ -12,6 +12,7 @@ export const useUsersStore = defineStore('users', () => {
     const options = computed(() => users.value.map(user => ({
         label: user.first_name + ' ' + user.last_name,
         value: String(user.id),
+        type: user.type,
         avatar_url: user.avatar_url,
         availability_status: user.availability_status,
     })))

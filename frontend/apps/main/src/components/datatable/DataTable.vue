@@ -26,7 +26,7 @@
               :key="header.id"
               class="h-11 px-4 text-center text-sm font-medium text-muted-foreground"
               :class="{
-                'cursor-pointer select-none transition-colors hover:text-foreground':
+                'group cursor-pointer select-none transition-colors hover:text-foreground':
                   header.column.getCanSort()
               }"
               @click="header.column.getToggleSortingHandler()?.($event)"
@@ -61,12 +61,13 @@
               :key="rows[virtualRow.index].id"
               :data-index="virtualRow.index"
               :data-state="rows[virtualRow.index].getIsSelected() ? 'selected' : undefined"
-              class="border-b border-border/50 transition-colors last:border-0 hover:bg-muted/30 data-[state=selected]:bg-muted"
+              class="group/row border-b border-border/50 transition-colors last:border-0 hover:bg-muted/30 data-[state=selected]:bg-muted"
             >
               <TableCell
                 v-for="cell in rows[virtualRow.index].getVisibleCells()"
                 :key="cell.id"
                 class="px-4 py-3 text-center text-sm"
+                :class="cell.column.id === 'actions' ? actionCellClass : ''"
               >
                 <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
               </TableCell>
@@ -122,6 +123,10 @@ import {
 import { Input } from '@shared-ui/components/ui/input'
 
 const { t } = useI18n()
+
+// Hidden until row-hover on pointer devices; always shown on touch, focus, and while the menu is open.
+const actionCellClass =
+  'transition-opacity duration-150 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100 focus-within:!opacity-100 [&:has([data-state=open])]:!opacity-100'
 
 const props = defineProps({
   columns: Array,

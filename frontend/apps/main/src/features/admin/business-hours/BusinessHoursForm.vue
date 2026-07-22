@@ -73,7 +73,7 @@
                     :disabled="!selectedDays[day]"
                   />
                 </div>
-                <span class="text-gray-500">to</span>
+                <span class="text-muted-foreground">to</span>
                 <div class="flex flex-col items-start">
                   <Input
                     type="time"

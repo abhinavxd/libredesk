@@ -242,7 +242,50 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// AI completions.
 	g.GET("/api/v1/ai/prompts", auth(handleGetAIPrompts))
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
-	g.PUT("/api/v1/ai/provider", perm(handleUpdateAIProvider, "ai:manage"))
+
+	// AI provider config (completion / embedding).
+	g.GET("/api/v1/ai/config/{type}", perm(handleGetAIConfig, "ai:manage"))
+	g.PUT("/api/v1/ai/config/{type}", perm(handleUpdateAIConfig, "ai:manage"))
+	g.POST("/api/v1/ai/config/{type}/test", perm(handleTestAIConfig, "ai:manage"))
+
+	// AI custom tools.
+	g.GET("/api/v1/ai/tools", perm(handleGetAITools, "ai:manage"))
+	g.GET("/api/v1/ai/tools/{id}", perm(handleGetAITool, "ai:manage"))
+	g.POST("/api/v1/ai/tools", perm(handleCreateAITool, "ai:manage"))
+	g.PUT("/api/v1/ai/tools/{id}", perm(handleUpdateAITool, "ai:manage"))
+	g.DELETE("/api/v1/ai/tools/{id}", perm(handleDeleteAITool, "ai:manage"))
+
+	// AI knowledge base snippets.
+	g.GET("/api/v1/ai/snippets", perm(handleGetAISnippets, "ai:manage"))
+	g.POST("/api/v1/ai/snippets", perm(handleCreateAISnippet, "ai:manage"))
+	g.POST("/api/v1/ai/snippets/import-url", perm(handleImportAISnippetFromURL, "ai:manage"))
+	g.PUT("/api/v1/ai/snippets/{id}", perm(handleUpdateAISnippet, "ai:manage"))
+	g.DELETE("/api/v1/ai/snippets/{id}", perm(handleDeleteAISnippet, "ai:manage"))
+
+	// AI assistant: reply drafting + copilot chat.
+	g.POST("/api/v1/ai/generate-reply", auth(handleAIGenerateReply))
+	g.POST("/api/v1/ai/summarize", auth(handleAISummarizeConversation))
+	g.POST("/api/v1/ai/suggest-tags", auth(handleAISuggestTags))
+	g.POST("/api/v1/ai/copilot", auth(handleAICopilot))
+	g.GET("/api/v1/ai/copilot/messages", auth(handleGetCopilotMessages))
+	g.DELETE("/api/v1/ai/copilot/messages", auth(handleClearCopilotMessages))
+
+	// Autonomous AI agents (assistants).
+	g.GET("/api/v1/ai/assistants/compact", auth(handleGetAIAssistantsCompact))
+	g.GET("/api/v1/ai/assistants", perm(handleGetAIAssistants, "ai:manage"))
+	g.GET("/api/v1/ai/assistants/{id}", perm(handleGetAIAssistant, "ai:manage"))
+	g.POST("/api/v1/ai/assistants", perm(handleCreateAIAssistant, "ai:manage"))
+	g.PUT("/api/v1/ai/assistants/{id}", perm(handleUpdateAIAssistant, "ai:manage"))
+	g.DELETE("/api/v1/ai/assistants/{id}", perm(handleDeleteAIAssistant, "ai:manage"))
+	g.POST("/api/v1/ai/assistants/{id}/preview", perm(handleAIAssistantPreview, "ai:manage"))
+	g.GET("/api/v1/ai/assistants/{id}/stats", perm(handleGetAIAssistantStats, "ai:manage"))
+
+	// AI FAQ learning: review queue for suggestions mined from resolved conversations + on/off setting.
+	g.GET("/api/v1/ai/faq-suggestions", perm(handleGetAIFaqSuggestions, "ai:manage"))
+	g.POST("/api/v1/ai/faq-suggestions/{id}/approve", perm(handleApproveAIFaqSuggestion, "ai:manage"))
+	g.POST("/api/v1/ai/faq-suggestions/{id}/reject", perm(handleRejectAIFaqSuggestion, "ai:manage"))
+	g.GET("/api/v1/ai/faq-learning", perm(handleGetAIFaqLearning, "ai:manage"))
+	g.PUT("/api/v1/ai/faq-learning", perm(handleUpdateAIFaqLearning, "ai:manage"))
 
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))

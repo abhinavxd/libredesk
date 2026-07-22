@@ -14,6 +14,13 @@
         {{ getFullName }}
       </router-link>
       <router-link
+        v-else-if="canManageAI"
+        :to="aiAssistantRoute"
+        class="cursor-pointer text-muted-foreground text-sm font-medium hover:underline hover:text-primary transition-colors duration-200"
+      >
+        {{ getFullName }}
+      </router-link>
+      <router-link
         v-else-if="canManageUsers"
         :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
         class="cursor-pointer text-muted-foreground text-sm font-medium hover:underline hover:text-primary transition-colors duration-200"
@@ -141,7 +148,7 @@
             <div
               v-if="!isOutgoing && hasQuotedContent"
               @click="toggleQuote"
-              class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded transition-colors duration-200"
+              class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded-md transition-colors duration-200"
             >
               {{ showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText') }}
             </div>
@@ -158,7 +165,7 @@
             <!-- Status Icons (outgoing only) -->
             <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
               <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
-              <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
+              <Check :size="14" v-if="showCheckCheck" class="text-success" />
               <Tooltip v-if="message.meta?.continuity_emailed">
                 <TooltipTrigger>
                   <Mail :size="12" class="text-muted-foreground" />
@@ -181,6 +188,18 @@
       <!-- Avatar (right for outgoing) -->
       <template v-if="isOutgoing">
         <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
+        <router-link
+          v-else-if="canManageAI"
+          :to="aiAssistantRoute"
+          class="flex-shrink-0"
+        >
+          <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
+            <AvatarImage :src="getAvatar" />
+            <AvatarFallback class="font-medium">
+              {{ avatarFallback }}
+            </AvatarFallback>
+          </Avatar>
+        </router-link>
         <router-link
           v-else-if="canManageUsers"
           :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
@@ -324,7 +343,15 @@ const deleteNote = () => {
 }
 
 const isSystemUser = computed(() => props.message.author?.email === 'System')
-const canManageUsers = computed(() => !isSystemUser.value && userStore.can('users:manage'))
+const isAIAssistant = computed(() => props.message.author?.type === 'ai_assistant')
+const canManageUsers = computed(
+  () => !isSystemUser.value && !isAIAssistant.value && userStore.can('users:manage')
+)
+const canManageAI = computed(() => isAIAssistant.value && userStore.can('ai:manage'))
+const aiAssistantRoute = computed(() => {
+  const id = props.message.meta?.ai_assistant_id
+  return id ? { name: 'edit-ai-assistant', params: { id } } : { name: 'ai-assistants' }
+})
 
 const isOutgoing = computed(() => props.direction === 'outgoing')
 
@@ -361,6 +388,8 @@ const bubbleClasses = computed(() => ({
   'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
   'border-destructive': isOutgoing.value && props.message.status === 'failed',
   relative: isOutgoing.value,
+  'corner-flat-tr': isOutgoing.value && !props.groupWithPrev,
+  'corner-flat-tl': !isOutgoing.value && !props.groupWithPrev,
   'show-quoted-text': !isOutgoing.value && showQuotedText.value,
   'hide-quoted-text': !isOutgoing.value && !showQuotedText.value
 }))
@@ -438,5 +467,13 @@ const showEnvelope = computed(() => {
   max-width: 100%;
   height: auto;
   cursor: zoom-in;
+}
+
+.message-bubble.corner-flat-tr {
+  border-top-right-radius: 0;
+}
+
+.message-bubble.corner-flat-tl {
+  border-top-left-radius: 0;
 }
 </style>

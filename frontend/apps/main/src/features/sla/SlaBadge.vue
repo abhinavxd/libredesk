@@ -2,7 +2,7 @@
   <div v-if="dueAt" class="flex justify-start items-center space-x-2">
     <!-- Overdue-->
     <span v-if="sla?.status === 'overdue'" key="overdue" class="sla-badge sla-overdue">
-      <AlertCircle size="12" class="shrink-0 text-red-600 dark:text-red-300" stroke-width="2" />
+      <AlertCircle size="12" class="shrink-0 text-destructive" stroke-width="2" />
       <span class="sla-text">
         <span v-if="!showExtra">{{ label }}</span>
         <span v-else>{{ label }} {{ $t('sla.overdueBy') }} {{ sla.value }} </span>
@@ -11,13 +11,13 @@
 
     <!-- SLA Hit -->
     <span v-else-if="sla?.status === 'hit' && showExtra" key="sla-hit" class="sla-badge sla-hit">
-      <CheckCircle size="12" class="shrink-0 text-green-600 dark:text-green-300" stroke-width="2" />
+      <CheckCircle size="12" class="shrink-0 text-success" stroke-width="2" />
       <span class="sla-text">{{ label }} {{ $t('sla.met') }}</span>
     </span>
 
     <!-- Remaining -->
     <span v-else-if="sla?.status === 'remaining'" key="remaining" class="sla-badge sla-remaining">
-      <Clock size="12" class="shrink-0 text-amber-600 dark:text-amber-300" stroke-width="2" />
+      <Clock size="12" class="shrink-0 text-warning" stroke-width="2" />
       <span class="sla-text">{{ label }} {{ sla.value }}</span>
     </span>
   </div>
@@ -52,23 +52,26 @@ watch(
 
 <style scoped>
 .sla-badge {
-  @apply inline-flex items-center px-1.5 py-0.5 rounded border transition-all
+  @apply inline-flex items-center px-1.5 py-0.5 rounded-md border transition-all
          text-xs font-medium tracking-tight space-x-1 hover:shadow-sm;
 }
 
 .sla-overdue {
-  @apply bg-red-50/80 border-red-100 text-red-600
-         dark:bg-red-900/40 dark:border-red-800/20 dark:text-red-300;
+  background-color: hsl(var(--destructive) / 0.1);
+  border-color: hsl(var(--destructive) / 0.2);
+  color: hsl(var(--destructive));
 }
 
 .sla-hit {
-  @apply bg-green-50/80 border-green-100 text-green-600
-         dark:bg-green-900/40 dark:border-green-800/20 dark:text-green-300;
+  background-color: hsl(var(--success) / 0.1);
+  border-color: hsl(var(--success) / 0.2);
+  color: hsl(var(--success));
 }
 
 .sla-remaining {
-  @apply bg-amber-50/80 border-amber-100 text-amber-600
-         dark:bg-amber-900/40 dark:border-amber-800/20 dark:text-amber-300;
+  background-color: hsl(var(--warning) / 0.1);
+  border-color: hsl(var(--warning) / 0.2);
+  color: hsl(var(--warning));
 }
 
 .sla-text {

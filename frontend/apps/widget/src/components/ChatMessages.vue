@@ -60,7 +60,7 @@
             ]"
           >
             <!-- Message content -->
-            <span v-if="message.content_type === 'text'" class="mb-1 whitespace-pre-wrap">{{
+            <span v-if="message.content_type === 'text'" class="whitespace-pre-wrap">{{
               message.content
             }}</span>
             <Letter
@@ -68,15 +68,18 @@
               :html="message.content"
               :allowedSchemas="['cid', 'https', 'http', 'mailto']"
               :allowed-css-properties="extendedCssProperties"
-              class="mb-1 native-html"
+              class="native-html"
             />
             <div
               v-if="containsQuoteMarkers(message.content)"
               @click="toggleQuote(message.uuid)"
+              @keydown.enter.prevent="toggleQuote(message.uuid)"
+              @keydown.space.prevent="toggleQuote(message.uuid)"
+              tabindex="0"
               role="button"
               :aria-expanded="isQuotedTextVisible(message.uuid)"
               :class="[
-                'text-xs cursor-pointer px-2 py-1 w-max rounded transition-all',
+                'text-xs cursor-pointer px-2 py-1 w-max rounded-md transition-all mt-1',
                 message.author.type === 'contact' || message.author.type === 'visitor'
                   ? 'text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-primary'
@@ -89,7 +92,7 @@
               }}
             </div>
             <!-- Show attachments if available -->
-            <MessageAttachment :attachments="message.attachments" />
+            <MessageAttachment class="mt-1" :attachments="message.attachments" />
           </div>
 
           <!-- Message metadata -->

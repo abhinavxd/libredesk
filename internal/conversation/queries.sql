@@ -195,6 +195,7 @@ SELECT
    c.priority_id,
    p.name as priority,
    s.name as status,
+   s.category as status_category,
    c.uuid,
    c.reference_number,
    c.first_reply_at,
@@ -309,6 +310,43 @@ WHERE c.contact_id = $1
 ORDER BY c.created_at DESC
 LIMIT $2;
 
+-- name: get-contact-conversations-for-ai
+SELECT
+    c.id,
+    c.reference_number,
+    c.subject,
+    cs.name AS status,
+    c.created_at,
+    c.last_message_at,
+    c.assigned_user_id,
+    c.assigned_team_id
+FROM conversations c
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE c.contact_id = $1
+  AND c.id != $2
+ORDER BY c.created_at DESC
+LIMIT 10;
+
+-- name: get-conversations-by-contact-email-for-ai
+SELECT
+    c.id,
+    c.reference_number,
+    c.subject,
+    cs.name AS status,
+    c.created_at,
+    c.last_message_at,
+    c.assigned_user_id,
+    c.assigned_team_id,
+    TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) AS contact_name
+FROM conversations c
+JOIN users u ON c.contact_id = u.id
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE LOWER(u.email) = LOWER($1)
+  AND u.type = 'contact'
+  AND u.deleted_at IS NULL
+ORDER BY c.created_at DESC
+LIMIT 10;
+
 -- name: get-chat-conversation
 SELECT
     c.created_at,
@@ -335,11 +373,13 @@ SELECT
     COALESCE(au.first_name, '') as "assignee.first_name",
     COALESCE(au.id, 0) as "assignee.id",
     COALESCE(au.last_name, '') as "assignee.last_name",
-    COALESCE(au.type::TEXT, '') as "assignee.type"
+    COALESCE(au.type::TEXT, '') as "assignee.type",
+    COALESCE(aa.expectation, '') as "assignee.expectation"
 FROM conversations c
 INNER JOIN inboxes inb on c.inbox_id = inb.id
 LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 LEFT JOIN users au ON c.assigned_user_id = au.id
+LEFT JOIN ai_assistants aa ON aa.user_id = au.id
 LEFT JOIN users lis ON c.last_interaction_sender_id = lis.id
 WHERE c.uuid = $1
   AND inb.deleted_at IS NULL;

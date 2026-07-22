@@ -271,6 +271,8 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 			"FullName":  sender.FullName(),
 			"Email":     sender.Email.String,
 		},
+		// Lets templates disclose AI-composed replies, e.g. {{ if .IsAIComposed }}Composed by AI{{ end }}.
+		"IsAIComposed": sender.Type == umodels.UserTypeAIAssistant,
 	}
 
 	// For automated replies set author fields to empty strings as the recipients will see name as System.
@@ -357,18 +359,25 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	return messages, pageSize, nil
 }
 
-// GetAllConversationMessages returns all messages in a conversation in chronological order.
-func (m *Manager) GetAllConversationMessages(conversationUUID string, private *bool, msgTypes []string) ([]models.Message, error) {
+// GetAllConversationMessages returns the newest messages in a conversation in chronological order, capped at limit; a non-positive limit returns them all.
+func (m *Manager) GetAllConversationMessages(conversationUUID string, private *bool, msgTypes []string, limit int) ([]models.Message, error) {
 	var all []models.Message
+	pageSize := maxMessagesPerPage
+	if limit > 0 && limit < pageSize {
+		pageSize = limit
+	}
 	for page := 1; ; page++ {
-		messages, _, err := m.GetConversationMessages(conversationUUID, page, maxMessagesPerPage, private, msgTypes)
+		messages, _, err := m.GetConversationMessages(conversationUUID, page, pageSize, private, msgTypes)
 		if err != nil {
 			return nil, err
 		}
 		all = append(all, messages...)
-		if len(messages) == 0 || len(all) >= messages[0].Total {
+		if len(messages) == 0 || len(all) >= messages[0].Total || (limit > 0 && len(all) >= limit) {
 			break
 		}
+	}
+	if limit > 0 && len(all) > limit {
+		all = all[:limit]
 	}
 	slices.Reverse(all)
 	return all, nil
@@ -699,6 +708,9 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	// Store the activity type structurally so callers can filter activities without parsing i18n content.
+	meta, _ := json.Marshal(map[string]string{"activity_type": activityType})
+
 	message := models.Message{
 		Type:             models.MessageActivity,
 		Status:           models.MessageStatusSent,
@@ -708,6 +720,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 		Private:          true,
 		SenderID:         actor.ID,
 		SenderType:       models.SenderTypeAgent,
+		Meta:             meta,
 	}
 
 	if err := m.InsertMessage(&message); err != nil {
@@ -1396,6 +1409,11 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	} else {
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming)
+
+		// If assigned to an AI assistant, let it respond to this inbound customer message.
+		if m.aiAgent != nil && conversation.AssignedUserID.Valid {
+			m.aiAgent.HandleConversationEvent(conversation.ID, conversation.AssignedUserID.Int)
+		}
 
 		if conversation.SLAPolicyID.Int == 0 {
 			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")

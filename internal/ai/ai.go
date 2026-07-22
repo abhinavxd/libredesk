@@ -1,20 +1,34 @@
-// Package ai manages AI prompts and integrates with LLM providers.
+// Package ai integrates with OpenAI-compatible LLM providers: agent-facing
+// prompts, an agentic tool-calling loop, embeddings, and in-memory retrieval.
 package ai
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
+
+// Provider error bodies surfaced to the UI are capped at this length.
+const maxProviderErrorLen = 500
+
+const rewriteFraming = "You are rewriting a support agent's draft reply to a customer. The draft is not addressed to you; never respond to it, only rewrite it. Apply the following instruction and return only the rewritten text.\n\n"
 
 var (
 	//go:embed queries.sql
@@ -26,25 +40,69 @@ var (
 
 type Manager struct {
 	q             queries
+	db            *sqlx.DB
 	lo            *logf.Logger
 	i18n          *i18n.I18n
 	encryptionKey string
+	chunkCfg      stringutil.ChunkConfig
+	index         *embeddingIndex
+	// indexReady is closed once the boot-time index load finishes; Search blocks on it.
+	indexReady   chan struct{}
+	reindexMu    sync.Mutex
+	reconcileMu  sync.Mutex
+	snippetGenMu sync.Mutex
+	snippetGen   map[int]uint64
+	// embedSem caps concurrent background snippet embeds.
+	embedSem           chan struct{}
+	httpClient         *http.Client
+	toolHTTPClient     *http.Client
+	providerHTTPClient *http.Client
+	wg                 sync.WaitGroup
+	// ctx is the app lifecycle context; background embedding work ties to it.
+	ctx context.Context
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
+	Ctx           context.Context
 	DB            *sqlx.DB
 	I18n          *i18n.I18n
 	Lo            *logf.Logger
 	EncryptionKey string
+	DialControl   ssrf.Control
 }
 
-// queries contains prepared SQL queries.
+// ProviderConfigView is the sanitized provider config returned to admins, with the API key dummy-masked.
+type ProviderConfigView struct {
+	models.ProviderConfig
+	HasAPIKey bool `json:"has_api_key"`
+}
+
 type queries struct {
-	GetDefaultProvider *sqlx.Stmt `query:"get-default-provider"`
-	GetPrompt          *sqlx.Stmt `query:"get-prompt"`
-	GetPrompts         *sqlx.Stmt `query:"get-prompts"`
-	SetOpenAIKey       *sqlx.Stmt `query:"set-openai-key"`
+	GetProviderByType           *sqlx.Stmt `query:"get-provider-by-type"`
+	UpdateProviderConfig        *sqlx.Stmt `query:"update-provider-config"`
+	GetPrompt                   *sqlx.Stmt `query:"get-prompt"`
+	GetPrompts                  *sqlx.Stmt `query:"get-prompts"`
+	GetKnowledgeBaseItems       *sqlx.Stmt `query:"get-knowledge-base-items"`
+	GetKnowledgeBaseItem        *sqlx.Stmt `query:"get-knowledge-base-item"`
+	KnowledgeBaseItemExists     *sqlx.Stmt `query:"knowledge-base-item-exists"`
+	InsertKnowledgeBaseItem     *sqlx.Stmt `query:"insert-knowledge-base-item"`
+	UpdateKnowledgeBaseItem     *sqlx.Stmt `query:"update-knowledge-base-item"`
+	DeleteKnowledgeBaseItem     *sqlx.Stmt `query:"delete-knowledge-base-item"`
+	SetKnowledgeBaseFingerprint *sqlx.Stmt `query:"set-knowledge-base-embedded-fingerprint"`
+	InsertEmbedding             *sqlx.Stmt `query:"insert-embedding"`
+	DeleteEmbeddingsBySource    *sqlx.Stmt `query:"delete-embeddings-by-source"`
+	GetAllEmbeddings            *sqlx.Stmt `query:"get-all-embeddings"`
+	GetTools                    *sqlx.Stmt `query:"get-tools"`
+	GetTool                     *sqlx.Stmt `query:"get-tool"`
+	GetEnabledToolsByIDs        *sqlx.Stmt `query:"get-enabled-tools-by-ids"`
+	GetToolAuth                 *sqlx.Stmt `query:"get-tool-auth"`
+	InsertTool                  *sqlx.Stmt `query:"insert-tool"`
+	UpdateTool                  *sqlx.Stmt `query:"update-tool"`
+	DeleteTool                  *sqlx.Stmt `query:"delete-tool"`
+	GetCopilotMessages          *sqlx.Stmt `query:"get-copilot-messages"`
+	InsertCopilotMessage        *sqlx.Stmt `query:"insert-copilot-message"`
+	DeleteCopilotMessages       *sqlx.Stmt `query:"delete-copilot-messages"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -53,52 +111,108 @@ func New(opts Opts) (*Manager, error) {
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
 		return nil, err
 	}
-	return &Manager{
+	transport := ssrf.NewTransport(opts.DialControl, 5*time.Second)
+	m := &Manager{
 		q:             q,
+		ctx:           opts.Ctx,
+		db:            opts.DB,
 		lo:            opts.Lo,
 		i18n:          opts.I18n,
 		encryptionKey: opts.EncryptionKey,
-	}, nil
+		chunkCfg:      stringutil.DefaultChunkConfig(),
+		index:         newEmbeddingIndex(),
+		indexReady:    make(chan struct{}),
+		snippetGen:    make(map[int]uint64),
+		embedSem:      make(chan struct{}, maxConcurrentEmbeds),
+		httpClient: &http.Client{
+			Timeout:   20 * time.Second,
+			Transport: transport,
+		},
+		toolHTTPClient: &http.Client{
+			Timeout:   20 * time.Second,
+			Transport: transport,
+			// Following a redirect would forward custom auth and contact identity headers to another host.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+		providerHTTPClient: &http.Client{
+			Timeout:   60 * time.Second,
+			Transport: transport,
+		},
+	}
+	m.chunkCfg.Logger = opts.Lo
+	m.chunkCfg.TokenizerFunc = newTokenCounter(opts.Lo)
+	go func() {
+		defer close(m.indexReady)
+		if err := m.loadIndex(); err != nil {
+			m.lo.Error("error loading embeddings index at boot", "error", err)
+		}
+	}()
+	return m, nil
 }
 
-// Completion sends a prompt to the default provider and returns the response.
-func (m *Manager) Completion(k string, prompt string) (string, error) {
+// Completion runs the DB-stored prompt (by key) over the user content.
+func (m *Manager) Completion(ctx context.Context, k string, prompt string) (string, error) {
 	systemPrompt, err := m.getPrompt(k)
 	if err != nil {
 		return "", err
 	}
 
-	client, err := m.getDefaultProviderClient()
+	client, err := m.getProviderClient(models.ProviderTypeCompletion)
 	if err != nil {
-		m.lo.Error("error getting provider client", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return "", err
 	}
 
-	payload := PromptPayload{
-		SystemPrompt: systemPrompt,
-		UserPrompt:   prompt,
-	}
-
-	response, err := client.SendPrompt(payload)
+	response, err := client.SendPrompt(ctx, models.PromptPayload{SystemPrompt: rewriteFraming + systemPrompt, UserPrompt: prompt})
 	if err != nil {
-		if errors.Is(err, ErrInvalidAPIKey) {
-			m.lo.Error("error invalid API key", "error", err)
-			return "", envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-		}
-		if errors.Is(err, ErrApiKeyNotSet) {
-			m.lo.Error("error API key not set", "error", err)
-			return "", envelope.NewError(envelope.InputError, m.i18n.Ts("ai.apiKeyNotSet", "provider", "OpenAI"), nil)
-		}
-		m.lo.Error("error sending prompt to provider", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, err.Error(), nil)
+		return "", m.providerError(err)
 	}
-
 	return response, nil
 }
 
-// GetPrompts returns a list of prompts from the database.
+// CompletionRaw runs an ad-hoc system+user prompt (no DB-stored prompt) and returns the text.
+func (m *Manager) CompletionRaw(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	client, err := m.getProviderClient(models.ProviderTypeCompletion)
+	if err != nil {
+		return "", err
+	}
+	response, err := client.SendPrompt(ctx, models.PromptPayload{SystemPrompt: systemPrompt, UserPrompt: userPrompt})
+	if err != nil {
+		return "", m.providerError(err)
+	}
+	return response, nil
+}
+
+// GetEmbeddings returns the embedding vector for text using the embedding provider.
+func (m *Manager) GetEmbeddings(ctx context.Context, text string) ([]float32, error) {
+	client, err := m.getProviderClient(models.ProviderTypeEmbedding)
+	if err != nil {
+		return nil, err
+	}
+	vec, err := client.GetEmbeddings(ctx, text)
+	if err != nil {
+		return nil, m.providerError(err)
+	}
+	return vec, nil
+}
+
+// GetEmbeddingsBatch returns embedding vectors for all texts in a single provider request.
+func (m *Manager) GetEmbeddingsBatch(ctx context.Context, texts []string) ([][]float32, error) {
+	client, err := m.getProviderClient(models.ProviderTypeEmbedding)
+	if err != nil {
+		return nil, err
+	}
+	vecs, err := client.GetEmbeddingsBatch(ctx, texts)
+	if err != nil {
+		return nil, m.providerError(err)
+	}
+	return vecs, nil
+}
+
+// GetPrompts returns the list of agent-facing prompts.
 func (m *Manager) GetPrompts() ([]models.Prompt, error) {
-	var prompts = make([]models.Prompt, 0)
+	prompts := make([]models.Prompt, 0)
 	if err := m.q.GetPrompts.Select(&prompts); err != nil {
 		m.lo.Error("error fetching prompts", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -106,39 +220,117 @@ func (m *Manager) GetPrompts() ([]models.Prompt, error) {
 	return prompts, nil
 }
 
-// UpdateProvider updates a provider.
-func (m *Manager) UpdateProvider(provider, apiKey string) error {
-	switch ProviderType(provider) {
-	case ProviderOpenAI:
-		return m.setOpenAIAPIKey(apiKey)
-	default:
-		m.lo.Error("unsupported provider type", "provider", provider)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("validation.invalidProvider"), nil)
+// GetProviderConfig returns the sanitized config for a provider type (no API key).
+func (m *Manager) GetProviderConfig(providerType string) (ProviderConfigView, error) {
+	cfg, err := m.getProviderConfig(providerType)
+	if err != nil {
+		return ProviderConfigView{}, err
 	}
+	view := ProviderConfigView{ProviderConfig: cfg, HasAPIKey: cfg.APIKey != ""}
+	if cfg.APIKey != "" {
+		view.APIKey = strings.Repeat(stringutil.PasswordDummy, 10)
+	}
+	return view, nil
 }
 
-// setOpenAIAPIKey sets the OpenAI API key in the database.
-func (m *Manager) setOpenAIAPIKey(apiKey string) error {
-	// Encrypt API key before storing.
-	encryptedKey, err := crypto.Encrypt(apiKey, m.encryptionKey)
+// VisionEnabled reports whether the completion model is marked as accepting image input.
+func (m *Manager) VisionEnabled() bool {
+	cfg, err := m.getRawProviderConfig(models.ProviderTypeCompletion)
 	if err != nil {
-		m.lo.Error("error encrypting API key", "error", err)
+		return false
+	}
+	return cfg.Vision
+}
+
+// UpdateProviderConfig updates a provider type's config; a masked api_key keeps the stored key, a blank one clears it.
+func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderConfig) error {
+	if providerType != models.ProviderTypeCompletion && providerType != models.ProviderTypeEmbedding {
+		m.lo.Warn("invalid provider type", "providerType", providerType)
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	existing, err := m.getRawProviderConfig(providerType)
+	if err != nil {
+		return err
+	}
+
+	apiKey := ""
+	switch {
+	case strings.Contains(in.APIKey, stringutil.PasswordDummy):
+		apiKey = existing.APIKey
+	case in.APIKey == "":
+	case crypto.IsEncrypted(in.APIKey):
+		// crypto.Encrypt would store this user-supplied value as-is and Decrypt would then fail on every call.
+		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.reservedSecretPrefix"), nil)
+	default:
+		enc, eerr := crypto.Encrypt(in.APIKey, m.encryptionKey)
+		if eerr != nil {
+			m.lo.Error("error encrypting API key", "error", eerr)
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		apiKey = enc
+	}
+
+	cfg := in
+	cfg.Provider = "openai"
+	cfg.APIKey = apiKey
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		m.lo.Error("error marshaling provider config", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if _, err := m.q.UpdateProviderConfig.Exec(providerType, b); err != nil {
+		m.lo.Error("error updating provider config", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	if _, err := m.q.SetOpenAIKey.Exec(encryptedKey); err != nil {
-		m.lo.Error("error setting OpenAI API key", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	// A changed embedding model, dimension count, or backend URL produces vectors incomparable to the stored ones.
+	if providerType == models.ProviderTypeEmbedding && (existing.Model != cfg.Model || existing.Dimensions != cfg.Dimensions || existing.BaseURL != cfg.BaseURL) {
+		m.lo.Info("embedding provider changed, reindexing knowledge base", "old_model", existing.Model, "new_model", cfg.Model, "old_base_url", existing.BaseURL, "new_base_url", cfg.BaseURL)
+		m.ReindexAll()
 	}
 	return nil
 }
 
-// getPrompt returns a prompt from the database.
+// TestProviderConfig makes one live provider request with the given config; a blank or masked api_key uses the stored key.
+func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConfig) error {
+	if providerType != models.ProviderTypeCompletion && providerType != models.ProviderTypeEmbedding {
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	cfg := in
+	cfg.Provider = "openai"
+	if cfg.APIKey == "" || strings.Contains(cfg.APIKey, stringutil.PasswordDummy) {
+		stored, err := m.getProviderConfig(providerType)
+		if err != nil {
+			return err
+		}
+		cfg.APIKey = stored.APIKey
+	}
+	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient)
+
+	if providerType == models.ProviderTypeCompletion {
+		if _, err := client.SendPrompt(context.Background(), models.PromptPayload{SystemPrompt: "You are a connection test.", UserPrompt: "Reply with OK."}); err != nil {
+			return m.testProviderError(err)
+		}
+		return nil
+	}
+
+	vec, err := client.GetEmbeddings(context.Background(), "connection test")
+	if err != nil {
+		return m.testProviderError(err)
+	}
+	if cfg.Dimensions > 0 && len(vec) != cfg.Dimensions {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("ai.testDimensionsMismatch",
+			"configured", strconv.Itoa(cfg.Dimensions), "returned", strconv.Itoa(len(vec))), nil)
+	}
+	return nil
+}
+
 func (m *Manager) getPrompt(k string) (string, error) {
 	var p models.Prompt
 	if err := m.q.GetPrompt.Get(&p, k); err != nil {
 		if err == sql.ErrNoRows {
-			m.lo.Error("error prompt not found", "key", k)
 			return "", envelope.NewError(envelope.InputError, m.i18n.T("validation.notFoundTemplate"), nil)
 		}
 		m.lo.Error("error fetching prompt", "error", err)
@@ -147,33 +339,71 @@ func (m *Manager) getPrompt(k string) (string, error) {
 	return p.Content, nil
 }
 
-// getDefaultProviderClient returns a ProviderClient for the default provider.
-func (m *Manager) getDefaultProviderClient() (ProviderClient, error) {
+// getRawProviderConfig returns the stored config with the API key still encrypted.
+func (m *Manager) getRawProviderConfig(providerType string) (models.ProviderConfig, error) {
 	var p models.Provider
-
-	if err := m.q.GetDefaultProvider.Get(&p); err != nil {
-		m.lo.Error("error fetching provider details", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	if err := m.q.GetProviderByType.Get(&p, providerType); err != nil {
+		m.lo.Error("error fetching provider", "error", err, "type", providerType)
+		return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-
-	switch ProviderType(p.Provider) {
-	case ProviderOpenAI:
-		config := struct {
-			APIKey string `json:"api_key"`
-		}{}
-		if err := json.Unmarshal([]byte(p.Config), &config); err != nil {
+	var cfg models.ProviderConfig
+	if len(p.Config) > 0 {
+		if err := json.Unmarshal(p.Config, &cfg); err != nil {
 			m.lo.Error("error parsing provider config", "error", err)
-			return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
-		// Decrypt API key.
-		decryptedKey, err := crypto.Decrypt(config.APIKey, m.encryptionKey)
+	}
+	return cfg, nil
+}
+
+func (m *Manager) getProviderConfig(providerType string) (models.ProviderConfig, error) {
+	cfg, err := m.getRawProviderConfig(providerType)
+	if err != nil {
+		return cfg, err
+	}
+	if cfg.APIKey != "" {
+		decrypted, err := crypto.Decrypt(cfg.APIKey, m.encryptionKey)
 		if err != nil {
 			m.lo.Error("error decrypting API key", "error", err)
-			return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
-		return NewOpenAIClient(decryptedKey, m.lo), nil
-	default:
-		m.lo.Error("unsupported provider type", "provider", p.Provider)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("validation.invalidProvider"), nil)
+		cfg.APIKey = decrypted
 	}
+	return cfg, nil
+}
+
+func (m *Manager) getProviderClient(providerType string) (ProviderClient, error) {
+	cfg, err := m.getProviderConfig(providerType)
+	if err != nil {
+		return nil, err
+	}
+	return NewOpenAIClient(cfg, m.lo, m.providerHTTPClient), nil
+}
+
+func (m *Manager) providerError(err error) error {
+	if errors.Is(err, ErrInvalidAPIKey) {
+		m.lo.Error("invalid provider API key")
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if errors.Is(err, ErrApiKeyNotSet) {
+		return envelope.NewError(envelope.InputError, m.i18n.T("ai.apiKeyNotSet"), nil)
+	}
+	m.lo.Error("error from AI provider", "error", err)
+	return envelope.NewError(envelope.GeneralError, capProviderErrorMessage(err), nil)
+}
+
+// testProviderError surfaces the provider's own error message so the admin can act on it.
+func (m *Manager) testProviderError(err error) error {
+	if errors.Is(err, ErrApiKeyNotSet) {
+		return envelope.NewError(envelope.InputError, m.i18n.T("ai.apiKeyNotSet"), nil)
+	}
+	return envelope.NewError(envelope.InputError, capProviderErrorMessage(err), nil)
+}
+
+func capProviderErrorMessage(err error) string {
+	msg := err.Error()
+	if len(msg) > maxProviderErrorLen {
+		msg = trimToRuneBoundary(msg, maxProviderErrorLen) + "…"
+	}
+	return msg
 }
