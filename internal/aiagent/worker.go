@@ -581,7 +581,7 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 		if msg.SenderType == cmodels.SenderTypeContact {
 			role = aimodels.RoleUser
 		}
-		text := strings.TrimSpace(msg.TextContent)
+		text := m.messageText(msg)
 
 		var images []aimodels.ChatImage
 		var markers []string
@@ -657,6 +657,31 @@ func unreadableFileMarker(att attachment.Attachment) string {
 
 func unreadableImageMarker(att attachment.Attachment) string {
 	return fmt.Sprintf("[The customer attached an image %q that you cannot view. Ask them to describe it if it matters.]", att.Name)
+}
+
+// messageText returns the message text with quoted reply chains stripped, falling back to the full text when stripping leaves nothing (a quote-only reply or forward).
+func (m *Manager) messageText(msg cmodels.Message) string {
+	full := strings.TrimSpace(msg.TextContent)
+	var trimmed string
+	if msg.ContentType == cmodels.ContentTypeHTML {
+		trimmed = stringutil.HTML2TextNoQuotes(msg.Content)
+	} else {
+		trimmed = stringutil.TrimPlainTextQuotes(full)
+	}
+	if trimmed == "" {
+		if full != "" {
+			m.lo.Debug("ai agent message was quote-only, keeping full text", "message_uuid", msg.UUID, "full_len", len(full))
+		}
+		return full
+	}
+	if trimmed != full {
+		removed := full
+		if rest, ok := strings.CutPrefix(full, trimmed); ok {
+			removed = strings.TrimSpace(rest)
+		}
+		m.lo.Debug("ai agent stripped quoted text", "message_uuid", msg.UUID, "kept_len", len(trimmed), "full_len", len(full), "removed", removed)
+	}
+	return trimmed
 }
 
 func splitConfirmation(answer string) (string, string) {

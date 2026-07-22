@@ -332,7 +332,8 @@
   [class*="_OutlookMessageHeader"],
   [class*="_OutlookMessageHeader"] ~ *,
   [class*="_yahoo_quoted"],
-  [class*="_gmail_quote_container"] {
+  [class*="_gmail_quote_container"],
+  [class*="_protonmail_quote"] {
     @apply hidden;
   }
 }

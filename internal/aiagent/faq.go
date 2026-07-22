@@ -251,7 +251,7 @@ func (m *Manager) buildMiningTranscript(msgs []cmodels.Message) (string, bool) {
 	var b strings.Builder
 	hasHumanReply := false
 	for _, msg := range msgs {
-		text := strings.TrimSpace(msg.TextContent)
+		text := m.messageText(msg)
 		if text == "" {
 			continue
 		}

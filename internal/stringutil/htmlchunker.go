@@ -78,10 +78,15 @@ func ChunkHTMLContent(title, htmlContent string, config ...ChunkConfig) ([]strin
 	}
 
 	// Plain text (or any text not wrapped in a block element) yields no boundaries;
-	// keep it as a single chunk so it still gets embedded.
+	// size-bound it into chunks so it still gets embedded without overflowing the model limit.
 	if len(boundaries) == 0 {
 		if text := strings.TrimSpace(HTML2Text(htmlContent)); text != "" {
-			return []string{buildEmbeddingText(title, "", text)}, nil
+			pieces := chunkPlainText(text, cfg)
+			result := make([]string, len(pieces))
+			for i, p := range pieces {
+				result[i] = buildEmbeddingText(title, "", p)
+			}
+			return result, nil
 		}
 	}
 
@@ -307,6 +312,20 @@ func createChunks(boundaries []htmlBoundary, cfg ChunkConfig) []htmlBoundary {
 	currentChunk.Priority = 10
 
 	for _, boundary := range boundaries {
+		// An oversized atomic boundary (a preserved or non-splittable block larger than MaxTokens)
+		// can't fit any chunk; flush the current chunk and emit it truncated on its own. Handled here
+		// so an overlap or leading-content prefix can't sneak it through un-truncated.
+		if boundary.Tokens > cfg.MaxTokens {
+			if currentChunk.Content != "" {
+				chunks = append(chunks, currentChunk)
+				currentChunk = htmlBoundary{Priority: 10}
+			}
+			if t := truncateOversizedContent(boundary, cfg); t.Content != "" {
+				chunks = append(chunks, t)
+			}
+			continue
+		}
+
 		shouldStartNewChunk := false
 
 		if boundary.Priority == 1 && currentChunk.Tokens >= cfg.MinTokens {
@@ -339,12 +358,6 @@ func createChunks(boundaries []htmlBoundary, cfg ChunkConfig) []htmlBoundary {
 
 		if boundary.Priority < currentChunk.Priority {
 			currentChunk.Priority = boundary.Priority
-		}
-
-		if currentChunk.Tokens > cfg.MaxTokens && currentChunk.Content == boundary.Content {
-			truncatedBoundary := truncateOversizedContent(boundary, cfg)
-			chunks = append(chunks, truncatedBoundary)
-			currentChunk = htmlBoundary{Priority: 10}
 		}
 	}
 
@@ -418,4 +431,66 @@ func buildEmbeddingText(title, heading, cleanText string) string {
 	}
 	fmt.Fprintf(&b, "Content: %s", cleanText)
 	return b.String()
+}
+
+// chunkPlainText packs unstructured text into <=MaxTokens pieces on sentence boundaries, hard-splitting any single sentence that alone exceeds the cap.
+func chunkPlainText(text string, cfg ChunkConfig) []string {
+	if cfg.TokenizerFunc(text) <= cfg.MaxTokens {
+		return []string{text}
+	}
+
+	var chunks []string
+	var cur strings.Builder
+	curTokens := 0
+	flush := func() {
+		if cur.Len() > 0 {
+			chunks = append(chunks, strings.TrimSpace(cur.String()))
+			cur.Reset()
+			curTokens = 0
+		}
+	}
+
+	for _, s := range sentenceRegex.Split(text, -1) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		st := cfg.TokenizerFunc(s)
+		if st > cfg.MaxTokens {
+			flush()
+			chunks = append(chunks, hardSplit(s, cfg)...)
+			continue
+		}
+		if curTokens+st > cfg.MaxTokens {
+			flush()
+		}
+		if cur.Len() > 0 {
+			cur.WriteString(" ")
+		}
+		cur.WriteString(s)
+		curTokens += st
+	}
+	flush()
+	return chunks
+}
+
+// hardSplit cuts s into consecutive pieces each within MaxTokens, taking the largest fitting rune prefix per piece.
+func hardSplit(s string, cfg ChunkConfig) []string {
+	runes := []rune(s)
+	var out []string
+	for len(runes) > 0 {
+		lo, hi, best := 1, len(runes), 1
+		for lo <= hi {
+			mid := (lo + hi) / 2
+			if cfg.TokenizerFunc(string(runes[:mid])) <= cfg.MaxTokens {
+				best = mid
+				lo = mid + 1
+			} else {
+				hi = mid - 1
+			}
+		}
+		out = append(out, string(runes[:best]))
+		runes = runes[best:]
+	}
+	return out
 }
