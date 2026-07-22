@@ -31,39 +31,5 @@ func V2_5_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS index_uniq_conversation_drafts_on_conversation_id_and_user_id_and_type ON conversation_drafts (conversation_id, user_id, type);`); err != nil {
 		return err
 	}
-
-// Seed default business hours and SLA policy. mirrors the INSERTs at the tail of schema.sql.
-// guarded on emptiness, not name, so configured installs aren't given a stray row.
-
-
-	if _, err := db.Exec(`
-		INSERT INTO business_hours ("name", description, is_always_open, hours, holidays)
-		SELECT
-			'Default',
-			'Default business hours, Monday to Friday, 09:00 to 17:00.',
-			false,
-			'{"Monday": {"open": "09:00", "close": "17:00"}, "Tuesday": {"open": "09:00", "close": "17:00"}, "Wednesday": {"open": "09:00", "close": "17:00"}, "Thursday": {"open": "09:00", "close": "17:00"}, "Friday": {"open": "09:00", "close": "17:00"}}'::jsonb,
-			'[]'::jsonb
-		WHERE NOT EXISTS (
-			SELECT 1 FROM business_hours
-		);
-	`); err != nil {
-		return err
-	}
-	if _, err := db.Exec(`
-		INSERT INTO sla_policies ("name", description, first_response_time, resolution_time, next_response_time, notifications)
-		SELECT
-			'Default',
-			'Default SLA policy, first response within 1 hour and resolution within 24 hours.',
-			'1h',
-			'24h',
-			NULL::text,
-			'[]'::jsonb
-		WHERE NOT EXISTS (
-			SELECT 1 FROM sla_policies
-		);
-	`); err != nil {
-		return err
-	}
 	return nil
 }
