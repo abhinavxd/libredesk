@@ -46,7 +46,8 @@ export const createFormSchema = (t) => z.object({
     }),
     read_interval: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
       message: t('validation.invalidDuration')
-    })
+    }),
+    original_sender_header: z.string().optional()
   }),
   smtp: z.object({
     host: z.string().min(1, t('globals.messages.required')),
