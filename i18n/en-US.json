@@ -1080,6 +1080,7 @@
   "validation.invalidDuration": "Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).",
   "validation.invalidEmail": "Invalid email address",
   "validation.invalidFromAddress": "Invalid from email address format, make sure it's a valid email address in the format `Name <mail@example.com>`",
+  "validation.invalidHeaderName": "Invalid header name. Use a single header field name without spaces or colons (e.g. X-Original-Sender).",
   "validation.invalidIPOrCIDR": "Invalid IP address or CIDR range: {entry}",
   "validation.invalidInbox": "Invalid inbox",
   "validation.invalidKey": "Invalid key",

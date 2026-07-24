@@ -70,3 +70,26 @@ func TestExtractSenderFromHeader(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidHeaderName(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input string
+		valid bool
+	}{
+		{"typical header", "X-Original-Sender", true},
+		{"simple token", "From", true},
+		{"empty", "", false},
+		{"contains space", "X Original Sender", false},
+		{"contains colon", "X-Original-Sender:", false},
+		{"contains control char", "X-Original\tSender", false},
+		{"non-ascii", "X-Originál-Sender", false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isValidHeaderName(tc.input); got != tc.valid {
+				t.Errorf("isValidHeaderName(%q) = %v, want %v", tc.input, got, tc.valid)
+			}
+		})
+	}
+}
