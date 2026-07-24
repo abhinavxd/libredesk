@@ -92,6 +92,10 @@ type IMAPConfig struct {
 	ScanInboxSince string `json:"scan_inbox_since"`
 	TLSType        string `json:"tls_type"`
 	TLSSkipVerify  bool   `json:"tls_skip_verify"`
+	// OriginalSenderHeader, when set, uses the address in this header as the
+	// message sender instead of the From header (e.g. "X-Original-Sender" for
+	// Google Groups). Falls back to From when the header is absent or invalid.
+	OriginalSenderHeader string `json:"original_sender_header"`
 }
 
 // ClearPasswords masks all config passwords

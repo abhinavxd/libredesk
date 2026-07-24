@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -125,7 +126,7 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		return fmt.Errorf("error searching messages: %w", err)
 	}
 
-	return e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier())
+	return e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier(), cfg)
 }
 
 // searchMessages searches for messages in the specified time range.
@@ -156,7 +157,7 @@ func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*ima
 }
 
 // fetchAndProcessMessages fetches and processes messages based on the search results.
-func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.Client, searchResults *imap.SearchData, inboxID int) error {
+func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.Client, searchResults *imap.SearchData, inboxID int, cfg imodels.IMAPConfig) error {
 	seqSet := imap.SeqSet{}
 	if searchResults.Min > 0 && searchResults.Max > 0 {
 		e.lo.Debug("using ESEARCH range", "min", searchResults.Min, "max", searchResults.Max, "inbox_id", inboxID)
@@ -170,18 +171,33 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		return nil
 	}
 
+	// Validate and normalize the configured original-sender header name so a bad
+	// value (whitespace, control characters, etc.) can't malform the IMAP
+	// HEADER.FIELDS request. An invalid value is ignored, falling back to From.
+	originalSenderHeader := strings.TrimSpace(cfg.OriginalSenderHeader)
+	if originalSenderHeader != "" && !isValidHeaderName(originalSenderHeader) {
+		e.lo.Warn("ignoring invalid original_sender_header", "header", cfg.OriginalSenderHeader, "inbox_id", inboxID)
+		originalSenderHeader = ""
+	}
+
 	// Fetch envelope and headers needed for auto-reply detection.
+	headerFields := []string{
+		headerAutoSubmitted,
+		headerAutoreply,
+		headerLibredeskLoopPrevention,
+		headerMessageID,
+	}
+	// Also fetch the configured original-sender header (e.g. X-Original-Sender)
+	// so the sender can be remapped below.
+	if originalSenderHeader != "" {
+		headerFields = append(headerFields, originalSenderHeader)
+	}
 	fetchOptions := &imap.FetchOptions{
 		Envelope: true,
 		BodySection: []*imap.FetchItemBodySection{
 			{
-				Specifier: imap.PartSpecifierHeader,
-				HeaderFields: []string{
-					headerAutoSubmitted,
-					headerAutoreply,
-					headerLibredeskLoopPrevention,
-					headerMessageID,
-				},
+				Specifier:    imap.PartSpecifierHeader,
+				HeaderFields: headerFields,
 			},
 		},
 	}
@@ -193,6 +209,8 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		autoReply          bool
 		isLoop             bool
 		extractedMessageID string
+		overrideFromAddr   string
+		overrideFromName   string
 	}
 	var messages []msgData
 
@@ -228,6 +246,8 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			autoReply          bool
 			isLoop             bool
 			extractedMessageID string
+			overrideFromAddr   string
+			overrideFromName   string
 		)
 		// Process all fetch items for the current message.
 		for {
@@ -261,6 +281,11 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 
 				// Extract Message-Id from raw headers as fallback for problematic Message IDs
 				extractedMessageID = extractMessageIDFromHeaders(envelope)
+
+				// Remap the sender from the configured header (e.g. X-Original-Sender).
+				if originalSenderHeader != "" {
+					overrideFromAddr, overrideFromName = extractSenderFromHeader(envelope, originalSenderHeader)
+				}
 			}
 
 			// Envelope.
@@ -275,7 +300,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			continue
 		}
 
-		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID})
+		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID, overrideFromAddr: overrideFromAddr, overrideFromName: overrideFromName})
 	}
 
 	// Now process each collected message.
@@ -300,7 +325,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		}
 
 		// Process the envelope.
-		if err := e.processEnvelope(ctx, client, msgData.env, msgData.seqNum, inboxID, msgData.extractedMessageID); err != nil && err != context.Canceled {
+		if err := e.processEnvelope(ctx, client, msgData.env, msgData.seqNum, inboxID, msgData.extractedMessageID, msgData.overrideFromAddr, msgData.overrideFromName); err != nil && err != context.Canceled {
 			e.lo.Error("error processing envelope", "error", err)
 		}
 	}
@@ -309,12 +334,23 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 }
 
 // processEnvelope processes a single email envelope.
-func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, env *imap.Envelope, seqNum uint32, inboxID int, extractedMessageID string) error {
-	if len(env.From) == 0 {
+//
+// overrideFromAddr/overrideFromName, when set, come from the inbox's configured
+// original-sender header (e.g. X-Original-Sender) and replace the envelope From
+// as the message sender. They are empty when the header is unset or invalid, in
+// which case the envelope From is used.
+func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, env *imap.Envelope, seqNum uint32, inboxID int, extractedMessageID, overrideFromAddr, overrideFromName string) error {
+	if len(env.From) == 0 && overrideFromAddr == "" {
 		e.lo.Warn("no sender received for email", "message_id", env.MessageID)
 		return nil
 	}
-	var fromAddress = strings.ToLower(env.From[0].Addr())
+	var fromAddress string
+	if len(env.From) > 0 {
+		fromAddress = strings.ToLower(env.From[0].Addr())
+	}
+	if overrideFromAddr != "" {
+		fromAddress = overrideFromAddr
+	}
 
 	// Determine final Message ID - prefer IMAP-parsed, fallback to raw header extraction
 	messageID := env.MessageID
@@ -352,8 +388,17 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 	e.lo.Debug("processing new incoming message", "message_id", messageID, "subject", env.Subject, "from", fromAddress, "inbox_id", inboxID)
 
-	// Make contact.
-	firstName, lastName := getContactName(env.From[0])
+	// Make contact. When the sender was remapped from the configured header,
+	// derive the name from that header (its display name, else the local part).
+	var firstName, lastName string
+	if overrideFromAddr != "" {
+		firstName, lastName = stringutil.SplitName(overrideFromName)
+		if firstName == "" {
+			firstName, _, _ = strings.Cut(fromAddress, "@")
+		}
+	} else {
+		firstName, lastName = getContactName(env.From[0])
+	}
 	contact := models.IncomingContact{
 		FirstName: firstName,
 		LastName:  lastName,
@@ -384,6 +429,12 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		if from.Addr() != "" {
 			fromAddr = append(fromAddr, strings.ToLower(from.Addr()))
 		}
+	}
+	// When the sender was remapped from the configured header, record the
+	// effective sender in meta so it stays consistent with the contact (and is
+	// not left empty when the envelope has no From).
+	if overrideFromAddr != "" {
+		fromAddr = []string{overrideFromAddr}
 	}
 
 	meta, err := json.Marshal(map[string]interface{}{
@@ -637,6 +688,41 @@ func extractMessageIDFromHeaders(envelope *enmime.Envelope) string {
 		return strings.TrimSpace(strings.Trim(rawMessageID, "<>"))
 	}
 	return ""
+}
+
+// extractSenderFromHeader returns the lowercased address and display name from
+// the given header (e.g. "X-Original-Sender"). It returns empty strings when the
+// header is absent or cannot be parsed as an email address, so callers fall back
+// to the envelope From.
+func extractSenderFromHeader(envelope *enmime.Envelope, headerName string) (addr string, name string) {
+	raw := strings.TrimSpace(envelope.GetHeader(headerName))
+	if raw == "" {
+		return "", ""
+	}
+	// Prefer a full address list (handles an optional display name and any
+	// trailing addresses); fall back to a single-address parse.
+	if addrs, err := mail.ParseAddressList(raw); err == nil && len(addrs) > 0 {
+		return strings.ToLower(addrs[0].Address), addrs[0].Name
+	}
+	if parsed, err := mail.ParseAddress(raw); err == nil {
+		return strings.ToLower(parsed.Address), parsed.Name
+	}
+	return "", ""
+}
+
+// isValidHeaderName reports whether s is a valid RFC 5322 header field name
+// (printable US-ASCII, 33-126, excluding ':'), i.e. safe to place in an IMAP
+// HEADER.FIELDS request.
+func isValidHeaderName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < 33 || r > 126 || r == ':' {
+			return false
+		}
+	}
+	return true
 }
 
 // extractConversationUUIDFromRecipient extracts conversation UUID from plus-addressed recipient.
