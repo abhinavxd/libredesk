@@ -13,11 +13,6 @@ var dialDigitsReplacer = strings.NewReplacer("+", "", "-", "")
 
 var dialCodeByISO = buildDialCodes()
 
-// JSON returns the raw country reference list (calling code, name, emoji, ISO-2) embedded at build time.
-func JSON() []byte {
-	return countriesJSON
-}
-
 // DialCodeForISO returns the dialing-code digits for an ISO-2 country, "" when unknown.
 func DialCodeForISO(iso string) string {
 	return dialCodeByISO[iso]

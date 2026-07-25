@@ -32,7 +32,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/config", handleGetConfig)
 
 	// Static country reference list for phone inputs.
-	g.GET("/api/v1/countries", auth(handleGetCountries))
 
 	// Media - supports both authenticated access and signed URLs.
 	g.GET("/uploads/{uuid}", authOrSignedURL(handleServeMedia))

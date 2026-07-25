@@ -132,7 +132,6 @@ const createOIDC = (data) =>
     }
   })
 const getConfig = () => http.get('/api/v1/config')
-const getCountries = () => http.get('/api/v1/countries')
 const getAllOIDC = () => http.get('/api/v1/oidc')
 const getOIDC = (id) => http.get(`/api/v1/oidc/${id}`)
 const updateOIDC = (id, data) =>
@@ -706,7 +705,6 @@ export default {
   createOIDC,
   getAllOIDC,
   getConfig,
-  getCountries,
   getOIDC,
   updateOIDC,
   deleteOIDC,

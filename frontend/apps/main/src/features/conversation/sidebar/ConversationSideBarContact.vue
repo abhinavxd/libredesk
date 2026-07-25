@@ -140,7 +140,7 @@ import {
 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
-import { useCountriesStore } from '@/stores/countries'
+import countries from '@shared-ui/constants/countries.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'
@@ -152,14 +152,13 @@ const emitter = useEmitter()
 const conversation = computed(() => conversationStore.current)
 const { t } = useI18n()
 const userStore = useUserStore()
-const countriesStore = useCountriesStore()
 
 const phoneNumber = computed(() => {
   const countryCodeValue = conversation.value?.contact?.phone_number_country_code || ''
   const number = conversation.value?.contact?.phone_number || t('conversation.sidebar.notAvailable')
   if (!countryCodeValue) return number
 
-  const country = countriesStore.countries.find((c) => c.iso_2 === countryCodeValue)
+  const country = countries.find((c) => c.iso_2 === countryCodeValue)
   if (!country) return number
   return `${country.calling_code} ${number}`
 })
@@ -167,7 +166,7 @@ const phoneNumber = computed(() => {
 const countryName = computed(() => {
   const code = conversation.value?.contact?.country
   if (!code) return ''
-  const c = countriesStore.countries.find((c) => c.iso_2 === code)
+  const c = countries.find((c) => c.iso_2 === code)
   return c ? c.name : code
 })
 
@@ -192,7 +191,6 @@ const contextLinks = ref([])
 const loadingAppId = ref(null)
 
 onMounted(async () => {
-  countriesStore.fetchCountries()
   try {
     const resp = await api.getActiveContextLinks()
     contextLinks.value = resp.data.data || []

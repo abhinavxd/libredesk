@@ -169,9 +169,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { storeToRefs } from 'pinia'
 import { IdCard } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
@@ -193,7 +192,7 @@ import { useInboxStore } from '@main/stores/inbox'
 import { useUsersStore } from '@main/stores/users'
 import { useUserStore } from '@main/stores/user'
 import { useTeamStore } from '@main/stores/team'
-import { useCountriesStore } from '@main/stores/countries'
+import { countryCallingOptions as allCountries } from '@shared-ui/constants/countries.js'
 import { useWhatsAppTemplatePicker } from './useWhatsAppTemplatePicker.js'
 import WhatsAppTemplatePicker from './WhatsAppTemplatePicker.vue'
 import api from '@/api'
@@ -206,8 +205,6 @@ const inboxStore = useInboxStore()
 const uStore = useUsersStore()
 const userStore = useUserStore()
 const teamStore = useTeamStore()
-const countriesStore = useCountriesStore()
-const { allCountries } = storeToRefs(countriesStore)
 
 const {
   selectedTemplate,
@@ -237,7 +234,6 @@ const lastName = ref('')
 const phoneCountryCode = ref('')
 const phoneNumber = ref('')
 
-onMounted(() => countriesStore.fetchCountries())
 onUnmounted(() => clearTimeout(timeoutId))
 
 watch(inboxId, (id) => fetchTemplates(id))
