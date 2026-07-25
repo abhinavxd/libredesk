@@ -1,5 +1,5 @@
 <template>
-  <form @submit.prevent="createConversation" class="flex flex-col flex-1 overflow-hidden">
+  <form @submit.prevent="createConversation" novalidate class="flex flex-col flex-1 overflow-hidden">
     <div class="space-y-4 flex-shrink-0">
       <div class="grid grid-cols-4 gap-4">
         <div class="space-y-2 relative col-span-2 min-w-0">

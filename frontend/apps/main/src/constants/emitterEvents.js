@@ -7,5 +7,6 @@ export const EMITTER_EVENTS = {
     SET_NESTED_COMMAND: 'set-nested-command',
     CONVERSATION_SIDEBAR_TOGGLE: 'conversation-sidebar-toggle',
     SCROLL_TO_MESSAGE: 'scroll-to-message',
-    WHATSAPP_TEMPLATE_PICKER_OPEN: 'whatsapp-template-picker-open'
+    WHATSAPP_TEMPLATE_PICKER_OPEN: 'whatsapp-template-picker-open',
+    COPILOT_INSERT_REPLY: 'copilot-insert-reply'
 }

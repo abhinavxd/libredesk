@@ -293,6 +293,7 @@ func handleSendMessage(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	markAssignmentNotificationRead(app, conv, user)
 	resolveQuotedCIDs(app, &message)
 	resolveAttachmentCIDs(&message, rootURL)
 	return r.SendEnvelope(message)

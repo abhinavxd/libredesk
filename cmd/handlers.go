@@ -75,6 +75,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/conversations/{uuid}/transcript", perm(handleDownloadConversationTranscript, "messages:read"))
 	g.POST("/api/v1/conversations/{cuuid}/messages", perm(handleSendMessage, "messages:write"))
 	g.PUT("/api/v1/conversations/{cuuid}/messages/{uuid}/retry", perm(handleRetryMessage, "messages:write"))
+	g.DELETE("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleDeleteMessage, "messages:write"))
 	g.POST("/api/v1/conversations", perm(handleCreateConversation, "conversations:write"))
 	g.PUT("/api/v1/conversations/{uuid}/custom-attributes", auth(handleUpdateConversationCustomAttributes))
 	g.PUT("/api/v1/conversations/{uuid}/contacts/custom-attributes", auth(handleUpdateContactCustomAttributes))
@@ -244,7 +245,79 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// AI completions.
 	g.GET("/api/v1/ai/prompts", auth(handleGetAIPrompts))
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
-	g.PUT("/api/v1/ai/provider", perm(handleUpdateAIProvider, "ai:manage"))
+
+	// AI provider config (completion / embedding).
+	g.GET("/api/v1/ai/config/{type}", perm(handleGetAIConfig, "ai:manage"))
+	g.PUT("/api/v1/ai/config/{type}", perm(handleUpdateAIConfig, "ai:manage"))
+	g.POST("/api/v1/ai/config/{type}/test", perm(handleTestAIConfig, "ai:manage"))
+
+	// AI custom tools.
+	g.GET("/api/v1/ai/tools", perm(handleGetAITools, "ai:manage"))
+	g.GET("/api/v1/ai/tools/{id}", perm(handleGetAITool, "ai:manage"))
+	g.POST("/api/v1/ai/tools", perm(handleCreateAITool, "ai:manage"))
+	g.PUT("/api/v1/ai/tools/{id}", perm(handleUpdateAITool, "ai:manage"))
+	g.DELETE("/api/v1/ai/tools/{id}", perm(handleDeleteAITool, "ai:manage"))
+
+	// AI knowledge base snippets.
+	g.GET("/api/v1/ai/snippets", perm(handleGetAISnippets, "ai:manage"))
+	g.POST("/api/v1/ai/snippets", perm(handleCreateAISnippet, "ai:manage"))
+	g.POST("/api/v1/ai/snippets/import-url", perm(handleImportAISnippetFromURL, "ai:manage"))
+	g.PUT("/api/v1/ai/snippets/{id}", perm(handleUpdateAISnippet, "ai:manage"))
+	g.DELETE("/api/v1/ai/snippets/{id}", perm(handleDeleteAISnippet, "ai:manage"))
+
+	// AI assistant: reply drafting + copilot chat.
+	g.POST("/api/v1/ai/generate-reply", auth(handleAIGenerateReply))
+	g.POST("/api/v1/ai/summarize", perm(handleAISummarizeConversation, "messages:write"))
+	g.POST("/api/v1/ai/suggest-tags", auth(handleAISuggestTags))
+	g.POST("/api/v1/ai/copilot", auth(handleAICopilot))
+	g.GET("/api/v1/ai/copilot/messages", auth(handleGetCopilotMessages))
+	g.DELETE("/api/v1/ai/copilot/messages", auth(handleClearCopilotMessages))
+
+	// Autonomous AI agents (assistants).
+	g.GET("/api/v1/ai/assistants/compact", auth(handleGetAIAssistantsCompact))
+	g.GET("/api/v1/ai/assistants", perm(handleGetAIAssistants, "ai:manage"))
+	g.GET("/api/v1/ai/assistants/{id}", perm(handleGetAIAssistant, "ai:manage"))
+	g.POST("/api/v1/ai/assistants", perm(handleCreateAIAssistant, "ai:manage"))
+	g.PUT("/api/v1/ai/assistants/{id}", perm(handleUpdateAIAssistant, "ai:manage"))
+	g.DELETE("/api/v1/ai/assistants/{id}", perm(handleDeleteAIAssistant, "ai:manage"))
+	g.POST("/api/v1/ai/assistants/{id}/preview", perm(handleAIAssistantPreview, "ai:manage"))
+	g.GET("/api/v1/ai/assistants/{id}/stats", perm(handleGetAIAssistantStats, "ai:manage"))
+
+	// AI FAQ learning: review queue for suggestions mined from resolved conversations + on/off setting.
+	g.GET("/api/v1/ai/faq-suggestions", perm(handleGetAIFaqSuggestions, "ai:manage"))
+	g.POST("/api/v1/ai/faq-suggestions/{id}/approve", perm(handleApproveAIFaqSuggestion, "ai:manage"))
+	g.POST("/api/v1/ai/faq-suggestions/{id}/reject", perm(handleRejectAIFaqSuggestion, "ai:manage"))
+	g.GET("/api/v1/ai/faq-learning", perm(handleGetAIFaqLearning, "ai:manage"))
+	g.PUT("/api/v1/ai/faq-learning", perm(handleUpdateAIFaqLearning, "ai:manage"))
+
+	// Help centers.
+	g.GET("/api/v1/help-centers", auth(handleGetHelpCenters))
+	g.GET("/api/v1/help-centers/{id}", auth(handleGetHelpCenter))
+	g.GET("/api/v1/help-centers/{id}/tree", auth(handleGetHelpCenterTree))
+	g.POST("/api/v1/help-centers", perm(handleCreateHelpCenter, "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{id}", perm(handleUpdateHelpCenter, "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{id}/toggle", perm(handleToggleHelpCenterActive, "help_center:manage"))
+	g.DELETE("/api/v1/help-centers/{id}", perm(handleDeleteHelpCenter, "help_center:manage"))
+	g.GET("/api/v1/help-centers/{hc_id}/collections", auth(handleGetCollections))
+	g.GET("/api/v1/help-centers/{hc_id}/collections/{id}", auth(handleGetCollection))
+	g.POST("/api/v1/help-centers/{hc_id}/collections", perm(handleCreateCollection, "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleUpdateCollection, "help_center:manage"))
+	g.DELETE("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleDeleteCollection, "help_center:manage"))
+	g.PUT("/api/v1/collections/{id}/toggle", perm(handleToggleCollection, "help_center:manage"))
+	g.GET("/api/v1/collections/{col_id}/articles", auth(handleGetArticles))
+	g.GET("/api/v1/collections/{col_id}/articles/{id}", auth(handleGetArticle))
+	g.POST("/api/v1/collections/{col_id}/articles", perm(handleCreateArticle, "help_center:manage"))
+	g.PUT("/api/v1/collections/{col_id}/articles/{id}", perm(handleUpdateArticle, "help_center:manage"))
+	g.DELETE("/api/v1/collections/{col_id}/articles/{id}", perm(handleDeleteArticle, "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}", perm(handleUpdateArticleByID, "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}/status", perm(handleUpdateArticleStatus, "help_center:manage"))
+	g.GET("/api/v1/help-centers/{id}/insights", perm(handleGetHelpCenterInsights, "help_center:manage"))
+
+	// Public help center JSON API.
+	g.GET("/api/public/help-centers/{slug}/tree", rateLimit(handleGetPublicHelpCenterTree, "public"))
+	g.GET("/api/public/help-centers/{slug}/articles/{article_slug}", rateLimit(handleGetPublicHelpCenterArticle, "public"))
+	g.GET("/api/public/help-centers/{slug}/search", rateLimit(handlePublicHelpCenterSearch, "public"))
+	g.POST("/api/public/help-centers/{slug}/articles/{article_slug}/feedback", rateLimit(handleHelpCenterArticleFeedback, "public"))
 
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))
@@ -320,6 +393,13 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/static/public/{all:*}", serveStaticFiles)
 
 	// Public pages.
+	g.GET("/hc/{slug}", rateLimit(handleRedirectHelpCenterHome, "public"))
+	g.GET("/hc/{slug}/{locale}", rateLimit(handleShowHelpCenterHome, "public"))
+	g.GET("/hc/{slug}/{locale}/sitemap.xml", rateLimit(handleHelpCenterSitemap, "public"))
+	g.GET("/hc/{slug}/{locale}/search", rateLimit(handleHelpCenterSearch, "public"))
+	g.GET("/hc/{slug}/{locale}/collections/{collection_slug}", rateLimit(handleShowHelpCenterCollection, "public"))
+	g.GET("/hc/{slug}/{locale}/articles/{article_slug}", rateLimit(handleShowHelpCenterArticle, "public"))
+
 	g.GET("/csat/{uuid}", rateLimit(handleShowCSAT, "public"))
 	g.GET("/csat/{uuid}/widget", rateLimit(handleShowCSATWidget, "public"))
 	g.POST("/csat/{uuid}", rateLimit(handleUpdateCSATResponse, "public"))
@@ -396,6 +476,7 @@ func serveStaticFiles(r *fastglue.Request) error {
 		contentType = http.DetectContentType(file.ReadBytes())
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
+	r.RequestCtx.Response.Header.Set("Cache-Control", "public, max-age=86400")
 	r.RequestCtx.SetBody(file.ReadBytes())
 	return nil
 }

@@ -6,6 +6,9 @@ export const useAppSettingsStore = defineStore('settings', {
         settings: {},
         public_config: {}
     }),
+    getters: {
+        copilotName: (state) => state.settings?.['app.copilot_name'] || 'Copilot'
+    },
     actions: {
         async fetchSettings (key = 'general') {
             try {

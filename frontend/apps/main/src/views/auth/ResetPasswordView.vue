@@ -1,6 +1,6 @@
 <template>
   <AuthLayout>
-    <Card class="bg-card box">
+    <Card class="bg-card box" id="reset-password-container">
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
           <CardTitle class="text-2xl font-bold text-foreground">{{
@@ -41,7 +41,7 @@
           v-if="errorMessage"
           :errorMessage="errorMessage"
           :border="true"
-          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded text-sm"
+          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded-md text-sm"
         />
 
         <div class="text-center">

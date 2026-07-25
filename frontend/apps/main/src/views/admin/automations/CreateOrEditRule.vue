@@ -5,8 +5,8 @@
   <LoadingOverlay :loading="isLoading">
     <div class="space-y-4">
       <form @submit="onSubmit">
-        <div class="space-y-5">
-          <div class="space-y-5">
+        <div class="space-y-6">
+          <div class="space-y-6">
             <FormField
               v-slot="{ value, handleChange }"
               type="checkbox"
@@ -110,12 +110,14 @@
           <div class="flex justify-center">
             <div class="flex items-center space-x-2">
               <Button
+                type="button"
                 :variant="groupOperator === 'AND' ? 'default' : 'outline'"
                 @click.prevent="toggleGroupOperator('AND')"
               >
                 {{ $t('admin.automation.and') }}
               </Button>
               <Button
+                type="button"
                 :variant="groupOperator === 'OR' ? 'default' : 'outline'"
                 @click.prevent="toggleGroupOperator('OR')"
               >
@@ -426,7 +428,7 @@ onMounted(async () => {
       if (resp.data.data.type === 'conversation_update') {
         rule.value.rules.events = []
       }
-      form.setValues(resp.data.data)
+      form.setValues(resp.data.data, false)
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',

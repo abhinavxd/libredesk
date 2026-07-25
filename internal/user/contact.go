@@ -34,17 +34,21 @@ func (u *Manager) CreateContact(user *models.User) error {
 					return emailErr
 				}
 			} else {
-				if setErr := u.SetExternalUserID(existing.ID, user.ExternalUserID.String); setErr == nil {
+				enriched, setErr := u.SetExternalUserID(existing.ID, user.ExternalUserID.String)
+				if setErr != nil && !dbutil.IsUniqueViolationError(setErr) {
+					return setErr
+				}
+				if enriched {
 					user.ID = existing.ID
 					return nil
 				}
-				// ext_id already belongs to another contact - fall through to upsert.
-				u.lo.Info("ext_id already exists on another contact, skipping enrichment", "contact_id", existing.ID, "ext_id", user.ExternalUserID.String)
+				// ext_id already belongs to another contact, or the contact was deleted mid-flight - fall through to upsert.
+				u.lo.Info("skipping contact enrichment, falling back to upsert", "contact_id", existing.ID, "ext_id", user.ExternalUserID.String)
 			}
 		}
 
 		// Upsert by ext_id - creates new or updates email/name on ext_id conflict.
-		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes).Scan(&user.ID); err != nil {
+		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes, user.PhoneNumber, user.PhoneNumberCountryCode).Scan(&user.ID); err != nil {
 			u.lo.Error("error inserting contact with external ID", "error", err)
 			return fmt.Errorf("inserting contact with external ID: %w", err)
 		}
@@ -52,20 +56,22 @@ func (u *Manager) CreateContact(user *models.User) error {
 	}
 
 	if user.Email.Valid && user.Email.String != "" {
-		// Reuse any existing contact with this email, preferring one with ext_id if multiple exist.
+		// An ext_id contact owns this email - reuse it; the no-ext-id upsert below can't match it and would insert a duplicate.
 		existing, err := u.GetContactByEmail(user.Email.String)
-		if err == nil {
+		if err == nil && existing.ExternalUserID.String != "" {
 			user.ID = existing.ID
 			return nil
 		}
 
 		// Other error than not found - fail.
-		if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
-			return err
+		if err != nil {
+			if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
+				return err
+			}
 		}
 	}
 
-	// No ext_id and no existing contact with email - create new.
+	// No ext_id contact for this email - insert new, or update the existing no-ext-id contact's name.
 	if err := u.q.InsertContactNoExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL).Scan(&user.ID); err != nil {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
@@ -73,9 +79,9 @@ func (u *Manager) CreateContact(user *models.User) error {
 	return nil
 }
 
-// UpdateContactBasicInfo updates only the name and email of a contact.
-func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email string) error {
-	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email))); err != nil {
+// UpdateContactBasicInfo updates only the name, email and phone of a contact.
+func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, phoneNumber, phoneNumberCountryCode string) error {
+	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email)), phoneNumber, phoneNumberCountryCode); err != nil {
 		u.lo.Error("error updating contact basic info", "error", err)
 		return fmt.Errorf("updating contact basic info: %w", err)
 	}

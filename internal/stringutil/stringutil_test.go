@@ -294,3 +294,87 @@ func TestSanitizeUTF8(t *testing.T) {
 		})
 	}
 }
+
+func TestSplitName(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantFirst string
+		wantLast  string
+	}{
+		{name: "empty", input: "", wantFirst: "", wantLast: ""},
+		{name: "whitespace only", input: "   ", wantFirst: "", wantLast: ""},
+		{name: "single name", input: "Cher", wantFirst: "Cher", wantLast: ""},
+		{name: "first and last", input: "John Doe", wantFirst: "John", wantLast: "Doe"},
+		{name: "middle name", input: "John Michael Doe", wantFirst: "John", wantLast: "Michael Doe"},
+		{name: "multi-word surname", input: "Ludwig van der Berg", wantFirst: "Ludwig", wantLast: "van der Berg"},
+		{name: "extra spaces", input: "  John   Doe  ", wantFirst: "John", wantLast: "Doe"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			first, last := SplitName(tt.input)
+			if first != tt.wantFirst || last != tt.wantLast {
+				t.Errorf("SplitName(%q) = (%q, %q), want (%q, %q)", tt.input, first, last, tt.wantFirst, tt.wantLast)
+			}
+		})
+	}
+}
+func TestGenerateSlug(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple title",
+			input:    "Hello World",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with special characters",
+			input:    "Hello, World! How are you?",
+			expected: "hello-world-how-are-you",
+		},
+		{
+			name:     "title with numbers",
+			input:    "Article 123: How to Code",
+			expected: "article-123-how-to-code",
+		},
+		{
+			name:     "title with underscores",
+			input:    "test_article_name",
+			expected: "test_article_name",
+		},
+		{
+			name:     "title with multiple spaces",
+			input:    "Hello     World",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with leading/trailing spaces",
+			input:    "  Hello World  ",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with multiple hyphens",
+			input:    "Hello---World",
+			expected: "hello-world",
+		},
+		{
+			name:     "unicode characters",
+			input:    "Hello World",
+			expected: "hello-world",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GenerateSlug(tt.input, false)
+			if result != tt.expected {
+				t.Errorf("GenerateSlug(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+

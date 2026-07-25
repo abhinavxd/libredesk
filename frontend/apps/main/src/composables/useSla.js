@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { calculateSla } from '../utils/sla'
 
 export function useSla (dueAt, actualAt) {
@@ -10,6 +10,7 @@ export function useSla (dueAt, actualAt) {
         }
         sla.value = calculateSla(dueAt.value, actualAt.value)
     }
+    watch([dueAt, actualAt], updateSla)
     onMounted(() => {
         updateSla()
         // Update the SLA every 30 seconds.

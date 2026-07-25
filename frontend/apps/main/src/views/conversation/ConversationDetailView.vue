@@ -31,7 +31,7 @@
         @collapse="onSidebarCollapse"
         @expand="onSidebarExpand"
       >
-        <div class="h-full overflow-y-auto overflow-x-hidden">
+        <div class="h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
           <ConversationSideBar />
         </div>
       </ResizablePanel>
@@ -41,7 +41,7 @@
     <button
       v-if="showContent && !sidebarOpen"
       @click="toggleSidebar"
-      class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-all duration-200 border shadow hover:scale-105 z-50"
+      class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-all duration-200 border shadow-md hover:scale-105 z-50"
     >
       <ChevronLeft size="16" />
     </button>

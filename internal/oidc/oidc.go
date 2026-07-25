@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/oidc/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
@@ -114,6 +116,10 @@ func (o *Manager) GetAll() ([]models.OIDC, error) {
 
 // Create adds a new oidc.
 func (o *Manager) Create(oidc models.OIDC) (models.OIDC, error) {
+	if err := o.validateCredentials(oidc); err != nil {
+		return models.OIDC{}, err
+	}
+
 	// Encrypt sensitive fields before saving
 	encryptedClientID, encryptedClientSecret, err := o.encryptOIDC(oidc.ClientID, oidc.ClientSecret)
 	if err != nil {
@@ -138,9 +144,12 @@ func (o *Manager) Update(id int, oidc models.OIDC) (models.OIDC, error) {
 		return models.OIDC{}, err
 	}
 
-	// If client secret is not provided, use the current one (already decrypted from Get)
-	if oidc.ClientSecret == "" {
+	// A masked secret keeps the stored one.
+	if strings.Contains(oidc.ClientSecret, stringutil.PasswordDummy) {
 		oidc.ClientSecret = current.ClientSecret
+	}
+	if err := o.validateCredentials(oidc); err != nil {
+		return models.OIDC{}, err
 	}
 
 	// Encrypt sensitive fields before updating
@@ -165,6 +174,17 @@ func (o *Manager) Delete(id int) error {
 	if _, err := o.q.DeleteOIDC.Exec(id); err != nil {
 		o.lo.Error("error deleting oidc", "error", err)
 		return envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
+// validateCredentials rejects a blank client id or secret; either one fails every token exchange, locking out OIDC-only agents with nothing to show the admin went wrong.
+func (o *Manager) validateCredentials(oidc models.OIDC) error {
+	if strings.TrimSpace(oidc.ClientID) == "" {
+		return envelope.NewError(envelope.InputError, o.i18n.Ts("globals.messages.empty", "name", "`client_id`"), nil)
+	}
+	if strings.TrimSpace(oidc.ClientSecret) == "" {
+		return envelope.NewError(envelope.InputError, o.i18n.Ts("globals.messages.empty", "name", "`client_secret`"), nil)
 	}
 	return nil
 }

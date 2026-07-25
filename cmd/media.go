@@ -61,6 +61,24 @@ func handleMediaUpload(r *fastglue.Request) error {
 		linkedModel = model[0]
 	}
 
+	// Help article media ends up on public help center pages, so it's served without auth.
+	// Only agents who manage the help center may upload publicly served media.
+	public := linkedModel == mmodels.ModelHelpArticles
+	if public {
+		auser := r.RequestCtx.UserValue("user").(amodels.User)
+		agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		allowed, err := app.authz.Enforce(agent, "help_center", "manage")
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		if !allowed {
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+		}
+	}
+
 	// Sanitize filename.
 	srcFileName := stringutil.SanitizeFilename(fileHeader.Filename)
 	srcContentType := fileHeader.Header.Get("Content-Type")
@@ -137,7 +155,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta)
+	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !public)
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error inserting metadata into database", "error", err)
@@ -147,7 +165,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 }
 
 // handleServeMedia serves uploaded media.
-// Supports both authenticated access (with permission checks) and signed URL access (no permission checks).
+// Supports public media (no checks), authenticated access (with permission checks) and signed URL access (no permission checks).
 func handleServeMedia(r *fastglue.Request) error {
 	var (
 		app        = r.Context.(*App)
@@ -155,21 +173,28 @@ func handleServeMedia(r *fastglue.Request) error {
 		authMethod = r.RequestCtx.UserValue("auth_method")
 	)
 
-	// If accessed via signed URL, skip permission checks and serve file directly.
-	if authMethod == "signed_url" {
-		return serveMediaFile(r, app, uuid, nil)
-	}
-
-	// Session/API key authenticated - perform full permission check.
-	auser := r.RequestCtx.UserValue("user").(amodels.User)
-
-	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	media, err := getMediaByUUID(app, uuid)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Fetch media from DB.
-	media, err := getMediaByUUID(app, uuid)
+	if !media.Private {
+		return serveMediaFile(r, app, uuid, &media)
+	}
+
+	// If accessed via signed URL, skip permission checks and serve file directly.
+	if authMethod == "signed_url" {
+		return serveMediaFile(r, app, uuid, &media)
+	}
+
+	// Unauthenticated and not a signed URL - private media requires auth.
+	auser, ok := r.RequestCtx.UserValue("user").(amodels.User)
+	if !ok {
+		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.UnauthorizedError)
+	}
+
+	// Session/API key authenticated - perform full permission check.
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -266,6 +291,10 @@ func getUnassociatedMedia(app *App, ids []int) ([]mmodels.Media, error) {
 }
 
 // getMediaByUUID fetches media metadata from DB, handling thumbnail prefix.
-func getMediaByUUID(app *App, uuid string) (mmodels.Media, error) {
-	return app.media.Get(0, strings.TrimPrefix(uuid, image.ThumbPrefix))
+func getMediaByUUID(app *App, mediaUUID string) (mmodels.Media, error) {
+	mediaUUID = strings.TrimPrefix(mediaUUID, image.ThumbPrefix)
+	if _, err := uuid.Parse(mediaUUID); err != nil {
+		return mmodels.Media{}, envelope.NewError(envelope.NotFoundError, app.i18n.T("globals.messages.notFound"), nil)
+	}
+	return app.media.Get(0, mediaUUID)
 }

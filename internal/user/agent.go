@@ -29,9 +29,9 @@ func (u *Manager) MonitorUserAvailability(ctx context.Context, onUsersOffline fu
 	}
 }
 
-// GetAgent retrieves an agent by ID and caches it.
+// GetAgent retrieves an agent (or AI assistant) by ID and caches it.
 func (u *Manager) GetAgent(id int, email string) (models.User, error) {
-	agent, err := u.Get(id, email, []string{models.UserTypeAgent})
+	agent, err := u.Get(id, email, []string{models.UserTypeAgent, models.UserTypeAIAssistant})
 	if err != nil {
 		return models.User{}, err
 	}
@@ -77,10 +77,10 @@ func (u *Manager) InvalidateAllAgentCache() {
 	u.agentCache = make(map[int]cachedAgent)
 }
 
-// GetAgentsCompact returns a compact list of agents with limited fields.
+// GetAgentsCompact returns a compact list of agents and AI assistants (both assignable identities).
 func (u *Manager) GetAgentsCompact() ([]models.UserCompact, error) {
 	var users = make([]models.UserCompact, 0)
-	if err := u.db.Select(&users, u.q.GetUsersCompact, pq.Array([]string{models.UserTypeAgent})); err != nil {
+	if err := u.db.Select(&users, u.q.GetUsersCompact, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant})); err != nil {
 		u.lo.Error("error fetching users from db", "error", err)
 		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -149,9 +149,13 @@ func (u *Manager) SoftDeleteAgent(id int) error {
 	if id == systemUser.ID {
 		return envelope.NewError(envelope.InputError, u.i18n.T("user.cannotDeleteSystemUser"), nil)
 	}
-	if _, err := u.q.SoftDeleteAgent.Exec(id); err != nil {
+	var deleted int
+	if err := u.q.SoftDeleteAgent.Get(&deleted, id); err != nil {
 		u.lo.Error("error deleting user", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if deleted == 0 {
+		return envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", u.i18n.T("globals.terms.agent")), nil)
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
@@ -357,7 +358,7 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	}
 
 	private := false
-	messages, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	messages, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, 0)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -630,20 +631,7 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 	if err := app.conversation.UpdateConversationStatus(uuid, 0 /**status_id**/, status, snoozedUntil, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-
-	// If status is `Resolved`, send CSAT survey if enabled on inbox.
-	if status == cmodels.StatusResolved {
-		// Check if CSAT is enabled on the inbox and send CSAT survey message.
-		inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-		if err != nil {
-			return sendErrorEnvelope(r, err)
-		}
-		if inbox.CSATEnabled {
-			if err := app.conversation.SendCSATReply(user.ID, *conversation); err != nil {
-				return sendErrorEnvelope(r, err)
-			}
-		}
-	}
+	markAssignmentNotificationRead(app, conversation, user)
 	return r.SendEnvelope(true)
 }
 
@@ -829,6 +817,8 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
 	channel, err := validateCreateConversationRequest(req, app)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -854,10 +844,19 @@ func handleCreateConversation(r *fastglue.Request) error {
 			ExternalUserID:   null.NewString(req.ExternalUserID, req.ExternalUserID != ""),
 			CustomAttributes: json.RawMessage(`{}`),
 		}
-		if err := app.user.CreateContact(&contact); err != nil {
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		// Reuse an existing contact as-is; this endpoint is gated only on conversations:write and must never rename a contact.
+		existing, err := app.user.GetContactByEmail(req.Email)
+		if err != nil {
+			if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
+				return sendErrorEnvelope(r, err)
+			}
+			if err := app.user.CreateContact(&contact); err != nil {
+				return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			}
+			contactID = contact.ID
+		} else {
+			contactID = existing.ID
 		}
-		contactID = contact.ID
 	}
 
 	var (

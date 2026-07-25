@@ -3,7 +3,7 @@
     <ContextMenuTrigger asChild>
       <router-link
         :to="conversationRoute"
-        class="group relative block px-3 py-3 transition-all duration-200 ease-in-out cursor-pointer"
+        class="group relative block px-3 py-2.5 transition-colors duration-150 ease-in-out cursor-pointer"
         :class="{
           'bg-accent': isCurrent,
           'bg-primary/5 hover:bg-primary/10': isItemSelected && !isCurrent,
@@ -46,35 +46,44 @@
           </div>
 
           <!-- Content container -->
-          <div class="flex-1 min-w-0 space-y-2">
+          <div class="flex-1 min-w-0 space-y-1.5">
             <!-- Name + Subject group -->
-            <div>
-              <!-- Contact name + inbox + time -->
+            <div class="space-y-0.5">
+              <!-- Contact name + channel + time -->
               <div class="flex items-baseline justify-between gap-2">
-                <div class="flex items-baseline gap-1.5 min-w-0">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <h3
+                      class="text-sm truncate min-w-0 text-foreground"
+                      :class="isUnread ? 'font-semibold' : 'font-medium'"
+                    >
+                      {{ contactFullName }}
+                    </h3>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ contactFullName }}</TooltipContent>
+                </Tooltip>
+                <div class="flex items-center gap-1 flex-shrink-0">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <h3 class="text-sm font-semibold truncate text-foreground">
-                        {{ contactFullName }}
-                      </h3>
+                      <component
+                        :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
+                        class="w-3 h-3 text-muted-foreground"
+                      />
                     </TooltipTrigger>
-                    <TooltipContent>{{ contactFullName }}</TooltipContent>
+                    <TooltipContent>{{ conversation.inbox_name }}</TooltipContent>
                   </Tooltip>
-                  <span class="text-xs text-muted-foreground truncate">
-                    {{ conversation.inbox_name }}
+                  <span
+                    class="text-xs text-muted-foreground whitespace-nowrap tabular-nums"
+                    v-if="conversation.last_message_at"
+                  >
+                    {{ relativeLastMessageTime }}
                   </span>
                 </div>
-                <span
-                  class="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 tabular-nums"
-                  v-if="conversation.last_message_at"
-                >
-                  {{ relativeLastMessageTime }}
-                </span>
               </div>
 
               <!-- Subject -->
               <p
-                v-if="conversation.subject"
+                v-if="showSubject && conversation.subject"
                 class="text-xs text-muted-foreground truncate"
               >
                 {{ conversation.subject }}
@@ -83,25 +92,28 @@
 
             <!-- Message preview + unread count -->
             <div class="flex items-center justify-between gap-2">
-              <p class="text-sm flex-1 min-w-0 truncate text-muted-foreground">
+              <p
+                class="text-sm flex-1 min-w-0 truncate"
+                :class="isUnread ? 'text-foreground font-medium' : 'text-muted-foreground'"
+              >
                 <template v-if="isTyping">
-                  <span class="italic text-primary">{{ $t('globals.terms.typing') }}</span>
+                  <span class="italic text-foreground">{{ $t('globals.terms.typing') }}</span>
                 </template>
-                <template v-else-if="hasDraftForConversation">
-                  <span class="font-medium text-primary">{{ $t('globals.terms.draft') }}:</span>
+                <template v-else-if="hasDraftForConversation && !isCurrent">
+                  <span class="font-medium text-foreground">{{ $t('globals.terms.draft') }}:</span>
                   {{ draftPreview }}
                 </template>
                 <template v-else>
                   <Reply
-                    class="text-green-600 inline-block align-text-bottom mr-0.5"
+                    class="text-success inline-block align-text-bottom mr-0.5"
                     :size="14"
                     v-if="conversation.last_message_sender === 'agent'"
                   />{{ trimmedLastMessage }}
                 </template>
               </p>
               <div
-                v-if="conversation.unread_message_count > 0"
-                class="flex items-center justify-center w-5 h-5 bg-green-600 text-white text-xs font-medium rounded-full flex-shrink-0"
+                v-if="isUnread"
+                class="flex items-center justify-center w-5 h-5 bg-primary text-primary-foreground text-xs font-medium rounded-full flex-shrink-0"
               >
                 {{ conversation.unread_message_count > 9 ? '9+' : conversation.unread_message_count }}
               </div>
@@ -116,7 +128,6 @@
                 :label="'FRD'"
                 :showExtra="false"
                 @status="frdStatus = $event"
-                :key="`${conversation.uuid}-${conversation.first_response_deadline_at}-${conversation.first_reply_at}`"
               />
               <SlaBadge
                 v-show="rdStatus === 'overdue' || rdStatus === 'remaining'"
@@ -125,7 +136,6 @@
                 :label="'RD'"
                 :showExtra="false"
                 @status="rdStatus = $event"
-                :key="`${conversation.uuid}-${conversation.resolution_deadline_at}-${conversation.resolved_at}`"
               />
               <SlaBadge
                 v-show="nrdStatus === 'overdue' || nrdStatus === 'remaining'"
@@ -134,7 +144,6 @@
                 :label="'NRD'"
                 :showExtra="false"
                 @status="nrdStatus = $event"
-                :key="`${conversation.uuid}-${conversation.next_response_deadline_at}-${conversation.next_response_met_at}`"
               />
             </div>
           </div>
@@ -167,6 +176,7 @@ import SlaBadge from '@main/features/sla/SlaBadge.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'
+import { useAppSettingsStore } from '@main/stores/appSettings'
 import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
 import { useI18n } from 'vue-i18n'
 
@@ -174,6 +184,7 @@ let timer = null
 const now = ref(new Date())
 const route = useRoute()
 const conversationStore = useConversationStore()
+const appSettingsStore = useAppSettingsStore()
 const { canBulkAct } = useBulkActionPermissions()
 const { t } = useI18n()
 const frdStatus = ref('')
@@ -243,18 +254,26 @@ const hasSlaDeadlines = computed(() => {
 })
 
 const hasDraftForConversation = computed(() => {
-  return conversationStore.hasDraft(props.conversation.uuid)
+  return conversationStore.conversationHasDraft(props.conversation.uuid)
 })
 
 const isTyping = computed(() => conversationStore.typingByUUID[props.conversation.uuid] === true)
 
 const draftPreview = computed(() => {
-  const draft = conversationStore.getDraft(props.conversation.uuid)
-  if (!draft?.content) return ''
-  const text = draft.content.replace(/<[^>]*>/g, '').trim()
-  if (!text && /<img\b/i.test(draft.content)) return t('globals.terms.image', 1)
-  return text.length > 120 ? text.slice(0, 120) + '...' : text
+  const draft = conversationStore.conversationDraftPreview(props.conversation.uuid)
+  if (!draft?.content && !draft?.meta?.attachments?.length) return ''
+  const text = (draft.content || '').replace(/<[^>]*>/g, '').trim()
+  if (text) return text.length > 120 ? text.slice(0, 120) + '...' : text
+  if (draft.meta?.attachments?.length) return conversationStore.getMediaPreview(draft.meta.attachments)
+  if (/<img\b/i.test(draft.content || '')) return t('globals.terms.image', 1)
+  return ''
 })
+
+const showSubject = computed(
+  () => appSettingsStore.settings['app.show_conversation_subject'] !== false
+)
+
+const isUnread = computed(() => props.conversation.unread_message_count > 0)
 
 const isCurrent = computed(() => props.conversation.uuid === props.currentConversation?.uuid)
 

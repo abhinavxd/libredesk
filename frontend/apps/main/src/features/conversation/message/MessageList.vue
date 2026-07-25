@@ -15,10 +15,10 @@
           >
             <Loader2
               v-if="conversationStore.messages.fetching"
-              size="17"
+              size="16"
               class="mr-2 animate-spin"
             />
-            <RefreshCw v-else size="17" class="mr-2" />
+            <RefreshCw v-else size="16" class="mr-2" />
             {{ $t('globals.terms.loadMore') }}
           </Button>
         </div>
@@ -97,6 +97,7 @@ import { isSameDay } from 'date-fns'
 import AssignSelfNudge from './AssignSelfNudge.vue'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
+import { useBulkActionPermissions } from '@main/composables/useBulkActionPermissions'
 import MessagesSkeleton from './MessagesSkeleton.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { useStickyScroll } from '@shared-ui/composables'
@@ -115,6 +116,7 @@ const contentEl = ref(null)
 const emitter = useEmitter()
 const unReadMessages = ref(0)
 const showAssignNudge = ref(false)
+const { canAssignAgent } = useBulkActionPermissions()
 let currentConversationUUID = ''
 let openScrollDone = false
 
@@ -164,7 +166,12 @@ const newMessageHandler = (data) => {
   const message = data.message
   if (message?.sender_id === userStore.userID) {
     hasUserScrolled.value = false
-    if (message.type === 'outgoing' && !message.private && !conversationStore.current.assigned_user_id) {
+    if (
+      message.type === 'outgoing' &&
+      !message.private &&
+      !conversationStore.current.assigned_user_id &&
+      canAssignAgent.value
+    ) {
       showAssignNudge.value = true
     }
     return
@@ -295,7 +302,7 @@ const messageRows = computed(() => {
   animation: highlightFade 2.5s ease-out forwards;
 }
 
-:global(.dark) .highlight-mention::after {
+:global(.dark .highlight-mention::after) {
   background-color: rgb(250 204 21 / 0.2);
 }
 

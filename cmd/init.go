@@ -15,6 +15,7 @@ import (
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
 	"github.com/abhinavxd/libredesk/internal/ai"
+	"github.com/abhinavxd/libredesk/internal/aiagent"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	"github.com/abhinavxd/libredesk/internal/autoassigner"
@@ -27,6 +28,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
@@ -48,6 +50,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/sla"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
@@ -206,7 +209,7 @@ func initFS(staticDir string) stuffbin.FileSystem {
 		// Only include paths that exist in the custom dir.
 		var sf []string
 		for _, def := range staticFiles {
-			src := strings.Split(def, ":")[0]
+			src, _, _ := strings.Cut(def, ":")
 			if _, err := os.Stat(filepath.Join(staticDir, src)); err == nil {
 				sf = append(sf, def)
 			}
@@ -246,7 +249,7 @@ func loadSettings(m *setting.Manager) {
 
 	// Setting keys are dot separated, eg: app.favicon_url. Unflatten them into
 	// nested maps {app: {favicon_url}}.
-	var out map[string]interface{}
+	var out map[string]any
 
 	if err := json.Unmarshal(j, &out); err != nil {
 		log.Fatalf("error unmarshalling settings from DB: %v", err)
@@ -467,8 +470,22 @@ func getTmplFuncs(consts *constants, i18n *i18n.I18n) template.FuncMap {
 		"SiteName": func() string {
 			return consts.SiteName
 		},
-		"L": func() interface{} {
+		"L": func() any {
 			return i18n
+		},
+		"map": func(pairs ...any) (map[string]any, error) {
+			if len(pairs)%2 != 0 {
+				return nil, fmt.Errorf("map: odd number of arguments")
+			}
+			out := make(map[string]any, len(pairs)/2)
+			for i := 0; i < len(pairs); i += 2 {
+				key, ok := pairs[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("map: key %v is not a string", pairs[i])
+				}
+				out[key] = pairs[i+1]
+			}
+			return out, nil
 		},
 	}
 }
@@ -481,7 +498,7 @@ func reloadSettings(app *App) error {
 		app.lo.Error("error parsing settings from DB", "error", err)
 		return err
 	}
-	var out map[string]interface{}
+	var out map[string]any
 	if err := json.Unmarshal(j, &out); err != nil {
 		app.lo.Error("error unmarshalling settings from DB", "error", err)
 		return err
@@ -537,6 +554,14 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 		err   error
 		lo    = initLogger("media")
 	)
+	rootURL := func() string {
+		u, err := settings.GetAppRootURL()
+		if err != nil {
+			// Fallback to config if settings fetch fails
+			return ko.String("app.root_url")
+		}
+		return u
+	}
 	switch s := ko.MustString("upload.provider"); s {
 	case "s3":
 		store, err = s3.New(s3.Opt{
@@ -561,16 +586,9 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 			fsExpiry = 1 * time.Hour
 		}
 		store, err = fs.New(fs.Opts{
-			UploadURI:  "/uploads",
+			UploadURI:  media.PublicURI,
 			UploadPath: filepath.Clean(ko.String("upload.fs.upload_path")),
-			RootURL: func() string {
-				rootURL, err := settings.GetAppRootURL()
-				if err != nil {
-					// Fallback to config if settings fetch fails
-					return ko.String("app.root_url")
-				}
-				return rootURL
-			},
+			RootURL:    rootURL,
 			SigningKey: ko.MustString("app.encryption_key"),
 			Expiry:     fsExpiry,
 		})
@@ -582,10 +600,11 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 	}
 
 	media, err := media.New(media.Opts{
-		Store: store,
-		Lo:    lo,
-		DB:    db,
-		I18n:  i18n,
+		Store:   store,
+		Lo:      lo,
+		DB:      db,
+		I18n:    i18n,
+		RootURL: rootURL,
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)
@@ -855,8 +874,14 @@ func initAuthz(i18n *i18n.I18n) *authz.Enforcer {
 	return enforcer
 }
 
+// initSSRFControl builds the shared outbound-request guard from config.
+func initSSRFControl() ssrf.Control {
+	lo := initLogger("ssrf")
+	return ssrf.NewControl(ko.Bool("ssrf.enabled"), ko.Strings("ssrf.allowed_cidrs"), lo)
+}
+
 // initAuth initializes the authentication manager.
-func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n) *auth_.Auth {
+func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n, dialControl ssrf.Control) *auth_.Auth {
 	lo := initLogger("auth")
 
 	providers, err := buildProviders(o)
@@ -866,7 +891,7 @@ func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n) *auth_.Auth {
 
 	secure := !ko.Bool("app.server.disable_secure_cookies")
 	sessionLifetime := ko.Duration("app.server.session_lifetime")
-	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure, SessionLifetime: sessionLifetime}, i18n, rd, lo)
+	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure, SessionLifetime: sessionLifetime}, i18n, rd, lo, dialControl)
 	if err != nil {
 		log.Fatalf("error initializing auth: %v", err)
 	}
@@ -1028,16 +1053,46 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(db *sqlx.DB, i18n *i18n.I18n) *ai.Manager {
+func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
+		Ctx:           ctx,
 		DB:            db,
 		Lo:            lo,
 		I18n:          i18n,
 		EncryptionKey: ko.MustString("app.encryption_key"),
+		DialControl:   dialControl,
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)
+	}
+	return m
+}
+
+// initHelpCenter inits the help center manager.
+func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleIndexer) *helpcenter.Manager {
+	m, err := helpcenter.New(helpcenter.Opts{
+		DB:      db,
+		Lo:      initLogger("helpcenter"),
+		I18n:    i18n,
+		Indexer: indexer,
+	})
+	if err != nil {
+		log.Fatalf("error initializing help center manager: %v", err)
+	}
+	return m
+}
+
+// initAIAgent inits the autonomous AI agent manager.
+func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
+	m, err := aiagent.New(aiagent.Opts{
+		DB:        db,
+		Lo:        initLogger("ai_agent"),
+		I18n:      i18n,
+		QueueSize: cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
+	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
+	if err != nil {
+		log.Fatalf("error initializing AI agent manager: %v", err)
 	}
 	return m
 }
@@ -1114,7 +1169,7 @@ func initContextLink(db *sqlx.DB, i18n *i18n.I18n) *contextlink.Manager {
 }
 
 // initWebhook inits webhook manager.
-func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
+func initWebhook(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *webhook.Manager {
 	var lo = initLogger("webhook")
 	m, err := webhook.New(webhook.Opts{
 		DB:            db,
@@ -1124,7 +1179,7 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 		QueueSize:     ko.MustInt("webhook.queue_size"),
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
-		AllowedHosts:  ko.Strings("webhook.allowed_hosts"),
+		DialControl:   dialControl,
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)

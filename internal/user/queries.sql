@@ -1,7 +1,8 @@
 -- name: get-users-compact
 SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
-WHERE users.email != 'System' AND users.deleted_at IS NULL AND type = ANY($1)
+-- email != 'System' also drops NULL-email users (anonymous visitors); AI assistants have no email and must still be listed.
+WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND type = ANY($1)
 
 -- name: soft-delete-agent
 WITH soft_delete AS (
@@ -21,7 +22,7 @@ delete_user_roles AS (
     WHERE user_id IN (SELECT id FROM soft_delete)
     RETURNING 1
 )
-SELECT 1;
+SELECT count(*) FROM soft_delete;
 
 -- name: get-user
 SELECT
@@ -166,21 +167,24 @@ JOIN roles r ON r.name = role_name
 RETURNING user_id;
 
 -- name: insert-contact-with-external-id
-INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes)
-VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7)
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes, phone_number, phone_number_country_code)
+VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (external_user_id) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL
-DO UPDATE SET
-    email = COALESCE(EXCLUDED.email, users.email),
-    first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
-    last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
-    updated_at = now()
+DO UPDATE SET email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
+              first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
+              last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
+              phone_number = COALESCE(NULLIF(EXCLUDED.phone_number, ''), users.phone_number),
+              phone_number_country_code = COALESCE(NULLIF(EXCLUDED.phone_number_country_code, ''), users.phone_number_country_code),
+              updated_at = now()
 RETURNING id;
 
 -- name: insert-contact-without-external-id
 INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id)
 VALUES ($1, 'contact', $2, $3, $4, $5, NULL)
 ON CONFLICT (email) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL
-DO UPDATE SET updated_at = now()
+DO UPDATE SET first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
+              last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
+              updated_at = now()
 RETURNING id;
 
 -- name: get-contact-by-email
@@ -259,8 +263,8 @@ SELECT COALESCE(
 ) AS id;
 
 -- name: insert-visitor
-INSERT INTO users (email, type, first_name, last_name, custom_attributes)
-VALUES ($1, 'visitor', $2, $3, $4)
+INSERT INTO users (email, type, first_name, last_name, custom_attributes, phone_number, phone_number_country_code)
+VALUES ($1, 'visitor', $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: update-last-login-at
@@ -291,6 +295,8 @@ UPDATE users
 SET first_name = COALESCE(NULLIF($2, ''), first_name),
     last_name = COALESCE(NULLIF($3, ''), last_name),
     email = COALESCE(NULLIF($4, ''), email),
+    phone_number = COALESCE(NULLIF($5, ''), phone_number),
+    phone_number_country_code = COALESCE(NULLIF($6, ''), phone_number_country_code),
     updated_at = now()
 WHERE id = $1 AND type IN ('contact', 'visitor');
 

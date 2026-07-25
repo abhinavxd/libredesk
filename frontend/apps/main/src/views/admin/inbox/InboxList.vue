@@ -107,7 +107,7 @@ const columns = [
         h(RouterLink,
           {
             to: { name: 'edit-inbox', params: { id: row.original.id } },
-            class: 'text-primary hover:underline'
+            class: 'text-foreground font-medium hover:underline'
           },
           () => row.getValue('name')
         )

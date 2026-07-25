@@ -1,5 +1,5 @@
 <template>
-  <form @submit="createConversation" class="flex flex-col flex-1 overflow-hidden">
+  <form @submit="createConversation" novalidate class="flex flex-col flex-1 overflow-hidden">
     <div class="space-y-4 pb-2 flex-shrink-0">
       <div class="space-y-2">
         <FormField name="contact_email">
@@ -265,7 +265,7 @@ import {
 } from '@shared-ui/components/ui/select'
 import { useI18n } from 'vue-i18n'
 import { useFileUpload } from '@/composables/useFileUpload'
-import Editor from '@/components/editor/TextEditor.vue'
+import Editor from '@/components/editor/ConversationEditor.vue'
 import { useMacroStore } from '@/stores/macro'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import { UserTypeAgent } from '@/constants/user'

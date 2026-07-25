@@ -79,6 +79,15 @@ func (s *Service) Send(message Message) error {
 	}
 }
 
+// SendSync sends on the caller's goroutine so delivery failures reach the caller; it holds no lock, so a slow relay cannot stall Send or Close.
+func (s *Service) SendSync(message Message) error {
+	provider, exists := s.providers[message.Provider]
+	if !exists {
+		return fmt.Errorf("unsupported provider: %s", message.Provider)
+	}
+	return provider.Send(message)
+}
+
 // Run starts the worker pool to process messages.
 func (s *Service) Run(ctx context.Context) {
 	for range s.concurrency {
@@ -100,12 +109,7 @@ func (s *Service) worker(ctx context.Context) {
 			if !ok {
 				return
 			}
-			provider, exists := s.providers[message.Provider]
-			if !exists {
-				s.lo.Error("unsupported provider", "provider", message.Provider)
-				continue
-			}
-			if err := provider.Send(message); err != nil {
+			if err := s.SendSync(message); err != nil {
 				s.lo.Error("error sending message", "error", err)
 			}
 		}
