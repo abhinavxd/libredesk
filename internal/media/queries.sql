@@ -46,9 +46,11 @@ WHERE model_type = $1
 -- name: get-unlinked-message-media
 SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta
 FROM media
-WHERE model_type = 'messages' 
-  AND (model_id IS NULL OR model_id = 0) 
-  AND created_at < NOW() - INTERVAL '7 days';
+WHERE model_type = 'messages'
+  AND (
+    ((model_id IS NULL OR model_id = 0) AND created_at < NOW() - INTERVAL '7 days')
+    OR (model_id > 0 AND NOT EXISTS (SELECT 1 FROM conversation_messages cm WHERE cm.id = media.model_id))
+  );
 
 -- name: content-id-exists
 SELECT m.uuid

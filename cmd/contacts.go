@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
+	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
@@ -176,6 +178,75 @@ func handleUpdateContact(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(contact)
+}
+
+// handleDeleteContact permanently deletes a contact along with their conversations, messages, and notes.
+func handleDeleteContact(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+
+	contact, err := app.user.GetContactOrVisitor(id, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	app.lo.Info("deleting contact", "contact_id", id, "actor_id", auser.ID)
+
+	if err := app.user.DeleteContact(id); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if contact.AvatarURL.Valid {
+		fileName := filepath.Base(contact.AvatarURL.String)
+		if err := app.media.Delete(fileName); err != nil {
+			app.lo.Error("error deleting contact avatar", "contact_id", id, "file", fileName, "error", err)
+		}
+	}
+
+	if err := app.activityLog.ContactDeleted(auser.ID, auser.Email, realip.FromRequest(r.RequestCtx), id, contact.Email.String); err != nil {
+		app.lo.Error("error creating contact deleted activity log", "error", err)
+	}
+
+	return r.SendEnvelope(true)
+}
+
+// handleExportContact sends all stored data for a contact as a JSON file download.
+func handleExportContact(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+
+	contact, err := app.user.GetContactOrVisitor(id, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	data, err := app.user.ExportContactData(id)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if err := app.activityLog.ContactDataExported(auser.ID, auser.Email, realip.FromRequest(r.RequestCtx), id, contact.Email.String); err != nil {
+		app.lo.Error("error creating contact data exported activity log", "error", err)
+	}
+
+	filename := fmt.Sprintf("contact-%d-data.json", id)
+	r.RequestCtx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+	r.RequestCtx.SetContentType("application/json; charset=utf-8")
+	r.RequestCtx.SetBody(data)
+	return nil
 }
 
 // handleGetContactNotes returns all notes for a contact.

@@ -13,6 +13,10 @@ export default defineConfig(({ mode, command }) => {
   const isWidget = mode === 'widget'
   const appPath = isWidget ? 'apps/widget' : 'apps/main'
 
+  const apiTarget = process.env.LD_API_TARGET || 'http://127.0.0.1:9000'
+  const wsTarget = process.env.LD_WS_TARGET || 'ws://127.0.0.1:9000'
+  const mainPort = process.env.LD_DEV_PORT ? Number(process.env.LD_DEV_PORT) : 8000
+
   // Load shared tailwind config but scope content to current app only,
   // so each app's CSS bundle doesn't include unused classes from the other.
   const tailwindConfig = require('./tailwind.config.cjs')
@@ -43,35 +47,35 @@ export default defineConfig(({ mode, command }) => {
       fs: {
         allow: [path.resolve(__dirname)],
       },
-      port: isWidget ? 8001 : 8000,
+      port: isWidget ? 8001 : mainPort,
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/widget.js': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/static': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/logout': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/uploads': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/ws': {
-          target: 'ws://127.0.0.1:9000',
+          target: wsTarget,
           ws: true,
           changeOrigin: true,
         },
         '/widget/ws': {
-          target: 'ws://127.0.0.1:9000',
+          target: wsTarget,
           ws: true,
           changeOrigin: true,
         }

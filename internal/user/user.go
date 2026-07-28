@@ -117,6 +117,8 @@ type queries struct {
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
 
 	MergeVisitorToContact *sqlx.Stmt `query:"merge-visitor-to-contact"`
+	DeleteContact         *sqlx.Stmt `query:"delete-contact"`
+	ExportContactData     *sqlx.Stmt `query:"export-contact-data"`
 }
 
 // New creates and returns a new instance of the Manager.
