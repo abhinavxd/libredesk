@@ -58,7 +58,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	// Trim whitespace and trailing slash from root URL.
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
 
-	// Get current language before update.
+	// Get current language before update for reloading i18n if needed.
 	app.Lock()
 	oldLang := ko.String("app.lang")
 	app.Unlock()
@@ -86,6 +86,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 		app.lo.Error("error reloading templates", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+
 	return r.SendEnvelope(true)
 }
 

@@ -195,6 +195,85 @@ const routes = [
             meta: { titleKey: 'globals.terms.general' }
           },
           {
+            path: 'ai',
+            redirect: { name: 'ai-providers' }
+          },
+          {
+            path: 'help-center',
+            component: () => import('@main/views/admin/help-center/HelpCenter.vue'),
+            meta: { titleKey: 'globals.terms.helpCenter' },
+            children: [
+              {
+                path: '',
+                name: 'help-center-list',
+                component: () => import('@main/views/admin/help-center/HelpCenterList.vue')
+              },
+              {
+                path: ':id/tree/:locale?',
+                name: 'help-center-tree',
+                props: true,
+                component: () => import('@main/views/admin/help-center/HelpCenterTree.vue'),
+                meta: { titleKey: 'globals.terms.helpCenter' }
+              }
+            ]
+          },
+          {
+            path: 'ai/providers',
+            name: 'ai-providers',
+            component: () => import('@main/views/admin/ai/AIProviders.vue'),
+            meta: { titleKey: 'globals.terms.provider', titleCount: 2 }
+          },
+          {
+            path: 'ai/snippets',
+            name: 'ai-snippets',
+            component: () => import('@main/views/admin/ai/AISnippets.vue'),
+            meta: { titleKey: 'admin.ai.snippets' }
+          },
+          {
+            path: 'ai/suggestions',
+            name: 'ai-suggestions',
+            component: () => import('@main/views/admin/ai/AISuggestions.vue'),
+            meta: { titleKey: 'admin.ai.suggestions' }
+          },
+          {
+            path: 'ai/tools',
+            name: 'ai-tools',
+            component: () => import('@main/views/admin/ai/AITools.vue'),
+            meta: { titleKey: 'admin.ai.tools' }
+          },
+          {
+            path: 'ai/assistants',
+            name: 'ai-assistants',
+            component: () => import('@main/views/admin/ai/AIAssistants.vue'),
+            meta: { titleKey: 'admin.ai.assistants' }
+          },
+          {
+            path: 'ai/tools/new',
+            name: 'new-ai-tool',
+            component: () => import('@main/views/admin/ai/CreateOrEditTool.vue'),
+            meta: { titleKey: 'admin.ai.tool.new' }
+          },
+          {
+            path: 'ai/tools/:id/edit',
+            name: 'edit-ai-tool',
+            props: true,
+            component: () => import('@main/views/admin/ai/CreateOrEditTool.vue'),
+            meta: { titleKey: 'admin.ai.tool.edit' }
+          },
+          {
+            path: 'ai/assistants/new',
+            name: 'new-ai-assistant',
+            component: () => import('@main/views/admin/ai/CreateOrEditAssistant.vue'),
+            meta: { titleKey: 'admin.ai.assistant.new' }
+          },
+          {
+            path: 'ai/assistants/:id/edit',
+            name: 'edit-ai-assistant',
+            props: true,
+            component: () => import('@main/views/admin/ai/CreateOrEditAssistant.vue'),
+            meta: { titleKey: 'admin.ai.assistant.edit' }
+          },
+          {
             path: 'business-hours',
             component: () => import('@main/views/admin/business-hours/BusinessHours.vue'),
             meta: { titleKey: 'globals.terms.businessHour', titleCount: 2 },
@@ -268,6 +347,23 @@ const routes = [
                 name: 'edit-inbox',
                 component: () => import('@main/views/admin/inbox/EditInbox.vue'),
                 meta: { titleKey: 'inbox.edit' }
+              }
+            ]
+          },
+          {
+            path: 'whatsapp/templates',
+            meta: { titleKey: 'admin.whatsappTemplates.title' },
+            children: [
+              {
+                path: '',
+                name: 'whatsapp-templates',
+                component: () => import('@main/views/admin/whatsapp/WhatsAppTemplateList.vue')
+              },
+              {
+                path: 'new',
+                name: 'whatsapp-template-new',
+                component: () => import('@main/views/admin/whatsapp/NewWhatsAppTemplate.vue'),
+                meta: { titleKey: 'admin.whatsappTemplates.newTemplate' }
               }
             ]
           },

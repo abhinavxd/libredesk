@@ -80,7 +80,7 @@
         class="px-4 py-8"
         :title="t('conversation.noConversationsFound')"
         :message="t('conversation.tryAdjustingFilters')"
-        :icon="MessageCircleQuestion"
+        :icon="Inbox"
       />
 
       <EmptyList
@@ -151,7 +151,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
+import { Inbox, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,

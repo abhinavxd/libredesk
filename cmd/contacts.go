@@ -61,6 +61,9 @@ func handleGetContact(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if identities, err := app.user.GetChannelIdentities(id); err == nil {
+		c.ChannelIdentities = identities
+	}
 	return r.SendEnvelope(c)
 }
 

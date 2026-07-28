@@ -21,7 +21,7 @@
             />
 
             <div class="flex gap-2 justify-start items-center">
-              <h2 class="text-2xl font-bold text-foreground">
+              <h2 class="text-xl font-semibold text-foreground">
                 {{ contact.first_name }} {{ contact.last_name }}
               </h2>
               <Badge v-if="contact.type" variant="secondary">
@@ -39,6 +39,19 @@
             >
               <IdCardIcon size="14" class="flex-shrink-0" />
               {{ contact.external_user_id }}
+            </div>
+
+            <div
+              v-for="identity in contact.channel_identities"
+              :key="identity.channel + identity.identifier"
+              class="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <WhatsAppIcon
+                v-if="identity.channel === 'whatsapp'"
+                class="size-3.5 flex-shrink-0"
+              />
+              <IdCardIcon v-else size="14" class="flex-shrink-0" />
+              {{ identity.channel === 'whatsapp' ? '+' + identity.identifier : identity.identifier }}
             </div>
 
             <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -115,6 +128,7 @@ import {
 } from '@shared-ui/components/ui/dialog'
 import { useUserStore } from '../../stores/user'
 import { ShieldOffIcon, ShieldCheckIcon, IdCardIcon, CalendarIcon } from 'lucide-vue-next'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import ContactDetail from '@/layouts/contact/ContactDetail.vue'
 import api from '../../api'
 import ContactForm from '@/features/contact/ContactForm.vue'
@@ -150,7 +164,7 @@ async function fetchContact() {
   try {
     const { data } = await api.getContact(route.params.id)
     contact.value = data.data
-    form.setValues(data.data)
+    form.setValues(data.data, false)
   } catch (err) {
     showError(err)
   } finally {

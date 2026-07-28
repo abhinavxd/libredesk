@@ -43,9 +43,11 @@ SELECT
     first_name,
     last_name,
     email,
+    phone_number,
+    phone_number_country_code,
     external_user_id
 FROM users
 WHERE type = 'contact'
 AND deleted_at IS NULL
-AND email ILIKE '%' || $1 || '%'
+AND (email ILIKE '%' || $1 || '%' OR phone_number ILIKE '%' || $1 || '%')
 LIMIT 15;

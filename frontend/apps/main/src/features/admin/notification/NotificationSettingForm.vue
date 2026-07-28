@@ -268,7 +268,7 @@ const onSmtpSubmit = smtpForm.handleSubmit(async (values) => {
 watch(
   () => props.initialValues,
   (newValues) => {
-    smtpForm.setValues(newValues)
+    smtpForm.setValues(newValues, false)
   },
   { deep: true, immediate: true }
 )

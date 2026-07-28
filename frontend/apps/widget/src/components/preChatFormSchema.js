@@ -31,15 +31,32 @@ export const createPreChatFormSchema = (t, fields = []) => {
             .email({ message: t('validation.invalidEmail') })
           break
 
-        case 'number':
-          fieldSchema = z.coerce.number({
-            invalid_type_error: t('validation.invalid')
-          })
-          break
+        case 'number': {
+          const emptyToUndefined = (v) => (v === '' || v === null ? undefined : v)
+          if (field.required) {
+            schemaFields[field.key] = z.preprocess(
+              emptyToUndefined,
+              z.number({
+                required_error: t('globals.messages.required'),
+                invalid_type_error: t('validation.invalid')
+              })
+            )
+          } else {
+            schemaFields[field.key] = z.preprocess(
+              emptyToUndefined,
+              z.number({ invalid_type_error: t('validation.invalid') }).optional()
+            )
+          }
+          return
+        }
 
         case 'checkbox':
-          fieldSchema = z.boolean().default(false)
-          break
+          schemaFields[field.key] = field.required
+            ? z.literal(true, {
+                errorMap: () => ({ message: t('globals.messages.required') })
+              })
+            : z.boolean().default(false)
+          return
 
         case 'date':
           fieldSchema = z.string().regex(/^(\d{4}-\d{2}-\d{2}|)$/, {
@@ -48,13 +65,22 @@ export const createPreChatFormSchema = (t, fields = []) => {
           break
 
         case 'link':
-          fieldSchema = z
-            .string()
-            .max(1000, { message: t('globals.messages.maxLength', { max: 1000 }) })
-            .refine((val) => val === '' || z.string().url().safeParse(val).success, {
-              message: t('validation.invalidUrl')
-            })
-          break
+          if (field.required) {
+            schemaFields[field.key] = z
+              .string()
+              .max(1000, { message: t('globals.messages.maxLength', { max: 1000 }) })
+              .min(1, { message: t('globals.messages.required') })
+              .url({ message: t('validation.invalidUrl') })
+          } else {
+            schemaFields[field.key] = z
+              .string()
+              .max(1000, { message: t('globals.messages.maxLength', { max: 1000 }) })
+              .refine((val) => val === '' || z.string().url().safeParse(val).success, {
+                message: t('validation.invalidUrl')
+              })
+              .optional()
+          }
+          return
 
         case 'text':
         case 'list':
@@ -71,7 +97,7 @@ export const createPreChatFormSchema = (t, fields = []) => {
           message: t('globals.messages.required')
         })
       } else if (field.type !== 'checkbox') {
-        fieldSchema = fieldSchema.optional()
+        fieldSchema = fieldSchema.or(z.literal('')).optional()
       }
       
       schemaFields[field.key] = fieldSchema

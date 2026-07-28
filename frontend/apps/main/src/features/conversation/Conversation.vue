@@ -21,9 +21,9 @@
           <DropdownMenuTrigger>
             <div
               v-if="conversationStore.current?.status"
-              class="flex items-center space-x-1 cursor-pointer bg-primary px-2 py-1 rounded text-sm"
+              class="flex items-center space-x-1 cursor-pointer bg-primary px-2 py-1 rounded-md text-sm"
             >
-              <span class="text-secondary font-medium inline-block">
+              <span class="text-primary-foreground font-medium inline-block">
                 {{ conversationStore.current?.status }}
               </span>
             </div>
@@ -48,6 +48,13 @@
             <DropdownMenuItem @click="downloadTranscript">
               {{ t('conversation.downloadTranscript') }}
             </DropdownMenuItem>
+            <DropdownMenuItem
+              v-if="userStore.can('messages:write')"
+              :disabled="isSummarizing"
+              @click="summarize"
+            >
+              {{ t('conversation.summarize') }}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -56,14 +63,16 @@
     <!-- Messages & reply box -->
     <div class="flex flex-col flex-grow overflow-hidden">
       <MessageList class="flex-1 overflow-y-auto" />
-      <ReplyBox />
+      <WhatsAppComposer v-if="isWhatsAppChannel" />
+      <ReplyBox v-else />
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useConversationStore } from '../../stores/conversation'
+import { useUserStore } from '@main/stores/user'
 import { Clock, MoreHorizontal } from 'lucide-vue-next'
 import {
   DropdownMenu,
@@ -76,6 +85,8 @@ import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
+import WhatsAppComposer from './WhatsAppComposer.vue'
+import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
@@ -83,6 +94,7 @@ import { useI18n } from 'vue-i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
 const conversationStore = useConversationStore()
+const userStore = useUserStore()
 const emitter = useEmitter()
 const { t } = useI18n()
 
@@ -120,6 +132,35 @@ const downloadTranscript = async () => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  }
+}
+
+const isWhatsAppChannel = computed(
+  () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
+)
+
+const isSummarizing = ref(false)
+
+const summarize = async () => {
+  const conversation = conversationStore.current
+  if (!conversation || isSummarizing.value) return
+  try {
+    isSummarizing.value = true
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'info',
+      description: t('conversation.summarizing')
+    })
+    await api.aiSummarizeConversation({ conversation_uuid: conversation.uuid })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('conversation.summarizeAdded')
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isSummarizing.value = false
   }
 }
 

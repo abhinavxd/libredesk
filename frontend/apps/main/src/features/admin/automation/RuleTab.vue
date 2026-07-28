@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-5" :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
+  <div class="space-y-6" :class="{ 'transition-opacity duration-300 opacity-50': isLoading }">
     <Spinner v-if="isLoading" />
     <div>
       <p class="text-sm-muted">{{ helptext }}</p>
@@ -36,7 +36,7 @@
 
     <div class="space-y-4">
       <div v-if="type === 'new_conversation'">
-        <draggable v-model="rules" class="space-y-5" item-key="id" @end="onDragEnd">
+        <draggable v-model="rules" class="space-y-6" item-key="id" @end="onDragEnd">
           <template #item="{ element }">
             <div class="draggable-item">
               <RuleList :rule="element" @delete-rule="deleteRule" @toggle-rule="toggleRule" />
@@ -44,7 +44,7 @@
           </template>
         </draggable>
       </div>
-      <div v-else class="space-y-5">
+      <div v-else class="space-y-6">
         <RuleList
           v-for="rule in rules"
           :key="rule.id"

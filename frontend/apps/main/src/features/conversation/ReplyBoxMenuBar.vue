@@ -12,7 +12,14 @@
     />
     <div class="flex justify-items-start gap-2">
       <!-- File inputs -->
-      <input type="file" class="hidden" ref="attachmentInput" multiple @change="handleFileUpload" />
+      <input
+        type="file"
+        class="hidden"
+        ref="attachmentInput"
+        multiple
+        :accept="attachmentAccept"
+        @change="handleFileUpload"
+      />
       <!-- <input
         type="file"
         class="hidden"
@@ -36,6 +43,28 @@
         :pressed="isEmojiPickerVisible"
       >
         <Smile class="h-4 w-4" />
+      </Toggle>
+      <Toggle
+        v-if="isWhatsAppConversation"
+        class="px-2 py-2 border-0"
+        variant="outline"
+        :title="$t('conversation.whatsapp.sendTemplate')"
+        @click="openTemplatePicker"
+        :pressed="false"
+      >
+        <WhatsAppIcon class="h-4 w-4" />
+      </Toggle>
+      <Toggle
+        v-if="showGenerateReply"
+        class="px-2 py-2 border-0"
+        variant="outline"
+        :pressed="false"
+        :disabled="isGenerating"
+        :title="$t('replyBox.generateReply')"
+        @click="emit('generateReply')"
+      >
+        <Loader2 v-if="isGenerating" class="h-4 w-4 animate-spin" />
+        <Sparkles v-else class="h-4 w-4" />
       </Toggle>
     </div>
     <div class="flex items-center">
@@ -73,11 +102,11 @@
 </template>
 
 <script setup>
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
-import { Paperclip, Smile, ChevronDownIcon } from 'lucide-vue-next'
+import { Paperclip, Smile, ChevronDownIcon, Sparkles, Loader2 } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -85,8 +114,12 @@ import {
   DropdownMenuContent,
   DropdownMenuLabel
 } from '@shared-ui/components/ui/dropdown-menu'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { useConversationStore } from '@main/stores/conversation'
-const conversationStore = useConversationStore()
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
+import { WHATSAPP_MEDIA_ACCEPT } from '@main/features/conversation/whatsappMedia'
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([
@@ -100,16 +133,21 @@ const attachmentInput = ref(null)
 // const inlineImageInput = ref(null)
 const isEmojiPickerVisible = ref(false)
 const emojiPickerRef = ref(null)
-const emit = defineEmits(['emojiSelect'])
+const emit = defineEmits(['emojiSelect', 'generateReply'])
 
 // Using defineProps for props that don't need two-way binding
 defineProps({
   isFullscreen: Boolean,
   isSending: Boolean,
+  isGenerating: Boolean,
   enableSend: Boolean,
   handleSend: Function,
   handleSendAndSetStatus: Function,
   showSendButton: {
+    type: Boolean,
+    default: true
+  },
+  showGenerateReply: {
     type: Boolean,
     default: true
   },
@@ -131,6 +169,21 @@ const triggerFileUpload = () => {
 
 const toggleEmojiPicker = () => {
   isEmojiPickerVisible.value = !isEmojiPickerVisible.value
+}
+
+const conversationStore = useConversationStore()
+const emitter = useEmitter()
+
+const isWhatsAppConversation = computed(
+  () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
+)
+
+const attachmentAccept = computed(() =>
+  isWhatsAppConversation.value ? WHATSAPP_MEDIA_ACCEPT : undefined
+)
+
+const openTemplatePicker = () => {
+  emitter.emit(EMITTER_EVENTS.WHATSAPP_TEMPLATE_PICKER_OPEN)
 }
 
 function onSelectEmoji(emoji) {

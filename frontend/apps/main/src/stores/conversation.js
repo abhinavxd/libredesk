@@ -362,7 +362,8 @@ export const useConversationStore = defineStore('conversation', () => {
     const msgData = messages.data
     const inboxEmail = conv?.inbox_mail
 
-    if (conv?.inbox_channel === 'livechat') {
+    // Recipients only exist for email conversations.
+    if (conv && conv.inbox_channel !== 'email') {
       currentTo.value = []
       currentCC.value = []
       currentBCC.value = []
@@ -857,6 +858,9 @@ export const useConversationStore = defineStore('conversation', () => {
             message: activityMessage
           })
         }, 100)
+        if (!document.hidden) {
+          updateAssigneeLastSeen(message.conversation_uuid)
+        }
         return
       }
 

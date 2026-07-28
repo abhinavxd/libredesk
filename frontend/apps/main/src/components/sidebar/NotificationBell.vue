@@ -1,7 +1,7 @@
 <template>
   <Popover v-model:open="isOpen">
     <PopoverTrigger as-child>
-      <SidebarMenuButton size="md" class="relative">
+      <SidebarMenuButton size="default" class="relative">
         <Bell class="h-5 w-5" />
         <span
           v-if="notificationStore.unreadCount > 0"

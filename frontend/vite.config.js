@@ -39,9 +39,10 @@ export default defineConfig(({ mode, command }) => {
     cacheDir: path.resolve(__dirname, `node_modules/.vite-${isWidget ? 'widget' : 'main'}`),
     server: {
       cors: { origin: "*" },
-      // Allow access to parent dir so shared-ui imports work in dev.
+      // Allow access to parent dir so shared-ui imports work in dev, and the
+      // repo root so the Go-embedded countries.json resolves.
       fs: {
-        allow: [path.resolve(__dirname)],
+        allow: [path.resolve(__dirname), path.resolve(__dirname, '..')],
       },
       port: isWidget ? 8001 : 8000,
       proxy: {
@@ -120,6 +121,7 @@ export default defineConfig(({ mode, command }) => {
         '@main': path.resolve(__dirname, 'apps/main/src'),
         '@widget': path.resolve(__dirname, 'apps/widget/src'),
         '@shared-ui': path.resolve(__dirname, 'shared-ui'),
+        '@countries': path.resolve(__dirname, '../internal/countries/countries.json'),
       },
     },
   }

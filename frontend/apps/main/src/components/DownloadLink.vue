@@ -3,7 +3,7 @@
     :href="downloadUrl(url)"
     :title="t('globals.terms.download')"
     :aria-label="t('globals.terms.download')"
-    class="inline-flex items-center justify-center p-1 rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+    class="inline-flex items-center justify-center p-1 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
     @click.stop
   >
     <Download :size="size" />

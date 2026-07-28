@@ -9,14 +9,21 @@
       <router-link
         v-if="!isOutgoing"
         :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
-        class="cursor-pointer text-muted-foreground text-sm font-medium hover:underline hover:text-primary transition-colors duration-200"
+        class="cursor-pointer text-muted-foreground text-sm font-medium hover:underline hover:text-foreground transition-colors duration-200"
+      >
+        {{ getFullName }}
+      </router-link>
+      <router-link
+        v-else-if="canManageAI"
+        :to="aiAssistantRoute"
+        class="cursor-pointer text-muted-foreground text-sm font-medium hover:underline hover:text-foreground transition-colors duration-200"
       >
         {{ getFullName }}
       </router-link>
       <router-link
         v-else-if="canManageUsers"
         :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
-        class="cursor-pointer text-muted-foreground text-sm font-medium hover:underline hover:text-primary transition-colors duration-200"
+        class="cursor-pointer text-muted-foreground text-sm font-medium hover:underline hover:text-foreground transition-colors duration-200"
       >
         {{ getFullName }}
       </router-link>
@@ -88,6 +95,13 @@
 
             <!-- Message Content -->
             <div
+              v-if="message.meta?.wa_unsupported"
+              class="mb-1 text-muted-foreground italic text-sm"
+            >
+              {{ t('conversation.whatsapp.unsupportedMessage') }}
+            </div>
+            <div
+              v-else
               ref="contentWrapperEl"
               class="relative"
               :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
@@ -141,13 +155,26 @@
             <div
               v-if="!isOutgoing && hasQuotedContent"
               @click="toggleQuote"
-              class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-primary rounded transition-colors duration-200"
+              class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-foreground rounded-md transition-colors duration-200"
             >
               {{ showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText') }}
             </div>
 
             <!-- Attachments -->
-            <BubbleAttachmentPreview :attachments="nonInlineAttachments" />
+            <BubbleAttachmentPreview
+              :attachments="nonInlineAttachments"
+              :failedUUIDs="failedAttachmentUUIDs"
+            />
+
+            <!-- Retry failed attachments (WhatsApp partial send) -->
+            <button
+              v-if="showAttachmentRetry"
+              @click="retryMessage(message)"
+              class="flex items-center gap-1 mt-1 text-xs text-destructive hover:text-destructive/80 transition-colors duration-200 self-end"
+            >
+              <RotateCcw :size="10" />
+              {{ t('conversation.whatsapp.retryAttachments') }}
+            </button>
 
             <!-- CSAT Response -->
             <CSATResponseDisplay :message="message" />
@@ -157,8 +184,8 @@
 
             <!-- Status Icons (outgoing only) -->
             <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
-              <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
-              <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
+              <Lock :size="12" v-if="isPrivateMessage" class="text-muted-foreground" />
+              <Check :size="14" v-if="showCheckCheck" class="text-success" />
               <Tooltip v-if="message.meta?.continuity_emailed">
                 <TooltipTrigger>
                   <Mail :size="12" class="text-muted-foreground" />
@@ -167,8 +194,16 @@
                   <p>{{ t('conversation.sentViaEmail') }}</p>
                 </TooltipContent>
               </Tooltip>
+              <Tooltip v-if="sendFailureReason">
+                <TooltipTrigger>
+                  <CircleAlert :size="12" class="text-destructive" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p class="max-w-xs break-words">{{ sendFailureReason }}</p>
+                </TooltipContent>
+              </Tooltip>
               <RotateCcw
-                size="10"
+                size="12"
                 @click="retryMessage(message)"
                 class="cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-200"
                 v-if="showRetry"
@@ -181,6 +216,18 @@
       <!-- Avatar (right for outgoing) -->
       <template v-if="isOutgoing">
         <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
+        <router-link
+          v-else-if="canManageAI"
+          :to="aiAssistantRoute"
+          class="flex-shrink-0"
+        >
+          <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
+            <AvatarImage :src="getAvatar" />
+            <AvatarFallback class="font-medium">
+              {{ avatarFallback }}
+            </AvatarFallback>
+          </Avatar>
+        </router-link>
         <router-link
           v-else-if="canManageUsers"
           :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
@@ -227,7 +274,7 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="deleteNote">{{ t('globals.messages.delete') }}</AlertDialogAction>
+        <AlertDialogAction variant="destructive" @click="deleteNote">{{ t('globals.messages.delete') }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
@@ -238,7 +285,7 @@ import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, Maximize2, Trash2, MoreHorizontal } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, CircleAlert, Maximize2, Trash2, MoreHorizontal } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -324,7 +371,15 @@ const deleteNote = () => {
 }
 
 const isSystemUser = computed(() => props.message.author?.email === 'System')
-const canManageUsers = computed(() => !isSystemUser.value && userStore.can('users:manage'))
+const isAIAssistant = computed(() => props.message.author?.type === 'ai_assistant')
+const canManageUsers = computed(
+  () => !isSystemUser.value && !isAIAssistant.value && userStore.can('users:manage')
+)
+const canManageAI = computed(() => isAIAssistant.value && userStore.can('ai:manage'))
+const aiAssistantRoute = computed(() => {
+  const id = props.message.meta?.ai_assistant_id
+  return id ? { name: 'edit-ai-assistant', params: { id } } : { name: 'ai-assistants' }
+})
 
 const isOutgoing = computed(() => props.direction === 'outgoing')
 
@@ -371,6 +426,29 @@ const showCheckCheck = computed(
   () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
 )
 const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
+
+const sendFailureReason = computed(() =>
+  props.message.status === 'failed' ? props.message.meta?.wa_failure_reason : null
+)
+
+const failedAttachmentUUIDs = computed(() => {
+  const sent = props.message.meta?.whatsapp_sent_attachments
+  if (!Array.isArray(sent) || !props.message.attachments?.length) return new Set()
+  const sentSet = new Set(sent)
+  return new Set(
+    props.message.attachments
+      .filter((a) => a.uuid && !sentSet.has(a.uuid))
+      .map((a) => a.uuid)
+  )
+})
+
+const showAttachmentRetry = computed(
+  () =>
+    isOutgoing.value &&
+    props.message.status === 'sent' &&
+    failedAttachmentUUIDs.value.size > 0 &&
+    props.message.sender_id === userStore.userID
+)
 
 const retryMessage = (msg) => {
   api.retryMessage(convStore.current.uuid, msg.uuid)

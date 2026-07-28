@@ -12,6 +12,7 @@
         {{ $t('actions.noActions') }}
       </h3>
       <Button
+        type="button"
         @click.prevent="add"
         variant="outline"
         size="sm"
@@ -26,7 +27,7 @@
     <div v-else class="space-y-6">
       <div v-for="(action, index) in model" :key="index" class="relative">
         <!-- Action Card -->
-        <div class="border rounded p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="border rounded-md p-6 shadow-sm hover:shadow-md transition-shadow">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1 space-y-4">
               <!-- Action Type Selection -->

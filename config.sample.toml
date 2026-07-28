@@ -24,8 +24,8 @@ disable_secure_cookies = false
 # Session lifetime duration.
 session_lifetime = "9h"
 # Request read and write timeouts.
-read_timeout = "5s"
-write_timeout = "5s"
+read_timeout = "8s"
+write_timeout = "8s"
 # Maximum request body size in bytes (100MB)
 # If you are using proxy, you may need to configure them to allow larger request bodies.
 max_body_size = 104857600
@@ -116,6 +116,12 @@ queue_size = 2000
 # Number of workers processing automation rules
 worker_count = 10
 
+[ai_agent]
+# Number of workers running autonomous AI assistant responses
+worker_count = 10
+# Maximum number of AI assistant response jobs that can be queued
+queue_size = 1000
+
 [autoassigner]
 # How often to run automatic conversation assignment
 autoassign_interval = "5m"
@@ -127,8 +133,17 @@ workers = 5
 queue_size = 10000
 # HTTP timeout for webhook requests
 timeout = "15s"
-# CIDR ranges allowed to bypass SSRF protection (e.g. ["10.0.0.0/8"])
-allowed_hosts = []
+
+# SSRF guard for admin-configured outbound URLs (webhooks, OIDC discovery, AI provider and tool calls).
+[ssrf]
+# Block outbound requests to private/loopback/link-local/cloud-metadata IPs.
+# Leave false for self-hosted single-tenant deployments, where internal webhooks,
+# OIDC providers and model endpoints on private IPs are legitimate.
+# Set true for multi-tenant/hosted deployments where those URLs come from untrusted tenants.
+enabled = false
+# CIDR ranges allowed to bypass the guard when enabled, for reaching known internal hosts.
+# Examples: ["10.0.0.0/8", "192.168.1.10/32", "172.16.0.0/12", "fd00::/8"]
+allowed_cidrs = []
 
 [conversation]
 # How often to check for conversations to unsnooze

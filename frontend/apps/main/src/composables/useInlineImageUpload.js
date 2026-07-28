@@ -167,5 +167,5 @@ export function useInlineImageUpload ({
         return dispatchFiles(event, files)
     }
 
-    return { handlePaste, handleDrop }
+    return { handlePaste, handleDrop, insertImages: acceptImages }
 }

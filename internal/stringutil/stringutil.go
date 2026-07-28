@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/jaytaylor/html2text"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
 const (
@@ -18,12 +21,26 @@ const (
 )
 
 var (
-	regexpNonAlNum  = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
-	regexpSpaces    = regexp.MustCompile(`[\s]+`)
-	uuidV4Regex     = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
-	regexpRefNumber = regexp.MustCompile(`#(\d+)`)
-	regexpConvUUID  = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+	regexpNonAlNum    = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
+	regexpSpaces      = regexp.MustCompile(`[\s]+`)
+	uuidV4Regex       = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
+	regexpRefNumber   = regexp.MustCompile(`#(\d+)`)
+	regexpSlugChars   = regexp.MustCompile(`[^a-z0-9\-_]+`)
+	regexpHyphens     = regexp.MustCompile(`-+`)
+	regexpConvUUID    = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+	waPhoneFormatting = strings.NewReplacer("+", "", "-", "", " ", "", "(", "", ")", "")
+
+	// markdownRenderer escapes raw HTML in the input; single newlines render as <br>.
+	markdownRenderer = goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(html.WithHardWraps()),
+	)
 )
+
+// NormalizeWhatsAppPhone strips formatting to the bare digit string Meta uses as the wa_id.
+func NormalizeWhatsAppPhone(s string) string {
+	return waPhoneFormatting.Replace(s)
+}
 
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.
 func SanitizeUTF8(s string) string {
@@ -34,6 +51,33 @@ func SanitizeUTF8(s string) string {
 	return strings.ToValidUTF8(s, "�")
 }
 
+// GenerateSlug generates a URL-friendly slug from a title, optionally prefixed with a random string.
+func GenerateSlug(title string, prefixRandom bool) string {
+	slug := strings.ToLower(strings.TrimSpace(title))
+	slug = regexpSpaces.ReplaceAllString(slug, "-")
+	slug = regexpSlugChars.ReplaceAllString(slug, "")
+	slug = regexpHyphens.ReplaceAllString(slug, "-")
+	slug = strings.Trim(slug, "-")
+
+	if slug == "" {
+		randomSlug, err := RandomAlphanumeric(12)
+		if err != nil {
+			slug = "untitled"
+		} else {
+			slug = strings.ToLower(randomSlug)
+		}
+	}
+
+	if prefixRandom {
+		randomPrefix, err := RandomAlphanumeric(12)
+		if err != nil {
+			return slug
+		}
+		slug = fmt.Sprintf("%s-%s", strings.ToLower(randomPrefix), slug)
+	}
+	return slug
+}
+
 // HTML2Text converts HTML to text.
 func HTML2Text(html string) string {
 	out, err := html2text.FromString(html, html2text.Options{TextOnly: true})
@@ -41,6 +85,15 @@ func HTML2Text(html string) string {
 		return ""
 	}
 	return strings.TrimSpace(out)
+}
+
+// Markdown2HTML converts markdown to HTML, falling back to the input on error.
+func Markdown2HTML(md string) string {
+	var b strings.Builder
+	if err := markdownRenderer.Convert([]byte(md), &b); err != nil {
+		return md
+	}
+	return b.String()
 }
 
 // SanitizeFilename sanitizes the provided filename.
@@ -56,7 +109,17 @@ func SanitizeFilename(fName string) string {
 
 	// Convert to lowercase
 	name = strings.ToLower(name)
-	return filepath.Base(name)
+	name = filepath.Base(name)
+
+	// Fully non-latin names sanitize down to nothing (or just the extension) and break media upload.
+	ext := filepath.Ext(name)
+	if strings.Trim(ext, ".") == "" {
+		ext = ""
+	}
+	if strings.Trim(strings.TrimSuffix(name, ext), ".-_ ") == "" {
+		name = "file" + ext
+	}
+	return name
 }
 
 // RandomAlphanumeric generates a random alphanumeric string of length n.

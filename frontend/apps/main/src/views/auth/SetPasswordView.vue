@@ -1,6 +1,6 @@
 <template>
   <AuthLayout>
-    <Card class="bg-card box">
+    <Card class="bg-card box" id="set-password-container">
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
           <CardTitle class="text-2xl font-bold text-foreground">{{
@@ -16,26 +16,50 @@
                 t('auth.newPassword')
               }}
             </Label>
-            <Input
-              id="password"
-              type="password"
-              autocomplete="new-password"
-              v-model="passwordForm.password"
-              :class="{ 'border-destructive': passwordHasError }"
-            />
+            <div class="relative">
+              <Input
+                id="password"
+                :type="showPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                v-model="passwordForm.password"
+                :class="{ 'border-destructive': passwordHasError }"
+                class="pr-10"
+              />
+              <button
+                type="button"
+                :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
+                class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                @click="showPassword = !showPassword"
+              >
+                <Eye v-if="!showPassword" class="w-5 h-5" />
+                <EyeOff v-else class="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div class="space-y-2">
             <Label for="confirmPassword" class="text-muted-foreground">
               {{ t('auth.confirmPassword') }}
             </Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              autocomplete="new-password"
-              v-model="passwordForm.confirmPassword"
-              :class="{ 'border-destructive': confirmPasswordHasError }"
-            />
+            <div class="relative">
+              <Input
+                id="confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                v-model="passwordForm.confirmPassword"
+                :class="{ 'border-destructive': confirmPasswordHasError }"
+                class="pr-10"
+              />
+              <button
+                type="button"
+                :aria-label="showConfirmPassword ? t('auth.hidePassword') : t('auth.showPassword')"
+                class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                @click="showConfirmPassword = !showConfirmPassword"
+              >
+                <Eye v-if="!showConfirmPassword" class="w-5 h-5" />
+                <EyeOff v-else class="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <Button
@@ -57,7 +81,7 @@
           v-if="errorMessage"
           :errorMessage="errorMessage"
           :border="true"
-          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded text-sm"
+          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded-md text-sm"
         />
       </CardContent>
     </Card>
@@ -77,12 +101,16 @@ import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
+import { Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
 
 const { t } = useI18n()
 const errorMessage = ref('')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 const isLoading = ref(false)
+const submitted = ref(false)
 const router = useRouter()
 const route = useRoute()
 const emitter = useEmitter()
@@ -118,6 +146,7 @@ const validateForm = () => {
 }
 
 const setPasswordAction = async () => {
+  submitted.value = true
   if (!validateForm()) return
 
   errorMessage.value = ''
@@ -141,11 +170,12 @@ const setPasswordAction = async () => {
 }
 
 const passwordHasError = computed(() => {
-  return passwordForm.value.password !== '' && passwordForm.value.password.length < 8
+  return submitted.value && passwordForm.value.password !== '' && passwordForm.value.password.length < 8
 })
 
 const confirmPasswordHasError = computed(() => {
   return (
+    submitted.value &&
     passwordForm.value.confirmPassword !== '' &&
     passwordForm.value.password !== passwordForm.value.confirmPassword
   )

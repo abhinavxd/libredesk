@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/mail"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,7 +16,9 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -25,11 +30,13 @@ func handleGetInboxes(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	rootURL, _ := app.setting.GetAppRootURL()
 	for i := range inboxes {
 		if err := inboxes[i].ClearPasswords(); err != nil {
 			app.lo.Error("error clearing inbox passwords from response", "error", err)
 			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
+		setWebhookURLWithRoot(app, &inboxes[i], rootURL)
 	}
 	return r.SendEnvelope(inboxes)
 }
@@ -48,7 +55,125 @@ func handleGetInbox(r *fastglue.Request) error {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	setWebhookURL(app, &inbox)
 	return r.SendEnvelope(inbox)
+}
+
+// setWebhookURL populates the computed webhook_url field for channels that receive inbound events over HTTP (currently WhatsApp only).
+func setWebhookURL(app *App, inb *imodels.Inbox) {
+	root, _ := app.setting.GetAppRootURL()
+	setWebhookURLWithRoot(app, inb, root)
+}
+
+func setWebhookURLWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
+	if inb.Channel != whatsappChannel.ChannelWhatsApp {
+		return
+	}
+	url := whatsAppCallbackURLFromRoot(rootURL, inb.ID)
+	if url == "" {
+		return
+	}
+	inb.WebhookURL = url
+	_, inb.TokenInvalid = app.inboxAuthErrors.Load(inb.ID)
+}
+
+func whatsAppCallbackURLFromRoot(root string, inboxID int) string {
+	if root == "" {
+		return ""
+	}
+	return strings.TrimRight(root, "/") + "/webhooks/whatsapp/" + strconv.Itoa(inboxID)
+}
+
+// isPublicWebhookURL reports whether root is a Meta-reachable webhook origin: an https URL with a non-loopback host.
+func isPublicWebhookURL(root string) bool {
+	u, err := url.Parse(strings.TrimSpace(root))
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	switch u.Hostname() {
+	case "", "localhost", "127.0.0.1", "::1":
+		return false
+	}
+	return true
+}
+
+// subscribeWhatsAppWebhook best-effort points the WABA's webhook at this inbox; the manual Meta dashboard setup stays as fallback.
+func subscribeWhatsAppWebhook(app *App, inboxID int) {
+	cfg, err := whatsAppConfigForInbox(app, inboxID)
+	if err != nil || app.whatsappClient == nil {
+		return
+	}
+	root, _ := app.setting.GetAppRootURL()
+	if !isPublicWebhookURL(root) {
+		app.lo.Warn("whatsapp webhook not auto-registered: the app root URL must be a public HTTPS URL Meta can reach; set it in Settings and re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "root_url", root)
+		return
+	}
+	callbackURL := whatsAppCallbackURLFromRoot(root, inboxID)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := app.whatsappClient.SubscribeWebhook(ctx, cfg.Account(), callbackURL, cfg.WebhookVerifyToken); err != nil {
+		app.lo.Error("whatsapp webhook auto-registration failed; configure it manually in the Meta dashboard or re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "callback_url", callbackURL, "error", err)
+		return
+	}
+	app.lo.Info("whatsapp webhook subscribed automatically", "inbox_id", inboxID, "callback_url", callbackURL)
+}
+
+func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbox) error {
+	if inb.Channel != whatsappChannel.ChannelWhatsApp || app.whatsappClient == nil {
+		return nil
+	}
+	var cfg whatsappChannel.Config
+	if err := json.Unmarshal(inb.Config, &cfg); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid whatsapp config format", nil, envelope.InputError)
+	}
+	if err := app.whatsappClient.ValidateCredentials(r.RequestCtx, cfg.Account()); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, fmt.Sprintf("meta credential check failed: %s", err.Error()), nil, envelope.InputError)
+	}
+	return nil
+}
+
+// ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta from its config: creates it when absent, edits it in place when the message or button changed, recreates under a new language when that changed. Approval arrives via webhook/sync.
+func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
+	if app.whatsappTemplate == nil {
+		return
+	}
+	cfg, err := whatsAppConfigForInbox(app, inboxID)
+	if err != nil {
+		app.lo.Warn("error reading whatsapp config for csat template", "inbox_id", inboxID, "error", err)
+		return
+	}
+	if strings.TrimSpace(cfg.CSATTemplateBody) == "" || strings.TrimSpace(cfg.CSATTemplateLanguage) == "" || strings.TrimSpace(cfg.CSATTemplateButtonText) == "" {
+		return
+	}
+	root, err := app.setting.GetAppRootURL()
+	if err != nil || root == "" {
+		return
+	}
+	base := strings.TrimRight(root, "/")
+	buttons, err := json.Marshal([]map[string]any{{
+		"type":    "URL",
+		"text":    cfg.CSATTemplateButtonText,
+		"url":     base + "/csat/{{1}}",
+		"example": []string{base + "/csat/example"},
+	}})
+	if err != nil {
+		return
+	}
+	name := wtmodels.CSATTemplateName(inboxID)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := app.whatsappTemplate.EnsureReserved(ctx, wtmodels.Template{
+		InboxID:     inboxID,
+		Name:        name,
+		Language:    cfg.CSATTemplateLanguage,
+		Category:    wtmodels.CategoryUtility,
+		BodyContent: cfg.CSATTemplateBody,
+		Buttons:     buttons,
+	}); err != nil {
+		app.lo.Warn("error provisioning whatsapp csat template", "inbox_id", inboxID, "error", err)
+		return
+	}
+	app.lo.Info("whatsapp csat template reconciled", "inbox_id", inboxID, "name", name)
 }
 
 // handleCreateInbox creates a new inbox
@@ -66,8 +191,12 @@ func handleCreateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 
-	if err := validateInbox(app, inbox); err != nil {
+	if err := validateInbox(app, inbox, false); err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if err := validateWhatsAppCredentials(r, app, inbox); err != nil {
+		return err
 	}
 
 	createdInbox, err := app.inbox.Create(inbox)
@@ -80,11 +209,16 @@ func handleCreateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	if createdInbox.Channel == whatsappChannel.ChannelWhatsApp {
+		go postSaveWhatsAppTasks(app, createdInbox.ID)
+	}
+
 	// Clear passwords before returning.
 	if err := createdInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	setWebhookURL(app, &createdInbox)
 
 	return r.SendEnvelope(createdInbox)
 }
@@ -110,8 +244,17 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 
-	if err := validateInbox(app, inbox); err != nil {
+	if err := validateInbox(app, inbox, true); err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	var previousConfig json.RawMessage
+	if inbox.Channel == whatsappChannel.ChannelWhatsApp {
+		previous, err := app.inbox.GetDBRecord(id)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		previousConfig = previous.Config
 	}
 
 	updatedInbox, err := app.inbox.Update(id, inbox)
@@ -119,9 +262,24 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	if err := validateWhatsAppCredentials(r, app, updatedInbox); err != nil {
+		if rbErr := app.inbox.UpdateConfig(id, previousConfig); rbErr != nil {
+			app.lo.Error("error rolling back inbox config after failed validation", "id", id, "error", rbErr)
+		}
+		if rbErr := reloadInbox(app, id); rbErr != nil {
+			app.lo.Error("error reloading inbox after config rollback", "id", id, "error", rbErr)
+		}
+		return err
+	}
+
 	if err := reloadInbox(app, id); err != nil {
 		app.lo.Error("error reloading inbox", "id", id, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+	}
+
+	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
+		app.inboxAuthErrors.Delete(id)
+		go postSaveWhatsAppTasks(app, id)
 	}
 
 	// Clear passwords before returning.
@@ -129,6 +287,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	setWebhookURL(app, &updatedInbox)
 
 	return r.SendEnvelope(updatedInbox)
 }
@@ -159,6 +318,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	setWebhookURL(app, &toggledInbox)
 
 	return r.SendEnvelope(toggledInbox)
 }
@@ -180,8 +340,13 @@ func handleDeleteInbox(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
+func postSaveWhatsAppTasks(app *App, inboxID int) {
+	subscribeWhatsAppWebhook(app, inboxID)
+	ensureWhatsAppCSATTemplate(app, inboxID)
+}
+
 // validateInbox validates the inbox
-func validateInbox(app *App, inbox imodels.Inbox) error {
+func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 	// Validate from address only for email channels.
 	if inbox.Channel == "email" {
 		if _, err := mail.ParseAddress(inbox.From); err != nil {
@@ -204,6 +369,29 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 	}
 	if inbox.Channel == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "channel"), nil)
+	}
+
+	// Live credential check against Meta runs in the handler where request context is available.
+	if inbox.Channel == whatsappChannel.ChannelWhatsApp {
+		var cfg whatsappChannel.Config
+		if err := json.Unmarshal(inbox.Config, &cfg); err != nil {
+			return envelope.NewError(envelope.InputError, "invalid whatsapp config", nil)
+		}
+		if cfg.PhoneNumberID == "" || cfg.WABAID == "" {
+			return envelope.NewError(envelope.InputError, "phone_number_id and waba_id are required", nil)
+		}
+		if cfg.WebhookVerifyToken == "" {
+			return envelope.NewError(envelope.InputError, "webhook_verify_token is required", nil)
+		}
+		// On edit secrets arrive masked/empty and the config merge restores them.
+		if !isUpdate {
+			if cfg.AccessToken == "" {
+				return envelope.NewError(envelope.InputError, "access_token is required", nil)
+			}
+			if cfg.AppSecret == "" {
+				return envelope.NewError(envelope.InputError, "app_secret is required", nil)
+			}
+		}
 	}
 
 	// Validate livechat-specific configuration
@@ -419,6 +607,24 @@ func trimInboxFields(inb *imodels.Inbox) error {
 			return err
 		}
 		trimEmailConfig(&cfg)
+		trimmedConfig, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		inb.Config = trimmedConfig
+	}
+
+	if inb.Channel == whatsappChannel.ChannelWhatsApp && len(inb.Config) > 0 {
+		var cfg whatsappChannel.Config
+		if err := json.Unmarshal(inb.Config, &cfg); err != nil {
+			return err
+		}
+		cfg.PhoneNumberID = strings.TrimSpace(cfg.PhoneNumberID)
+		cfg.WABAID = strings.TrimSpace(cfg.WABAID)
+		cfg.AccessToken = strings.TrimSpace(cfg.AccessToken)
+		cfg.AppSecret = strings.TrimSpace(cfg.AppSecret)
+		cfg.WebhookVerifyToken = strings.TrimSpace(cfg.WebhookVerifyToken)
+		cfg.APIVersion = strings.TrimSpace(cfg.APIVersion)
 		trimmedConfig, err := json.Marshal(cfg)
 		if err != nil {
 			return err
