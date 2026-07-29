@@ -20,12 +20,27 @@ const conversationStore = useConversationStore()
 
 let lastFetchedKey = ''
 
+const storeHasCurrentList = () => {
+  const c = conversationStore.conversations
+  if (!c.initialized) return false
+  if (viewID.value) return c.listType === CONVERSATION_LIST_TYPE.VIEW && String(c.viewID) === String(viewID.value)
+  if (type.value) return c.listType === type.value
+  if (teamID.value) return c.listType === CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED && String(c.teamID) === String(teamID.value)
+  return false
+}
+
 const fetchForCurrentRoute = () => {
   if (!type.value && !teamID.value && !viewID.value) return
 
   const key = `${type.value || ''}|${teamID.value || ''}|${viewID.value || ''}`
   if (key === lastFetchedKey) return
   lastFetchedKey = key
+
+  // List already loaded: soft-refresh in place. A full fetch resets the list first and blanks it.
+  if (storeHasCurrentList()) {
+    conversationStore.refreshConversationList()
+    return
+  }
 
   if (viewID.value) {
     conversationStore.setListStatus('', false)
