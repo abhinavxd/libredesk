@@ -264,6 +264,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/notifications/read-all", auth(handleMarkAllNotificationsAsRead))
 	g.DELETE("/api/v1/notifications/{id}", auth(handleDeleteNotification))
 	g.DELETE("/api/v1/notifications", auth(handleDeleteAllNotifications))
+	g.GET("/api/v1/notifications/preferences", auth(handleGetNotificationPreferences))
+	g.PUT("/api/v1/notifications/preferences", auth(handleUpdateNotificationPreferences))
 
 	// WebSocket.
 	g.GET("/ws", auth(func(r *fastglue.Request) error {

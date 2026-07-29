@@ -16,6 +16,7 @@ const (
 	TmplSLABreached          = "SLA breached"
 	TmplMentioned            = "Mentioned in conversation"
 	TmplCSATRequest          = "CSAT request"
+	TmplNewReply             = "New reply from contact"
 
 	// Built-in templates fetched from memory stored in `static` directory.
 	TmplResetPassword = "reset-password"

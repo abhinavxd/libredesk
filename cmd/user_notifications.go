@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"strconv"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -93,6 +95,37 @@ func handleDeleteAllNotifications(r *fastglue.Request) error {
 	)
 
 	if err := app.userNotification.DeleteAll(auser.ID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
+func handleGetNotificationPreferences(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	prefs, err := app.notificationPref.GetMatrix(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(map[string]any{
+		"preferences":   prefs,
+		"email_enabled": ko.Bool("notification.email.enabled"),
+	})
+}
+
+func handleUpdateNotificationPreferences(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		prefs []nmodels.NotificationPreference
+	)
+	if err := json.Unmarshal(r.RequestCtx.PostBody(), &prefs); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
+			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	if err := app.notificationPref.Update(auser.ID, prefs); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)

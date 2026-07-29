@@ -10,12 +10,41 @@ import (
 // NotificationType represents the type of user notification.
 type NotificationType string
 
+// NotificationChannel represents the delivery channel of a notification.
+type NotificationChannel string
+
 const (
 	NotificationTypeMention    NotificationType = "mention"
 	NotificationTypeAssignment NotificationType = "assignment"
 	NotificationTypeSLAWarning NotificationType = "sla_warning"
 	NotificationTypeSLABreach  NotificationType = "sla_breach"
+	NotificationTypeNewReply   NotificationType = "new_reply"
+
+	NotificationChannelInApp NotificationChannel = "in_app"
+	NotificationChannelEmail NotificationChannel = "email"
 )
+
+// AgentNotificationTypes are the notification types agents can set preferences for.
+var AgentNotificationTypes = []NotificationType{
+	NotificationTypeNewReply,
+	NotificationTypeAssignment,
+	NotificationTypeMention,
+	NotificationTypeSLAWarning,
+	NotificationTypeSLABreach,
+}
+
+// NotificationChannels are the delivery channels a preference can target.
+var NotificationChannels = []NotificationChannel{
+	NotificationChannelInApp,
+	NotificationChannelEmail,
+}
+
+// NotificationPreference is a per-channel toggle for a notification type. A missing row means enabled.
+type NotificationPreference struct {
+	NotificationType NotificationType    `db:"notification_type" json:"notification_type"`
+	Channel          NotificationChannel `db:"channel" json:"channel"`
+	Enabled          bool                `db:"enabled" json:"enabled"`
+}
 
 // UserNotification represents an in-app notification for a user.
 type UserNotification struct {

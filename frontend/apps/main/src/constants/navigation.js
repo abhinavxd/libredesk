@@ -190,6 +190,12 @@ export const accountNavItems = [
     titleKey: 'globals.terms.profile',
     href: '/account/profile',
     icon: 'CircleUser'
+  },
+  {
+    titleKey: 'globals.terms.notification',
+    href: '/account/notifications',
+    isTitleKeyPlural: true,
+    icon: 'Bell'
   }
 ]
 

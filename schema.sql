@@ -22,7 +22,8 @@ DROP TYPE IF EXISTS "sla_metric" CASCADE; CREATE TYPE "sla_metric" AS ENUM ('fir
 DROP TYPE IF EXISTS "sla_notification_type" CASCADE; CREATE TYPE "sla_notification_type" AS ENUM ('warning', 'breach');
 DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online', 'agent_password_set', 'agent_role_permissions_changed');
 DROP TYPE IF EXISTS "macro_visible_when" CASCADE; CREATE TYPE "macro_visible_when" AS ENUM ('replying', 'starting_conversation', 'adding_private_note');
-DROP TYPE IF EXISTS "user_notification_type" CASCADE; CREATE TYPE "user_notification_type" AS ENUM ('mention', 'assignment', 'sla_warning', 'sla_breach');
+DROP TYPE IF EXISTS "user_notification_type" CASCADE; CREATE TYPE "user_notification_type" AS ENUM ('mention', 'assignment', 'sla_warning', 'sla_breach', 'new_reply');
+DROP TYPE IF EXISTS "notification_channel" CASCADE; CREATE TYPE "notification_channel" AS ENUM ('in_app', 'email');
 DROP TYPE IF EXISTS "conversation_status_category" CASCADE; CREATE TYPE "conversation_status_category" AS ENUM ('open', 'waiting', 'resolved');
 DROP TYPE IF EXISTS "webhook_event" CASCADE; CREATE TYPE webhook_event AS ENUM (
 	'conversation.created',
@@ -701,6 +702,19 @@ CREATE INDEX index_user_notifications_on_user_id_is_read ON user_notifications(u
 CREATE INDEX index_user_notifications_on_created_at ON user_notifications(created_at);
 CREATE INDEX index_user_notifications_on_conversation_id ON user_notifications(conversation_id);
 
+DROP TABLE IF EXISTS user_notification_preferences CASCADE;
+CREATE TABLE user_notification_preferences (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	notification_type user_notification_type NOT NULL,
+	channel notification_channel NOT NULL,
+	enabled BOOLEAN NOT NULL DEFAULT TRUE,
+	CONSTRAINT constraint_uniq_user_notification_preferences UNIQUE (user_id, notification_type, channel)
+);
+CREATE INDEX index_user_notification_preferences_on_user_id ON user_notification_preferences(user_id);
+
 INSERT INTO ai_providers
 ("name", provider, config, is_default)
 VALUES('openai', 'openai', '{"api_key": ""}'::jsonb, true);
@@ -796,6 +810,27 @@ VALUES('email_notification'::template_type, '
 </div>
 
 ', false, 'Conversation assigned', 'New conversation assigned to you', true);
+
+INSERT INTO templates
+("type", body, is_default, "name", subject, is_builtin)
+VALUES('email_notification'::template_type, '
+<p>{{ .Author.FullName }} replied to a conversation assigned to you:</p>
+
+<div>
+    Reference number: {{ .Conversation.ReferenceNumber }} <br>
+    Subject: {{ .Conversation.Subject }}
+</div>
+
+<p>
+    <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
+</p>
+
+<div>
+    Best regards,<br>
+    Libredesk
+</div>
+
+', false, 'New reply from contact', 'New reply on conversation #{{ .Conversation.ReferenceNumber }}', true);
 
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)

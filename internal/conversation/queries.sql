@@ -542,10 +542,14 @@ SET custom_attributes = $2,
 WHERE uuid = $1;
 
 -- name: update-conversation-waiting-since
-UPDATE conversations
-SET waiting_since = $2,
+WITH old AS (
+    SELECT uuid, waiting_since IS NOT NULL AS was_waiting FROM conversations WHERE uuid = $1
+)
+UPDATE conversations SET
+    waiting_since = $2,
     updated_at = NOW()
-WHERE uuid = $1;
+FROM old WHERE conversations.uuid = old.uuid
+RETURNING old.was_waiting;
 
 -- name: update-conversation-reply-timestamps
 WITH old AS (

@@ -674,23 +674,23 @@ func (c *Manager) UpdateConversationLastMessage(conversation int, conversationUU
 	return nil
 }
 
-// UpdateConversationWaitingSince updates the waiting since timestamp for a conversation.
-func (c *Manager) UpdateConversationWaitingSince(conversationUUID string, at *time.Time) error {
-	res, err := c.q.UpdateConversationWaitingSince.Exec(conversationUUID, at)
-	if err != nil {
+// UpdateConversationWaitingSince sets the waiting since timestamp and reports whether the conversation was already waiting.
+func (c *Manager) UpdateConversationWaitingSince(conversationUUID string, at *time.Time) (bool, error) {
+	var wasWaiting bool
+	if err := c.q.UpdateConversationWaitingSince.QueryRow(conversationUUID, at).Scan(&wasWaiting); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
 		c.lo.Error("error updating conversation waiting since", "error", err)
-		return err
+		return false, err
 	}
 
-	rows, _ := res.RowsAffected()
-	if rows > 0 {
-		if at != nil {
-			c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": at.Format(time.RFC3339)})
-		} else {
-			c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": nil})
-		}
+	if at != nil {
+		c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": at.Format(time.RFC3339)})
+	} else {
+		c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": nil})
 	}
-	return nil
+	return wasWaiting, nil
 }
 
 // UpdateConversationUserAssignee sets the assignee of a conversation to a specifc user.
@@ -1140,6 +1140,75 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 		},
 	})
 	return nil
+}
+
+// NotifyNewReply notifies the assigned agent of an incoming reply.
+func (m *Manager) NotifyNewReply(conversation models.Conversation, senderID int) {
+	if conversation.AssignedUserID.Int == 0 || conversation.AssignedUserID.Int == senderID {
+		return
+	}
+
+	agent, err := m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
+	if err != nil {
+		m.lo.Error("error fetching agent for new reply notification", "user_id", conversation.AssignedUserID.Int, "error", err)
+		return
+	}
+
+	sender, err := m.userStore.Get(senderID, "", []string{})
+	if err != nil {
+		m.lo.Error("error fetching sender for new reply notification", "user_id", senderID, "error", err)
+		return
+	}
+
+	var email *notifier.EmailNotification
+	if agent.Email.String != "" {
+		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplNewReply,
+			map[string]any{
+				"Conversation": map[string]any{
+					"ReferenceNumber": conversation.ReferenceNumber,
+					"Subject":         conversation.Subject.String,
+					"Priority":        conversation.Priority.String,
+					"UUID":            conversation.UUID,
+				},
+				"Contact": map[string]any{
+					"FirstName": conversation.Contact.FirstName,
+					"LastName":  conversation.Contact.LastName,
+					"FullName":  conversation.Contact.FullName(),
+					"Email":     conversation.Contact.Email.String,
+				},
+				"Recipient": map[string]any{
+					"FirstName": agent.FirstName,
+					"LastName":  agent.LastName,
+					"FullName":  agent.FullName(),
+					"Email":     agent.Email.String,
+				},
+				"Author": map[string]any{
+					"FirstName": sender.FirstName,
+					"LastName":  sender.LastName,
+					"FullName":  sender.FullName(),
+					"Email":     sender.Email.String,
+				},
+			})
+		if err != nil {
+			m.lo.Error("error rendering template", "template", template.TmplNewReply, "conversation_uuid", conversation.UUID, "error", err)
+		} else {
+			email = &notifier.EmailNotification{
+				Recipients: []string{agent.Email.String},
+				Subject:    subject,
+				Content:    content,
+			}
+		}
+	}
+
+	m.dispatcher.Send(notifier.Notification{
+		Type:             nmodels.NotificationTypeNewReply,
+		RecipientIDs:     []int{agent.ID},
+		Title:            m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber),
+		Body:             conversation.Subject,
+		ConversationID:   null.IntFrom(conversation.ID),
+		ConversationUUID: conversation.UUID,
+		Email:            email,
+	})
 }
 
 // NotifyMention sends notifications (in-app, WebSocket, email) for mentions.

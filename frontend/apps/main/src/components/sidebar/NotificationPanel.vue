@@ -134,6 +134,7 @@ import {
   Trash2,
   AtSign,
   UserPlus,
+  MessageSquare,
   AlertTriangle,
   AlertCircle
 } from 'lucide-vue-next'
@@ -153,6 +154,7 @@ const getNotificationIcon = (type) => {
   const icons = {
     mention: AtSign,
     assignment: UserPlus,
+    new_reply: MessageSquare,
     sla_warning: AlertTriangle,
     sla_breach: AlertCircle
   }
@@ -163,6 +165,7 @@ const getNotificationIconClass = (type) => {
   const classes = {
     mention: 'text-primary',
     assignment: 'text-accent-foreground',
+    new_reply: 'text-primary',
     sla_warning: 'text-destructive',
     sla_breach: 'text-destructive'
   }

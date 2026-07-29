@@ -2,6 +2,7 @@ package notifier
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
@@ -47,6 +48,7 @@ type Dispatcher struct {
 	inApp        *UserNotificationManager
 	outbound     *Service
 	wsHub        WSHub
+	prefs        *PreferenceManager
 	emailEnabled bool
 	lo           *logf.Logger
 }
@@ -56,6 +58,7 @@ type DispatcherOpts struct {
 	InApp        *UserNotificationManager
 	Outbound     *Service
 	WSHub        WSHub
+	Prefs        *PreferenceManager
 	EmailEnabled bool
 	Lo           *logf.Logger
 }
@@ -66,39 +69,67 @@ func NewDispatcher(opts DispatcherOpts) *Dispatcher {
 		inApp:        opts.InApp,
 		outbound:     opts.Outbound,
 		wsHub:        opts.WSHub,
+		prefs:        opts.Prefs,
 		emailEnabled: opts.EmailEnabled,
 		lo:           opts.Lo,
 	}
+}
+
+// disabledChannels resolves the opted-out channels of every recipient. On a lookup failure email
+// is suppressed for all recipients, an unreadable preference must not override an email opt-out.
+func (d *Dispatcher) disabledChannels(n Notification) map[int][]models.NotificationChannel {
+	disabled, err := d.prefs.DisabledChannels(n.RecipientIDs, n.Type)
+	if err != nil {
+		disabled = make(map[int][]models.NotificationChannel, len(n.RecipientIDs))
+		for _, recipientID := range n.RecipientIDs {
+			disabled[recipientID] = []models.NotificationChannel{models.NotificationChannelEmail}
+		}
+	}
+	return disabled
 }
 
 // Send sends a notification through all configured channels.
 // For each recipient: creates in-app notification (DB), broadcasts via Websocket,
 // and sends email if Email field is provided.
 func (d *Dispatcher) Send(n Notification) {
-	for i, recipientID := range n.RecipientIDs {
-		d.sendToRecipient(recipientID, n)
-
-		if d.outbound != nil && n.Email != nil && d.emailEnabled {
+	var emails []EmailNotification
+	if n.Email != nil {
+		emails = make([]EmailNotification, len(n.RecipientIDs))
+		for i := range n.RecipientIDs {
 			var email string
 			if i < len(n.Email.Recipients) {
 				email = n.Email.Recipients[i]
 			} else if len(n.Email.Recipients) == 1 {
 				email = n.Email.Recipients[0] // Broadcast mode
 			}
-			if email != "" {
-				d.sendEmail(recipientID, email, n.Email.Subject, n.Email.Content, n.Type)
+			if email == "" {
+				continue
+			}
+			emails[i] = EmailNotification{
+				Recipients: []string{email},
+				Subject:    n.Email.Subject,
+				Content:    n.Email.Content,
 			}
 		}
 	}
+	d.SendWithEmails(n, emails)
 }
 
 // SendWithEmails sends notifications where each recipient has their own email content.
 // This is useful when email content is personalized per recipient.
 func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) {
-	for i, recipientID := range n.RecipientIDs {
-		d.sendToRecipient(recipientID, n)
+	if len(n.RecipientIDs) == 0 {
+		return
+	}
+	disabled := d.disabledChannels(n)
 
-		if d.outbound != nil && i < len(emails) && len(emails[i].Recipients) > 0 && d.emailEnabled {
+	for i, recipientID := range n.RecipientIDs {
+		if !slices.Contains(disabled[recipientID], models.NotificationChannelInApp) {
+			d.sendToRecipient(recipientID, n)
+		}
+
+		if d.outbound != nil && i < len(emails) && len(emails[i].Recipients) > 0 && d.emailEnabled &&
+			!slices.Contains(disabled[recipientID], models.NotificationChannelEmail) {
 			e := emails[i]
 			d.sendEmail(recipientID, e.Recipients[0], e.Subject, e.Content, n.Type)
 		}

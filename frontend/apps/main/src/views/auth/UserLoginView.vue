@@ -44,9 +44,7 @@
 
         <form @submit.prevent="loginAction" class="space-y-3">
           <div class="space-y-2">
-            <Label for="email" class="text-muted-foreground">{{
-              t('globals.terms.email')
-            }}</Label>
+            <Label for="email" class="text-muted-foreground">{{ t('globals.terms.email') }}</Label>
             <Input
               id="email"
               type="text"
@@ -90,11 +88,7 @@
             </router-link>
           </div>
 
-          <Button
-            class="w-full"
-            :disabled="isLoading"
-            type="submit"
-          >
+          <Button class="w-full" :disabled="isLoading" type="submit">
             <span v-if="isLoading" class="flex items-center justify-center">
               <div
                 class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"
@@ -159,6 +153,14 @@ const demoCredentials = {
   password: 'demo@libredesk.io'
 }
 
+const oidcErrorKeys = {
+  oidc_provider_error: 'auth.oidcProviderError',
+  oidc_session_expired: 'auth.oidcSessionExpired',
+  oidc_no_account: 'auth.oidcNoAccount',
+  oidc_account_disabled: 'user.accountDisabled',
+  oidc_login_failed: 'auth.oidcLoginFailed'
+}
+
 onMounted(async () => {
   // Prefill the login form with demo credentials if it's a demo build
   if (isDemoBuild) {
@@ -166,7 +168,16 @@ onMounted(async () => {
     loginForm.value.password = demoCredentials.password
   }
   fetchOIDCProviders()
+  showOIDCError()
 })
+
+const showOIDCError = () => {
+  const { error, ...query } = router.currentRoute.value.query
+  if (!error) return
+  errorMessage.value = t(oidcErrorKeys[error] ?? 'auth.oidcLoginFailed')
+  useTemporaryClass('login-container', 'animate-shake')
+  router.replace({ query })
+}
 
 const fetchOIDCProviders = async () => {
   try {
