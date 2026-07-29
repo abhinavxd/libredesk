@@ -7,8 +7,19 @@ import (
 )
 
 func V2_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
-	if _, err := db.Exec(`ALTER TYPE user_notification_type ADD VALUE IF NOT EXISTS 'new_reply';`); err != nil {
-		return err
+	for _, v := range []string{
+		"new_reply",
+		"new_reply_participating",
+		"sla_first_response_warning",
+		"sla_first_response_breach",
+		"sla_next_response_warning",
+		"sla_next_response_breach",
+		"sla_resolution_warning",
+		"sla_resolution_breach",
+	} {
+		if _, err := db.Exec(`ALTER TYPE user_notification_type ADD VALUE IF NOT EXISTS '` + v + `';`); err != nil {
+			return err
+		}
 	}
 
 	if _, err := db.Exec(`
@@ -36,10 +47,6 @@ func V2_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	`); err != nil {
 		return err
 	}
-	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS index_user_notification_preferences_on_user_id ON user_notification_preferences(user_id);`); err != nil {
-		return err
-	}
-
 	if _, err := db.Exec(`
 		INSERT INTO templates ("type", body, is_default, "name", subject, is_builtin)
 		SELECT 'email_notification'::template_type, '
@@ -61,6 +68,31 @@ func V2_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 
 ', false, 'New reply from contact', 'New reply on conversation #{{ .Conversation.ReferenceNumber }}', true
 		WHERE NOT EXISTS (SELECT 1 FROM templates WHERE "name" = 'New reply from contact');
+	`); err != nil {
+		return err
+	}
+
+	if _, err := db.Exec(`
+		INSERT INTO templates ("type", body, is_default, "name", subject, is_builtin)
+		SELECT 'email_notification'::template_type, '
+<p>{{ .Author.FullName }} replied to a conversation you are participating in:</p>
+
+<div>
+    Reference number: {{ .Conversation.ReferenceNumber }} <br>
+    Subject: {{ .Conversation.Subject }}
+</div>
+
+<p>
+    <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
+</p>
+
+<div>
+    Best regards,<br>
+    Libredesk
+</div>
+
+', false, 'New reply on participating conversation', 'New reply on conversation #{{ .Conversation.ReferenceNumber }}', true
+		WHERE NOT EXISTS (SELECT 1 FROM templates WHERE "name" = 'New reply on participating conversation');
 	`); err != nil {
 		return err
 	}

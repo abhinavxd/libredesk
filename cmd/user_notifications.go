@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"strconv"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
@@ -121,9 +120,9 @@ func handleUpdateNotificationPreferences(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 		prefs []nmodels.NotificationPreference
 	)
-	if err := json.Unmarshal(r.RequestCtx.PostBody(), &prefs); err != nil {
+	if err := r.Decode(&prefs, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+			app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 	if err := app.notificationPref.Update(auser.ID, prefs); err != nil {
 		return sendErrorEnvelope(r, err)

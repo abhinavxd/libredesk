@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/volatiletech/null/v9"
@@ -14,11 +15,20 @@ type NotificationType string
 type NotificationChannel string
 
 const (
-	NotificationTypeMention    NotificationType = "mention"
-	NotificationTypeAssignment NotificationType = "assignment"
+	NotificationTypeMention                NotificationType = "mention"
+	NotificationTypeAssignment             NotificationType = "assignment"
+	NotificationTypeNewReply               NotificationType = "new_reply"
+	NotificationTypeNewReplyParticipating  NotificationType = "new_reply_participating"
+	NotificationTypeSLAFirstResponseWarn   NotificationType = "sla_first_response_warning"
+	NotificationTypeSLAFirstResponseBreach NotificationType = "sla_first_response_breach"
+	NotificationTypeSLANextResponseWarn    NotificationType = "sla_next_response_warning"
+	NotificationTypeSLANextResponseBreach  NotificationType = "sla_next_response_breach"
+	NotificationTypeSLAResolutionWarn      NotificationType = "sla_resolution_warning"
+	NotificationTypeSLAResolutionBreach    NotificationType = "sla_resolution_breach"
+
+	// Superseded by the per-metric types above, retained so existing notification rows still render.
 	NotificationTypeSLAWarning NotificationType = "sla_warning"
 	NotificationTypeSLABreach  NotificationType = "sla_breach"
-	NotificationTypeNewReply   NotificationType = "new_reply"
 
 	NotificationChannelInApp NotificationChannel = "in_app"
 	NotificationChannelEmail NotificationChannel = "email"
@@ -26,11 +36,16 @@ const (
 
 // AgentNotificationTypes are the notification types agents can set preferences for.
 var AgentNotificationTypes = []NotificationType{
-	NotificationTypeNewReply,
 	NotificationTypeAssignment,
 	NotificationTypeMention,
-	NotificationTypeSLAWarning,
-	NotificationTypeSLABreach,
+	NotificationTypeNewReply,
+	NotificationTypeNewReplyParticipating,
+	NotificationTypeSLAFirstResponseWarn,
+	NotificationTypeSLAFirstResponseBreach,
+	NotificationTypeSLANextResponseWarn,
+	NotificationTypeSLANextResponseBreach,
+	NotificationTypeSLAResolutionWarn,
+	NotificationTypeSLAResolutionBreach,
 }
 
 // NotificationChannels are the delivery channels a preference can target.
@@ -39,11 +54,22 @@ var NotificationChannels = []NotificationChannel{
 	NotificationChannelEmail,
 }
 
-// NotificationPreference is a per-channel toggle for a notification type. A missing row means enabled.
+// defaultDisabledTypes are off until an agent opts in. Every other type defaults to on.
+var defaultDisabledTypes = []NotificationType{
+	NotificationTypeNewReply,
+	NotificationTypeNewReplyParticipating,
+}
+
+// NotificationPreference is a per-channel toggle for a notification type.
 type NotificationPreference struct {
 	NotificationType NotificationType    `db:"notification_type" json:"notification_type"`
 	Channel          NotificationChannel `db:"channel" json:"channel"`
 	Enabled          bool                `db:"enabled" json:"enabled"`
+}
+
+// DefaultEnabled reports the preference for a type when the agent has no stored row for it.
+func DefaultEnabled(nType NotificationType) bool {
+	return !slices.Contains(defaultDisabledTypes, nType)
 }
 
 // UserNotification represents an in-app notification for a user.

@@ -75,17 +75,23 @@ func NewDispatcher(opts DispatcherOpts) *Dispatcher {
 	}
 }
 
-// disabledChannels resolves the opted-out channels of every recipient. On a lookup failure email
-// is suppressed for all recipients, an unreadable preference must not override an email opt-out.
-func (d *Dispatcher) disabledChannels(n Notification) map[int][]models.NotificationChannel {
-	disabled, err := d.prefs.DisabledChannels(n.RecipientIDs, n.Type)
-	if err != nil {
-		disabled = make(map[int][]models.NotificationChannel, len(n.RecipientIDs))
-		for _, recipientID := range n.RecipientIDs {
-			disabled[recipientID] = []models.NotificationChannel{models.NotificationChannelEmail}
+// EnabledChannels returns the channels each recipient will actually be notified on, accounting for
+// their preferences and the globally configured channels.
+func (d *Dispatcher) EnabledChannels(recipientIDs []int, nType models.NotificationType) map[int][]models.NotificationChannel {
+	enabled := d.prefs.EnabledChannels(recipientIDs, nType)
+	if !d.emailEnabled || d.outbound == nil {
+		for recipientID, channels := range enabled {
+			channels = slices.DeleteFunc(channels, func(c models.NotificationChannel) bool {
+				return c == models.NotificationChannelEmail
+			})
+			if len(channels) == 0 {
+				delete(enabled, recipientID)
+				continue
+			}
+			enabled[recipientID] = channels
 		}
 	}
-	return disabled
+	return enabled
 }
 
 // Send sends a notification through all configured channels.
@@ -121,15 +127,15 @@ func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) 
 	if len(n.RecipientIDs) == 0 {
 		return
 	}
-	disabled := d.disabledChannels(n)
+	enabled := d.EnabledChannels(n.RecipientIDs, n.Type)
 
 	for i, recipientID := range n.RecipientIDs {
-		if !slices.Contains(disabled[recipientID], models.NotificationChannelInApp) {
+		if slices.Contains(enabled[recipientID], models.NotificationChannelInApp) {
 			d.sendToRecipient(recipientID, n)
 		}
 
-		if d.outbound != nil && i < len(emails) && len(emails[i].Recipients) > 0 && d.emailEnabled &&
-			!slices.Contains(disabled[recipientID], models.NotificationChannelEmail) {
+		if i < len(emails) && len(emails[i].Recipients) > 0 &&
+			slices.Contains(enabled[recipientID], models.NotificationChannelEmail) {
 			e := emails[i]
 			d.sendEmail(recipientID, e.Recipients[0], e.Subject, e.Content, n.Type)
 		}

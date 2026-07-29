@@ -1,8 +1,6 @@
 package notifier
 
 import (
-	"database/sql"
-	"errors"
 	"slices"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -15,14 +13,15 @@ import (
 )
 
 type prefQueries struct {
-	GetPreferences   *sqlx.Stmt `query:"get-notification-preferences"`
-	GetDisabled      *sqlx.Stmt `query:"get-disabled-notification-channels"`
-	UpsertPreference *sqlx.Stmt `query:"upsert-notification-preference"`
+	GetPreferences     *sqlx.Stmt `query:"get-notification-preferences"`
+	GetPreferencesType *sqlx.Stmt `query:"get-notification-preferences-for-type"`
+	UpsertPreference   *sqlx.Stmt `query:"upsert-notification-preference"`
 }
 
-type disabledChannel struct {
+type userChannelPreference struct {
 	UserID  int                        `db:"user_id"`
 	Channel models.NotificationChannel `db:"channel"`
+	Enabled bool                       `db:"enabled"`
 }
 
 type PreferenceManager struct {
@@ -50,42 +49,60 @@ func NewPreferenceManager(opts PreferenceManagerOpts) (*PreferenceManager, error
 	}, nil
 }
 
-// DisabledChannels returns the channels each of the users has opted out of for the notification type.
-func (m *PreferenceManager) DisabledChannels(userIDs []int, nType models.NotificationType) (map[int][]models.NotificationChannel, error) {
-	var rows []disabledChannel
-	if err := m.q.GetDisabled.Select(&rows, pq.Array(userIDs), nType); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		m.lo.Error("error fetching disabled notification channels", "type", nType, "error", err)
-		return nil, err
+// EnabledChannels returns the channels each of the users receives the notification type on. On a lookup
+// failure the type's default applies, an unreadable preference must not deliver what nobody opted into.
+func (m *PreferenceManager) EnabledChannels(userIDs []int, nType models.NotificationType) map[int][]models.NotificationChannel {
+	var rows []userChannelPreference
+	if err := m.q.GetPreferencesType.Select(&rows, pq.Array(userIDs), nType); err != nil {
+		m.lo.Error("error fetching notification preferences", "type", nType, "error", err)
 	}
-	disabled := make(map[int][]models.NotificationChannel, len(rows))
+
+	stored := make(map[[2]any]bool, len(rows))
 	for _, r := range rows {
-		disabled[r.UserID] = append(disabled[r.UserID], r.Channel)
+		stored[[2]any{r.UserID, r.Channel}] = r.Enabled
 	}
-	return disabled, nil
+
+	def := models.DefaultEnabled(nType)
+	enabled := make(map[int][]models.NotificationChannel, len(userIDs))
+	for _, userID := range userIDs {
+		for _, channel := range models.NotificationChannels {
+			on, ok := stored[[2]any{userID, channel}]
+			if !ok {
+				on = def
+			}
+			if on {
+				enabled[userID] = append(enabled[userID], channel)
+			}
+		}
+	}
+	return enabled
 }
 
-// GetMatrix returns the effective preference for every agent notification type and channel. Absent rows default to enabled.
+// GetMatrix returns the effective preference for every agent notification type and channel.
 func (m *PreferenceManager) GetMatrix(userID int) ([]models.NotificationPreference, error) {
-	var stored []models.NotificationPreference
-	if err := m.q.GetPreferences.Select(&stored, userID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	var rows []models.NotificationPreference
+	if err := m.q.GetPreferences.Select(&rows, userID); err != nil {
 		m.lo.Error("error fetching notification preferences", "user_id", userID, "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	stored := make(map[[2]any]bool, len(rows))
+	for _, r := range rows {
+		stored[[2]any{r.NotificationType, r.Channel}] = r.Enabled
 	}
 
 	matrix := make([]models.NotificationPreference, 0, len(models.AgentNotificationTypes)*len(models.NotificationChannels))
 	for _, nType := range models.AgentNotificationTypes {
 		for _, channel := range models.NotificationChannels {
-			pref := models.NotificationPreference{
+			on, ok := stored[[2]any{nType, channel}]
+			if !ok {
+				on = models.DefaultEnabled(nType)
+			}
+			matrix = append(matrix, models.NotificationPreference{
 				NotificationType: nType,
 				Channel:          channel,
-				Enabled:          true,
-			}
-			if i := slices.IndexFunc(stored, func(p models.NotificationPreference) bool {
-				return p.NotificationType == nType && p.Channel == channel
-			}); i >= 0 {
-				pref.Enabled = stored[i].Enabled
-			}
-			matrix = append(matrix, pref)
+				Enabled:          on,
+			})
 		}
 	}
 	return matrix, nil

@@ -285,6 +285,8 @@ type queries struct {
 	GetChatConversation                *sqlx.Stmt `query:"get-chat-conversation"`
 	GetContactPreviousConversations    *sqlx.Stmt `query:"get-contact-previous-conversations"`
 	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
+	GetConversationParticipantAgents   *sqlx.Stmt `query:"get-conversation-participant-agents"`
+	GetAgentsWithoutUnseenReplies      *sqlx.Stmt `query:"get-agents-without-unseen-replies"`
 	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
 	UpdateConversationWaitingSince     *sqlx.Stmt `query:"update-conversation-waiting-since"`
 	UpdateConversationReplyTimestamps  *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
@@ -674,23 +676,23 @@ func (c *Manager) UpdateConversationLastMessage(conversation int, conversationUU
 	return nil
 }
 
-// UpdateConversationWaitingSince sets the waiting since timestamp and reports whether the conversation was already waiting.
-func (c *Manager) UpdateConversationWaitingSince(conversationUUID string, at *time.Time) (bool, error) {
-	var wasWaiting bool
-	if err := c.q.UpdateConversationWaitingSince.QueryRow(conversationUUID, at).Scan(&wasWaiting); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
-		}
+// UpdateConversationWaitingSince updates the waiting since timestamp for a conversation.
+func (c *Manager) UpdateConversationWaitingSince(conversationUUID string, at *time.Time) error {
+	res, err := c.q.UpdateConversationWaitingSince.Exec(conversationUUID, at)
+	if err != nil {
 		c.lo.Error("error updating conversation waiting since", "error", err)
-		return false, err
+		return err
 	}
 
-	if at != nil {
-		c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": at.Format(time.RFC3339)})
-	} else {
-		c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": nil})
+	rows, _ := res.RowsAffected()
+	if rows > 0 {
+		if at != nil {
+			c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": at.Format(time.RFC3339)})
+		} else {
+			c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": nil})
+		}
 	}
-	return wasWaiting, nil
+	return nil
 }
 
 // UpdateConversationUserAssignee sets the assignee of a conversation to a specifc user.
@@ -1090,35 +1092,9 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 		return fmt.Errorf("fetching agent: %w", err)
 	}
 
-	// Render email template.
+	// Automated messages do not have an author.
 	content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplConversationAssigned,
-		map[string]any{
-			"Conversation": map[string]any{
-				"ReferenceNumber": conversation.ReferenceNumber,
-				"Subject":         conversation.Subject.String,
-				"Priority":        conversation.Priority.String,
-				"UUID":            conversation.UUID,
-			},
-			"Contact": map[string]any{
-				"FirstName": conversation.Contact.FirstName,
-				"LastName":  conversation.Contact.LastName,
-				"FullName":  conversation.Contact.FullName(),
-				"Email":     conversation.Contact.Email.String,
-			},
-			"Recipient": map[string]any{
-				"FirstName": agent.FirstName,
-				"LastName":  agent.LastName,
-				"FullName":  agent.FullName(),
-				"Email":     agent.Email.String,
-			},
-			// Automated messages do not have an author.
-			"Author": map[string]any{
-				"FirstName": "",
-				"LastName":  "",
-				"FullName":  "",
-				"Email":     "",
-			},
-		})
+		notificationTemplateData(conversation, agent, umodels.User{}))
 	if err != nil {
 		m.lo.Error("error rendering template", "template", template.TmplConversationAssigned, "conversation_uuid", conversation.UUID, "error", err)
 		return fmt.Errorf("rendering template: %w", err)
@@ -1142,73 +1118,123 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 	return nil
 }
 
-// NotifyNewReply notifies the assigned agent of an incoming reply.
-func (m *Manager) NotifyNewReply(conversation models.Conversation, senderID int) {
-	if conversation.AssignedUserID.Int == 0 || conversation.AssignedUserID.Int == senderID {
+// NotifyNewReply notifies the assigned agent and the other participating agents of an incoming reply.
+func (m *Manager) NotifyNewReply(conversation models.Conversation, message models.Message) {
+	var participants []umodels.User
+	if err := m.q.GetConversationParticipantAgents.Select(&participants, conversation.UUID); err != nil {
+		m.lo.Error("error fetching participants for new reply notification", "conversation_uuid", conversation.UUID, "error", err)
+	}
+
+	assigneeID := conversation.AssignedUserID.Int
+	var participating []umodels.User
+	for _, p := range participants {
+		if p.ID == message.SenderID || p.ID == assigneeID {
+			continue
+		}
+		participating = append(participating, p)
+	}
+
+	var assigneeChannels, participatingChannels map[int][]nmodels.NotificationChannel
+	if assigneeID != 0 && assigneeID != message.SenderID {
+		assigneeChannels = m.dispatcher.EnabledChannels([]int{assigneeID}, nmodels.NotificationTypeNewReply)
+	}
+	if len(participating) > 0 {
+		ids := make([]int, 0, len(participating))
+		for _, p := range participating {
+			ids = append(ids, p.ID)
+		}
+		participatingChannels = m.dispatcher.EnabledChannels(ids, nmodels.NotificationTypeNewReplyParticipating)
+	}
+	if len(assigneeChannels) == 0 && len(participatingChannels) == 0 {
 		return
 	}
 
-	agent, err := m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
-	if err != nil {
-		m.lo.Error("error fetching agent for new reply notification", "user_id", conversation.AssignedUserID.Int, "error", err)
-		return
+	// A recipient who already has unseen replies has an unread notification for this conversation,
+	// notifying again per message would spam them during a burst.
+	candidateIDs := make([]int, 0, len(assigneeChannels)+len(participatingChannels))
+	for id := range assigneeChannels {
+		candidateIDs = append(candidateIDs, id)
 	}
-
-	sender, err := m.userStore.Get(senderID, "", []string{})
-	if err != nil {
-		m.lo.Error("error fetching sender for new reply notification", "user_id", senderID, "error", err)
-		return
+	for id := range participatingChannels {
+		candidateIDs = append(candidateIDs, id)
 	}
+	notifiable := m.agentsWithoutUnseenReplies(conversation.UUID, candidateIDs, message.ID)
 
-	var email *notifier.EmailNotification
-	if agent.Email.String != "" {
-		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplNewReply,
-			map[string]any{
-				"Conversation": map[string]any{
-					"ReferenceNumber": conversation.ReferenceNumber,
-					"Subject":         conversation.Subject.String,
-					"Priority":        conversation.Priority.String,
-					"UUID":            conversation.UUID,
-				},
-				"Contact": map[string]any{
-					"FirstName": conversation.Contact.FirstName,
-					"LastName":  conversation.Contact.LastName,
-					"FullName":  conversation.Contact.FullName(),
-					"Email":     conversation.Contact.Email.String,
-				},
-				"Recipient": map[string]any{
-					"FirstName": agent.FirstName,
-					"LastName":  agent.LastName,
-					"FullName":  agent.FullName(),
-					"Email":     agent.Email.String,
-				},
-				"Author": map[string]any{
-					"FirstName": sender.FirstName,
-					"LastName":  sender.LastName,
-					"FullName":  sender.FullName(),
-					"Email":     sender.Email.String,
-				},
-			})
-		if err != nil {
-			m.lo.Error("error rendering template", "template", template.TmplNewReply, "conversation_uuid", conversation.UUID, "error", err)
+	var assignees []umodels.User
+	if len(assigneeChannels) > 0 && slices.Contains(notifiable, assigneeID) {
+		if agent, err := m.userStore.GetAgent(assigneeID, ""); err != nil {
+			m.lo.Error("error fetching agent for new reply notification", "user_id", assigneeID, "error", err)
 		} else {
-			email = &notifier.EmailNotification{
-				Recipients: []string{agent.Email.String},
-				Subject:    subject,
-				Content:    content,
-			}
+			assignees = append(assignees, agent)
 		}
 	}
+	participating = slices.DeleteFunc(participating, func(p umodels.User) bool {
+		return len(participatingChannels[p.ID]) == 0 || !slices.Contains(notifiable, p.ID)
+	})
+	if len(assignees) == 0 && len(participating) == 0 {
+		return
+	}
 
-	m.dispatcher.Send(notifier.Notification{
-		Type:             nmodels.NotificationTypeNewReply,
-		RecipientIDs:     []int{agent.ID},
+	sender, err := m.userStore.Get(message.SenderID, "", []string{})
+	if err != nil {
+		m.lo.Error("error fetching sender for new reply notification", "user_id", message.SenderID, "error", err)
+		return
+	}
+
+	m.notifyNewReplyRecipients(conversation, nmodels.NotificationTypeNewReply, template.TmplNewReply, assignees, assigneeChannels, sender)
+	m.notifyNewReplyRecipients(conversation, nmodels.NotificationTypeNewReplyParticipating, template.TmplNewReplyParticipating, participating, participatingChannels, sender)
+}
+
+func (m *Manager) notifyNewReplyRecipients(conversation models.Conversation, nType nmodels.NotificationType, tmplName string, recipients []umodels.User, channels map[int][]nmodels.NotificationChannel, author umodels.User) {
+	if len(recipients) == 0 {
+		return
+	}
+	recipientIDs := make([]int, len(recipients))
+	emails := make([]notifier.EmailNotification, len(recipients))
+	for i, recipient := range recipients {
+		recipientIDs[i] = recipient.ID
+		if !slices.Contains(channels[recipient.ID], nmodels.NotificationChannelEmail) {
+			continue
+		}
+		if rendered := m.renderNotificationEmail(tmplName, conversation, recipient, author); rendered != nil {
+			emails[i] = *rendered
+		}
+	}
+	m.dispatcher.SendWithEmails(notifier.Notification{
+		Type:             nType,
+		RecipientIDs:     recipientIDs,
 		Title:            m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber),
 		Body:             conversation.Subject,
 		ConversationID:   null.IntFrom(conversation.ID),
 		ConversationUUID: conversation.UUID,
-		Email:            email,
-	})
+	}, emails)
+}
+
+// agentsWithoutUnseenReplies returns the given agents that have seen every incoming message older than the given one.
+func (m *Manager) agentsWithoutUnseenReplies(conversationUUID string, userIDs []int, messageID int) []int {
+	var caughtUp []int
+	if err := m.q.GetAgentsWithoutUnseenReplies.Select(&caughtUp, conversationUUID, pq.Array(userIDs), messageID); err != nil {
+		m.lo.Error("error fetching agents without unseen replies", "conversation_uuid", conversationUUID, "error", err)
+		return userIDs
+	}
+	return caughtUp
+}
+
+// renderNotificationEmail returns nil when the recipient has no email or the template fails to render.
+func (m *Manager) renderNotificationEmail(tmplName string, conversation models.Conversation, recipient, author umodels.User) *notifier.EmailNotification {
+	if recipient.Email.String == "" {
+		return nil
+	}
+	content, subject, err := m.template.RenderStoredEmailTemplate(tmplName, notificationTemplateData(conversation, recipient, author))
+	if err != nil {
+		m.lo.Error("error rendering template", "template", tmplName, "conversation_uuid", conversation.UUID, "error", err)
+		return nil
+	}
+	return &notifier.EmailNotification{
+		Recipients: []string{recipient.Email.String},
+		Subject:    subject,
+		Content:    content,
+	}
 }
 
 // NotifyMention sends notifications (in-app, WebSocket, email) for mentions.
@@ -1266,38 +1292,19 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 		// Render personalized email for this recipient.
 		var email notifier.EmailNotification
 		if recipient.Email.String != "" {
-			content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned,
-				map[string]any{
-					"Conversation": map[string]any{
-						"ReferenceNumber": conversation.ReferenceNumber,
-						"Subject":         conversation.Subject.String,
-						"Priority":        conversation.Priority.String,
-						"UUID":            conversation.UUID,
-					},
-					"Recipient": map[string]any{
-						"FirstName": recipient.FirstName,
-						"LastName":  recipient.LastName,
-						"FullName":  recipient.FullName(),
-						"Email":     recipient.Email.String,
-					},
-					"Message": map[string]any{
-						"UUID":    message.UUID,
-						"Content": message.Content,
-					},
-					"MentionedBy": map[string]any{
-						"FirstName": author.FirstName,
-						"LastName":  author.LastName,
-						"FullName":  author.FullName(),
-						"Email":     author.Email.String,
-					},
-					// Automated messages do not have an author.
-					"Author": map[string]any{
-						"FirstName": "",
-						"LastName":  "",
-						"FullName":  "",
-						"Email":     "",
-					},
-				})
+			// Mentions have no automated author, the mentioning agent is exposed as MentionedBy.
+			data := notificationTemplateData(conversation, recipient, umodels.User{})
+			data["Message"] = map[string]any{
+				"UUID":    message.UUID,
+				"Content": message.Content,
+			}
+			data["MentionedBy"] = map[string]any{
+				"FirstName": author.FirstName,
+				"LastName":  author.LastName,
+				"FullName":  author.FullName(),
+				"Email":     author.Email.String,
+			}
+			content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned, data)
 			if err != nil {
 				m.lo.Error("error rendering mention notification template", "conversation_uuid", conversationUUID, "error", err)
 			} else {
@@ -2031,5 +2038,34 @@ func renderTagFilter(operator, value string, paramIndex int) (string, []any, err
 		return "NOT EXISTS (SELECT 1 FROM conversation_tags WHERE conversation_id = conversations.id)", nil, nil
 	default:
 		return "", nil, fmt.Errorf("invalid operator for tags: %s", operator)
+	}
+}
+
+func notificationTemplateData(conversation models.Conversation, recipient, author umodels.User) map[string]any {
+	return map[string]any{
+		"Conversation": map[string]any{
+			"ReferenceNumber": conversation.ReferenceNumber,
+			"Subject":         conversation.Subject.String,
+			"Priority":        conversation.Priority.String,
+			"UUID":            conversation.UUID,
+		},
+		"Contact": map[string]any{
+			"FirstName": conversation.Contact.FirstName,
+			"LastName":  conversation.Contact.LastName,
+			"FullName":  conversation.Contact.FullName(),
+			"Email":     conversation.Contact.Email.String,
+		},
+		"Recipient": map[string]any{
+			"FirstName": recipient.FirstName,
+			"LastName":  recipient.LastName,
+			"FullName":  recipient.FullName(),
+			"Email":     recipient.Email.String,
+		},
+		"Author": map[string]any{
+			"FirstName": author.FirstName,
+			"LastName":  author.LastName,
+			"FullName":  author.FullName(),
+			"Email":     author.Email.String,
+		},
 	}
 }

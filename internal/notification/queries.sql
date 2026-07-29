@@ -52,10 +52,10 @@ SELECT notification_type, channel, enabled
 FROM user_notification_preferences
 WHERE user_id = $1;
 
--- name: get-disabled-notification-channels
-SELECT user_id, channel
+-- name: get-notification-preferences-for-type
+SELECT user_id, channel, enabled
 FROM user_notification_preferences
-WHERE user_id = ANY($1::bigint[]) AND notification_type = $2 AND enabled = FALSE;
+WHERE user_id = ANY($1::bigint[]) AND notification_type = $2;
 
 -- name: upsert-notification-preference
 INSERT INTO user_notification_preferences (user_id, notification_type, channel, enabled)

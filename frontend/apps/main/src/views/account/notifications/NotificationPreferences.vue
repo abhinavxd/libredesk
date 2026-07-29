@@ -20,16 +20,16 @@
 
         <div v-for="row in rows" :key="row.type" class="flex items-center px-4 py-3">
           <div class="flex-grow pr-4">
-            <p class="text-sm text-foreground">{{ row.label }}</p>
+            <p class="text-sm text-foreground">{{ typeLabel(row.type) }}</p>
           </div>
           <div v-for="channel in channels" :key="channel.key" class="w-20 flex justify-center">
             <Switch
               :checked="row[channel.key]"
-              :disabled="channel.requiresEmail && !emailEnabled"
+              :disabled="channel.key === 'email' && !emailEnabled"
               :aria-label="
                 $t('notification.channelToggleLabel', {
                   channel: $t(channel.labelKey),
-                  type: row.label
+                  type: typeLabel(row.type)
                 })
               "
               @update:checked="update(row, channel.key, $event)"
@@ -57,16 +57,23 @@ const emailEnabled = ref(true)
 
 const channels = [
   { key: 'in_app', labelKey: 'notification.channel.inApp' },
-  { key: 'email', labelKey: 'globals.terms.email', requiresEmail: true }
+  { key: 'email', labelKey: 'globals.terms.email' }
 ]
 
 const typeLabels = {
-  new_reply: 'notification.type.newReply',
   assignment: 'notification.type.assignment',
   mention: 'notification.type.mention',
-  sla_warning: 'notification.type.slaWarning',
-  sla_breach: 'notification.type.slaBreach'
+  new_reply: 'notification.type.newReply',
+  new_reply_participating: 'notification.type.newReplyParticipating',
+  sla_first_response_warning: 'notification.type.slaFirstResponseWarning',
+  sla_first_response_breach: 'notification.type.slaFirstResponseBreach',
+  sla_next_response_warning: 'notification.type.slaNextResponseWarning',
+  sla_next_response_breach: 'notification.type.slaNextResponseBreach',
+  sla_resolution_warning: 'notification.type.slaResolutionWarning',
+  sla_resolution_breach: 'notification.type.slaResolutionBreach'
 }
+
+const typeLabel = (type) => (typeLabels[type] ? t(typeLabels[type]) : type)
 
 const fetchPreferences = async () => {
   try {
@@ -74,14 +81,7 @@ const fetchPreferences = async () => {
     emailEnabled.value = data.data.email_enabled
     const byType = {}
     for (const pref of data.data.preferences) {
-      if (!byType[pref.notification_type]) {
-        byType[pref.notification_type] = {
-          type: pref.notification_type,
-          label: typeLabels[pref.notification_type]
-            ? t(typeLabels[pref.notification_type])
-            : pref.notification_type
-        }
-      }
+      byType[pref.notification_type] ??= { type: pref.notification_type }
       byType[pref.notification_type][pref.channel] = pref.enabled
     }
     rows.value = Object.values(byType)

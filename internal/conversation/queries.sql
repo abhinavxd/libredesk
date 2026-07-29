@@ -464,6 +464,32 @@ WHERE conversation_id =
     SELECT id FROM conversations WHERE uuid = $1
 );
 
+-- name: get-conversation-participant-agents
+SELECT users.id, users.first_name, users.last_name, users.email
+FROM conversation_participants
+INNER JOIN users ON users.id = conversation_participants.user_id
+WHERE conversation_participants.conversation_id = (SELECT id FROM conversations WHERE uuid = $1)
+  AND users.type = 'agent'
+  AND users.email != 'System'
+  AND users.enabled
+  AND users.deleted_at IS NULL;
+
+-- name: get-agents-without-unseen-replies
+SELECT candidate.id
+FROM unnest($2::INT[]) AS candidate(id), conversations c
+WHERE c.uuid = $1
+  AND NOT EXISTS (
+    SELECT 1 FROM conversation_messages
+    WHERE conversation_id = c.id
+      AND type = 'incoming'
+      AND id < $3
+      AND created_at > COALESCE(
+          (SELECT last_seen_at FROM conversation_last_seen
+           WHERE conversation_id = c.id AND user_id = candidate.id),
+          '1970-01-01'::TIMESTAMPTZ
+      )
+);
+
 -- name: insert-conversation-participant
 INSERT INTO conversation_participants
 (user_id, conversation_id)
@@ -542,14 +568,10 @@ SET custom_attributes = $2,
 WHERE uuid = $1;
 
 -- name: update-conversation-waiting-since
-WITH old AS (
-    SELECT uuid, waiting_since IS NOT NULL AS was_waiting FROM conversations WHERE uuid = $1
-)
-UPDATE conversations SET
-    waiting_since = $2,
+UPDATE conversations
+SET waiting_since = $2,
     updated_at = NOW()
-FROM old WHERE conversations.uuid = old.uuid
-RETURNING old.was_waiting;
+WHERE uuid = $1;
 
 -- name: update-conversation-reply-timestamps
 WITH old AS (
