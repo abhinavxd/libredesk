@@ -105,6 +105,7 @@ type App struct {
 	activityLog      *activitylog.Manager
 	notifier         *notifier.Service
 	userNotification *notifier.UserNotificationManager
+	notificationPref *notifier.PreferenceManager
 	customAttribute  *customAttribute.Manager
 	report           *report.Manager
 	webhook          *webhook.Manager
@@ -224,7 +225,8 @@ func main() {
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
 		userNotification            = initUserNotification(db, i18n)
-		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub, ko.Bool("notification.email.enabled"))
+		notificationPreference      = initNotificationPreference(db, i18n)
+		notifDispatcher             = initNotifDispatcher(userNotification, notificationPreference, notifier, wsHub, ko.Bool("notification.email.enabled"))
 		automation                  = initAutomationEngine(db, i18n)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
@@ -289,6 +291,7 @@ func main() {
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		userNotification: userNotification,
+		notificationPref: notificationPreference,
 		wsHub:            wsHub,
 	}
 	app.consts.Store(constants)

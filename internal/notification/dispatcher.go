@@ -2,6 +2,7 @@ package notifier
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
@@ -47,6 +48,7 @@ type Dispatcher struct {
 	inApp        *UserNotificationManager
 	outbound     *Service
 	wsHub        WSHub
+	prefs        *PreferenceManager
 	emailEnabled bool
 	lo           *logf.Logger
 }
@@ -56,6 +58,7 @@ type DispatcherOpts struct {
 	InApp        *UserNotificationManager
 	Outbound     *Service
 	WSHub        WSHub
+	Prefs        *PreferenceManager
 	EmailEnabled bool
 	Lo           *logf.Logger
 }
@@ -66,39 +69,73 @@ func NewDispatcher(opts DispatcherOpts) *Dispatcher {
 		inApp:        opts.InApp,
 		outbound:     opts.Outbound,
 		wsHub:        opts.WSHub,
+		prefs:        opts.Prefs,
 		emailEnabled: opts.EmailEnabled,
 		lo:           opts.Lo,
 	}
+}
+
+// EnabledChannels returns the channels each recipient will actually be notified on, accounting for
+// their preferences and the globally configured channels.
+func (d *Dispatcher) EnabledChannels(recipientIDs []int, nType models.NotificationType) map[int][]models.NotificationChannel {
+	enabled := d.prefs.EnabledChannels(recipientIDs, nType)
+	if !d.emailEnabled || d.outbound == nil {
+		for recipientID, channels := range enabled {
+			channels = slices.DeleteFunc(channels, func(c models.NotificationChannel) bool {
+				return c == models.NotificationChannelEmail
+			})
+			if len(channels) == 0 {
+				delete(enabled, recipientID)
+				continue
+			}
+			enabled[recipientID] = channels
+		}
+	}
+	return enabled
 }
 
 // Send sends a notification through all configured channels.
 // For each recipient: creates in-app notification (DB), broadcasts via Websocket,
 // and sends email if Email field is provided.
 func (d *Dispatcher) Send(n Notification) {
-	for i, recipientID := range n.RecipientIDs {
-		d.sendToRecipient(recipientID, n)
-
-		if d.outbound != nil && n.Email != nil && d.emailEnabled {
+	var emails []EmailNotification
+	if n.Email != nil {
+		emails = make([]EmailNotification, len(n.RecipientIDs))
+		for i := range n.RecipientIDs {
 			var email string
 			if i < len(n.Email.Recipients) {
 				email = n.Email.Recipients[i]
 			} else if len(n.Email.Recipients) == 1 {
 				email = n.Email.Recipients[0] // Broadcast mode
 			}
-			if email != "" {
-				d.sendEmail(recipientID, email, n.Email.Subject, n.Email.Content, n.Type)
+			if email == "" {
+				continue
+			}
+			emails[i] = EmailNotification{
+				Recipients: []string{email},
+				Subject:    n.Email.Subject,
+				Content:    n.Email.Content,
 			}
 		}
 	}
+	d.SendWithEmails(n, emails)
 }
 
 // SendWithEmails sends notifications where each recipient has their own email content.
 // This is useful when email content is personalized per recipient.
 func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) {
-	for i, recipientID := range n.RecipientIDs {
-		d.sendToRecipient(recipientID, n)
+	if len(n.RecipientIDs) == 0 {
+		return
+	}
+	enabled := d.EnabledChannels(n.RecipientIDs, n.Type)
 
-		if d.outbound != nil && i < len(emails) && len(emails[i].Recipients) > 0 && d.emailEnabled {
+	for i, recipientID := range n.RecipientIDs {
+		if slices.Contains(enabled[recipientID], models.NotificationChannelInApp) {
+			d.sendToRecipient(recipientID, n)
+		}
+
+		if i < len(emails) && len(emails[i].Recipients) > 0 &&
+			slices.Contains(enabled[recipientID], models.NotificationChannelEmail) {
 			e := emails[i]
 			d.sendEmail(recipientID, e.Recipients[0], e.Subject, e.Content, n.Type)
 		}

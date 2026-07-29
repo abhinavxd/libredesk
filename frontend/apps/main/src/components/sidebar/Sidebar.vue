@@ -52,6 +52,7 @@ import {
   Link,
   BarChart3,
   CircleUser,
+  Bell,
   Contact
 } from 'lucide-vue-next'
 
@@ -77,6 +78,7 @@ const navIconMap = {
   Link,
   BarChart3,
   CircleUser,
+  Bell,
   Contact
 }
 import {
@@ -397,7 +399,7 @@ const viewToDelete = ref(null)
                 <SidebarMenuButton :isActive="isActiveParent(item.href)" asChild>
                   <router-link :to="item.href">
                     <component :is="navIconMap[item.icon]" v-if="item.icon" />
-                    <span>{{ t(item.titleKey) }}</span>
+                    <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
                   </router-link>
                 </SidebarMenuButton>
                 <SidebarMenuAction>

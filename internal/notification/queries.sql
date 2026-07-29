@@ -46,3 +46,19 @@ DELETE FROM user_notifications WHERE user_id = $1;
 
 -- name: delete-old-notifications
 DELETE FROM user_notifications WHERE created_at < NOW() - INTERVAL '30 days';
+
+-- name: get-notification-preferences
+SELECT notification_type, channel, enabled
+FROM user_notification_preferences
+WHERE user_id = $1;
+
+-- name: get-notification-preferences-for-type
+SELECT user_id, channel, enabled
+FROM user_notification_preferences
+WHERE user_id = ANY($1::bigint[]) AND notification_type = $2;
+
+-- name: upsert-notification-preference
+INSERT INTO user_notification_preferences (user_id, notification_type, channel, enabled)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id, notification_type, channel)
+DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now();
