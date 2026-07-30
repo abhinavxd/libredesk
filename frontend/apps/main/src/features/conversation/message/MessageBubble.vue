@@ -106,7 +106,7 @@
               >
                 {{ sanitizedContent }}
               </div>
-              <div v-else ref="messageContentEl" @click="onMessageContentClick">
+              <div v-else ref="messageContentEl" @click="onMessageContentClick" class="dark:bg-white dark:text-black dark:p-4 dark:rounded-md">
                 <Letter
                   :html="sanitizedContent"
                   :allowedSchemas="['cid', 'https', 'http', 'mailto']"
