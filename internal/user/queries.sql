@@ -430,3 +430,29 @@ SELECT
 
 -- name: get-user-ids-by-role
 SELECT user_id FROM user_roles WHERE role_id = $1;
+
+-- name: insert-device-token
+INSERT INTO user_device_tokens (user_id, name, selector, verifier_hash, expires_at)
+VALUES ($1, $2, $3, $4, NOW() + INTERVAL '90 days')
+RETURNING id, created_at, user_id, name, last_used_at, expires_at, revoked_at;
+
+-- name: get-device-token-by-selector
+SELECT id, user_id, name, verifier_hash, last_used_at, expires_at, revoked_at, created_at
+FROM user_device_tokens
+WHERE selector = $1;
+
+-- name: touch-device-token
+UPDATE user_device_tokens
+SET last_used_at = NOW(), expires_at = NOW() + INTERVAL '90 days'
+WHERE id = $1;
+
+-- name: get-device-tokens
+SELECT id, created_at, user_id, name, last_used_at, expires_at, revoked_at
+FROM user_device_tokens
+WHERE user_id = $1 AND revoked_at IS NULL
+ORDER BY created_at DESC;
+
+-- name: revoke-device-token
+UPDATE user_device_tokens
+SET revoked_at = NOW()
+WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL;

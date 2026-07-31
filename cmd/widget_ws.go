@@ -108,8 +108,8 @@ func handleWidgetWS(r *fastglue.Request) error {
 		sc := &safeConn{conn: conn}
 
 		var (
-			client   *livechat.Client
-			liveChat *livechat.LiveChat
+			client    *livechat.Client
+			liveChat  *livechat.LiveChat
 			inboxUUID string
 			userID    int
 		)

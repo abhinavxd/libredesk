@@ -59,7 +59,14 @@ func handleWS(r *fastglue.Request, hub *ws.Hub) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 		app   = r.Context.(*App)
 	)
-	err := agentUpgrader.Upgrade(r.RequestCtx, func(conn *websocket.Conn) {
+	// A native client sends no Origin, and the origin check is browser CSRF defence. Skip it only
+	// on the token path; the cookie path stays strict.
+	upgrader := agentUpgrader
+	if method, ok := r.RequestCtx.UserValue("auth_method").(string); ok && method == "device_token" {
+		upgrader.CheckOrigin = func(ctx *fasthttp.RequestCtx) bool { return true }
+	}
+
+	err := upgrader.Upgrade(r.RequestCtx, func(conn *websocket.Conn) {
 		c := ws.Client{
 			ID:   auser.ID,
 			Hub:  hub,

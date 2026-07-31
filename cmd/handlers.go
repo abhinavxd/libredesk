@@ -20,6 +20,7 @@ const maxPageSize = 500
 func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Authentication.
 	g.POST("/api/v1/auth/login", rateLimit(handleLogin, "auth"))
+	g.POST("/api/v1/auth/device-token", rateLimit(handleCreateDeviceToken, "auth"))
 	g.GET("/logout", auth(handleLogout))
 	g.GET("/api/v1/oidc/{id}/login", rateLimit(handleOIDCLogin, "auth"))
 	g.GET("/api/v1/oidc/{id}/finish", rateLimit(handleOIDCCallback, "auth"))
@@ -129,6 +130,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/agents/me/teams", auth(handleGetCurrentAgentTeams))
 	g.PUT("/api/v1/agents/me/availability", auth(handleUpdateAgentAvailability))
 	g.DELETE("/api/v1/agents/me/avatar", auth(handleDeleteCurrentAgentAvatar))
+	g.GET("/api/v1/agents/me/device-tokens", auth(handleGetDeviceTokens))
+	g.DELETE("/api/v1/agents/me/device-tokens/{id}", auth(handleDeleteDeviceToken))
 
 	g.GET("/api/v1/agents/compact", auth(handleGetAgentsCompact))
 	g.GET("/api/v1/agents", perm(handleGetAgents, "users:manage"))

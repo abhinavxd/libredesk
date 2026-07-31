@@ -174,6 +174,22 @@ CREATE UNIQUE INDEX index_unique_users_on_email_when_no_ext_id_contact
 	ON users (email)
 	WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL;
 
+DROP TABLE IF EXISTS user_device_tokens CASCADE;
+CREATE TABLE user_device_tokens (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	user_id INT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	name TEXT NOT NULL,
+	selector TEXT NOT NULL UNIQUE,
+	verifier_hash BYTEA NOT NULL,
+	last_used_at TIMESTAMPTZ NULL,
+	expires_at TIMESTAMPTZ NOT NULL,
+	revoked_at TIMESTAMPTZ NULL,
+
+	CONSTRAINT constraint_user_device_tokens_on_name CHECK (LENGTH(name) <= 140)
+);
+CREATE INDEX index_user_device_tokens_on_user_id ON user_device_tokens(user_id);
+
 DROP TABLE IF EXISTS user_roles CASCADE;
 CREATE TABLE user_roles (
 	id SERIAL PRIMARY KEY,

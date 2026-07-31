@@ -96,6 +96,17 @@ type ChatUser struct {
 	Expectation        string      `db:"expectation" json:"expectation,omitempty"`
 }
 
+type DeviceToken struct {
+	ID           int       `db:"id" json:"id"`
+	CreatedAt    time.Time `db:"created_at" json:"created_at"`
+	UserID       int       `db:"user_id" json:"user_id"`
+	Name         string    `db:"name" json:"name"`
+	LastUsedAt   null.Time `db:"last_used_at" json:"last_used_at"`
+	ExpiresAt    time.Time `db:"expires_at" json:"expires_at"`
+	RevokedAt    null.Time `db:"revoked_at" json:"revoked_at"`
+	VerifierHash []byte    `db:"verifier_hash" json:"-"`
+}
+
 type Note struct {
 	ID        int         `db:"id" json:"id"`
 	CreatedAt time.Time   `db:"created_at" json:"created_at"`

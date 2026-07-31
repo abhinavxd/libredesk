@@ -117,6 +117,13 @@ type queries struct {
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
 
 	MergeVisitorToContact *sqlx.Stmt `query:"merge-visitor-to-contact"`
+
+	// Device token queries
+	InsertDeviceToken        *sqlx.Stmt `query:"insert-device-token"`
+	GetDeviceTokenBySelector *sqlx.Stmt `query:"get-device-token-by-selector"`
+	TouchDeviceToken         *sqlx.Stmt `query:"touch-device-token"`
+	GetDeviceTokens          *sqlx.Stmt `query:"get-device-tokens"`
+	RevokeDeviceToken        *sqlx.Stmt `query:"revoke-device-token"`
 }
 
 // New creates and returns a new instance of the Manager.

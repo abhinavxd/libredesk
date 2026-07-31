@@ -31,6 +31,19 @@ func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 		return user, nil
 	}
 
+	// Bearer device token, used by the mobile app. CSRF does not apply: it is cookie defence.
+	if hdr := string(r.RequestCtx.Request.Header.Peek("Authorization")); strings.HasPrefix(hdr, "Bearer ") {
+		user, err = app.user.ValidateDeviceToken(strings.TrimPrefix(hdr, "Bearer "))
+		if err != nil {
+			return user, err
+		}
+		if !user.Enabled {
+			return user, envelope.NewError(envelope.PermissionError, app.i18n.T("user.accountDisabled"), nil)
+		}
+		r.RequestCtx.SetUserValue("auth_method", "device_token")
+		return user, nil
+	}
+
 	// Session-based authentication - Check CSRF first.
 	method := string(r.RequestCtx.Method())
 	if method == "POST" || method == "PUT" || method == "DELETE" {
