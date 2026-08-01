@@ -27,5 +27,8 @@ func V2_7_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS index_user_device_tokens_on_user_id ON user_device_tokens(user_id);`); err != nil {
 		return err
 	}
+	if _, err := db.Exec(`INSERT INTO settings (key, value) VALUES ('app.allow_mobile_app', 'true'::jsonb) ON CONFLICT (key) DO NOTHING;`); err != nil {
+		return err
+	}
 	return nil
 }

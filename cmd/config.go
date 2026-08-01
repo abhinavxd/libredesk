@@ -30,6 +30,8 @@ func handleGetConfig(r *fastglue.Request) error {
 		"app.favicon_url": settings["app.favicon_url"],
 		"app.logo_url":    settings["app.logo_url"],
 		"app.site_name":   settings["app.site_name"],
+		// The mobile app reads this to explain itself before asking for a password.
+		"app.allow_mobile_app": app.consts.Load().(*constants).AllowMobileApp,
 	}
 
 	// Get all OIDC providers

@@ -81,6 +81,7 @@ type constants struct {
 	UploadProvider              string
 	AllowedUploadFileExtensions []string
 	MaxFileUploadSizeMB         int
+	AllowMobileApp              bool
 }
 
 // Config loads config from files and environment variables into koanf.
@@ -160,6 +161,8 @@ func initConstants() *constants {
 		UploadProvider:              ko.MustString("upload.provider"),
 		AllowedUploadFileExtensions: ko.Strings("app.allowed_file_upload_extensions"),
 		MaxFileUploadSizeMB:         ko.Int("app.max_file_upload_size"),
+		// Absent on a settings row predating the toggle, which must keep working.
+		AllowMobileApp: !ko.Exists("app.allow_mobile_app") || ko.Bool("app.allow_mobile_app"),
 	}
 }
 

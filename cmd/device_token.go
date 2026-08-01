@@ -32,6 +32,10 @@ func handleCreateDeviceToken(r *fastglue.Request) error {
 		req deviceTokenReq
 	)
 
+	if !app.consts.Load().(*constants).AllowMobileApp {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("auth.mobileAppDisabled"), nil, envelope.PermissionError)
+	}
+
 	if err := r.Decode(&req, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
@@ -70,6 +74,10 @@ func handleExchangeOIDCCode(r *fastglue.Request) error {
 		app = r.Context.(*App)
 		req tokenExchangeReq
 	)
+
+	if !app.consts.Load().(*constants).AllowMobileApp {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("auth.mobileAppDisabled"), nil, envelope.PermissionError)
+	}
 
 	if err := r.Decode(&req, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)

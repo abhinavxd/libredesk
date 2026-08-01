@@ -33,6 +33,11 @@ func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 
 	// Bearer device token, used by the mobile app. CSRF does not apply: it is cookie defence.
 	if hdr := string(r.RequestCtx.Request.Header.Peek("Authorization")); strings.HasPrefix(hdr, "Bearer ") {
+		// Checked here rather than per route so the toggle covers the websocket too. Tokens are
+		// blocked, not revoked, so turning the setting back on restores every phone as it was.
+		if !app.consts.Load().(*constants).AllowMobileApp {
+			return user, envelope.NewError(envelope.PermissionError, app.i18n.T("auth.mobileAppDisabled"), nil)
+		}
 		user, err = app.user.ValidateDeviceToken(strings.TrimPrefix(hdr, "Bearer "))
 		if err != nil {
 			return user, err

@@ -50,8 +50,13 @@ func handleOIDCLogin(r *fastglue.Request) error {
 	// instead and receives a one-time code on the callback.
 	client := string(r.RequestCtx.QueryArgs().Peek("client"))
 	challenge := string(r.RequestCtx.QueryArgs().Peek("code_challenge"))
-	if client == oidcClientMobile && (challenge == "" || len(challenge) > maxCodeChallengeLength) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	if client == oidcClientMobile {
+		if !app.consts.Load().(*constants).AllowMobileApp {
+			return redirectToApp(r, "mobile_disabled")
+		}
+		if challenge == "" || len(challenge) > maxCodeChallengeLength {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+		}
 	}
 
 	sessionValues := map[string]any{
