@@ -21,6 +21,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Authentication.
 	g.POST("/api/v1/auth/login", rateLimit(handleLogin, "auth"))
 	g.POST("/api/v1/auth/device-token", rateLimit(handleCreateDeviceToken, "auth"))
+	g.POST("/api/v1/auth/token/exchange", rateLimit(handleExchangeOIDCCode, "auth"))
 	g.GET("/logout", auth(handleLogout))
 	g.GET("/api/v1/oidc/{id}/login", rateLimit(handleOIDCLogin, "auth"))
 	g.GET("/api/v1/oidc/{id}/finish", rateLimit(handleOIDCCallback, "auth"))

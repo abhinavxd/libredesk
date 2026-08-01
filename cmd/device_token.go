@@ -6,6 +6,7 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -16,6 +17,12 @@ type deviceTokenReq struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Name     string `json:"name"`
+}
+
+type tokenExchangeReq struct {
+	Code         string `json:"code"`
+	CodeVerifier string `json:"code_verifier"`
+	Name         string `json:"name"`
 }
 
 // handleCreateDeviceToken mints a long-lived token for a mobile device.
@@ -41,6 +48,51 @@ func handleCreateDeviceToken(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if !user.Enabled {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("user.accountDisabled"), nil, envelope.PermissionError)
+	}
+
+	token, record, err := app.user.MintDeviceToken(user.ID, req.Name)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(map[string]any{
+		"id":    record.ID,
+		"token": token,
+		"name":  record.Name,
+		"email": user.Email.String,
+	})
+}
+
+// handleExchangeOIDCCode trades the one-time code from an SSO login for a device token.
+func handleExchangeOIDCCode(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req tokenExchangeReq
+	)
+
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Code == "" || req.CodeVerifier == "" || req.Name == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+	if len(req.Name) > maxDeviceNameLength {
+		req.Name = req.Name[:maxDeviceNameLength]
+	}
+
+	userID, err := app.auth.ConsumeLoginCode(r.RequestCtx, req.Code, req.CodeVerifier)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Re-checked here because the agent could have been disabled between the callback and this call.
+	user, err := app.user.GetAgent(userID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if user.Type != models.UserTypeAgent || !user.Enabled {
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("user.accountDisabled"), nil, envelope.PermissionError)
 	}
 
