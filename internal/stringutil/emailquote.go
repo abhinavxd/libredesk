@@ -25,14 +25,14 @@ var (
 func HTML2TextNoQuotes(htmlContent string) string {
 	doc, err := html.Parse(strings.NewReader(htmlContent))
 	if err != nil {
-		return TrimPlainTextQuotes(HTML2Text(htmlContent))
+		return TrimPlainTextQuotes(HTML2TextMarkdownLinks(htmlContent))
 	}
 	pruneQuotedNodes(doc)
 	var b strings.Builder
 	if err := html.Render(&b, doc); err != nil {
-		return TrimPlainTextQuotes(HTML2Text(htmlContent))
+		return TrimPlainTextQuotes(HTML2TextMarkdownLinks(htmlContent))
 	}
-	return TrimPlainTextQuotes(HTML2Text(b.String()))
+	return TrimPlainTextQuotes(HTML2TextMarkdownLinks(b.String()))
 }
 
 // TrimPlainTextQuotes strips a trailing quoted-reply block (">" lines, "On ... wrote:" and "Original Message" markers) from plain text.

@@ -65,7 +65,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 
 		if len(res.ToolCalls) == 0 {
 			m.lo.Debug("ai run final answer", "answer", res.Content)
-			return res.Content, nil
+			return stripCodeFence(res.Content), nil
 		}
 
 		messages = append(messages, models.ChatMessage{
@@ -95,7 +95,7 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("ai.noAnswerWithinSteps"), nil)
 	}
 	m.lo.Debug("ai run final answer", "answer", res.Content, "forced", true)
-	return res.Content, nil
+	return stripCodeFence(res.Content), nil
 }
 
 func (m *Manager) executeToolCall(ctx context.Context, registry map[string]Tool, tc models.ToolCall) string {

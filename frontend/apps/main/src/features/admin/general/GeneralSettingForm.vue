@@ -11,19 +11,6 @@
       </FormItem>
     </FormField>
 
-    <FormField v-slot="{ field }" name="copilot_name">
-      <FormItem>
-        <FormLabel>{{ t('admin.general.copilotName') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="Copilot" v-bind="field" />
-        </FormControl>
-        <FormDescription>
-          {{ t('admin.general.copilotName.description') }}
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
     <FormField v-slot="{ componentField }" name="lang">
       <FormItem>
         <FormLabel>{{ t('globals.terms.language') }}</FormLabel>

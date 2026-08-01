@@ -141,7 +141,6 @@ import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
-import { convertTextToHtml } from '@shared-ui/utils/string'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
 
@@ -213,7 +212,7 @@ const mentions = ref([])
 
 aiPromptStore.fetchPrompts()
 
-const runAiGeneration = async (requestFn, returnsHtml = false) => {
+const runAiGeneration = async (requestFn) => {
   if (isGenerating.value) return
   const uuid = currentConversationUUID.value
   if (!uuid) return
@@ -221,8 +220,7 @@ const runAiGeneration = async (requestFn, returnsHtml = false) => {
   try {
     const resp = await requestFn(uuid)
     if (uuid !== currentConversationUUID.value) return
-    const out = resp.data.data || ''
-    htmlContent.value = returnsHtml ? out : convertTextToHtml(out)
+    htmlContent.value = resp.data.data || ''
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -234,12 +232,11 @@ const runAiGeneration = async (requestFn, returnsHtml = false) => {
 }
 
 const handleAiPromptSelected = (key) =>
-  runAiGeneration(() => api.aiCompletion({ prompt_key: key, content: textContent.value }))
+  runAiGeneration(() => api.aiCompletion({ prompt_key: key, content: htmlContent.value }))
 
 const handleGenerateReply = () =>
-  runAiGeneration(
-    (uuid) => api.aiGenerateReply({ conversation_uuid: uuid, instruction: textContent.value }),
-    true
+  runAiGeneration((uuid) =>
+    api.aiGenerateReply({ conversation_uuid: uuid, instruction: textContent.value })
   )
 
 // Copilot's "Insert into reply" replaces the draft with its answer (already HTML from the panel),

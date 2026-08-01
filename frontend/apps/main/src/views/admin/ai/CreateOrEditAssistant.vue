@@ -33,7 +33,6 @@
             <Card>
               <CardHeader>
                 <CardTitle>{{ t('admin.ai.assistant.preview.title') }}</CardTitle>
-                <CardDescription>{{ t('admin.ai.assistant.preview.description') }}</CardDescription>
               </CardHeader>
               <CardContent class="space-y-4">
                 <Textarea
@@ -127,7 +126,7 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.assistant.editHelp') }}</p>
+      <p>{{ t('admin.ai.assistantsHelp') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/ai#assistants"
         target="_blank"
@@ -153,7 +152,6 @@ import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle
 } from '@shared-ui/components/ui/card'

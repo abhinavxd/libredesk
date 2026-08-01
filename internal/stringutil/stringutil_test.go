@@ -296,3 +296,54 @@ func TestSplitName(t *testing.T) {
 		})
 	}
 }
+
+func TestHTML2TextMarkdownLinks(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want string
+	}{
+		{
+			name: "link with distinct text becomes a markdown link",
+			html: `<p>See <a href="https://example.com/guide">the guide</a> for steps.</p>`,
+			want: "See [the guide](https://example.com/guide) for steps.",
+		},
+		{
+			name: "link text equal to url not duplicated",
+			html: `<p><a href="https://example.com">https://example.com</a></p>`,
+			want: "https://example.com",
+		},
+		{
+			name: "plain text unchanged",
+			html: `<p>No links here.</p>`,
+			want: "No links here.",
+		},
+		{
+			name: "nested markup inside the anchor flattens to link text",
+			html: `<p><a href="https://example.com/x"><strong>Pay</strong> now</a></p>`,
+			want: "[Pay now](https://example.com/x)",
+		},
+		{
+			name: "brackets in link text are escaped",
+			html: `<p><a href="https://example.com">Docs [beta]</a></p>`,
+			want: `[Docs \[beta\]](https://example.com)`,
+		},
+		{
+			name: "url with parentheses is wrapped in angle brackets",
+			html: `<p><a href="https://example.com/a(b)">See</a></p>`,
+			want: "[See](<https://example.com/a(b)>)",
+		},
+		{
+			name: "anchor without href keeps its text",
+			html: `<p><a name="top">Top</a> of page.</p>`,
+			want: "Top of page.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := HTML2TextMarkdownLinks(tt.html); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

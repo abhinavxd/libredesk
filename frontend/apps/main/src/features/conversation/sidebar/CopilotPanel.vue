@@ -10,10 +10,10 @@
         @update:model-value="persistAssistant"
       >
         <SelectTrigger class="h-8 w-auto gap-1.5 border-0 shadow-none text-muted-foreground focus:ring-0">
-          <SelectValue :placeholder="appSettingsStore.copilotName" />
+          <SelectValue :placeholder="COPILOT_NAME" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem :value="0">{{ appSettingsStore.copilotName }}</SelectItem>
+          <SelectItem :value="0">{{ COPILOT_NAME }}</SelectItem>
           <SelectItem v-for="a in assistants" :key="a.id" :value="a.id">{{ a.name }}</SelectItem>
         </SelectContent>
       </Select>
@@ -39,9 +39,9 @@
           <Bot class="h-6 w-6 text-primary" />
         </div>
         <div class="space-y-1">
-          <p class="text-sm font-medium text-foreground">{{ appSettingsStore.copilotName }}</p>
+          <p class="text-sm font-medium text-foreground">{{ COPILOT_NAME }}</p>
           <p class="text-xs text-muted-foreground">
-            {{ $t('copilot.emptyState', { name: appSettingsStore.copilotName }) }}
+            {{ $t('copilot.emptyState', { name: COPILOT_NAME }) }}
           </p>
         </div>
         <div class="flex flex-col gap-1.5 w-full max-w-[85%]">
@@ -177,19 +177,18 @@ import { DotLoader } from '@shared-ui/components/ui/loader'
 import { Eraser, Bot, Copy, Reply, StickyNote } from 'lucide-vue-next'
 import { useConversationStore } from '@/stores/conversation'
 import { useCopilotStore } from '@/stores/copilot'
-import { useAppSettingsStore } from '@/stores/appSettings'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { getTextFromHTML } from '@shared-ui/utils/string.js'
 import { UserTypeAgent } from '@/constants/user'
+import { COPILOT_NAME } from '@/constants/copilot'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 
 const conversationStore = useConversationStore()
 const copilotStore = useCopilotStore()
-const appSettingsStore = useAppSettingsStore()
 const aiAssistantStore = useAIAssistantStore()
 const emitter = useEmitter()
 const { t } = useI18n()

@@ -660,6 +660,10 @@ func (m *Manager) messageText(msg cmodels.Message) string {
 	full := strings.TrimSpace(msg.TextContent)
 	var trimmed string
 	if msg.ContentType == cmodels.ContentTypeHTML {
+		// Render full with the same link-keeping options as trimmed, else the prefix diffing below never matches.
+		if t := stringutil.HTML2TextMarkdownLinks(msg.Content); t != "" {
+			full = t
+		}
 		trimmed = stringutil.HTML2TextNoQuotes(msg.Content)
 	} else {
 		trimmed = stringutil.TrimPlainTextQuotes(full)

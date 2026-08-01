@@ -41,7 +41,7 @@ func TestHTML2TextNoQuotes(t *testing.T) {
 		{
 			name: "protonmail",
 			html: `<div><div>Hello with quoted.</div><div class="protonmail_signature_block"><div class="protonmail_signature_block-proton">Sent with <a href="https://proton.me/mail/home">Proton Mail</a> secure email.</div></div><div class="protonmail_quote">On Wednesday, July 22nd, 2026 at 9:06 PM, Abhinav &lt;user@example.com&gt; wrote:<br><blockquote class="protonmail_quote" type="cite"><p>Hello!</p></blockquote><br></div></div>`,
-			want: "Hello with quoted.\nSent with Proton Mail secure email.",
+			want: "Hello with quoted.\nSent with [Proton Mail](https://proton.me/mail/home) secure email.",
 		},
 		{
 			name: "quote only returns empty",

@@ -73,7 +73,18 @@
 
     <FormField v-slot="{ componentField }" name="parameters">
       <FormItem>
-        <FormLabel>{{ t('admin.ai.tool.parameters') }}</FormLabel>
+        <div class="flex items-center justify-between">
+          <FormLabel>{{ t('admin.ai.tool.parameters') }}</FormLabel>
+          <Button
+            v-if="!componentField.modelValue"
+            type="button"
+            variant="ghost"
+            size="sm"
+            @click="insertParametersExample"
+          >
+            {{ t('globals.messages.insertExample') }}
+          </Button>
+        </div>
         <FormControl>
           <Textarea
             rows="16"
@@ -119,15 +130,24 @@
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ t('admin.ai.tool.turnOffVerificationTitle') }}</AlertDialogTitle>
-        <AlertDialogDescription class="whitespace-pre-line">
-          {{ t('admin.ai.tool.turnOffVerificationBody') }}
+        <AlertDialogDescription as="div" class="space-y-3">
+          <p>{{ t('admin.ai.tool.turnOffVerificationBody') }}</p>
+          <p>{{ t('admin.ai.tool.turnOffVerificationEndpoint') }}</p>
+          <a
+            href="https://docs.libredesk.io/configuration/ai#writing-a-custom-tool"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link-style"
+          >
+            {{ t('globals.terms.learnMore') }}
+          </a>
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>
           {{ t('admin.ai.tool.keepVerificationOn') }}
         </AlertDialogCancel>
-        <AlertDialogAction @click="confirmTurnOff">
+        <AlertDialogAction variant="destructive" @click="confirmTurnOff">
           {{ t('admin.ai.tool.turnOffVerification') }}
         </AlertDialogAction>
       </AlertDialogFooter>
@@ -227,6 +247,10 @@ const form = useForm({
     requires_verification: true
   }
 })
+
+const insertParametersExample = () => {
+  form.setFieldValue('parameters', parametersPlaceholder, false)
+}
 
 const confirmTurnOffOpen = ref(false)
 
