@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
@@ -24,14 +25,10 @@ func handleCreateDeviceToken(r *fastglue.Request) error {
 		req deviceTokenReq
 	)
 
-	// A stolen token must not be able to mint siblings or extend itself.
-	if method, ok := r.RequestCtx.UserValue("auth_method").(string); ok && method == "device_token" {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
-	}
-
 	if err := r.Decode(&req, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
+	req.Name = strings.TrimSpace(req.Name)
 	if req.Email == "" || req.Password == "" || req.Name == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}

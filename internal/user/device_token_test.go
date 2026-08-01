@@ -3,8 +3,11 @@ package user
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/abhinavxd/libredesk/internal/user/models"
 )
 
 func TestParseDeviceToken(t *testing.T) {
@@ -90,6 +93,16 @@ func TestMintedTokenShapeRoundTrips(t *testing.T) {
 	wrong := sha256.Sum256([]byte(verifier + "x"))
 	if subtle.ConstantTimeCompare(stored[:], wrong[:]) == 1 {
 		t.Fatal("a wrong verifier matched")
+	}
+}
+
+func TestDeviceTokenJSONOmitsVerifierHash(t *testing.T) {
+	payload, err := json.Marshal(models.DeviceToken{VerifierHash: []byte("verifier-hash")})
+	if err != nil {
+		t.Fatalf("marshal device token: %v", err)
+	}
+	if strings.Contains(string(payload), "verifier_hash") || strings.Contains(string(payload), "verifier-hash") {
+		t.Fatalf("device token JSON exposed the verifier hash: %s", payload)
 	}
 }
 
