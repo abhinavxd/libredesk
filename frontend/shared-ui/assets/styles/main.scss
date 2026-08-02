@@ -259,10 +259,10 @@
 
 // Sender colours are only legible against white, so incoming email HTML is not themed.
 .dark .email-light-canvas {
-  `@apply` p-2 rounded border border-border;
+  @apply p-2 rounded border border-border;
 
   color-scheme: light;
-  background: `#fff`;
+  background: #fff;
   color: #1a1a1a;
 }
 

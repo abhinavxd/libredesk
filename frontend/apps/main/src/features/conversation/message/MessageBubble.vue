@@ -106,7 +106,7 @@
               >
                 {{ sanitizedContent }}
               </div>
-              <div
+main.scss              <div
                 v-else
                 ref="messageContentEl"
                 @click="onMessageContentClick"
