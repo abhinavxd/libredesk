@@ -295,6 +295,19 @@
           <FormMessage />
         </FormItem>
       </FormField>
+
+      <FormField v-slot="{ componentField }" name="imap.original_sender_header">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.originalSenderHeader') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="X-Original-Sender" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>
+            {{ $t('admin.inbox.originalSenderHeader.description') }}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </div>
 
     <!-- OAuth SMTP Configuration -->
@@ -490,6 +503,19 @@
           </FormControl>
           <FormDescription>
             {{ $t('admin.inbox.imapScanInboxSince.description') }}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="imap.original_sender_header">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.originalSenderHeader') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="X-Original-Sender" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>
+            {{ $t('admin.inbox.originalSenderHeader.description') }}
           </FormDescription>
           <FormMessage />
         </FormItem>
@@ -904,7 +930,8 @@ const form = useForm({
       tls_type: 'none',
       read_interval: '5m',
       scan_inbox_since: '48h',
-      tls_skip_verify: false
+      tls_skip_verify: false,
+      original_sender_header: ''
     },
     smtp: {
       host: 'smtp.gmail.com',
