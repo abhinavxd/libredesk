@@ -37,8 +37,10 @@
             />
           </div>
           <div class="flex justify-end space-x-3 pt-2">
-            <Button variant="outline" @click="cancelAddNote"> {{ $t('globals.messages.cancel') }} </Button>
-            <Button type="submit" :disabled="!newNote.trim()">
+            <Button type="button" variant="outline" @click="cancelAddNote">
+              {{ $t('globals.messages.cancel') }}
+            </Button>
+            <Button type="submit" :disabled="!newNote.trim() || isSaving" :isLoading="isSaving">
               {{ $t('contact.saveNote') }}
             </Button>
           </div>
@@ -51,7 +53,7 @@
       <Card
         v-for="note in visibleNotes"
         :key="note.id"
-        class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow"
+        class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow-md"
       >
         <!-- Header -->
         <CardHeader :class="compact ? 'p-3 pb-2' : 'bg-background border-b p-2'">
@@ -102,7 +104,7 @@
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-[180px]">
                 <DropdownMenuItem
-                  @click="deleteNote(note.id)"
+                  @click="promptDeleteNote(note.id)"
                   class="text-destructive cursor-pointer"
                 >
                   <TrashIcon class="mr-2" size="15" />
@@ -132,6 +134,21 @@
       </div>
     </div>
 
+    <AlertDialog :open="deleteDialogOpen" @update:open="(v) => (deleteDialogOpen = v)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ $t('contact.deleteNoteConfirmation') }}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" @click="confirmDeleteNote">
+            {{ $t('globals.messages.delete') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <!-- No notes message -->
     <template v-if="showEmpty">
       <div v-if="compact" class="text-center text-sm text-muted-foreground py-4">
@@ -139,9 +156,6 @@
       </div>
       <div v-else class="box border-dashed p-10 text-center bg-muted/50 mt-6">
         <div class="flex flex-col items-center">
-          <div class="rounded-full bg-muted p-4 mb-2">
-            <MessageSquareIcon class="text-muted-foreground" size="25" />
-          </div>
           <h3 class="mt-2 text-base font-medium text-foreground">
             {{ $t('contact.notes.empty') }}
           </h3>
@@ -181,12 +195,16 @@ import {
   DropdownMenuItem
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
-  PlusIcon,
-  MoreVerticalIcon,
-  TrashIcon,
-  ClockIcon,
-  MessageSquareIcon
-} from 'lucide-vue-next'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import { PlusIcon, MoreVerticalIcon, TrashIcon, ClockIcon } from 'lucide-vue-next'
 import Editor from '@main/components/editor/TextEditor.vue'
 import { useI18n } from 'vue-i18n'
 import { useEmitter } from '@main/composables/useEmitter'
@@ -207,6 +225,9 @@ const notes = ref([])
 const isAddingNote = ref(false)
 const newNote = ref('')
 const isLoading = ref(false)
+const isSaving = ref(false)
+const noteToDelete = ref(null)
+const deleteDialogOpen = ref(false)
 const NOTES_LIMIT = 10
 const showAll = ref(false)
 const latestFetchId = ref(0)
@@ -254,7 +275,8 @@ const cancelAddNote = () => {
 
 const addOrUpdateNote = async () => {
   const targetId = props.contactId
-  if (!targetId) return
+  if (!targetId || isSaving.value) return
+  isSaving.value = true
   try {
     await api.createContactNote(targetId, { note: newNote.value })
     notesCache.delete(targetId)
@@ -265,7 +287,21 @@ const addOrUpdateNote = async () => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  } finally {
+    isSaving.value = false
   }
+}
+
+const promptDeleteNote = (noteId) => {
+  noteToDelete.value = noteId
+  deleteDialogOpen.value = true
+}
+
+const confirmDeleteNote = async () => {
+  const noteId = noteToDelete.value
+  deleteDialogOpen.value = false
+  noteToDelete.value = null
+  if (noteId !== null) await deleteNote(noteId)
 }
 
 const deleteNote = async (noteId) => {

@@ -89,7 +89,7 @@
                   </div>
 
                   <!-- Required -->
-                  <div class="flex items-center space-x-2">
+                  <div v-if="field.type !== 'checkbox'" class="flex items-center space-x-2">
                     <Checkbox v-model:checked="field.required" />
                     <label class="text-sm">{{ $t('globals.terms.required') }}</label>
                   </div>
@@ -113,7 +113,7 @@
             <div
               v-for="attr in availableCustomAttributes"
               :key="attr.id"
-              class="flex items-center space-x-2 p-2 border rounded cursor-pointer hover:bg-accent"
+              class="flex items-center space-x-2 p-2 border rounded-md cursor-pointer hover:bg-accent"
               @click="addCustomAttributeToForm(attr)"
             >
               <div class="flex-1">

@@ -73,7 +73,7 @@
                     :disabled="!selectedDays[day]"
                   />
                 </div>
-                <span class="text-gray-500">to</span>
+                <span class="text-muted-foreground">to</span>
                 <div class="flex flex-col items-start">
                   <Input
                     type="time"
@@ -95,7 +95,7 @@
         <div class="flex justify-between items-center mb-4">
           <div></div>
           <DialogTrigger as-child>
-            <Button @click="openHolidayForm = true">
+            <Button type="button" @click="openHolidayForm = true">
               {{
                 t('businessHour.newHoliday')
               }}
@@ -320,7 +320,7 @@ const initializeFromValues = (values) => {
   }
 
   // Update form
-  form.setValues(values)
+  form.setValues(values, false)
   syncHoursToForm()
 }
 

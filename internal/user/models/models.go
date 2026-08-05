@@ -17,9 +17,10 @@ const (
 	SystemUserEmail = "System"
 
 	// User types
-	UserTypeAgent   = "agent"
-	UserTypeContact = "contact"
-	UserTypeVisitor = "visitor"
+	UserTypeAgent       = "agent"
+	UserTypeContact     = "contact"
+	UserTypeVisitor     = "visitor"
+	UserTypeAIAssistant = "ai_assistant"
 
 	// User availability statuses
 	Online  = "online"
@@ -92,6 +93,7 @@ type ChatUser struct {
 	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
 	Type               string      `db:"type" json:"type"`
 	ActiveAt           null.Time   `db:"active_at" json:"active_at"`
+	Expectation        string      `db:"expectation" json:"expectation,omitempty"`
 }
 
 type Note struct {

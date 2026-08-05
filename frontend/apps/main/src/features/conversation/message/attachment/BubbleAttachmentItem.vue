@@ -3,7 +3,7 @@
     <Popover :open="showAudio" @update:open="showAudio = $event">
       <PopoverTrigger as-child>
         <div
-          class="relative w-36 h-28 rounded border overflow-hidden cursor-pointer transition-colors"
+          class="relative w-36 h-28 rounded-md border overflow-hidden cursor-pointer transition-colors"
           :class="
             isImage
               ? ''
@@ -13,9 +13,10 @@
         >
           <template v-if="isImage">
             <img
-              :src="getThumbFilepath(attachment.url)"
+              :src="attachment.thumbnail_url || getThumbFilepath(attachment.url)"
               :alt="attachment.name"
               class="w-full h-full object-cover"
+              @error="fallbackToOriginal($event, attachment.url)"
             />
             <div
               class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
@@ -83,6 +84,12 @@ const emit = defineEmits(['preview'])
 const showAudio = ref(false)
 
 const shortName = (name) => (name || '').substring(0, 40)
+
+const fallbackToOriginal = (event, originalUrl) => {
+  if (event.target.dataset.originalFallback) return
+  event.target.dataset.originalFallback = 'true'
+  event.target.src = originalUrl
+}
 
 const isImage = computed(() => (props.attachment.content_type || '').startsWith('image/'))
 

@@ -1,0 +1,27 @@
+From: Dana Sender <dana@example.com>
+To: support@example.org
+Subject: Screenshots
+Message-ID: <empty-filename-test@example.com>
+Date: Wed, 15 Jul 2026 15:25:00 +0200
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="----=_Mixed_EFN"
+
+------=_Mixed_EFN
+Content-Type: text/plain; charset="utf-8"
+
+Screenshots attached.
+------=_Mixed_EFN
+Content-Type: image/png; name=""
+Content-Disposition: attachment; filename=""
+Content-Transfer-Encoding: base64
+Content-ID: <shot-1@example.com>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+------=_Mixed_EFN
+Content-Type: image/gif; name=""
+Content-Disposition: attachment; filename=""
+Content-Transfer-Encoding: base64
+Content-ID: <shot-2@example.com>
+
+R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==
+------=_Mixed_EFN--

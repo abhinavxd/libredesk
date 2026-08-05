@@ -8,7 +8,7 @@
         @import-complete="getData"
       >
         <template #csv-example>
-          <div class="bg-muted p-3 rounded text-xs font-mono overflow-x-auto leading-relaxed">
+          <div class="bg-muted p-3 rounded-md text-xs font-mono overflow-x-auto leading-relaxed">
             <div>first_name,last_name,email,roles,teams</div>
             <div>John,Doe,john@example.com,Agent,Sales</div>
             <div>Jane,Smith,jane@example.com,Admin,Support</div>
@@ -40,13 +40,11 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { useUsersStore } from '@/stores/users'
 import { useI18n } from 'vue-i18n'
 import Importer from '@/components/importer/Importer.vue'
 import api from '@/api'
 
 const isLoading = ref(false)
-const usersStore = useUsersStore()
 const { t } = useI18n()
 const data = ref([])
 const emitter = useEmitter()
@@ -67,8 +65,8 @@ onUnmounted(() => {
 const getData = async () => {
   try {
     isLoading.value = true
-    await usersStore.fetchUsers(true)
-    data.value = usersStore.users
+    const response = await api.getUsers()
+    data.value = response?.data?.data || []
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

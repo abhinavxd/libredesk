@@ -12,7 +12,7 @@
                 @import-complete="getTags"
               >
                 <template #csv-example>
-                  <div class="bg-muted p-3 rounded text-xs font-mono overflow-x-auto leading-relaxed">
+                  <div class="bg-muted p-3 rounded-md text-xs font-mono overflow-x-auto leading-relaxed">
                     <div>name</div>
                     <div>Bug</div>
                     <div>Feature Request</div>
@@ -129,7 +129,7 @@ const form = useForm({
 
 const editTag = (item) => {
   editingId.value = item.id
-  form.setValues(item)
+  form.setValues(item, false)
   form.setErrors({})
   isEditing.value = true
   dialogOpen.value = true

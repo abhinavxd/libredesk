@@ -1,6 +1,6 @@
 <template>
   <AuthLayout>
-    <Card class="bg-card box">
+    <Card class="bg-card box" id="reset-password-container">
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
           <CardTitle class="text-2xl font-bold text-foreground">{{
@@ -41,7 +41,7 @@
           v-if="errorMessage"
           :errorMessage="errorMessage"
           :border="true"
-          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded text-sm"
+          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded-md text-sm"
         />
 
         <div class="text-center">
@@ -63,7 +63,7 @@ import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../api'
 import { validateEmail } from '@shared-ui/utils/string'
-import { useTemporaryClass } from '../../composables/useTemporaryClass'
+import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
 import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
@@ -86,7 +86,7 @@ const resetForm = ref({
 const validateForm = () => {
   if (!validateEmail(resetForm.value.email)) {
     errorMessage.value = t('validation.invalidEmail')
-    useTemporaryClass('reset-password-container', 'animate-shake')
+    applyTemporaryClass('reset-password-container', 'animate-shake')
     return false
   }
   return true
@@ -112,7 +112,7 @@ const requestResetAction = async () => {
       description: handleHTTPError(err).message
     })
     errorMessage.value = handleHTTPError(err).message
-    useTemporaryClass('reset-password-container', 'animate-shake')
+    applyTemporaryClass('reset-password-container', 'animate-shake')
   } finally {
     isLoading.value = false
   }

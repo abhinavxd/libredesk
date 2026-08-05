@@ -36,7 +36,7 @@
                   <p class="text-xs text-muted-foreground flex items-center gap-1">
                     <template v-if="replyExpectation">{{ replyExpectation }}</template>
                     <template v-else>
-                      <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                      <span class="inline-block w-2 h-2 rounded-full bg-success"></span>
                       {{ $t('globals.terms.online', 1) }}
                     </template>
                   </p>
@@ -60,7 +60,7 @@
                 </div>
                 <div v-for="field in prechatFields" :key="field.key" class="space-y-2">
                   <div v-if="field.type === 'checkbox'" class="flex items-start gap-3">
-                    <div class="size-4 mt-0.5 rounded border border-input shrink-0"></div>
+                    <div class="size-4 mt-0.5 rounded-md border border-input shrink-0"></div>
                     <label class="text-sm font-medium">
                       {{ field.label
                       }}<span v-if="field.required" class="text-destructive"> *</span>
@@ -143,8 +143,8 @@
                       class="max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words"
                       :class="
                         m.type === 'user'
-                          ? 'bg-primary text-primary-foreground rounded-br-sm'
-                          : 'bg-muted text-foreground rounded-bl-sm'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-foreground'
                       "
                     >
                       {{ m.content }}

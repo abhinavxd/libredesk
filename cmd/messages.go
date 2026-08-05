@@ -66,11 +66,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	rootURL, _ := app.setting.GetAppRootURL()
 	for i := range messages {
 		total = messages[i].Total
-		// Populate attachment URLs
-		for j := range messages[i].Attachments {
-			att := messages[i].Attachments[j]
-			messages[i].Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
-		}
+		app.conversation.SignAttachmentURLs(messages[i].Attachments)
 		resolveQuotedCIDs(app, &messages[i])
 		resolveAttachmentCIDs(&messages[i], rootURL)
 	}
@@ -135,10 +131,7 @@ func handleGetMessage(r *fastglue.Request) error {
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
-	for j := range message.Attachments {
-		att := message.Attachments[j]
-		message.Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
-	}
+	app.conversation.SignAttachmentURLs(message.Attachments)
 	resolveQuotedCIDs(app, &message)
 	resolveAttachmentCIDs(&message, rootURL)
 

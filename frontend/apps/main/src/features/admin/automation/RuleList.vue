@@ -4,7 +4,7 @@
       <div class="flex items-center gap-3">
         <router-link
           :to="{ name: 'edit-automation', params: { id: rule.id } }"
-          class="text-base text-primary hover:underline"
+          class="text-base text-foreground font-medium hover:underline"
         >
           {{ rule.name }}
         </router-link>
@@ -54,7 +54,7 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="handleDelete">{{
+        <AlertDialogAction variant="destructive" @click="handleDelete">{{
           $t('globals.messages.delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>

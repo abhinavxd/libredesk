@@ -15,10 +15,10 @@
           >
             <Loader2
               v-if="conversationStore.messages.fetching"
-              size="17"
+              size="16"
               class="mr-2 animate-spin"
             />
-            <RefreshCw v-else size="17" class="mr-2" />
+            <RefreshCw v-else size="16" class="mr-2" />
             {{ $t('globals.terms.loadMore') }}
           </Button>
         </div>

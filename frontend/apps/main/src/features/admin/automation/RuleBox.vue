@@ -25,9 +25,9 @@
       </RadioGroup>
     </div>
 
-    <div class="space-y-5 rounded" :class="{ 'box p-5': ruleGroup.rules?.length > 0 }">
-      <div class="space-y-5">
-        <div v-for="(rule, index) in ruleGroup.rules" :key="rule" class="space-y-5">
+    <div class="space-y-6" :class="{ 'box p-5': ruleGroup.rules?.length > 0 }">
+      <div class="space-y-6">
+        <div v-for="(rule, index) in ruleGroup.rules" :key="rule" class="space-y-6">
           <div v-if="index > 0">
             <hr class="border-t-2 border-dotted border-border" />
           </div>
@@ -184,7 +184,7 @@
         </div>
       </div>
       <div>
-        <Button variant="outline" size="sm" @click.prevent="addCondition">
+        <Button type="button" variant="outline" size="sm" @click.prevent="addCondition">
           {{
             $t('actions.addCondition')
           }}

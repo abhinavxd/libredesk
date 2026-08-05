@@ -131,7 +131,6 @@
                 <div class="space-y-1 leading-none">
                   <FormLabel class="text-sm font-medium">
                     {{ field.label }}
-                    <span v-if="field.required" class="text-destructive">*</span>
                   </FormLabel>
                   <FormMessage />
                 </div>
@@ -299,11 +298,10 @@ const { handleSubmit, meta, values } = useForm({
 
 const requiredFieldsFilled = computed(() => {
   return sortedFields.value
-    .filter((field) => field.required)
+    .filter((field) => field.required && field.type !== 'checkbox')
     .every((field) => {
       const value = values[field.key]
-      if (field.type === 'checkbox') return true
-      return value && String(value).trim() !== ''
+      return value !== undefined && value !== null && String(value).trim() !== ''
     })
 })
 
@@ -312,8 +310,15 @@ const submitForm = handleSubmit((values) => {
   const filteredValues = {}
   Object.keys(values).forEach((key) => {
     const field = sortedFields.value.find((f) => f.key === key)
-    if (field?.type === 'checkbox' || (values[key] && String(values[key]).trim())) {
-      filteredValues[key] = values[key]
+    const value = values[key]
+    if (
+      (field?.type === 'checkbox' && value === true) ||
+      (field?.type !== 'checkbox' &&
+        value !== undefined &&
+        value !== null &&
+        String(value).trim() !== '')
+    ) {
+      filteredValues[key] = value
     }
   })
 

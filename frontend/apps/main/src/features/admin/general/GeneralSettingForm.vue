@@ -289,7 +289,7 @@ watch(
     // Convert business hours id to string
     if (newValues.business_hours_id)
       newValues.business_hours_id = newValues.business_hours_id.toString()
-    form.setValues(newValues)
+    form.setValues(newValues, false)
   },
   { deep: true }
 )

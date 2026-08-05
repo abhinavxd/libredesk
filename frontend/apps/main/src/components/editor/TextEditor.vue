@@ -10,7 +10,7 @@
       <div class="flex space-x-1 items-center">
         <DropdownMenu v-if="aiPrompts.length > 0">
           <DropdownMenuTrigger>
-            <Button size="sm" variant="ghost" class="flex items-center justify-center">
+            <Button type="button" size="sm" variant="ghost" class="flex items-center justify-center">
               <span class="flex items-center">
                 <span class="text-medium">AI</span>
                 <Bot size="14" class="ml-1" />
@@ -29,6 +29,7 @@
           </DropdownMenuContent>
         </DropdownMenu>
         <Button
+          type="button"
           size="sm"
           variant="ghost"
           @click.prevent="editor?.chain().focus().toggleBold().run()"
@@ -37,6 +38,7 @@
           <Bold size="14" />
         </Button>
         <Button
+          type="button"
           size="sm"
           variant="ghost"
           @click.prevent="editor?.chain().focus().toggleItalic().run()"
@@ -45,6 +47,7 @@
           <Italic size="14" />
         </Button>
         <Button
+          type="button"
           size="sm"
           variant="ghost"
           @click.prevent="editor?.chain().focus().toggleBulletList().run()"
@@ -54,6 +57,7 @@
         </Button>
 
         <Button
+          type="button"
           size="sm"
           variant="ghost"
           @click.prevent="editor?.chain().focus().toggleOrderedList().run()"
@@ -62,6 +66,7 @@
           <ListOrdered size="14" />
         </Button>
         <Button
+          type="button"
           size="sm"
           variant="ghost"
           @click.prevent="openLinkModal"
@@ -462,11 +467,11 @@ defineExpose({ focus, extractMentions })
 
   // Anchor tag styling
   a {
-    color: #0066cc;
+    color: hsl(var(--link));
     cursor: pointer;
 
     &:hover {
-      color: #003d7a;
+      text-decoration: underline;
     }
   }
 

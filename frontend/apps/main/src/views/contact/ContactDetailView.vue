@@ -21,7 +21,7 @@
             />
 
             <div class="flex gap-2 justify-start items-center">
-              <h2 class="text-2xl font-bold text-foreground">
+              <h2 class="text-xl font-semibold text-foreground">
                 {{ contact.first_name }} {{ contact.last_name }}
               </h2>
               <Badge v-if="contact.type" variant="secondary">
@@ -150,7 +150,7 @@ async function fetchContact() {
   try {
     const { data } = await api.getContact(route.params.id)
     contact.value = data.data
-    form.setValues(data.data)
+    form.setValues(data.data, false)
   } catch (err) {
     showError(err)
   } finally {

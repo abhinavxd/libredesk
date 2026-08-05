@@ -103,7 +103,7 @@
           v-if="errorMessage"
           :errorMessage="errorMessage"
           :border="true"
-          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded text-sm"
+          class="w-full bg-destructive/10 text-destructive border-destructive/20 p-3 rounded-md text-sm"
         />
       </CardContent>
     </Card>
@@ -116,7 +116,7 @@ import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../api'
 import { validateEmail } from '@shared-ui/utils/string'
-import { useTemporaryClass } from '../../composables/useTemporaryClass'
+import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
 import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
@@ -137,6 +137,7 @@ const isLoading = ref(false)
 const router = useRouter()
 const userStore = useUserStore()
 const shakeCard = ref(false)
+const submitted = ref(false)
 const showPassword = ref(false)
 const loginForm = ref({
   email: '',
@@ -205,18 +206,19 @@ const redirectToOIDC = (provider) => {
 const validateForm = () => {
   if (!validateEmail(loginForm.value.email) && loginForm.value.email !== 'System') {
     errorMessage.value = t('validation.invalidEmail')
-    useTemporaryClass('login-container', 'animate-shake')
+    applyTemporaryClass('login-container', 'animate-shake')
     return false
   }
   if (!loginForm.value.password) {
     errorMessage.value = t('validation.passwordCannotBeEmpty')
-    useTemporaryClass('login-container', 'animate-shake')
+    applyTemporaryClass('login-container', 'animate-shake')
     return false
   }
   return true
 }
 
 const loginAction = () => {
+  submitted.value = true
   if (!validateForm()) return
 
   errorMessage.value = ''
@@ -244,7 +246,7 @@ const loginAction = () => {
     })
     .catch((error) => {
       errorMessage.value = handleHTTPError(error).message
-      useTemporaryClass('login-container', 'animate-shake')
+      applyTemporaryClass('login-container', 'animate-shake')
     })
     .finally(() => {
       isLoading.value = false
@@ -256,11 +258,10 @@ const enabledOIDCProviders = computed(() => {
 })
 
 const emailHasError = computed(() => {
+  if (!submitted.value) return false
   const email = loginForm.value.email
-  return email !== 'System' && !validateEmail(email) && email !== ''
+  return email !== 'System' && !validateEmail(email)
 })
 
-const passwordHasError = computed(
-  () => !loginForm.value.password && loginForm.value.password !== ''
-)
+const passwordHasError = computed(() => submitted.value && !loginForm.value.password)
 </script>

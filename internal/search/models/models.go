@@ -24,6 +24,7 @@ type MessageResult struct {
 }
 
 type ContactResult struct {
+	ID             int         `db:"id" json:"id"`
 	CreatedAt      time.Time   `db:"created_at" json:"created_at"`
 	FirstName      string      `db:"first_name" json:"first_name"`
 	LastName       string      `db:"last_name" json:"last_name"`

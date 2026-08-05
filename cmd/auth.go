@@ -7,6 +7,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -115,6 +116,10 @@ func handleOIDCCallback(r *fastglue.Request) error {
 	if !user.Enabled {
 		app.lo.Error("oidc login rejected for disabled account", "provider_id", providerID, "user_id", user.ID)
 		return redirectLoginError(r, oidcErrAccountDisabled, nextStr)
+	}
+	// Only agents can log in; GetAgent also resolves ai_assistant identity users.
+	if user.Type != models.UserTypeAgent {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.PermissionError)
 	}
 
 	if err := app.auth.SaveSession(amodels.User{

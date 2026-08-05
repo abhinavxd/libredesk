@@ -91,7 +91,7 @@ onMounted(async () => {
     try {
       isLoading.value = true
       const resp = await api.getContextLink(props.id)
-      form.setValues(resp.data.data)
+      form.setValues(resp.data.data, false)
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',

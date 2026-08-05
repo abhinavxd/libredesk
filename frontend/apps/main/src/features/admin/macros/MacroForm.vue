@@ -225,7 +225,7 @@ watch(
   () => props.initialValues,
   (newValues) => {
     if (Object.keys(newValues).length === 0) return
-    form.setValues(newValues)
+    form.setValues(newValues, false)
   },
   { immediate: true }
 )

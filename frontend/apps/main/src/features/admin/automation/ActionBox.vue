@@ -1,7 +1,7 @@
 <template>
-  <div class="space-y-5 rounded" :class="{ 'box p-5': actions.length > 0 }">
-    <div class="space-y-5">
-      <div v-for="(action, index) in actions" :key="index" class="space-y-5">
+  <div class="space-y-6" :class="{ 'box p-5': actions.length > 0 }">
+    <div class="space-y-6">
+      <div v-for="(action, index) in actions" :key="index" class="space-y-6">
         <div v-if="index > 0">
           <hr class="border-t-2 border-dotted border-border" />
         </div>
@@ -76,7 +76,7 @@
       </div>
     </div>
     <div>
-      <Button variant="outline" @click.prevent="addAction">{{
+      <Button type="button" variant="outline" @click.prevent="addAction">{{
         $t('actions.addAction')
       }}</Button>
     </div>

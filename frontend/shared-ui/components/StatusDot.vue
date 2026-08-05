@@ -2,7 +2,7 @@
   <div class="rounded-full" :class="sizeClass">
     <svg class="block !size-full" viewBox="0 0 16 16" aria-hidden="true">
       <template v-if="isOnline">
-        <circle cx="8" cy="8" r="8" class="fill-green-500" />
+        <circle cx="8" cy="8" r="8" class="fill-success" />
         <path
           d="M4.3 8.4 6.8 11 11.7 5.3"
           class="stroke-white"
@@ -13,7 +13,7 @@
         />
       </template>
       <template v-else-if="isAway">
-        <circle cx="8" cy="8" r="8" class="fill-amber-500" />
+        <circle cx="8" cy="8" r="8" class="fill-warning" />
         <path
           d="M8 8V4.5 M8 8H11"
           class="stroke-white"
@@ -28,7 +28,7 @@
         cy="8"
         r="6.75"
         fill="none"
-        class="stroke-gray-400"
+        class="stroke-muted-foreground"
         stroke-width="2.5"
       />
     </svg>

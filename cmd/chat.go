@@ -688,9 +688,6 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
-	for i := range message.Attachments {
-		message.Attachments[i].URL = app.media.GetSignedURL(message.Attachments[i].UUID)
-	}
 	app.conversation.SignAvatarURL(&message.Author.AvatarURL)
 
 	// Strip agent email from widget responses.

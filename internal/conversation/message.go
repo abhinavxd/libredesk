@@ -271,6 +271,8 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 			"FullName":  sender.FullName(),
 			"Email":     sender.Email.String,
 		},
+		// Lets templates disclose AI-composed replies, e.g. {{ if .IsAIComposed }}Composed by AI{{ end }}.
+		"IsAIComposed": sender.Type == umodels.UserTypeAIAssistant,
 	}
 
 	// For automated replies set author fields to empty strings as the recipients will see name as System.
@@ -357,18 +359,25 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	return messages, pageSize, nil
 }
 
-// GetAllConversationMessages returns all messages in a conversation in chronological order.
-func (m *Manager) GetAllConversationMessages(conversationUUID string, private *bool, msgTypes []string) ([]models.Message, error) {
+// GetAllConversationMessages returns the newest messages in a conversation in chronological order, capped at limit; a non-positive limit returns them all.
+func (m *Manager) GetAllConversationMessages(conversationUUID string, private *bool, msgTypes []string, limit int) ([]models.Message, error) {
 	var all []models.Message
+	pageSize := maxMessagesPerPage
+	if limit > 0 && limit < pageSize {
+		pageSize = limit
+	}
 	for page := 1; ; page++ {
-		messages, _, err := m.GetConversationMessages(conversationUUID, page, maxMessagesPerPage, private, msgTypes)
+		messages, _, err := m.GetConversationMessages(conversationUUID, page, pageSize, private, msgTypes)
 		if err != nil {
 			return nil, err
 		}
 		all = append(all, messages...)
-		if len(messages) == 0 || len(all) >= messages[0].Total {
+		if len(messages) == 0 || len(all) >= messages[0].Total || (limit > 0 && len(all) >= limit) {
 			break
 		}
+	}
+	if limit > 0 && len(all) > limit {
+		all = all[:limit]
 	}
 	slices.Reverse(all)
 	return all, nil
@@ -383,11 +392,19 @@ func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 	}
 
 	// Generate signed URLs for attachments.
-	for i := range message.Attachments {
-		message.Attachments[i].URL = m.mediaStore.GetSignedURL(message.Attachments[i].UUID)
-	}
+	m.SignAttachmentURLs(message.Attachments)
 
 	return message, nil
+}
+
+// SignAttachmentURLs adds access URLs for the original image and its thumbnail.
+func (m *Manager) SignAttachmentURLs(attachments attachment.Attachments) {
+	for i := range attachments {
+		attachments[i].URL = m.mediaStore.GetURL(attachments[i].UUID, attachments[i].ContentType, attachments[i].Name)
+		if strings.HasPrefix(attachments[i].ContentType, "image/") {
+			attachments[i].ThumbnailURL = m.mediaStore.GetThumbnailURL(attachments[i].UUID)
+		}
+	}
 }
 
 // UpdateMessageStatus updates the status of a message.
@@ -567,7 +584,6 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.ContentType = models.ContentTypeText
 	}
 
-	// Extract inline media UUIDs for linking after message insertion.
 	inlineUUIDs := extractInlineImageUUIDs(message.Content)
 
 	// Rewrite inline image URLs to cid:ldsk-<uuid>. The read API resolves them back to signed URLs.
@@ -580,20 +596,27 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.TextContent = stringutil.HTML2Text(message.Content)
 	}
 
-	// Insert Message.
-	if err := m.q.InsertMessage.Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
+	tx, err := m.db.Beginx()
+	if err != nil {
+		m.lo.Error("error beginning message insert transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	defer tx.Rollback()
+
+	if err := tx.Stmtx(m.q.InsertMessage).Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
 		m.lo.Error("error inserting message in db", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Attach just inserted message to the media.
-	for _, media := range message.Media {
-		m.mediaStore.Attach(media.ID, mmodels.ModelMessages, message.ID)
+	if err := m.mediaStore.LinkMessageMediaTx(tx, message.ID, message.Media, inlineUUIDs); err != nil {
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Link inline media and stamp content_id so the cid: form just persisted resolves on read.
-	m.linkInlineMediaToMessage(inlineUUIDs, message.ID)
+	if err := tx.Commit(); err != nil {
+		m.lo.Error("error committing message insert transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
 
 	// Add this user as a participant if not already present.
 	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
@@ -699,6 +722,9 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	// Store the activity type structurally so callers can filter activities without parsing i18n content.
+	meta, _ := json.Marshal(map[string]string{"activity_type": activityType})
+
 	message := models.Message{
 		Type:             models.MessageActivity,
 		Status:           models.MessageStatusSent,
@@ -708,6 +734,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 		Private:          true,
 		SenderID:         actor.ID,
 		SenderType:       models.SenderTypeAgent,
+		Meta:             meta,
 	}
 
 	if err := m.InsertMessage(&message); err != nil {
@@ -1086,39 +1113,6 @@ func rewriteInlineImagesToCID(content string) string {
 	})
 }
 
-// linkInlineMediaToMessage attaches each inline-image media row to this
-// message (so it isn't garbage-collected as an orphan) and stamps a stable
-// content_id so cid:ldsk-<uuid> in the saved body resolves on read.
-func (m *Manager) linkInlineMediaToMessage(uuids []string, messageID int) {
-	for _, uuid := range uuids {
-		media, err := m.mediaStore.Get(0, uuid)
-		if err != nil {
-			continue
-		}
-		if media.Model.Valid && media.Model.String != mmodels.ModelMessages {
-			continue
-		}
-		// Linked to a different message already, leave it.
-		if media.ModelID.Valid && media.ModelID.Int != messageID {
-			continue
-		}
-
-		// Attach.
-		if !media.ModelID.Valid {
-			if err := m.mediaStore.Attach(media.ID, mmodels.ModelMessages, messageID); err != nil {
-				m.lo.Warn("error linking inline media to message", "uuid", uuid, "message_id", messageID, "error", err)
-			}
-		}
-
-		// Set content_id if not already set.
-		if media.ContentID == "" {
-			if err := m.mediaStore.SetContentID(media.ID, inlineContentID(uuid)); err != nil {
-				m.lo.Warn("error setting media content_id", "uuid", uuid, "message_id", messageID, "error", err)
-			}
-		}
-	}
-}
-
 // uploadMessageAttachments uploads all attachments for a message.
 func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 	if len(message.Attachments) == 0 {
@@ -1301,7 +1295,10 @@ func (m *Manager) fetchMessageAttachments(messageID int) (attachment.Attachments
 			Content:     blob,
 			Size:        media.Size,
 			Header:      attachment.MakeHeader(media.ContentType, contentID, media.Filename, "base64", media.Disposition.String),
-			URL:         m.mediaStore.GetSignedURL(media.UUID),
+			URL:         m.mediaStore.GetURL(media.UUID, media.ContentType, media.Filename),
+		}
+		if strings.HasPrefix(media.ContentType, "image/") {
+			attachment.ThumbnailURL = m.mediaStore.GetThumbnailURL(media.UUID)
 		}
 		attachments = append(attachments, attachment)
 	}
@@ -1401,6 +1398,11 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 
 		go m.NotifyNewReply(conversation, message)
 
+		// If assigned to an AI assistant, let it respond to this inbound customer message.
+		if m.aiAgent != nil && conversation.AssignedUserID.Valid {
+			m.aiAgent.HandleConversationEvent(conversation.ID, conversation.AssignedUserID.Int)
+		}
+
 		if conversation.SLAPolicyID.Int == 0 {
 			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
 			return nil
@@ -1435,6 +1437,7 @@ func (m *Manager) broadcastMessageToWidgetClients(message *models.Message) {
 		return
 	}
 
+	m.SignAttachmentURLs(message.Attachments)
 	m.SignAvatarURL(&message.Author.AvatarURL)
 	liveChatInbox.BroadcastMessageToClients(message.ConversationUUID, conversation.ContactID, models.ChatMessage{
 		UUID:             message.UUID,
@@ -1464,8 +1467,9 @@ func (m *Manager) getMediaPreview(media mmodels.Media) string {
 	}
 }
 
+// inlineContentID lowercases the uuid to match the content_id the DB stamps from uuid::TEXT.
 func inlineContentID(uuid string) string {
-	return "ldsk-" + uuid
+	return "ldsk-" + strings.ToLower(uuid)
 }
 
 // findExistingMedia resolves an inbound cid to its stored form: ldsk-* is left as-is, others are namespaced by conversation to avoid cross-conversation collisions.

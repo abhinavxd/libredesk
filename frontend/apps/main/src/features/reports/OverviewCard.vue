@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-1 flex-col gap-5 box p-5">
+  <div class="flex flex-1 flex-col gap-4 box p-5">
     <div class="flex items-center justify-between">
-      <p class="text-xl font-medium">{{ title }}</p>
+      <p class="text-sm font-medium text-muted-foreground">{{ title }}</p>
       <slot name="header-right"></slot>
     </div>
     <div :class="gridClass">
@@ -45,8 +45,8 @@ const gridClass = computed(() => {
 
 const valueClass = computed(() => {
   const sizes = {
-    default: 'text-2xl font-bold',
-    large: 'text-3xl font-bold tracking-tight'
+    default: 'text-2xl font-bold tabular-nums',
+    large: 'text-3xl font-bold tracking-tight tabular-nums'
   }
   return sizes[props.size] || sizes.default
 })
