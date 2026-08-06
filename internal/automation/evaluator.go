@@ -103,8 +103,6 @@ func (e *Engine) evaluateGroup(rules []models.RuleDetail, operator string, conve
 func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conversation, previousValues map[string]string) bool {
 	var (
 		valueToCompare   string
-		ruleValues       []string
-		conditionMet     bool
 		customAttributes map[string]any
 	)
 
@@ -160,6 +158,8 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 				return false
 			}
 			valueToCompare = previous
+		case models.ConversationIncomingTo:
+			return evaluateStringValues(conversation.IncomingTo, rule)
 		default:
 			e.lo.Error("error unrecognized conversation field", "field", rule.Field, "field_type", rule.FieldType, "conversation_uuid", conversation.UUID)
 			return false
@@ -200,103 +200,82 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 		return false
 	}
 
-	// Case sensitive match?
-	if !rule.CaseSensitiveMatch {
-		valueToCompare = strings.ToLower(valueToCompare)
-		rule.Value = strings.ToLower(rule.Value)
-	}
-
-	// Split and trim values for Contains/NotContains operations
-	if rule.Operator == models.RuleOperatorContains || rule.Operator == models.RuleOperatorNotContains {
-		ruleValues = strings.Split(rule.Value, ",")
-		for i := range ruleValues {
-			ruleValues[i] = strings.TrimSpace(ruleValues[i])
-			if !rule.CaseSensitiveMatch {
-				ruleValues[i] = strings.ToLower(ruleValues[i])
-			}
-		}
-	}
-
-	e.lo.Debug("evaluating rule", "rule_field", rule.Field, "rule_operator", rule.Operator,
-		"rule_value", rule.Value, "rule_values", ruleValues, "value_to_compare",
-		valueToCompare, "conversation_uuid", conversation.UUID)
-
-	// Compare with set operator
-	switch rule.Operator {
-	case models.RuleOperatorEquals:
-		conditionMet = valueToCompare == rule.Value
-	case models.RuleOperatorNotEqual:
-		conditionMet = valueToCompare != rule.Value
-	case models.RuleOperatorContains:
-		// Normalize input text by collapsing multiple spaces
-		normalizedInputText := strings.Join(strings.Fields(valueToCompare), " ")
-		conditionMet = false
-
-		// Check each rule value against the normalized input
-		for _, ruleValue := range ruleValues {
-			// Normalize rule value by collapsing multiple spaces
-			normalizedRuleValue := strings.Join(strings.Fields(ruleValue), " ")
-
-			// Respect CaseSensitiveMatch flag
-			if rule.CaseSensitiveMatch {
-				if strings.Contains(normalizedInputText, normalizedRuleValue) {
-					conditionMet = true
-					break
-				}
-			} else {
-				if strings.Contains(
-					strings.ToLower(normalizedInputText),
-					strings.ToLower(normalizedRuleValue),
-				) {
-					conditionMet = true
-					break
-				}
-			}
-		}
-	case models.RuleOperatorNotContains:
-		// Normalize input text by collapsing multiple spaces
-		normalizedInputText := strings.Join(strings.Fields(valueToCompare), " ")
-		conditionMet = true
-
-		// Check each rule value against the normalized input
-		for _, ruleValue := range ruleValues {
-			// Normalize rule value by collapsing multiple spaces
-			normalizedRuleValue := strings.Join(strings.Fields(ruleValue), " ")
-
-			// Respect CaseSensitiveMatch flag
-			if rule.CaseSensitiveMatch {
-				if strings.Contains(normalizedInputText, normalizedRuleValue) {
-					conditionMet = false
-					break
-				}
-			} else {
-				if strings.Contains(
-					strings.ToLower(normalizedInputText),
-					strings.ToLower(normalizedRuleValue),
-				) {
-					conditionMet = false
-					break
-				}
-			}
-		}
-	case models.RuleOperatorSet:
-		conditionMet = len(valueToCompare) > 0
-	case models.RuleOperatorNotSet:
-		conditionMet = len(valueToCompare) == 0
-	case models.RuleOperatorGreaterThan:
-		value1, _ := strconv.Atoi(valueToCompare)
-		value2, _ := strconv.Atoi(rule.Value)
-		conditionMet = value1 > value2
-	case models.RuleOperatorLessThan:
-		value1, _ := strconv.Atoi(valueToCompare)
-		value2, _ := strconv.Atoi(rule.Value)
-		conditionMet = value1 < value2
-	case models.RuleOperatorStartsWith:
-		conditionMet = strings.HasPrefix(valueToCompare, rule.Value)
-	default:
-		e.lo.Error("error unrecognized rule logical operator", "operator", rule.Operator)
-		return false
-	}
+	conditionMet := evaluateValue(valueToCompare, rule)
 	e.lo.Debug("conversation automation rule status", "has_met", conditionMet, "conversation_uuid", conversation.UUID)
 	return conditionMet
+}
+
+// evaluateValue compares one field value against a rule.
+func evaluateValue(value string, rule models.RuleDetail) bool {
+	left, right := value, rule.Value
+	if !rule.CaseSensitiveMatch {
+		left, right = strings.ToLower(left), strings.ToLower(right)
+	}
+
+	switch rule.Operator {
+	case models.RuleOperatorEquals:
+		return left == right
+	case models.RuleOperatorNotEqual:
+		return left != right
+	case models.RuleOperatorContains, models.RuleOperatorNotContains:
+		left = strings.Join(strings.Fields(left), " ")
+		matches := false
+		for _, ruleValue := range strings.Split(right, ",") {
+			ruleValue = strings.Join(strings.Fields(ruleValue), " ")
+			if strings.Contains(left, ruleValue) {
+				matches = true
+				break
+			}
+		}
+		return matches == (rule.Operator == models.RuleOperatorContains)
+	case models.RuleOperatorSet:
+		return len(value) > 0
+	case models.RuleOperatorNotSet:
+		return len(value) == 0
+	case models.RuleOperatorGreaterThan:
+		value1, _ := strconv.Atoi(value)
+		value2, _ := strconv.Atoi(rule.Value)
+		return value1 > value2
+	case models.RuleOperatorLessThan:
+		value1, _ := strconv.Atoi(value)
+		value2, _ := strconv.Atoi(rule.Value)
+		return value1 < value2
+	case models.RuleOperatorStartsWith:
+		return strings.HasPrefix(left, right)
+	default:
+		return false
+	}
+}
+
+// evaluateStringValues compares a rule against a multi-value field such as email recipients.
+// Positive operators match any value; negative operators require every value to differ.
+func evaluateStringValues(values []string, rule models.RuleDetail) bool {
+	nonEmptyValues := make([]string, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			nonEmptyValues = append(nonEmptyValues, value)
+		}
+	}
+	values = nonEmptyValues
+
+	if rule.Operator == models.RuleOperatorSet {
+		return len(values) > 0
+	}
+	if rule.Operator == models.RuleOperatorNotSet {
+		return len(values) == 0
+	}
+
+	negative := rule.Operator == models.RuleOperatorNotEqual || rule.Operator == models.RuleOperatorNotContains
+	if rule.Operator == models.RuleOperatorNotEqual {
+		rule.Operator = models.RuleOperatorEquals
+	} else if rule.Operator == models.RuleOperatorNotContains {
+		rule.Operator = models.RuleOperatorContains
+	}
+
+	for _, value := range values {
+		if evaluateValue(value, rule) {
+			return !negative
+		}
+	}
+	return negative
 }
