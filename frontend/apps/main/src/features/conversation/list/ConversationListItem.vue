@@ -43,7 +43,11 @@
                 :checked="isItemSelected"
                 :aria-label="t('conversation.bulkActions.selectConversation')"
                 class="w-5 h-5"
-                :class="showCheckbox ? '' : 'opacity-0 [@media(hover:hover)]:opacity-100'"
+                :class="
+                  showCheckbox
+                    ? ''
+                    : 'opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:opacity-100'
+                "
               />
             </div>
           </div>
