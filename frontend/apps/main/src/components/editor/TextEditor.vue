@@ -159,6 +159,7 @@ import { useTypingIndicator } from '@shared-ui/composables'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInlineImageUpload } from '@main/composables/useInlineImageUpload'
 import mentionSuggestion from './mentionSuggestion'
+import ticketReferenceSuggestion from './ticketReferenceSuggestion'
 
 const textContent = defineModel('textContent', { default: '' })
 const htmlContent = defineModel('htmlContent', { default: '' })
@@ -186,6 +187,14 @@ const props = defineProps({
     default: false
   },
   getSuggestions: {
+    type: Function,
+    default: null
+  },
+  enableTicketReferences: {
+    type: Boolean,
+    default: false
+  },
+  getTicketSuggestions: {
     type: Function,
     default: null
   },
@@ -279,6 +288,33 @@ const CustomMention = Mention.extend({
   }
 })
 
+const TicketReference = Mention.extend({
+  name: 'ticketReference',
+
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      href: { default: null }
+    }
+  },
+
+  renderText({ node }) {
+    return `#${node.attrs.label}`
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    return [
+      'a',
+      {
+        ...HTMLAttributes,
+        href: node.attrs.href,
+        class: [HTMLAttributes.class, 'ld-ticket-reference'].filter(Boolean).join(' ')
+      },
+      `#${node.attrs.label}`
+    ]
+  }
+})
+
 const isInternalUpdate = ref(false)
 
 const buildExtensions = () => {
@@ -302,6 +338,10 @@ const buildExtensions = () => {
       suggestion: mentionSuggestion
     })
   ]
+
+  if (props.getTicketSuggestions) {
+    extensions.push(TicketReference.configure({ suggestion: ticketReferenceSuggestion }))
+  }
 
   return extensions
 }
@@ -339,6 +379,18 @@ const editor = useEditor({
   editorProps: {
     attributes: { class: 'outline-none' },
     getSuggestions: props.getSuggestions,
+    getTicketSuggestions: props.getTicketSuggestions,
+    ticketReferencesEnabled: () => props.enableTicketReferences,
+    handleDOMEvents: {
+      click: (_view, event) => {
+        const target = event.target instanceof HTMLElement ? event.target.closest('a.ld-ticket-reference') : null
+        if (!target) return false
+
+        event.preventDefault()
+        window.open(target.href, '_blank', 'noopener,noreferrer')
+        return true
+      }
+    },
     handlePaste,
     handleDrop,
     handleKeyDown: (view, event) => {
