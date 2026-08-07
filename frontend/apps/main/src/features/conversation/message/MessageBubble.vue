@@ -106,7 +106,12 @@
               >
                 {{ sanitizedContent }}
               </div>
-              <div v-else ref="messageContentEl" @click="onMessageContentClick">
+main.scss              <div
+                v-else
+                ref="messageContentEl"
+                @click="onMessageContentClick"
+                :class="{ 'email-light-canvas': !isOutgoing }"
+              >
                 <Letter
                   :html="sanitizedContent"
                   :allowedSchemas="['cid', 'https', 'http', 'mailto']"
