@@ -4,7 +4,7 @@
     <div
       v-if="!groupWithPrev"
       class="mb-1 flex items-center gap-1"
-      :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'"
+      :class="isOutgoing ? 'pr-2 md:pr-[47px]' : 'pl-10 md:pl-[47px]'"
     >
       <router-link
         v-if="!isOutgoing"
@@ -52,15 +52,18 @@
       </template>
 
       <!-- Bubble Wrapper with max 80% width -->
+      <!-- 80% of a 390px viewport leaves ~220px of usable content box once the
+           avatar column and gutters are taken out, so give the bubble the full
+           width on phones and keep the desktop proportion from `md:` up. -->
       <div
-        class="w-4/5"
+        class="w-full md:w-4/5"
         :class="{ 'flex justify-end items-center gap-2': isOutgoing }"
         style="contain: inline-size"
       >
         <!-- Delete note menu (private notes, appears on hover, left of bubble) -->
         <div
           v-if="isPrivateMessage && !isDeleted"
-          class="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200"
+          class="flex-shrink-0 transition-opacity duration-200 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-within:!opacity-100"
         >
           <DropdownMenu>
             <DropdownMenuTrigger as-child>

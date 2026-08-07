@@ -25,12 +25,14 @@
         <ChevronsUpDown class="ml-auto size-4" />
       </SidebarMenuButton>
     </DropdownMenuTrigger>
+    <!-- In the mobile drawer the trigger sits at the left edge, so a menu
+         opening to the right would run off-screen. -->
     <DropdownMenuContent
       class="min-w-56"
-      side="right"
-      align="end"
+      :side="isMobile ? 'bottom' : 'right'"
+      :align="isMobile ? 'start' : 'end'"
       :side-offset="8"
-      :align-offset="40"
+      :align-offset="isMobile ? 0 : 40"
     >
       <DropdownMenuLabel class="font-normal space-y-2 px-2">
         <!-- User header -->
@@ -128,12 +130,14 @@ import StatusDot from '@shared-ui/components/StatusDot.vue'
 import { Switch } from '@shared-ui/components/ui/switch'
 import { ChevronsUpDown, CircleUserRound, Keyboard, LogOut } from 'lucide-vue-next'
 import { useUserStore } from '../../stores/user'
+import { useIsMobile } from '../../composables/useIsMobile'
 import { useRouter } from 'vue-router'
 import KeyboardShortcutsDialog from '../KeyboardShortcutsDialog.vue'
 
 import { useColorMode } from '@vueuse/core'
 import { ref } from 'vue'
 
+const isMobile = useIsMobile()
 const mode = useColorMode()
 const userStore = useUserStore()
 const router = useRouter()

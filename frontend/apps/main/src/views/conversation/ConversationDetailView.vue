@@ -4,8 +4,9 @@
       v-if="isLoading"
       class="conv-progress absolute inset-x-0 top-0 h-0.5 z-50 pointer-events-none"
     />
+    <!-- Desktop: thread and contact sidebar side by side in a splitter. -->
     <ResizablePanelGroup
-      v-if="showContent"
+      v-if="showContent && !isMobile"
       direction="horizontal"
       class="h-full transition-opacity duration-200"
       :class="{ 'opacity-60': isDimmed }"
@@ -21,9 +22,13 @@
       <ResizableHandle />
 
       <!-- Sidebar Panel (collapsible) -->
+      <!-- default-size must match collapsed-size when the sidebar is persisted
+           closed, so the panel mounts collapsed. Collapsing after mount does
+           not work: the group has already normalised the two default sizes and
+           laid out, so the sidebar keeps a share of the width. -->
       <ResizablePanel
         ref="sidebarPanelRef"
-:default-size="panelSizes[1]"
+        :default-size="sidebarOpen ? panelSizes[1] : 0"
         :min-size="15"
         :max-size="40"
         :collapsible="true"
@@ -37,9 +42,28 @@
       </ResizablePanel>
     </ResizablePanelGroup>
 
-    <!-- Toggle button when sidebar is collapsed -->
+    <!-- Mobile: the contact sidebar has no intrinsic width (it is sized
+         entirely by its ResizablePanel), so it becomes a Sheet instead. -->
+    <template v-else-if="showContent">
+      <div
+        class="h-full transition-opacity duration-200"
+        :class="{ 'opacity-60': isDimmed }"
+        :inert="isDimmed"
+      >
+        <Conversation />
+      </div>
+
+      <Sheet :open="mobileSidebarOpen" @update:open="mobileSidebarOpen = $event">
+        <SheetContent side="right" class="w-[85vw] max-w-sm p-0 overflow-y-auto">
+          <ConversationSideBar />
+        </SheetContent>
+      </Sheet>
+    </template>
+
+    <!-- Toggle button when sidebar is collapsed. Desktop only: on mobile the
+         same emitter event opens the Sheet from the conversation header. -->
     <button
-      v-if="showContent && !sidebarOpen"
+      v-if="showContent && !isMobile && !sidebarOpen"
       @click="toggleSidebar"
       class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-all duration-200 border shadow-md hover:scale-105 z-50"
     >
@@ -58,6 +82,8 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import Conversation from '@main/features/conversation/Conversation.vue'
 import ConversationSideBar from '@main/features/conversation/sidebar/ConversationSideBar.vue'
+import { useIsMobile } from '@main/composables/useIsMobile'
+import { Sheet, SheetContent } from '@shared-ui/components/ui/sheet'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@shared-ui/components/ui/resizable'
 
 const props = defineProps({
@@ -67,9 +93,13 @@ const props = defineProps({
 const conversationStore = useConversationStore()
 const route = useRoute()
 const emitter = useEmitter()
+const isMobile = useIsMobile()
 const sidebarPanelRef = ref(null)
+// Desktop-only state. The mobile Sheet starts closed on every conversation and
+// never reads the persisted desktop percentages.
 const sidebarOpen = useStorage('conversationSidebarOpen', true)
 const panelSizes = useStorage('conversationDetailPanelSizes', [70, 30])
+const mobileSidebarOpen = ref(false)
 
 const showContent = computed(
   () => conversationStore.current || conversationStore.conversation.loading
@@ -81,7 +111,13 @@ const isLoading = computed(
 
 const isDimmed = computed(() => conversationStore.conversation.loading)
 
+// collapse()/expand() are splitter-specific, so mobile needs a parallel path
+// off the same CONVERSATION_SIDEBAR_TOGGLE event.
 const toggleSidebar = () => {
+  if (isMobile.value) {
+    mobileSidebarOpen.value = !mobileSidebarOpen.value
+    return
+  }
   if (sidebarOpen.value) {
     sidebarPanelRef.value?.collapse()
   } else {
@@ -142,6 +178,8 @@ onMounted(() => {
 watch(
   () => props.uuid,
   (newUUID, oldUUID) => {
+    // Never carry the previous conversation's open contact Sheet across.
+    mobileSidebarOpen.value = false
     if (!newUUID || newUUID === oldUUID) return
     const canTransition = oldUUID && !route.query.scrollTo && typeof document.startViewTransition === 'function'
     if (!canTransition) {

@@ -20,7 +20,10 @@ const props = defineProps({
 
 const emits = defineEmits(['update:open']);
 
-const isMobile = useMediaQuery('(max-width: 768px)');
+// 767px, not 768px, so this is the exact complement of Tailwind's `md:`
+// (min-width: 768px). At exactly 768px the desktop branch below renders and
+// `md:` classes apply, which previously disagreed by one pixel.
+const isMobile = useMediaQuery('(max-width: 767px)');
 const openMobile = ref(false);
 
 const open = useVModel(props, 'open', emits, {

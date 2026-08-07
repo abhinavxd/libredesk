@@ -7,7 +7,7 @@
       ref="emojiPickerRef"
       :native="true"
       @select="onSelectEmoji"
-      class="absolute bottom-14 left-14"
+      class="absolute bottom-14 left-0 md:left-14 z-20"
       v-if="isEmojiPickerVisible"
     />
     <div class="flex justify-items-start gap-2">

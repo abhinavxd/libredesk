@@ -1,11 +1,33 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <div class="h-12 flex-shrink-0 px-2 border-b flex items-center justify-between">
-      <div>
-        <span>{{ conversationStore.currentContactName }}</span>
+    <div class="h-12 flex-shrink-0 px-2 border-b flex items-center justify-between gap-2">
+      <div class="flex items-center gap-1 min-w-0">
+        <!-- Mobile is single-pane, so the list is only reachable by going
+             back. On desktop the list is always visible alongside. -->
+        <Button
+          v-if="isMobile"
+          variant="ghost"
+          class="w-8 h-8 p-0 shrink-0 -ml-1"
+          :aria-label="t('globals.messages.back')"
+          @click="goBackToList"
+        >
+          <ChevronLeft class="w-5 h-5" />
+        </Button>
+        <span class="truncate">{{ conversationStore.currentContactName }}</span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- Opens the contact sidebar, which is a Sheet on mobile. Desktop has
+             its own re-open tab on the panel edge. -->
+        <Button
+          v-if="isMobile"
+          variant="ghost"
+          class="w-8 h-8 p-0"
+          :aria-label="t('globals.terms.contact')"
+          @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
+        >
+          <PanelRight class="w-4 h-4" />
+        </Button>
         <Tooltip v-if="isSnoozed && snoozedUntilLabel">
           <TooltipTrigger as-child>
             <span class="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
@@ -72,7 +94,9 @@
 import { computed, ref } from 'vue'
 import { useConversationStore } from '../../stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { Clock, MoreHorizontal } from 'lucide-vue-next'
+import { Clock, MoreHorizontal, ChevronLeft, PanelRight } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { useIsMobile } from '@main/composables/useIsMobile'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,6 +118,16 @@ const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const emitter = useEmitter()
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const isMobile = useIsMobile()
+
+// Each detail route is `<list route name>-conversation`, so the parent list
+// route is the same name without that suffix, with the same params.
+const goBackToList = () => {
+  const listName = String(route.name).replace(/-conversation$/, '')
+  router.push({ name: listName, params: route.params })
+}
 
 const isSnoozed = computed(
   () => conversationStore.current?.status === CONVERSATION_DEFAULT_STATUSES.SNOOZED

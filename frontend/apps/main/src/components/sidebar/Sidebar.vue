@@ -106,6 +106,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
+import MobileDrawerNav from './MobileDrawerNav.vue'
+import CloseDrawerOnNavigate from './CloseDrawerOnNavigate.vue'
 import { filterNavItems } from '@main/utils/nav-permissions'
 import { permissions } from '@main/constants/permissions'
 import { useStorage } from '@vueuse/core'
@@ -252,6 +254,7 @@ const viewToDelete = ref(null)
     :default-open="sidebarOpen"
     v-on:update:open="sidebarOpen = $event"
   >
+    <CloseDrawerOnNavigate />
     <!-- Contacts sidebar -->
     <template
       v-if="route.matched.some((record) => record.name && record.name.startsWith('contact'))"
@@ -269,6 +272,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredContactsNavItems" :key="item.titleKey">
@@ -305,6 +309,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredReportsNavItems" :key="item.titleKey">
@@ -340,6 +345,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredAdminNavItems" :key="item.titleKey">
@@ -409,6 +415,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in accountNavItems" :key="item.titleKey">
@@ -449,6 +456,7 @@ const viewToDelete = ref(null)
         </SidebarHeader>
 
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem>

@@ -238,8 +238,14 @@
 }
 
 .message-bubble {
-  @apply flex flex-col px-4 pt-2 pb-3 w-fit min-w-[30%] max-w-full border overflow-x-auto rounded-xl shadow-sm;
-  overflow-wrap: break-all;
+  // No min-width on phones: a 30% floor on a 390px viewport forces short
+  // messages wider than their content while leaving long ones nothing to gain.
+  @apply flex flex-col px-4 pt-2 pb-3 w-fit md:min-w-[30%] max-w-full border overflow-x-auto rounded-xl shadow-sm;
+
+  // break-word, not break-all: break-all splits ordinary words mid-character,
+  // which is unreadable at phone widths. break-word only breaks words that
+  // cannot fit on a line of their own, which is the case this was guarding.
+  overflow-wrap: break-word;
 
   * {
     max-width: 100%;
@@ -379,6 +385,14 @@
 
 .dark .v3-emoji-picker {
   --v3-group-image-filter: invert(1) !important;
+}
+
+// The picker is ~350px wide by default, which overflows off-screen right on a
+// 390px viewport. Clamp it to the available width on phones.
+@media (max-width: 767px) {
+  .v3-emoji-picker {
+    width: min(20rem, calc(100vw - 2rem)) !important;
+  }
 }
 
 // Hide number input spinners.

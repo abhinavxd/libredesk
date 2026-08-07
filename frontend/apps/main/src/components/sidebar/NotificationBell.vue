@@ -9,9 +9,19 @@
         >
           {{ notificationStore.unreadCount > 99 ? '99' : notificationStore.unreadCount }}
         </span>
+        <!-- The rail names this button with a tooltip, which touch has no way
+             to reveal, so the drawer needs the label inline. -->
+        <span v-if="isMobile">{{ t('globals.terms.notification', 2) }}</span>
       </SidebarMenuButton>
     </PopoverTrigger>
-    <PopoverContent side="right" :side-offset="8" align="end" class="w-96 p-0">
+    <!-- In the mobile drawer the trigger sits at the left edge, so a panel
+         opening to the right would run off-screen. -->
+    <PopoverContent
+      :side="isMobile ? 'bottom' : 'right'"
+      :side-offset="8"
+      :align="isMobile ? 'start' : 'end'"
+      class="w-[min(24rem,calc(100vw-2rem))] p-0"
+    >
       <NotificationPanel @close="isOpen = false" />
     </PopoverContent>
   </Popover>
@@ -19,13 +29,17 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Bell } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { SidebarMenuButton } from '@shared-ui/components/ui/sidebar'
 import { useNotificationStore } from '@main/stores/notification'
+import { useIsMobile } from '@main/composables/useIsMobile'
 import NotificationPanel from './NotificationPanel.vue'
 
 const notificationStore = useNotificationStore()
+const isMobile = useIsMobile()
+const { t } = useI18n()
 const isOpen = ref(false)
 
 onMounted(() => {

@@ -40,8 +40,10 @@
   <div class="text-foreground bg-background">
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
+      <!-- Full-bleed on phones: at 390px the desktop `max-w-[60%]` would give a
+           234px-wide modal, narrower than the inline editor it replaces. -->
       <DialogContent
-        class="max-w-[60%] max-h-[75%] h-[70%] bg-card text-card-foreground p-4 flex flex-col"
+        class="inset-0 translate-x-0 translate-y-0 w-full max-w-none h-[100dvh] max-h-none rounded-none sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-[60%] sm:h-[70%] sm:max-h-[75%] sm:rounded-lg bg-card text-card-foreground p-4 flex flex-col overflow-hidden"
         :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
         @escapeKeyDown="isEditorFullscreen = false"
         :hide-close-button="true"
@@ -77,11 +79,29 @@
       </DialogContent>
     </Dialog>
 
+    <!-- Mobile: the inline composer is ~280px tall, and with the soft keyboard
+         raised on a 390x844 device that leaves the thread no room at all.
+         Collapse it to a tap target that opens the fullscreen editor. -->
+    <div v-if="isMobile && !isEditorFullscreen" class="p-2">
+      <button
+        type="button"
+        class="w-full h-11 flex items-center gap-2 rounded-md border px-3 text-left text-sm bg-background"
+        :class="{ '!bg-private': messageType === 'private_note' }"
+        @click="isEditorFullscreen = true"
+      >
+        <Pencil class="w-4 h-4 shrink-0 text-muted-foreground" />
+        <span v-if="draftPreview" class="truncate">{{ draftPreview }}</span>
+        <span v-else class="truncate text-muted-foreground">
+          {{ messageType === 'private_note' ? $t('globals.terms.privateNote') : $t('globals.terms.reply') }}
+        </span>
+      </button>
+    </div>
+
     <!-- Main Editor non-fullscreen -->
     <div
       class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
       :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
-      v-if="!isEditorFullscreen"
+      v-if="!isMobile && !isEditorFullscreen"
     >
       <ReplyBoxContent
         ref="replyBoxContentRef"
@@ -138,6 +158,8 @@ import {
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
 import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
+import { Pencil } from 'lucide-vue-next'
+import { useIsMobile } from '@main/composables/useIsMobile'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
@@ -150,6 +172,7 @@ const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
+const isMobile = useIsMobile()
 
 // Setup file upload composable
 const {
@@ -262,6 +285,10 @@ onUnmounted(() => {
 const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
+
+// First line of the draft, so the collapsed mobile composer shows that there is
+// unsent text rather than an empty prompt.
+const draftPreview = computed(() => textContent.value.trim().split('\n')[0])
 
 const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
   let hasMessageSendingErrored = false
