@@ -96,8 +96,10 @@
         :autoFocus="true"
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
+        :enableTicketReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
+        :getTicketSuggestions="getTicketSuggestions"
         @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
@@ -159,6 +161,7 @@ import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import { useUsersStore } from '@main/stores/users'
 import { useTeamStore } from '@main/stores/team'
+import { getTicketSuggestions as fetchTicketSuggestions } from '@main/components/editor/ticketReference'
 
 const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
@@ -204,6 +207,11 @@ const getSuggestions = async (query) => {
     }))
 
   return [...users, ...teams].slice(0, 25)
+}
+
+const getTicketSuggestions = async (query) => {
+  if (messageType.value !== 'private_note') return []
+  return fetchTicketSuggestions(query)
 }
 
 // Handle mentions changed from editor
