@@ -296,6 +296,63 @@ func TestSplitName(t *testing.T) {
 		})
 	}
 }
+func TestGenerateSlug(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple title",
+			input:    "Hello World",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with special characters",
+			input:    "Hello, World! How are you?",
+			expected: "hello-world-how-are-you",
+		},
+		{
+			name:     "title with numbers",
+			input:    "Article 123: How to Code",
+			expected: "article-123-how-to-code",
+		},
+		{
+			name:     "title with underscores",
+			input:    "test_article_name",
+			expected: "test_article_name",
+		},
+		{
+			name:     "title with multiple spaces",
+			input:    "Hello     World",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with leading/trailing spaces",
+			input:    "  Hello World  ",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with multiple hyphens",
+			input:    "Hello---World",
+			expected: "hello-world",
+		},
+		{
+			name:     "unicode characters",
+			input:    "Hello World",
+			expected: "hello-world",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GenerateSlug(tt.input)
+			if result != tt.expected {
+				t.Errorf("GenerateSlug(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
 
 func TestHTML2TextMarkdownLinks(t *testing.T) {
 	tests := []struct {

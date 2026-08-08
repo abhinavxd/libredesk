@@ -55,7 +55,7 @@ var (
 		"properties": {
 			"query": {
 				"type": "string",
-				"description": "The natural-language search query to find relevant knowledge base snippets."
+				"description": "The natural-language search query to find relevant knowledge base content."
 			}
 		},
 		"required": ["query"]
@@ -89,7 +89,7 @@ type searchArticlesTool struct {
 func (t *searchArticlesTool) Name() string { return toolSearchArticles }
 
 func (t *searchArticlesTool) Description() string {
-	return "Search the knowledge base snippets for information relevant to the customer's question. Returns the most relevant content chunks."
+	return "Search the knowledge base snippets and help center articles for information relevant to the customer's question. Returns the most relevant content chunks."
 }
 
 func (t *searchArticlesTool) Parameters() types.JSONText { return searchArticlesParams }

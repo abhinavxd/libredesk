@@ -258,20 +258,19 @@ func authOrSignedURL(handler fastglue.FastRequestHandler) fastglue.FastRequestHa
 		}
 
 		// Authentication failed, check for signed URL.
-		validator := app.media.SignedURLValidator()
-		if validator == nil {
-			// Store doesn't support signed URLs, require auth.
-			return r.SendErrorEnvelope(http.StatusUnauthorized,
-				app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.GeneralError)
-		}
-
 		// Parse signature and expiry from query params.
+		validator := app.media.SignedURLValidator()
 		sig := string(r.RequestCtx.QueryArgs().Peek("sig"))
 		expStr := string(r.RequestCtx.QueryArgs().Peek("exp"))
 
-		if sig == "" || expStr == "" {
-			return r.SendErrorEnvelope(http.StatusUnauthorized,
-				app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.GeneralError)
+		// No signature (or store doesn't support them) - let the handler through without
+		// a user; it serves public media and rejects private media.
+		if validator == nil || sig == "" || expStr == "" {
+			if err := app.rateLimit.Check(r.RequestCtx, "media"); err != nil {
+				return err
+			}
+			r.RequestCtx.SetUserValue("auth_method", "public")
+			return handler(r)
 		}
 
 		exp, err := strconv.ParseInt(expStr, 10, 64)

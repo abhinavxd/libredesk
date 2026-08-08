@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"slices"
 
@@ -20,6 +21,9 @@ import (
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
 )
+
+// immutable suppresses revalidation, so this is how long a revoked file stays reachable from a client cache.
+const mediaCacheTTL = 24 * time.Hour
 
 // handleMediaUpload handles media uploads.
 func handleMediaUpload(r *fastglue.Request) error {
@@ -59,6 +63,22 @@ func handleMediaUpload(r *fastglue.Request) error {
 	model, ok := form.Value["linked_model"]
 	if ok && len(model) > 0 {
 		linkedModel = model[0]
+	}
+
+	// Only agents who manage the help center may upload publicly served media.
+	if mmodels.IsPublicModel(linkedModel) {
+		auser := r.RequestCtx.UserValue("user").(amodels.User)
+		agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		allowed, err := app.authz.Enforce(agent, "help_center", "manage")
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		if !allowed {
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+		}
 	}
 
 	// Sanitize filename.
@@ -139,7 +159,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta)
+	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel))
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error inserting metadata into database", "error", err)
@@ -149,7 +169,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 }
 
 // handleServeMedia serves uploaded media.
-// Supports both authenticated access (with permission checks) and signed URL access (no permission checks).
+// Supports public media (no checks), authenticated access (with permission checks) and signed URL access (no permission checks).
 func handleServeMedia(r *fastglue.Request) error {
 	var (
 		app        = r.Context.(*App)
@@ -157,21 +177,28 @@ func handleServeMedia(r *fastglue.Request) error {
 		authMethod = r.RequestCtx.UserValue("auth_method")
 	)
 
-	// If accessed via signed URL, skip permission checks and serve file directly.
-	if authMethod == "signed_url" {
-		return serveMediaFile(r, app, uuid, nil)
-	}
-
-	// Session/API key authenticated - perform full permission check.
-	auser := r.RequestCtx.UserValue("user").(amodels.User)
-
-	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	media, err := getMediaByUUID(app, uuid)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Fetch media from DB.
-	media, err := getMediaByUUID(app, uuid)
+	if !media.Private {
+		return serveMediaFile(r, app, uuid, &media)
+	}
+
+	// If accessed via signed URL, skip permission checks and serve file directly.
+	if authMethod == "signed_url" {
+		return serveMediaFile(r, app, uuid, &media)
+	}
+
+	// Unauthenticated and not a signed URL - private media requires auth.
+	auser, ok := r.RequestCtx.UserValue("user").(amodels.User)
+	if !ok {
+		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.UnauthorizedError)
+	}
+
+	// Session/API key authenticated - perform full permission check.
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -233,6 +260,7 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		r.RequestCtx.Response.Header.Set("Content-Type", media.ContentType)
 		r.RequestCtx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`%s; filename="%s"`, disposition, media.Filename))
 		r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+		r.RequestCtx.Response.Header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, immutable", cacheVisibility(media.Private), int(mediaCacheTTL.Seconds())))
 
 		fasthttp.ServeFile(r.RequestCtx, filepath.Join(ko.String("upload.fs.upload_path"), uuid))
 	case "s3":
@@ -240,6 +268,8 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		if forceDownload {
 			url = app.media.GetURLForDownload(uuid, media.Filename)
 		}
+		// The presigned target is an expiring credential; a cached redirect would leak it and 403 later.
+		r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
 		r.RequestCtx.Redirect(url, http.StatusFound)
 	}
 	return nil
@@ -268,6 +298,17 @@ func getUnassociatedMedia(app *App, ids []int) ([]mmodels.Media, error) {
 }
 
 // getMediaByUUID fetches media metadata from DB, handling thumbnail prefix.
-func getMediaByUUID(app *App, uuid string) (mmodels.Media, error) {
-	return app.media.Get(0, strings.TrimPrefix(uuid, image.ThumbPrefix))
+func getMediaByUUID(app *App, mediaUUID string) (mmodels.Media, error) {
+	mediaUUID = strings.TrimPrefix(mediaUUID, image.ThumbPrefix)
+	if _, err := uuid.Parse(mediaUUID); err != nil {
+		return mmodels.Media{}, envelope.NewError(envelope.NotFoundError, app.i18n.T("globals.messages.notFound"), nil)
+	}
+	return app.media.Get(0, mediaUUID)
+}
+
+func cacheVisibility(private bool) string {
+	if private {
+		return "private"
+	}
+	return "public"
 }

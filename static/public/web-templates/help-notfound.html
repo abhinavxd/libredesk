@@ -1,0 +1,12 @@
+{{ define "help-notfound" }}
+{{ template "hc-header" . }}
+
+<section class="hc-notfound">
+    <p class="hc-code">404</p>
+    <h1>{{ $.L.T "globals.messages.pageNotFound" }}</h1>
+    <p>{{ $.L.T "helpCenter.notFoundText" }}</p>
+    <a class="hc-back" href="/hc/{{ .Data.HelpCenter.Slug }}/{{ .Data.HelpCenter.CurrentLocale }}">{{ $.L.T "helpCenter.backToHelpCenter" }}</a>
+</section>
+
+{{ template "hc-footer" . }}
+{{ end }}

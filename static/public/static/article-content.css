@@ -1,0 +1,100 @@
+/* Article body typography and the custom article nodes (button links, callouts,
+   collapsibles). Shared by the admin article editor and the published help center
+   page: if these two disagree, the editor stops being WYSIWYG. Colors come from
+   --hc-* variables the host defines. */
+
+.hc-prose { font-size: 1.02rem; line-height: 1.75; }
+.hc-prose > :first-child { margin-top: 0; }
+.hc-prose h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: -.022em; line-height: 1.25; margin: 2.75rem 0 .85rem; }
+.hc-prose h2 { font-size: 1.4rem; font-weight: 650; letter-spacing: -.015em; margin: 2.5rem 0 .75rem; }
+.hc-prose h3 { font-size: 1.15rem; font-weight: 650; margin: 2rem 0 .5rem; }
+.hc-prose h4 { font-size: 1rem; font-weight: 700; margin: 1.75rem 0 .4rem; }
+.hc-prose p, .hc-prose ul, .hc-prose ol { margin: 0 0 1.15rem; }
+.hc-prose ul { list-style: disc; padding-left: 1.35rem; }
+.hc-prose ol { list-style: decimal; padding-left: 1.35rem; }
+.hc-prose li { margin: .3rem 0; }
+.hc-prose img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--hc-border); }
+.hc-prose iframe { max-width: 100%; border: 0; border-radius: 8px; }
+
+/* Inline-block so the align buttons, which set text-align on the wrapper, can move it. */
+[data-youtube-video] iframe { display: inline-block; max-width: 100%; }
+.hc-prose a { text-decoration: underline; text-underline-offset: 2px; }
+.hc-prose code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .88em; background: var(--hc-accent-tint); padding: .15em .4em; border-radius: 5px;
+}
+.hc-prose pre {
+    background: #16181d; color: #e7e8ec;
+    border-radius: 10px; padding: 1rem 1.15rem; overflow-x: auto; margin: 0 0 1.15rem;
+}
+.hc-prose pre code { background: none; padding: 0; font-size: .86em; color: inherit; }
+.hc-prose blockquote {
+    margin: 1.25rem 0; padding: .5rem 1.1rem;
+    border-left: 3px solid var(--hc-accent); background: var(--hc-accent-tint);
+    border-radius: 0 8px 8px 0; color: var(--hc-muted);
+}
+.hc-prose blockquote > :last-child { margin-bottom: 0; }
+.hc-prose table { border-collapse: collapse; width: 100%; margin: 0 0 1.15rem; font-size: .95rem; }
+.hc-prose th, .hc-prose td { border: 1px solid var(--hc-border); padding: .5rem .7rem; text-align: left; }
+.hc-prose th { background: var(--hc-accent-tint); font-weight: 600; }
+.hc-prose hr { border: none; border-top: 1px solid var(--hc-border); margin: 2rem 0; }
+
+a.hc-button {
+    display: inline-block;
+    margin: .35rem 0;
+    padding: .6rem 1.15rem;
+    background: var(--hc-accent-ink);
+    color: #fff;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+}
+a.hc-button:hover { text-decoration: none; opacity: .92; color: #fff; }
+
+.hc-callout {
+    position: relative;
+    margin: 1.25rem 0;
+    padding: .85rem 1rem .85rem 2.9rem;
+    border-radius: 6px;
+    font-size: .98rem;
+}
+.hc-callout::before {
+    position: absolute;
+    left: 1rem;
+    top: .95rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: .82rem;
+    line-height: 1;
+}
+.hc-callout > :last-child { margin-bottom: 0; }
+.hc-callout-info { background: #eff6ff; }
+.hc-callout-info::before { content: "i"; background: #3b82f6; }
+.hc-callout-success { background: #f0fdf4; }
+.hc-callout-success::before { content: "✓"; background: #22c55e; }
+.hc-callout-warning { background: #fffbeb; }
+.hc-callout-warning::before { content: "!"; background: #f59e0b; }
+.hc-callout-danger { background: #fef2f2; }
+/* A different glyph from the warning variant, so the two do not rely on amber-vs-red alone. */
+.hc-callout-danger::before { content: "\00d7"; background: #ef4444; font-size: 1rem; }
+
+details.hc-details {
+    margin: 1.25rem 0;
+    padding: .5rem 1.1rem;
+    border: 1px solid var(--hc-border);
+    border-radius: 8px;
+}
+details.hc-details > summary.hc-details-summary {
+    font-weight: 600;
+    cursor: pointer;
+    padding: .35rem 0;
+    list-style-position: inside;
+}
+details.hc-details[open] > summary.hc-details-summary { margin-bottom: .35rem; }
+details.hc-details > .hc-details-content > :last-child { margin-bottom: 0; }

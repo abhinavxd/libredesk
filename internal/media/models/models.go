@@ -9,11 +9,17 @@ import (
 
 const (
 	// TODO: pick these table names from their respective package/models/models.go
-	ModelMessages = "messages"
-	ModelUser     = "users"
+	ModelMessages     = "messages"
+	ModelUser         = "users"
+	ModelHelpArticles = "help_articles"
 
 	DispositionInline = "inline"
 )
+
+// IsPublicModel reports whether media linked to the model type is served without authentication.
+func IsPublicModel(modelType string) bool {
+	return modelType == ModelHelpArticles
+}
 
 // Media represents an uploaded object in DB and storage backend.
 type Media struct {
@@ -30,6 +36,7 @@ type Media struct {
 	Disposition null.String     `db:"disposition" json:"disposition"`
 	Size        int             `db:"size" json:"size"`
 	Meta        json.RawMessage `db:"meta" json:"meta"`
+	Private     bool            `db:"private" json:"private"`
 
 	// Pseudo fields
 	URL     string `json:"url"`

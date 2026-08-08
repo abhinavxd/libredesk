@@ -32,6 +32,7 @@ export const permissions = {
   BUSINESS_HOURS_MANAGE: 'business_hours:manage',
   SLA_MANAGE: 'sla:manage',
   AI_MANAGE: 'ai:manage',
+  HELP_CENTER_MANAGE: 'help_center:manage',
   CUSTOM_ATTRIBUTES_MANAGE: 'custom_attributes:manage',
   CONTACTS_READ_ALL: 'contacts:read_all',
   CONTACTS_READ: 'contacts:read',

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,9 +28,14 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// PublicURI is the app route that serves uploaded media.
+const PublicURI = "/uploads"
+
 var (
 	//go:embed queries.sql
 	efs embed.FS
+
+	publicMediaURLRe = regexp.MustCompile(`/uploads/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})`)
 )
 
 // Store defines the interface for media storage operations.
@@ -55,15 +61,17 @@ type Manager struct {
 	store   Store
 	lo      *logf.Logger
 	i18n    *i18n.I18n
+	rootURL func() string
 	queries queries
 }
 
 // Opts provides options for configuring the Manager.
 type Opts struct {
-	Store Store
-	Lo    *logf.Logger
-	DB    *sqlx.DB
-	I18n  *i18n.I18n
+	Store   Store
+	Lo      *logf.Logger
+	DB      *sqlx.DB
+	I18n    *i18n.I18n
+	RootURL func() string
 }
 
 // New initializes and returns a new Manager instance for handling media operations.
@@ -76,26 +84,30 @@ func New(opt Opts) (*Manager, error) {
 		store:   opt.Store,
 		lo:      opt.Lo,
 		i18n:    opt.I18n,
+		rootURL: opt.RootURL,
 		queries: q,
 	}, nil
 }
 
 // queries holds the prepared SQL statements.
 type queries struct {
-	Insert                  *sqlx.Stmt `query:"insert-media"`
-	Get                     *sqlx.Stmt `query:"get-media"`
-	GetByUUID               *sqlx.Stmt `query:"get-media-by-uuid"`
-	Delete                  *sqlx.Stmt `query:"delete-media"`
-	LinkMessageMedia        *sqlx.Stmt `query:"link-message-media"`
-	GetByModel              *sqlx.Stmt `query:"get-model-media"`
-	GetUnlinkedMessageMedia *sqlx.Stmt `query:"get-unlinked-message-media"`
-	ContentIDExists         *sqlx.Stmt `query:"content-id-exists"`
-	GetByContentIDs         *sqlx.Stmt `query:"get-media-by-content-ids"`
-	GetDraftInlineMedia     *sqlx.Stmt `query:"get-draft-inline-media"`
+	Insert                      *sqlx.Stmt `query:"insert-media"`
+	Get                         *sqlx.Stmt `query:"get-media"`
+	GetByUUID                   *sqlx.Stmt `query:"get-media-by-uuid"`
+	Delete                      *sqlx.Stmt `query:"delete-media"`
+	LinkMessageMedia            *sqlx.Stmt `query:"link-message-media"`
+	GetByModel                  *sqlx.Stmt `query:"get-model-media"`
+	GetUnlinkedMessageMedia     *sqlx.Stmt `query:"get-unlinked-message-media"`
+	GetUnlinkedHelpArticleMedia *sqlx.Stmt `query:"get-unlinked-help-article-media"`
+	LinkHelpArticleMedia        *sqlx.Stmt `query:"link-help-article-media"`
+	UnlinkHelpArticleMedia      *sqlx.Stmt `query:"unlink-help-article-media"`
+	ContentIDExists             *sqlx.Stmt `query:"content-id-exists"`
+	GetByContentIDs             *sqlx.Stmt `query:"get-media-by-content-ids"`
+	GetDraftInlineMedia         *sqlx.Stmt `query:"get-draft-inline-media"`
 }
 
 // UploadAndInsert uploads file on storage and inserts an entry in db.
-func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte) (models.Media, error) {
+func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (models.Media, error) {
 	var (
 		uuid = uuid.New()
 		err  error
@@ -107,7 +119,7 @@ func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, mo
 		return models.Media{}, err
 	}
 
-	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta)
+	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private)
 	if err != nil {
 		m.store.Delete(uuid.String())
 		return models.Media{}, err
@@ -136,9 +148,9 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 }
 
 // Insert inserts media details into the database and returns the inserted media record.
-func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte) (models.Media, error) {
+func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool) (models.Media, error) {
 	var id int
-	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid).Scan(&id); err != nil {
+	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
 		m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -168,8 +180,34 @@ func (m *Manager) Get(id int, uuid string) (models.Media, error) {
 		m.lo.Error("error fetching media", "error", err)
 		return media, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	media.URL = m.GetURL(media.UUID, media.ContentType, media.Filename)
+	if media.Private {
+		media.URL = m.GetURL(media.UUID, media.ContentType, media.Filename)
+	} else {
+		media.URL = m.PublicURL(media.UUID)
+	}
 	return media, nil
+}
+
+// PublicURL returns the stable unsigned app URL for a public media file.
+func (m *Manager) PublicURL(uuid string) string {
+	return m.rootURL() + PublicURI + "/" + uuid
+}
+
+// LinkHelpArticleMedia links media referenced in the article content and unlinks the rest.
+func (m *Manager) LinkHelpArticleMedia(articleID int, content string) error {
+	uuids := []string{}
+	for _, match := range publicMediaURLRe.FindAllStringSubmatch(content, -1) {
+		uuids = append(uuids, match[1])
+	}
+	if _, err := m.queries.LinkHelpArticleMedia.Exec(articleID, pq.Array(uuids)); err != nil {
+		m.lo.Error("error linking help article media", "article_id", articleID, "error", err)
+		return fmt.Errorf("linking help article media: %w", err)
+	}
+	if _, err := m.queries.UnlinkHelpArticleMedia.Exec(articleID, pq.Array(uuids)); err != nil {
+		m.lo.Error("error unlinking help article media", "article_id", articleID, "error", err)
+		return fmt.Errorf("unlinking help article media: %w", err)
+	}
+	return nil
 }
 
 // ContentIDExists reports whether a media row with the given content_id is linked to a message in the given conversation. Scoped this way so an orphan media row (e.g., from a partial failure) doesn't short-circuit a retry into skipping the upload.
@@ -318,26 +356,33 @@ func (m *Manager) Delete(name string) error {
 	return nil
 }
 
-// DeleteUnlinkedMedia is a blocking function that periodically deletes media files that are not linked to any conversation message.
+// DeleteUnlinkedMedia is a blocking function that periodically deletes media files that are not linked to any conversation message or help article.
 func (m *Manager) DeleteUnlinkedMedia(ctx context.Context) {
-	m.deleteUnlinkedMessageMedia()
+	m.deleteUnlinked()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(12 * time.Hour):
 			m.lo.Info("starting periodic deletion of unlinked media")
-			if err := m.deleteUnlinkedMessageMedia(); err != nil {
-				m.lo.Error("error deleting unlinked media", "error", err)
-			}
+			m.deleteUnlinked()
 		}
 	}
 }
 
-// deleteUnlinkedMessageMedia fetches all media files that are not linked to any message and deletes them from the storage backend and the database.
-func (m *Manager) deleteUnlinkedMessageMedia() error {
+// deleteUnlinked runs all unlinked-media sweeps.
+func (m *Manager) deleteUnlinked() {
+	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedHelpArticleMedia} {
+		if err := m.deleteUnlinkedRows(stmt); err != nil {
+			m.lo.Error("error deleting unlinked media", "error", err)
+		}
+	}
+}
+
+// deleteUnlinkedRows deletes the media rows returned by the given query from the storage backend and the database.
+func (m *Manager) deleteUnlinkedRows(stmt *sqlx.Stmt) error {
 	var media []models.Media
-	if err := m.queries.GetUnlinkedMessageMedia.Select(&media); err != nil {
+	if err := stmt.Select(&media); err != nil {
 		m.lo.Error("error fetching unlinked media", "error", err)
 		return err
 	}

@@ -506,6 +506,44 @@ const getCopilotMessages = (conversationUUID) =>
   http.get('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
 const clearCopilotMessages = (conversationUUID) =>
   http.delete('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
+const getHelpCenters = () => http.get('/api/v1/help-centers')
+const getHelpCenter = (id) => http.get(`/api/v1/help-centers/${id}`)
+const createHelpCenter = (data) => http.post('/api/v1/help-centers', data)
+const updateHelpCenter = (id, data) => http.put(`/api/v1/help-centers/${id}`, data)
+const deleteHelpCenter = (id) => http.delete(`/api/v1/help-centers/${id}`)
+const toggleHelpCenter = (id) => http.put(`/api/v1/help-centers/${id}/toggle`)
+const previewHelpCenter = (id, data, page) =>
+  http.post(`/api/v1/help-centers/${id}/preview`, data, {
+    responseType: 'text',
+    params: page ? { page } : {}
+  })
+const getHelpCenterTree = (id, locale) =>
+  http.get(`/api/v1/help-centers/${id}/tree`, { params: locale ? { locale } : {} })
+const getCollections = (helpCenterId) => http.get(`/api/v1/help-centers/${helpCenterId}/collections`)
+const getCollection = (helpCenterId, id) =>
+  http.get(`/api/v1/help-centers/${helpCenterId}/collections/${id}`)
+const createCollection = (helpCenterId, data) =>
+  http.post(`/api/v1/help-centers/${helpCenterId}/collections`, data)
+const updateCollection = (helpCenterId, id, data) =>
+  http.put(`/api/v1/help-centers/${helpCenterId}/collections/${id}`, data)
+const deleteCollection = (helpCenterId, id) =>
+  http.delete(`/api/v1/help-centers/${helpCenterId}/collections/${id}`)
+const toggleCollection = (id) => http.put(`/api/v1/collections/${id}/toggle`)
+const updateCollectionSortOrders = (helpCenterId, data) =>
+  http.put(`/api/v1/help-centers/${helpCenterId}/collection-sort-order`, data)
+const moveArticleToCollection = (id, data) => http.put(`/api/v1/articles/${id}/collection`, data)
+const updateArticleSortOrders = (collectionId, data) =>
+  http.put(`/api/v1/collections/${collectionId}/article-sort-order`, data)
+const getArticles = (collectionId) => http.get(`/api/v1/collections/${collectionId}/articles`)
+const getArticle = (collectionId, id) =>
+  http.get(`/api/v1/collections/${collectionId}/articles/${id}`)
+const createArticle = (collectionId, data) =>
+  http.post(`/api/v1/collections/${collectionId}/articles`, data)
+const updateArticle = (id, data) => http.put(`/api/v1/articles/${id}`, data)
+const deleteArticle = (collectionId, id) =>
+  http.delete(`/api/v1/collections/${collectionId}/articles/${id}`)
+const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data)
+const getHelpCenterInsights = (id) => http.get(`/api/v1/help-centers/${id}/insights`)
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
   headers: {
@@ -724,6 +762,30 @@ export default {
   importAISnippetFromURL,
   updateAISnippet,
   deleteAISnippet,
+  getHelpCenters,
+  getHelpCenter,
+  createHelpCenter,
+  updateHelpCenter,
+  deleteHelpCenter,
+  toggleHelpCenter,
+  previewHelpCenter,
+  getHelpCenterTree,
+  getCollections,
+  getCollection,
+  createCollection,
+  updateCollection,
+  deleteCollection,
+  toggleCollection,
+  updateCollectionSortOrders,
+  updateArticleSortOrders,
+  moveArticleToCollection,
+  getArticles,
+  getArticle,
+  createArticle,
+  updateArticle,
+  deleteArticle,
+  updateArticleStatus,
+  getHelpCenterInsights,
   getAIFaqSuggestions,
   approveAIFaqSuggestion,
   rejectAIFaqSuggestion,

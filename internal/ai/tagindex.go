@@ -74,7 +74,7 @@ func (m *Manager) purgeTagEmbeddings() {
 
 // tagCandidates returns the current names of the tags most similar to text, most similar first; a name only the index still knows is dropped.
 func (m *Manager) tagCandidates(ctx context.Context, text string, k int, tags []models.TagRef) ([]string, error) {
-	results, err := m.searchSource(ctx, text, k, models.SourceTag)
+	results, err := m.searchSources(ctx, text, k, models.SourceTag)
 	if err != nil {
 		return nil, err
 	}

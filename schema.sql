@@ -397,6 +397,7 @@ CREATE TABLE media (
 	disposition media_disposition NULL,
 	"size" INT NULL,
 	meta jsonb DEFAULT '{}'::jsonb NOT NULL,
+	private BOOLEAN NOT NULL DEFAULT true,
 	CONSTRAINT constraint_media_on_filename CHECK (length(filename) <= 1000),
 	CONSTRAINT constraint_media_on_content_id CHECK (length(content_id) <= 300)
 );
@@ -630,6 +631,95 @@ CREATE TABLE embeddings (
 	meta JSONB NOT NULL DEFAULT '{}'
 );
 CREATE INDEX index_embeddings_on_source_type_source_id ON embeddings(source_type, source_id);
+
+DROP TABLE IF EXISTS help_centers CASCADE;
+CREATE TABLE help_centers (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	name TEXT NOT NULL,
+	slug TEXT NOT NULL UNIQUE,
+	page_title TEXT NOT NULL DEFAULT '',
+	header_text TEXT NOT NULL DEFAULT '',
+	meta_description TEXT NOT NULL DEFAULT '',
+	logo_url TEXT NOT NULL DEFAULT '',
+	color TEXT NOT NULL DEFAULT '#1f93ff',
+	nav_links JSONB NOT NULL DEFAULT '[]',
+	custom_css TEXT NOT NULL DEFAULT '',
+	custom_js TEXT NOT NULL DEFAULT '',
+	default_locale TEXT NOT NULL DEFAULT 'en',
+	allowed_locales JSONB NOT NULL DEFAULT '["en"]',
+	is_active BOOLEAN NOT NULL DEFAULT true,
+	theme JSONB NOT NULL DEFAULT '{}',
+	public_url TEXT NOT NULL DEFAULT ''
+);
+
+DROP TABLE IF EXISTS article_collections CASCADE;
+CREATE TABLE article_collections (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	help_center_id INTEGER NOT NULL REFERENCES help_centers(id) ON DELETE CASCADE,
+	slug TEXT NOT NULL,
+	parent_id INTEGER NULL REFERENCES article_collections(id) ON DELETE CASCADE,
+	locale TEXT NOT NULL DEFAULT 'en',
+	name TEXT NOT NULL,
+	description TEXT NOT NULL DEFAULT '',
+	icon TEXT NOT NULL DEFAULT '',
+	sort_order INTEGER NOT NULL DEFAULT 0,
+	is_published BOOLEAN NOT NULL DEFAULT false
+);
+CREATE UNIQUE INDEX index_unique_article_collections_on_help_center_slug_locale ON article_collections(help_center_id, slug, locale);
+CREATE INDEX index_article_collections_on_help_center_id ON article_collections(help_center_id);
+CREATE INDEX index_article_collections_on_parent_id ON article_collections(parent_id);
+
+DROP TABLE IF EXISTS help_articles CASCADE;
+CREATE TABLE help_articles (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	collection_id INTEGER NOT NULL REFERENCES article_collections(id) ON DELETE CASCADE,
+	author_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	created_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	slug TEXT NOT NULL,
+	locale TEXT NOT NULL DEFAULT 'en',
+	title TEXT NOT NULL,
+	content TEXT NOT NULL DEFAULT '',
+	excerpt TEXT NOT NULL DEFAULT '',
+	meta_title TEXT NOT NULL DEFAULT '',
+	meta_description TEXT NOT NULL DEFAULT '',
+	meta_image_url TEXT NOT NULL DEFAULT '',
+	sort_order INTEGER NOT NULL DEFAULT 0,
+	status TEXT NOT NULL DEFAULT 'draft',
+	view_count INTEGER NOT NULL DEFAULT 0,
+	ai_enabled BOOLEAN NOT NULL DEFAULT false,
+	embedded_fingerprint TEXT NOT NULL DEFAULT '',
+	CONSTRAINT constraint_help_articles_on_status CHECK (status IN ('draft', 'published', 'archived'))
+);
+CREATE UNIQUE INDEX index_unique_help_articles_on_collection_slug_locale ON help_articles(collection_id, slug, locale);
+CREATE INDEX index_help_articles_on_collection_id ON help_articles(collection_id);
+CREATE INDEX index_help_articles_on_author_id ON help_articles(author_id);
+CREATE INDEX index_help_articles_on_title_trgm ON help_articles USING gin (title gin_trgm_ops);
+CREATE INDEX index_help_articles_on_content_trgm ON help_articles USING gin (content gin_trgm_ops);
+
+DROP TABLE IF EXISTS help_article_feedback CASCADE;
+CREATE TABLE help_article_feedback (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	article_id INTEGER NOT NULL REFERENCES help_articles(id) ON DELETE CASCADE,
+	is_helpful BOOLEAN NOT NULL
+);
+CREATE INDEX index_help_article_feedback_on_article_id ON help_article_feedback(article_id);
+
+DROP TABLE IF EXISTS help_search_queries CASCADE;
+CREATE TABLE help_search_queries (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	help_center_id INTEGER NOT NULL REFERENCES help_centers(id) ON DELETE CASCADE,
+	query TEXT NOT NULL,
+	results_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX index_help_search_queries_on_help_center_id ON help_search_queries(help_center_id);
 
 DROP TABLE IF EXISTS ai_tools CASCADE;
 CREATE TABLE ai_tools (
@@ -897,7 +987,7 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
+		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,help_center:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
 	);
 
 

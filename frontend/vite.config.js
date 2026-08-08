@@ -39,9 +39,10 @@ export default defineConfig(({ mode, command }) => {
     cacheDir: path.resolve(__dirname, `node_modules/.vite-${isWidget ? 'widget' : 'main'}`),
     server: {
       cors: { origin: "*" },
-      // Allow access to parent dir so shared-ui imports work in dev.
+      // Allow access to parent dir so shared-ui imports work in dev, plus the
+      // public stylesheet the article editor shares with the rendered page.
       fs: {
-        allow: [path.resolve(__dirname)],
+        allow: [path.resolve(__dirname), path.resolve(__dirname, '../static/public/static')],
       },
       port: isWidget ? 8001 : 8000,
       proxy: {
@@ -120,6 +121,7 @@ export default defineConfig(({ mode, command }) => {
         '@main': path.resolve(__dirname, 'apps/main/src'),
         '@widget': path.resolve(__dirname, 'apps/widget/src'),
         '@shared-ui': path.resolve(__dirname, 'shared-ui'),
+        '@public-static': path.resolve(__dirname, '../static/public/static'),
       },
     },
   }

@@ -1,0 +1,166 @@
+{{ define "help-article" }}
+{{ template "hc-header" . }}
+
+<nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
+    <ol>
+        <li><a href="/hc/{{ .Data.HelpCenter.Slug }}/{{ .Data.HelpCenter.CurrentLocale }}">{{ .Data.HelpCenter.Name }}</a></li>
+        {{ if .Data.Collection.Name }}
+        <li><a href="/hc/{{ .Data.HelpCenter.Slug }}/{{ .Data.HelpCenter.CurrentLocale }}/collections/{{ .Data.Collection.Slug }}">{{ .Data.Collection.Name }}</a></li>
+        {{ end }}
+        <li><span class="hc-current" aria-current="page">{{ .Data.Article.Title }}</span></li>
+    </ol>
+</nav>
+
+<article class="hc-article">
+    <h1>{{ .Data.Article.Title }}</h1>
+    {{ if .Data.Article.Excerpt }}<p class="hc-article-excerpt">{{ .Data.Article.Excerpt }}</p>{{ end }}
+    {{ $showAuthor := and .Data.HelpCenter.Theme.Article.ShowAuthor .Data.Article.AuthorName }}
+    <div class="hc-meta{{ if $showAuthor }} hc-meta-byline{{ end }}">
+        {{ if $showAuthor }}
+        {{ if .Data.Article.AuthorAvatar }}<img class="hc-avatar hc-byline-avatar" src="{{ .Data.Article.AuthorAvatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial hc-byline-avatar">{{ .Data.AuthorInitial }}</span>{{ end }}
+        {{ end }}
+        <span>{{ if $showAuthor }}<span class="hc-author">{{ .Data.Article.AuthorName }}</span> &middot; {{ end }}{{ $.L.T "globals.terms.lastUpdated" }} <time class="hc-date" datetime="{{ .Data.ModifiedTime }}">{{ .Data.Article.UpdatedAt.Format "Jan 2, 2006" }}</time></span>
+    </div>
+    <div class="hc-article-body">
+        {{ if not .Data.HelpCenter.Theme.Article.HideToc }}
+        <nav class="hc-toc{{ if .Data.TOC }} hc-toc-open{{ end }}" id="hc-toc" aria-label="{{ $.L.T "helpCenter.onThisPage" }}"{{ if not .Data.TOC }} hidden{{ end }}>
+            <button class="hc-toc-title" type="button" id="hc-toc-toggle" aria-expanded="{{ if .Data.TOC }}true{{ else }}false{{ end }}" aria-controls="hc-toc-list">
+                {{ $.L.T "helpCenter.onThisPage" }}
+                <svg class="hc-toc-caret" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <ul id="hc-toc-list">{{ range .Data.TOC }}<li><a href="#{{ .ID }}">{{ .Title }}</a></li>{{ end }}</ul>
+        </nav>
+        {{ end }}
+        <div class="hc-prose" id="hc-prose">{{ .Data.Content }}</div>
+    </div>
+</article>
+
+<div class="hc-article-foot">
+<div class="hc-helpful" id="hc-helpful" role="group" aria-labelledby="hc-helpful-q" data-endpoint="/api/public/help-centers/{{ .Data.HelpCenter.Slug }}/articles/{{ .Data.Article.Slug }}/feedback?locale={{ .Data.Article.Locale }}">
+    <span class="hc-helpful-q" id="hc-helpful-q">{{ $.L.T "helpCenter.wasHelpful" }}</span>
+    <button type="button" data-helpful="true">{{ $.L.T "globals.messages.yes" }}</button>
+    <button type="button" data-helpful="false">{{ $.L.T "globals.messages.no" }}</button>
+    <span class="hc-helpful-thanks" hidden>{{ $.L.T "helpCenter.feedbackThanks" }}</span>
+</div>
+
+{{ if and .Data.Related (not .Data.HelpCenter.Theme.Article.HideRelated) }}
+<aside class="hc-related">
+    <h2>{{ $.L.T "helpCenter.relatedArticles" }}</h2>
+    <ul class="hc-article-list">
+        {{ range .Data.Related }}
+        <li><a href="/hc/{{ $.Data.HelpCenter.Slug }}/{{ $.Data.HelpCenter.CurrentLocale }}/articles/{{ .Slug }}">{{ template "hc-doc-icon" }}{{ .Title }}</a></li>
+        {{ end }}
+    </ul>
+</aside>
+{{ end }}
+</div>
+
+<script>
+(function () {
+    // The server can only render one fixed English format, so the reader's locale is applied here.
+    var lang = document.documentElement.lang || undefined;
+    document.querySelectorAll('time.hc-date[datetime]').forEach(function (el) {
+        var d = new Date(el.getAttribute('datetime'));
+        if (isNaN(d)) return;
+        try {
+            el.textContent = d.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (e) {}
+    });
+
+    var prose = document.getElementById('hc-prose');
+    var toc = document.getElementById('hc-toc');
+    if (prose && toc) {
+        var headings = prose.querySelectorAll('h2, h3, h4');
+        var list = toc.querySelector('ul');
+        var links = [];
+        var tracked = [];
+        headings.forEach(function (h, i) {
+            var text = h.textContent.trim();
+            if (!text) return;
+            if (!h.id) h.id = 'sec-' + i + '-' + text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            var li = document.createElement('li');
+            if (h.tagName === 'H3') li.className = 'hc-toc-h3';
+            if (h.tagName === 'H4') li.className = 'hc-toc-h4';
+            var a = document.createElement('a');
+            a.href = '#' + h.id;
+            a.textContent = text;
+            li.appendChild(a);
+            list.appendChild(li);
+            links.push(a);
+            tracked.push(h);
+        });
+        if (links.length >= 2) toc.hidden = false;
+
+        var toggle = document.getElementById('hc-toc-toggle');
+        if (toggle) {
+            // The rail is permanently open at desktop width, so it stops being a disclosure there.
+            var wide = window.matchMedia('(min-width: 1100px)');
+            var syncState = function () {
+                if (wide.matches) {
+                    toggle.setAttribute('aria-expanded', 'true');
+                    toggle.disabled = true;
+                } else {
+                    toggle.disabled = false;
+                    toggle.setAttribute('aria-expanded', toc.classList.contains('hc-toc-open') ? 'true' : 'false');
+                }
+            };
+            syncState();
+            wide.addEventListener('change', syncState);
+            toggle.addEventListener('click', function () {
+                toc.classList.toggle('hc-toc-open');
+                syncState();
+            });
+            list.addEventListener('click', function () {
+                toc.classList.remove('hc-toc-open');
+                syncState();
+            });
+        }
+
+        if (tracked.length && 'IntersectionObserver' in window) {
+            var visible = new Set();
+            var markActive = function () {
+                var current = null;
+                for (var i = 0; i < tracked.length; i++) {
+                    if (visible.has(tracked[i])) { current = links[i]; break; }
+                }
+                links.forEach(function (a) { a.classList.toggle('hc-toc-active', a === current); });
+            };
+            var observer = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) {
+                    if (e.isIntersecting) visible.add(e.target); else visible.delete(e.target);
+                });
+                markActive();
+            }, { rootMargin: '0px 0px -70% 0px' });
+            tracked.forEach(function (h) { observer.observe(h); });
+        }
+    }
+
+    var box = document.getElementById('hc-helpful');
+    if (box) {
+        var key = 'hc-feedback:' + box.dataset.endpoint;
+        var done = function () {
+            box.querySelectorAll('button').forEach(function (b) { b.hidden = true; });
+            box.querySelector('.hc-helpful-q').hidden = true;
+            box.querySelector('.hc-helpful-thanks').hidden = false;
+        };
+        try { if (localStorage.getItem(key)) done(); } catch (e) {}
+        box.querySelectorAll('button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                done();
+                fetch(box.dataset.endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ helpful: b.dataset.helpful === 'true' })
+                }).then(function (res) {
+                    // Only a stored vote suppresses the form on reload, so a failed one can be retried.
+                    if (!res.ok) return;
+                    try { localStorage.setItem(key, b.dataset.helpful); } catch (e) {}
+                }).catch(function () {});
+            });
+        });
+    }
+})();
+</script>
+
+{{ template "hc-footer" . }}
+{{ end }}

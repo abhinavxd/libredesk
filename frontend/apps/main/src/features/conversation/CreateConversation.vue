@@ -297,7 +297,7 @@ import {
 } from '@shared-ui/components/ui/select'
 import { useI18n } from 'vue-i18n'
 import { useFileUpload } from '@/composables/useFileUpload'
-import Editor from '@/components/editor/TextEditor.vue'
+import Editor from '@/components/editor/ConversationEditor.vue'
 import { useMacroStore } from '@/stores/macro'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import { UserTypeAgent } from '@/constants/user'
