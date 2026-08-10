@@ -1,5 +1,5 @@
 -- name: insert-media
-INSERT INTO media (store, filename, content_type, size, meta, model_id, model_type, disposition, content_id, uuid, private)
+INSERT INTO media (store, filename, content_type, size, meta, model_id, model_type, disposition, content_id, uuid, private, uploaded_by)
 VALUES(
   $1,
   $2,
@@ -11,20 +11,27 @@ VALUES(
   $8,
   $9,
   $10,
-  $11
+  $11,
+  NULLIF($12, 0)
 )
 RETURNING id;
 
 -- name: get-media
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE
    ($1 > 0 AND id = $1)
    OR
    ($2 != '' AND uuid = NULLIF($2, '')::uuid)
 
+-- name: get-media-uploaded-by
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, uploaded_by
+FROM media
+WHERE id = $1
+  AND (uploaded_by = $2 OR uploaded_by IS NULL)
+
 -- name: get-media-by-uuid
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE uuid = $1;
 
