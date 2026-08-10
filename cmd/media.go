@@ -30,6 +30,7 @@ const mediaCacheTTL = 24 * time.Hour
 func handleMediaUpload(r *fastglue.Request) error {
 	var (
 		app     = r.Context.(*App)
+		auser   = r.RequestCtx.UserValue("user").(amodels.User)
 		cleanUp = false
 	)
 
@@ -159,8 +160,8 @@ func handleMediaUpload(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel))
+	// Insert in DB — record the uploading agent's ID for ownership enforcement.
+	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel), auser.ID)
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error inserting metadata into database", "error", err)
@@ -289,9 +290,10 @@ func bytesToMegabytes(bytes int64) float64 {
 	return float64(bytes) / 1024 / 1024
 }
 
-// getUnassociatedMedia fetches media by IDs, skipping any already associated with a model.
-func getUnassociatedMedia(app *App, ids []int) ([]mmodels.Media, error) {
-	all, err := app.media.GetMany(ids)
+// getUnassociatedMedia fetches media by IDs that are owned by uploaderID and not yet attached to any message.
+// Only media uploaded by the requesting user is returned, preventing cross-agent file theft via sequential ID enumeration.
+func getUnassociatedMedia(app *App, ids []int, uploaderID int) ([]mmodels.Media, error) {
+	all, err := app.media.GetManyByUploader(ids, uploaderID)
 	if err != nil {
 		return nil, err
 	}
