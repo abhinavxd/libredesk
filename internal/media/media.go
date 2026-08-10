@@ -94,6 +94,7 @@ func New(opt Opts) (*Manager, error) {
 type queries struct {
 	Insert                      *sqlx.Stmt `query:"insert-media"`
 	Get                         *sqlx.Stmt `query:"get-media"`
+	GetByUploader               *sqlx.Stmt `query:"get-media-uploaded-by"`
 	GetByUUID                   *sqlx.Stmt `query:"get-media-by-uuid"`
 	Delete                      *sqlx.Stmt `query:"delete-media"`
 	LinkMessageMedia            *sqlx.Stmt `query:"link-message-media"`
@@ -108,7 +109,7 @@ type queries struct {
 }
 
 // UploadAndInsert uploads file on storage and inserts an entry in db.
-func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (models.Media, error) {
+func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool, uploaderID int) (models.Media, error) {
 	var (
 		uuid = uuid.New()
 		err  error
@@ -120,7 +121,7 @@ func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, mo
 		return models.Media{}, err
 	}
 
-	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private)
+	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private, uploaderID)
 	if err != nil {
 		m.store.Delete(uuid.String())
 		return models.Media{}, err
@@ -149,9 +150,9 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 }
 
 // Insert inserts media details into the database and returns the inserted media record.
-func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool) (models.Media, error) {
+func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool, uploaderID int) (models.Media, error) {
 	var id int
-	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
+	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private, uploaderID).Scan(&id); err != nil {
 		m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -164,6 +165,25 @@ func (m *Manager) GetMany(ids []int) ([]models.Media, error) {
 	for _, id := range ids {
 		med, err := m.Get(id, "")
 		if err != nil {
+			return nil, err
+		}
+		out = append(out, med)
+	}
+	return out, nil
+}
+
+// GetManyByUploader fetches media records by IDs, returning only those uploaded by the given user.
+// Records with NULL uploaded_by (e.g. system/email-ingested media) are also returned to preserve
+// backward compatibility with existing messages.
+func (m *Manager) GetManyByUploader(ids []int, uploaderID int) ([]models.Media, error) {
+	out := make([]models.Media, 0, len(ids))
+	for _, id := range ids {
+		var med models.Media
+		if err := m.queries.GetByUploader.Get(&med, id, uploaderID); err != nil {
+			if err == sql.ErrNoRows {
+				m.lo.Warn("media not found or not owned by uploader, skipping", "media_id", id, "uploader_id", uploaderID)
+				continue
+			}
 			return nil, err
 		}
 		out = append(out, med)
