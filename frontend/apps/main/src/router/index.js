@@ -10,6 +10,12 @@ import { abortRouteScope } from '../api'
 
 const routes = [
   {
+    path: '/portal',
+    name: 'portal',
+    component: () => import('@main/views/portal/PortalView.vue'),
+    meta: { title: 'My tickets' }
+  },
+  {
     path: '/',
     component: OuterApp,
     children: [
@@ -30,12 +36,6 @@ const routes = [
         name: 'set-password',
         component: () => import('@main/views/auth/SetPasswordView.vue'),
         meta: { titleKey: 'auth.setNewPassword' }
-      },
-      {
-        path: 'portal',
-        name: 'portal',
-        component: () => import('@main/views/portal/PortalView.vue'),
-        meta: { title: 'My tickets' }
       }
     ]
   },
