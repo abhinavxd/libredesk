@@ -130,6 +130,14 @@ func auth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 func portalAuth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
+		method := string(r.RequestCtx.Method())
+		if method == fasthttp.MethodPost || method == fasthttp.MethodPut || method == fasthttp.MethodDelete {
+			cookieToken := string(r.RequestCtx.Request.Header.Cookie("csrf_token"))
+			headerToken := string(r.RequestCtx.Request.Header.Peek("X-CSRFTOKEN"))
+			if cookieToken == "" || headerToken == "" || cookieToken != headerToken {
+				return r.SendErrorEnvelope(http.StatusForbidden, app.i18n.T("auth.csrfTokenMismatch"), nil, envelope.PermissionError)
+			}
+		}
 		sessUser, err := app.auth.ValidateSession(r)
 		if err != nil || sessUser.ID <= 0 {
 			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.PermissionError)
@@ -210,6 +218,13 @@ func authPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 
 		// User is authenticated.
 		if user.ID > 0 {
+			storedUser, getErr := app.user.Get(user.ID, "", []string{})
+			if getErr != nil {
+				return sendErrorEnvelope(r, getErr)
+			}
+			if storedUser.Type == models.UserTypeContact {
+				return r.RedirectURI("/portal", fasthttp.StatusFound, nil, "")
+			}
 			return handler(r)
 		}
 

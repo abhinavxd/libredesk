@@ -26,8 +26,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Customer portal. These routes never share the agent authorization middleware.
 	g.GET("/api/v1/portal/me", portalAuth(handleGetPortalMe))
+	g.GET("/api/v1/portal/inboxes", portalAuth(handleGetPortalInboxes))
 	g.GET("/portal/logout", portalAuth(handleLogout))
 	g.GET("/api/v1/portal/conversations", portalAuth(handleGetPortalConversations))
+	g.POST("/api/v1/portal/conversations", rateLimit(portalAuth(handleCreatePortalConversation), "auth"))
 	g.GET("/api/v1/portal/conversations/{uuid}", portalAuth(handleGetPortalConversation))
 	g.GET("/api/v1/portal/conversations/{uuid}/messages", portalAuth(handleGetPortalMessages))
 

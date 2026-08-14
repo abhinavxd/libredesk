@@ -23,7 +23,7 @@ function getCSRFToken () {
 
 // Route-scoped abort, opt-in via { abortOnRoute: true }. Default no-abort protects in-flight saves.
 let routeAbort = new AbortController()
-export function abortRouteScope () {
+export function abortRouteScope() {
   routeAbort.abort()
   routeAbort = new AbortController()
 }
@@ -151,11 +151,12 @@ const updateSettings = (key, data) =>
     }
   })
 const getSettings = (key) => http.get(`/api/v1/settings/${key}`)
-const login = (data) => http.post(`/api/v1/auth/login`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const login = (data) =>
+  http.post(`/api/v1/auth/login`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getAutomationRules = (type) =>
   http.get(`/api/v1/automations/rules`, {
     params: { type: type }
@@ -210,23 +211,26 @@ const updateContact = (id, data) =>
       'Content-Type': 'multipart/form-data'
     }
   })
-const blockContact = (id, data) => http.put(`/api/v1/contacts/${id}/block`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const blockContact = (id, data) =>
+  http.put(`/api/v1/contacts/${id}/block`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getTeam = (id) => http.get(`/api/v1/teams/${id}`)
 const getTeams = () => http.get('/api/v1/teams')
-const updateTeam = (id, data) => http.put(`/api/v1/teams/${id}`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const createTeam = (data) => http.post('/api/v1/teams', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const updateTeam = (id, data) =>
+  http.put(`/api/v1/teams/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const createTeam = (data) =>
+  http.post('/api/v1/teams', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getTeamsCompact = () => http.get('/api/v1/teams/compact')
 const deleteTeam = (id) => http.delete(`/api/v1/teams/${id}`)
 const updateUser = (id, data) =>
@@ -247,21 +251,24 @@ const getUser = (id) => http.get(`/api/v1/agents/${id}`)
 const deleteUserAvatar = () => http.delete('/api/v1/agents/me/avatar')
 const getCurrentUser = () => http.get('/api/v1/agents/me')
 const getCurrentUserTeams = () => http.get('/api/v1/agents/me/teams')
-const updateCurrentUserAvailability = (data) => http.put('/api/v1/agents/me/availability', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const resetPassword = (data) => http.post('/api/v1/agents/reset-password', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const setPassword = (data) => http.post('/api/v1/agents/set-password', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const updateCurrentUserAvailability = (data) =>
+  http.put('/api/v1/agents/me/availability', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const resetPassword = (data) =>
+  http.post('/api/v1/agents/reset-password', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const setPassword = (data) =>
+  http.post('/api/v1/agents/set-password', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const deleteUser = (id) => http.delete(`/api/v1/agents/${id}`)
 const importAgents = (data) =>
   http.post('/api/v1/agents/import', data, {
@@ -284,11 +291,12 @@ const importTags = (data) =>
     }
   })
 const getTagImportStatus = () => http.get('/api/v1/tags/import/status')
-const upsertTags = (uuid, data) => http.post(`/api/v1/conversations/${uuid}/tags`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const upsertTags = (uuid, data) =>
+  http.post(`/api/v1/conversations/${uuid}/tags`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const updateAssignee = (uuid, assignee_type, data) =>
   http.put(`/api/v1/conversations/${uuid}/assignee/${assignee_type}`, data, {
     headers: {
@@ -346,7 +354,8 @@ const sendMessage = (uuid, data) =>
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
-const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
+const getContactPageVisits = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
 const getAllMacros = () => http.get('/api/v1/macros')
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
 const createMacro = (data) =>
@@ -390,7 +399,8 @@ const getOverviewCounts = () => http.get('/api/v1/reports/overview/counts')
 const getOverviewCharts = (params) => http.get('/api/v1/reports/overview/charts', { params })
 const getOverviewSLA = (params) => http.get('/api/v1/reports/overview/sla', { params })
 const getOverviewCSAT = (params) => http.get('/api/v1/reports/overview/csat', { params })
-const getOverviewMessageVolume = (params) => http.get('/api/v1/reports/overview/messages', { params })
+const getOverviewMessageVolume = (params) =>
+  http.get('/api/v1/reports/overview/messages', { params })
 const getOverviewTagDistribution = (params) => http.get('/api/v1/reports/overview/tags', { params })
 const getLanguage = (lang) => http.get(`/api/v1/lang/${lang}`)
 const getAvailableLanguages = () => http.get('/api/v1/lang')
@@ -411,11 +421,15 @@ const updateInbox = (id, data) =>
   })
 const deleteInbox = (id) => http.delete(`/api/v1/inboxes/${id}`)
 const saveDraft = (uuid, type, data) =>
-  http.post(`/api/v1/conversations/${uuid}/draft`, { ...data, type }, {
-    headers: {
-      'Content-Type': 'application/json'
+  http.post(
+    `/api/v1/conversations/${uuid}/draft`,
+    { ...data, type },
+    {
+      headers: {
+        'Content-Type': 'application/json'
+      }
     }
-  })
+  )
 
 const getAllDrafts = () => http.get('/api/v1/drafts')
 
@@ -507,11 +521,12 @@ const getCopilotMessages = (conversationUUID) =>
 const clearCopilotMessages = (conversationUUID) =>
   http.delete('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
-const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const createContactNote = (id, data) =>
+  http.post(`/api/v1/contacts/${id}/notes`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const deleteContactNote = (id, noteId) => http.delete(`/api/v1/contacts/${id}/notes/${noteId}`)
 const getActivityLogs = (params) => http.get('/api/v1/activity-logs', { params })
 const getWebhooksCompact = () => http.get('/api/v1/webhooks/compact')
@@ -549,12 +564,16 @@ const getActiveContextLinks = () => http.get('/api/v1/context-links/active')
 const getContextLinkURL = (id, conversationUUID) =>
   http.get(`/api/v1/context-links/${id}/url`, { params: { conversation_uuid: conversationUUID } })
 
-const generateAPIKey = (id) => 
-  http.post(`/api/v1/agents/${id}/api-key`, {}, {
-    headers: {
-      'Content-Type': 'application/json'
+const generateAPIKey = (id) =>
+  http.post(
+    `/api/v1/agents/${id}/api-key`,
+    {},
+    {
+      headers: {
+        'Content-Type': 'application/json'
+      }
     }
-  })
+  )
 
 const revokeAPIKey = (id) => http.delete(`/api/v1/agents/${id}/api-key`)
 
@@ -573,13 +592,18 @@ const markAllNotificationsAsRead = () => http.put('/api/v1/notifications/read-al
 const deleteNotification = (id) => http.delete(`/api/v1/notifications/${id}`)
 const deleteAllNotifications = () => http.delete('/api/v1/notifications')
 const getPortalMe = () => http.get('/api/v1/portal/me')
+const getPortalInboxes = () => http.get('/api/v1/portal/inboxes')
 const getPortalConversations = (params) => http.get('/api/v1/portal/conversations', { params })
+const createPortalConversation = (data) => http.post('/api/v1/portal/conversations', data)
 const getPortalConversation = (uuid) => http.get(`/api/v1/portal/conversations/${uuid}`)
-const getPortalMessages = (uuid, params) => http.get(`/api/v1/portal/conversations/${uuid}/messages`, { params })
+const getPortalMessages = (uuid, params) =>
+  http.get(`/api/v1/portal/conversations/${uuid}/messages`, { params })
 
 export default {
   getPortalMe,
+  getPortalInboxes,
   getPortalConversations,
+  createPortalConversation,
   getPortalConversation,
   getPortalMessages,
   login,

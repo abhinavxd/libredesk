@@ -655,9 +655,8 @@ router.beforeEach((to, from, next) => {
   const i18n = getI18n()
   const typeKey = typeof to.meta?.typeKey === 'function' ? to.meta.typeKey(to) : ''
   const titleKey = typeKey || to.meta?.titleKey
-  const pageTitle = to.meta?.title || (titleKey && i18n
-    ? i18n.global.t(titleKey, to.meta?.titleCount || 1)
-    : '')
+  const pageTitle =
+    to.meta?.title || (titleKey && i18n ? i18n.global.t(titleKey, to.meta?.titleCount || 1) : '')
   document.title = `${pageTitle} - ${siteName}`
   next()
 })
