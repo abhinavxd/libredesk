@@ -34,6 +34,12 @@ read_buffer_size = 65536
 # Keepalive settings.
 keepalive_timeout = "10s"
 
+[auth]
+# Allow users to sign in with their LibreDesk email and password.
+# Disable this only after configuring and enabling at least one OIDC provider.
+# LibreDesk automatically keeps local login available when no OIDC provider is enabled to prevent lockout.
+local_login_enabled = true
+
 # File upload provider to use, either `fs` or `s3`.
 [upload]
 provider = "fs"

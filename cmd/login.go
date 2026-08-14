@@ -21,6 +21,14 @@ func handleLogin(r *fastglue.Request) error {
 		loginReq loginRequest
 	)
 
+	oidcProviders, err := app.oidc.GetAll()
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if !isLocalLoginEnabled(oidcProviders) {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, "Local login is disabled. Sign in with an SSO provider.", nil, envelope.PermissionError)
+	}
+
 	// Decode JSON request.
 	if err := r.Decode(&loginReq, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
