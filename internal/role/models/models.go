@@ -9,11 +9,13 @@ import (
 const (
 	RoleAdmin = "Admin"
 	RoleAgent = "Agent"
+	RoleUser  = "User"
 )
 
 var DefaultRoles = []string{
 	RoleAdmin,
 	RoleAgent,
+	RoleUser,
 }
 
 type Role struct {

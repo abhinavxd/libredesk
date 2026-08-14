@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
@@ -9,6 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
 )
 
@@ -84,14 +86,37 @@ func handleOIDCCallback(r *fastglue.Request) error {
 			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
-	// Lookup the user by email and set the session.
+	if strings.TrimSpace(claims.Email) == "" || !claims.EmailVerified {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, "A verified email address is required.", nil, envelope.PermissionError)
+	}
+	claims.Email = strings.ToLower(strings.TrimSpace(claims.Email))
+
+	// Existing agents take precedence. Agent access remains an explicit admin action.
 	user, err := app.user.GetAgent(0, claims.Email)
 	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	// Only agents can log in; GetAgent also resolves ai_assistant identity users.
-	if user.Type != models.UserTypeAgent {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.PermissionError)
+		envErr, isEnvelope := err.(envelope.Error)
+		if !isEnvelope || envErr.ErrorType != envelope.NotFoundError {
+			return sendErrorEnvelope(r, err)
+		}
+
+		user, err = app.user.GetContactByEmail(claims.Email)
+		if err != nil {
+			envErr, isEnvelope = err.(envelope.Error)
+			if !isEnvelope || envErr.ErrorType != envelope.NotFoundError {
+				return sendErrorEnvelope(r, err)
+			}
+			firstName, lastName := oidcNames(claims.Name, claims.GivenName, claims.FamilyName)
+			user = models.User{
+				Email: null.NewString(claims.Email, true), FirstName: firstName, LastName: lastName,
+				AvatarURL: null.NewString(claims.Picture, claims.Picture != ""), Type: models.UserTypeContact,
+			}
+			if err := app.user.ResolveContact(&user, models.ContactReuse); err != nil {
+				return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			}
+		}
+		if err := app.user.EnsureUserRole(user.ID); err != nil {
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
 	}
 
 	if err := app.auth.SaveSession(amodels.User{
@@ -109,7 +134,9 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	app.user.InvalidateAgentCache(user.ID)
+	if user.Type == models.UserTypeAgent {
+		app.user.InvalidateAgentCache(user.ID)
+	}
 
 	// Insert activity log.
 	if err := app.activityLog.Login(user.ID, user.Email.String, ip); err != nil {
@@ -118,10 +145,25 @@ func handleOIDCCallback(r *fastglue.Request) error {
 
 	// Read the 'next' parameter from session to redirect after login.
 	nextParam, _ := app.auth.GetSessionValue(r, oidcNextSessKey)
-	redirectURL := "/"
-	if nextStr, ok := nextParam.(string); ok && nextStr != "" {
+	redirectURL := "/portal"
+	if user.Type == models.UserTypeAgent {
+		redirectURL = "/"
+	}
+	if nextStr, ok := nextParam.(string); ok && nextStr != "" &&
+		(user.Type == models.UserTypeAgent || strings.HasPrefix(nextStr, "/portal")) {
 		redirectURL = nextStr
 	}
 
 	return r.RedirectURI(redirectURL, fasthttp.StatusFound, nil, "")
+}
+
+func oidcNames(name, givenName, familyName string) (string, string) {
+	if givenName != "" || familyName != "" {
+		return givenName, familyName
+	}
+	parts := strings.Fields(name)
+	if len(parts) == 0 {
+		return "User", ""
+	}
+	return parts[0], strings.Join(parts[1:], " ")
 }

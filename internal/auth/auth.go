@@ -34,6 +34,9 @@ type OIDCclaim struct {
 	EmailVerified bool   `json:"email_verified"`
 	Sub           string `json:"sub"`
 	Picture       string `json:"picture"`
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
 }
 
 // Provider defines an OIDC provider configuration

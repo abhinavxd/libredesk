@@ -129,12 +129,13 @@ func (u *Manager) Update(id int, r models.Role) (models.Role, error) {
 	if len(validPermissions) == 0 {
 		return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.empty", "name", u.i18n.P("globals.terms.permission")), nil)
 	}
-	// Disallow updating `Admin` role, as the main System login requires it.
+	// Disallow updating protected roles. User must remain permissionless so a
+	// portal identity can never inherit agent capabilities.
 	role, err := u.Get(id)
 	if err != nil {
 		return models.Role{}, err
 	}
-	if role.Name == models.RoleAdmin {
+	if role.Name == models.RoleAdmin || role.Name == models.RoleUser {
 		return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.T("admin.role.cannotModifyAdminRole"), nil)
 	}
 

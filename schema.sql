@@ -882,6 +882,9 @@ INSERT INTO conversation_statuses (name, category) VALUES
 ('Closed', 'resolved');
 
 -- Default roles
+INSERT INTO roles ("name", description, permissions)
+VALUES ('User', 'Customer portal user.', '{}');
+
 INSERT INTO
 	roles ("name", description, permissions)
 VALUES

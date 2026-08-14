@@ -125,6 +125,26 @@ func auth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	}
 }
 
+// portalAuth accepts session-authenticated contacts only. It deliberately does
+// not accept API keys or agent identities, keeping the portal boundary separate.
+func portalAuth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		app := r.Context.(*App)
+		sessUser, err := app.auth.ValidateSession(r)
+		if err != nil || sessUser.ID <= 0 {
+			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.PermissionError)
+		}
+		user, err := app.user.Get(sessUser.ID, "", []string{models.UserTypeContact})
+		if err != nil || !user.Enabled {
+			return r.SendErrorEnvelope(http.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+		}
+		r.RequestCtx.SetUserValue("user", amodels.User{
+			ID: user.ID, Email: user.Email.String, FirstName: user.FirstName, LastName: user.LastName,
+		})
+		return handler(r)
+	}
+}
+
 // perm checks if the user has the required permission to access the endpoint.
 // Supports both API key authentication (Authorization header) and session-based authentication.
 func perm(handler fastglue.FastRequestHandler, perm string) fastglue.FastRequestHandler {

@@ -127,7 +127,7 @@ func (u *Manager) syncContact(user *models.User) error {
 				}
 				if enriched {
 					user.ID = existing.ID
-					return nil
+					return u.EnsureUserRole(user.ID)
 				}
 				// ext_id already belongs to another contact, or the contact was deleted mid-flight - fall through to upsert.
 				u.lo.Info("skipping contact enrichment, falling back to upsert", "contact_id", existing.ID, "ext_id", user.ExternalUserID.String)
@@ -144,7 +144,7 @@ func (u *Manager) syncContact(user *models.User) error {
 			u.lo.Error("error inserting contact with external ID", "error", err)
 			return fmt.Errorf("inserting contact with external ID: %w", err)
 		}
-		return nil
+		return u.EnsureUserRole(user.ID)
 	}
 
 	if user.Email.Valid && user.Email.String != "" {
@@ -152,7 +152,7 @@ func (u *Manager) syncContact(user *models.User) error {
 		existing, err := u.GetContactByEmail(user.Email.String)
 		if err == nil && existing.ExternalUserID.String != "" {
 			user.ID = existing.ID
-			return nil
+			return u.EnsureUserRole(user.ID)
 		}
 
 		// Other error than not found - fail.
@@ -172,6 +172,15 @@ func (u *Manager) syncContact(user *models.User) error {
 	if err := u.q.InsertContactNoExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL).Scan(&user.ID); err != nil {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
+	}
+	return u.EnsureUserRole(user.ID)
+}
+
+// EnsureUserRole grants a contact the permissionless portal role.
+func (u *Manager) EnsureUserRole(userID int) error {
+	if _, err := u.q.EnsureUserRole.Exec(userID); err != nil {
+		u.lo.Error("assigning user role", "user_id", userID, "error", err)
+		return fmt.Errorf("assigning user role: %w", err)
 	}
 	return nil
 }

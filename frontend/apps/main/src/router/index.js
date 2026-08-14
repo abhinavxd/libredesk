@@ -30,6 +30,12 @@ const routes = [
         name: 'set-password',
         component: () => import('@main/views/auth/SetPasswordView.vue'),
         meta: { titleKey: 'auth.setNewPassword' }
+      },
+      {
+        path: 'portal',
+        name: 'portal',
+        component: () => import('@main/views/portal/PortalView.vue'),
+        meta: { title: 'My tickets' }
       }
     ]
   },
@@ -649,9 +655,9 @@ router.beforeEach((to, from, next) => {
   const i18n = getI18n()
   const typeKey = typeof to.meta?.typeKey === 'function' ? to.meta.typeKey(to) : ''
   const titleKey = typeKey || to.meta?.titleKey
-  const pageTitle = titleKey && i18n
+  const pageTitle = to.meta?.title || (titleKey && i18n
     ? i18n.global.t(titleKey, to.meta?.titleCount || 1)
-    : ''
+    : '')
   document.title = `${pageTitle} - ${siteName}`
   next()
 })

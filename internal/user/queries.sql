@@ -178,6 +178,11 @@ DO UPDATE SET email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
               updated_at = now()
 RETURNING id;
 
+-- name: ensure-user-role
+INSERT INTO user_roles (user_id, role_id)
+SELECT $1, id FROM roles WHERE name = 'User'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
 -- name: insert-contact-without-external-id
 INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id)
 VALUES ($1, 'contact', $2, $3, $4, $5, NULL)

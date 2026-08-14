@@ -572,8 +572,16 @@ const markNotificationAsRead = (id) => http.put(`/api/v1/notifications/${id}/rea
 const markAllNotificationsAsRead = () => http.put('/api/v1/notifications/read-all')
 const deleteNotification = (id) => http.delete(`/api/v1/notifications/${id}`)
 const deleteAllNotifications = () => http.delete('/api/v1/notifications')
+const getPortalMe = () => http.get('/api/v1/portal/me')
+const getPortalConversations = (params) => http.get('/api/v1/portal/conversations', { params })
+const getPortalConversation = (uuid) => http.get(`/api/v1/portal/conversations/${uuid}`)
+const getPortalMessages = (uuid, params) => http.get(`/api/v1/portal/conversations/${uuid}/messages`, { params })
 
 export default {
+  getPortalMe,
+  getPortalConversations,
+  getPortalConversation,
+  getPortalMessages,
   login,
   deleteUser,
   importAgents,
