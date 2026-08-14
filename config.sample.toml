@@ -38,6 +38,7 @@ keepalive_timeout = "10s"
 # Allow users to sign in with their LibreDesk email and password.
 # Disable this only after configuring and enabling at least one OIDC provider.
 # LibreDesk automatically keeps local login available when no OIDC provider is enabled to prevent lockout.
+# If an enabled provider is unavailable or misconfigured, set auth.local_login_enabled = true to restore password login.
 local_login_enabled = true
 
 # File upload provider to use, either `fs` or `s3`.
