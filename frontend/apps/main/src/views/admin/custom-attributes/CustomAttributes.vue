@@ -148,7 +148,8 @@ const form = useForm({
     name: '',
     data_type: 'text',
     applies_to: appliesTo.value,
-    values: []
+    values: [],
+    portal_required: false
   }
 })
 

@@ -136,6 +136,24 @@
       </FormItem>
     </FormField>
 
+    <FormField
+      v-if="form.values.applies_to === 'conversation'"
+      name="portal_required"
+      v-slot="{ value, handleChange }"
+    >
+      <FormItem class="flex items-start gap-3 rounded-md border border-border p-4">
+        <FormControl>
+          <Checkbox :checked="value" @update:checked="handleChange" />
+        </FormControl>
+        <div class="grid gap-1 leading-none">
+          <FormLabel>{{ $t('admin.customAttributes.portalRequired') }}</FormLabel>
+          <FormDescription>
+            {{ $t('admin.customAttributes.portalRequired.description') }}
+          </FormDescription>
+        </div>
+      </FormItem>
+    </FormField>
+
     <!-- Form submit button slot -->
     <slot name="footer"></slot>
   </form>
@@ -167,6 +185,7 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { Input } from '@shared-ui/components/ui/input'
+import { Checkbox } from '@shared-ui/components/ui/checkbox'
 
 const props = defineProps({
   form: {

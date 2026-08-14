@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"regexp"
 	"strings"
 	"time"
 
@@ -8,14 +10,17 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
 
 type createPortalConversationRequest struct {
-	InboxID int    `json:"inbox_id"`
-	Subject string `json:"subject"`
-	Content string `json:"content"`
+	InboxID          int            `json:"inbox_id"`
+	Subject          string         `json:"subject"`
+	Content          string         `json:"content"`
+	CC               []string       `json:"cc"`
+	CustomAttributes map[string]any `json:"custom_attributes"`
 }
 
 type portalInbox struct {
@@ -37,6 +42,21 @@ func handleGetPortalInboxes(r *fastglue.Request) error {
 	for _, candidate := range inboxes {
 		if candidate.Enabled && candidate.Channel == inbox.ChannelEmail {
 			result = append(result, portalInbox{ID: candidate.ID, Name: candidate.Name})
+		}
+	}
+	return r.SendEnvelope(result)
+}
+
+func handleGetPortalCustomAttributes(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	attributes, err := app.customAttribute.GetAll("conversation")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	result := attributes[:0]
+	for _, attribute := range attributes {
+		if attribute.PortalRequired {
+			result = append(result, attribute)
 		}
 	}
 	return r.SendEnvelope(result)
@@ -68,6 +88,46 @@ func handleCreatePortalConversation(r *fastglue.Request) error {
 	if req.Subject == "" || req.Content == "" || len(req.Subject) > 200 || len(req.Content) > 10000 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
+	cc := make([]string, 0, len(req.CC))
+	seen := map[string]struct{}{strings.ToLower(user.Email): {}}
+	for _, address := range req.CC {
+		address = strings.ToLower(strings.TrimSpace(address))
+		if address == "" {
+			continue
+		}
+		if !stringutil.ValidEmail(address) || len(cc) >= 20 {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidEmail"), nil, envelope.InputError)
+		}
+		if _, exists := seen[address]; !exists {
+			seen[address] = struct{}{}
+			cc = append(cc, address)
+		}
+	}
+	attributes, err := app.customAttribute.GetAll("conversation")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	validAttributes := make(map[string]any)
+	for _, attribute := range attributes {
+		value, exists := req.CustomAttributes[attribute.Key]
+		if attribute.PortalRequired && (!exists || strings.TrimSpace(strings.ReplaceAll(strings.TrimSpace(toString(value)), "false", "")) == "") {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, attribute.Name+" is required.", nil, envelope.InputError)
+		}
+		if !exists {
+			continue
+		}
+		if attribute.Regex != "" {
+			pattern, compileErr := regexp.Compile(attribute.Regex)
+			if compileErr != nil || !pattern.MatchString(toString(value)) {
+				message := attribute.RegexHint
+				if message == "" {
+					message = attribute.Name + " is invalid."
+				}
+				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, message, nil, envelope.InputError)
+			}
+		}
+		validAttributes[attribute.Key] = value
+	}
 
 	selectedInbox, err := app.inbox.GetDBRecord(req.InboxID)
 	if err != nil || !selectedInbox.Enabled || selectedInbox.Channel != inbox.ChannelEmail {
@@ -75,13 +135,17 @@ func handleCreatePortalConversation(r *fastglue.Request) error {
 	}
 
 	conversationID, conversationUUID, err := app.conversation.CreateConversation(
-		user.ID, selectedInbox.ID, "", time.Now(), req.Subject, true, nil, nil, 0, 0,
+		user.ID, selectedInbox.ID, "", time.Now(), req.Subject, true, nil, validAttributes, 0, 0,
 	)
 	if err != nil {
 		app.lo.Error("creating portal conversation", "contact_id", user.ID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
-	if _, err := app.conversation.CreateContactMessage(nil, user.ID, conversationUUID, req.Content, cmodels.ContentTypeText, true); err != nil {
+	messageMeta := map[string]any{}
+	if len(cc) > 0 {
+		messageMeta["cc"] = cc
+	}
+	if _, err := app.conversation.CreateContactMessageWithMeta(nil, user.ID, conversationUUID, req.Content, cmodels.ContentTypeText, true, messageMeta); err != nil {
 		if deleteErr := app.conversation.DeleteConversation(conversationUUID); deleteErr != nil {
 			app.lo.Error("deleting failed portal conversation", "conversation_uuid", conversationUUID, "error", deleteErr)
 		}
@@ -94,6 +158,17 @@ func handleCreatePortalConversation(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(created)
+}
+
+func toString(value any) string {
+	if value == nil {
+		return ""
+	}
+	if text, ok := value.(string); ok {
+		return text
+	}
+	encoded, _ := json.Marshal(value)
+	return string(encoded)
 }
 
 func handleGetPortalConversation(r *fastglue.Request) error {

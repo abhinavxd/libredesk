@@ -80,7 +80,7 @@ func (m *Manager) GetAll(appliesTo string) ([]models.CustomAttribute, error) {
 // Create creates a new custom attribute.
 func (m *Manager) Create(attr models.CustomAttribute) (models.CustomAttribute, error) {
 	var createdAttr models.CustomAttribute
-	if err := m.q.InsertCustomAttribute.Get(&createdAttr, attr.AppliesTo, attr.Name, attr.Description, attr.Key, pq.Array(attr.Values), attr.DataType, attr.Regex, attr.RegexHint); err != nil {
+	if err := m.q.InsertCustomAttribute.Get(&createdAttr, attr.AppliesTo, attr.Name, attr.Description, attr.Key, pq.Array(attr.Values), attr.DataType, attr.Regex, attr.RegexHint, attr.PortalRequired); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return models.CustomAttribute{}, envelope.NewError(envelope.InputError, m.i18n.T("errors.alreadyExistsCustomAttribute"), nil)
 		}
@@ -93,7 +93,7 @@ func (m *Manager) Create(attr models.CustomAttribute) (models.CustomAttribute, e
 // Update updates a custom attribute by ID.
 func (m *Manager) Update(id int, attr models.CustomAttribute) (models.CustomAttribute, error) {
 	var updatedAttr models.CustomAttribute
-	if err := m.q.UpdateCustomAttribute.Get(&updatedAttr, id, attr.AppliesTo, attr.Name, attr.Description, pq.Array(attr.Values), attr.Regex, attr.RegexHint); err != nil {
+	if err := m.q.UpdateCustomAttribute.Get(&updatedAttr, id, attr.AppliesTo, attr.Name, attr.Description, pq.Array(attr.Values), attr.Regex, attr.RegexHint, attr.PortalRequired); err != nil {
 		m.lo.Error("error updating custom attribute", "error", err)
 		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

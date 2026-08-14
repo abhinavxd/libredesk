@@ -10,7 +10,8 @@ SELECT
     values,
     data_type,
     regex,
-    regex_hint
+    regex_hint,
+    portal_required
 FROM
     custom_attribute_definitions
 WHERE
@@ -32,7 +33,8 @@ SELECT
     values,
     data_type,
     regex,
-    regex_hint
+    regex_hint,
+    portal_required
 FROM
     custom_attribute_definitions
 WHERE
@@ -40,9 +42,9 @@ WHERE
 
 -- name: insert-custom-attribute
 INSERT INTO
-    custom_attribute_definitions (applies_to, name, description, key, values, data_type, regex, regex_hint)
+    custom_attribute_definitions (applies_to, name, description, key, values, data_type, regex, regex_hint, portal_required)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8)
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *
 
 -- name: delete-custom-attribute
@@ -61,6 +63,7 @@ SET
     values = $5,
     regex = $6,
     regex_hint = $7,
+    portal_required = $8,
     updated_at = NOW()
 WHERE
     id = $1

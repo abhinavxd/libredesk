@@ -593,6 +593,7 @@ const deleteNotification = (id) => http.delete(`/api/v1/notifications/${id}`)
 const deleteAllNotifications = () => http.delete('/api/v1/notifications')
 const getPortalMe = () => http.get('/api/v1/portal/me')
 const getPortalInboxes = () => http.get('/api/v1/portal/inboxes')
+const getPortalCustomAttributes = () => http.get('/api/v1/portal/custom-attributes')
 const getPortalConversations = (params) => http.get('/api/v1/portal/conversations', { params })
 const createPortalConversation = (data) => http.post('/api/v1/portal/conversations', data)
 const getPortalConversation = (uuid) => http.get(`/api/v1/portal/conversations/${uuid}`)
@@ -602,6 +603,7 @@ const getPortalMessages = (uuid, params) =>
 export default {
   getPortalMe,
   getPortalInboxes,
+  getPortalCustomAttributes,
   getPortalConversations,
   createPortalConversation,
   getPortalConversation,

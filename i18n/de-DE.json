@@ -84,6 +84,8 @@
   "admin.conversationTags.new.description": "Lege den Tag-Namen fest. Klicke auf Speichern, wenn du fertig bist.",
   "admin.customAttribute.help": "Benutzerdefinierte Attribute helfen Ihnen, zusätzliche Details zu Ihren Kontakten oder Konversationen festzulegen, wie z. B. den Abonnementplan oder das Datum des ersten Kaufs.",
   "admin.customAttributes.keyNotAllowed": "Der angegebene Schlüssel ist nicht zulässig, da er mit den Standardattributen kollidiert. Bitte verwenden Sie einen anderen Schlüssel.",
+  "admin.customAttributes.portalRequired": "Im Kundenportal erforderlich",
+  "admin.customAttributes.portalRequired.description": "Fordern Sie Kunden auf, dieses Feld auszufüllen, bevor sie ein Ticket erstellen können.",
   "admin.empty": "Wähle einen Bereich aus der Seitenleiste",
   "admin.general.allowedFileUploadExtensions": "Erlaubte Dateiendungen für Uploads",
   "admin.general.businessHours.placeholder": "Geschäftszeiten auswählen",

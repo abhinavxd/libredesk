@@ -473,6 +473,15 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 
 // CreateContactMessage creates a contact message in a conversation.
 func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, conversationUUID, content, contentType string, isNewConversation bool) (models.Message, error) {
+	return m.CreateContactMessageWithMeta(media, contactID, conversationUUID, content, contentType, isNewConversation, nil)
+}
+
+// CreateContactMessageWithMeta creates a contact message with recipient metadata.
+func (m *Manager) CreateContactMessageWithMeta(media []mmodels.Media, contactID int, conversationUUID, content, contentType string, isNewConversation bool, meta map[string]any) (models.Message, error) {
+	metaJSON, err := json.Marshal(meta)
+	if err != nil {
+		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
 	message := models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         contactID,
@@ -483,6 +492,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 		ContentType:      contentType,
 		Private:          false,
 		Media:            media,
+		Meta:             metaJSON,
 	}
 	if err := m.InsertMessage(&message); err != nil {
 		return models.Message{}, err

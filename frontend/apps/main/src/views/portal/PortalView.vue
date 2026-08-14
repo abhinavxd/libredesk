@@ -187,10 +187,81 @@
               required
             />
           </div>
+          <div class="grid gap-2">
+            <div class="flex items-center justify-between gap-3">
+              <Label>Additional email addresses</Label>
+              <Button type="button" size="sm" variant="ghost" @click="addRecipient">
+                <Plus class="mr-1 size-4" /> Add email
+              </Button>
+            </div>
+            <p class="text-xs text-muted-foreground">
+              These people will be included in replies to this ticket.
+            </p>
+            <div v-for="(_, index) in newTicket.cc" :key="index" class="flex gap-2">
+              <Input
+                v-model.trim="newTicket.cc[index]"
+                type="email"
+                :aria-label="`Additional email address ${index + 1}`"
+                placeholder="name@example.com"
+                required
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Remove email address"
+                @click="newTicket.cc.splice(index, 1)"
+              >
+                <X class="size-4" />
+              </Button>
+            </div>
+          </div>
+          <div v-if="portalAttributes.length" class="grid gap-4 border-t border-border pt-4">
+            <div>
+              <h3 class="text-sm font-medium">Ticket details</h3>
+              <p class="text-xs text-muted-foreground">Fields marked with * are required.</p>
+            </div>
+            <div v-for="attribute in portalAttributes" :key="attribute.id" class="grid gap-2">
+              <Label :for="`ticket-attribute-${attribute.key}`">{{ attribute.name }} *</Label>
+              <p v-if="attribute.description" class="text-xs text-muted-foreground">
+                {{ attribute.description }}
+              </p>
+              <Checkbox
+                v-if="attribute.data_type === 'checkbox'"
+                :id="`ticket-attribute-${attribute.key}`"
+                :checked="!!newTicket.custom_attributes[attribute.key]"
+                @update:checked="newTicket.custom_attributes[attribute.key] = $event"
+              />
+              <select
+                v-else-if="attribute.data_type === 'list'"
+                :id="`ticket-attribute-${attribute.key}`"
+                v-model="newTicket.custom_attributes[attribute.key]"
+                class="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                required
+              >
+                <option disabled value="">Select a value</option>
+                <option v-for="option in attribute.values" :key="option" :value="option">
+                  {{ option }}
+                </option>
+              </select>
+              <Input
+                v-else
+                :id="`ticket-attribute-${attribute.key}`"
+                v-model="newTicket.custom_attributes[attribute.key]"
+                :type="attributeInputType(attribute.data_type)"
+                :pattern="attribute.regex || undefined"
+                :title="attribute.regex_hint || attribute.description"
+                required
+              />
+            </div>
+          </div>
           <p v-if="createError" class="text-sm text-destructive">{{ createError }}</p>
           <div class="flex justify-end gap-2">
             <Button type="button" variant="outline" @click="createOpen = false">Cancel</Button>
-            <Button type="submit" :disabled="creating || !newTicket.subject || !newTicket.content">
+            <Button
+              type="submit"
+              :disabled="creating || !newTicket.subject || !newTicket.content || !portalFieldsValid"
+            >
               {{ creating ? 'Creating…' : 'Create ticket' }}
             </Button>
           </div>
@@ -201,12 +272,13 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
 import { Textarea } from '@shared-ui/components/ui/textarea'
+import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -214,13 +286,14 @@ import {
   DialogHeader,
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
-import { CircleAlert, LogOut, Plus, Ticket } from 'lucide-vue-next'
+import { CircleAlert, LogOut, Plus, Ticket, X } from 'lucide-vue-next'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
 
 const currentUser = ref(null)
 const siteName = ref('Support portal')
 const portalInboxes = ref([])
+const portalAttributes = ref([])
 const tickets = ref([])
 const selected = ref(null)
 const messages = ref([])
@@ -230,7 +303,21 @@ const error = ref(false)
 const createOpen = ref(false)
 const creating = ref(false)
 const createError = ref('')
-const newTicket = reactive({ inbox_id: 0, subject: '', content: '' })
+const newTicket = reactive({ inbox_id: 0, subject: '', content: '', cc: [], custom_attributes: {} })
+
+const portalFieldsValid = computed(() =>
+  portalAttributes.value.every((attribute) => {
+    const value = newTicket.custom_attributes[attribute.key]
+    return attribute.data_type === 'checkbox' ? value === true : String(value ?? '').trim() !== ''
+  })
+)
+
+const addRecipient = () => {
+  if (newTicket.cc.length < 20) newTicket.cc.push('')
+}
+
+const attributeInputType = (type) =>
+  ({ number: 'number', date: 'date', link: 'url' })[type] || 'text'
 
 const formatDate = (value) =>
   value
@@ -259,6 +346,13 @@ async function createTicket() {
     tickets.value.unshift(ticket)
     newTicket.subject = ''
     newTicket.content = ''
+    newTicket.cc = []
+    newTicket.custom_attributes = Object.fromEntries(
+      portalAttributes.value.map((attribute) => [
+        attribute.key,
+        attribute.data_type === 'checkbox' ? false : ''
+      ])
+    )
     createOpen.value = false
     await selectTicket(ticket)
   } catch (requestError) {
@@ -272,15 +366,23 @@ async function loadPortal() {
   loading.value = true
   error.value = false
   try {
-    const [meResponse, inboxesResponse, ticketsResponse, configResponse] = await Promise.all([
+    const [meResponse, inboxesResponse, attributesResponse, ticketsResponse, configResponse] = await Promise.all([
       api.getPortalMe(),
       api.getPortalInboxes(),
+      api.getPortalCustomAttributes(),
       api.getPortalConversations({ page_size: 100 }),
       api.getConfig()
     ])
     currentUser.value = meResponse.data.data
     siteName.value = configResponse.data.data?.['app.site_name'] || siteName.value
     portalInboxes.value = inboxesResponse.data.data || []
+    portalAttributes.value = attributesResponse.data.data || []
+    newTicket.custom_attributes = Object.fromEntries(
+      portalAttributes.value.map((attribute) => [
+        attribute.key,
+        attribute.data_type === 'checkbox' ? false : ''
+      ])
+    )
     newTicket.inbox_id = portalInboxes.value[0]?.id || 0
     tickets.value = ticketsResponse.data.data.results || []
     if (tickets.value.length) await selectTicket(tickets.value[0])

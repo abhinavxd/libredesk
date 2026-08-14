@@ -733,6 +733,7 @@ CREATE TABLE custom_attribute_definitions (
 	data_type TEXT NOT NULL,
 	regex TEXT NULL,
 	regex_hint TEXT NULL,
+	portal_required BOOLEAN DEFAULT FALSE NOT NULL,
 	CONSTRAINT constraint_custom_attribute_definitions_on_name CHECK (length("name") <= 140),
 	CONSTRAINT constraint_custom_attribute_definitions_on_description CHECK (length(description) <= 300),
 	CONSTRAINT constraint_custom_attribute_definitions_on_key CHECK (length(key) <= 140),

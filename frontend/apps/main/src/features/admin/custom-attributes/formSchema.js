@@ -60,6 +60,7 @@ export const createFormSchema = (t) => z.object({
     }),
     regex: z.string().optional(),
     regex_hint: z.string().optional(),
+    portal_required: z.boolean().default(false),
     values: z.array(z.string())
         .default([])
 })
