@@ -223,6 +223,9 @@ func authPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 				return sendErrorEnvelope(r, getErr)
 			}
 			if storedUser.Type == models.UserTypeContact {
+				if string(r.RequestCtx.Path()) == "/portal" {
+					return handler(r)
+				}
 				return r.RedirectURI("/portal", fasthttp.StatusFound, nil, "")
 			}
 			return handler(r)
