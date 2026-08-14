@@ -273,6 +273,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
@@ -290,6 +291,7 @@ import { CircleAlert, LogOut, Plus, Ticket, X } from 'lucide-vue-next'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
 
+const route = useRoute()
 const currentUser = ref(null)
 const siteName = ref('Support portal')
 const portalInboxes = ref([])
@@ -385,7 +387,10 @@ async function loadPortal() {
     )
     newTicket.inbox_id = portalInboxes.value[0]?.id || 0
     tickets.value = ticketsResponse.data.data.results || []
-    if (tickets.value.length) await selectTicket(tickets.value[0])
+    if (tickets.value.length) {
+      const linkedTicket = tickets.value.find((ticket) => ticket.uuid === route.query.ticket)
+      await selectTicket(linkedTicket || tickets.value[0])
+    }
   } catch (requestError) {
     if (requestError.response?.status === 401 || requestError.response?.status === 403) {
       window.location.assign('/')
