@@ -1457,12 +1457,14 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			return fmt.Errorf("sending private note: %w", err)
 		}
 	case amodels.ActionReply:
-		// Automated replies always go to the contact only. CCs from the
-		// conversation history are deliberately not carried forward.
 		if conv.Contact.Email.String == "" {
 			return fmt.Errorf("auto-reply skipped: contact has no email for conversation: %s", conv.UUID)
 		}
-		_, err := m.QueueReply(
+		cc, err := m.getLatestIncomingCC(conv.UUID, conv.Contact.Email.String)
+		if err != nil {
+			return fmt.Errorf("get auto-reply recipients: %w", err)
+		}
+		_, err = m.QueueReply(
 			[]mmodels.Media{},
 			conv.InboxID,
 			user.ID,
@@ -1470,7 +1472,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			conv.UUID,
 			action.Value[0],
 			[]string{conv.Contact.Email.String},
-			nil,
+			cc,
 			nil,
 			map[string]any{"is_automated": true},
 		)
@@ -1635,6 +1637,30 @@ func (m *Manager) resolveNotifyRecipients(entries []string, conv models.Conversa
 		}
 	}
 	return ids
+}
+
+// getLatestIncomingCC returns the copied recipients of the incoming message
+// that triggered an automation reply.
+func (m *Manager) getLatestIncomingCC(conversationUUID, contactEmail string) ([]string, error) {
+	private := false
+	messages, err := m.GetAllConversationMessages(conversationUUID, &private, []string{models.MessageIncoming}, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(messages) == 0 || len(messages[0].Meta) == 0 {
+		return nil, nil
+	}
+	return automationReplyCC(messages[0].Meta, contactEmail)
+}
+
+func automationReplyCC(messageMeta json.RawMessage, contactEmail string) ([]string, error) {
+	var meta struct {
+		CC []string `json:"cc"`
+	}
+	if err := json.Unmarshal(messageMeta, &meta); err != nil {
+		return nil, fmt.Errorf("decode latest incoming message metadata: %w", err)
+	}
+	return stringutil.DedupAndExcludeString(meta.CC, contactEmail), nil
 }
 
 // RemoveConversationAssignee removes assigned user from a conversation.
