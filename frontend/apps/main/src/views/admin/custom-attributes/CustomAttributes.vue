@@ -135,7 +135,20 @@ const editCustomAttribute = (item) => {
 }
 
 const newCustomAttribute = () => {
-  form.resetForm()
+  form.resetForm({
+    values: {
+      id: 0,
+      name: '',
+      description: '',
+      key: '',
+      data_type: 'text',
+      applies_to: appliesTo.value,
+      regex: '',
+      regex_hint: '',
+      values: [],
+      portal_required: false
+    }
+  })
   form.setErrors({})
   isEditing.value = false
   dialogOpen.value = true
