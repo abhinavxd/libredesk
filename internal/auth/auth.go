@@ -66,6 +66,7 @@ type Auth struct {
 	i18n       *i18n.I18n
 	oauthCfgs  map[int]oauth2.Config
 	verifiers  map[int]*oidc.IDTokenVerifier
+	providers  map[int]*oidc.Provider
 	sess       *simplesessions.Manager
 	logger     *logf.Logger
 	rd         *redis.Client
@@ -76,6 +77,7 @@ type Auth struct {
 func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control) (*Auth, error) {
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
+	providers := make(map[int]*oidc.Provider)
 
 	oidcClient := newOIDCClient(dialControl)
 
@@ -98,6 +100,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 
 		oauthCfgs[provider.ID] = oauthCfg
 		verifiers[provider.ID] = verifier
+		providers[provider.ID] = oidcProv
 	}
 
 	lifetime := cfg.SessionLifetime
@@ -127,6 +130,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 		i18n:       i18n,
 		oauthCfgs:  oauthCfgs,
 		verifiers:  verifiers,
+		providers:  providers,
 		sess:       sess,
 		logger:     logger,
 		rd:         rd,
@@ -162,6 +166,7 @@ func (a *Auth) Reload(cfg Config) error {
 
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
+	providers := make(map[int]*oidc.Provider)
 
 	for _, provider := range cfg.Providers {
 		oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), a.oidcClient), provider.ProviderURL)
@@ -182,11 +187,13 @@ func (a *Auth) Reload(cfg Config) error {
 
 		oauthCfgs[provider.ID] = oauthCfg
 		verifiers[provider.ID] = verifier
+		providers[provider.ID] = oidcProv
 	}
 
 	a.cfg = cfg
 	a.oauthCfgs = oauthCfgs
 	a.verifiers = verifiers
+	a.providers = providers
 
 	return nil
 }
@@ -216,6 +223,10 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 	if !ok {
 		return "", OIDCclaim{}, fmt.Errorf("invalid provider ID: %d", providerID)
 	}
+	provider, ok := a.providers[providerID]
+	if !ok {
+		return "", OIDCclaim{}, fmt.Errorf("invalid provider ID: %d", providerID)
+	}
 
 	// Otherwise the token exchange and JWKS fetch use http.DefaultClient, which has no SSRF guard and no timeout.
 	ctx = oidc.ClientContext(ctx, a.oidcClient)
@@ -240,6 +251,17 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 	var claims OIDCclaim
 	if err := idTk.Claims(&claims); err != nil {
 		return "", OIDCclaim{}, errors.New("error getting user from OIDC")
+	}
+
+	// Authorization-code flows do not consistently include standard profile
+	// claims in the ID token. UserInfo is the canonical source for claims
+	// requested through the profile and email scopes.
+	userInfo, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(tk))
+	if err != nil {
+		return "", OIDCclaim{}, fmt.Errorf("error getting OIDC userinfo: %v", err)
+	}
+	if err := userInfo.Claims(&claims); err != nil {
+		return "", OIDCclaim{}, errors.New("error decoding OIDC userinfo")
 	}
 	return rawIDTk, claims, nil
 }
