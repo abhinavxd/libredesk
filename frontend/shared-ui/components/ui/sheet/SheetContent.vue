@@ -7,7 +7,7 @@ import {
   DialogOverlay,
   DialogPortal,
   useForwardPropsEmits,
-} from 'reka-ui';
+} from 'radix-vue';
 import { cn } from '../../../lib/utils';
 import { sheetVariants } from '.';
 

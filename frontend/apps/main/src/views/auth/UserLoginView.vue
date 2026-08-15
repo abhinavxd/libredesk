@@ -50,6 +50,7 @@
             <Input
               id="email"
               type="text"
+              autofocus
               autocomplete="username"
               v-model.trim="loginForm.email"
               :class="{ 'border-destructive': emailHasError }"

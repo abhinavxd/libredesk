@@ -75,7 +75,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	app.conversation.ProcessCSATStatus(messages)
 
 	// Strip CSAT UUID from agent sessions to prevent self-rating.
-	if r.RequestCtx.UserValue("auth_method") != "api_key" {
+	if r.RequestCtx.UserValue("auth_method") != authMethodAPIKey {
 		for i := range messages {
 			if messages[i].HasCSAT() {
 				messages[i].StripCSATUUID()
@@ -126,7 +126,7 @@ func handleGetMessage(r *fastglue.Request) error {
 	message = messages[0]
 
 	// Strip CSAT UUID from agent sessions to prevent self-rating.
-	if r.RequestCtx.UserValue("auth_method") != "api_key" && message.HasCSAT() {
+	if r.RequestCtx.UserValue("auth_method") != authMethodAPIKey && message.HasCSAT() {
 		message.StripCSATUUID()
 	}
 

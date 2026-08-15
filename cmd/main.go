@@ -4,9 +4,11 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -37,6 +39,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/priority"
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
@@ -68,6 +71,17 @@ var (
 	// Injected at build time.
 	buildString   string
 	versionString string
+
+	// assetVersion is hashed from buildString so public cache-bust URLs don't leak the version.
+	assetVersion = func() string {
+		src := buildString
+		if src == "" {
+			src = strconv.FormatInt(time.Now().Unix(), 36)
+		}
+		h := fnv.New32a()
+		h.Write([]byte(src))
+		return strconv.FormatUint(uint64(h.Sum32()), 36)
+	}()
 )
 
 const (
@@ -103,6 +117,7 @@ type App struct {
 	view             *view.Manager
 	ai               *ai.Manager
 	aiAgent          *aiagent.Manager
+	helpcenter       *helpcenter.Manager
 	search           *search.Manager
 	activityLog      *activitylog.Manager
 	notifier         *notifier.Service
@@ -233,6 +248,7 @@ func main() {
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
 		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings, user, notifier, rdb)
+		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
 	)
@@ -261,6 +277,7 @@ func main() {
 	go user.MonitorUserAvailability(ctx, onUsersOffline(conversation))
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
+	go helpCenter.RunSearchLogCleaner(ctx)
 	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
 	go ai.Run(ctx)
 
@@ -297,6 +314,7 @@ func main() {
 		macro:            initMacro(db, i18n),
 		ai:               ai,
 		aiAgent:          aiAgent,
+		helpcenter:       helpCenter,
 		importer:         initImporter(i18n),
 		webhook:          webhook,
 		contextLink:      initContextLink(db, i18n),
@@ -310,6 +328,7 @@ func main() {
 	g := fastglue.NewGlue()
 	g.SetContext(app)
 	initHandlers(g, wsHub)
+	g.Router.NotFound = helpCenterHostNotFound(app, g)
 
 	s := &fasthttp.Server{
 		Name:                 appName,

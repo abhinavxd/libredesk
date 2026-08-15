@@ -523,7 +523,9 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 	disposition := null.NewString("", false)
 	contentID := ""
 	meta := []byte("{}")
-	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, contentID, linkedModel, linkedID, file, int(srcFileSize), disposition, meta)
+	// Agent and AI assistant avatars are public: both appear as authors on the help center.
+	private := user.Type != models.UserTypeAgent && user.Type != models.UserTypeAIAssistant
+	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, contentID, linkedModel, linkedID, file, int(srcFileSize), disposition, meta, private)
 	if err != nil {
 		app.lo.Error("error uploading file", "user_id", user.ID, "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorUploadingFile"), nil)

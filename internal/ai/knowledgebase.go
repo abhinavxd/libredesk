@@ -2,15 +2,60 @@ package ai
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
-	"fmt"
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 )
+
+// snippetSource indexes enabled knowledge base snippets.
+type snippetSource struct {
+	m *Manager
+}
+
+func (s snippetSource) sourceType() string {
+	return models.SourceSnippet
+}
+
+func (s snippetSource) list() ([]embedItem, error) {
+	rows, err := s.m.GetKnowledgeBaseItems()
+	if err != nil {
+		return nil, err
+	}
+	items := make([]embedItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, snippetItem(row))
+	}
+	return items, nil
+}
+
+func (s snippetSource) get(id int) (embedItem, error) {
+	row, err := s.m.GetKnowledgeBaseItem(id)
+	if err != nil {
+		return embedItem{}, err
+	}
+	return snippetItem(row), nil
+}
+
+func (s snippetSource) exists(id int) (bool, error) {
+	var exists bool
+	if err := s.m.q.KnowledgeBaseItemExists.Get(&exists, id); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func (s snippetSource) setFingerprint(id int, fingerprint string) {
+	if _, err := s.m.q.SetKnowledgeBaseFingerprint.Exec(id, fingerprint); err != nil {
+		s.m.lo.Error("error setting snippet embedded fingerprint", "error", err, "id", id)
+	}
+}
+
+// deleteOrphans is a no-op: snippet rows and their vectors are deleted in one transaction.
+func (s snippetSource) deleteOrphans() ([]int, error) {
+	return nil, nil
+}
 
 // GetKnowledgeBaseItems returns all snippet knowledge base items.
 func (m *Manager) GetKnowledgeBaseItems() ([]models.KnowledgeBaseItem, error) {
@@ -49,7 +94,7 @@ func (m *Manager) CreateKnowledgeBaseItem(title, content, source, sourceURL stri
 		m.lo.Error("error creating knowledge base item", "error", err)
 		return item, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	m.reindexSnippet(item)
+	m.reindexItem(snippetSource{m}, snippetItem(item))
 	return item, nil
 }
 
@@ -68,7 +113,7 @@ func (m *Manager) UpdateKnowledgeBaseItem(id int, title, content string, enabled
 		m.lo.Error("error updating knowledge base item", "error", err)
 		return item, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	m.reindexSnippet(item)
+	m.reindexItem(snippetSource{m}, snippetItem(item))
 	return item, nil
 }
 
@@ -79,7 +124,7 @@ func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
 
 	// Supersede any in-flight reindex for this snippet so a slower embed can't re-insert its vectors
 	// after the delete commits.
-	m.dropSnippetGen(id)
+	m.dropGen(models.SourceSnippet, id)
 
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -106,103 +151,6 @@ func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
 	return nil
 }
 
-// reindexSnippet embeds an enabled snippet (or drops its vectors when disabled) in the background.
-func (m *Manager) reindexSnippet(item models.KnowledgeBaseItem) {
-	gen := m.nextSnippetGen(item.ID)
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
-		m.embedSem <- struct{}{}
-		defer func() { <-m.embedSem }()
-		m.reindexSnippetSync(m.ctx, item, gen)
-	}()
-}
-
-func (m *Manager) reindexSnippetSync(ctx context.Context, item models.KnowledgeBaseItem, gen uint64) {
-	cfg, err := m.getRawProviderConfig(models.ProviderTypeEmbedding)
-	if err != nil {
-		return
-	}
-	m.reindexSnippetWith(ctx, item, cfg.BaseURL, cfg.Model, cfg.Dimensions, gen)
-}
-
-// reindexSnippetWith embeds an enabled snippet (or drops its vectors when disabled), gated by gen so an older job can't overwrite a newer one.
-func (m *Manager) reindexSnippetWith(ctx context.Context, item models.KnowledgeBaseItem, baseURL, model string, dimensions int, gen uint64) {
-	if !item.Enabled {
-		m.reindexMu.Lock()
-		defer m.reindexMu.Unlock()
-		if !m.canCommitSnippet(item.ID, gen) {
-			return
-		}
-		if err := m.removeEmbeddings(models.SourceSnippet, item.ID); err != nil {
-			m.lo.Error("error removing snippet embeddings", "error", err)
-			return
-		}
-		m.setSnippetFingerprint(item.ID, "")
-		return
-	}
-
-	indexed, err := m.embedSource(ctx, models.SourceSnippet, item.ID, item.Title, item.Content)
-	if err != nil {
-		m.lo.Error("error indexing snippet", "error", err, "id", item.ID)
-		return
-	}
-
-	m.reindexMu.Lock()
-	defer m.reindexMu.Unlock()
-	if !m.canCommitSnippet(item.ID, gen) {
-		return
-	}
-	if err := m.commitEmbeddings(models.SourceSnippet, []int{item.ID}, indexed); err != nil {
-		m.lo.Error("error indexing snippet", "error", err, "id", item.ID)
-		return
-	}
-	m.setSnippetFingerprint(item.ID, snippetFingerprint(item, baseURL, model, dimensions))
-}
-
-// nextSnippetGen bumps and returns the reindex generation for a snippet; a job only commits if its gen is still the latest.
-func (m *Manager) nextSnippetGen(id int) uint64 {
-	m.snippetGenMu.Lock()
-	defer m.snippetGenMu.Unlock()
-	m.snippetGen[id]++
-	return m.snippetGen[id]
-}
-
-func (m *Manager) isLatestSnippetGen(id int, gen uint64) bool {
-	m.snippetGenMu.Lock()
-	defer m.snippetGenMu.Unlock()
-	return m.snippetGen[id] == gen
-}
-
-// canCommitSnippet reports whether a reindex commit may proceed: gen is still the latest and the row still exists (a delete between snapshot and commit would otherwise be resurrected). Caller must hold reindexMu.
-func (m *Manager) canCommitSnippet(id int, gen uint64) bool {
-	if !m.isLatestSnippetGen(id, gen) {
-		return false
-	}
-	var exists bool
-	if err := m.q.KnowledgeBaseItemExists.Get(&exists, id); err != nil {
-		m.lo.Error("error checking knowledge base item existence", "error", err, "id", id)
-		return false
-	}
-	if !exists {
-		m.dropSnippetGen(id)
-		return false
-	}
-	return true
-}
-
-func (m *Manager) dropSnippetGen(id int) {
-	m.snippetGenMu.Lock()
-	defer m.snippetGenMu.Unlock()
-	delete(m.snippetGen, id)
-}
-
-func (m *Manager) setSnippetFingerprint(id int, fingerprint string) {
-	if _, err := m.q.SetKnowledgeBaseFingerprint.Exec(id, fingerprint); err != nil {
-		m.lo.Error("error setting snippet embedded fingerprint", "error", err, "id", id)
-	}
-}
-
 // ReindexAll triggers a reconcile so snippets are re-embedded against the current model, e.g. after the embedding model changed.
 func (m *Manager) ReindexAll() {
 	m.wg.Add(1)
@@ -212,8 +160,12 @@ func (m *Manager) ReindexAll() {
 	}()
 }
 
-// snippetFingerprint signs the content and the full embedding provider identity (base URL, model, dimensions); base URL is included so re-pointing the provider triggers reindex even when the model name is unchanged.
-func snippetFingerprint(item models.KnowledgeBaseItem, baseURL, model string, dimensions int) string {
-	sum := sha256.Sum256(fmt.Appendf(nil, "%s\x00%s\x00%s\x00%s\x00%d", item.Title, item.Content, baseURL, model, dimensions))
-	return hex.EncodeToString(sum[:])
+func snippetItem(row models.KnowledgeBaseItem) embedItem {
+	return embedItem{
+		ID:          row.ID,
+		Title:       row.Title,
+		Content:     row.Content,
+		Fingerprint: row.EmbeddedFingerprint,
+		Eligible:    row.Enabled,
+	}
 }

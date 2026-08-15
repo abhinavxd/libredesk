@@ -6,13 +6,11 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-// V2_8_1 restores custom-attribute management on legacy Admin roles.
+// V2_8_1 adds portal intake configuration to conversation custom attributes.
 func V2_8_1(db *sqlx.DB, _ stuffbin.FileSystem, _ *koanf.Koanf) error {
 	_, err := db.Exec(`
-		UPDATE roles
-		SET permissions = array_append(permissions, 'custom_attributes:manage')
-		WHERE name = 'Admin'
-		  AND NOT ('custom_attributes:manage' = ANY(permissions));
+		ALTER TABLE custom_attribute_definitions
+		ADD COLUMN IF NOT EXISTS portal_required BOOLEAN DEFAULT FALSE NOT NULL;
 	`)
 	return err
 }

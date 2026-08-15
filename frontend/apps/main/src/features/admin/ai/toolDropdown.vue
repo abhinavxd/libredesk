@@ -8,12 +8,19 @@
     </DropdownMenuTrigger>
     <DropdownMenuContent>
       <DropdownMenuItem @click="editTool">
+        <Pencil class="mr-2 h-4 w-4" />
         {{ t('globals.messages.edit') }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="toggleEnabled">
+        <component :is="tool.enabled ? PowerOff : Power" class="mr-2 h-4 w-4" />
         {{ tool.enabled ? t('globals.messages.disable') : t('globals.messages.enable') }}
       </DropdownMenuItem>
-      <DropdownMenuItem @click="() => (alertOpen = true)">
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        @click="() => (alertOpen = true)"
+        class="text-destructive focus:text-destructive"
+      >
+        <Trash class="mr-2 h-4 w-4" />
         {{ t('globals.messages.delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
@@ -39,11 +46,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreVertical } from 'lucide-vue-next'
+import { MoreVertical, Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu/index.js'
 import { Button } from '@shared-ui/components/ui/button/index.js'

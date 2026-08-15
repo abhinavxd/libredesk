@@ -34,6 +34,18 @@ export const adminNavItems = [
     ]
   },
   {
+    titleKey: 'globals.terms.helpCenter',
+    badge: 'BETA',
+    children: [
+      {
+        titleKey: 'globals.terms.helpCenter',
+        href: '/admin/help-center',
+        permission: 'help_center:manage',
+        icon: 'BookOpen'
+      }
+    ]
+  },
+  {
     titleKey: 'admin.ai.title',
     badge: 'BETA',
     children: [

@@ -356,7 +356,9 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 
 	sess, err := a.sess.Acquire(r.RequestCtx, r, r)
 	if err != nil {
-		a.logger.Error("error acquiring session", "error", err)
+		if err != simplesessions.ErrInvalidSession {
+			a.logger.Error("error acquiring session", "error", err)
+		}
 		return models.User{}, err
 	}
 

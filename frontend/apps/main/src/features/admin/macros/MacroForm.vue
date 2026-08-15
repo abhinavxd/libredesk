@@ -161,7 +161,7 @@ import {
   SelectTag
 } from '@shared-ui/components/ui/select/index.js'
 import { useI18n } from 'vue-i18n'
-import Editor from '@main/components/editor/TextEditor.vue'
+import Editor from '@main/components/editor/ConversationEditor.vue'
 
 const { macroActions } = useConversationFilters()
 const { t } = useI18n()

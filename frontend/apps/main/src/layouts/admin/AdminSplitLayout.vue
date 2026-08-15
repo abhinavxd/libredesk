@@ -1,5 +1,5 @@
 <template>
-  <div class="flex justify-between h-full">
+  <div class="flex justify-between flex-1 min-h-0">
     <div class="w-full xl:w-8/12 pr-6 relative">
       <slot name="content" />
     </div>

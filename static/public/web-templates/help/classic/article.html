@@ -1,0 +1,48 @@
+{{ define "classic-help-article" }}
+{{ template "classic-header" . }}
+
+<nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
+    <ol>
+        <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
+        {{ if .Data.Collection.Name }}
+        <li><a href="{{ .Data.HelpCenter.BasePath }}/collections/{{ .Data.Collection.Slug }}">{{ .Data.Collection.Name }}</a></li>
+        {{ end }}
+        <li><span class="hc-current" aria-current="page">{{ .Data.Article.Title }}</span></li>
+    </ol>
+</nav>
+
+<article class="hc-article">
+    <h1>{{ .Data.Article.Title }}</h1>
+    {{ if .Data.Article.Excerpt }}<p class="hc-article-excerpt">{{ .Data.Article.Excerpt }}</p>{{ end }}
+    {{ $showAuthor := and .Data.HelpCenter.Theme.Article.ShowAuthor .Data.Article.AuthorName }}
+    <div class="hc-meta{{ if $showAuthor }} hc-meta-byline{{ end }}">
+        {{ if $showAuthor }}
+        {{ if .Data.Article.AuthorAvatar }}<img class="hc-avatar hc-byline-avatar" src="{{ .Data.Article.AuthorAvatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial hc-byline-avatar">{{ .Data.AuthorInitial }}</span>{{ end }}
+        {{ end }}
+        <span>{{ if $showAuthor }}<span class="hc-author">{{ .Data.Article.AuthorName }}</span> &middot; {{ end }}{{ $.L.T "globals.terms.lastUpdated" }} <time class="hc-date" datetime="{{ .Data.ModifiedTime }}">{{ .Data.Article.UpdatedAt.Format "Jan 2, 2006" }}</time></span>
+    </div>
+    <div class="hc-article-body">
+        {{ template "hc-article-toc" . }}
+        <div class="hc-prose" id="hc-prose">{{ .Data.Content }}</div>
+    </div>
+</article>
+
+<div class="hc-article-foot">
+{{ template "hc-helpful" . }}
+
+{{ if and .Data.Related (not .Data.HelpCenter.Theme.Article.HideRelated) }}
+<aside class="hc-related">
+    <h2>{{ $.L.T "helpCenter.relatedArticles" }}</h2>
+    <ul class="hc-article-list">
+        {{ range .Data.Related }}
+        <li><a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">{{ template "hc-doc-icon" }}{{ .Title }}</a></li>
+        {{ end }}
+    </ul>
+</aside>
+{{ end }}
+</div>
+
+{{ template "hc-article-behavior" . }}
+
+{{ template "classic-footer" . }}
+{{ end }}

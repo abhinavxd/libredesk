@@ -76,6 +76,9 @@ const (
 	// AI
 	PermAIManage = "ai:manage"
 
+	// Help center
+	PermHelpCenterManage = "help_center:manage"
+
 	// Contacts
 	PermContactsReadAll = "contacts:read_all"
 	PermContactsRead    = "contacts:read"
@@ -128,6 +131,7 @@ var validPermissions = map[string]struct{}{
 	PermNotificationSettingsManage:      {},
 	PermOIDCManage:                      {},
 	PermAIManage:                        {},
+	PermHelpCenterManage:                {},
 	PermCustomAttributesManage:          {},
 	PermContactsReadAll:                 {},
 	PermContactsRead:                    {},

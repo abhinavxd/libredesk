@@ -28,6 +28,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
@@ -427,13 +428,13 @@ func getCustomStaticDir() string {
 func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *i18n.I18n) *tmpl.Manager {
 	var (
 		lo      = initLogger("template")
-		funcMap = getTmplFuncs(consts, i18n)
+		funcMap = getTmplFuncs(consts, i18n, fs)
 	)
 	tpls, err := stuffbin.ParseTemplatesGlob(funcMap, fs, "/static/email-templates/*.html")
 	if err != nil {
 		log.Fatalf("error parsing e-mail templates: %v", err)
 	}
-	webTpls, err := stuffbin.ParseTemplatesGlob(funcMap, fs, "/static/public/web-templates/*.html")
+	webTpls, err := parseWebTemplates(funcMap, fs)
 	if err != nil {
 		log.Fatalf("error parsing web templates: %v", err)
 	}
@@ -446,13 +447,20 @@ func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *
 }
 
 // getTmplFuncs returns the template functions.
-func getTmplFuncs(consts *constants, i18n *i18n.I18n) template.FuncMap {
+func getTmplFuncs(consts *constants, i18n *i18n.I18n, fs stuffbin.FileSystem) template.FuncMap {
+	lucideIcons := loadLucideIcons(fs)
 	return template.FuncMap{
+		"LucideIcon": func(name string) template.HTML {
+			return lucideIcons[name]
+		},
 		"RootURL": func() string {
 			return consts.AppBaseURL
 		},
 		"FaviconURL": func() string {
 			return consts.FaviconURL
+		},
+		"AssetVer": func() string {
+			return assetVersion
 		},
 		"Date": func(layout string) string {
 			if layout == "" {
@@ -468,6 +476,20 @@ func getTmplFuncs(consts *constants, i18n *i18n.I18n) template.FuncMap {
 		},
 		"L": func() any {
 			return i18n
+		},
+		"map": func(pairs ...any) (map[string]any, error) {
+			if len(pairs)%2 != 0 {
+				return nil, fmt.Errorf("map: odd number of arguments")
+			}
+			out := make(map[string]any, len(pairs)/2)
+			for i := 0; i < len(pairs); i += 2 {
+				key, ok := pairs[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("map: key %v is not a string", pairs[i])
+				}
+				out[key] = pairs[i+1]
+			}
+			return out, nil
 		},
 	}
 }
@@ -500,19 +522,35 @@ func reloadSettings(app *App) error {
 // reloadTemplates reloads the templates from the filesystem.
 func reloadTemplates(app *App) error {
 	app.lo.Info("reloading templates")
-	funcMap := getTmplFuncs(app.consts.Load().(*constants), app.i18n)
+	funcMap := getTmplFuncs(app.consts.Load().(*constants), app.i18n, app.fs)
 	tpls, err := stuffbin.ParseTemplatesGlob(funcMap, app.fs, "/static/email-templates/*.html")
 	if err != nil {
 		app.lo.Error("error parsing email templates", "error", err)
 		return err
 	}
-	webTpls, err := stuffbin.ParseTemplatesGlob(funcMap, app.fs, "/static/public/web-templates/*.html")
+	webTpls, err := parseWebTemplates(funcMap, app.fs)
 	if err != nil {
 		app.lo.Error("error parsing web templates", "error", err)
 		return err
 	}
 
 	return app.tmpl.Reload(webTpls, tpls, funcMap)
+}
+
+// parseWebTemplates parses the top-level web templates and the per-template help center pages.
+func parseWebTemplates(funcMap template.FuncMap, fs stuffbin.FileSystem) (*template.Template, error) {
+	var paths []string
+	for _, pattern := range []string{
+		"/static/public/web-templates/*.html",
+		"/static/public/web-templates/help/*/*.html",
+	} {
+		p, err := fs.Glob(pattern)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p...)
+	}
+	return stuffbin.ParseTemplates(funcMap, fs, paths...)
 }
 
 // initTeam inits team manager.
@@ -536,6 +574,14 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 		err   error
 		lo    = initLogger("media")
 	)
+	rootURL := func() string {
+		u, err := settings.GetAppRootURL()
+		if err != nil {
+			// Fallback to config if settings fetch fails
+			return ko.String("app.root_url")
+		}
+		return u
+	}
 	switch s := ko.MustString("upload.provider"); s {
 	case "s3":
 		store, err = s3.New(s3.Opt{
@@ -560,16 +606,9 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 			fsExpiry = 1 * time.Hour
 		}
 		store, err = fs.New(fs.Opts{
-			UploadURI:  "/uploads",
+			UploadURI:  media.PublicURI,
 			UploadPath: filepath.Clean(ko.String("upload.fs.upload_path")),
-			RootURL: func() string {
-				rootURL, err := settings.GetAppRootURL()
-				if err != nil {
-					// Fallback to config if settings fetch fails
-					return ko.String("app.root_url")
-				}
-				return rootURL
-			},
+			RootURL:    rootURL,
 			SigningKey: ko.MustString("app.encryption_key"),
 			Expiry:     fsExpiry,
 		})
@@ -581,10 +620,11 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 	}
 
 	media, err := media.New(media.Opts{
-		Store: store,
-		Lo:    lo,
-		DB:    db,
-		I18n:  i18n,
+		Store:   store,
+		Lo:      lo,
+		DB:      db,
+		I18n:    i18n,
+		RootURL: rootURL,
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)
@@ -982,6 +1022,20 @@ func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.
 	return m
 }
 
+// initHelpCenter inits the help center manager.
+func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleIndexer) *helpcenter.Manager {
+	m, err := helpcenter.New(helpcenter.Opts{
+		DB:      db,
+		Lo:      initLogger("helpcenter"),
+		I18n:    i18n,
+		Indexer: indexer,
+	})
+	if err != nil {
+		log.Fatalf("error initializing help center manager: %v", err)
+	}
+	return m
+}
+
 // initAIAgent inits the autonomous AI agent manager.
 func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
 	m, err := aiagent.New(aiagent.Opts{
@@ -1171,6 +1225,7 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 		{"widget", 100},
 		{"auth", 30},
 		{"public", 100},
+		{"media", 300},
 	}
 
 	for _, d := range defaults {

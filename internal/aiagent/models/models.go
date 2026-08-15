@@ -45,9 +45,10 @@ type Assistant struct {
 	RemoveAvatar bool `db:"-" json:"remove_avatar"`
 }
 
-// PreviewSource is one knowledge base item a preview reply was grounded in.
+// PreviewSource is one knowledge item a preview reply was grounded in.
 type PreviewSource struct {
 	ID    int     `json:"id"`
+	Type  string  `json:"type"`
 	Title string  `json:"title"`
 	Score float64 `json:"score"`
 }

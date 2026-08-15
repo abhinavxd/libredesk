@@ -60,14 +60,14 @@ type Manager struct {
 	chunkCfg      stringutil.ChunkConfig
 	index         *embeddingIndex
 	// indexReady is closed once the boot-time index load finishes; Search blocks on it.
-	indexReady   chan struct{}
-	reindexMu    sync.Mutex
-	reconcileMu  sync.Mutex
-	snippetGenMu sync.Mutex
-	snippetGen   map[int]uint64
+	indexReady  chan struct{}
+	reindexMu   sync.Mutex
+	reconcileMu sync.Mutex
+	genMu       sync.Mutex
+	gen         map[genKey]uint64
 	// tagGen is bumped on every tag vector purge; an in-flight tag reindex only commits if its gen is still current.
 	tagGen atomic.Uint64
-	// embedSem caps concurrent background snippet embeds.
+	// embedSem caps concurrent background embed jobs.
 	embedSem           chan struct{}
 	httpClient         *http.Client
 	toolHTTPClient     *http.Client
@@ -105,6 +105,11 @@ type queries struct {
 	UpdateKnowledgeBaseItem      *sqlx.Stmt `query:"update-knowledge-base-item"`
 	DeleteKnowledgeBaseItem      *sqlx.Stmt `query:"delete-knowledge-base-item"`
 	SetKnowledgeBaseFingerprint  *sqlx.Stmt `query:"set-knowledge-base-embedded-fingerprint"`
+	GetEmbeddableHelpArticles    *sqlx.Stmt `query:"get-embeddable-help-articles"`
+	GetEmbeddableHelpArticle     *sqlx.Stmt `query:"get-embeddable-help-article"`
+	HelpArticleExists            *sqlx.Stmt `query:"help-article-exists"`
+	SetHelpArticleFingerprint    *sqlx.Stmt `query:"set-help-article-embedded-fingerprint"`
+	DeleteOrphanArticleVectors   *sqlx.Stmt `query:"delete-orphan-help-article-embeddings"`
 	InsertEmbedding              *sqlx.Stmt `query:"insert-embedding"`
 	DeleteEmbeddingsBySource     *sqlx.Stmt `query:"delete-embeddings-by-source"`
 	DeleteEmbeddingsBySourceIDs  *sqlx.Stmt `query:"delete-embeddings-by-source-ids"`
@@ -140,7 +145,7 @@ func New(opts Opts) (*Manager, error) {
 		chunkCfg:      stringutil.DefaultChunkConfig(),
 		index:         newEmbeddingIndex(),
 		indexReady:    make(chan struct{}),
-		snippetGen:    make(map[int]uint64),
+		gen:           make(map[genKey]uint64),
 		embedSem:      make(chan struct{}, maxConcurrentEmbeds),
 		httpClient: &http.Client{
 			Timeout:   20 * time.Second,

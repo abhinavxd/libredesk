@@ -35,6 +35,9 @@ importers:
       '@tanstack/vue-virtual':
         specifier: ^3.13.23
         version: 3.13.23(vue@3.5.13(typescript@5.7.3))
+      '@tiptap/extension-code-block-lowlight':
+        specifier: ^2.11.2
+        version: 2.27.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))(@tiptap/extension-code-block@2.11.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))(@tiptap/pm@2.11.2))(@tiptap/pm@2.11.2)(highlight.js@11.12.0)(lowlight@3.3.0)
       '@tiptap/extension-image':
         specifier: ^2.11.2
         version: 2.11.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))
@@ -59,6 +62,15 @@ importers:
       '@tiptap/extension-table-row':
         specifier: ^2.11.5
         version: 2.11.5(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))
+      '@tiptap/extension-text-align':
+        specifier: ^2.11.2
+        version: 2.27.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))
+      '@tiptap/extension-underline':
+        specifier: ^2.11.2
+        version: 2.27.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))
+      '@tiptap/extension-youtube':
+        specifier: ^2.11.2
+        version: 2.27.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))
       '@tiptap/pm':
         specifier: ^2.11.2
         version: 2.11.2
@@ -98,9 +110,15 @@ importers:
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
+      highlight.js:
+        specifier: ^11.12.0
+        version: 11.12.0
       lettersanitizer:
         specifier: ^1.0.7
         version: 1.0.7
+      lowlight:
+        specifier: ^3.3.0
+        version: 3.3.0
       lucide-vue-next:
         specifier: ^0.525.0
         version: 0.525.0(vue@3.5.13(typescript@5.7.3))
@@ -1037,6 +1055,15 @@ packages:
     peerDependencies:
       '@tiptap/core': ^2.7.0
 
+  '@tiptap/extension-code-block-lowlight@2.27.2':
+    resolution: {integrity: sha512-v6NKStBbQ/XCc1NnCi3ObsL1DsxadSIBtUQNA/B+urkPgn5LEy72HAGlf0xwjRaNkAGSaTASLKmc84L5q5zlGQ==}
+    peerDependencies:
+      '@tiptap/core': ^2.7.0
+      '@tiptap/extension-code-block': ^2.7.0
+      '@tiptap/pm': ^2.7.0
+      highlight.js: ^11
+      lowlight: ^2 || ^3
+
   '@tiptap/extension-code-block@2.11.2':
     resolution: {integrity: sha512-O6gVfql3uFZNq9yaUDa98VgV58BqaUSeOUnhZwLzpB/4VlqzTyW6/kvFxhKcSp7f+GmrMQaV4PXRs+tZcq6EFw==}
     peerDependencies:
@@ -1163,6 +1190,11 @@ packages:
       '@tiptap/core': ^2.7.0
       '@tiptap/pm': ^2.7.0
 
+  '@tiptap/extension-text-align@2.27.2':
+    resolution: {integrity: sha512-0Pyks6Hu+Q/+9+5/osoSv0SP6jIerdWMYbi13aaZLsJoj3lBj5WNaE11JtAwSFN5sx0IbqhDSlp1zkvRnzgZ8g==}
+    peerDependencies:
+      '@tiptap/core': ^2.7.0
+
   '@tiptap/extension-text-style@2.11.2':
     resolution: {integrity: sha512-RAa7BTwEOJRZN3EB2lg03KXyu7JC/Ce96cerh3D0Fo78yrtKOArPaiVHoTki6ZEIG43ccHEit1PPjMYxivPPeg==}
     peerDependencies:
@@ -1170,6 +1202,16 @@ packages:
 
   '@tiptap/extension-text@2.11.2':
     resolution: {integrity: sha512-fJZeKYM5jeJ7NpS3FWLnC/NAvg+mZNbcTaRgXMo5ljBCgiMcYHhYg9p/RHk4SeICZBBpR9WSSZXHMACd9CbJiA==}
+    peerDependencies:
+      '@tiptap/core': ^2.7.0
+
+  '@tiptap/extension-underline@2.27.2':
+    resolution: {integrity: sha512-gPOsbAcw1S07ezpAISwoO8f0RxpjcSH7VsHEFDVuXm4ODE32nhvSinvHQjv2icRLOXev+bnA7oIBu7Oy859gWQ==}
+    peerDependencies:
+      '@tiptap/core': ^2.7.0
+
+  '@tiptap/extension-youtube@2.27.2':
+    resolution: {integrity: sha512-3l/tfJ8wO8/tALo1tpAfN7TTJQQ00V52XaYamjQPVzPGelm/ECCfSCGQ4oRv8gbyzjUbZkNpkSV1Bj2V7QcGDg==}
     peerDependencies:
       '@tiptap/core': ^2.7.0
 
@@ -1312,6 +1354,9 @@ packages:
   '@types/geojson@7946.0.16':
     resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
 
+  '@types/hast@3.0.5':
+    resolution: {integrity: sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g==}
+
   '@types/leaflet@1.7.6':
     resolution: {integrity: sha512-Emkz3V08QnlelSbpT46OEAx+TBZYTOX2r1yM7W+hWg5+djHtQ1GbEXBDRLaqQDOYcDI51Ss0ayoqoKD4CtLUDA==}
 
@@ -1371,6 +1416,9 @@ packages:
 
   '@types/topojson@3.2.6':
     resolution: {integrity: sha512-ppfdlxjxofWJ66XdLgIlER/85RvpGyfOf8jrWf+3kVIjEatFxEZYD/Ea83jO672Xu1HRzd/ghwlbcZIUNHTskw==}
+
+  '@types/unist@3.0.3':
+    resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
   '@types/web-bluetooth@0.0.20':
     resolution: {integrity: sha512-g9gZnnXVq7gM7v3tJCWV/qw7w+KeOlSHAhgF9RytFyifW6AF61hdT2ucrYhPq9hLs5JIryeupHV3qGk95dH9ow==}
@@ -2058,9 +2106,16 @@ packages:
     resolution: {integrity: sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==}
     engines: {node: '>=0.4.0'}
 
+  dequal@2.0.3:
+    resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
+    engines: {node: '>=6'}
+
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  devlop@1.1.0:
+    resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
 
   didyoumean@1.2.2:
     resolution: {integrity: sha512-gxtyfqMg7GKyhQmb056K7M3xszy/myH8w+B4RT+QXBQsvAOdc3XymqDDPHx1BgPgsdAA5SIifona89YtRATDzw==}
@@ -2447,6 +2502,14 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
+  highlight.js@11.11.2:
+    resolution: {integrity: sha512-oaXMACAU0kzOMXBjWpNcX+vlwSBCIAiZ9BHa7gA15NOTtT2L/l8OSZDuqS2XppOhZBPJ7hm4o8ep2kyuip2uEQ==}
+    engines: {node: '>=12.0.0'}
+
+  highlight.js@11.12.0:
+    resolution: {integrity: sha512-nbfWpyRMcMrPMmDwJB+dhX/eiaPKtc2RB+0QZskqJ3WjRA/FDS0e9hZrx8EC/lbEv8gXy98FcDbNa/dspAaJMg==}
+    engines: {node: '>=12.0.0'}
+
   hookable@5.5.3:
     resolution: {integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==}
 
@@ -2713,6 +2776,9 @@ packages:
   log-update@6.1.0:
     resolution: {integrity: sha512-9ie8ItPR6tjY5uYJh8K/Zrv/RMZ5VOlOWvtZdEHYSTFKZfIBPQa9tOAEeAWhd+AnIneLJ22w5fjOYtoutpWq5w==}
     engines: {node: '>=18'}
+
+  lowlight@3.3.0:
+    resolution: {integrity: sha512-0JNhgFoPvP6U6lE/UdVsSq99tn6DhjjpAj5MxG49ewd2mOBVtwWYIT8ClyABhq198aXXODMU6Ox8DrGy/CpTZQ==}
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
@@ -4613,6 +4679,14 @@ snapshots:
     dependencies:
       '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
 
+  '@tiptap/extension-code-block-lowlight@2.27.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))(@tiptap/extension-code-block@2.11.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))(@tiptap/pm@2.11.2))(@tiptap/pm@2.11.2)(highlight.js@11.12.0)(lowlight@3.3.0)':
+    dependencies:
+      '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
+      '@tiptap/extension-code-block': 2.11.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))(@tiptap/pm@2.11.2)
+      '@tiptap/pm': 2.11.2
+      highlight.js: 11.12.0
+      lowlight: 3.3.0
+
   '@tiptap/extension-code-block@2.11.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))(@tiptap/pm@2.11.2)':
     dependencies:
       '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
@@ -4718,11 +4792,23 @@ snapshots:
       '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
       '@tiptap/pm': 2.11.2
 
+  '@tiptap/extension-text-align@2.27.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))':
+    dependencies:
+      '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
+
   '@tiptap/extension-text-style@2.11.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))':
     dependencies:
       '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
 
   '@tiptap/extension-text@2.11.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))':
+    dependencies:
+      '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
+
+  '@tiptap/extension-underline@2.27.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))':
+    dependencies:
+      '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
+
+  '@tiptap/extension-youtube@2.27.2(@tiptap/core@2.11.2(@tiptap/pm@2.11.2))':
     dependencies:
       '@tiptap/core': 2.11.2(@tiptap/pm@2.11.2)
 
@@ -4926,6 +5012,10 @@ snapshots:
 
   '@types/geojson@7946.0.16': {}
 
+  '@types/hast@3.0.5':
+    dependencies:
+      '@types/unist': 3.0.3
+
   '@types/leaflet@1.7.6':
     dependencies:
       '@types/geojson': 7946.0.16
@@ -4996,6 +5086,8 @@ snapshots:
       '@types/topojson-server': 3.0.4
       '@types/topojson-simplify': 3.0.3
       '@types/topojson-specification': 1.0.5
+
+  '@types/unist@3.0.3': {}
 
   '@types/web-bluetooth@0.0.20': {}
 
@@ -5856,8 +5948,14 @@ snapshots:
 
   delayed-stream@1.0.0: {}
 
+  dequal@2.0.3: {}
+
   detect-libc@2.1.2:
     optional: true
+
+  devlop@1.1.0:
+    dependencies:
+      dequal: 2.0.3
 
   didyoumean@1.2.2: {}
 
@@ -6309,6 +6407,10 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
+  highlight.js@11.11.2: {}
+
+  highlight.js@11.12.0: {}
+
   hookable@5.5.3: {}
 
   html-encoding-sniffer@6.0.0:
@@ -6563,6 +6665,12 @@ snapshots:
       slice-ansi: 7.1.2
       strip-ansi: 7.2.0
       wrap-ansi: 9.0.2
+
+  lowlight@3.3.0:
+    dependencies:
+      '@types/hast': 3.0.5
+      devlop: 1.1.0
+      highlight.js: 11.11.2
 
   lru-cache@10.4.3: {}
 
