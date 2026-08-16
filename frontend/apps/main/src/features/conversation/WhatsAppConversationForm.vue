@@ -223,6 +223,7 @@ const phoneNumber = ref('')
 const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydown, selectContact } =
   useContactSearch({
     getQuery: () => phoneNumber.value,
+    filterResults: (c) => c.phone_number,
     onSelect: (contact) => {
       selectedContact.value = contact
       phoneNumber.value = contact.phone_number || ''

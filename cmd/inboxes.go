@@ -132,10 +132,10 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	}
 	var cfg whatsappChannel.Config
 	if err := json.Unmarshal(inb.Config, &cfg); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid whatsapp config format", nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, "invalid whatsapp config format", nil)
 	}
 	if err := app.whatsappClient.ValidateCredentials(r.RequestCtx, cfg.Account()); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, fmt.Sprintf("meta credential check failed: %s", err.Error()), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, fmt.Sprintf("meta credential check failed: %s", err.Error()), nil)
 	}
 	return nil
 }
@@ -204,7 +204,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 	}
 
 	if err := validateWhatsAppCredentials(r, app, inbox); err != nil {
-		return err
+		return sendErrorEnvelope(r, err)
 	}
 
 	createdInbox, err := app.inbox.Create(inbox)
@@ -277,7 +277,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		if rbErr := reloadInbox(app, id); rbErr != nil {
 			app.lo.Error("error reloading inbox after config rollback", "id", id, "error", rbErr)
 		}
-		return err
+		return sendErrorEnvelope(r, err)
 	}
 
 	if err := reloadInbox(app, id); err != nil {
@@ -348,12 +348,22 @@ func handleDeleteInbox(r *fastglue.Request) error {
 }
 
 func postSaveWhatsAppTasks(app *App, inboxID int) {
+	defer func() {
+		if r := recover(); r != nil {
+			app.lo.Error("recovered from panic in whatsapp post-save tasks", "inbox_id", inboxID, "panic", r)
+		}
+	}()
 	subscribeWhatsAppWebhook(app, inboxID)
 	ensureWhatsAppCSATTemplate(app, inboxID)
 }
 
 // reconcileWhatsAppCSATTemplates re-registers every enabled WhatsApp inbox's CSAT template, whose button embeds the root URL.
 func reconcileWhatsAppCSATTemplates(app *App) {
+	defer func() {
+		if r := recover(); r != nil {
+			app.lo.Error("recovered from panic in whatsapp csat template reconcile", "panic", r)
+		}
+	}()
 	inboxes, err := app.inbox.GetAll()
 	if err != nil {
 		app.lo.Error("error listing inboxes for csat template reconcile", "error", err)

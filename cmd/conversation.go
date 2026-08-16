@@ -837,6 +837,16 @@ func handleCreateConversation(r *fastglue.Request) error {
 	)
 	switch channel {
 	case whatsappChannel.ChannelWhatsApp:
+		if req.ContactID <= 0 {
+			canWriteContacts, err := app.authz.Enforce(user, "contacts", "write")
+			if err != nil {
+				app.lo.Error("error checking permission", "error", err)
+				return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			}
+			if !canWriteContacts {
+				return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil))
+			}
+		}
 		contactID, err = resolveWhatsAppContact(app, req)
 		if err != nil {
 			return sendErrorEnvelope(r, err)

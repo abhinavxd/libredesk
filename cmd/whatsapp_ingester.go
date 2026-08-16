@@ -17,6 +17,8 @@ const (
 
 	// Must exceed the worst-case media-download budget so the reclaimer never re-runs a still-in-flight delivery.
 	whatsAppReclaimMinIdle = 5 * time.Minute
+
+	whatsAppEnqueueTimeout = 5 * time.Second
 )
 
 // whatsAppJob is the durable envelope persisted to the stream; Body is the raw Meta POST body, parsed in the worker.
@@ -74,7 +76,9 @@ func (i *WhatsAppIngester) Enqueue(inboxID int, body []byte) error {
 	if err != nil {
 		return err
 	}
-	return i.queue.Enqueue(context.Background(), data)
+	ctx, cancel := context.WithTimeout(context.Background(), whatsAppEnqueueTimeout)
+	defer cancel()
+	return i.queue.Enqueue(ctx, data)
 }
 
 // lockSender blocks until the per-sender-phone lock is held, returning the release func.

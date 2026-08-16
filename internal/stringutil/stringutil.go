@@ -30,7 +30,6 @@ var (
 	regexpSlugChars       = regexp.MustCompile(`[^a-z0-9\-_]+`)
 	regexpHyphens         = regexp.MustCompile(`-+`)
 	regexpConvUUID        = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
-	waPhoneFormatting     = strings.NewReplacer("+", "", "-", "", " ", "", "(", "", ")", "")
 
 	// markdownRenderer escapes raw HTML in the input; single newlines render as <br>.
 	markdownRenderer = goldmark.New(
@@ -41,7 +40,14 @@ var (
 
 // NormalizeWhatsAppPhone strips formatting to the bare digit string Meta uses as the wa_id.
 func NormalizeWhatsAppPhone(s string) string {
-	return waPhoneFormatting.Replace(s)
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.

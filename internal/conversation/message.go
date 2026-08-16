@@ -618,7 +618,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 				return models.Message{}, envelope.NewError(envelope.InputError, reason, nil)
 			}
 		}
-		rendered, err := m.prepareWhatsAppOutbound(inboxRecord, contactID, conversationUUID, content, len(media) > 0, metaMap)
+		rendered, err := m.prepareWhatsAppOutbound(inboxRecord, conversationUUID, content, len(media) > 0, metaMap)
 		if err != nil {
 			return models.Message{}, err
 		}

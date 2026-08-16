@@ -211,7 +211,7 @@ func (m *Manager) whatsAppWindowOpen(contactID, inboxID int) bool {
 }
 
 // prepareWhatsAppOutbound writes channel fields into metaMap and returns the rendered template body, or free-form content unchanged.
-func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID int, conversationUUID string, content string, hasAttachments bool, metaMap map[string]any) (string, error) {
+func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversationUUID string, content string, hasAttachments bool, metaMap map[string]any) (string, error) {
 	var conv struct {
 		InboxID   int `db:"inbox_id"`
 		ContactID int `db:"contact_id"`
@@ -225,12 +225,12 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 	}
 
 	// The channel identity is the wa_id Meta routes by; the phone columns are display data an agent may edit freely.
-	toPhone, err := m.userStore.GetChannelIdentity(contactID, whatsappChannel.ChannelWhatsApp)
+	toPhone, err := m.userStore.GetChannelIdentity(conv.ContactID, whatsappChannel.ChannelWhatsApp)
 	if err != nil {
 		return content, err
 	}
 	if toPhone == "" {
-		contact, err := m.userStore.Get(contactID, "", nil)
+		contact, err := m.userStore.Get(conv.ContactID, "", nil)
 		if err != nil {
 			return content, err
 		}
@@ -246,11 +246,11 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 			return content, envelope.NewError(envelope.InputError, "contact has no phone number", nil)
 		}
 		// Link the wa_id now so the contact's reply threads back to this contact instead of forking a duplicate.
-		linkedID, err := m.userStore.LinkChannelIdentity(contactID, whatsappChannel.ChannelWhatsApp, toPhone)
+		linkedID, err := m.userStore.LinkChannelIdentity(conv.ContactID, whatsappChannel.ChannelWhatsApp, toPhone)
 		if err != nil {
 			return content, err
 		}
-		if linkedID != contactID {
+		if linkedID != conv.ContactID {
 			return content, envelope.NewError(envelope.ConflictError, "contact's phone number is already linked to another contact on WhatsApp", nil)
 		}
 	}
