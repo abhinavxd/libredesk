@@ -8,6 +8,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -333,6 +334,19 @@ func validateTemplateParams(t wtmodels.Template, params map[string]string) error
 		for _, key := range whatsapp.OrderedPlaceholders(t.HeaderContent.String) {
 			if strings.TrimSpace(params["header:"+key]) == "" {
 				return envelope.NewError(envelope.InputError, fmt.Sprintf("missing value for template header parameter {{%s}}", key), nil)
+			}
+		}
+	}
+	if len(t.Buttons) > 0 {
+		var btns []whatsapp.TemplateButton
+		if err := json.Unmarshal(t.Buttons, &btns); err == nil {
+			for i, b := range btns {
+				if !strings.EqualFold(b.Type, "URL") || len(whatsapp.OrderedPlaceholders(b.URL)) == 0 {
+					continue
+				}
+				if strings.TrimSpace(params["button_url_"+strconv.Itoa(i)]) == "" {
+					return envelope.NewError(envelope.InputError, fmt.Sprintf("missing value for the %s button link", b.Text), nil)
+				}
 			}
 		}
 	}

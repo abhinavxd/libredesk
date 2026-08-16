@@ -221,6 +221,9 @@
             >
               <X class="size-4" />
             </Button>
+            <p v-if="buttonErrors[idx]" class="col-span-12 text-sm text-destructive">
+              {{ buttonErrors[idx] }}
+            </p>
           </div>
         </div>
 
@@ -366,6 +369,28 @@ const cancel = () => {
   router.push({ name: 'whatsapp-templates' })
 }
 
+const buttonErrors = reactive({})
+
+const isButtonEmpty = (b) => !b.text?.trim() && !b.url?.trim() && !b.phone_number?.trim()
+
+const validateButtons = () => {
+  for (const k of Object.keys(buttonErrors)) delete buttonErrors[k]
+  let ok = true
+  buttons.value.forEach((b, idx) => {
+    if (isButtonEmpty(b)) return
+    let missing = ''
+    if (!b.text?.trim()) missing = t('globals.terms.title')
+    else if (b.type === 'URL' && !b.url?.trim()) missing = t('globals.terms.url', 1)
+    else if (b.type === 'PHONE_NUMBER' && !b.phone_number?.trim())
+      missing = t('globals.terms.phoneNumber', 1)
+    if (missing) {
+      buttonErrors[idx] = t('globals.messages.required', { name: missing })
+      ok = false
+    }
+  })
+  return ok
+}
+
 const validateSampleValues = () => {
   for (const k of Object.keys(sampleErrors)) delete sampleErrors[k]
   let ok = true
@@ -385,7 +410,7 @@ watch(sampleValues, () => {
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
-  if (!validateSampleValues()) return
+  if (!validateSampleValues() || !validateButtons()) return
   try {
     isLoading.value = true
     const payload = {
@@ -395,7 +420,7 @@ const onSubmit = form.handleSubmit(async (values) => {
       footer_content: values.footer_content || null,
       sample_values: { ...sampleValues },
       buttons: buttons.value
-        .filter((b) => b.text && (b.type === 'QUICK_REPLY' || b.url || b.phone_number))
+        .filter((b) => !isButtonEmpty(b))
         .map((b) => ({
           type: b.type,
           text: b.text,

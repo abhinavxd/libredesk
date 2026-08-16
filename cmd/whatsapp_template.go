@@ -14,7 +14,10 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-const whatsAppTemplateSyncInterval = 6 * time.Hour
+const (
+	whatsAppTemplateSyncInterval = 6 * time.Hour
+	whatsAppTemplateSyncTimeout  = 2 * time.Minute
+)
 
 func whatsappTemplateSyncWorker(ctx context.Context, app *App) {
 	initial := time.NewTimer(2 * time.Minute)
@@ -50,7 +53,7 @@ func syncAllWhatsAppTemplates(ctx context.Context, app *App) {
 		if rec.Channel != whatsappChannel.ChannelWhatsApp || !rec.Enabled {
 			continue
 		}
-		syncCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		syncCtx, cancel := context.WithTimeout(ctx, whatsAppTemplateSyncTimeout)
 		if _, err := app.whatsappTemplate.SyncFromMeta(syncCtx, rec.ID); err != nil {
 			app.lo.Warn("periodic whatsapp template sync failed", "inbox_id", rec.ID, "error", err)
 			cancel()
@@ -132,7 +135,9 @@ func handleCreateWhatsAppTemplate(r *fastglue.Request) error {
 	if t.InboxID == 0 || t.Name == "" || t.Language == "" || t.Category == "" || t.BodyContent == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "inbox_id, name, language, category, body_content are required", nil, envelope.InputError)
 	}
-	created, err := app.whatsappTemplate.Create(r.RequestCtx, t)
+	ctx, cancel := context.WithTimeout(r.RequestCtx, whatsappChannel.MetaCallTimeout)
+	defer cancel()
+	created, err := app.whatsappTemplate.Create(ctx, t)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -149,7 +154,9 @@ func handleDeleteWhatsAppTemplate(r *fastglue.Request) error {
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid id", nil, envelope.InputError)
 	}
-	if err := app.whatsappTemplate.Delete(r.RequestCtx, id); err != nil {
+	ctx, cancel := context.WithTimeout(r.RequestCtx, whatsappChannel.MetaCallTimeout)
+	defer cancel()
+	if err := app.whatsappTemplate.Delete(ctx, id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(map[string]string{"status": "deleted"})
@@ -165,7 +172,9 @@ func handleSyncWhatsAppTemplates(r *fastglue.Request) error {
 	if err != nil || inboxID == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "inbox_id is required", nil, envelope.InputError)
 	}
-	count, err := app.whatsappTemplate.SyncFromMeta(r.RequestCtx, inboxID)
+	ctx, cancel := context.WithTimeout(r.RequestCtx, whatsAppTemplateSyncTimeout)
+	defer cancel()
+	count, err := app.whatsappTemplate.SyncFromMeta(ctx, inboxID)
 	if err != nil {
 		app.lo.Error("error syncing whatsapp templates", "inbox_id", inboxID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadGateway, err.Error(), nil, envelope.GeneralError)

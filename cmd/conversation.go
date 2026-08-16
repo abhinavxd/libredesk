@@ -1050,10 +1050,11 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 	if dialCode == "" {
 		return 0, envelope.NewError(envelope.InputError, "`phone_number_country_code` is invalid", nil)
 	}
-	waID := stringutil.NormalizeWhatsAppPhone(dialCode + req.PhoneNumber)
-	if waID == "" {
-		return 0, envelope.NewError(envelope.InputError, "`phone_number` is invalid", nil)
+	local, err := localPhoneNumber(req.PhoneNumber, dialCode)
+	if err != nil {
+		return 0, err
 	}
+	waID := dialCode + local
 	contact := umodels.User{
 		Type:             umodels.UserTypeContact,
 		FirstName:        req.FirstName,
@@ -1064,8 +1065,25 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 	if err != nil {
 		return 0, err
 	}
-	if err := app.user.SetContactPhoneIfMissing(id, stringutil.NormalizeWhatsAppPhone(req.PhoneNumber), req.PhoneNumberCountryCode); err != nil {
+	if err := app.user.SetContactPhoneIfMissing(id, local, req.PhoneNumberCountryCode); err != nil {
 		app.lo.Error("error setting whatsapp contact phone", "user_id", id, "error", err)
 	}
 	return id, nil
+}
+
+// localPhoneNumber returns the digits after the country dial code, accepting numbers typed with a leading + or 00.
+func localPhoneNumber(phone, dialCode string) (string, error) {
+	trimmed := strings.TrimSpace(phone)
+	digits := stringutil.NormalizeWhatsAppPhone(trimmed)
+	if strings.HasPrefix(trimmed, "+") || strings.HasPrefix(digits, "00") {
+		digits = strings.TrimPrefix(digits, "00")
+		if !strings.HasPrefix(digits, dialCode) {
+			return "", envelope.NewError(envelope.InputError, "`phone_number` does not match `phone_number_country_code`", nil)
+		}
+		digits = strings.TrimPrefix(digits, dialCode)
+	}
+	if digits == "" {
+		return "", envelope.NewError(envelope.InputError, "`phone_number` is invalid", nil)
+	}
+	return digits, nil
 }

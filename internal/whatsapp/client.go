@@ -22,7 +22,10 @@ const (
 	defaultTimeout  = 30 * time.Second
 	// maxMediaDownloadBytes matches Meta's largest media cap (100MB documents).
 	maxMediaDownloadBytes = 100 * 1024 * 1024
+	maxTemplatePages      = 100
 )
+
+var metaHostSuffixes = []string{"facebook.com", "fbcdn.net", "fbsbx.com", "whatsapp.net", "whatsapp.com"}
 
 type Client struct {
 	httpClient  *http.Client
@@ -157,6 +160,9 @@ func (c *Client) GetMediaURL(ctx context.Context, acc Account, mediaID string) (
 }
 
 func (c *Client) DownloadMedia(ctx context.Context, acc Account, mediaURL string) ([]byte, error) {
+	if err := c.checkAuthenticatedHost(mediaURL); err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, mediaURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building media request: %w", err)
@@ -236,7 +242,12 @@ func (c *Client) UploadMedia(ctx context.Context, acc Account, content []byte, c
 func (c *Client) FetchTemplates(ctx context.Context, acc Account) ([]MetaTemplate, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s/message_templates?limit=100", c.baseURL, acc.Version(), acc.WABAID)
 	var out []MetaTemplate
-	for endpoint != "" {
+	for page := 0; endpoint != "" && page < maxTemplatePages; page++ {
+		if page > 0 {
+			if err := c.checkAuthenticatedHost(endpoint); err != nil {
+				return nil, err
+			}
+		}
 		body, err := c.doRequest(ctx, http.MethodGet, endpoint, nil, acc)
 		if err != nil {
 			return nil, err
@@ -349,4 +360,22 @@ func parseMetaError(statusCode int, respBody []byte) error {
 		UserMsg:    env.Error.ErrorUserMsg,
 		FBTraceID:  env.Error.FBTraceID,
 	}
+}
+
+// checkAuthenticatedHost guards URLs read out of Meta response bodies before the access token is attached.
+func (c *Client) checkAuthenticatedHost(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" {
+		return fmt.Errorf("refusing to call non-https url %q", raw)
+	}
+	host := strings.ToLower(u.Hostname())
+	if base, err := url.Parse(c.baseURL); err == nil && strings.EqualFold(base.Hostname(), host) {
+		return nil
+	}
+	for _, suffix := range metaHostSuffixes {
+		if host == suffix || strings.HasSuffix(host, "."+suffix) {
+			return nil
+		}
+	}
+	return fmt.Errorf("refusing to send credentials to unexpected host %q", host)
 }
