@@ -32,7 +32,7 @@ export const createToolColumns = (t, { onEdit } = {}) => [
   {
     accessorKey: 'enabled',
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.enabled')),
+    header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
     cell: ({ row }) =>
       h(
         'div',

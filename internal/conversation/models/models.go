@@ -351,6 +351,21 @@ func (m *Message) IsContinuityMessage() bool {
 	return isContinuity
 }
 
+// ShouldEvaluateAutomation reports whether this outgoing message may trigger automation rules; machine-generated messages must not, else they loop.
+func (m *Message) ShouldEvaluateAutomation(systemUserID int) bool {
+	return m.SenderID != systemUserID && !m.IsAutomated()
+}
+
+// IsAutomated returns true if the message was produced by an automation rule action.
+func (m *Message) IsAutomated() bool {
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(m.Meta), &meta); err != nil {
+		return false
+	}
+	isAutomated, _ := meta["is_automated"].(bool)
+	return isAutomated
+}
+
 // csatMeta unmarshals the message meta and returns the map and whether is_csat is true.
 func (m *Message) csatMeta() (map[string]any, bool) {
 	var meta map[string]any
@@ -574,6 +589,11 @@ func Transcript(msgs []Message, max int) string {
 			role = "Customer"
 		}
 		text := strings.TrimSpace(msg.TextContent)
+		if msg.ContentType == ContentTypeHTML {
+			if t := stringutil.HTML2TextMarkdownLinks(msg.Content); t != "" {
+				text = t
+			}
+		}
 		if text == "" {
 			continue
 		}

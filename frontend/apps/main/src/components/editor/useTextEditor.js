@@ -1,24 +1,29 @@
 import { ref, watch, onUnmounted } from 'vue'
 import { useEditor } from '@tiptap/vue-3'
-import { useTypingIndicator } from '@shared-ui/composables'
-import { useConversationStore } from '@main/stores/conversation'
 import { useInlineImageUpload } from '@main/composables/useInlineImageUpload'
 
-export function useTextEditor({ props, extensions, htmlContent, textContent, emit }) {
+export function useTextEditor({
+  extensions,
+  htmlContent,
+  textContent,
+  autoFocus = true,
+  editable = true,
+  insertContent = () => '',
+  isInlineEnabled = () => false,
+  linkedModel = 'messages',
+  getSuggestions = null,
+  onSend = () => {},
+  onUpdate = () => {},
+  onBlur = () => {},
+  onOtherFiles = () => {}
+}) {
   const isInternalUpdate = ref(false)
 
   const { handlePaste, handleDrop, insertImages } = useInlineImageUpload({
     getEditor: () => editor.value,
-    isInlineEnabled: () => props.enableInlineImages,
-    linkedModel: props.linkedModel,
-    onOtherFiles: (files) => emit('filesDropped', files)
-  })
-
-  const conversationStore = useConversationStore()
-  const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyping, {
-    get isPrivateMessage() {
-      return props.messageType === 'private_note'
-    }
+    isInlineEnabled,
+    linkedModel,
+    onOtherFiles
   })
 
   const extractMentions = () => {
@@ -39,11 +44,12 @@ export function useTextEditor({ props, extensions, htmlContent, textContent, emi
 
   const editor = useEditor({
     extensions,
-    autofocus: props.autoFocus,
+    autofocus: autoFocus,
+    editable,
     content: htmlContent.value,
     editorProps: {
       attributes: { class: 'outline-none' },
-      getSuggestions: props.getSuggestions,
+      getSuggestions,
       handlePaste,
       handleDrop,
       handleKeyDown: (view, event) => {
@@ -52,8 +58,7 @@ export function useTextEditor({ props, extensions, htmlContent, textContent, emi
           return false
         }
         if (event.ctrlKey && event.key === 'Enter') {
-          emit('send')
-          stopTyping()
+          onSend()
           return true
         }
       }
@@ -63,16 +68,9 @@ export function useTextEditor({ props, extensions, htmlContent, textContent, emi
       htmlContent.value = editor.getHTML()
       textContent.value = editor.getText()
       isInternalUpdate.value = false
-
-      startTyping()
-
-      if (props.enableMentions) {
-        emit('mentionsChanged', extractMentions())
-      }
+      onUpdate()
     },
-    onBlur: () => {
-      stopTyping()
-    }
+    onBlur
   })
 
   watch(
@@ -81,26 +79,22 @@ export function useTextEditor({ props, extensions, htmlContent, textContent, emi
       if (!isInternalUpdate.value && editor.value && newContent !== editor.value.getHTML()) {
         editor.value.commands.setContent(newContent || '', false)
         textContent.value = editor.value.getText()
-        editor.value.commands.focus()
       }
     },
     { immediate: true }
   )
 
-  watch(
-    () => props.insertContent,
-    (val) => {
-      if (val) editor.value?.commands.insertContent(val)
-    }
-  )
+  watch(insertContent, (val) => {
+    if (val) editor.value?.commands.insertContent(val)
+  })
 
   onUnmounted(() => {
     editor.value?.destroy()
   })
 
-  const focus = () => {
-    editor.value?.commands.focus()
+  const focus = (position) => {
+    editor.value?.commands.focus(position)
   }
 
-  return { editor, handlePaste, handleDrop, insertImages, extractMentions, focus }
+  return { editor, insertImages, extractMentions, focus }
 }

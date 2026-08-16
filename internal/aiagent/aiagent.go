@@ -26,11 +26,6 @@ import (
 	"github.com/zerodha/logf"
 )
 
-const (
-	// aiRunMaxSteps is the per-reply tool-calling budget, separate from the per-conversation max_turns cap.
-	aiRunMaxSteps = 6
-)
-
 //go:embed queries.sql
 var efs embed.FS
 
@@ -79,6 +74,9 @@ type Manager struct {
 	notifier *notifier.Service
 	redis    *redis.Client
 
+	maxSteps           int
+	maxHistoryMessages int
+
 	queue    chan int
 	inflight map[int]bool
 	// pending marks a conversation that received a fresh event while its response was in flight, so
@@ -101,10 +99,12 @@ type Manager struct {
 }
 
 type Opts struct {
-	DB        *sqlx.DB
-	Lo        *logf.Logger
-	I18n      *i18n.I18n
-	QueueSize int
+	DB                 *sqlx.DB
+	Lo                 *logf.Logger
+	I18n               *i18n.I18n
+	QueueSize          int
+	MaxSteps           int
+	MaxHistoryMessages int
 }
 
 // New creates the AI agent manager.
@@ -114,24 +114,26 @@ func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaMan
 		return nil, err
 	}
 	m := &Manager{
-		q:                q,
-		db:               opts.DB,
-		lo:               opts.Lo,
-		i18n:             opts.I18n,
-		ai:               aiManager,
-		convo:            convo,
-		media:            mediaManager,
-		setting:          settingManager,
-		user:             userManager,
-		notifier:         notifierService,
-		redis:            rdb,
-		queue:            make(chan int, opts.QueueSize),
-		inflight:         map[int]bool{},
-		pending:          map[int]bool{},
-		lastSeen:         map[int]int{},
-		miningQueue:      make(chan int, opts.QueueSize),
-		miningInflight:   map[int]bool{},
-		assistantUserIDs: map[int]bool{},
+		q:                  q,
+		db:                 opts.DB,
+		lo:                 opts.Lo,
+		i18n:               opts.I18n,
+		maxSteps:           opts.MaxSteps,
+		maxHistoryMessages: opts.MaxHistoryMessages,
+		ai:                 aiManager,
+		convo:              convo,
+		media:              mediaManager,
+		setting:            settingManager,
+		user:               userManager,
+		notifier:           notifierService,
+		redis:              rdb,
+		queue:              make(chan int, opts.QueueSize),
+		inflight:           map[int]bool{},
+		pending:            map[int]bool{},
+		lastSeen:           map[int]int{},
+		miningQueue:        make(chan int, opts.QueueSize),
+		miningInflight:     map[int]bool{},
+		assistantUserIDs:   map[int]bool{},
 	}
 	if err := m.refreshAssistantUserIDs(); err != nil {
 		return nil, err

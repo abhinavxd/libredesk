@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 
+	"time"
+
 	"github.com/abhinavxd/libredesk/internal/ai"
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
@@ -14,7 +16,6 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	statusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
 	imageutil "github.com/abhinavxd/libredesk/internal/image"
-	"time"
 
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -22,8 +23,6 @@ import (
 
 const (
 	channelEmail = "email"
-
-	maxHistoryMessages = 30
 
 	maxImagesPerMessage = 3
 	maxImagesTotal      = 4
@@ -220,7 +219,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 
 	private := false
-	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, maxHistoryMessages, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, m.maxHistoryMessages, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
 	if err != nil {
 		m.lo.Error("error fetching messages for ai agent", "conversation_uuid", conv.UUID, "error", err)
 		return
@@ -280,7 +279,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		if conv.InboxChannel != channelEmail && conv.Contact.Type == umodels.UserTypeContact {
 			return true
 		}
-		return m.isConversationVerified(conv.UUID)
+		return m.isConversationVerified(conv.UUID, conv.Contact.Email.String)
 	}
 	// Snapshot for the run-start registration decisions (one Redis read); tctx still gets the live
 	// closure so mid-turn verification is picked up per tool call.
@@ -304,7 +303,8 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	// verified: the 30-min window can expire mid-run and a blocked tool then points the model at
 	// them. set_contact_email is visitor-only, so a self-claimed email can be corrected in chat; a
 	// known contact's email is never swappable this way.
-	if conv.InboxChannel == channelEmail || conv.Contact.Type != umodels.UserTypeContact {
+	needsVerification := m.assistantHasVerifiedTool(assistant)
+	if needsVerification && (conv.InboxChannel == channelEmail || conv.Contact.Type != umodels.UserTypeContact) {
 		offerSetEmail := conv.Contact.Type == umodels.UserTypeVisitor
 		tools = append(tools, &sendEmailVerificationTool{m: m, conv: &conv})
 		tools = append(tools, &checkEmailVerificationTool{m: m, conv: &conv})
@@ -313,7 +313,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		}
 		m.lo.Debug("ai agent offering verification tools", "conversation_uuid", conv.UUID, "set_contact_email_offered", offerSetEmail)
 	}
-	if !runVerified {
+	if needsVerification && !runVerified {
 		systemPrompt += "\n\n" + verificationNote
 	}
 
@@ -333,7 +333,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	stopTyping := m.keepTyping(conv.UUID)
-	answer, err := m.ai.RunAgentWithTools(runCtx, systemPrompt, history, aiRunMaxSteps, tctx, assistant.ToolIDs, false, false, tools)
+	answer, err := m.ai.RunAgentWithTools(runCtx, systemPrompt, history, m.maxSteps, tctx, assistant.ToolIDs, false, false, tools)
 	stopTyping()
 	// A human agent may have taken over or resolved the conversation mid-run; if so, drop this
 	// run's reply and status actions instead of talking over them.
@@ -485,7 +485,7 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 	runCtx, cancel := context.WithTimeout(ctx, livechatRunTimeout)
 	defer cancel()
 	// Preview is search-only: no custom tools (empty allowed set), no built-in, no side effects.
-	answer, err := m.ai.RunAgentWithTools(runCtx, buildSystemPrompt(a), history, aiRunMaxSteps, ai.ToolContext{}, []int{}, false, false, tools)
+	answer, err := m.ai.RunAgentWithTools(runCtx, buildSystemPrompt(a), history, m.maxSteps, ai.ToolContext{}, []int{}, false, false, tools)
 	if err != nil {
 		return "", nil, err
 	}
@@ -496,23 +496,43 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 	return main, m.previewSources(hits), nil
 }
 
-// previewSources dedupes search hits by knowledge base item, keeping each item's best score.
+// previewSources dedupes search hits by source, keeping each one's best score. Snippets and help
+// articles number their rows independently, so the type is part of a hit's identity.
 func (m *Manager) previewSources(hits []aimodels.SearchResult) []models.PreviewSource {
+	type sourceKey struct {
+		sourceType string
+		id         int
+	}
 	sources := []models.PreviewSource{}
-	best := map[int]int{}
+	best := map[sourceKey]int{}
 	for _, h := range hits {
-		if idx, ok := best[h.SourceID]; ok {
+		key := sourceKey{h.SourceType, h.SourceID}
+		if idx, ok := best[key]; ok {
 			sources[idx].Score = max(sources[idx].Score, h.Score)
 			continue
 		}
-		item, err := m.ai.GetKnowledgeBaseItem(h.SourceID)
+		title, err := m.sourceTitle(h.SourceType, h.SourceID)
 		if err != nil {
 			continue
 		}
-		best[h.SourceID] = len(sources)
-		sources = append(sources, models.PreviewSource{ID: item.ID, Title: item.Title, Score: h.Score})
+		best[key] = len(sources)
+		sources = append(sources, models.PreviewSource{ID: h.SourceID, Type: h.SourceType, Title: title, Score: h.Score})
 	}
 	return sources
+}
+
+func (m *Manager) sourceTitle(sourceType string, id int) (string, error) {
+	switch sourceType {
+	case aimodels.SourceHelpArticle:
+		return m.ai.GetHelpArticleTitle(id)
+	case aimodels.SourceSnippet:
+		item, err := m.ai.GetKnowledgeBaseItem(id)
+		if err != nil {
+			return "", err
+		}
+		return item.Title, nil
+	}
+	return "", fmt.Errorf("unknown embedding source type %q", sourceType)
 }
 
 func lastIsInboundContact(msgs []cmodels.Message) bool {
@@ -547,9 +567,6 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 		kept = append(kept, msg)
 	}
 	msgs = kept
-	if len(msgs) > maxHistoryMessages {
-		msgs = msgs[len(msgs)-maxHistoryMessages:]
-	}
 	vision := m.ai.VisionEnabled()
 	m.lo.Debug("ai agent building history", "messages", len(msgs), "vision", vision)
 	// Spend the image budget newest-first so the message being answered never loses its
@@ -636,6 +653,25 @@ func (m *Manager) recentContactConversations(conv cmodels.Conversation, verified
 	return recent
 }
 
+// assistantHasVerifiedTool reports whether any tool attached to the assistant is verification-gated;
+// it fails open so a lookup error keeps the verification flow available.
+func (m *Manager) assistantHasVerifiedTool(a models.Assistant) bool {
+	if len(a.ToolIDs) == 0 {
+		return false
+	}
+	tools, err := m.ai.GetEnabledToolsByIDs(a.ToolIDs)
+	if err != nil {
+		m.lo.Error("error fetching assistant tools for verification check", "assistant_id", a.ID, "error", err)
+		return true
+	}
+	for _, t := range tools {
+		if t.RequiresVerification {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Manager) encodeAttachmentImage(att attachment.Attachment) (aimodels.ChatImage, bool) {
 	blob, err := m.media.GetBlob(att.UUID)
 	if err != nil {
@@ -664,6 +700,10 @@ func (m *Manager) messageText(msg cmodels.Message) string {
 	full := strings.TrimSpace(msg.TextContent)
 	var trimmed string
 	if msg.ContentType == cmodels.ContentTypeHTML {
+		// Render full with the same link-keeping options as trimmed, else the prefix diffing below never matches.
+		if t := stringutil.HTML2TextMarkdownLinks(msg.Content); t != "" {
+			full = t
+		}
 		trimmed = stringutil.HTML2TextNoQuotes(msg.Content)
 	} else {
 		trimmed = stringutil.TrimPlainTextQuotes(full)

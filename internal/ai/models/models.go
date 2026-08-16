@@ -23,6 +23,7 @@ const (
 
 	// Source types for embeddings.
 	SourceSnippet     = "snippet"
+	SourceTag         = "tag"
 	SourceHelpArticle = "help_article"
 
 	// ai_knowledge_base.source values.
@@ -95,6 +96,7 @@ type HelpArticleItem struct {
 	Content             string `db:"content"`
 	Status              string `db:"status"`
 	AIEnabled           bool   `db:"ai_enabled"`
+	IsReachable         bool   `db:"is_reachable"`
 	EmbeddedFingerprint string `db:"embedded_fingerprint"`
 }
 
@@ -133,6 +135,12 @@ type Embedding struct {
 	ChunkText  string `db:"chunk_text"`
 	Embedding  []byte `db:"embedding"`
 	Dimensions int    `db:"dimensions"`
+}
+
+// TagRef is a tag id and name.
+type TagRef struct {
+	ID   int    `db:"id"`
+	Name string `db:"name"`
 }
 
 // SearchResult is one hit from the in-memory embedding search.

@@ -239,8 +239,9 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 
 		m.BroadcastConversationUpdate(message.ConversationUUID, wsData)
 
-		// Evaluate automation rules for outgoing message.
-		m.automation.EvaluateConversationUpdateRulesByID(message.ConversationID, "", amodels.EventConversationMessageOutgoing)
+		if message.ShouldEvaluateAutomation(systemUser.ID) {
+			m.automation.EvaluateConversationUpdateRulesByID(message.ConversationID, "", amodels.EventConversationMessageOutgoing, umodels.User{ID: message.SenderID})
+		}
 	}
 }
 
@@ -401,11 +402,19 @@ func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 	}
 
 	// Generate signed URLs for attachments.
-	for i := range message.Attachments {
-		message.Attachments[i].URL = m.mediaStore.GetSignedURL(message.Attachments[i].UUID)
-	}
+	m.SignAttachmentURLs(message.Attachments)
 
 	return message, nil
+}
+
+// SignAttachmentURLs adds access URLs for the original image and its thumbnail.
+func (m *Manager) SignAttachmentURLs(attachments attachment.Attachments) {
+	for i := range attachments {
+		attachments[i].URL = m.mediaStore.GetURL(attachments[i].UUID, attachments[i].ContentType, attachments[i].Name)
+		if strings.HasPrefix(attachments[i].ContentType, "image/") {
+			attachments[i].ThumbnailURL = m.mediaStore.GetThumbnailURL(attachments[i].UUID)
+		}
+	}
 }
 
 // UpdateMessageStatus updates the status of a message.
@@ -685,7 +694,6 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.ContentType = models.ContentTypeText
 	}
 
-	// Extract inline media UUIDs for linking after message insertion.
 	inlineUUIDs := extractInlineImageUUIDs(message.Content)
 
 	// Rewrite inline image URLs to cid:ldsk-<uuid>. The read API resolves them back to signed URLs.
@@ -698,7 +706,6 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.TextContent = stringutil.HTML2Text(message.Content)
 	}
 
-	// Insert + attach atomically: the outgoing scanner must not pick up a pending message while its attachments are still being linked.
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error beginning message insert transaction", "error", err)
@@ -712,19 +719,14 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	for _, media := range message.Media {
-		if err := m.mediaStore.AttachTx(tx, media.ID, mmodels.ModelMessages, message.ID); err != nil {
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-		}
+	if err := m.mediaStore.LinkMessageMediaTx(tx, message.ID, message.Media, inlineUUIDs); err != nil {
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing message insert transaction", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-
-	// Link inline media and stamp content_id so the cid: form just persisted resolves on read.
-	m.linkInlineMediaToMessage(inlineUUIDs, message.ID)
 
 	// Add this user as a participant if not already present.
 	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
@@ -920,7 +922,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 			Email:     in.Contact.Email,
 			Type:      umodels.UserTypeContact,
 		}
-		if err := m.userStore.CreateContact(&user); err != nil {
+		if err := m.userStore.ResolveContact(&user, umodels.ContactSync); err != nil {
 			m.lo.Error("error creating contact for incoming message", "message_source_id", in.SourceID.String, "error", err)
 			return models.Message{}, fmt.Errorf("creating contact: %w", err)
 		}
@@ -951,7 +953,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	msg := in.ToMessage(senderID, conversationID, conversationUUID)
 
 	// Upload message attachments. On failure, delete the conversation if it was just created for this message.
-	if upErr := m.UploadMessageAttachments(&msg); upErr != nil {
+	if upErr := m.uploadMessageAttachments(&msg); upErr != nil {
 		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID.String, "error", upErr)
 		if isNewConversation && conversationUUID != "" {
 			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID.String)
@@ -1021,7 +1023,7 @@ func (m *Manager) resolveByPlusAddress(in *models.IncomingMessage) (senderID, co
 	conversationUUID = conversation.UUID
 	senderID = conversation.Contact.ID
 
-	// Already a contact - if same email, return as sender. If different email, let CreateContact resolve actual sender.
+	// Already a contact - if same email, return as sender. If different email, let contact resolution find the actual sender.
 	if conversation.Contact.Type == umodels.UserTypeContact {
 		if !strings.EqualFold(conversation.Contact.Email.String, in.Contact.Email.String) {
 			return 0, conversationID, conversationUUID, nil
@@ -1039,7 +1041,7 @@ func (m *Manager) resolveByPlusAddress(in *models.IncomingMessage) (senderID, co
 	if contactErr == nil {
 		m.lo.Debug("a contact already exists with the same email as visitor; not upgrading visitor", "conversation_uuid", conversation.UUID, "contact_email", in.Contact.Email.String, "contact_user_id", user.ID)
 		// A contact with this email already exists; don't upgrade visitor.
-		// Let CreateContact resolve the correct sender ID.
+		// Let contact resolution find the correct sender ID.
 		return 0, conversationID, conversationUUID, nil
 	}
 
@@ -1084,7 +1086,7 @@ func (m *Manager) isVisitorUpgradeSafe(conversation models.Conversation) bool {
 // ProcessIncomingLiveChatMessage handles incoming live chat messages.
 func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Message, error) {
 	// Upload message attachments.
-	if err := m.UploadMessageAttachments(&msg); err != nil {
+	if err := m.uploadMessageAttachments(&msg); err != nil {
 		return models.Message{}, fmt.Errorf("uploading message attachments: %w", err)
 	}
 
@@ -1109,7 +1111,7 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 
 // ProcessIncomingWhatsAppMessage uploads attachments, inserts the message, advances the 24h window clock and runs the shared incoming hooks.
 func (m *Manager) ProcessIncomingWhatsAppMessage(msg models.Message, isNewConversation bool, inboundAt time.Time) (models.Message, error) {
-	if err := m.UploadMessageAttachments(&msg); err != nil {
+	if err := m.uploadMessageAttachments(&msg); err != nil {
 		return models.Message{}, fmt.Errorf("uploading whatsapp attachments: %w", err)
 	}
 
@@ -1244,41 +1246,8 @@ func rewriteInlineImagesToCID(content string) string {
 	})
 }
 
-// linkInlineMediaToMessage attaches each inline-image media row to this
-// message (so it isn't garbage-collected as an orphan) and stamps a stable
-// content_id so cid:ldsk-<uuid> in the saved body resolves on read.
-func (m *Manager) linkInlineMediaToMessage(uuids []string, messageID int) {
-	for _, uuid := range uuids {
-		media, err := m.mediaStore.Get(0, uuid)
-		if err != nil {
-			continue
-		}
-		if media.Model.Valid && media.Model.String != mmodels.ModelMessages {
-			continue
-		}
-		// Linked to a different message already, leave it.
-		if media.ModelID.Valid && media.ModelID.Int != messageID {
-			continue
-		}
-
-		// Attach.
-		if !media.ModelID.Valid {
-			if err := m.mediaStore.Attach(media.ID, mmodels.ModelMessages, messageID); err != nil {
-				m.lo.Warn("error linking inline media to message", "uuid", uuid, "message_id", messageID, "error", err)
-			}
-		}
-
-		// Set content_id if not already set.
-		if media.ContentID == "" {
-			if err := m.mediaStore.SetContentID(media.ID, inlineContentID(uuid)); err != nil {
-				m.lo.Warn("error setting media content_id", "uuid", uuid, "message_id", messageID, "error", err)
-			}
-		}
-	}
-}
-
-// UploadMessageAttachments uploads all attachments for a message.
-func (m *Manager) UploadMessageAttachments(message *models.Message) error {
+// uploadMessageAttachments uploads all attachments for a message.
+func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 	if len(message.Attachments) == 0 {
 		return nil
 	}
@@ -1322,6 +1291,7 @@ func (m *Manager) UploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
+			true,          /** private **/
 		)
 		if err != nil {
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
@@ -1459,7 +1429,10 @@ func (m *Manager) fetchMessageAttachments(messageID int) (attachment.Attachments
 			Content:     blob,
 			Size:        media.Size,
 			Header:      attachment.MakeHeader(media.ContentType, contentID, media.Filename, "base64", media.Disposition.String),
-			URL:         m.mediaStore.GetSignedURL(media.UUID),
+			URL:         m.mediaStore.GetURL(media.UUID, media.ContentType, media.Filename),
+		}
+		if strings.HasPrefix(media.ContentType, "image/") {
+			attachment.ThumbnailURL = m.mediaStore.GetThumbnailURL(media.UUID)
 		}
 		attachments = append(attachments, attachment)
 	}
@@ -1536,6 +1509,12 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		return nil
 	}
 
+	// Snapshot before reopening so previous_* filters see the pre-reopen state.
+	var previousValues map[string]string
+	if preReopen, err := m.GetConversation(0, conversationUUID, ""); err == nil {
+		previousValues = amodels.PreviousValues(preReopen)
+	}
+
 	// Reopen conversation if it's not Open.
 	systemUser, err := m.userStore.GetSystemUser()
 	if err != nil {
@@ -1553,7 +1532,10 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		m.lo.Error("error fetching conversation for incoming message hooks", "conversation_uuid", conversationUUID, "error", err)
 	} else {
 		// Trigger automations on incoming message event.
-		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming)
+		if previousValues == nil {
+			previousValues = amodels.PreviousValues(conversation)
+		}
+		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming, previousValues, umodels.User{ID: conversation.ContactID})
 
 		// If assigned to an AI assistant, let it respond to this inbound customer message.
 		if m.aiAgent != nil && conversation.AssignedUserID.Valid {
@@ -1594,6 +1576,7 @@ func (m *Manager) broadcastMessageToWidgetClients(message *models.Message) {
 		return
 	}
 
+	m.SignAttachmentURLs(message.Attachments)
 	m.SignAvatarURL(&message.Author.AvatarURL)
 	liveChatInbox.BroadcastMessageToClients(message.ConversationUUID, conversation.ContactID, models.ChatMessage{
 		UUID:             message.UUID,
@@ -1623,8 +1606,9 @@ func (m *Manager) getMediaPreview(media mmodels.Media) string {
 	}
 }
 
+// inlineContentID lowercases the uuid to match the content_id the DB stamps from uuid::TEXT.
 func inlineContentID(uuid string) string {
-	return "ldsk-" + uuid
+	return "ldsk-" + strings.ToLower(uuid)
 }
 
 // findExistingMedia resolves an inbound cid to its stored form: ldsk-* is left as-is, others are namespaced by conversation to avoid cross-conversation collisions.

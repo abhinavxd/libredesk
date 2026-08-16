@@ -13,6 +13,7 @@
             v-model="linkUrl"
             type="text"
             :placeholder="$t('placeholders.enterUrl')"
+            :aria-label="$t('placeholders.enterUrl')"
             @keydown.enter.prevent="setLink"
           />
           <div v-if="allowButton" class="flex items-center gap-2">
@@ -27,7 +28,12 @@
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" @click="unsetLink" v-if="editor?.isActive('link')">
+          <Button
+            type="button"
+            variant="outline"
+            @click="unsetLink"
+            v-if="editor?.isActive('link')"
+          >
             {{ $t('actions.removeLink') }}
           </Button>
           <Button type="submit">
@@ -77,8 +83,12 @@ const open = () => {
 
 const setLink = () => {
   if (linkUrl.value) {
-    const attrs = { href: linkUrl.value }
-    if (props.allowButton && linkAsButton.value) attrs.class = 'hc-button'
+    // class must be set explicitly: setLink merges attrs, so omitting it would
+    // keep a previously applied hc-button class.
+    const attrs = {
+      href: linkUrl.value,
+      class: props.allowButton && linkAsButton.value ? 'hc-button' : null
+    }
     props.editor?.chain().focus().extendMarkRange('link').setLink(attrs).run()
   }
   isOpen.value = false

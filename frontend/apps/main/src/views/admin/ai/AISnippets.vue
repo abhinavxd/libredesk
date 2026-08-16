@@ -10,7 +10,6 @@
             <DialogContent class="sm:max-w-[560px]">
               <DialogHeader>
                 <DialogTitle>{{ t('admin.ai.snippet.importUrl') }}</DialogTitle>
-                <DialogDescription>{{ t('admin.ai.snippet.importUrlHint') }}</DialogDescription>
               </DialogHeader>
               <form class="space-y-4" @submit.prevent="importFromUrl">
                 <Input
@@ -55,7 +54,7 @@
     <template #help>
       <p>{{ t('admin.ai.snippetsHelp') }}</p>
       <a
-        href="https://docs.libredesk.io/configuration/ai"
+        href="https://docs.libredesk.io/configuration/ai#snippets"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
@@ -75,7 +74,6 @@ import { Button } from '@shared-ui/components/ui/button/index.js'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger

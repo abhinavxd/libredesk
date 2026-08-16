@@ -2,7 +2,7 @@ import { describe, test, expect, vi } from 'vitest'
 
 vi.mock('./useFileUpload', () => ({
     useFileUpload: () => ({
-        upload: vi.fn().mockResolvedValue({ url: '/uploads/abc' })
+        upload: vi.fn().mockResolvedValue({ url: '/uploads/abc', uuid: 'abc', private: false })
     })
 }))
 

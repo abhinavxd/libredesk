@@ -156,7 +156,11 @@ func (m *UserNotificationManager) DeleteOldNotifications(ctx context.Context) er
 
 // RunNotificationCleaner runs a background job to delete old notifications every 24 hours.
 func (m *UserNotificationManager) RunNotificationCleaner(ctx context.Context) {
-	time.Sleep(10 * time.Second)
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(60 * time.Second):
+	}
 	if err := m.DeleteOldNotifications(ctx); err != nil {
 		m.lo.Error("error cleaning old notifications", "error", err)
 	}

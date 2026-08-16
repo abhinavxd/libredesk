@@ -1,7 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/vue-3'
 
-// Colored callout box. The variant lives in the class (hc-callout-<variant>) rather
-// than a data attribute, which the article sanitizer already preserves on <div>.
 export const CALLOUT_VARIANTS = ['info', 'success', 'warning', 'danger']
 
 export const Callout = Node.create({

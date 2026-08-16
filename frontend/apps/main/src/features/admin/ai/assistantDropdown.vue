@@ -8,9 +8,15 @@
     </DropdownMenuTrigger>
     <DropdownMenuContent>
       <DropdownMenuItem @click="editAssistant">
+        <Pencil class="mr-2 h-4 w-4" />
         {{ t('globals.messages.edit') }}
       </DropdownMenuItem>
-      <DropdownMenuItem @click="() => (alertOpen = true)">
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        @click="() => (alertOpen = true)"
+        class="text-destructive focus:text-destructive"
+      >
+        <Trash class="mr-2 h-4 w-4" />
         {{ t('globals.messages.delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
@@ -36,11 +42,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreVertical } from 'lucide-vue-next'
+import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu/index.js'
 import { Button } from '@shared-ui/components/ui/button/index.js'
@@ -57,12 +64,14 @@ import {
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { useAIAssistantStore } from '@/stores/aiAssistant'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 
 const { t } = useI18n()
 const alertOpen = ref(false)
 const emitter = useEmitter()
+const aiAssistantStore = useAIAssistantStore()
 
 const props = defineProps({
   assistant: { type: Object, required: true }
@@ -75,6 +84,7 @@ const editAssistant = () => {
 const deleteAssistant = async () => {
   try {
     await api.deleteAIAssistant(props.assistant.id)
+    aiAssistantStore.invalidate()
     alertOpen.value = false
     emitter.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'ai_assistants' })
   } catch (error) {

@@ -220,6 +220,7 @@
         :handleFileUpload="handleFileUpload"
         @emojiSelect="handleEmojiSelect"
         :showSendButton="false"
+        :showGenerateReply="false"
       />
       <Button type="submit" :disabled="isDisabled" :isLoading="loading">
         {{ $t('globals.messages.submit') }}
@@ -435,12 +436,17 @@ const createConversation = form.handleSubmit(async (values) => {
     values.team_id = values.team_id ? Number(values.team_id) : null
     values.agent_id = values.agent_id ? Number(values.agent_id) : null
     values.attachments = mediaFiles.value.map((file) => file.id)
+    if (selectedContact.value?.external_user_id) {
+      values.external_user_id = selectedContact.value.external_user_id
+    }
+    // Form data is a snapshot from search; never let it overwrite the stored contact.
+    values.reuse_contact = true
     values.initiator = UserTypeAgent
     const conversation = await api.createConversation(values)
     const conversationUUID = conversation.data.data.uuid
 
     const macro = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)
-    if (conversationUUID !== '' && macro?.id && macro?.actions?.length > 0) {
+    if (conversationUUID !== '' && macro?.id) {
       try {
         await api.applyMacro(conversationUUID, macro.id, macro.actions)
       } catch (error) {
@@ -465,10 +471,8 @@ const createConversation = form.handleSubmit(async (values) => {
 watch(
   () => conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).id,
   () => {
-    form.setFieldValue(
-      'content',
-      conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
-    )
+    const content = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
+    if (content) form.setFieldValue('content', content)
   },
   { deep: true }
 )

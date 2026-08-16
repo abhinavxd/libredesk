@@ -7,15 +7,20 @@
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>
-      <DropdownMenuItem @click="editRole(props.role.id)">{{
-        $t('globals.messages.edit')
-      }}</DropdownMenuItem>
-      <DropdownMenuItem
-        @click="() => (alertOpen = true)"
-        v-if="Roles.includes(props.role.name) === false"
-      >
-        {{ $t('globals.messages.delete') }}
+      <DropdownMenuItem @click="editRole(props.role.id)">
+        <Pencil class="mr-2 h-4 w-4" />
+        {{ $t('globals.messages.edit') }}
       </DropdownMenuItem>
+      <template v-if="Roles.includes(props.role.name) === false">
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          @click="() => (alertOpen = true)"
+          class="text-destructive focus:text-destructive"
+        >
+          <Trash class="mr-2 h-4 w-4" />
+          {{ $t('globals.messages.delete') }}
+        </DropdownMenuItem>
+      </template>
     </DropdownMenuContent>
   </DropdownMenu>
 
@@ -24,9 +29,7 @@
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{
-            $t('role.deletionConfirmation')
-          }}
+          {{ $t('role.deletionConfirmation') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
@@ -41,11 +44,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreVertical } from 'lucide-vue-next'
+import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
 import {

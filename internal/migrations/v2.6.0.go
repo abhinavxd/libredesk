@@ -7,7 +7,6 @@ import (
 )
 
 func V2_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
-	// ALTER TYPE ADD VALUE cannot run inside a transaction; each Exec here is autocommit.
 	if _, err := db.Exec(`ALTER TYPE user_type ADD VALUE IF NOT EXISTS 'ai_assistant';`); err != nil {
 		return err
 	}
@@ -38,7 +37,6 @@ func V2_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	`); err != nil {
 		return err
 	}
-	// Older releases hardcoded temperature 0.7; keep that behavior for configured providers that predate the field.
 	if _, err := db.Exec(`
 		UPDATE ai_providers SET config = config || '{"temperature": 0.7}'::jsonb
 		WHERE type = 'completion' AND COALESCE(config->>'api_key', '') <> '' AND NOT config ? 'temperature';
@@ -204,10 +202,6 @@ func V2_6_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS index_copilot_messages_on_conversation_user ON copilot_messages(conversation_id, user_id, id);`); err != nil {
-		return err
-	}
-
-	if _, err := db.Exec(`INSERT INTO settings ("key", value) VALUES ('app.copilot_name', '"Juno"'::jsonb) ON CONFLICT ("key") DO NOTHING;`); err != nil {
 		return err
 	}
 

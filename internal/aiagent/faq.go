@@ -222,7 +222,7 @@ func (m *Manager) mine(ctx context.Context, convID int) {
 		if q == "" || a == "" {
 			continue
 		}
-		if dup, err := m.isDuplicateFAQ(ctx, q); err != nil {
+		if dup, err := m.isDuplicateFAQ(ctx, q, a); err != nil {
 			m.lo.Warn("faq dedup check failed, keeping candidate", "error", err)
 		} else if dup {
 			m.lo.Debug("faq candidate near-duplicate of existing snippet, skipping", "question", q)
@@ -284,8 +284,9 @@ func (m *Manager) extractFAQs(ctx context.Context, transcript string) ([]minedFA
 	return parseFAQs(out), nil
 }
 
-func (m *Manager) isDuplicateFAQ(ctx context.Context, question string) (bool, error) {
-	results, err := m.ai.Search(ctx, question, 1)
+// isDuplicateFAQ embeds question+answer together to match the shape of indexed snippet chunks (title+content); a question alone rarely clears the threshold against a long chunk.
+func (m *Manager) isDuplicateFAQ(ctx context.Context, question, answer string) (bool, error) {
+	results, err := m.ai.Search(ctx, question+"\n"+answer, 1)
 	if err != nil {
 		return false, err
 	}

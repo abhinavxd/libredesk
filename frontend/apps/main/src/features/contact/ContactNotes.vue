@@ -156,9 +156,6 @@
       </div>
       <div v-else class="box border-dashed p-10 text-center bg-muted/50 mt-6">
         <div class="flex flex-col items-center">
-          <div class="rounded-full bg-muted p-4 mb-2">
-            <MessageSquareIcon class="text-muted-foreground" size="25" />
-          </div>
           <h3 class="mt-2 text-base font-medium text-foreground">
             {{ $t('contact.notes.empty') }}
           </h3>
@@ -207,13 +204,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import {
-  PlusIcon,
-  MoreVerticalIcon,
-  TrashIcon,
-  ClockIcon,
-  MessageSquareIcon
-} from 'lucide-vue-next'
+import { PlusIcon, MoreVerticalIcon, TrashIcon, ClockIcon } from 'lucide-vue-next'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 import { useI18n } from 'vue-i18n'
 import { useEmitter } from '@main/composables/useEmitter'

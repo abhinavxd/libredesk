@@ -31,6 +31,47 @@
                     : $t('contact.type.contact')
                 }}
               </Badge>
+              <Badge v-if="!contact.enabled" variant="destructive" class="gap-1">
+                <ShieldOffIcon size="12" />
+                {{ t('globals.terms.blocked') }}
+              </Badge>
+              <DropdownMenu v-if="canOpenActionsMenu">
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" class="h-7 w-7">
+                    <MoreVerticalIcon class="h-4 w-4" />
+                    <span class="sr-only">{{ t('globals.terms.openMenu') }}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" class="w-[200px]">
+                  <DropdownMenuItem
+                    v-if="userStore.can('contacts:block')"
+                    class="cursor-pointer"
+                    @click="showBlockConfirmation = true"
+                  >
+                    <ShieldOffIcon v-if="contact.enabled" class="mr-2" size="15" />
+                    <ShieldCheckIcon v-else class="mr-2" size="15" />
+                    {{ t(contact.enabled ? 'globals.messages.block' : 'globals.messages.unblock') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-if="userStore.can('contacts:export')"
+                    class="cursor-pointer"
+                    @click="exportContact"
+                  >
+                    <DownloadIcon class="mr-2" size="15" />
+                    {{ t('globals.messages.exportData') }}
+                  </DropdownMenuItem>
+                  <template v-if="userStore.can('contacts:delete')">
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      class="text-destructive cursor-pointer"
+                      @click="showDeleteConfirmation = true"
+                    >
+                      <Trash2Icon class="mr-2" size="15" />
+                      {{ t('contact.deleteContact') }}
+                    </DropdownMenuItem>
+                  </template>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             <div
@@ -59,18 +100,6 @@
               {{ $t('globals.terms.createdOn') }}
               {{ contact.created_at ? format(new Date(contact.created_at), 'PPP') : 'N/A' }}
             </div>
-
-            <div class="w-30 pt-3">
-              <Button
-                :variant="contact.enabled ? 'destructive' : 'outline'"
-                @click="showBlockConfirmation = true"
-                size="sm"
-              >
-                <ShieldOffIcon v-if="contact.enabled" size="18" />
-                <ShieldCheckIcon v-else size="18" />
-                {{ t(contact.enabled ? 'globals.messages.block' : 'globals.messages.unblock') }}
-              </Button>
-            </div>
           </div>
 
           <div class="mt-12 space-y-10">
@@ -82,36 +111,52 @@
 
       <Spinner v-if="formLoading" />
 
-      <Dialog :open="showBlockConfirmation" @update:open="showBlockConfirmation = $event">
-        <DialogContent class="sm:max-w-md">
-          <DialogHeader class="gap-y-3">
-            <DialogTitle>
+      <AlertDialog :open="showBlockConfirmation" @update:open="(v) => (showBlockConfirmation = v)">
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
               {{ contact?.enabled ? t('contact.blockContact') : t('contact.unblockContact') }}
-            </DialogTitle>
-            <DialogDescription>
+            </AlertDialogTitle>
+            <AlertDialogDescription>
               {{ contact?.enabled ? t('contact.blockConfirm') : t('contact.unblockConfirm') }}
-            </DialogDescription>
-          </DialogHeader>
-          <div class="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" @click="showBlockConfirmation = false">
-              {{ t('globals.messages.cancel') }}
-            </Button>
-            <Button
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+            <AlertDialogAction
               :variant="contact?.enabled ? 'destructive' : 'default'"
               @click="confirmToggleBlock"
             >
               {{ contact?.enabled ? t('globals.messages.block') : t('globals.messages.unblock') }}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        :open="showDeleteConfirmation"
+        @update:open="(v) => (showDeleteConfirmation = v)"
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{{ t('contact.deleteContact') }}</AlertDialogTitle>
+            <AlertDialogDescription>{{ t('contact.deleteConfirm') }}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" @click="confirmDelete">
+              {{ t('globals.messages.delete') }}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   </ContactDetail>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
@@ -120,37 +165,64 @@ import { AvatarUpload } from '@shared-ui/components/ui/avatar'
 import { Button } from '@shared-ui/components/ui/button'
 import { Badge } from '@shared-ui/components/ui/badge'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from '@shared-ui/components/ui/dialog'
-import { useUserStore } from '../../stores/user'
-import { ShieldOffIcon, ShieldCheckIcon, IdCardIcon, CalendarIcon } from 'lucide-vue-next'
-import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator
+} from '@shared-ui/components/ui/dropdown-menu'
+import { useUserStore } from '@/stores/user'
+import {
+  ShieldOffIcon,
+  ShieldCheckIcon,
+  IdCardIcon,
+  CalendarIcon,
+  DownloadIcon,
+  Trash2Icon,
+  MoreVerticalIcon
+} from 'lucide-vue-next'
 import ContactDetail from '@/layouts/contact/ContactDetail.vue'
-import api from '../../api'
+import api from '@/api'
 import ContactForm from '@/features/contact/ContactForm.vue'
 import ContactNotes from '@/features/contact/ContactNotes.vue'
-import { createFormSchema } from '../../features/contact/formSchema.js'
-import { useEmitter } from '../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents'
+import { createFormSchema } from '@/features/contact/formSchema.js'
+import { useEmitter } from '@/composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 
 const { t } = useI18n()
 const emitter = useEmitter()
 const route = useRoute()
+const router = useRouter()
 const formLoading = ref(false)
 const contact = ref(null)
 const showBlockConfirmation = ref(false)
+const showDeleteConfirmation = ref(false)
 const userStore = useUserStore()
 
 const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t))
 })
+
+const canOpenActionsMenu = computed(
+  () =>
+    userStore.can('contacts:block') ||
+    userStore.can('contacts:export') ||
+    userStore.can('contacts:delete')
+)
 
 const breadcrumbLinks = [
   { path: 'contacts', label: t('globals.terms.contact', 2) },
@@ -194,6 +266,29 @@ async function toggleBlock() {
     )
   } catch (err) {
     showError(err)
+  }
+}
+
+async function confirmDelete() {
+  showDeleteConfirmation.value = false
+  try {
+    formLoading.value = true
+    await api.deleteContact(contact.value.id)
+    emitToast(t('globals.messages.deletedSuccessfully'))
+    router.push({ name: 'contacts' })
+  } catch (err) {
+    showError(err)
+  } finally {
+    formLoading.value = false
+  }
+}
+
+async function exportContact() {
+  try {
+    const response = await api.exportContact(contact.value.id)
+    downloadBlobResponse(response, `contact-${contact.value.id}-data.json`)
+  } catch (err) {
+    showError(await parseBlobError(err))
   }
 }
 

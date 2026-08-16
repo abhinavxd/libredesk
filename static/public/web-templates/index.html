@@ -1,12 +1,12 @@
 {{ define "header" }}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />	
+	<meta charset="utf-8" />	
 	<title>{{ .Data.Title }} - {{ SiteName }}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 
-	<link href="/static/public/static/style.css" rel="stylesheet" type="text/css" />
+	<link href="/static/public/static/style.css?v={{ AssetVer }}" rel="stylesheet" type="text/css" />
 
 	{{ if ne FaviconURL "" }}
 		<link rel="icon" href="{{ FaviconURL }}" type="image/x-icon" />

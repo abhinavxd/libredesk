@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -94,7 +96,7 @@ type queries struct {
 	Get                         *sqlx.Stmt `query:"get-media"`
 	GetByUUID                   *sqlx.Stmt `query:"get-media-by-uuid"`
 	Delete                      *sqlx.Stmt `query:"delete-media"`
-	Attach                      *sqlx.Stmt `query:"attach-to-model"`
+	LinkMessageMedia            *sqlx.Stmt `query:"link-message-media"`
 	GetByModel                  *sqlx.Stmt `query:"get-model-media"`
 	GetUnlinkedMessageMedia     *sqlx.Stmt `query:"get-unlinked-message-media"`
 	GetUnlinkedHelpArticleMedia *sqlx.Stmt `query:"get-unlinked-help-article-media"`
@@ -102,11 +104,11 @@ type queries struct {
 	UnlinkHelpArticleMedia      *sqlx.Stmt `query:"unlink-help-article-media"`
 	ContentIDExists             *sqlx.Stmt `query:"content-id-exists"`
 	GetByContentIDs             *sqlx.Stmt `query:"get-media-by-content-ids"`
-	SetContentID                *sqlx.Stmt `query:"set-media-content-id"`
+	GetDraftInlineMedia         *sqlx.Stmt `query:"get-draft-inline-media"`
 }
 
 // UploadAndInsert uploads file on storage and inserts an entry in db.
-func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte) (models.Media, error) {
+func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (models.Media, error) {
 	var (
 		uuid = uuid.New()
 		err  error
@@ -118,7 +120,7 @@ func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, mo
 		return models.Media{}, err
 	}
 
-	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, true)
+	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private)
 	if err != nil {
 		m.store.Delete(uuid.String())
 		return models.Media{}, err
@@ -189,12 +191,10 @@ func (m *Manager) Get(id int, uuid string) (models.Media, error) {
 
 // PublicURL returns the stable unsigned app URL for a public media file.
 func (m *Manager) PublicURL(uuid string) string {
-	return m.rootURL() + PublicURI + "/" + uuid
+	return strings.TrimRight(m.rootURL(), "/") + PublicURI + "/" + uuid
 }
 
-// LinkHelpArticleMedia links help-article media referenced in the article content to the
-// article and unlinks previously linked media no longer referenced, leaving it for the
-// unlinked-media janitor.
+// LinkHelpArticleMedia links media referenced in the article content and unlinks the rest.
 func (m *Manager) LinkHelpArticleMedia(articleID int, content string) error {
 	uuids := []string{}
 	for _, match := range publicMediaURLRe.FindAllStringSubmatch(content, -1) {
@@ -207,15 +207,6 @@ func (m *Manager) LinkHelpArticleMedia(articleID int, content string) error {
 	if _, err := m.queries.UnlinkHelpArticleMedia.Exec(articleID, pq.Array(uuids)); err != nil {
 		m.lo.Error("error unlinking help article media", "article_id", articleID, "error", err)
 		return fmt.Errorf("unlinking help article media: %w", err)
-	}
-	return nil
-}
-
-// SetContentID stamps a content_id onto a media row if one isn't already set.
-func (m *Manager) SetContentID(id int, contentID string) error {
-	if _, err := m.queries.SetContentID.Exec(id, contentID); err != nil {
-		m.lo.Error("error setting media content_id", "id", id, "content_id", contentID, "error", err)
-		return fmt.Errorf("setting media content_id: %w", err)
 	}
 	return nil
 }
@@ -247,6 +238,19 @@ func (m *Manager) GetByContentIDs(contentIDs []string, conversationUUID string) 
 		return nil, fmt.Errorf("fetching media by content_ids: %w", err)
 	}
 	return out, nil
+}
+
+// GetDraftInlineMedia returns media by UUID only if it's unattached or linked to a message in the given conversation.
+func (m *Manager) GetDraftInlineMedia(uuid string, conversationID int) (models.Media, error) {
+	var media models.Media
+	if err := m.queries.GetDraftInlineMedia.Get(&media, uuid, conversationID); err != nil {
+		if err == sql.ErrNoRows {
+			return media, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundMedia"), nil)
+		}
+		m.lo.Error("error fetching draft inline media", "uuid", uuid, "error", err)
+		return media, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return media, nil
 }
 
 // GetBlob retrieves the raw binary content of a media file by its name.
@@ -281,25 +285,41 @@ func (m *Manager) GetSignedURL(name string) string {
 	return m.GetURL(name, "", "")
 }
 
+// GetThumbnailURL returns the URL for an image thumbnail.
+func (m *Manager) GetThumbnailURL(uuid string) string {
+	if m.store.Name() == "fs" {
+		// FS validates thumbnail requests with the original UUID signature.
+		u, err := url.Parse(m.GetSignedURL(uuid))
+		if err == nil {
+			if idx := strings.LastIndex(u.Path, "/"); idx >= 0 {
+				u.Path = u.Path[:idx+1] + image.ThumbPrefix + uuid
+			} else {
+				u.Path = image.ThumbPrefix + uuid
+			}
+			return u.String()
+		}
+	}
+	return m.store.GetURL(image.ThumbPrefix+uuid, "inline", "")
+}
+
 // SignedURLValidator returns the store's signature validator if available.
 // Returns nil if the store doesn't support signed URL validation.
 func (m *Manager) SignedURLValidator() func(name, sig string, exp int64) bool {
 	return m.store.SignedURLValidator()
 }
 
-// Attach associates a media file with a specific model by its ID and model name.
-func (m *Manager) Attach(id int, model string, modelID int) error {
-	if _, err := m.queries.Attach.Exec(id, model, modelID); err != nil {
-		m.lo.Error("error attaching media to model", "model", model, "model_id", modelID, "media_id", id, "error", err)
-		return fmt.Errorf("attaching media;%d to model:%s model_id:%d: %w", id, model, modelID, err)
+// LinkMessageMediaTx links a message's attachments and inline images to it within the given transaction, stamping a content_id on the inline ones.
+func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.Media, inlineUUIDs []string) error {
+	if len(media) == 0 && len(inlineUUIDs) == 0 {
+		return nil
 	}
-	return nil
-}
-
-func (m *Manager) AttachTx(tx *sqlx.Tx, id int, model string, modelID int) error {
-	if _, err := tx.Stmtx(m.queries.Attach).Exec(id, model, modelID); err != nil {
-		m.lo.Error("error attaching media to model", "model", model, "model_id", modelID, "media_id", id, "error", err)
-		return fmt.Errorf("attaching media;%d to model:%s model_id:%d: %w", id, model, modelID, err)
+	ids := make([]int, 0, len(media))
+	for _, med := range media {
+		ids = append(ids, med.ID)
+	}
+	if _, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs)); err != nil {
+		m.lo.Error("error linking media to message", "message_id", messageID, "error", err)
+		return fmt.Errorf("linking media to message:%d: %w", messageID, err)
 	}
 	return nil
 }
@@ -339,6 +359,11 @@ func (m *Manager) Delete(name string) error {
 
 // DeleteUnlinkedMedia is a blocking function that periodically deletes media files that are not linked to any conversation message or help article.
 func (m *Manager) DeleteUnlinkedMedia(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(60 * time.Second):
+	}
 	m.deleteUnlinked()
 	for {
 		select {
@@ -368,18 +393,17 @@ func (m *Manager) deleteUnlinkedRows(stmt *sqlx.Stmt) error {
 		return err
 	}
 	for _, mm := range media {
-		m.lo.Debug("deleting media not linked to any message", "media_id", mm.ID)
+		m.lo.Info("deleting unlinked media", "media_id", mm.ID, "uuid", mm.UUID, "filename", mm.Filename, "model_type", mm.Model.String, "model_id", mm.ModelID.Int)
 		if err := m.Delete(mm.UUID); err != nil {
-			m.lo.Error("error deleting unlinked media", "error", err)
+			m.lo.Error("error deleting unlinked media", "media_id", mm.ID, "model_type", mm.Model.String, "model_id", mm.ModelID.Int, "error", err)
 			continue
 		}
 
 		// If it's an image, also delete the `thumb_uuid` image from store.
 		if strings.HasPrefix(mm.ContentType, "image/") {
 			thumbUUID := image.ThumbPrefix + mm.UUID
-			m.lo.Debug("deleting thumbnail for unlinked media", "thumb_uuid", thumbUUID)
 			if err := m.Delete(thumbUUID); err != nil {
-				m.lo.Error("error deleting thumbnail for unlinked media", "error", err)
+				m.lo.Error("error deleting thumbnail for unlinked media", "media_id", mm.ID, "thumb_uuid", thumbUUID, "error", err)
 			}
 		}
 	}
@@ -394,6 +418,11 @@ func (m *Manager) detectContentType(sourceContentType string, content io.ReadSee
 	// Set default if empty
 	if sourceContentType == "" {
 		sourceContentType = "application/octet-stream"
+	}
+
+	// Handle "image/svg+xml; charset=utf-8", keep just the type.
+	if mediaType, _, err := mime.ParseMediaType(sourceContentType); err == nil && mediaType != "" {
+		sourceContentType = mediaType
 	}
 
 	// Trust source unless it's a generic/useless type

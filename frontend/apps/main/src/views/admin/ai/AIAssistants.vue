@@ -18,7 +18,7 @@
     <template #help>
       <p>{{ t('admin.ai.assistantsHelp') }}</p>
       <a
-        href="https://docs.libredesk.io/configuration/ai"
+        href="https://docs.libredesk.io/configuration/ai#assistants"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"

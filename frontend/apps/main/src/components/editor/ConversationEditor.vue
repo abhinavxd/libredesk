@@ -24,8 +24,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { EditorContent, BubbleMenu } from '@tiptap/vue-3'
+import { useTypingIndicator } from '@shared-ui/composables'
+import { useConversationStore } from '@main/stores/conversation'
 import EditorToolbar from './EditorToolbar.vue'
 import EditorLinkDialog from './EditorLinkDialog.vue'
 import { buildConversationExtensions } from './editorExtensions'
@@ -65,13 +67,40 @@ const shouldShowBubble = ({ editor: e, state }) => {
   return true
 }
 
+const conversationStore = useConversationStore()
+const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyping, {
+  get isPrivateMessage() {
+    return props.messageType === 'private_note'
+  }
+})
+
 const { editor, extractMentions, focus } = useTextEditor({
-  props,
   extensions: buildConversationExtensions({ getPlaceholder: () => props.placeholder }),
   htmlContent,
   textContent,
-  emit
+  autoFocus: props.autoFocus,
+  editable: !props.disabled,
+  insertContent: () => props.insertContent,
+  isInlineEnabled: () => props.enableInlineImages,
+  linkedModel: props.linkedModel,
+  getSuggestions: props.getSuggestions,
+  onSend: () => {
+    emit('send')
+    stopTyping()
+  },
+  onUpdate: () => {
+    startTyping()
+    if (props.enableMentions) emit('mentionsChanged', extractMentions())
+  },
+  onBlur: stopTyping,
+  onOtherFiles: (files) => emit('filesDropped', files)
 })
+
+// Pointer-events alone still lets an already-focused editor take keystrokes.
+watch(
+  () => props.disabled,
+  (disabled) => editor.value?.setEditable(!disabled, false)
+)
 
 defineExpose({ focus, extractMentions })
 </script>

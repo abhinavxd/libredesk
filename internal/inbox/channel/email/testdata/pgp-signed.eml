@@ -1,0 +1,22 @@
+From: Alice Signer <alice@example.com>
+To: support@example.org
+Subject: Signed message
+Message-ID: <pgp-signed-test@example.com>
+Date: Wed, 15 Jul 2026 15:05:00 +0200
+MIME-Version: 1.0
+Content-Type: multipart/signed; micalg=pgp-sha256; protocol="application/pgp-signature"; boundary="----=_Signed_ABC"
+
+------=_Signed_ABC
+Content-Type: text/plain; charset="utf-8"
+
+Please update my account email.
+------=_Signed_ABC
+Content-Type: application/pgp-signature
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEexampleexampleexampleexampleexampleFAmMAAAAACgkQ
+exampleexampleexampleexampleexampleexampleexampleexampleexample=
+=AbCd
+-----END PGP SIGNATURE-----
+------=_Signed_ABC--

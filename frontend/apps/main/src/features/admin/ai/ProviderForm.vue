@@ -28,7 +28,7 @@
               <FormControl>
                 <Input
                   type="text"
-                  :placeholder="showEmbeddingFields ? 'text-embedding-3-small' : 'gpt-4o-mini'"
+                  :placeholder="showEmbeddingFields ? 'text-embedding-3-small' : 'gpt-5.4-mini'"
                   v-bind="componentField"
                 />
               </FormControl>
@@ -204,7 +204,7 @@ const fieldDefaults = {
 
 // OpenAI-compatible provider presets: pre-fill base URL + model (+ dims for embedding).
 const completionPresets = [
-  { value: 'openai', label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  { value: 'openai', label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-5.4-mini' },
   {
     value: 'anthropic',
     label: 'Anthropic (Claude)',
@@ -215,7 +215,7 @@ const completionPresets = [
     value: 'openrouter',
     label: 'OpenRouter',
     base_url: 'https://openrouter.ai/api/v1',
-    model: 'openai/gpt-4o-mini'
+    model: 'openai/gpt-5.4-mini'
   },
   {
     value: 'groq',

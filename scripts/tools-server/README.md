@@ -1,8 +1,12 @@
-# AI copilot tools test server
+# AI assistant custom tools test server
 
-A minimal HTTP server for testing AI copilot custom tools locally. Maps a contact's
-external user id (sent by libredesk in the `X-Libredesk-Contact-External-Id` header)
-to fake account data. Edit the `users` map in `main.go` to add test users.
+A small HTTP server for trying out custom tools without wiring up a real backend.
+It holds two fake accounts and looks them up by the contact's external user id,
+which libredesk sends in the `X-Libredesk-Contact-External-Id` header. Add your
+own test users by editing the `users` map in `main.go`.
+
+Custom tools are only called by AI assistants. Copilot gets the built-in tools
+and never touches these.
 
 ## Run
 
@@ -10,13 +14,14 @@ to fake account data. Edit the `users` map in `main.go` to add test users.
 go run ./scripts/tools-server
 ```
 
-Listens on `:7070` by default (`-addr` to change). Every request logs the contact
-headers and the raw args JSON the model sent.
+It listens on `:7070`, or pass `-addr` to change that. Every request logs the contact
+headers and the raw args JSON the model sent, which is usually enough to work out
+why a tool call did not do what you expected.
 
 ## Headers libredesk sends
 
-On every custom tool call libredesk injects the contact and conversation context
-server-side (the model never sees or controls these):
+Libredesk injects the contact and conversation context on every custom tool call.
+This happens server-side, so the model cannot see or change any of it:
 
 | Header                            | Value                                              |
 | --------------------------------- | -------------------------------------------------- |
@@ -28,8 +33,13 @@ server-side (the model never sees or controls these):
 | `X-Libredesk-Conversation-UUID`   | conversation uuid                                  |
 | `X-Libredesk-Inbox-Id`            | inbox id                                           |
 
-Trust `X-Libredesk-Contact-Email` for sensitive lookups only when
-`X-Libredesk-Contact-Verified` is `true`; a `visitor` can self-claim any address.
+A visitor can type any email address into a chat, so only trust
+`X-Libredesk-Contact-Email` for account data when `X-Libredesk-Contact-Verified`
+is `true`. This server returns a 403 otherwise.
+
+Work out who the customer is from these headers and nothing else. The request body
+holds the model's arguments, written from whatever the customer typed, so it must
+never decide which account you return.
 
 ## Endpoints
 
@@ -41,15 +51,18 @@ Trust `X-Libredesk-Contact-Email` for sensitive lookups only when
 
 ## Tool setup (Admin -> AI -> Tools)
 
-For each endpoint create a tool with:
+Create one tool per endpoint:
 
 - Method: `POST`
 - Auth header: `X-Api-Key`
 - Auth value: `test-secret-token`
 - Parameters: leave empty
 
-Example: name `get_account`, URL `http://localhost:7070/account`, description
+For example, name `get_account`, URL `http://localhost:7070/account`, description
 "Get the customer's account details: name, email, plan, and KYC status."
+
+Grant the tools to an assistant under **Admin -> AI -> Assistants**, then assign a
+conversation to that assistant. Nothing gets called until you do both.
 
 ## Test contacts
 
@@ -58,5 +71,5 @@ Set the contact's external user id and email to one of:
 - `USR1001` / alice@example.com - pro plan, KYC verified, has orders
 - `USR1002` / bob@example.com - free plan, KYC pending, no orders
 
-Error paths: bad API key -> 401, missing external id -> 400, unknown id -> 404,
-email mismatch -> 403.
+Error paths: bad API key -> 401, unverified contact -> 403, missing external id -> 400,
+unknown id -> 404, email mismatch -> 403.

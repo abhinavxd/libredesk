@@ -89,7 +89,7 @@
                   </div>
 
                   <!-- Required -->
-                  <div class="flex items-center space-x-2">
+                  <div v-if="field.type !== 'checkbox'" class="flex items-center space-x-2">
                     <Checkbox v-model:checked="field.required" />
                     <label class="text-sm">{{ $t('globals.terms.required') }}</label>
                   </div>

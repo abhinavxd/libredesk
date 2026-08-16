@@ -32,10 +32,35 @@ DELETE FROM ai_knowledge_base WHERE id = $1;
 UPDATE ai_knowledge_base SET embedded_fingerprint = $2 WHERE id = $1;
 
 -- name: get-embeddable-help-articles
-SELECT id, title, content, status, ai_enabled, embedded_fingerprint FROM help_articles;
+WITH RECURSIVE published_collections AS (
+    SELECT c.id FROM article_collections c
+    JOIN help_centers hc ON hc.id = c.help_center_id AND hc.is_active
+    WHERE c.parent_id IS NULL AND c.is_published = true
+    UNION
+    SELECT c.id FROM article_collections c JOIN published_collections p ON c.parent_id = p.id
+    WHERE c.is_published = true
+)
+SELECT a.id, a.title, a.content, a.status, a.ai_enabled, a.embedded_fingerprint,
+    a.collection_id IN (SELECT id FROM published_collections) AS is_reachable
+FROM help_articles a
+WHERE (a.status = 'published' AND a.ai_enabled) OR a.embedded_fingerprint <> '';
 
 -- name: get-embeddable-help-article
-SELECT id, title, content, status, ai_enabled, embedded_fingerprint FROM help_articles WHERE id = $1;
+WITH RECURSIVE published_collections AS (
+    SELECT c.id FROM article_collections c
+    JOIN help_centers hc ON hc.id = c.help_center_id AND hc.is_active
+    WHERE c.parent_id IS NULL AND c.is_published = true
+    UNION
+    SELECT c.id FROM article_collections c JOIN published_collections p ON c.parent_id = p.id
+    WHERE c.is_published = true
+)
+SELECT a.id, a.title, a.content, a.status, a.ai_enabled, a.embedded_fingerprint,
+    a.collection_id IN (SELECT id FROM published_collections) AS is_reachable
+FROM help_articles a
+WHERE a.id = $1;
+
+-- name: help-article-exists
+SELECT EXISTS(SELECT 1 FROM help_articles WHERE id = $1);
 
 -- name: set-help-article-embedded-fingerprint
 UPDATE help_articles SET embedded_fingerprint = $2 WHERE id = $1;
@@ -50,6 +75,15 @@ INSERT INTO embeddings (source_type, source_id, chunk_text, embedding, dimension
 
 -- name: delete-embeddings-by-source
 DELETE FROM embeddings WHERE source_type = $1 AND source_id = $2;
+
+-- name: delete-embeddings-by-source-ids
+DELETE FROM embeddings WHERE source_type = $1 AND source_id = ANY($2);
+
+-- name: delete-embeddings-by-source-type
+DELETE FROM embeddings WHERE source_type = $1;
+
+-- name: get-tags
+SELECT id, name FROM tags ORDER BY id;
 
 -- name: get-all-embeddings
 SELECT id, source_type, source_id, chunk_text, embedding, dimensions FROM embeddings;

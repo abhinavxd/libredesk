@@ -1,6 +1,7 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import UserDataTableDropDown from '@/features/admin/agents/dataTableDropdown.vue'
+import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import { format } from 'date-fns'
 
 export const createColumns = (t) => [
@@ -34,10 +35,16 @@ export const createColumns = (t) => [
     accessorKey: 'enabled',
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.enabled'))
+      return h('div', { class: 'text-center' }, t('globals.terms.status'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('enabled') ? t('globals.messages.yes') : t('globals.messages.no'))
+      return h(
+        'div',
+        { class: 'text-center' },
+        h(Badge, { variant: row.getValue('enabled') ? 'success' : 'secondary' }, () =>
+          row.getValue('enabled') ? t('globals.terms.enabled') : t('globals.terms.disabled')
+        )
+      )
     }
   },
   {

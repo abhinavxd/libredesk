@@ -250,9 +250,14 @@ const { t } = useI18n()
 
 // Computed property to get the correct filters based on type
 const currentFilters = computed(() => {
-  return props.type === 'new_conversation'
-    ? newConversationFilters.value
-    : conversationFilters.value
+  if (props.type === 'new_conversation') return newConversationFilters.value
+  if (props.type === 'conversation_update') return conversationFilters.value
+  // previous_* values only exist on conversation update events.
+  const filters = { ...conversationFilters.value }
+  for (const key of Object.keys(filters)) {
+    if (key.startsWith('previous_')) delete filters[key]
+  }
+  return filters
 })
 
 // Watch for type change and reset the rules as the fields will change

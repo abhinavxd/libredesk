@@ -101,7 +101,8 @@ export function useInlineImageUpload ({
         await Promise.all(
             pending.map(async ({ file, uploadId }) => {
                 const media = await upload(file, { inline: true })
-                if (media?.url) replacePlaceholder(uploadId, media.url)
+                // Public media gets a host-independent path; private URLs carry a signature.
+                if (media?.url) replacePlaceholder(uploadId, media.private ? media.url : `/uploads/${media.uuid}`)
                 else removePlaceholder(uploadId)
             })
         )

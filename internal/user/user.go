@@ -100,6 +100,7 @@ type queries struct {
 	InsertAgent                      *sqlx.Stmt `query:"insert-agent"`
 	InsertContactWithExtID           *sqlx.Stmt `query:"insert-contact-with-external-id"`
 	InsertContactNoExtID             *sqlx.Stmt `query:"insert-contact-without-external-id"`
+	InsertContactIfAbsent            *sqlx.Stmt `query:"insert-contact-if-absent"`
 	GetContactByEmail                *sqlx.Stmt `query:"get-contact-by-email"`
 	GetContactByEmailWithoutExtID    *sqlx.Stmt `query:"get-contact-by-email-without-ext-id"`
 	IsEmailBlocked                   *sqlx.Stmt `query:"is-email-blocked"`
@@ -124,6 +125,8 @@ type queries struct {
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
 
 	MergeVisitorToContact *sqlx.Stmt `query:"merge-visitor-to-contact"`
+	DeleteContact         *sqlx.Stmt `query:"delete-contact"`
+	ExportContactData     *sqlx.Stmt `query:"export-contact-data"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -212,8 +215,8 @@ func (u *Manager) GetSystemUser() (models.User, error) {
 	return u.Get(0, models.SystemUserEmail, []string{models.UserTypeAgent})
 }
 
-// GetByExternalID retrieves a user by external user ID.
-func (u *Manager) GetByExternalID(externalUserID string) (models.User, error) {
+// GetContactByExternalID retrieves a contact by external user ID.
+func (u *Manager) GetContactByExternalID(externalUserID string) (models.User, error) {
 	var user models.User
 	if err := u.q.GetUserByExternalID.Get(&user, externalUserID); err != nil {
 		if err == sql.ErrNoRows {

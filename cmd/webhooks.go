@@ -11,6 +11,18 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+// handleGetWebhooksCompact returns all webhooks in a compact format.
+func handleGetWebhooksCompact(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+	)
+	webhooks, err := app.webhook.GetAllCompact()
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(webhooks)
+}
+
 // handleGetWebhooks returns all webhooks from the database.
 func handleGetWebhooks(r *fastglue.Request) error {
 	var (

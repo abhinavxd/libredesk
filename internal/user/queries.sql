@@ -187,6 +187,12 @@ DO UPDATE SET first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first
               updated_at = now()
 RETURNING id;
 
+-- name: insert-contact-if-absent
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes)
+VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7)
+ON CONFLICT DO NOTHING
+RETURNING id;
+
 -- name: get-contact-by-email
 SELECT id, external_user_id FROM users
 WHERE email = $1 AND type = 'contact' AND deleted_at IS NULL
@@ -430,6 +436,7 @@ LEFT JOIN roles r ON r.id = ur.role_id
 LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
 WHERE u.deleted_at IS NULL
     AND u.external_user_id = $1
+    AND u.type = 'contact'
 GROUP BY u.id;
 
 -- name: get-visitor-by-email
@@ -485,3 +492,64 @@ SELECT
 
 -- name: get-user-ids-by-role
 SELECT user_id FROM user_roles WHERE role_id = $1;
+
+-- name: delete-contact
+DELETE FROM users
+WHERE id = $1 AND type IN ('contact', 'visitor');
+
+-- name: export-contact-data
+SELECT jsonb_build_object(
+    'contact', (
+        SELECT jsonb_build_object(
+            'id', id,
+            'created_at', created_at,
+            'first_name', first_name,
+            'last_name', last_name,
+            'email', email,
+            'phone_number_country_code', phone_number_country_code,
+            'phone_number', phone_number,
+            'country', country,
+            'avatar_url', avatar_url,
+            'external_user_id', external_user_id,
+            'custom_attributes', custom_attributes,
+            'availability_status', availability_status,
+            'last_active_at', last_active_at,
+            'last_login_at', last_login_at,
+            'enabled', enabled
+        )
+        FROM users
+        WHERE id = $1 AND type IN ('contact', 'visitor')
+    ),
+    'conversations', (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'reference_number', c.reference_number,
+            'created_at', c.created_at,
+            'subject', c.subject,
+            'status', cs.name,
+            'custom_attributes', c.custom_attributes,
+            'messages', (
+                SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                    'created_at', m.created_at,
+                    'type', m.type,
+                    'sender_type', m.sender_type,
+                    'content', m.text_content
+                ) ORDER BY m.created_at), '[]'::jsonb)
+                FROM conversation_messages m
+                WHERE m.conversation_id = c.id AND m.private = false AND m.type IN ('incoming', 'outgoing')
+            ),
+            'csat_responses', (
+                SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                    'created_at', cr.created_at,
+                    'rating', cr.rating,
+                    'feedback', cr.feedback,
+                    'response_timestamp', cr.response_timestamp
+                ) ORDER BY cr.created_at), '[]'::jsonb)
+                FROM csat_responses cr
+                WHERE cr.conversation_id = c.id AND cr.response_timestamp IS NOT NULL
+            )
+        ) ORDER BY c.created_at), '[]'::jsonb)
+        FROM conversations c
+        LEFT JOIN conversation_statuses cs ON cs.id = c.status_id
+        WHERE c.contact_id = $1
+    )
+);

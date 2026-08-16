@@ -68,6 +68,8 @@
                       <component
                         :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
                         class="w-3 h-3 text-muted-foreground"
+                        role="img"
+                        :aria-label="conversation.inbox_name"
                       />
                     </TooltipTrigger>
                     <TooltipContent>{{ conversation.inbox_name }}</TooltipContent>

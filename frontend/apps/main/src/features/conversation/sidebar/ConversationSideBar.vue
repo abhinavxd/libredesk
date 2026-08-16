@@ -2,7 +2,7 @@
   <Tabs v-model="activeTab" class="flex flex-col h-full">
     <TabsList class="grid grid-cols-2 mx-4 mt-3">
       <TabsTrigger value="details" class="text-xs">{{ $t('copilot.details') }}</TabsTrigger>
-      <TabsTrigger value="copilot" class="text-xs">{{ appSettingsStore.copilotName }}</TabsTrigger>
+      <TabsTrigger value="copilot" class="text-xs">{{ COPILOT_NAME }}</TabsTrigger>
     </TabsList>
 
     <TabsContent value="details" class="mt-0">
@@ -164,7 +164,7 @@ import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
 import { useTagStore } from '@/stores/tag'
 import { useUserStore } from '@/stores/user'
-import { useAppSettingsStore } from '@/stores/appSettings'
+import { COPILOT_NAME } from '@/constants/copilot'
 import {
   Accordion,
   AccordionContent,
@@ -197,7 +197,6 @@ const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
 const tagStore = useTagStore()
 const userStore = useUserStore()
-const appSettingsStore = useAppSettingsStore()
 const tags = ref([])
 const accordionState = useStorage('conversation-sidebar-accordion', [])
 const activeTab = useStorage('conversation-sidebar-tab', 'details')

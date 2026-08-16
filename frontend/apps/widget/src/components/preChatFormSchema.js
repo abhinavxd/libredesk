@@ -51,11 +51,7 @@ export const createPreChatFormSchema = (t, fields = []) => {
         }
 
         case 'checkbox':
-          schemaFields[field.key] = field.required
-            ? z.literal(true, {
-                errorMap: () => ({ message: t('globals.messages.required') })
-              })
-            : z.boolean().default(false)
+          schemaFields[field.key] = z.boolean().default(false)
           return
 
         case 'date':

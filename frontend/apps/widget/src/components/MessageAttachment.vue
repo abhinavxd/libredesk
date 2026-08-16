@@ -11,6 +11,7 @@
           :src="getThumbnailUrl(attachment)"
           :alt="attachment.name"
           class="max-w-48 max-h-32 rounded-lg object-cover"
+          @error="fallbackToOriginal($event, attachment.url)"
           @click="openImage(attachment.url)"
         />
       </div>
@@ -49,7 +50,13 @@ const isImage = (attachment) => {
 
 const getThumbnailUrl = (attachment) => {
   if (!isImage(attachment)) return attachment.url
-  return getThumbFilepath(attachment.url)
+  return attachment.thumbnail_url || getThumbFilepath(attachment.url)
+}
+
+const fallbackToOriginal = (event, originalUrl) => {
+  if (event.target.dataset.originalFallback) return
+  event.target.dataset.originalFallback = 'true'
+  event.target.src = originalUrl
 }
 
 const openImage = (url) => {

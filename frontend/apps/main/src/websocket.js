@@ -1,6 +1,7 @@
 import { useConversationStore } from './stores/conversation'
 import { useNotificationStore } from './stores/notification'
 import { useUsersStore } from './stores/users'
+import { useConnectionStore } from './stores/connection'
 import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
 
@@ -19,6 +20,7 @@ export class WebSocketClient {
     this.convStore = useConversationStore()
     this.notificationStore = useNotificationStore()
     this.usersStore = useUsersStore()
+    this.connectionStore = useConnectionStore()
     this.messageQueue = []
     this.maxQueueSize = 50
     this.queueTimeoutMs = 30000
@@ -50,6 +52,8 @@ export class WebSocketClient {
     this.reconnectInterval = 1000
     this.reconnectAttempts = 0
     this.isReconnecting = false
+    this.connectionStore.setConnecting(false)
+    this.connectionStore.setConnectionFailed(false)
     this.lastPong = Date.now()
     this.setupPing()
     this.flushMessageQueue()
@@ -148,10 +152,19 @@ export class WebSocketClient {
   }
 
   reconnect () {
-    if (this.isReconnecting || this.reconnectAttempts >= this.maxReconnectAttempts) return
+    if (this.isReconnecting) return
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.connectionStore.setConnecting(false)
+      this.connectionStore.setConnectionFailed(true)
+      return
+    }
 
     this.isReconnecting = true
     this.reconnectAttempts++
+
+    this.connectionStore.setConnecting(true)
+    // The online listener resets the attempt counter, so a retry can follow a give up.
+    this.connectionStore.setConnectionFailed(false)
 
     this.reconnectTimer = setTimeout(() => {
       this.isReconnecting = false
@@ -179,6 +192,8 @@ export class WebSocketClient {
 
     window.addEventListener('focus', () => {
       if (this.socket?.readyState !== WebSocket.OPEN) {
+        this.reconnectAttempts = 0
+        this.reconnectInterval = 1000
         this.reconnect()
       }
     })
@@ -306,6 +321,8 @@ export class WebSocketClient {
   close () {
     this.manualClose = true
     this.clearPing()
+    this.connectionStore.setConnecting(false)
+    this.connectionStore.setConnectionFailed(false)
     if (this.socket) {
       this.socket.close()
     }

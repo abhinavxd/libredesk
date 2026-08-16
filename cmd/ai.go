@@ -293,9 +293,9 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if strings.TrimSpace(resp) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
 	}
-	return r.SendEnvelope(resp)
+	return r.SendEnvelope(stringutil.Markdown2HTML(resp))
 }
 
 // handleAISummarizeConversation summarizes a conversation and posts the summary as the requesting agent's private note.
@@ -322,7 +322,7 @@ func handleAISummarizeConversation(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if strings.TrimSpace(summary) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
 	}
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
 	note := "**" + app.i18n.T("ai.summaryNoteTitle") + "**\n\n" + summary
@@ -348,25 +348,12 @@ func handleAISuggestTags(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	tags, err := app.tag.GetAll()
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	if len(tags) == 0 {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.noTagsConfigured"), nil))
-	}
-
 	transcript := conversationTranscript(app, req.ConversationUUID)
 	if strings.TrimSpace(transcript) == "" {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.tagSuggestEmptyConversation"), nil))
 	}
 
-	names := make([]string, 0, len(tags))
-	for _, t := range tags {
-		names = append(names, t.Name)
-	}
-
-	suggestions, err := app.ai.SuggestTags(r.RequestCtx, transcript, names)
+	suggestions, err := app.ai.SuggestTags(r.RequestCtx, transcript)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -421,10 +408,8 @@ func handleAICopilot(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if strings.TrimSpace(resp) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
 	}
-	// Copilot answers in markdown; store and return HTML so the panel, reply editor and private notes consume it as is.
-	resp = stringutil.Markdown2HTML(resp)
 	// Persist the exchange only after a successful reply, so a failed or empty call leaves no orphaned turn.
 	if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleUser, req.Message); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -432,7 +417,7 @@ func handleAICopilot(r *fastglue.Request) error {
 	if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleAssistant, resp); err != nil {
 		app.lo.Error("error saving copilot reply", "error", err)
 	}
-	return r.SendEnvelope(resp)
+	return r.SendEnvelope(stringutil.Markdown2HTML(resp))
 }
 
 // handleGetCopilotMessages returns the requesting agent's persisted copilot chat for a conversation.
@@ -450,6 +435,12 @@ func handleGetCopilotMessages(r *fastglue.Request) error {
 	msgs, err := app.ai.GetCopilotMessages(conv.ID, auser.ID, maxCopilotHistoryMessages)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+	// Assistant turns are stored as markdown; the panel renders HTML.
+	for i := range msgs {
+		if msgs[i].Role == aimodels.RoleAssistant {
+			msgs[i].Content = stringutil.Markdown2HTML(msgs[i].Content)
+		}
 	}
 	return r.SendEnvelope(msgs)
 }

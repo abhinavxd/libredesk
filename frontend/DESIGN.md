@@ -79,7 +79,7 @@ Color carries meaning; use the semantic token, never a raw palette color.
 
 Both themes use three tiers so panels read as floating, not flat:
 
-```
+```text
 canvas (deepest gutter behind the panels)
   └─ background (app content + sidebar chrome, same value)
         └─ card / popover (lifted by border + shadow-sm)

@@ -20,7 +20,7 @@
     <template #help>
       <p>{{ t('admin.ai.providersHelp') }}</p>
       <a
-        href="https://docs.libredesk.io/configuration/ai"
+        href="https://docs.libredesk.io/configuration/ai#providers"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"

@@ -66,10 +66,13 @@ type Opts struct {
 type DeliveryTask struct {
 	Event   models.WebhookEvent
 	Payload any
+	// Zero means fan out to all subscribers of Event.
+	WebhookID int
 }
 
 // queries contains prepared SQL queries.
 type queries struct {
+	GetWebhooksCompact *sqlx.Stmt `query:"get-webhooks-compact"`
 	GetAllWebhooks     *sqlx.Stmt `query:"get-all-webhooks"`
 	GetWebhook         *sqlx.Stmt `query:"get-webhook"`
 	GetWebhookSecret   *sqlx.Stmt `query:"get-webhook-secret"`
@@ -106,6 +109,16 @@ func New(opts Opts) (*Manager, error) {
 		workers:       opts.Workers,
 		encryptionKey: opts.EncryptionKey,
 	}, nil
+}
+
+// GetAllCompact retrieves all webhooks with only id and name.
+func (m *Manager) GetAllCompact() ([]models.WebhookCompact, error) {
+	var webhooks = make([]models.WebhookCompact, 0)
+	if err := m.q.GetWebhooksCompact.Select(&webhooks); err != nil {
+		m.lo.Error("error fetching webhooks", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return webhooks, nil
 }
 
 // GetAll retrieves all webhooks.
@@ -257,6 +270,31 @@ func (m *Manager) TriggerEvent(event models.WebhookEvent, data any) {
 	}
 }
 
+// TriggerWebhook enqueues a delivery of the given event to one specific webhook.
+func (m *Manager) TriggerWebhook(webhookID int, event models.WebhookEvent, data any) {
+	// A non-positive ID would be treated as a fan out to every subscriber of the event.
+	if webhookID <= 0 {
+		m.lo.Warn("dropping targeted webhook delivery, webhook ID is not positive", "webhook_id", webhookID, "event", event)
+		return
+	}
+
+	m.closedMu.RLock()
+	defer m.closedMu.RUnlock()
+	if m.closed {
+		return
+	}
+
+	select {
+	case m.deliveryQueue <- DeliveryTask{
+		Event:     event,
+		Payload:   data,
+		WebhookID: webhookID,
+	}:
+	default:
+		m.lo.Warn("webhook delivery queue is full, dropping webhook delivery", "event", event, "webhook_id", webhookID, "queue_size", len(m.deliveryQueue))
+	}
+}
+
 // Run starts the webhook delivery worker pool.
 func (m *Manager) Run(ctx context.Context) {
 	for i := 0; i < m.workers; i++ {
@@ -297,6 +335,20 @@ func (m *Manager) worker(ctx context.Context) {
 
 // deliverWebhook delivers webhooks for an event by making HTTP requests.
 func (m *Manager) deliverWebhook(task DeliveryTask) {
+	if task.WebhookID > 0 {
+		webhook, err := m.Get(task.WebhookID)
+		if err != nil {
+			m.lo.Error("error fetching webhook for delivery", "webhook_id", task.WebhookID, "event", task.Event, "error", err)
+			return
+		}
+		if !webhook.IsActive {
+			m.lo.Debug("skipping delivery, webhook is inactive", "webhook_id", webhook.ID, "event", task.Event)
+			return
+		}
+		m.deliverSingleWebhook(webhook, task)
+		return
+	}
+
 	webhooks, err := m.getWebhooksByEvent(string(task.Event))
 	if err != nil {
 		m.lo.Error("error fetching webhooks for event", "event", task.Event, "error", err)

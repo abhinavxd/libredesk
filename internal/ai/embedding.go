@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/lib/pq"
 )
 
 // reconcileInterval is how often knowledge base content that failed to embed is retried.
@@ -45,12 +47,13 @@ func (ix *embeddingIndex) replaceAll(chunks []indexedChunk) {
 	ix.chunks = chunks
 }
 
-func (ix *embeddingIndex) replaceSource(sourceType string, sourceID int, chunks []indexedChunk) {
+// replaceWhere drops every chunk matching drop, then appends chunks.
+func (ix *embeddingIndex) replaceWhere(drop func(indexedChunk) bool, chunks []indexedChunk) {
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
 	kept := ix.chunks[:0:0]
 	for _, c := range ix.chunks {
-		if c.sourceType == sourceType && c.sourceID == sourceID {
+		if drop(c) {
 			continue
 		}
 		kept = append(kept, c)
@@ -58,12 +61,38 @@ func (ix *embeddingIndex) replaceSource(sourceType string, sourceID int, chunks 
 	ix.chunks = append(kept, chunks...)
 }
 
-func (ix *embeddingIndex) removeSource(sourceType string, sourceID int) {
-	ix.replaceSource(sourceType, sourceID, nil)
+// replaceSourceIDs drops every chunk of a source type whose id is in ids, then appends chunks.
+func (ix *embeddingIndex) replaceSourceIDs(sourceType string, ids []int, chunks []indexedChunk) {
+	drop := make(map[int]bool, len(ids))
+	for _, id := range ids {
+		drop[id] = true
+	}
+	ix.replaceWhere(func(c indexedChunk) bool { return c.sourceType == sourceType && drop[c.sourceID] }, chunks)
 }
 
-// search returns the top-k matches and the count of chunks skipped for mismatched vector dimensions.
-func (ix *embeddingIndex) search(query []float32, k int) ([]models.SearchResult, int) {
+func (ix *embeddingIndex) removeSource(sourceType string, sourceID int) {
+	ix.replaceSourceIDs(sourceType, []int{sourceID}, nil)
+}
+
+func (ix *embeddingIndex) removeSourceType(sourceType string) {
+	ix.replaceWhere(func(c indexedChunk) bool { return c.sourceType == sourceType }, nil)
+}
+
+// chunksBySourceID returns a source type's chunks keyed by source id; only valid for one-chunk-per-source types.
+func (ix *embeddingIndex) chunksBySourceID(sourceType string) map[int]indexedChunk {
+	ix.mu.RLock()
+	defer ix.mu.RUnlock()
+	out := make(map[int]indexedChunk)
+	for _, c := range ix.chunks {
+		if c.sourceType == sourceType {
+			out[c.sourceID] = c
+		}
+	}
+	return out
+}
+
+// search returns the top-k matches within the given source types and the count of chunks skipped for mismatched vector dimensions.
+func (ix *embeddingIndex) search(query []float32, k int, sourceTypes ...string) ([]models.SearchResult, int) {
 	ix.mu.RLock()
 	defer ix.mu.RUnlock()
 
@@ -75,6 +104,9 @@ func (ix *embeddingIndex) search(query []float32, k int) ([]models.SearchResult,
 	dimMismatch := 0
 	results := make([]models.SearchResult, 0, len(ix.chunks))
 	for _, c := range ix.chunks {
+		if !slices.Contains(sourceTypes, c.sourceType) {
+			continue
+		}
 		if len(c.vec) != len(query) {
 			dimMismatch++
 			continue
@@ -98,8 +130,12 @@ func (ix *embeddingIndex) search(query []float32, k int) ([]models.SearchResult,
 	return results, dimMismatch
 }
 
-// Search embeds the query and returns the top-k most similar chunks across the whole index.
+// Search embeds the query and returns the top-k most similar knowledge chunks across snippets and help articles.
 func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.SearchResult, error) {
+	return m.searchSources(ctx, query, k, models.SourceSnippet, models.SourceHelpArticle)
+}
+
+func (m *Manager) searchSources(ctx context.Context, query string, k int, sourceTypes ...string) ([]models.SearchResult, error) {
 	// A run arriving right after boot must not search the index before it has loaded.
 	select {
 	case <-m.indexReady:
@@ -110,11 +146,11 @@ func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.Sea
 	if err != nil {
 		return nil, err
 	}
-	results, dimMismatch := m.index.search(qvec, k)
+	results, dimMismatch := m.index.search(qvec, k, sourceTypes...)
 	if dimMismatch > 0 {
-		m.lo.Warn("skipped stale embeddings with mismatched dimensions; reindex the knowledge base after changing the embedding model", "count", dimMismatch, "query_dimensions", len(qvec))
+		m.lo.Warn("skipped stale embeddings with mismatched dimensions; reindex after changing the embedding model", "source_types", sourceTypes, "count", dimMismatch, "query_dimensions", len(qvec))
 	}
-	m.lo.Debug("rag search", "query_len", len(query), "hits", len(results))
+	m.lo.Debug("rag search", "source_types", sourceTypes, "query_len", len(query), "hits", len(results))
 	for i, r := range results {
 		m.lo.Debug("rag fetched chunk", "rank", i+1, "score", r.Score, "source_type", r.SourceType, "source_id", r.SourceID, "chunk_len", len(r.ChunkText))
 	}
@@ -129,7 +165,7 @@ func (m *Manager) Reindex(sourceType string, sourceID int, title, htmlContent st
 	}
 	m.reindexMu.Lock()
 	defer m.reindexMu.Unlock()
-	return m.commitEmbeddings(sourceType, sourceID, indexed)
+	return m.commitEmbeddings(sourceType, []int{sourceID}, indexed)
 }
 
 // embedSource chunks and embeds content without touching stored state, so it can run before taking reindexMu.
@@ -165,8 +201,8 @@ func (m *Manager) embedSource(ctx context.Context, sourceType string, sourceID i
 	return indexed, nil
 }
 
-// commitEmbeddings replaces a source's stored and in-memory vectors. Caller must hold reindexMu.
-func (m *Manager) commitEmbeddings(sourceType string, sourceID int, indexed []indexedChunk) error {
+// commitEmbeddings replaces the stored and in-memory vectors of the given source ids. Caller must hold reindexMu.
+func (m *Manager) commitEmbeddings(sourceType string, sourceIDs []int, indexed []indexedChunk) error {
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		m.lo.Error("error beginning reindex transaction", "error", err)
@@ -176,14 +212,14 @@ func (m *Manager) commitEmbeddings(sourceType string, sourceID int, indexed []in
 		_ = tx.Rollback()
 	}()
 
-	if _, err := tx.Stmtx(m.q.DeleteEmbeddingsBySource).Exec(sourceType, sourceID); err != nil {
+	if _, err := tx.Stmtx(m.q.DeleteEmbeddingsBySourceIDs).Exec(sourceType, pq.Array(sourceIDs)); err != nil {
 		m.lo.Error("error clearing old embeddings", "error", err)
 		return err
 	}
 	insert := tx.Stmtx(m.q.InsertEmbedding)
 	for _, c := range indexed {
-		if _, err := insert.Exec(sourceType, sourceID, c.chunkText, serializeEmbedding(c.vec), len(c.vec)); err != nil {
-			m.lo.Error("error inserting embedding", "error", err)
+		if _, err := insert.Exec(sourceType, c.sourceID, c.chunkText, serializeEmbedding(c.vec), len(c.vec)); err != nil {
+			m.lo.Error("error inserting embedding", "error", err, "source_id", c.sourceID)
 			return err
 		}
 	}
@@ -192,7 +228,7 @@ func (m *Manager) commitEmbeddings(sourceType string, sourceID int, indexed []in
 		return err
 	}
 
-	m.index.replaceSource(sourceType, sourceID, indexed)
+	m.index.replaceSourceIDs(sourceType, sourceIDs, indexed)
 	return nil
 }
 
@@ -276,7 +312,7 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 	}
 }
 
-// reconcile re-embeds every enabled snippet whose stored fingerprint no longer matches its content and the active model.
+// reconcile brings every embedded source back in line with the active embedding provider.
 func (m *Manager) reconcile(ctx context.Context) {
 	if !m.reconcileMu.TryLock() {
 		return
@@ -291,34 +327,14 @@ func (m *Manager) reconcile(ctx context.Context) {
 	if cfg.APIKey == "" {
 		return
 	}
-	items, err := m.GetKnowledgeBaseItems()
-	if err != nil {
-		return
-	}
 
-	reindexed := 0
-	for _, item := range items {
+	for _, src := range m.embedSources() {
 		if ctx.Err() != nil {
 			return
 		}
-		if !item.Enabled {
-			// A disabled item should carry no embeddings; clean up any left behind.
-			if item.EmbeddedFingerprint != "" {
-				m.reindexSnippetWith(ctx, item, cfg.BaseURL, cfg.Model, cfg.Dimensions, m.nextSnippetGen(item.ID))
-			}
-			continue
-		}
-		if item.EmbeddedFingerprint == snippetFingerprint(item, cfg.BaseURL, cfg.Model, cfg.Dimensions) {
-			continue
-		}
-		m.reindexSnippetWith(ctx, item, cfg.BaseURL, cfg.Model, cfg.Dimensions, m.nextSnippetGen(item.ID))
-		reindexed++
+		m.reconcileSource(ctx, src, cfg.BaseURL, cfg.Model, cfg.Dimensions)
 	}
-	if reindexed > 0 {
-		m.lo.Info("reconciled knowledge base embeddings", "reindexed", reindexed)
-	}
-
-	m.reconcileHelpArticles(cfg.Model, cfg.Dimensions)
+	m.reconcileTags(ctx)
 }
 
 func serializeEmbedding(vec []float32) []byte {

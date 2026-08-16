@@ -7,9 +7,9 @@
         </div>
 
         <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <div class="flex gap-5">
-              <div class="w-48">
+          <div class="flex items-start justify-between gap-5">
+            <div class="flex gap-5 flex-1 min-w-0">
+              <div class="w-56 shrink-0">
                 <!-- Type -->
                 <Select
                   v-model="action.type"
@@ -35,7 +35,7 @@
               <!-- Value -->
               <div
                 v-if="action.type && conversationActions[action.type]?.type === 'tag'"
-                class="w-full"
+                class="flex-1 min-w-0"
               >
                 <SelectTag
                   v-model="action.value"
@@ -45,7 +45,31 @@
               </div>
 
               <div
-                class="w-48"
+                v-if="action.type && conversationActions[action.type]?.type === 'recipients'"
+                class="flex-1 min-w-0 space-y-3"
+              >
+                <SelectTag
+                  :modelValue="action.recipients || []"
+                  @update:modelValue="(value) => handleNotifyRecipientsChange(value, index)"
+                  :items="notifyRecipientOptions"
+                  :placeholder="t('placeholders.selectRecipients')"
+                />
+                <Input
+                  type="text"
+                  :placeholder="t('globals.terms.subject')"
+                  :modelValue="action.subject || ''"
+                  @update:modelValue="(value) => handleNotifySubjectChange(value, index)"
+                />
+                <Textarea
+                  :placeholder="t('globals.terms.message')"
+                  :modelValue="action.message || ''"
+                  @update:modelValue="(value) => handleNotifyMessageChange(value, index)"
+                  class="h-36"
+                />
+              </div>
+
+              <div
+                class="flex-1 min-w-0"
                 v-if="action.type && conversationActions[action.type]?.type === 'select'"
               >
                 <SelectComboBox
@@ -53,7 +77,44 @@
                   :items="conversationActions[action.type]?.options"
                   :placeholder="t('placeholders.selectValue')"
                   @select="handleValueChange($event, index)"
-                  :type="action.type === 'assign_team' ? 'team' : 'user'"
+                  :type="action.type === 'assign_user' ? 'user' : 'team'"
+                />
+              </div>
+
+              <div
+                class="flex gap-3 flex-1 min-w-0"
+                v-if="action.type && conversationActions[action.type]?.type === 'webhook'"
+              >
+                <div class="flex-1 min-w-0">
+                  <SelectComboBox
+                    v-model="action.value[0]"
+                    :items="webhookStore.options"
+                    :placeholder="t('placeholders.selectWebhook')"
+                    @select="handleWebhookChange($event, index)"
+                  />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <Input
+                    type="text"
+                    :placeholder="t('placeholders.webhookEventName')"
+                    :modelValue="action.value[1] || ''"
+                    @update:modelValue="(value) => handleWebhookEventChange(value, index)"
+                  />
+                  <p class="text-xs text-muted-foreground mt-1">
+                    {{ $t('admin.automation.webhookEventNameHint') }}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                class="flex-1 min-w-0"
+                v-if="action.type && conversationActions[action.type]?.type === 'text'"
+              >
+                <Input
+                  type="text"
+                  :placeholder="placeholderForText(action.type)"
+                  :modelValue="action.value[0] || ''"
+                  @update:modelValue="(value) => handleTextChange(value, index)"
                 />
               </div>
             </div>
@@ -84,10 +145,15 @@
 </template>
 
 <script setup>
-import { toRefs } from 'vue'
+import { toRefs, computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
+import { Input } from '@shared-ui/components/ui/input'
+import { Textarea } from '@shared-ui/components/ui/textarea'
 import CloseButton from '@main/components/button/CloseButton.vue'
-import { useTagStore } from '../../../stores/tag'
+import { useTagStore } from '@main/stores/tag'
+import { useWebhookStore } from '@main/stores/webhook'
+import { useUsersStore } from '@main/stores/users'
+import { useTeamStore } from '@main/stores/team'
 import {
   Select,
   SelectContent,
@@ -97,7 +163,7 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { SelectTag } from '@shared-ui/components/ui/select'
-import { useConversationFilters } from '../../../composables/useConversationFilters'
+import { useConversationFilters } from '@main/composables/useConversationFilters'
 import { getTextFromHTML } from '@shared-ui/utils/string'
 import { useI18n } from 'vue-i18n'
 import Editor from '@main/components/editor/ConversationEditor.vue'
@@ -114,11 +180,73 @@ const { actions } = toRefs(props)
 const { t } = useI18n()
 const emit = defineEmits(['update-actions', 'add-action', 'remove-action'])
 const tagsStore = useTagStore()
+const webhookStore = useWebhookStore()
+const uStore = useUsersStore()
+const tStore = useTeamStore()
 const { conversationActions } = useConversationFilters()
 
+webhookStore.fetchWebhooks()
+
+const notifyRecipientOptions = computed(() => [
+  { label: t('globals.terms.assignee'), value: 'assignee' },
+  { label: t('globals.terms.assignedTeam'), value: 'assigned_team' },
+  ...tStore.options.map((o) => ({
+    label: `${t('globals.terms.team')}: ${o.label}`,
+    value: `team:${o.value}`
+  })),
+  ...uStore.options.map((o) => ({
+    label: `${t('globals.terms.agent')}: ${o.label}`,
+    value: `user:${o.value}`
+  }))
+])
+
+const handleNotifyRecipientsChange = (value, index) => {
+  actions.value[index].recipients = value || []
+  emitUpdate(index)
+}
+
+const handleNotifySubjectChange = (value, index) => {
+  actions.value[index].subject = value
+  emitUpdate(index)
+}
+
+const handleNotifyMessageChange = (value, index) => {
+  actions.value[index].message = value
+  emitUpdate(index)
+}
+
+const handleTextChange = (value, index) => {
+  actions.value[index].value = [value]
+  emitUpdate(index)
+}
+
+const handleWebhookChange = (value, index) => {
+  if (typeof value === 'object') {
+    value = value.value
+  }
+  const current = actions.value[index].value || []
+  actions.value[index].value = [value || '', current[1] || '']
+  emitUpdate(index)
+}
+
+const handleWebhookEventChange = (value, index) => {
+  const current = actions.value[index].value || []
+  actions.value[index].value = [current[0] || '', value]
+  emitUpdate(index)
+}
+
+const placeholderForText = (type) => {
+  if (type === 'snooze') return t('placeholders.snoozeDuration')
+  return t('actions.setValue')
+}
+
 const handleFieldChange = (value, index) => {
-  actions.value[index].value = []
-  actions.value[index].type = value
+  const action = actions.value[index]
+  action.value = []
+  action.type = value
+  delete action.subject
+  delete action.message
+  delete action.recipients
   emitUpdate(index)
 }
 

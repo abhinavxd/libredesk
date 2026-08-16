@@ -2,9 +2,11 @@ package models
 
 import (
 	"encoding/json"
+	"strconv"
 	"time"
 
 	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/lib/pq"
 )
 
@@ -20,6 +22,9 @@ const (
 	ActionSetTags         = "set_tags"
 	ActionRemoveTags      = "remove_tags"
 	ActionSendCSAT        = "send_csat"
+	ActionNotify          = "notify"
+	ActionSnooze          = "snooze"
+	ActionTriggerWebhook  = "trigger_webhook"
 
 	OperatorAnd = "AND"
 	OperatorOR  = "OR"
@@ -32,6 +37,7 @@ const (
 	RuleOperatorNotSet      = "not set"
 	RuleOperatorGreaterThan = "greater than"
 	RuleOperatorLessThan    = "less than"
+	RuleOperatorStartsWith  = "starts with"
 
 	RuleTypeNewConversation    = "new_conversation"
 	RuleTypeConversationUpdate = "conversation_update"
@@ -49,6 +55,18 @@ const (
 	ConversationHoursSinceResolved     = "hours_since_resolved"
 	ConversationInbox                  = "inbox"
 	ContactEmail                       = "contact_email"
+
+	ConversationPreviousStatus       = "previous_status"
+	ConversationPreviousPriority     = "previous_priority"
+	ConversationPreviousAssignedUser = "previous_assigned_user"
+	ConversationPreviousAssignedTeam = "previous_assigned_team"
+
+	NotifyRecipientAssignee     = "assignee"
+	NotifyRecipientAssignedTeam = "assigned_team"
+	NotifyRecipientTeam         = "team"
+	NotifyRecipientUser         = "user"
+
+	MaxNotifyRecipients = 1000
 
 	EventConversationUserAssigned    = "conversation.user.assigned"
 	EventConversationTeamAssigned    = "conversation.team.assigned"
@@ -75,6 +93,7 @@ var ActionPermissions = map[string]string{
 	ActionAddTags:         authzModels.PermConversationsUpdateTags,
 	ActionSetTags:         authzModels.PermConversationsUpdateTags,
 	ActionRemoveTags:      authzModels.PermConversationsUpdateTags,
+	ActionSnooze:          authzModels.PermConversationsUpdateStatus,
 }
 
 // RuleRecord represents a rule record in the database
@@ -118,4 +137,32 @@ type RuleAction struct {
 	Type         string   `json:"type" db:"type"`
 	Value        []string `json:"value" db:"value"`
 	DisplayValue []string `json:"display_value" db:"-"`
+
+	// Set only for the notify action.
+	Subject    string   `json:"subject,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	Recipients []string `json:"recipients,omitempty"`
+}
+
+// PreviousValues returns conv's field values keyed for previous_* filters; pass the pre-change conversation.
+func PreviousValues(conv cmodels.Conversation) map[string]string {
+	values := map[string]string{
+		ConversationPreviousStatus:       "",
+		ConversationPreviousPriority:     "",
+		ConversationPreviousAssignedUser: "",
+		ConversationPreviousAssignedTeam: "",
+	}
+	if conv.StatusID.Valid {
+		values[ConversationPreviousStatus] = strconv.Itoa(conv.StatusID.Int)
+	}
+	if conv.PriorityID.Valid {
+		values[ConversationPreviousPriority] = strconv.Itoa(conv.PriorityID.Int)
+	}
+	if conv.AssignedUserID.Valid {
+		values[ConversationPreviousAssignedUser] = strconv.Itoa(conv.AssignedUserID.Int)
+	}
+	if conv.AssignedTeamID.Valid {
+		values[ConversationPreviousAssignedTeam] = strconv.Itoa(conv.AssignedTeamID.Int)
+	}
+	return values
 }

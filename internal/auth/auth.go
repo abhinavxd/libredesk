@@ -28,6 +28,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// ErrOIDCInvalidClient reports the provider rejecting the client credentials, typically an expired or wrong client secret.
+var ErrOIDCInvalidClient = errors.New("oidc provider rejected client credentials")
+
 // OIDCclaim holds OIDC token claims data
 type OIDCclaim struct {
 	Email         string `json:"email"`
@@ -206,11 +209,13 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 
 	oauthCfg, ok := a.oauthCfgs[providerID]
 	if !ok {
+		a.logger.Error("oidc provider not configured, it may have failed to initialize at startup", "provider_id", providerID)
 		return "", OIDCclaim{}, fmt.Errorf("invalid provider ID: %d", providerID)
 	}
 
 	verifier, ok := a.verifiers[providerID]
 	if !ok {
+		a.logger.Error("oidc verifier not configured, it may have failed to initialize at startup", "provider_id", providerID)
 		return "", OIDCclaim{}, fmt.Errorf("invalid provider ID: %d", providerID)
 	}
 
@@ -219,25 +224,34 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 
 	tk, err := oauthCfg.Exchange(ctx, code)
 	if err != nil {
+		a.logger.Error("error exchanging oidc authorization code for token, check the provider client ID / client secret (it may have expired) and redirect URL", "provider_id", providerID, "error", err)
+		var retrieveErr *oauth2.RetrieveError
+		if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_client" {
+			return "", OIDCclaim{}, ErrOIDCInvalidClient
+		}
 		return "", OIDCclaim{}, fmt.Errorf("error exchanging token: %v", err)
 	}
 
 	// Extract the ID Token from OAuth2 token.
 	rawIDTk, ok := tk.Extra("id_token").(string)
 	if !ok {
+		a.logger.Error("oidc token response has no id_token, check that the provider supports OIDC and the openid scope is allowed", "provider_id", providerID)
 		return "", OIDCclaim{}, errors.New("id_token missing")
 	}
 
 	// Parse and verify ID Token payload.
 	idTk, err := verifier.Verify(ctx, rawIDTk)
 	if err != nil {
+		a.logger.Error("error verifying oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, fmt.Errorf("error verifying ID token: %v", err)
 	}
 
 	var claims OIDCclaim
 	if err := idTk.Claims(&claims); err != nil {
+		a.logger.Error("error parsing claims from oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, errors.New("error getting user from OIDC")
 	}
+	a.logger.Debug("oidc token exchange successful", "provider_id", providerID, "email", claims.Email, "email_verified", claims.EmailVerified)
 	return rawIDTk, claims, nil
 }
 
@@ -331,7 +345,9 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 
 	sess, err := a.sess.Acquire(r.RequestCtx, r, r)
 	if err != nil {
-		a.logger.Error("error acquiring session", "error", err)
+		if err != simplesessions.ErrInvalidSession {
+			a.logger.Error("error acquiring session", "error", err)
+		}
 		return models.User{}, err
 	}
 

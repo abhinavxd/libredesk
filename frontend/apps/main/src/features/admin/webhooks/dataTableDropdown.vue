@@ -9,19 +9,26 @@
     <DropdownMenuContent>
       <DropdownMenuItem :as-child="true">
         <RouterLink :to="{ name: 'edit-webhook', params: { id: props.webhook.id } }">
+          <Pencil class="mr-2 h-4 w-4" />
           {{ $t('globals.messages.edit') }}
         </RouterLink>
       </DropdownMenuItem>
       <DropdownMenuItem @click="handleToggle">
+        <component :is="props.webhook.is_active ? PowerOff : Power" class="mr-2 h-4 w-4" />
         {{
           props.webhook.is_active ? $t('globals.messages.disable') : $t('globals.messages.enable')
         }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="handleTest">
+        <Send class="mr-2 h-4 w-4" />
         {{ $t('webhook.sendTest') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuItem @click="() => (alertOpen = true)" class="text-destructive">
+      <DropdownMenuItem
+        @click="() => (alertOpen = true)"
+        class="text-destructive focus:text-destructive"
+      >
+        <Trash class="mr-2 h-4 w-4" />
         {{ $t('globals.messages.delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
@@ -47,7 +54,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreVertical } from 'lucide-vue-next'
+import { MoreVertical, Pencil, Power, PowerOff, Send, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,

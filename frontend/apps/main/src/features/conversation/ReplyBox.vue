@@ -142,7 +142,6 @@ import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
-import { convertTextToHtml } from '@shared-ui/utils/string'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
 
@@ -220,7 +219,8 @@ const {
   isLoading: isDraftLoading,
   clearDraft,
   loadedAttachments,
-  loadedMacroActions
+  loadedMacroActions,
+  loadedMacroID
 } = useDraftManager(currentConversationUUID, messageType, mediaFiles)
 
 // Rest of existing state
@@ -250,7 +250,7 @@ const runAiGeneration = async (requestFn) => {
   try {
     const resp = await requestFn(uuid)
     if (uuid !== currentConversationUUID.value) return
-    htmlContent.value = convertTextToHtml(resp.data.data || '')
+    htmlContent.value = resp.data.data || ''
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -262,10 +262,12 @@ const runAiGeneration = async (requestFn) => {
 }
 
 const handleAiPromptSelected = (key) =>
-  runAiGeneration(() => api.aiCompletion({ prompt_key: key, content: textContent.value }))
+  runAiGeneration(() => api.aiCompletion({ prompt_key: key, content: htmlContent.value }))
 
 const handleGenerateReply = () =>
-  runAiGeneration((uuid) => api.aiGenerateReply({ conversation_uuid: uuid, instruction: textContent.value }))
+  runAiGeneration((uuid) =>
+    api.aiGenerateReply({ conversation_uuid: uuid, instruction: textContent.value })
+  )
 
 // Copilot's "Insert into reply" replaces the draft with its answer (already HTML from the panel),
 // forcing reply mode so a private note in progress does not silently receive customer-facing text.
@@ -439,7 +441,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   if (!hasMessageSendingErrored) {
     const macroID = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.id
     const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
-    if (macroID > 0 && macroActions.length > 0) {
+    if (macroID > 0) {
       try {
         await api.applyMacro(convUUID, macroID, macroActions)
       } catch (error) {
@@ -482,12 +484,13 @@ watch(
   { deep: true }
 )
 
-// Reset first so a loaded draft never inherits the previous conversation's macro id/message_content (drafts store only actions).
+// Reset first so a loaded draft never inherits the previous conversation's macro (drafts store no message_content).
 watch(
-  loadedMacroActions,
-  (actions) => {
+  [loadedMacroID, loadedMacroActions],
+  ([id, actions]) => {
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
-    if (actions.length) conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
+    if (id > 0) conversationStore.setMacro({ id, actions: [...toRaw(actions)] }, MACRO_CONTEXT.REPLY)
+    else if (actions.length) conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
   },
   { deep: true }
 )

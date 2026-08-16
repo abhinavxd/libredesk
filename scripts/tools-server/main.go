@@ -1,4 +1,4 @@
-// Test server for AI copilot custom tools. Point tool URLs at
+// Test server for AI assistant custom tools. Point tool URLs at
 // http://localhost:7070/<endpoint> and set auth header X-Api-Key: test-secret-token.
 package main
 
@@ -12,17 +12,18 @@ import (
 
 const (
 	apiKeyHeader = "X-Api-Key"
-	apiKey       = "passy123"
+	apiKey       = "test-secret-token"
 
-	contactIDHeader    = "X-Libredesk-Contact-External-Id"
-	contactEmailHeader = "X-Libredesk-Contact-Email"
+	contactIDHeader       = "X-Libredesk-Contact-External-Id"
+	contactEmailHeader    = "X-Libredesk-Contact-Email"
+	contactVerifiedHeader = "X-Libredesk-Contact-Verified"
 )
 
 // users maps the contact's external user id (as set on the libredesk contact)
 // to their account data. Edit this to match your test contacts.
 var users = map[string]User{
-	"your_app_user_123": {
-		Email:   "user@example.com",
+	"USR1001": {
+		Email:   "alice@example.com",
 		Name:    "Alice",
 		Plan:    "pro",
 		Balance: 2450.75,
@@ -84,17 +85,23 @@ func handleBalance(w http.ResponseWriter, r *http.Request, u User) {
 	writeJSON(w, map[string]any{"balance": u.Balance, "currency": "INR"})
 }
 
-// withUser validates the auth header, resolves the contact's external id to a
-// user, and cross-checks the contact email against the mapped account.
+// withUser validates the auth header and the verified flag, resolves the contact's
+// external id to a user, and cross-checks the contact email against the mapped account.
+// Identity is read only from the headers libredesk injects, never from the model's args.
 func withUser(next func(http.ResponseWriter, *http.Request, User)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get(contactIDHeader)
 		email := r.Header.Get(contactEmailHeader)
+		verified := r.Header.Get(contactVerifiedHeader)
 		body, _ := io.ReadAll(r.Body)
-		log.Printf("%s %s external_id=%q email=%q args=%s", r.Method, r.URL.Path, id, email, body)
+		log.Printf("%s %s external_id=%q email=%q verified=%q args=%s", r.Method, r.URL.Path, id, email, verified, body)
 
 		if r.Header.Get(apiKeyHeader) != apiKey {
 			writeError(w, http.StatusUnauthorized, "invalid or missing "+apiKeyHeader)
+			return
+		}
+		if verified != "true" {
+			writeError(w, http.StatusForbidden, "contact is not verified; a self-claimed email is not enough for account data")
 			return
 		}
 		if id == "" {

@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"slices"
 
@@ -20,6 +22,9 @@ import (
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
 )
+
+// immutable suppresses revalidation, so this is how long a revoked file stays reachable from a client cache.
+const mediaCacheTTL = 24 * time.Hour
 
 // handleMediaUpload handles media uploads.
 func handleMediaUpload(r *fastglue.Request) error {
@@ -61,10 +66,8 @@ func handleMediaUpload(r *fastglue.Request) error {
 		linkedModel = model[0]
 	}
 
-	// Help article media ends up on public help center pages, so it's served without auth.
 	// Only agents who manage the help center may upload publicly served media.
-	public := linkedModel == mmodels.ModelHelpArticles
-	if public {
+	if mmodels.IsPublicModel(linkedModel) {
 		auser := r.RequestCtx.UserValue("user").(amodels.User)
 		agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
 		if err != nil {
@@ -155,7 +158,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !public)
+	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel))
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error inserting metadata into database", "error", err)
@@ -175,15 +178,20 @@ func handleServeMedia(r *fastglue.Request) error {
 
 	media, err := getMediaByUUID(app, uuid)
 	if err != nil {
+		// Anonymous probes must not distinguish missing media from existing private media.
+		if authMethod == authMethodPublic {
+			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.UnauthorizedError)
+		}
 		return sendErrorEnvelope(r, err)
 	}
 
+	// Public serve as is.
 	if !media.Private {
 		return serveMediaFile(r, app, uuid, &media)
 	}
 
 	// If accessed via signed URL, skip permission checks and serve file directly.
-	if authMethod == "signed_url" {
+	if authMethod == authMethodSignedURL {
 		return serveMediaFile(r, app, uuid, &media)
 	}
 
@@ -254,8 +262,13 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		}
 
 		r.RequestCtx.Response.Header.Set("Content-Type", media.ContentType)
-		r.RequestCtx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`%s; filename="%s"`, disposition, media.Filename))
+		r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": media.Filename}))
 		r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+		// Sandbox SVGs.
+		if media.ContentType == "image/svg+xml" {
+			r.RequestCtx.Response.Header.Set("Content-Security-Policy", "sandbox")
+		}
+		r.RequestCtx.Response.Header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, immutable", cacheVisibility(media.Private), int(mediaCacheTTL.Seconds())))
 
 		fasthttp.ServeFile(r.RequestCtx, filepath.Join(ko.String("upload.fs.upload_path"), uuid))
 	case "s3":
@@ -263,6 +276,7 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		if forceDownload {
 			url = app.media.GetURLForDownload(uuid, media.Filename)
 		}
+		r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
 		r.RequestCtx.Redirect(url, http.StatusFound)
 	}
 	return nil
@@ -297,4 +311,11 @@ func getMediaByUUID(app *App, mediaUUID string) (mmodels.Media, error) {
 		return mmodels.Media{}, envelope.NewError(envelope.NotFoundError, app.i18n.T("globals.messages.notFound"), nil)
 	}
 	return app.media.Get(0, mediaUUID)
+}
+
+func cacheVisibility(private bool) string {
+	if private {
+		return "private"
+	}
+	return "public"
 }

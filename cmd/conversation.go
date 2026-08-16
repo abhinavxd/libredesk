@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"slices"
 	"strconv"
 	"strings"
@@ -56,6 +57,7 @@ type createConversationRequest struct {
 	FirstName              string            `json:"first_name"`
 	LastName               string            `json:"last_name"`
 	ExternalUserID         string            `json:"external_user_id"`
+	ReuseContact           bool              `json:"reuse_contact"`
 	Subject                string            `json:"subject"`
 	Content                string            `json:"content"`
 	Attachments            []int             `json:"attachments"`
@@ -366,7 +368,7 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	transcript := app.conversation.BuildTranscript(*conversation, messages, time.Now())
 	safeRef := stringutil.SanitizeFilename(conversation.ReferenceNumber)
 	filename := fmt.Sprintf("transcript-%s.txt", safeRef)
-	r.RequestCtx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
 	r.RequestCtx.SetContentType("text/plain; charset=utf-8")
 	r.RequestCtx.SetBody(transcript)
@@ -829,7 +831,10 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	var contactID int
+	var (
+		contactID int
+		to        = []string{req.Email}
+	)
 	switch channel {
 	case whatsappChannel.ChannelWhatsApp:
 		contactID, err = resolveWhatsAppContact(app, req)
@@ -844,19 +849,23 @@ func handleCreateConversation(r *fastglue.Request) error {
 			ExternalUserID:   null.NewString(req.ExternalUserID, req.ExternalUserID != ""),
 			CustomAttributes: json.RawMessage(`{}`),
 		}
-		// Reuse an existing contact as-is; this endpoint is gated only on conversations:write and must never rename a contact.
-		existing, err := app.user.GetContactByEmail(req.Email)
+		canWriteContacts, err := app.authz.Enforce(user, "contacts", "write")
 		if err != nil {
-			if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
-				return sendErrorEnvelope(r, err)
-			}
-			if err := app.user.CreateContact(&contact); err != nil {
-				return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
-			}
-			contactID = contact.ID
-		} else {
-			contactID = existing.ID
+			app.lo.Error("error checking permission", "error", err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 		}
+		policy := umodels.ContactReuse
+		if canWriteContacts && !req.ReuseContact {
+			policy = umodels.ContactSync
+		}
+		if err := app.user.ResolveContact(&contact, policy); err != nil {
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
+		// A contact matched by external ID keeps its stored email as the recipient.
+		if policy == umodels.ContactReuse && contact.Email.String != "" {
+			to = []string{contact.Email.String}
+		}
+		contactID = contact.ID
 	}
 
 	var (
@@ -912,7 +921,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		}
 		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, "", nil, nil, nil, meta)
 	case req.Initiator == umodels.UserTypeAgent:
-		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, []string{req.Email}, nil, nil, map[string]any{})
+		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, nil, nil, map[string]any{})
 	case req.Initiator == umodels.UserTypeContact:
 		agentInitiated = false
 		_, sendErr = app.conversation.CreateContactMessage(media, contactID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true)

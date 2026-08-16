@@ -38,6 +38,12 @@ export function useActivityLogFilters () {
             }, {
                 label: t('activityLog.entryType.agentRolePermissionsChanged'),
                 value: 'agent_role_permissions_changed'
+            }, {
+                label: t('activityLog.entryType.contactDeleted'),
+                value: 'contact_deleted'
+            }, {
+                label: t('activityLog.entryType.contactDataExported'),
+                value: 'contact_data_exported'
             }]
         },
     }))

@@ -150,6 +150,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/contacts/{id}", perm(handleGetContact, "contacts:read"))
 	g.PUT("/api/v1/contacts/{id}", perm(handleUpdateContact, "contacts:write"))
 	g.PUT("/api/v1/contacts/{id}/block", perm(handleBlockContact, "contacts:block"))
+	g.DELETE("/api/v1/contacts/{id}", perm(handleDeleteContact, "contacts:delete"))
+	g.GET("/api/v1/contacts/{id}/export", perm(handleExportContact, "contacts:export"))
 
 	// Contact notes.
 	g.GET("/api/v1/contacts/{id}/notes", perm(handleGetContactNotes, "contact_notes:read"))
@@ -194,6 +196,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.DELETE("/api/v1/roles/{id}", perm(handleDeleteRole, "roles:manage"))
 
 	// Webhooks.
+	g.GET("/api/v1/webhooks/compact", auth(handleGetWebhooksCompact))
 	g.GET("/api/v1/webhooks", perm(handleGetWebhooks, "webhooks:manage"))
 	g.GET("/api/v1/webhooks/{id}", perm(handleGetWebhook, "webhooks:manage"))
 	g.POST("/api/v1/webhooks", perm(handleCreateWebhook, "webhooks:manage"))
@@ -290,25 +293,27 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/ai/faq-learning", perm(handleUpdateAIFaqLearning, "ai:manage"))
 
 	// Help centers.
-	g.GET("/api/v1/help-centers", auth(handleGetHelpCenters))
-	g.GET("/api/v1/help-centers/{id}", auth(handleGetHelpCenter))
-	g.GET("/api/v1/help-centers/{id}/tree", auth(handleGetHelpCenterTree))
+	g.GET("/api/v1/help-centers", perm(handleGetHelpCenters, "help_center:manage"))
+	g.GET("/api/v1/help-centers/locales", perm(handleGetHelpCenterLocales, "help_center:manage"))
+	g.GET("/api/v1/help-centers/{id}", perm(handleGetHelpCenter, "help_center:manage"))
+	g.GET("/api/v1/help-centers/{id}/tree", perm(handleGetHelpCenterTree, "help_center:manage"))
 	g.POST("/api/v1/help-centers", perm(handleCreateHelpCenter, "help_center:manage"))
 	g.PUT("/api/v1/help-centers/{id}", perm(handleUpdateHelpCenter, "help_center:manage"))
+	g.POST("/api/v1/help-centers/{id}/preview", perm(handleHelpCenterPreview, "help_center:manage"))
 	g.PUT("/api/v1/help-centers/{id}/toggle", perm(handleToggleHelpCenterActive, "help_center:manage"))
 	g.DELETE("/api/v1/help-centers/{id}", perm(handleDeleteHelpCenter, "help_center:manage"))
-	g.GET("/api/v1/help-centers/{hc_id}/collections", auth(handleGetCollections))
-	g.GET("/api/v1/help-centers/{hc_id}/collections/{id}", auth(handleGetCollection))
+	g.GET("/api/v1/help-centers/{hc_id}/collections", perm(handleGetCollections, "help_center:manage"))
 	g.POST("/api/v1/help-centers/{hc_id}/collections", perm(handleCreateCollection, "help_center:manage"))
 	g.PUT("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleUpdateCollection, "help_center:manage"))
 	g.DELETE("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleDeleteCollection, "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{hc_id}/collection-sort-order", perm(handleUpdateCollectionSortOrders, "help_center:manage"))
 	g.PUT("/api/v1/collections/{id}/toggle", perm(handleToggleCollection, "help_center:manage"))
-	g.GET("/api/v1/collections/{col_id}/articles", auth(handleGetArticles))
-	g.GET("/api/v1/collections/{col_id}/articles/{id}", auth(handleGetArticle))
+	g.PUT("/api/v1/collections/{col_id}/article-sort-order", perm(handleUpdateArticleSortOrders, "help_center:manage"))
+	g.GET("/api/v1/collections/{col_id}/articles/{id}", perm(handleGetArticle, "help_center:manage"))
 	g.POST("/api/v1/collections/{col_id}/articles", perm(handleCreateArticle, "help_center:manage"))
-	g.PUT("/api/v1/collections/{col_id}/articles/{id}", perm(handleUpdateArticle, "help_center:manage"))
 	g.DELETE("/api/v1/collections/{col_id}/articles/{id}", perm(handleDeleteArticle, "help_center:manage"))
-	g.PUT("/api/v1/articles/{id}", perm(handleUpdateArticleByID, "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}", perm(handleUpdateArticle, "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}/collection", perm(handleMoveArticle, "help_center:manage"))
 	g.PUT("/api/v1/articles/{id}/status", perm(handleUpdateArticleStatus, "help_center:manage"))
 	g.GET("/api/v1/help-centers/{id}/insights", perm(handleGetHelpCenterInsights, "help_center:manage"))
 
@@ -370,8 +375,14 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.DELETE("/api/v1/whatsapp/templates/{id}", perm(handleDeleteWhatsAppTemplate, "inboxes:manage"))
 	g.POST("/api/v1/whatsapp/templates/sync", perm(handleSyncWhatsAppTemplates, "inboxes:manage"))
 
+	// getAndHead registers both methods: uptime checkers and link validators probe with HEAD.
+	getAndHead := func(path string, h fastglue.FastRequestHandler) {
+		g.GET(path, h)
+		g.HEAD(path, h)
+	}
+
 	// Frontend pages.
-	g.GET("/", notAuthPage(serveIndexPage))
+	getAndHead("/", helpCenterHostHome(notAuthPage(serveIndexPage)))
 	g.GET("/widget", validateWidgetInbox(serveWidgetIndexPage))
 	g.GET("/inboxes/{all:*}", authPage(serveIndexPage))
 	g.GET("/teams/{all:*}", authPage(serveIndexPage))
@@ -392,12 +403,14 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/static/public/{all:*}", serveStaticFiles)
 
 	// Public pages.
-	g.GET("/hc/{slug}", rateLimit(handleRedirectHelpCenterHome, "public"))
-	g.GET("/hc/{slug}/{locale}", rateLimit(handleShowHelpCenterHome, "public"))
-	g.GET("/hc/{slug}/{locale}/sitemap.xml", rateLimit(handleHelpCenterSitemap, "public"))
-	g.GET("/hc/{slug}/{locale}/search", rateLimit(handleHelpCenterSearch, "public"))
-	g.GET("/hc/{slug}/{locale}/collections/{collection_slug}", rateLimit(handleShowHelpCenterCollection, "public"))
-	g.GET("/hc/{slug}/{locale}/articles/{article_slug}", rateLimit(handleShowHelpCenterArticle, "public"))
+	getAndHead("/robots.txt", rateLimit(handleRobotsTxt, "public"))
+	getAndHead("/sitemap.xml", rateLimit(handleSitemapIndex, "public"))
+	getAndHead("/hc/{slug}", rateLimit(handleRedirectHelpCenterHome, "public"))
+	getAndHead("/hc/{slug}/{locale}", rateLimit(handleShowHelpCenterHome, "public"))
+	getAndHead("/hc/{slug}/{locale}/sitemap.xml", rateLimit(handleHelpCenterSitemap, "public"))
+	getAndHead("/hc/{slug}/{locale}/search", rateLimit(handleHelpCenterSearch, "public"))
+	getAndHead("/hc/{slug}/{locale}/collections/{collection_slug}", rateLimit(handleShowHelpCenterCollection, "public"))
+	getAndHead("/hc/{slug}/{locale}/articles/{article_slug}", rateLimit(handleShowHelpCenterArticle, "public"))
 
 	g.GET("/csat/{uuid}", rateLimit(handleShowCSAT, "public"))
 	g.GET("/csat/{uuid}/widget", rateLimit(handleShowCSATWidget, "public"))

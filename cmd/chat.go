@@ -688,9 +688,6 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
-	for i := range message.Attachments {
-		message.Attachments[i].URL = app.media.GetSignedURL(message.Attachments[i].UUID)
-	}
 	app.conversation.SignAvatarURL(&message.Author.AvatarURL)
 
 	// Strip agent email from widget responses.
@@ -798,7 +795,7 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 			ExternalUserID:         null.NewString(claims.ExternalUserID, true),
 			CustomAttributes:       marshalCustomAttributes(claims.ContactCustomAttributes, app),
 		}
-		if err := app.user.CreateContact(&user); err != nil {
+		if err := app.user.ResolveContact(&user, umodels.ContactSync); err != nil {
 			return 0, err
 		}
 		return user.ID, nil
@@ -902,7 +899,7 @@ func resolveUserFromClaims(app *App, claims Claims) (umodels.User, error) {
 	case claims.UserID > 0:
 		user, err = app.user.Get(claims.UserID, "", []string{umodels.UserTypeContact, umodels.UserTypeVisitor})
 	case claims.ExternalUserID != "":
-		user, err = app.user.GetByExternalID(claims.ExternalUserID)
+		user, err = app.user.GetContactByExternalID(claims.ExternalUserID)
 	default:
 		return umodels.User{}, errors.New("error fetching user")
 	}

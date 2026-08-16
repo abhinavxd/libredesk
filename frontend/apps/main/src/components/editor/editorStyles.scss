@@ -18,9 +18,7 @@
   flex: 1;
   min-height: 70px;
   overflow-y: auto;
-  word-wrap: break-word !important;
-  overflow-wrap: break-word !important;
-  word-break: break-word;
+  overflow-wrap: anywhere !important;
   white-space: pre-wrap;
   max-width: 100%;
 }
@@ -34,7 +32,8 @@
   table {
     border-collapse: collapse;
 
-    td, th {
+    td,
+    th {
       border: 1px solid #dee2e6;
       padding: 6px 8px;
       vertical-align: top;
@@ -122,10 +121,26 @@
       box-shadow: 0 0 0 1px hsl(var(--border));
     }
 
-    .image-resize-handle-tl { top: -6px; left: -6px; cursor: nwse-resize; }
-    .image-resize-handle-tr { top: -6px; right: -6px; cursor: nesw-resize; }
-    .image-resize-handle-bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
-    .image-resize-handle-br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+    .image-resize-handle-tl {
+      top: -6px;
+      left: -6px;
+      cursor: nwse-resize;
+    }
+    .image-resize-handle-tr {
+      top: -6px;
+      right: -6px;
+      cursor: nesw-resize;
+    }
+    .image-resize-handle-bl {
+      bottom: -6px;
+      left: -6px;
+      cursor: nesw-resize;
+    }
+    .image-resize-handle-br {
+      bottom: -6px;
+      right: -6px;
+      cursor: nwse-resize;
+    }
 
     // Anchored to the image's left edge (no centering) so the toolbar
     // never extends past the image's left side and into adjacent UI when

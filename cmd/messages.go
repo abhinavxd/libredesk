@@ -70,11 +70,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	rootURL, _ := app.setting.GetAppRootURL()
 	for i := range messages {
 		total = messages[i].Total
-		// Populate attachment URLs
-		for j := range messages[i].Attachments {
-			att := messages[i].Attachments[j]
-			messages[i].Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
-		}
+		app.conversation.SignAttachmentURLs(messages[i].Attachments)
 		resolveQuotedCIDs(app, &messages[i])
 		resolveAttachmentCIDs(&messages[i], rootURL)
 	}
@@ -83,7 +79,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	app.conversation.ProcessCSATStatus(messages)
 
 	// Strip CSAT UUID from agent sessions to prevent self-rating.
-	if r.RequestCtx.UserValue("auth_method") != "api_key" {
+	if r.RequestCtx.UserValue("auth_method") != authMethodAPIKey {
 		for i := range messages {
 			if messages[i].HasCSAT() {
 				messages[i].StripCSATUUID()
@@ -134,15 +130,12 @@ func handleGetMessage(r *fastglue.Request) error {
 	message = messages[0]
 
 	// Strip CSAT UUID from agent sessions to prevent self-rating.
-	if r.RequestCtx.UserValue("auth_method") != "api_key" && message.HasCSAT() {
+	if r.RequestCtx.UserValue("auth_method") != authMethodAPIKey && message.HasCSAT() {
 		message.StripCSATUUID()
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
-	for j := range message.Attachments {
-		att := message.Attachments[j]
-		message.Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
-	}
+	app.conversation.SignAttachmentURLs(message.Attachments)
 	resolveQuotedCIDs(app, &message)
 	resolveAttachmentCIDs(&message, rootURL)
 

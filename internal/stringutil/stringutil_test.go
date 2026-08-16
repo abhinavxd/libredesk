@@ -233,30 +233,6 @@ func TestExtractReferenceNumber(t *testing.T) {
 	}
 }
 
-func TestSanitizeFilename(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{name: "plain", input: "Report Final.PDF", expected: "report-final.pdf"},
-		{name: "non latin with extension", input: "रिपोर्ट.pdf", expected: "file.pdf"},
-		{name: "emoji only", input: "📷📷", expected: "file"},
-		{name: "non latin no extension", input: "отчет", expected: "file"},
-		{name: "dots only", input: "...", expected: "file"},
-		{name: "mixed keeps latin part", input: "invoice-2024 रिपोर्ट.pdf", expected: "invoice-2024-.pdf"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := SanitizeFilename(tt.input)
-			if result != tt.expected {
-				t.Errorf("SanitizeFilename(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestSanitizeUTF8(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -290,6 +266,40 @@ func TestSanitizeUTF8(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := SanitizeUTF8(tt.input); got != tt.expected {
 				t.Errorf("SanitizeUTF8(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSanitizeFilename(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"plain ascii", "report.pdf", "report.pdf"},
+		{"case preserved", "Report.PDF", "Report.PDF"},
+		{"cyrillic preserved", "Документ_Иванов.pdf", "Документ_Иванов.pdf"},
+		{"chinese with space", "报告 2024.xlsx", "报告-2024.xlsx"},
+		{"spaces collapse to hyphen", "my  file name.txt", "my-file-name.txt"},
+		{"path traversal", "../../etc/passwd", "passwd"},
+		{"windows path stripped to base name", `dir\sub\file.txt`, "file.txt"},
+		{"control chars stripped", "a\r\nb\x00c.pdf", "a-bc.pdf"},
+		{"empty", "", "attachment"},
+		{"whitespace only", "   ", "attachment"},
+		{"dot only", ".", "attachment"},
+		{"dot dot", "..", "attachment"},
+		{"slash only", "/", "attachment"},
+		{"slashes only", "///", "attachment"},
+		{"backslash only", `\`, "attachment"},
+		{"c1 control stripped", "a\u0085b.pdf", "ab.pdf"},
+		{"invalid utf8 replaced", "rapport\xe9.pdf", "rapport�.pdf"},
+		{"emoji preserved", "photo😀.jpg", "photo😀.jpg"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SanitizeFilename(tt.input); got != tt.expected {
+				t.Errorf("SanitizeFilename(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
 	}
@@ -370,7 +380,7 @@ func TestGenerateSlug(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateSlug(tt.input, false)
+			result := GenerateSlug(tt.input)
 			if result != tt.expected {
 				t.Errorf("GenerateSlug(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
@@ -378,3 +388,53 @@ func TestGenerateSlug(t *testing.T) {
 	}
 }
 
+func TestHTML2TextMarkdownLinks(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want string
+	}{
+		{
+			name: "link with distinct text becomes a markdown link",
+			html: `<p>See <a href="https://example.com/guide">the guide</a> for steps.</p>`,
+			want: "See [the guide](https://example.com/guide) for steps.",
+		},
+		{
+			name: "link text equal to url not duplicated",
+			html: `<p><a href="https://example.com">https://example.com</a></p>`,
+			want: "https://example.com",
+		},
+		{
+			name: "plain text unchanged",
+			html: `<p>No links here.</p>`,
+			want: "No links here.",
+		},
+		{
+			name: "nested markup inside the anchor flattens to link text",
+			html: `<p><a href="https://example.com/x"><strong>Pay</strong> now</a></p>`,
+			want: "[Pay now](https://example.com/x)",
+		},
+		{
+			name: "brackets in link text are escaped",
+			html: `<p><a href="https://example.com">Docs [beta]</a></p>`,
+			want: `[Docs \[beta\]](https://example.com)`,
+		},
+		{
+			name: "url with parentheses is wrapped in angle brackets",
+			html: `<p><a href="https://example.com/a(b)">See</a></p>`,
+			want: "[See](<https://example.com/a(b)>)",
+		},
+		{
+			name: "anchor without href keeps its text",
+			html: `<p><a name="top">Top</a> of page.</p>`,
+			want: "Top of page.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := HTML2TextMarkdownLinks(tt.html); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

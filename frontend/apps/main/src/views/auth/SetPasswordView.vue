@@ -95,7 +95,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../api'
 import { useEmitter } from '../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useTemporaryClass } from '../../composables/useTemporaryClass'
+import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
 import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
@@ -104,6 +104,9 @@ import { Label } from '@shared-ui/components/ui/label'
 import { Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
+
+const PASSWORD_MIN_LENGTH = 8
+const PASSWORD_MAX_LENGTH = 72
 
 const { t } = useI18n()
 const errorMessage = ref('')
@@ -134,12 +137,20 @@ onMounted(() => {
 const validateForm = () => {
   if (!passwordForm.value.password) {
     errorMessage.value = t('auth.passwordRequired')
-    useTemporaryClass('set-password-container', 'animate-shake')
+    applyTemporaryClass('set-password-container', 'animate-shake')
+    return false
+  }
+  if (!isPasswordLengthValid(passwordForm.value.password)) {
+    errorMessage.value = t('validation.minmax', {
+      min: PASSWORD_MIN_LENGTH,
+      max: PASSWORD_MAX_LENGTH
+    })
+    applyTemporaryClass('set-password-container', 'animate-shake')
     return false
   }
   if (passwordForm.value.password !== passwordForm.value.confirmPassword) {
     errorMessage.value = t('auth.passwordsDoNotMatch')
-    useTemporaryClass('set-password-container', 'animate-shake')
+    applyTemporaryClass('set-password-container', 'animate-shake')
     return false
   }
   return true
@@ -163,21 +174,21 @@ const setPasswordAction = async () => {
     router.push({ name: 'login' })
   } catch (err) {
     errorMessage.value = handleHTTPError(err).message
-    useTemporaryClass('set-password-container', 'animate-shake')
+    applyTemporaryClass('set-password-container', 'animate-shake')
   } finally {
     isLoading.value = false
   }
 }
 
 const passwordHasError = computed(() => {
-  return submitted.value && passwordForm.value.password !== '' && passwordForm.value.password.length < 8
+  return submitted.value && !isPasswordLengthValid(passwordForm.value.password)
 })
 
 const confirmPasswordHasError = computed(() => {
-  return (
-    submitted.value &&
-    passwordForm.value.confirmPassword !== '' &&
-    passwordForm.value.password !== passwordForm.value.confirmPassword
-  )
+  return submitted.value && passwordForm.value.password !== passwordForm.value.confirmPassword
 })
+
+function isPasswordLengthValid(password) {
+  return password.length >= PASSWORD_MIN_LENGTH && password.length <= PASSWORD_MAX_LENGTH
+}
 </script>

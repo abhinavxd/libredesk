@@ -35,6 +35,7 @@ export const adminNavItems = [
   },
   {
     titleKey: 'globals.terms.helpCenter',
+    badge: 'BETA',
     children: [
       {
         titleKey: 'globals.terms.helpCenter',

@@ -1,0 +1,12 @@
+{{ define "classic-help-notfound" }}
+{{ template "classic-header" . }}
+
+<section class="hc-notfound">
+    <p class="hc-code">{{ .Data.ErrorCode }}</p>
+    <h1>{{ .Data.ErrorTitle }}</h1>
+    <p>{{ .Data.ErrorText }}</p>
+    <a class="hc-back" href="{{ .Data.HelpCenter.BasePath }}">{{ $.L.T "helpCenter.backToHelpCenter" }}</a>
+</section>
+
+{{ template "classic-footer" . }}
+{{ end }}

@@ -44,12 +44,11 @@
 
         <form @submit.prevent="loginAction" class="space-y-3">
           <div class="space-y-2">
-            <Label for="email" class="text-muted-foreground">{{
-              t('globals.terms.email')
-            }}</Label>
+            <Label for="email" class="text-muted-foreground">{{ t('globals.terms.email') }}</Label>
             <Input
               id="email"
               type="text"
+              autofocus
               autocomplete="username"
               v-model.trim="loginForm.email"
               :class="{ 'border-destructive': emailHasError }"
@@ -90,11 +89,7 @@
             </router-link>
           </div>
 
-          <Button
-            class="w-full"
-            :disabled="isLoading"
-            type="submit"
-          >
+          <Button class="w-full" :disabled="isLoading" type="submit">
             <span v-if="isLoading" class="flex items-center justify-center">
               <div
                 class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"
@@ -122,7 +117,7 @@ import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../api'
 import { validateEmail } from '@shared-ui/utils/string'
-import { useTemporaryClass } from '../../composables/useTemporaryClass'
+import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
 import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
@@ -160,6 +155,15 @@ const demoCredentials = {
   password: 'demo@libredesk.io'
 }
 
+const oidcErrorKeys = {
+  oidc_invalid_client: 'auth.oidcInvalidClient',
+  oidc_access_denied: 'auth.oidcAccessDenied',
+  oidc_session_expired: 'auth.oidcSessionExpired',
+  oidc_no_account: 'auth.oidcNoAccount',
+  oidc_account_disabled: 'user.accountDisabled',
+  oidc_login_failed: 'auth.oidcLoginFailed'
+}
+
 onMounted(async () => {
   // Prefill the login form with demo credentials if it's a demo build
   if (isDemoBuild) {
@@ -167,7 +171,16 @@ onMounted(async () => {
     loginForm.value.password = demoCredentials.password
   }
   fetchOIDCProviders()
+  showOIDCError()
 })
+
+const showOIDCError = () => {
+  const { error, ...query } = router.currentRoute.value.query
+  if (!error) return
+  errorMessage.value = t(Object.hasOwn(oidcErrorKeys, error) ? oidcErrorKeys[error] : 'auth.oidcLoginFailed')
+  applyTemporaryClass('login-container', 'animate-shake')
+  router.replace({ query })
+}
 
 const fetchOIDCProviders = async () => {
   try {
@@ -195,12 +208,12 @@ const redirectToOIDC = (provider) => {
 const validateForm = () => {
   if (!validateEmail(loginForm.value.email) && loginForm.value.email !== 'System') {
     errorMessage.value = t('validation.invalidEmail')
-    useTemporaryClass('login-container', 'animate-shake')
+    applyTemporaryClass('login-container', 'animate-shake')
     return false
   }
   if (!loginForm.value.password) {
     errorMessage.value = t('validation.passwordCannotBeEmpty')
-    useTemporaryClass('login-container', 'animate-shake')
+    applyTemporaryClass('login-container', 'animate-shake')
     return false
   }
   return true
@@ -235,7 +248,7 @@ const loginAction = () => {
     })
     .catch((error) => {
       errorMessage.value = handleHTTPError(error).message
-      useTemporaryClass('login-container', 'animate-shake')
+      applyTemporaryClass('login-container', 'animate-shake')
     })
     .finally(() => {
       isLoading.value = false

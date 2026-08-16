@@ -33,7 +33,6 @@
             <Card>
               <CardHeader>
                 <CardTitle>{{ t('admin.ai.assistant.preview.title') }}</CardTitle>
-                <CardDescription>{{ t('admin.ai.assistant.preview.description') }}</CardDescription>
               </CardHeader>
               <CardContent class="space-y-4">
                 <Textarea
@@ -75,10 +74,19 @@
                   <div class="rounded-md border border-border p-3 space-y-1">
                     <div
                       v-for="source in previewSources"
-                      :key="source.id"
+                      :key="`${source.type}-${source.id}`"
                       class="flex items-center justify-between text-sm"
                     >
-                      <span class="text-foreground">{{ source.title }}</span>
+                      <span class="text-foreground">
+                        {{ source.title }}
+                        <span class="ml-2 text-xs text-muted-foreground">
+                          {{
+                            source.type === 'help_article'
+                              ? t('globals.terms.article')
+                              : t('admin.ai.snippets', 1)
+                          }}
+                        </span>
+                      </span>
                       <span class="text-xs text-muted-foreground">
                         {{ Math.round(source.score * 100) }}%
                       </span>
@@ -127,9 +135,9 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.assistant.editHelp') }}</p>
+      <p>{{ t('admin.ai.assistantsHelp') }}</p>
       <a
-        href="https://docs.libredesk.io/configuration/ai"
+        href="https://docs.libredesk.io/configuration/ai#assistants"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
@@ -153,7 +161,6 @@ import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle
 } from '@shared-ui/components/ui/card'
@@ -161,6 +168,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { useAIAssistantStore } from '@/stores/aiAssistant'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
@@ -170,6 +178,7 @@ const props = defineProps({
 const { t } = useI18n()
 const router = useRouter()
 const emitter = useEmitter()
+const aiAssistantStore = useAIAssistantStore()
 const assistant = ref({})
 const isLoading = ref(false)
 const stats = ref({})
@@ -233,6 +242,7 @@ const submitForm = async (values) => {
       await api.createAIAssistant(values)
       router.push({ name: 'ai-assistants' })
     }
+    aiAssistantStore.invalidate()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })

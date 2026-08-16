@@ -10,9 +10,9 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.tool.editHelp') }}</p>
+      <p>{{ t('admin.ai.toolsHelp') }}</p>
       <a
-        href="https://docs.libredesk.io/configuration/ai"
+        href="https://docs.libredesk.io/configuration/ai#tools"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"

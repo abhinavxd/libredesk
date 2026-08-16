@@ -431,13 +431,13 @@ func getCustomStaticDir() string {
 func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *i18n.I18n) *tmpl.Manager {
 	var (
 		lo      = initLogger("template")
-		funcMap = getTmplFuncs(consts, i18n)
+		funcMap = getTmplFuncs(consts, i18n, fs)
 	)
 	tpls, err := stuffbin.ParseTemplatesGlob(funcMap, fs, "/static/email-templates/*.html")
 	if err != nil {
 		log.Fatalf("error parsing e-mail templates: %v", err)
 	}
-	webTpls, err := stuffbin.ParseTemplatesGlob(funcMap, fs, "/static/public/web-templates/*.html")
+	webTpls, err := parseWebTemplates(funcMap, fs)
 	if err != nil {
 		log.Fatalf("error parsing web templates: %v", err)
 	}
@@ -450,13 +450,20 @@ func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *
 }
 
 // getTmplFuncs returns the template functions.
-func getTmplFuncs(consts *constants, i18n *i18n.I18n) template.FuncMap {
+func getTmplFuncs(consts *constants, i18n *i18n.I18n, fs stuffbin.FileSystem) template.FuncMap {
+	lucideIcons := loadLucideIcons(fs)
 	return template.FuncMap{
+		"LucideIcon": func(name string) template.HTML {
+			return lucideIcons[name]
+		},
 		"RootURL": func() string {
 			return consts.AppBaseURL
 		},
 		"FaviconURL": func() string {
 			return consts.FaviconURL
+		},
+		"AssetVer": func() string {
+			return assetVersion
 		},
 		"Date": func(layout string) string {
 			if layout == "" {
@@ -518,19 +525,35 @@ func reloadSettings(app *App) error {
 // reloadTemplates reloads the templates from the filesystem.
 func reloadTemplates(app *App) error {
 	app.lo.Info("reloading templates")
-	funcMap := getTmplFuncs(app.consts.Load().(*constants), app.i18n)
+	funcMap := getTmplFuncs(app.consts.Load().(*constants), app.i18n, app.fs)
 	tpls, err := stuffbin.ParseTemplatesGlob(funcMap, app.fs, "/static/email-templates/*.html")
 	if err != nil {
 		app.lo.Error("error parsing email templates", "error", err)
 		return err
 	}
-	webTpls, err := stuffbin.ParseTemplatesGlob(funcMap, app.fs, "/static/public/web-templates/*.html")
+	webTpls, err := parseWebTemplates(funcMap, app.fs)
 	if err != nil {
 		app.lo.Error("error parsing web templates", "error", err)
 		return err
 	}
 
 	return app.tmpl.Reload(webTpls, tpls, funcMap)
+}
+
+// parseWebTemplates parses the top-level web templates and the per-template help center pages.
+func parseWebTemplates(funcMap template.FuncMap, fs stuffbin.FileSystem) (*template.Template, error) {
+	var paths []string
+	for _, pattern := range []string{
+		"/static/public/web-templates/*.html",
+		"/static/public/web-templates/help/*/*.html",
+	} {
+		p, err := fs.Glob(pattern)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p...)
+	}
+	return stuffbin.ParseTemplates(funcMap, fs, paths...)
 }
 
 // initTeam inits team manager.
@@ -954,13 +977,12 @@ func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Man
 
 // initI18n inits i18n.
 func initI18n(fs stuffbin.FileSystem) *i18n.I18n {
-	fileName := cmp.Or(ko.String("app.lang"), defLang)
-	log.Printf("loading i18n language file: %s", fileName)
-	file, err := fs.Get("i18n/" + fileName + ".json")
-	if err != nil {
-		log.Fatalf("error reading i18n language file `%s` : %v", fileName, err)
+	lang := cmp.Or(ko.String("app.lang"), defLang)
+	log.Printf("loading i18n language file: %s", lang)
+	if _, err := fs.Read("/i18n/" + lang + ".json"); err != nil {
+		log.Fatalf("error reading i18n language file `%s` : %v", lang, err)
 	}
-	i18n, err := i18n.New(file.ReadBytes())
+	i18n, err := loadI18nLang(lang, fs)
 	if err != nil {
 		log.Fatalf("error initializing i18n: %v", err)
 	}
@@ -1086,10 +1108,12 @@ func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleInde
 // initAIAgent inits the autonomous AI agent manager.
 func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
 	m, err := aiagent.New(aiagent.Opts{
-		DB:        db,
-		Lo:        initLogger("ai_agent"),
-		I18n:      i18n,
-		QueueSize: cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
+		DB:                 db,
+		Lo:                 initLogger("ai_agent"),
+		I18n:               i18n,
+		QueueSize:          cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
+		MaxSteps:           min(max(cmp.Or(ko.Int("ai_agent.max_steps"), 6), 1), 20),
+		MaxHistoryMessages: min(max(cmp.Or(ko.Int("ai_agent.max_history_messages"), 30), 5), 100),
 	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
 	if err != nil {
 		log.Fatalf("error initializing AI agent manager: %v", err)
@@ -1270,6 +1294,7 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 		{"widget", 100},
 		{"auth", 30},
 		{"public", 100},
+		{"media", 300},
 	}
 
 	for _, d := range defaults {
