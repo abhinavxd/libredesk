@@ -52,6 +52,7 @@ var (
 	efs                             embed.FS
 	errConversationNotFound         = errors.New("conversation not found")
 	ErrConversationAlreadyAssigned  = errors.New("conversation already assigned")
+	ErrMessageNotFound              = errors.New("message not found")
 	conversationsAllowedFields      = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since", "next_sla_deadline_at", "snoozed_until", "sla_policy_id"}
 	conversationStatusAllowedFields = []string{"id", "name"}
 	usersAllowedFields              = []string{"email", "external_user_id"}
@@ -170,6 +171,7 @@ type userStore interface {
 	ResolveContact(user *umodels.User, policy umodels.ContactPolicy) error
 	UpgradeVisitorToContact(visitorID int) error
 	GetChannelIdentity(contactID int, channel string) (string, error)
+	LinkChannelIdentity(contactID int, channel, identifier string) (int, error)
 }
 
 type mediaStore interface {
@@ -312,6 +314,7 @@ func (m *Manager) SetWhatsAppTemplateStore(s WhatsAppTemplateStore) {
 type queries struct {
 	// Conversation queries.
 	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
+	GetConversationInboxContact         *sqlx.Stmt `query:"get-conversation-inbox-contact"`
 	GetConversation                     *sqlx.Stmt `query:"get-conversation"`
 	GetConversationListItem             *sqlx.Stmt `query:"get-conversation-list-item"`
 	GetConversationsCreatedAfter        *sqlx.Stmt `query:"get-conversations-created-after"`
@@ -367,10 +370,8 @@ type queries struct {
 	MarkMessagePendingForRetry         *sqlx.Stmt `query:"mark-message-pending-for-retry"`
 	UpdateMessageSourceID              *sqlx.Stmt `query:"update-message-source-id"`
 	UpdateMessageSourceIDByUUID        *sqlx.Stmt `query:"update-message-source-id-by-uuid"`
-	UpdateMessageStatusBySourceID      *sqlx.Stmt `query:"update-message-status-by-source-id"`
-	MergeMessageMetaBySourceID         *sqlx.Stmt `query:"merge-message-meta-by-source-id"`
+	ApplyWhatsAppMessageStatus         *sqlx.Stmt `query:"apply-whatsapp-message-status"`
 	MergeMessageMetaByUUID             *sqlx.Stmt `query:"merge-message-meta-by-uuid"`
-	GetMessageUUIDBySourceID           *sqlx.Stmt `query:"get-message-uuid-by-source-id"`
 	GetWhatsAppReadReceiptTarget       *sqlx.Stmt `query:"get-whatsapp-read-receipt-target"`
 	UpdateConversationLastInboundAt    *sqlx.Stmt `query:"update-conversation-last-inbound-at"`
 	GetContactWindowInboundAt          *sqlx.Stmt `query:"get-contact-window-inbound-at"`

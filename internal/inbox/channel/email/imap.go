@@ -103,10 +103,12 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 			token:    oauthConfig.AccessToken,
 		}
 		if err := client.Authenticate(saslClient); err != nil {
+			e.flagAuthError()
 			return fmt.Errorf("error authenticating with OAuth to IMAP server: %w", err)
 		}
 	} else {
 		if err := client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
+			e.flagAuthError()
 			return fmt.Errorf("error logging in to the IMAP server: %w", err)
 		}
 	}

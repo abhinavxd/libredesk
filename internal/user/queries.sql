@@ -243,6 +243,15 @@ VALUES ($1, $2::channels, $3)
 ON CONFLICT (channel, identifier) DO UPDATE SET updated_at = now()
 RETURNING contact_id;
 
+-- name: update-channel-identity
+-- $1=channel, $2=old identifier, $3=new identifier. No-op when the new identifier already belongs to a contact.
+UPDATE contact_channel_identities SET identifier = $3, updated_at = now()
+WHERE channel = $1::channels AND identifier = $2
+AND NOT EXISTS (
+    SELECT 1 FROM contact_channel_identities WHERE channel = $1::channels AND identifier = $3
+)
+RETURNING contact_id;
+
 -- name: upsert-contact-with-channel-identity
 -- Atomic: a contact with no email and no ext_id has no uniqueness key, so a separate insert + link would orphan user rows on retry.
 -- $1=email, $2=first_name, $3=last_name, $4=password, $5=avatar_url, $6=channel, $7=identifier

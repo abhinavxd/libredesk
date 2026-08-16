@@ -18,40 +18,27 @@
             </FormControl>
             <FormMessage />
 
-            <div
-              v-if="searchResults.length"
-              class="absolute w-full z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            <ContactSearchResults
+              :results="searchResults"
+              :highlighted-index="highlightedIndex"
+              @select="selectContact"
             >
-              <ul class="max-h-60 overflow-y-auto" role="listbox">
-                <li
-                  v-for="(contact, index) in searchResults"
-                  :key="contact.id"
-                  @click="selectContact(contact)"
-                  role="option"
-                  :aria-selected="index === highlightedIndex"
-                  class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors duration-200"
-                  :class="
-                    index === highlightedIndex
-                      ? 'bg-accent text-accent-foreground'
-                      : 'hover:bg-accent hover:text-accent-foreground'
-                  "
-                >
-                  <div>
-                    <p class="font-medium">
-                      {{ contact.first_name }} {{ contact.last_name }}
-                    </p>
-                    <p class="text-xs text-muted-foreground">{{ contact.email }}</p>
-                    <div
-                      v-if="contact.external_user_id"
-                      class="flex items-center gap-1 text-xs text-muted-foreground"
-                    >
-                      <IdCard :size="12" class="flex-shrink-0" />
-                      <span class="truncate">{{ contact.external_user_id }}</span>
-                    </div>
+              <template #default="{ contact }">
+                <div>
+                  <p class="font-medium">
+                    {{ contact.first_name }} {{ contact.last_name }}
+                  </p>
+                  <p class="text-xs text-muted-foreground">{{ contact.email }}</p>
+                  <div
+                    v-if="contact.external_user_id"
+                    class="flex items-center gap-1 text-xs text-muted-foreground"
+                  >
+                    <IdCard :size="12" class="flex-shrink-0" />
+                    <span class="truncate">{{ contact.external_user_id }}</span>
                   </div>
-                </li>
-              </ul>
-            </div>
+                </div>
+              </template>
+            </ContactSearchResults>
           </FormItem>
         </FormField>
 
@@ -245,7 +232,7 @@ import {
 import { z } from 'zod'
 import { ref, watch, onUnmounted, nextTick, onMounted, computed } from 'vue'
 import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
-import { useConversationStore } from '../../stores/conversation'
+import { useConversationStore } from '@/stores/conversation'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
@@ -272,6 +259,8 @@ import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import { UserTypeAgent } from '@/constants/user'
 import { IdCard } from 'lucide-vue-next'
 import api from '@/api'
+import { useContactSearch } from '@/features/conversation/useContactSearch.js'
+import ContactSearchResults from '@/features/conversation/ContactSearchResults.vue'
 import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 
 const emit = defineEmits(['close'])
@@ -283,11 +272,9 @@ const userStore = useUserStore()
 const teamStore = useTeamStore()
 const emitter = useEmitter()
 const loading = ref(false)
-const searchResults = ref([])
 const emailQuery = ref('')
 const conversationStore = useConversationStore()
 const macroStore = useMacroStore()
-let timeoutId = null
 let previousMacroView = ''
 const insertContent = ref('')
 const selectedContact = ref(null)
@@ -332,7 +319,6 @@ const formSchema = z.object({
 })
 
 onUnmounted(() => {
-  clearTimeout(timeoutId)
   clearMediaFiles()
   conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
   macroStore.setCurrentView(previousMacroView)
@@ -377,57 +363,17 @@ watch(emailQuery, (newVal) => {
   }
 })
 
-const handleSearchContacts = async () => {
-  clearTimeout(timeoutId)
-  timeoutId = setTimeout(async () => {
-    const query = emailQuery.value.trim()
-
-    if (query.length < 3) {
-      searchResults.value.splice(0)
-      return
+const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydown, selectContact } =
+  useContactSearch({
+    getQuery: () => emailQuery.value,
+    filterResults: (c) => c.email,
+    onSelect: (contact) => {
+      selectedContact.value = contact
+      emailQuery.value = contact.email
+      form.setFieldValue('first_name', contact.first_name)
+      form.setFieldValue('last_name', contact.last_name || '')
     }
-
-    try {
-      const resp = await api.searchContacts({ query })
-      searchResults.value = resp.data.data.filter((c) => c.email)
-      highlightedIndex.value = -1
-    } catch (error) {
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-      searchResults.value.splice(0)
-    }
-  }, 300)
-}
-
-const highlightedIndex = ref(-1)
-
-const handleSearchKeydown = (e) => {
-  if (!searchResults.value.length) return
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    highlightedIndex.value = Math.min(highlightedIndex.value + 1, searchResults.value.length - 1)
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    highlightedIndex.value = Math.max(highlightedIndex.value - 1, 0)
-  } else if (e.key === 'Enter' && highlightedIndex.value >= 0) {
-    e.preventDefault()
-    selectContact(searchResults.value[highlightedIndex.value])
-  } else if (e.key === 'Escape') {
-    searchResults.value.splice(0)
-    highlightedIndex.value = -1
-  }
-}
-
-const selectContact = (contact) => {
-  selectedContact.value = contact
-  emailQuery.value = contact.email
-  form.setFieldValue('first_name', contact.first_name)
-  form.setFieldValue('last_name', contact.last_name || '')
-  searchResults.value.splice(0)
-  highlightedIndex.value = -1
-}
+  })
 
 const createConversation = form.handleSubmit(async (values) => {
   loading.value = true

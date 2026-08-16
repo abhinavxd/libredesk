@@ -88,6 +88,31 @@ type WebhookMessage struct {
 		Payload string `json:"payload"`
 	} `json:"button,omitempty"`
 
+	Location *struct {
+		Latitude  json.Number `json:"latitude"`
+		Longitude json.Number `json:"longitude"`
+		Name      string      `json:"name,omitempty"`
+		Address   string      `json:"address,omitempty"`
+	} `json:"location,omitempty"`
+
+	Contacts []struct {
+		Name struct {
+			FormattedName string `json:"formatted_name"`
+		} `json:"name"`
+		Phones []struct {
+			Phone string `json:"phone"`
+			WAID  string `json:"wa_id,omitempty"`
+		} `json:"phones,omitempty"`
+	} `json:"contacts,omitempty"`
+
+	System *struct {
+		Type     string `json:"type"`
+		Body     string `json:"body"`
+		WAID     string `json:"wa_id,omitempty"`
+		NewWAID  string `json:"new_wa_id,omitempty"`
+		Customer string `json:"customer,omitempty"`
+	} `json:"system,omitempty"`
+
 	Context *struct {
 		From string `json:"from"`
 		ID   string `json:"id"`
@@ -191,6 +216,26 @@ func (p *WebhookPayload) ExtractMessages() []ParsedMessage {
 						pm.ButtonReplyID = m.Button.Payload
 						pm.Text = m.Button.Text
 					}
+				case "location":
+					if m.Location != nil {
+						pm.Text = locationText(m.Location.Name, m.Location.Address, m.Location.Latitude.String(), m.Location.Longitude.String())
+					}
+				case "contacts":
+					var lines []string
+					for _, c := range m.Contacts {
+						phone := ""
+						if len(c.Phones) > 0 {
+							phone = c.Phones[0].Phone
+						}
+						lines = append(lines, strings.TrimSpace(strings.TrimSuffix(c.Name.FormattedName+" "+phone, " ")))
+					}
+					pm.Text = strings.Join(lines, "\n")
+				case "system":
+					if m.System != nil {
+						pm.SystemType = m.System.Type
+						pm.SystemNewWAID = firstNonEmptyStr(m.System.NewWAID, m.System.WAID)
+						pm.Text = m.System.Body
+					}
 				}
 				out = append(out, pm)
 			}
@@ -266,6 +311,17 @@ func applyMedia(pm *ParsedMessage, m *WebhookMedia) {
 	pm.MediaMimeType = m.MimeType
 	pm.Caption = m.Caption
 	pm.Filename = m.Filename
+}
+
+func locationText(name, address, lat, lng string) string {
+	var lines []string
+	if label := strings.TrimSpace(strings.Trim(name+", "+address, ", ")); label != "" {
+		lines = append(lines, label)
+	}
+	if lat != "" && lng != "" {
+		lines = append(lines, "https://www.google.com/maps?q="+lat+","+lng)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func firstNonEmptyStr(values ...string) string {

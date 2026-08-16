@@ -14,18 +14,26 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
 )
 
-const whatsAppDefaultContactName = "Contact"
+const (
+	whatsAppDefaultContactName = "Contact"
+	// Retry window for a status whose message row is missing; older events reference a wamid that will never exist locally.
+	whatsAppStatusNotFoundGrace = 10 * time.Minute
+)
+
+var errNoEnabledWhatsAppInbox = errors.New("no enabled whatsapp inbox for event")
 
 func handleWhatsAppWebhookVerify(r *fastglue.Request) error {
 	app := r.Context.(*App)
@@ -67,15 +75,11 @@ func handleWhatsAppWebhookEvent(r *fastglue.Request) error {
 
 	body := append([]byte(nil), r.RequestCtx.PostBody()...)
 
-	// Verify against the running inbox's secret so the webhook keeps working (and stays durable) during a DB outage.
-	appSecret, ok := whatsAppRunningAppSecret(app, inboxID)
-	if !ok {
-		cfg, err := whatsAppConfigForInbox(app, inboxID)
-		if err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusNotFound, "inbox not found", nil, envelope.NotFoundError)
-		}
-		appSecret = cfg.AppSecret
+	cfg, err := whatsAppConfigForInbox(app, inboxID)
+	if err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusNotFound, "inbox not found", nil, envelope.NotFoundError)
 	}
+	appSecret := cfg.AppSecret
 	if appSecret == "" {
 		app.lo.Error("whatsapp webhook rejected: app secret not configured", "inbox_id", inboxID)
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, "webhook app secret not configured", nil, envelope.PermissionError)
@@ -110,13 +114,13 @@ func processWhatsAppPayload(ctx context.Context, app *App, inboxID int, payload 
 	}
 
 	for _, st := range payload.ExtractStatuses() {
-		if err := app.conversation.UpdateMessageStatusBySourceID(st.MessageID, mapWhatsAppStatus(st.Status)); err != nil {
-			app.lo.Error("error applying whatsapp status update", "wa_message_id", st.MessageID, "status", st.Status, "error", err)
-			errs = append(errs, err)
-		}
-		if err := app.conversation.RecordWhatsAppStatus(st.MessageID, st.Status, st.Timestamp, st.UserMsg); err != nil {
-			app.lo.Error("error recording whatsapp status meta", "wa_message_id", st.MessageID, "status", st.Status, "error", err)
-			errs = append(errs, err)
+		if err := app.conversation.ApplyWhatsAppStatus(st.MessageID, st.Status, st.Timestamp, st.UserMsg); err != nil {
+			if errors.Is(err, conversation.ErrMessageNotFound) && time.Since(st.Timestamp) > whatsAppStatusNotFoundGrace {
+				app.lo.Warn("dropping whatsapp status for unknown message", "wa_message_id", st.MessageID, "status", st.Status, "event_at", st.Timestamp)
+			} else {
+				app.lo.Error("error applying whatsapp status update", "wa_message_id", st.MessageID, "status", st.Status, "error", err)
+				errs = append(errs, err)
+			}
 		}
 	}
 
@@ -132,6 +136,11 @@ func processWhatsAppPayload(ctx context.Context, app *App, inboxID int, payload 
 				if err := app.whatsappTemplate.HandleStatusUpdate(ibID, ts.MetaTemplateID, ts.TemplateName, ts.Language, ts.Event, ts.Reason); err != nil {
 					app.lo.Error("error applying template status update", "inbox_id", ibID, "name", ts.TemplateName, "event", ts.Event, "error", err)
 					errs = append(errs, err)
+					continue
+				}
+				// An edit skipped while the template was under review can now be applied.
+				if ts.TemplateName == wtmodels.CSATTemplateName(ibID) {
+					go ensureWhatsAppCSATTemplate(app, ibID)
 				}
 			}
 		}
@@ -149,10 +158,17 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 	switch m.Type {
 	case "reaction", "ephemeral", "request_welcome":
 		return nil
+	case "system":
+		return applyWhatsAppSystemEvent(app, m)
 	}
 
 	// Meta posts all events of an app to one callback URL, so the URL's inbox ID is not authoritative.
 	inbRec, cfg, err := resolveWhatsAppInbox(app, inboxID, m.PhoneNumberID)
+	if errors.Is(err, errNoEnabledWhatsAppInbox) {
+		// Retrying cannot fix a disabled/unmatched inbox, so drop instead of poisoning the delivery.
+		app.lo.Warn("dropping whatsapp message: no enabled inbox for event", "url_inbox_id", inboxID, "phone_number_id", m.PhoneNumberID, "wa_message_id", m.ID)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("resolving inbox: %w", err)
 	}
@@ -249,23 +265,27 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 	return nil
 }
 
-// buildInboundMeta records reply-context and interactive-button provenance; nil when there's nothing to record.
+// applyWhatsAppSystemEvent repoints a contact's wa_id when the customer moves to a new number, so their replies keep threading to the same contact.
+func applyWhatsAppSystemEvent(app *App, m whatsapp.ParsedMessage) error {
+	if m.SystemType != "user_changed_number" || m.SystemNewWAID == "" || m.SystemNewWAID == m.From {
+		return nil
+	}
+	contactID, err := app.user.UpdateChannelIdentity(whatsappChannel.ChannelWhatsApp, m.From, m.SystemNewWAID)
+	if err != nil {
+		return fmt.Errorf("repointing whatsapp identity: %w", err)
+	}
+	if contactID == 0 {
+		app.lo.Warn("whatsapp number change not applied, new number already belongs to a contact", "old_wa_id", m.From, "new_wa_id", m.SystemNewWAID)
+		return nil
+	}
+	app.lo.Info("whatsapp contact changed number", "contact_id", contactID, "old_wa_id", m.From, "new_wa_id", m.SystemNewWAID)
+	return nil
+}
+
+// buildInboundMeta returns nil when there's nothing to record.
 func buildInboundMeta(app *App, m whatsapp.ParsedMessage) json.RawMessage {
 	patch := map[string]any{}
 
-	if m.ContextID != "" {
-		// Best-effort: the quoted wamid may predate this inbox, so the raw Meta ID is kept alongside.
-		if uuid, err := app.conversation.MessageUUIDBySourceID(m.ContextID); err == nil && uuid != "" {
-			patch["wa_reply_to_message_uuid"] = uuid
-		}
-		patch["wa_reply_to_source_id"] = m.ContextID
-	}
-	if m.ButtonReplyID != "" {
-		patch["wa_button_reply_id"] = m.ButtonReplyID
-	}
-	if m.ListReplyID != "" {
-		patch["wa_list_reply_id"] = m.ListReplyID
-	}
 	if m.Type == "unsupported" {
 		patch["wa_unsupported"] = true
 	}
@@ -442,13 +462,6 @@ func textPreview(m whatsapp.ParsedMessage) string {
 	return "[whatsapp message]"
 }
 
-func mapWhatsAppStatus(metaStatus string) string {
-	if metaStatus == cmodels.MessageStatusFailed {
-		return cmodels.MessageStatusFailed
-	}
-	return cmodels.MessageStatusSent
-}
-
 func inboxIDFromPath(r *fastglue.Request) (int, error) {
 	raw, ok := r.RequestCtx.UserValue("inbox_id").(string)
 	if !ok || raw == "" {
@@ -469,14 +482,13 @@ func whatsAppInboxIDsByWABA(app *App) map[string][]int {
 	return out
 }
 
-// resolveWhatsAppInbox returns the inbox record and decoded config for the payload's phone_number_id, falling back to the URL inbox.
 func resolveWhatsAppInbox(app *App, urlInboxID int, phoneNumberID string) (imodels.Inbox, whatsappChannel.Config, error) {
 	rec, urlErr := app.inbox.GetDBRecord(urlInboxID)
 	var cfg whatsappChannel.Config
 	if urlErr == nil {
 		cfg, urlErr = whatsAppConfigFromRecord(rec)
 	}
-	if urlErr == nil && (phoneNumberID == "" || cfg.PhoneNumberID == phoneNumberID) {
+	if urlErr == nil && rec.Enabled && (phoneNumberID == "" || cfg.PhoneNumberID == phoneNumberID) {
 		return rec, cfg, nil
 	}
 
@@ -505,7 +517,7 @@ func resolveWhatsAppInbox(app *App, urlInboxID int, phoneNumberID string) (imode
 	if urlErr != nil {
 		return imodels.Inbox{}, whatsappChannel.Config{}, urlErr
 	}
-	return rec, cfg, nil
+	return imodels.Inbox{}, whatsappChannel.Config{}, errNoEnabledWhatsAppInbox
 }
 
 // forEachEnabledWhatsAppInbox invokes fn with each enabled WhatsApp inbox's record and decoded config; returning false stops iteration.
@@ -529,7 +541,13 @@ func forEachEnabledWhatsAppInbox(app *App, fn func(rec imodels.Inbox, cfg whatsa
 	}
 }
 
+// whatsAppConfigForInbox prefers the running inbox's in-memory config; the DB fallback covers disabled or unregistered inboxes.
 func whatsAppConfigForInbox(app *App, inboxID int) (whatsappChannel.Config, error) {
+	if inb, err := app.inbox.Get(inboxID); err == nil {
+		if wa, ok := inb.(interface{ Config() whatsappChannel.Config }); ok {
+			return wa.Config(), nil
+		}
+	}
 	rec, err := app.inbox.GetDBRecord(inboxID)
 	if err != nil {
 		return whatsappChannel.Config{}, err
@@ -546,19 +564,6 @@ func whatsAppConfigFromRecord(rec imodels.Inbox) (whatsappChannel.Config, error)
 		return whatsappChannel.Config{}, fmt.Errorf("decoding whatsapp inbox config: %w", err)
 	}
 	return cfg, nil
-}
-
-// whatsAppRunningAppSecret returns the app secret from the in-memory inbox; ok is false for a disabled or unregistered inbox.
-func whatsAppRunningAppSecret(app *App, inboxID int) (string, bool) {
-	inb, err := app.inbox.Get(inboxID)
-	if err != nil {
-		return "", false
-	}
-	wa, ok := inb.(interface{ AppSecret() string })
-	if !ok {
-		return "", false
-	}
-	return wa.AppSecret(), true
 }
 
 // markWhatsAppMessageRead sends a read receipt to Meta for an inbound message; best-effort, logs and swallows failures.

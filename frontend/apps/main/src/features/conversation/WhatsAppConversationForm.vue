@@ -42,43 +42,30 @@
             />
           </div>
 
-          <div
-            v-if="searchResults.length"
-            class="absolute w-full z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          <ContactSearchResults
+            :results="searchResults"
+            :highlighted-index="highlightedIndex"
+            @select="selectContact"
           >
-            <ul class="max-h-60 overflow-y-auto" role="listbox">
-              <li
-                v-for="(contact, index) in searchResults"
-                :key="contact.id"
-                @click="selectContact(contact)"
-                role="option"
-                :aria-selected="index === highlightedIndex"
-                class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors duration-200"
-                :class="
-                  index === highlightedIndex
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent hover:text-accent-foreground'
-                "
-              >
-                <div class="min-w-0">
-                  <p class="font-medium">{{ contact.first_name }} {{ contact.last_name }}</p>
-                  <p v-if="contact.phone_number" class="text-xs text-muted-foreground truncate">
-                    {{ contact.phone_number }}
-                  </p>
-                  <p v-if="contact.email" class="text-xs text-muted-foreground truncate">
-                    {{ contact.email }}
-                  </p>
-                  <div
-                    v-if="contact.external_user_id"
-                    class="flex items-center gap-1 text-xs text-muted-foreground"
-                  >
-                    <IdCard :size="12" class="flex-shrink-0" />
-                    <span class="truncate">{{ contact.external_user_id }}</span>
-                  </div>
+            <template #default="{ contact }">
+              <div class="min-w-0">
+                <p class="font-medium">{{ contact.first_name }} {{ contact.last_name }}</p>
+                <p v-if="contact.phone_number" class="text-xs text-muted-foreground truncate">
+                  {{ contact.phone_number }}
+                </p>
+                <p v-if="contact.email" class="text-xs text-muted-foreground truncate">
+                  {{ contact.email }}
+                </p>
+                <div
+                  v-if="contact.external_user_id"
+                  class="flex items-center gap-1 text-xs text-muted-foreground"
+                >
+                  <IdCard :size="12" class="flex-shrink-0" />
+                  <span class="truncate">{{ contact.external_user_id }}</span>
                 </div>
-              </li>
-            </ul>
-          </div>
+              </div>
+            </template>
+          </ContactSearchResults>
         </div>
 
         <div class="space-y-2 min-w-0">
@@ -169,7 +156,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IdCard } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
@@ -195,6 +182,8 @@ import { useTeamStore } from '@main/stores/team'
 import { countryCallingOptions as allCountries } from '@shared-ui/constants/countries.js'
 import { useWhatsAppTemplatePicker } from './useWhatsAppTemplatePicker.js'
 import WhatsAppTemplatePicker from './WhatsAppTemplatePicker.vue'
+import { useContactSearch } from './useContactSearch.js'
+import ContactSearchResults from './ContactSearchResults.vue'
 import api from '@/api'
 
 const emit = defineEmits(['close'])
@@ -224,17 +213,24 @@ const teamId = ref('none')
 const agentId = ref(userStore.userID ? String(userStore.userID) : 'none')
 const loading = ref(false)
 
-const searchResults = ref([])
-const highlightedIndex = ref(-1)
 const selectedContact = ref(null)
-let timeoutId = null
 
 const firstName = ref('')
 const lastName = ref('')
 const phoneCountryCode = ref('')
 const phoneNumber = ref('')
 
-onUnmounted(() => clearTimeout(timeoutId))
+const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydown, selectContact } =
+  useContactSearch({
+    getQuery: () => phoneNumber.value,
+    onSelect: (contact) => {
+      selectedContact.value = contact
+      phoneNumber.value = contact.phone_number || ''
+      phoneCountryCode.value = contact.phone_number_country_code || ''
+      firstName.value = contact.first_name || ''
+      lastName.value = contact.last_name || ''
+    }
+  })
 
 watch(inboxId, (id) => fetchTemplates(id))
 
@@ -250,55 +246,6 @@ const hasContact = computed(() => {
 const canSubmit = computed(
   () => !!inboxId.value && !!selectedTemplate.value && allParamsFilled.value && hasContact.value
 )
-
-const handleSearchContacts = () => {
-  clearTimeout(timeoutId)
-  timeoutId = setTimeout(async () => {
-    const query = phoneNumber.value.trim()
-    if (query.length < 3) {
-      searchResults.value.splice(0)
-      return
-    }
-    try {
-      const resp = await api.searchContacts({ query })
-      searchResults.value = [...resp.data.data]
-      highlightedIndex.value = -1
-    } catch (error) {
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-      searchResults.value.splice(0)
-    }
-  }, 300)
-}
-
-const handleSearchKeydown = (e) => {
-  if (!searchResults.value.length) return
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    highlightedIndex.value = Math.min(highlightedIndex.value + 1, searchResults.value.length - 1)
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    highlightedIndex.value = Math.max(highlightedIndex.value - 1, 0)
-  } else if (e.key === 'Enter' && highlightedIndex.value >= 0) {
-    e.preventDefault()
-    selectContact(searchResults.value[highlightedIndex.value])
-  } else if (e.key === 'Escape') {
-    searchResults.value.splice(0)
-    highlightedIndex.value = -1
-  }
-}
-
-const selectContact = (contact) => {
-  selectedContact.value = contact
-  phoneNumber.value = contact.phone_number || ''
-  phoneCountryCode.value = contact.phone_number_country_code || ''
-  firstName.value = contact.first_name || ''
-  lastName.value = contact.last_name || ''
-  searchResults.value.splice(0)
-  highlightedIndex.value = -1
-}
 
 watch([phoneNumber, phoneCountryCode], ([num, code]) => {
   if (!selectedContact.value) return

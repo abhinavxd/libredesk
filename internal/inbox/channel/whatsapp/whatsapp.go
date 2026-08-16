@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -28,17 +27,6 @@ const (
 	maxAudioBytes    = 16 * 1024 * 1024
 	maxDocumentBytes = 100 * 1024 * 1024
 )
-
-// captionMarker marks the standalone caption text as sent when the first attachment type can't carry a caption (audio). Prevents re-sending it on retry.
-const captionMarker = "__caption__"
-
-// PartialSendError is returned when at least one item was delivered but the send did not complete fully.
-type PartialSendError struct {
-	Err error
-}
-
-func (e *PartialSendError) Error() string { return e.Err.Error() }
-func (e *PartialSendError) Unwrap() error { return e.Err }
 
 var supportedMediaMIMETypes = map[string]struct{}{
 	"audio/aac":                     {},
@@ -99,10 +87,9 @@ type SendMeta struct {
 	TemplateButtons       []whatsapp.TemplateButton `json:"template_buttons,omitempty"`
 }
 
-// SourceIDUpdater persists the Meta message ID for status correlation and records per-attachment delivery for retries.
+// SourceIDUpdater persists the Meta message ID for status correlation.
 type SourceIDUpdater interface {
 	UpdateMessageSourceID(messageUUID, sourceID string) error
-	SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs []string) error
 }
 
 type WhatsApp struct {
@@ -146,7 +133,7 @@ func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 }
 
 func (w *WhatsApp) Identifier() int          { return w.id }
-func (w *WhatsApp) AppSecret() string        { return w.config.AppSecret }
+func (w *WhatsApp) Config() Config           { return w.config }
 func (w *WhatsApp) Channel() string          { return ChannelWhatsApp }
 func (w *WhatsApp) Name() string             { return w.name }
 func (w *WhatsApp) FromAddress() string      { return "" }
@@ -166,9 +153,10 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 		return fmt.Errorf("missing recipient phone number on outbound message")
 	}
 
+	// An attachment costs two calls: the media upload and the send.
 	timeout := MetaCallTimeout
-	if n := len(message.Attachments); n > 0 {
-		timeout = time.Duration(1+n) * MetaCallTimeout
+	if len(message.Attachments) > 0 {
+		timeout = 2 * MetaCallTimeout
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -188,7 +176,7 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 		sourceID, err = w.client.SendTemplate(ctx, acc, meta.ToPhone, meta.TemplateName, meta.TemplateLanguage, components)
 
 	case len(message.Attachments) > 0:
-		sourceID, err = w.sendAttachments(ctx, acc, meta, message)
+		sourceID, err = w.sendAttachment(ctx, acc, meta, message)
 
 	case strings.TrimSpace(textBody(message)) != "":
 		sourceID, err = w.client.SendText(ctx, acc, meta.ToPhone, textBody(message), meta.ReplyToWAMessageID)
@@ -197,7 +185,6 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 		return fmt.Errorf("outbound message has no content")
 	}
 
-	// Persist the source id even on a partial-failure error path, so a status webhook for the already-delivered media still correlates.
 	if sourceID != "" && w.sourceUpdater != nil {
 		if upErr := w.sourceUpdater.UpdateMessageSourceID(message.UUID, sourceID); upErr != nil {
 			w.lo.Error("failed to persist whatsapp source id", "message_uuid", message.UUID, "source_id", sourceID, "error", upErr)
@@ -206,102 +193,35 @@ func (w *WhatsApp) Send(message models.OutboundMessage) error {
 	return err
 }
 
-// sendAttachments sends caption as standalone text when the first attachment can't carry it (audio); skips already-sent items on retry.
-func (w *WhatsApp) sendAttachments(ctx context.Context, acc whatsapp.Account, meta SendMeta, message models.OutboundMessage) (string, error) {
+// sendAttachment uploads and sends one attachment; Meta accepts only one media per message.
+func (w *WhatsApp) sendAttachment(ctx context.Context, acc whatsapp.Account, meta SendMeta, message models.OutboundMessage) (string, error) {
+	if len(message.Attachments) > 1 {
+		return "", fmt.Errorf("whatsapp accepts one attachment per message, got %d", len(message.Attachments))
+	}
 	if bad := rejectedAttachments(message.Attachments); len(bad) > 0 {
 		return "", fmt.Errorf("WhatsApp can't send these files: %s", strings.Join(bad, "; "))
 	}
 
-	caption := strings.TrimSpace(textBody(message))
-	replyTo := meta.ReplyToWAMessageID
-	var firstID string
-
-	sent := parseSentAttachmentMarkers(message.Meta)
-	fail := func(err error) (string, error) {
-		if w.sourceUpdater != nil {
-			if perr := w.sourceUpdater.SetWhatsAppSentAttachments(message.UUID, markerKeys(sent)); perr != nil {
-				w.lo.Error("failed to persist whatsapp sent-attachment markers", "message_uuid", message.UUID, "error", perr)
-			}
-		}
-		if firstID != "" || len(sent) > 0 {
-			return firstID, &PartialSendError{Err: err}
-		}
-		return firstID, err
+	att := message.Attachments[0]
+	mediaID, err := w.client.UploadMedia(ctx, acc, att.Content, att.ContentType, att.Name)
+	if err != nil {
+		return "", fmt.Errorf("uploading attachment to meta: %w", err)
 	}
-
-	if caption != "" && len(message.Attachments) > 0 {
-		if t := mediaTypeForAttachment(message.Attachments[0]); t != "image" && t != "video" && t != "document" {
-			if !sent[captionMarker] {
-				id, err := w.client.SendText(ctx, acc, meta.ToPhone, caption, replyTo)
-				if err != nil {
-					return fail(err)
-				}
-				sent[captionMarker] = true
-				firstID = id
-			}
-			caption, replyTo = "", ""
-		}
-	}
-
-	for i, att := range message.Attachments {
-		if att.UUID != "" && sent[att.UUID] {
-			continue
-		}
-		mediaType := mediaTypeForAttachment(att)
-		mediaID, err := w.client.UploadMedia(ctx, acc, att.Content, att.ContentType, att.Name)
-		if err != nil {
-			return fail(fmt.Errorf("uploading attachment to meta: %w", err))
-		}
-
-		var attCaption, attReply string
-		if i == 0 {
-			attCaption = caption
-			attReply = replyTo
-		}
-
-		id, err := w.client.SendMedia(ctx, acc, meta.ToPhone, mediaType, mediaID, attCaption, att.Name, attReply)
-		if err != nil {
-			return fail(err)
-		}
-		if att.UUID != "" {
-			sent[att.UUID] = true
-		}
-		if i == 0 && firstID == "" {
-			firstID = id
-		}
-	}
-	if w.sourceUpdater != nil {
-		if err := w.sourceUpdater.SetWhatsAppSentAttachments(message.UUID, markerKeys(sent)); err != nil {
-			w.lo.Error("failed to persist whatsapp sent-attachment markers on success", "message_uuid", message.UUID, "error", err)
-		}
-	}
-	return firstID, nil
+	return w.client.SendMedia(ctx, acc, meta.ToPhone, mediaTypeForAttachment(att), mediaID, strings.TrimSpace(textBody(message)), att.Name, meta.ReplyToWAMessageID)
 }
 
-func parseSentAttachmentMarkers(raw json.RawMessage) map[string]bool {
-	out := map[string]bool{}
-	if len(raw) == 0 {
-		return out
-	}
-	var env struct {
-		Sent []string `json:"whatsapp_sent_attachments"`
-	}
-	if err := json.Unmarshal(raw, &env); err != nil {
-		return out
-	}
-	for _, k := range env.Sent {
-		out[k] = true
-	}
-	return out
+// SupportsCaption reports whether media of this content type can carry a caption; audio can't.
+func SupportsCaption(contentType string) bool {
+	return mediaTypeForAttachment(attachment.Attachment{ContentType: contentType}) != "audio"
 }
 
-func markerKeys(sent map[string]bool) []string {
-	keys := make([]string, 0, len(sent))
-	for k := range sent {
-		keys = append(keys, k)
+// RejectMediaReason returns why WhatsApp won't accept the file, or an empty string when it will.
+func RejectMediaReason(name, contentType string, size int) string {
+	reasons := rejectedAttachments([]attachment.Attachment{{Name: name, ContentType: contentType, Size: size}})
+	if len(reasons) == 0 {
+		return ""
 	}
-	sort.Strings(keys)
-	return keys
+	return reasons[0]
 }
 
 func parseSendMeta(raw json.RawMessage) (SendMeta, error) {
@@ -387,22 +307,14 @@ func normalizeMIME(contentType string) string {
 	return mime
 }
 
+// mediaTypeForAttachment maps MIME to Meta's media type; the per-MIME size cap is enforced on upload, so an oversized image can't pass as a document.
 func mediaTypeForAttachment(att attachment.Attachment) string {
 	switch normalizeMIME(att.ContentType) {
 	case "image/jpeg", "image/png":
-		if att.Size > 0 && att.Size > effectiveLimit(maxImageBytes) {
-			return "document"
-		}
 		return "image"
 	case "video/mp4", "video/3gpp", "video/3gp":
-		if att.Size > 0 && att.Size > effectiveLimit(maxVideoBytes) {
-			return "document"
-		}
 		return "video"
 	case "audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg", "audio/opus":
-		if att.Size > 0 && att.Size > effectiveLimit(maxAudioBytes) {
-			return "document"
-		}
 		return "audio"
 	}
 	return "document"

@@ -53,8 +53,12 @@ func syncAllWhatsAppTemplates(ctx context.Context, app *App) {
 		syncCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		if _, err := app.whatsappTemplate.SyncFromMeta(syncCtx, rec.ID); err != nil {
 			app.lo.Warn("periodic whatsapp template sync failed", "inbox_id", rec.ID, "error", err)
+			cancel()
+			continue
 		}
 		cancel()
+		// Must follow the sync: an edit skipped during review only applies once the status is fresh.
+		ensureWhatsAppCSATTemplate(app, rec.ID)
 	}
 }
 

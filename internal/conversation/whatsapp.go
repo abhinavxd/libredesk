@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -36,22 +37,10 @@ const (
 	WhatsAppStatusFailed    = "failed"
 )
 
-var templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z0-9_]+\}\}`)
+// A media header needs a media ID the sender can't supply, so only text (or no) headers can go out.
+var sendableTemplateHeaderTypes = []string{"", "NONE", "TEXT"}
 
-// MessageUUIDBySourceID resolves a transport-side message ID to a local message UUID, "" with nil error when no match.
-func (m *Manager) MessageUUIDBySourceID(sourceID string) (string, error) {
-	if sourceID == "" {
-		return "", nil
-	}
-	var uuid string
-	if err := m.q.GetMessageUUIDBySourceID.Get(&uuid, sourceID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil
-		}
-		return "", err
-	}
-	return uuid, nil
-}
+var templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z0-9_]+\}\}`)
 
 // WhatsAppReadReceiptTarget returns the inbox ID and wamid of the latest unseen inbound message, or empty values when there is nothing to mark read.
 func (m *Manager) WhatsAppReadReceiptTarget(uuid string, userID int) (int, string, error) {
@@ -68,8 +57,7 @@ func (m *Manager) WhatsAppReadReceiptTarget(uuid string, userID int) (int, strin
 	return row.InboxID, row.SourceID, nil
 }
 
-// RecordWhatsAppStatus stamps a Meta status event (sent/delivered/read/failed) into the message meta and broadcasts a partial message_update.
-func (m *Manager) RecordWhatsAppStatus(sourceID, metaStatus string, eventAt time.Time, errorMsg string) error {
+func (m *Manager) ApplyWhatsAppStatus(sourceID, metaStatus string, eventAt time.Time, errorMsg string) error {
 	if sourceID == "" || metaStatus == "" {
 		return nil
 	}
@@ -79,90 +67,63 @@ func (m *Manager) RecordWhatsAppStatus(sourceID, metaStatus string, eventAt time
 	ts := eventAt.Format(time.RFC3339)
 
 	patch := map[string]any{
-		"wa_status":            metaStatus,
-		"wa_status_updated_at": ts,
+		"provider_status":            metaStatus,
+		"provider_status_updated_at": ts,
 	}
 	switch metaStatus {
 	case WhatsAppStatusSent:
-		patch["wa_sent_at"] = ts
+		patch["provider_sent_at"] = ts
 	case WhatsAppStatusDelivered:
-		patch["wa_delivered_at"] = ts
+		patch["provider_delivered_at"] = ts
 	case WhatsAppStatusRead:
-		patch["wa_read_at"] = ts
+		patch["provider_read_at"] = ts
 	case WhatsAppStatusFailed:
-		patch["wa_failed_at"] = ts
+		patch["provider_failed_at"] = ts
 		if errorMsg != "" {
-			patch["wa_failure_reason"] = errorMsg
+			patch["provider_failure_reason"] = errorMsg
 		}
 	}
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
 
-	return m.mergeWhatsAppMeta(m.q.MergeMessageMetaBySourceID, sourceID, patch)
+	// The message_status enum collapses delivered/read into sent; the full lifecycle lives in meta.
+	dbStatus := models.MessageStatusSent
+	if metaStatus == WhatsAppStatusFailed {
+		dbStatus = models.MessageStatusFailed
+	}
+
+	var row struct {
+		UUID             string          `db:"uuid"`
+		ConversationUUID string          `db:"conversation_uuid"`
+		Status           string          `db:"status"`
+		Meta             json.RawMessage `db:"meta"`
+	}
+	if err := m.q.ApplyWhatsAppMessageStatus.Get(&row, sourceID, dbStatus, patchBytes); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("status update for source_id=%s status=%s: %w", sourceID, metaStatus, ErrMessageNotFound)
+		}
+		m.lo.Error("error applying whatsapp message status", "source_id", sourceID, "error", err)
+		return err
+	}
+	m.BroadcastMessageUpdate(row.ConversationUUID, row.UUID, map[string]any{"status": row.Status, "meta": stripCSATUUID(row.Meta)})
+	return nil
 }
 
-// RecordWhatsAppSendFailure stamps a send-time Meta error into the message meta and broadcasts it.
 func (m *Manager) RecordWhatsAppSendFailure(messageUUID, errorMsg string) error {
 	if messageUUID == "" || errorMsg == "" {
 		return nil
 	}
 	patch := map[string]any{
-		"wa_status":         WhatsAppStatusFailed,
-		"wa_failed_at":      time.Now().UTC().Format(time.RFC3339),
-		"wa_failure_reason": errorMsg,
+		"provider_status":         WhatsAppStatusFailed,
+		"provider_failed_at":      time.Now().UTC().Format(time.RFC3339),
+		"provider_failure_reason": errorMsg,
 	}
 	return m.mergeWhatsAppMeta(m.q.MergeMessageMetaByUUID, messageUUID, patch)
 }
 
-// HasPartialWhatsAppSend reports whether a sent message has attachments that were not delivered, making it eligible for retry.
-func (m *Manager) HasPartialWhatsAppSend(msg models.Message) bool {
-	if len(msg.Attachments) == 0 {
-		return false
-	}
-	var meta struct {
-		SentAttachments []string `json:"whatsapp_sent_attachments"`
-	}
-	if err := json.Unmarshal(msg.Meta, &meta); err != nil || len(meta.SentAttachments) == 0 {
-		return false
-	}
-	sent := make(map[string]struct{}, len(meta.SentAttachments))
-	for _, id := range meta.SentAttachments {
-		sent[id] = struct{}{}
-	}
-	for _, att := range msg.Attachments {
-		if _, ok := sent[att.UUID]; !ok {
-			return true
-		}
-	}
-	return false
-}
-
-// SetWhatsAppSentAttachments records delivered attachment UUIDs so a retry does not re-deliver them.
-func (m *Manager) SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs []string) error {
-	if messageUUID == "" {
-		return nil
-	}
-	patch, err := json.Marshal(map[string]any{"whatsapp_sent_attachments": attachmentUUIDs})
-	if err != nil {
-		return err
-	}
-	var row struct {
-		UUID             string          `db:"uuid"`
-		ConversationUUID string          `db:"conversation_uuid"`
-		Meta             json.RawMessage `db:"meta"`
-	}
-	if err := m.q.MergeMessageMetaByUUID.Get(&row, messageUUID, patch); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
-		return err
-	}
-	var metaMap map[string]any
-	if err := json.Unmarshal(row.Meta, &metaMap); err == nil && row.ConversationUUID != "" {
-		m.BroadcastMessageUpdate(row.ConversationUUID, row.UUID, map[string]any{"meta": metaMap})
-	}
-	return nil
-}
-
-// mergeWhatsAppMeta is a no-op on an unmatched key, e.g. the 2nd..nth media of a multi-attachment send shares one message row.
+// mergeWhatsAppMeta is a no-op on an unmatched key.
 func (m *Manager) mergeWhatsAppMeta(stmt *sqlx.Stmt, key string, patch map[string]any) error {
 	patchBytes, err := json.Marshal(patch)
 	if err != nil {
@@ -251,9 +212,13 @@ func (m *Manager) whatsAppWindowOpen(contactID, inboxID int) bool {
 
 // prepareWhatsAppOutbound writes channel fields into metaMap and returns the rendered template body, or free-form content unchanged.
 func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID int, conversationUUID string, content string, hasAttachments bool, metaMap map[string]any) (string, error) {
-	conv, err := m.GetConversation(0, conversationUUID, "")
-	if err != nil {
-		return content, err
+	var conv struct {
+		InboxID   int `db:"inbox_id"`
+		ContactID int `db:"contact_id"`
+	}
+	if err := m.q.GetConversationInboxContact.Get(&conv, conversationUUID); err != nil {
+		m.lo.Error("error fetching conversation inbox and contact", "conversation_uuid", conversationUUID, "error", err)
+		return content, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if conv.InboxID != inboxRecord.ID {
 		return content, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -277,9 +242,17 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 			return content, envelope.NewError(envelope.InputError, "contact's phone country code is missing or invalid", nil)
 		}
 		toPhone = stringutil.NormalizeWhatsAppPhone(dialCode + contact.PhoneNumber.String)
-	}
-	if toPhone == "" {
-		return content, envelope.NewError(envelope.InputError, "contact has no phone number", nil)
+		if toPhone == "" {
+			return content, envelope.NewError(envelope.InputError, "contact has no phone number", nil)
+		}
+		// Link the wa_id now so the contact's reply threads back to this contact instead of forking a duplicate.
+		linkedID, err := m.userStore.LinkChannelIdentity(contactID, whatsappChannel.ChannelWhatsApp, toPhone)
+		if err != nil {
+			return content, err
+		}
+		if linkedID != contactID {
+			return content, envelope.NewError(envelope.ConflictError, "contact's phone number is already linked to another contact on WhatsApp", nil)
+		}
 	}
 
 	templateID := extractInt(metaMap, "whatsapp_template_id")
@@ -304,6 +277,9 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 		}
 		if !strings.EqualFold(t.Status, wtmodels.StatusApproved) {
 			return content, envelope.NewError(envelope.InputError, fmt.Sprintf("template not approved (status: %s)", t.Status), nil)
+		}
+		if t.HeaderType.Valid && !slices.Contains(sendableTemplateHeaderTypes, strings.ToUpper(t.HeaderType.String)) {
+			return content, envelope.NewError(envelope.InputError, fmt.Sprintf("templates with a %s header can't be sent yet", strings.ToUpper(t.HeaderType.String)), nil)
 		}
 		send.TemplateName = t.Name
 		send.TemplateLanguage = t.Language

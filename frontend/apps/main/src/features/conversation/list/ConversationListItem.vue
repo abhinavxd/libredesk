@@ -11,7 +11,6 @@
         }"
       >
         <div class="flex items-start gap-2">
-          <!-- Avatar with channel indicator (checkbox overlays on hover / when selecting) -->
           <div class="relative flex-shrink-0 w-10 h-10">
             <div
               class="transition-opacity"
@@ -27,9 +26,6 @@
                   {{ conversation.contact.first_name.substring(0, 2).toUpperCase() }}
                 </AvatarFallback>
               </Avatar>
-              <span class="absolute -bottom-0.5 -right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-background border border-border">
-                <component :is="channelIcon" class="w-2.5 h-2.5 text-muted-foreground" />
-              </span>
             </div>
             <div
               v-if="canBulkAct"
@@ -66,7 +62,7 @@
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <component
-                        :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
+                        :is="channelIcon"
                         class="w-3 h-3 text-muted-foreground"
                         role="img"
                         :aria-label="conversation.inbox_name"

@@ -432,6 +432,9 @@ LIMIT 200;
 -- name: get-conversation-uuid
 SELECT uuid from conversations where id = $1;
 
+-- name: get-conversation-inbox-contact
+SELECT inbox_id, contact_id FROM conversations WHERE uuid = $1;
+
 -- name: update-conversation-assigned-user
 UPDATE conversations
 SET assigned_user_id = $2,
@@ -870,15 +873,6 @@ UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
 -- name: update-message-source-id-by-uuid
 UPDATE conversation_messages SET source_id = $2, updated_at = NOW() WHERE uuid = $1;
 
--- name: update-message-status-by-source-id
-UPDATE conversation_messages m
-SET status = $2, updated_at = NOW()
-FROM conversations c
-WHERE m.source_id = $1
-  AND m.status != 'failed'
-  AND c.id = m.conversation_id
-RETURNING m.uuid, c.uuid AS conversation_uuid;
-
 -- name: merge-message-meta-by-uuid
 UPDATE conversation_messages m
 SET meta = COALESCE(m.meta, '{}'::jsonb) || $2::jsonb,
@@ -888,28 +882,30 @@ WHERE m.uuid = $1
   AND c.id = m.conversation_id
 RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
 
--- name: merge-message-meta-by-source-id
+-- name: apply-whatsapp-message-status
+-- Meta guard is monotonic (rank order) and sticky on failure; the enum status only guards against un-failing a failed message.
 WITH ranks(status, rank) AS (
   VALUES ('sent', 1), ('delivered', 2), ('read', 3), ('failed', 4)
 )
 UPDATE conversation_messages m
-SET meta = COALESCE(m.meta, '{}'::jsonb) || $2::jsonb,
+SET status = CASE WHEN m.status != 'failed' THEN $2::message_status ELSE m.status END,
+    meta = CASE
+      WHEN COALESCE(m.meta->>'provider_status', '') != 'failed'
+       AND COALESCE(
+             (SELECT rank FROM ranks WHERE status = ($3::jsonb)->>'provider_status'),
+             0
+           ) >= COALESCE(
+             (SELECT rank FROM ranks WHERE status = m.meta->>'provider_status'),
+             0
+           )
+      THEN COALESCE(m.meta, '{}'::jsonb) || $3::jsonb
+      ELSE m.meta
+    END,
     updated_at = NOW()
 FROM conversations c
 WHERE m.source_id = $1
   AND c.id = m.conversation_id
-  AND COALESCE(m.meta->>'wa_status', '') != 'failed'
-  AND COALESCE(
-        (SELECT rank FROM ranks WHERE status = ($2::jsonb)->>'wa_status'),
-        0
-      ) >= COALESCE(
-        (SELECT rank FROM ranks WHERE status = m.meta->>'wa_status'),
-        0
-      )
-RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
-
--- name: get-message-uuid-by-source-id
-SELECT uuid FROM conversation_messages WHERE source_id = $1 LIMIT 1;
+RETURNING m.uuid, c.uuid AS conversation_uuid, m.status, m.meta;
 
 -- name: get-whatsapp-read-receipt-target
 SELECT cm.source_id, c.inbox_id

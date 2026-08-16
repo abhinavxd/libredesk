@@ -343,7 +343,7 @@ func main() {
 	go app.whatsappIngester.Run()
 	waClient.SetAuthErrorHook(makeWhatsAppAuthErrorHook(app))
 
-	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, conversation)
+	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, conversation, makeInboxAuthErrorHook(app))
 
 	go whatsappTemplateSyncWorker(ctx, app)
 

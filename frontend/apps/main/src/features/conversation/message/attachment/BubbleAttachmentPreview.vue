@@ -4,7 +4,6 @@
       v-for="attachment in attachments"
       :key="attachment.uuid"
       :attachment="attachment"
-      :failed="failedUUIDs.has(attachment.uuid)"
       @preview="openLightbox"
     />
   </div>
@@ -22,8 +21,7 @@ import BubbleAttachmentItem from '@/features/conversation/message/attachment/Bub
 import ImageLightbox from '@/components/ImageLightbox.vue'
 
 const props = defineProps({
-  attachments: { type: Array, required: true },
-  failedUUIDs: { type: Set, default: () => new Set() }
+  attachments: { type: Array, required: true }
 })
 
 const isImage = (attachment) => (attachment.content_type || '').startsWith('image/')

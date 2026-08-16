@@ -4,9 +4,9 @@ import OuterApp from '@main/OuterApp.vue'
 import InboxLayout from '@main/layouts/inbox/InboxLayout.vue'
 import AccountLayout from '@main/layouts/account/AccountLayout.vue'
 import AdminLayout from '@main/layouts/admin/AdminLayout.vue'
-import { useAppSettingsStore } from '../stores/appSettings'
-import { getI18n } from '../i18n'
-import { abortRouteScope } from '../api'
+import { useAppSettingsStore } from '@main/stores/appSettings'
+import { getI18n } from '@main/i18n'
+import { abortRouteScope } from '@main/api'
 
 const routes = [
   {

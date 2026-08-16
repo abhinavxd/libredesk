@@ -107,13 +107,17 @@
               :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
             >
               <div
-                v-if="message.content_type === 'text'"
+                v-if="message.content_type === 'text' && sanitizedContent"
                 class="mb-1 native-html whitespace-pre-wrap"
                 :class="{ 'mb-3': message.attachments.length > 0 }"
               >
                 {{ sanitizedContent }}
               </div>
-              <div v-else ref="messageContentEl" @click="onMessageContentClick">
+              <div
+                v-else-if="message.content_type !== 'text' && sanitizedContent"
+                ref="messageContentEl"
+                @click="onMessageContentClick"
+              >
                 <Letter
                   :html="sanitizedContent"
                   :allowedSchemas="['cid', 'https', 'http', 'mailto']"
@@ -161,20 +165,7 @@
             </div>
 
             <!-- Attachments -->
-            <BubbleAttachmentPreview
-              :attachments="nonInlineAttachments"
-              :failedUUIDs="failedAttachmentUUIDs"
-            />
-
-            <!-- Retry failed attachments (WhatsApp partial send) -->
-            <button
-              v-if="showAttachmentRetry"
-              @click="retryMessage(message)"
-              class="flex items-center gap-1 mt-1 text-xs text-destructive hover:text-destructive/80 transition-colors duration-200 self-end"
-            >
-              <RotateCcw :size="10" />
-              {{ t('conversation.whatsapp.retryAttachments') }}
-            </button>
+            <BubbleAttachmentPreview :attachments="nonInlineAttachments" />
 
             <!-- CSAT Response -->
             <CSATResponseDisplay :message="message" />
@@ -428,26 +419,7 @@ const showCheckCheck = computed(
 const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
 
 const sendFailureReason = computed(() =>
-  props.message.status === 'failed' ? props.message.meta?.wa_failure_reason : null
-)
-
-const failedAttachmentUUIDs = computed(() => {
-  const sent = props.message.meta?.whatsapp_sent_attachments
-  if (!Array.isArray(sent) || !props.message.attachments?.length) return new Set()
-  const sentSet = new Set(sent)
-  return new Set(
-    props.message.attachments
-      .filter((a) => a.uuid && !sentSet.has(a.uuid))
-      .map((a) => a.uuid)
-  )
-})
-
-const showAttachmentRetry = computed(
-  () =>
-    isOutgoing.value &&
-    props.message.status === 'sent' &&
-    failedAttachmentUUIDs.value.size > 0 &&
-    props.message.sender_id === userStore.userID
+  props.message.status === 'failed' ? props.message.meta?.provider_failure_reason : null
 )
 
 const retryMessage = (msg) => {

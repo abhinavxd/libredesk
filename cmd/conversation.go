@@ -1031,6 +1031,9 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 // resolveWhatsAppContact returns the outbound contact, creating one keyed by the wa_id when none is selected.
 func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error) {
 	if req.ContactID > 0 {
+		if _, err := app.user.GetContactOrVisitor(req.ContactID, ""); err != nil {
+			return 0, err
+		}
 		return req.ContactID, nil
 	}
 	dialCode := countries.DialCodeForISO(req.PhoneNumberCountryCode)

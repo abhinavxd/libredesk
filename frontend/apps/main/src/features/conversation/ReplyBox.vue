@@ -165,16 +165,40 @@ const {
   linkedModel: 'messages'
 })
 
-const WA_MAX_FILE_MB = 100
+// Meta's per-type upload caps, less the 2% headroom the backend applies. Mirrors maxMediaBytes in internal/inbox/channel/whatsapp.
+const WA_MAX_FILE_MB = { image: 5 * 0.98, video: 16 * 0.98, audio: 16 * 0.98, document: 100 * 0.98 }
+
+function waMediaType(contentType = '') {
+  if (['image/jpeg', 'image/png'].includes(contentType)) return 'image'
+  if (['video/mp4', 'video/3gpp', 'video/3gp'].includes(contentType)) return 'video'
+  if (contentType.startsWith('audio/')) return 'audio'
+  return 'document'
+}
+
+// WhatsApp takes one attachment per message, so a multi-file reply is sent as several messages, the caption riding the first.
+function buildWhatsAppReplyParts(content, files) {
+  const parts = []
+  let caption = content
+  if (hasTextContent.value && waMediaType(files[0].content_type) === 'audio') {
+    parts.push({ content: caption, attachments: [] })
+    caption = ''
+  }
+  files.forEach((file, i) => parts.push({ content: i === 0 ? caption : '', attachments: [file] }))
+  return parts
+}
 
 function validateWhatsAppFiles(files) {
   if (conversationStore.current?.inbox_channel !== WHATSAPP_CHANNEL) return files
   const valid = []
   for (const file of files) {
-    if (file.size > WA_MAX_FILE_MB * 1024 * 1024) {
+    const maxMB = WA_MAX_FILE_MB[waMediaType(file.type)]
+    if (file.size > maxMB * 1024 * 1024) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
-        description: t('conversation.whatsapp.fileSizeExceeded', { name: file.name, size: WA_MAX_FILE_MB })
+        description: t('conversation.whatsapp.fileSizeExceeded', {
+          name: file.name,
+          size: Math.floor(maxMB)
+        })
       })
     } else {
       valid.push(file)
@@ -354,7 +378,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
       }
     }
   }
-  let tempUUID = null
+  let tempUUIDs = []
 
   // Add pending message to cache for instant display.
   if (hasContent) {
@@ -392,48 +416,61 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     if (parsedCC.length) meta.cc = parsedCC
     if (parsedBCC.length) meta.bcc = parsedBCC
 
-    tempUUID = conversationStore.addPendingMessage(
-      convUUID,
-      savedContent,
-      isPrivate,
-      author,
-      mediaFiles.value,
-      textContent.value,
-      meta
+    const isWhatsAppReply =
+      !isPrivate && conversationStore.current.inbox_channel === WHATSAPP_CHANNEL
+    const parts =
+      isWhatsAppReply && mediaFiles.value.length
+        ? buildWhatsAppReplyParts(savedContent, mediaFiles.value)
+        : [{ content: savedContent, attachments: mediaFiles.value }]
+
+    tempUUIDs = parts.map((part, i) =>
+      conversationStore.addPendingMessage(
+        convUUID,
+        part.content,
+        isPrivate,
+        author,
+        part.attachments,
+        i === 0 ? textContent.value : '',
+        meta
+      )
     )
 
     // Clear editor immediately.
     htmlContent.value = ''
 
-    try {
-      isSending.value = true
-      const response = await api.sendMessage(convUUID, {
-        sender_type: UserTypeAgent,
-        private: isPrivate,
-        message: savedContent,
-        attachments: mediaFiles.value.map((file) => file.id),
-        mentions: isPrivate ? mentions.value : [],
-        cc: parsedCC,
-        bcc: parsedBCC,
-        to: parsedTo,
-        echo_id: isPrivate ? '' : tempUUID
-      })
+    isSending.value = true
+    for (const [i, part] of parts.entries()) {
+      try {
+        const response = await api.sendMessage(convUUID, {
+          sender_type: UserTypeAgent,
+          private: isPrivate,
+          message: part.content,
+          attachments: part.attachments.map((file) => file.id),
+          mentions: isPrivate ? mentions.value : [],
+          cc: parsedCC,
+          bcc: parsedBCC,
+          to: parsedTo,
+          echo_id: isPrivate ? '' : tempUUIDs[i]
+        })
 
-      // Private notes are sent immediately so replace immediately.
-      if (isPrivate && response?.data?.data) {
-        conversationStore.replacePendingMessage(convUUID, tempUUID, response.data.data)
+        if (isPrivate && response?.data?.data) {
+          conversationStore.replacePendingMessage(convUUID, tempUUIDs[i], response.data.data)
+        }
+      } catch (error) {
+        hasMessageSendingErrored = true
+        // Drop the bubbles for everything still unsent; parts already accepted stay in the timeline.
+        tempUUIDs.slice(i).forEach((uuid) => conversationStore.removePendingMessage(convUUID, uuid))
+        if (i === 0) htmlContent.value = savedContent
+        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+          variant: 'destructive',
+          description: handleHTTPError(error).message
+        })
+        break
       }
+    }
 
+    if (!hasMessageSendingErrored) {
       notificationStore.markAssignmentAsReadForConversation(convUUID)
-    } catch (error) {
-      hasMessageSendingErrored = true
-      // Remove pending message and restore editor content.
-      conversationStore.removePendingMessage(convUUID, tempUUID)
-      htmlContent.value = savedContent
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
     }
   }
 

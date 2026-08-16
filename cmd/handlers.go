@@ -366,8 +366,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/webhooks/whatsapp/{inbox_id}", rateLimit(handleWhatsAppWebhookVerify, "public"))
 	g.POST("/webhooks/whatsapp/{inbox_id}", handleWhatsAppWebhookEvent)
 
-	// WhatsApp templates (admin).
-	g.GET("/api/v1/whatsapp/templates", perm(handleListWhatsAppTemplates, "inboxes:manage"))
+	// WhatsApp templates.
+	g.GET("/api/v1/whatsapp/templates", auth(handleListWhatsAppTemplates))
 	g.GET("/api/v1/whatsapp/templates/{id}", perm(handleGetWhatsAppTemplate, "inboxes:manage"))
 	g.POST("/api/v1/whatsapp/templates", perm(handleCreateWhatsAppTemplate, "inboxes:manage"))
 	g.DELETE("/api/v1/whatsapp/templates/{id}", perm(handleDeleteWhatsAppTemplate, "inboxes:manage"))

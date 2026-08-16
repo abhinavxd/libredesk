@@ -4,19 +4,19 @@ import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { TYPING_RECEIVE_TIMEOUT } from '@shared-ui/composables/useTypingIndicator.js'
 import { deepMerge } from '@shared-ui/utils/object.js'
-import { computeRecipientsFromMessage } from '../utils/email-recipients'
-import { useEmitter } from '../composables/useEmitter'
-import { EMITTER_EVENTS } from '../constants/emitterEvents'
+import { computeRecipientsFromMessage } from '@/utils/email-recipients'
+import { useEmitter } from '@/composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { subscribeToConversation, sendTypingIndicator, subscribeListReplace } from '@main/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
-import MessageCache from '../utils/conversation-message-cache'
-import { getI18n } from '../i18n'
+import MessageCache from '@/utils/conversation-message-cache'
+import { getI18n } from '@/i18n'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@/constants/conversation'
 import { useThrottleFn } from '@vueuse/core'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
 import { delayedLoading } from '@/utils/delayed-loading'
-import api from '../api'
+import api from '@/api'
 
 export const useConversationStore = defineStore('conversation', () => {
   const CONV_LIST_PAGE_SIZE = 25
@@ -881,9 +881,11 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  let pendingMessageSeq = 0
+
   function addPendingMessage (conversationUUID, content, isPrivate, author, attachments = [], textContent = '', meta = {}) {
     const pendingMessage = {
-      uuid: `pending-${Date.now()}`,
+      uuid: `pending-${Date.now()}-${++pendingMessageSeq}`,
       type: 'outgoing',
       status: 'pending',
       content,

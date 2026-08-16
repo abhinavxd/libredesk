@@ -14,6 +14,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
@@ -36,7 +37,7 @@ func handleGetInboxes(r *fastglue.Request) error {
 			app.lo.Error("error clearing inbox passwords from response", "error", err)
 			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
-		setWebhookURLWithRoot(app, &inboxes[i], rootURL)
+		setComputedInboxFieldsWithRoot(app, &inboxes[i], rootURL)
 	}
 	return r.SendEnvelope(inboxes)
 }
@@ -55,17 +56,25 @@ func handleGetInbox(r *fastglue.Request) error {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	setWebhookURL(app, &inbox)
+	setComputedInboxFields(app, &inbox)
 	return r.SendEnvelope(inbox)
 }
 
-// setWebhookURL populates the computed webhook_url field for channels that receive inbound events over HTTP (currently WhatsApp only).
-func setWebhookURL(app *App, inb *imodels.Inbox) {
-	root, _ := app.setting.GetAppRootURL()
-	setWebhookURLWithRoot(app, inb, root)
+func makeInboxAuthErrorHook(app *App) email.AuthErrorCallback {
+	return func(inboxID int) {
+		if _, flagged := app.inboxAuthErrors.LoadOrStore(inboxID, time.Now()); !flagged {
+			app.lo.Error("inbox credentials rejected, messages will not be sent or received until they are updated", "inbox_id", inboxID)
+		}
+	}
 }
 
-func setWebhookURLWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
+func setComputedInboxFields(app *App, inb *imodels.Inbox) {
+	root, _ := app.setting.GetAppRootURL()
+	setComputedInboxFieldsWithRoot(app, inb, root)
+}
+
+func setComputedInboxFieldsWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
+	_, inb.TokenInvalid = app.inboxAuthErrors.Load(inb.ID)
 	if inb.Channel != whatsappChannel.ChannelWhatsApp {
 		return
 	}
@@ -74,7 +83,6 @@ func setWebhookURLWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
 		return
 	}
 	inb.WebhookURL = url
-	_, inb.TokenInvalid = app.inboxAuthErrors.Load(inb.ID)
 }
 
 func whatsAppCallbackURLFromRoot(root string, inboxID int) string {
@@ -218,7 +226,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	setWebhookURL(app, &createdInbox)
+	setComputedInboxFields(app, &createdInbox)
 
 	return r.SendEnvelope(createdInbox)
 }
@@ -278,7 +286,6 @@ func handleUpdateInbox(r *fastglue.Request) error {
 	}
 
 	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
-		app.inboxAuthErrors.Delete(id)
 		go postSaveWhatsAppTasks(app, id)
 	}
 
@@ -287,7 +294,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	setWebhookURL(app, &updatedInbox)
+	setComputedInboxFields(app, &updatedInbox)
 
 	return r.SendEnvelope(updatedInbox)
 }
@@ -318,7 +325,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	setWebhookURL(app, &toggledInbox)
+	setComputedInboxFields(app, &toggledInbox)
 
 	return r.SendEnvelope(toggledInbox)
 }
@@ -343,6 +350,21 @@ func handleDeleteInbox(r *fastglue.Request) error {
 func postSaveWhatsAppTasks(app *App, inboxID int) {
 	subscribeWhatsAppWebhook(app, inboxID)
 	ensureWhatsAppCSATTemplate(app, inboxID)
+}
+
+// reconcileWhatsAppCSATTemplates re-registers every enabled WhatsApp inbox's CSAT template, whose button embeds the root URL.
+func reconcileWhatsAppCSATTemplates(app *App) {
+	inboxes, err := app.inbox.GetAll()
+	if err != nil {
+		app.lo.Error("error listing inboxes for csat template reconcile", "error", err)
+		return
+	}
+	for _, inb := range inboxes {
+		if inb.Channel != inbox.ChannelWhatsApp || !inb.Enabled {
+			continue
+		}
+		ensureWhatsAppCSATTemplate(app, inb.ID)
+	}
 }
 
 // validateInbox validates the inbox

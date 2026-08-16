@@ -189,12 +189,6 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Send message
 	err = inb.Send(outbound)
 	if err != nil && err != livechat.ErrClientNotConnected {
-		var partial *whatsappChannel.PartialSendError
-		if errors.As(err, &partial) {
-			m.lo.Warn("whatsapp partial send - some attachments not delivered", "message_uuid", message.UUID, "error", err)
-			m.UpdateMessageStatus(message.UUID, models.MessageStatusSent)
-			return
-		}
 		if inb.Channel() == inbox.ChannelWhatsApp {
 			m.RecordWhatsAppSendFailure(message.UUID, err.Error())
 		}
@@ -449,29 +443,6 @@ func (m *Manager) UpdateMessageSourceID(messageUUID, sourceID string) error {
 	return nil
 }
 
-func (m *Manager) UpdateMessageStatusBySourceID(sourceID, status string) error {
-	if sourceID == "" {
-		return nil
-	}
-	var row struct {
-		UUID             string `db:"uuid"`
-		ConversationUUID string `db:"conversation_uuid"`
-	}
-	if err := m.q.UpdateMessageStatusBySourceID.Get(&row, sourceID, status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			// ErrNoRows means either a terminally-failed row excluded by the query (don't retry) or a row not yet inserted because the status webhook outran the send (retry).
-			if exists, _ := m.MessageExists(sourceID); exists {
-				return nil
-			}
-			return fmt.Errorf("message not found for status update, will retry: source_id=%s status=%s", sourceID, status)
-		}
-		m.lo.Error("error updating message status by source id", "source_id", sourceID, "error", err)
-		return err
-	}
-	m.BroadcastMessageUpdate(row.ConversationUUID, row.UUID, map[string]any{"status": status})
-	return nil
-}
-
 // UpdateConversationLastInboundAt advances the clock gating business-initiated messages (WhatsApp 24h window).
 func (m *Manager) UpdateConversationLastInboundAt(conversationID int, at time.Time) error {
 	if at.IsZero() {
@@ -528,12 +499,13 @@ func (m *Manager) GetReopenableConversationForContact(contactID, inboxID, window
 	return row.ID, row.UUID, nil
 }
 
-// MarkMessageAsPending sets a failed or partially-sent message back to pending for retry.
 func (m *Manager) MarkMessageAsPending(uuid string) error {
 	if _, err := m.q.MarkMessagePendingForRetry.Exec(uuid); err != nil {
 		m.lo.Error("error marking message as pending", "uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorSendingMessage"), nil)
 	}
+	conversationUUID, _ := m.getConversationUUIDFromMessageUUID(uuid)
+	m.BroadcastMessageUpdate(conversationUUID, uuid, map[string]any{"status": models.MessageStatusPending})
 	return nil
 }
 
@@ -636,6 +608,16 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 	case inbox.ChannelWhatsApp:
+		// Meta accepts one media per message, so a multi-attachment reply must be sent as separate messages.
+		if len(media) > 1 {
+			return models.Message{}, envelope.NewError(envelope.InputError, "WhatsApp accepts one attachment per message", nil)
+		}
+		// Reject unsendable media here; Meta's upload endpoint enforces the same caps and would only fail after the message is queued.
+		for _, md := range media {
+			if reason := whatsappChannel.RejectMediaReason(md.Filename, md.ContentType, md.Size); reason != "" {
+				return models.Message{}, envelope.NewError(envelope.InputError, reason, nil)
+			}
+		}
 		rendered, err := m.prepareWhatsAppOutbound(inboxRecord, contactID, conversationUUID, content, len(media) > 0, metaMap)
 		if err != nil {
 			return models.Message{}, err

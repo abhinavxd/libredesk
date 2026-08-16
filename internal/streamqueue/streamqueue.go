@@ -2,6 +2,7 @@
 package streamqueue
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -42,9 +43,7 @@ type Opts struct {
 	Consumer     string
 	Workers      int
 	MaxAttempts  int
-	MaxLen       int64
 	ClaimMinIdle time.Duration
-	ReclaimEvery time.Duration
 }
 
 // Queue is a single consumer group over one Redis stream, with a dead-letter stream for poison entries.
@@ -58,9 +57,7 @@ type Queue struct {
 	consumer     string
 	workers      int
 	maxAttempts  int
-	maxLen       int64
 	claimMinIdle time.Duration
-	reclaimEvery time.Duration
 	ctx          context.Context
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
@@ -89,12 +86,10 @@ func New(opts Opts) (*Queue, error) {
 		stream:       opts.Stream,
 		deadStream:   opts.Stream + ":dead",
 		group:        opts.Group,
-		consumer:     cmpOr(opts.Consumer, "consumer"),
+		consumer:     cmp.Or(opts.Consumer, "consumer"),
 		workers:      positiveOr(opts.Workers, defaultWorkers),
 		maxAttempts:  positiveOr(opts.MaxAttempts, defaultMaxAttempts),
-		maxLen:       positiveOr64(opts.MaxLen, defaultMaxLen),
-		claimMinIdle: durationOr(opts.ClaimMinIdle, defaultClaimMinIdle),
-		reclaimEvery: durationOr(opts.ReclaimEvery, defaultReclaimEvery),
+		claimMinIdle: positiveOr(opts.ClaimMinIdle, defaultClaimMinIdle),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
@@ -110,7 +105,7 @@ func New(opts Opts) (*Queue, error) {
 func (q *Queue) Enqueue(ctx context.Context, payload []byte) error {
 	return q.rd.XAdd(ctx, &redis.XAddArgs{
 		Stream: q.stream,
-		MaxLen: q.maxLen,
+		MaxLen: defaultMaxLen,
 		Approx: true,
 		Values: map[string]any{payloadField: payload},
 	}).Err()
@@ -167,7 +162,7 @@ func (q *Queue) worker(consumer string) {
 
 func (q *Queue) reclaimer() {
 	defer q.wg.Done()
-	t := time.NewTicker(q.reclaimEvery)
+	t := time.NewTicker(defaultReclaimEvery)
 	defer t.Stop()
 	for {
 		select {
@@ -297,28 +292,7 @@ func (q *Queue) sleep(d time.Duration) {
 	}
 }
 
-func cmpOr(v, fallback string) string {
-	if v == "" {
-		return fallback
-	}
-	return v
-}
-
-func positiveOr(v, fallback int) int {
-	if v <= 0 {
-		return fallback
-	}
-	return v
-}
-
-func positiveOr64(v, fallback int64) int64 {
-	if v <= 0 {
-		return fallback
-	}
-	return v
-}
-
-func durationOr(v, fallback time.Duration) time.Duration {
+func positiveOr[T ~int | ~int64](v, fallback T) T {
 	if v <= 0 {
 		return fallback
 	}

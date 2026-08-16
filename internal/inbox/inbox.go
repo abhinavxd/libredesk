@@ -435,7 +435,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			m.lo.Error("error unmarshalling whatsapp update config", "id", id, "error", err)
 			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
-		for _, fieldName := range []string{"access_token", "app_secret"} {
+		for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token"} {
 			val, _ := updateCfg[fieldName].(string)
 			if val == "" || strings.Contains(val, stringutil.PasswordDummy) {
 				if existing, ok := currentCfg[fieldName].(string); ok {

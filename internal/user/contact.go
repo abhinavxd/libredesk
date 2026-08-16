@@ -229,6 +229,19 @@ func (u *Manager) LinkChannelIdentity(contactID int, channel, identifier string)
 	return linkedID, nil
 }
 
+// UpdateChannelIdentity returns the contact id, or 0 when the new identifier already belongs to a contact.
+func (u *Manager) UpdateChannelIdentity(channel, oldIdentifier, newIdentifier string) (int, error) {
+	var contactID int
+	if err := u.q.UpdateChannelIdentity.QueryRow(channel, oldIdentifier, newIdentifier).Scan(&contactID); err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+		u.lo.Error("error updating channel identity", "channel", channel, "error", err)
+		return 0, fmt.Errorf("updating channel identity: %w", err)
+	}
+	return contactID, nil
+}
+
 func (u *Manager) UpsertContactByChannelIdentity(channel, identifier string, contact *models.User) (int, error) {
 	id, err := u.GetContactIDByChannelIdentity(channel, identifier)
 	if err == nil {

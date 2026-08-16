@@ -152,7 +152,7 @@ func (m *Inbox) ClearPasswords() error {
 			return err
 		}
 		dummy := strings.Repeat(stringutil.PasswordDummy, 10)
-		for _, field := range []string{"access_token", "app_secret"} {
+		for _, field := range []string{"access_token", "app_secret", "webhook_verify_token"} {
 			if v, ok := cfg[field].(string); ok && v != "" {
 				cfg[field] = dummy
 			}

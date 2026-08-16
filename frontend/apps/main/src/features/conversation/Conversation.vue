@@ -71,7 +71,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { useConversationStore } from '../../stores/conversation'
+import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { Clock, MoreHorizontal } from 'lucide-vue-next'
 import {
@@ -87,9 +87,9 @@ import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
 import WhatsAppComposer from './WhatsAppComposer.vue'
 import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
-import { useEmitter } from '../../composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { CONVERSATION_DEFAULT_STATUSES } from '@main/constants/conversation'
+import { useEmitter } from '@main/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'

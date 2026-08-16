@@ -8,23 +8,36 @@
       <span>{{ $t('admin.inbox.whatsapp.tokenInvalid') }}</span>
     </div>
 
-    <!-- Basic Fields -->
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <div class="grid grid-cols-2 gap-4">
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <!-- Toggle Fields -->
+      <FormField v-slot="{ componentField }" name="reopen_window_hours">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
+          <FormControl>
+            <Input type="number" min="0" placeholder="48" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>
+            {{ $t('admin.inbox.whatsapp.reopenWindow.description') }}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </div>
+
     <FormField v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
         <SwitchField
           :title="$t('globals.terms.enabled')"
-          :description="$t('admin.inbox.enabled.description')"
+          :description="$t('admin.inbox.whatsapp.enabled.description')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />
@@ -109,7 +122,6 @@
       </div>
     </div>
 
-    <!-- Meta Cloud API Credentials -->
     <div class="box p-4 space-y-4">
       <h3 class="font-semibold">{{ $t('admin.inbox.whatsapp.metaCredentials') }}</h3>
       <p class="text-sm text-muted-foreground flex items-start gap-1.5">
@@ -145,9 +157,6 @@
                 v-bind="componentField"
               />
             </FormControl>
-            <FormDescription>
-              {{ $t('admin.inbox.whatsapp.wabaID.description') }}
-            </FormDescription>
             <FormMessage />
           </FormItem>
         </FormField>
@@ -186,7 +195,7 @@
           <FormItem>
             <FormLabel>{{ $t('admin.inbox.whatsapp.apiVersion') }}</FormLabel>
             <FormControl>
-              <Input type="text" placeholder="v21.0" v-bind="componentField" />
+              <Input type="text" placeholder="v25.0" v-bind="componentField" />
             </FormControl>
             <FormDescription>
               {{ $t('admin.inbox.whatsapp.apiVersion.description') }}
@@ -194,23 +203,9 @@
             <FormMessage />
           </FormItem>
         </FormField>
-
-        <FormField v-slot="{ componentField }" name="reopen_window_hours">
-          <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
-            <FormControl>
-              <Input type="number" min="0" placeholder="48" v-bind="componentField" />
-            </FormControl>
-            <FormDescription>
-              {{ $t('admin.inbox.whatsapp.reopenWindow.description') }}
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
       </div>
     </div>
 
-    <!-- Webhook Configuration -->
     <div class="box p-4 space-y-4">
       <h3 class="font-semibold">{{ $t('admin.inbox.whatsapp.webhook') }}</h3>
       <p class="text-sm text-muted-foreground flex items-start gap-1.5">
@@ -218,37 +213,35 @@
         <span>{{ $t('admin.inbox.whatsapp.webhook.description') }}</span>
       </p>
 
-      <FormField v-slot="{ componentField }" name="config.webhook_verify_token">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.verifyToken') }}</FormLabel>
-          <FormControl>
-            <Input
-              type="text"
-              :placeholder="t('admin.inbox.whatsapp.verifyToken.placeholder')"
-              v-bind="componentField"
-            />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.whatsapp.verifyToken.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
+      <div class="grid grid-cols-2 gap-4">
+        <FormField v-slot="{ componentField }" name="config.webhook_verify_token">
+          <FormItem>
+            <FormLabel>{{ $t('admin.inbox.whatsapp.verifyToken') }}</FormLabel>
+            <FormControl>
+              <Input
+                type="text"
+                :placeholder="t('admin.inbox.whatsapp.verifyToken.placeholder')"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormDescription>
+              {{ $t('admin.inbox.whatsapp.verifyToken.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-      <!-- Computed webhook URL from the backend; only set once the inbox has been saved. -->
-      <div v-if="webhookURL" class="space-y-1">
-        <label class="text-sm font-medium">{{ $t('admin.inbox.whatsapp.webhookURL') }}</label>
-        <div class="flex items-center gap-2">
-          <Input :model-value="webhookURL" readonly class="font-mono text-xs" />
-          <CopyButton :text="webhookURL" />
+        <div class="space-y-2">
+          <Label class="text-muted-foreground">{{ $t('admin.inbox.whatsapp.webhookURL') }}</Label>
+          <div v-if="webhookURL" class="flex items-center gap-2">
+            <Input :model-value="webhookURL" readonly class="font-mono text-xs" />
+            <CopyButton :text="webhookURL" />
+          </div>
+          <p v-else class="text-sm text-muted-foreground">
+            {{ $t('admin.inbox.whatsapp.webhookURL.afterSave') }}
+          </p>
         </div>
-        <p class="text-sm text-muted-foreground">
-          {{ $t('admin.inbox.whatsapp.webhookURL.description') }}
-        </p>
       </div>
-      <p v-else class="text-sm text-muted-foreground">
-        {{ $t('admin.inbox.whatsapp.webhookURL.afterSave') }}
-      </p>
     </div>
 
     <Button type="submit" :is-loading="isLoading" :disabled="isLoading">
@@ -276,6 +269,7 @@ import {
   FormDescription
 } from '@shared-ui/components/ui/form/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
+import { Label } from '@shared-ui/components/ui/label'
 import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import { WHATSAPP_TEMPLATE_LANGUAGES } from '@main/features/admin/whatsapp/whatsappLanguages.js'
 import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
@@ -333,7 +327,7 @@ const form = useForm({
       access_token: '',
       app_secret: '',
       webhook_verify_token: '',
-      api_version: 'v21.0',
+      api_version: 'v25.0',
       csat_template_language: DEFAULT_CSAT_TEMPLATE_LANGUAGE,
       csat_template_body: DEFAULT_CSAT_TEMPLATE_BODY,
       csat_template_button_text: DEFAULT_CSAT_TEMPLATE_BUTTON_TEXT

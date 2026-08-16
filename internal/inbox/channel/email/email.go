@@ -41,11 +41,15 @@ type Email struct {
 	userStore            inbox.UserStore
 	wg                   sync.WaitGroup
 	tokenRefreshCallback TokenRefreshCallback
+	authErrorCallback    AuthErrorCallback
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
 // It receives the inbox ID and the updated config with new tokens.
 type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
+
+// AuthErrorCallback is called when the inbox credentials are rejected by the provider.
+type AuthErrorCallback func(inboxID int)
 
 // Opts holds the options required for the email inbox.
 type Opts struct {
@@ -55,6 +59,7 @@ type Opts struct {
 	Config               models.Config
 	Lo                   *logf.Logger
 	TokenRefreshCallback TokenRefreshCallback // Optional callback for token refresh
+	AuthErrorCallback    AuthErrorCallback    // Optional callback for credential rejection
 }
 
 // New returns a new instance of the email inbox.
@@ -87,6 +92,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		authType:             opts.Config.AuthType,
 		enablePlusAddressing: opts.Config.EnablePlusAddressing,
 		tokenRefreshCallback: opts.TokenRefreshCallback,
+		authErrorCallback:    opts.AuthErrorCallback,
 	}
 	return e, nil
 }
@@ -183,6 +189,7 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	if err != nil {
 		e.oauthMu.Unlock()
 		e.lo.Error("Failed to refresh OAuth token", "inbox_id", e.Identifier(), "error", err)
+		e.flagAuthError()
 		return nil, false, fmt.Errorf("OAuth token expired and refresh failed for inbox %d: %w", e.Identifier(), err)
 	}
 
@@ -201,6 +208,12 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 
 	e.lo.Info("Successfully refreshed OAuth token", "inbox_id", e.Identifier())
 	return oauthCopy, true, nil
+}
+
+func (e *Email) flagAuthError() {
+	if e.authErrorCallback != nil {
+		e.authErrorCallback(e.Identifier())
+	}
 }
 
 // closeSMTPPool closes the smtp pool.

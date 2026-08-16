@@ -4,7 +4,7 @@ import {
   reportsNavItems,
   accountNavItems,
   contactNavItems
-} from '../../constants/navigation'
+} from '@main/constants/navigation'
 import { useRoute, useRouter } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
 import { Badge } from '@shared-ui/components/ui/badge'

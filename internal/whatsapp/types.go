@@ -3,7 +3,7 @@ package whatsapp
 
 import "time"
 
-const DefaultAPIVersion = "v21.0"
+const DefaultAPIVersion = "v25.0"
 
 // Account holds the per-inbox Meta Graph API credentials, already decrypted at the call site.
 type Account struct {
@@ -143,6 +143,8 @@ type ParsedMessage struct {
 	ContactName   string
 	PhoneNumberID string
 	ContextID     string
+	SystemType    string
+	SystemNewWAID string
 }
 
 type ParsedStatus struct {
