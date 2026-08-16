@@ -24,6 +24,9 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+// csatTemplateLocks serializes CSAT template reconciliation per inbox; EnsureReserved reads then creates.
+var csatTemplateLocks = &keyedLock{entries: make(map[string]*keyedLockEntry)}
+
 // handleGetInboxes returns all inboxes
 func handleGetInboxes(r *fastglue.Request) error {
 	var app = r.Context.(*App)
@@ -145,6 +148,8 @@ func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	if app.whatsappTemplate == nil {
 		return
 	}
+	defer csatTemplateLocks.lock(strconv.Itoa(inboxID))()
+
 	cfg, err := whatsAppConfigForInbox(app, inboxID)
 	if err != nil {
 		app.lo.Warn("error reading whatsapp config for csat template", "inbox_id", inboxID, "error", err)
