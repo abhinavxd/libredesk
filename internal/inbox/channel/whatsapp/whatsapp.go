@@ -99,7 +99,7 @@ type SendMeta struct {
 	TemplateButtons       []whatsapp.TemplateButton `json:"template_buttons,omitempty"`
 }
 
-// SourceIDUpdater persists the Meta message ID after a successful send for status correlation, and records per-attachment delivery so a retry does not re-deliver media.
+// SourceIDUpdater persists the Meta message ID for status correlation and records per-attachment delivery for retries.
 type SourceIDUpdater interface {
 	UpdateMessageSourceID(messageUUID, sourceID string) error
 	SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs []string) error

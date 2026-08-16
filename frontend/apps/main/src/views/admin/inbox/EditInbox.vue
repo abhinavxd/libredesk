@@ -120,8 +120,7 @@ const submitForm = (values) => {
       reopen_window_hours: values.reopen_window_hours,
       config: { ...values.config }
     }
-    // Match the password-dummy preservation pattern email uses: empty out
-    // masked secrets so the backend keeps the existing encrypted value.
+    // Emptying a masked secret makes the backend keep the existing encrypted value.
     if (payload.config.access_token?.includes('•')) {
       payload.config.access_token = ''
     }

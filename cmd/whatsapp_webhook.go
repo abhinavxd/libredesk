@@ -27,7 +27,6 @@ import (
 
 const whatsAppDefaultContactName = "Contact"
 
-// handleWhatsAppWebhookVerify responds to Meta's GET verification challenge.
 func handleWhatsAppWebhookVerify(r *fastglue.Request) error {
 	app := r.Context.(*App)
 
@@ -58,7 +57,6 @@ func handleWhatsAppWebhookVerify(r *fastglue.Request) error {
 	return nil
 }
 
-// handleWhatsAppWebhookEvent processes a Meta webhook delivery.
 func handleWhatsAppWebhookEvent(r *fastglue.Request) error {
 	app := r.Context.(*App)
 
@@ -283,7 +281,7 @@ func buildInboundMeta(app *App, m whatsapp.ParsedMessage) json.RawMessage {
 	return raw
 }
 
-// fetchWhatsAppAttachments downloads the inbound media; a permanent (4xx) failure returns (nil, nil) for a placeholder, any other error propagates so the queue retries.
+// fetchWhatsAppAttachments returns (nil, nil) on a permanent (4xx) failure so a placeholder is stored; any other error propagates for a queue retry.
 func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel.Config, m whatsapp.ParsedMessage) (attachment.Attachments, error) {
 	if m.MediaID == "" || app.whatsappClient == nil {
 		return nil, nil
@@ -358,7 +356,6 @@ func isPermanentMediaError(err error) bool {
 		}
 		return me.StatusCode >= 400 && me.StatusCode < 500
 	}
-	// Transport errors.
 	var netErr net.Error
 	if errors.As(err, &netErr) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return false
@@ -444,7 +441,6 @@ func textPreview(m whatsapp.ParsedMessage) string {
 	}
 	return "[whatsapp message]"
 }
-
 
 func mapWhatsAppStatus(metaStatus string) string {
 	if metaStatus == cmodels.MessageStatusFailed {

@@ -852,8 +852,7 @@ func initWhatsAppClient() *whatsappapi.Client {
 	return whatsappapi.New(initLogger("whatsapp_client"))
 }
 
-// inboxAccountResolver implements whatsapp_template.AccountResolver against
-// the inbox manager so templates can talk to Meta using per-inbox credentials.
+// inboxAccountResolver resolves per-inbox Meta credentials for the template manager.
 type inboxAccountResolver struct {
 	inbox *inbox.Manager
 }

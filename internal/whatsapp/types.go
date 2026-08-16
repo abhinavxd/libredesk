@@ -22,7 +22,6 @@ func (a Account) Version() string {
 	return a.APIVersion
 }
 
-// MetaAPIError is a structured Graph API error response implementing the error interface.
 type MetaAPIError struct {
 	StatusCode int    `json:"-"`
 	Message    string `json:"message"`
@@ -40,7 +39,6 @@ func (e *MetaAPIError) Error() string {
 	return e.Message
 }
 
-// metaErrorEnvelope is the top-level wrapper Meta returns on error responses.
 type metaErrorEnvelope struct {
 	Error struct {
 		Message      string `json:"message"`
@@ -52,7 +50,6 @@ type metaErrorEnvelope struct {
 	} `json:"error"`
 }
 
-// SendResponse is the shape Meta returns from the messages endpoint.
 type SendResponse struct {
 	MessagingProduct string `json:"messaging_product"`
 	Contacts         []struct {
@@ -65,7 +62,6 @@ type SendResponse struct {
 	} `json:"messages"`
 }
 
-// MediaInfo describes a media object fetched from Meta.
 type MediaInfo struct {
 	URL              string `json:"url"`
 	MimeType         string `json:"mime_type"`
@@ -75,12 +71,10 @@ type MediaInfo struct {
 	MessagingProduct string `json:"messaging_product"`
 }
 
-// UploadMediaResponse is returned by Meta after a media upload.
 type UploadMediaResponse struct {
 	ID string `json:"id"`
 }
 
-// MetaTemplate is the template shape Meta returns when listing or after submission.
 type MetaTemplate struct {
 	ID             string              `json:"id"`
 	Name           string              `json:"name"`
@@ -92,7 +86,6 @@ type MetaTemplate struct {
 	RejectedReason string              `json:"rejected_reason,omitempty"`
 }
 
-// TemplateComponent is a single component (header/body/footer/buttons) in a template.
 type TemplateComponent struct {
 	Type    string           `json:"type"`
 	Format  string           `json:"format,omitempty"`
@@ -101,7 +94,6 @@ type TemplateComponent struct {
 	Buttons []TemplateButton `json:"buttons,omitempty"`
 }
 
-// TemplateButton is a button on a template.
 type TemplateButton struct {
 	Type        string   `json:"type"`
 	Text        string   `json:"text,omitempty"`
@@ -110,7 +102,6 @@ type TemplateButton struct {
 	Example     []string `json:"example,omitempty"`
 }
 
-// TemplateSubmission is the payload sent to Meta when creating a template.
 type TemplateSubmission struct {
 	Name            string              `json:"name"`
 	Language        string              `json:"language"`
@@ -126,7 +117,6 @@ type TemplateEdit struct {
 	Components      []TemplateComponent `json:"components"`
 }
 
-// templateListResponse is the paginated response from list templates.
 type templateListResponse struct {
 	Data   []MetaTemplate `json:"data"`
 	Paging struct {
@@ -138,7 +128,6 @@ type templateListResponse struct {
 	} `json:"paging"`
 }
 
-// ParsedMessage is the flat shape used internally for an inbound WhatsApp message.
 type ParsedMessage struct {
 	From          string
 	ID            string
@@ -156,7 +145,6 @@ type ParsedMessage struct {
 	ContextID     string
 }
 
-// ParsedStatus is the flat shape used internally for a status webhook event.
 type ParsedStatus struct {
 	MessageID string
 	Status    string
@@ -164,7 +152,6 @@ type ParsedStatus struct {
 	UserMsg   string
 }
 
-// ParsedTemplateStatus is the flat shape for a template status update event.
 type ParsedTemplateStatus struct {
 	WABAID         string
 	Event          string

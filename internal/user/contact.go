@@ -229,7 +229,6 @@ func (u *Manager) LinkChannelIdentity(contactID int, channel, identifier string)
 	return linkedID, nil
 }
 
-// UpsertContactByChannelIdentity resolves the contact for a channel identity, creating and linking one when the identity is new.
 func (u *Manager) UpsertContactByChannelIdentity(channel, identifier string, contact *models.User) (int, error) {
 	id, err := u.GetContactIDByChannelIdentity(channel, identifier)
 	if err == nil {
@@ -278,7 +277,6 @@ func (u *Manager) SetContactPhoneIfMissing(id int, phone, countryCode string) er
 	return nil
 }
 
-// GetChannelIdentities returns all channel identities linked to a contact.
 func (u *Manager) GetChannelIdentities(contactID int) ([]models.ChannelIdentity, error) {
 	out := make([]models.ChannelIdentity, 0)
 	if err := u.q.GetChannelIdentitiesByContact.Select(&out, contactID); err != nil {

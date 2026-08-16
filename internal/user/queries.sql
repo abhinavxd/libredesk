@@ -244,8 +244,7 @@ ON CONFLICT (channel, identifier) DO UPDATE SET updated_at = now()
 RETURNING contact_id;
 
 -- name: upsert-contact-with-channel-identity
--- Atomically creates a contact (no email, no ext_id) and links the channel identity in one statement.
--- If the identity already exists, returns its contact_id without inserting a new user row.
+-- Atomic: a contact with no email and no ext_id has no uniqueness key, so a separate insert + link would orphan user rows on retry.
 -- $1=email, $2=first_name, $3=last_name, $4=password, $5=avatar_url, $6=channel, $7=identifier
 WITH existing AS (
     SELECT contact_id FROM contact_channel_identities

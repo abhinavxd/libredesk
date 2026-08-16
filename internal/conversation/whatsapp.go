@@ -53,7 +53,7 @@ func (m *Manager) MessageUUIDBySourceID(sourceID string) (string, error) {
 	return uuid, nil
 }
 
-// WhatsAppReadReceiptTarget returns the inbox ID and wamid of the latest inbound message the user has not yet seen on a WhatsApp conversation, or empty values when there is nothing to mark read.
+// WhatsAppReadReceiptTarget returns the inbox ID and wamid of the latest unseen inbound message, or empty values when there is nothing to mark read.
 func (m *Manager) WhatsAppReadReceiptTarget(uuid string, userID int) (int, string, error) {
 	var row struct {
 		SourceID string `db:"source_id"`
@@ -135,7 +135,7 @@ func (m *Manager) HasPartialWhatsAppSend(msg models.Message) bool {
 	return false
 }
 
-// SetWhatsAppSentAttachments records the attachment UUIDs already delivered for a message so retrying a partially-sent multi-attachment message does not re-deliver them.
+// SetWhatsAppSentAttachments records delivered attachment UUIDs so a retry does not re-deliver them.
 func (m *Manager) SetWhatsAppSentAttachments(messageUUID string, attachmentUUIDs []string) error {
 	if messageUUID == "" {
 		return nil
@@ -249,7 +249,7 @@ func (m *Manager) whatsAppWindowOpen(contactID, inboxID int) bool {
 	return ts.Valid && time.Since(ts.Time) < WhatsAppWindowDuration
 }
 
-// prepareWhatsAppOutbound validates the send, writes channel fields into metaMap, and returns the rendered template body or unchanged free-form content.
+// prepareWhatsAppOutbound writes channel fields into metaMap and returns the rendered template body, or free-form content unchanged.
 func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID int, conversationUUID string, content string, hasAttachments bool, metaMap map[string]any) (string, error) {
 	conv, err := m.GetConversation(0, conversationUUID, "")
 	if err != nil {
@@ -346,7 +346,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, contactID i
 	return rendered, nil
 }
 
-// validateTemplateParams rejects a template send whose body or text-header placeholders have no supplied value, so Meta's parameter-mismatch error surfaces locally as a clear input error.
+// validateTemplateParams rejects unfilled body and text-header placeholders locally, ahead of Meta's opaque parameter-mismatch error.
 func validateTemplateParams(t wtmodels.Template, params map[string]string) error {
 	for _, key := range whatsapp.OrderedPlaceholders(t.BodyContent) {
 		if strings.TrimSpace(params["body:"+key]) == "" {
@@ -363,7 +363,7 @@ func validateTemplateParams(t wtmodels.Template, params map[string]string) error
 	return nil
 }
 
-// renderTemplateBody fills {{name}} placeholders from "body:"+name params, leaving unmatched ones verbatim to expose missing params in the timeline.
+// renderTemplateBody fills {{name}} placeholders from "body:"+name params; unmatched ones stay verbatim so missing params show in the timeline.
 func renderTemplateBody(body string, params map[string]string) string {
 	if body == "" || len(params) == 0 {
 		return body

@@ -105,7 +105,6 @@ type ChannelIdentity struct {
 
 type ChannelIdentities []ChannelIdentity
 
-// Scan implements sql.Scanner for a json_agg of channel identities.
 func (c *ChannelIdentities) Scan(src interface{}) error {
 	if src == nil {
 		*c = nil

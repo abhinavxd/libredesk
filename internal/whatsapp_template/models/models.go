@@ -34,8 +34,7 @@ const (
 	CategoryAuthentication = "AUTHENTICATION"
 )
 
-// Template is a stored WhatsApp template, mirroring Meta's record plus a
-// libredesk-side scoping (inbox_id) and submission state.
+// Template mirrors Meta's record plus libredesk-side scoping (inbox_id) and submission state.
 type Template struct {
 	ID              int             `db:"id" json:"id"`
 	CreatedAt       time.Time       `db:"created_at" json:"created_at"`

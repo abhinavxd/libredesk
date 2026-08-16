@@ -132,7 +132,7 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	return nil
 }
 
-// ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta from its config: creates it when absent, edits it in place when the message or button changed, recreates under a new language when that changed. Approval arrives via webhook/sync.
+// ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta; a language change creates a fresh one. Approval arrives via webhook/sync.
 func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	if app.whatsappTemplate == nil {
 		return

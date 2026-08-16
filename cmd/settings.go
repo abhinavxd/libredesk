@@ -58,7 +58,6 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	// Trim whitespace and trailing slash from root URL.
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
 
-	// Get current language before update for reloading i18n if needed.
 	app.Lock()
 	oldLang := ko.String("app.lang")
 	app.Unlock()

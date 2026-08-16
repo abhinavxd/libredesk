@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-// WebhookPayload is the top-level shape Meta delivers.
 type WebhookPayload struct {
 	Object string         `json:"object"`
 	Entry  []WebhookEntry `json:"entry"`
@@ -126,7 +125,6 @@ type WebhookError struct {
 	FBTraceID string `json:"fbtrace_id"`
 }
 
-// ParsePayload deserializes the webhook body.
 func ParsePayload(body []byte) (*WebhookPayload, error) {
 	var p WebhookPayload
 	dec := json.NewDecoder(bytes.NewReader(body))
@@ -137,7 +135,6 @@ func ParsePayload(body []byte) (*WebhookPayload, error) {
 	return &p, nil
 }
 
-// ExtractMessages flattens inbound messages out of the nested webhook payload.
 func (p *WebhookPayload) ExtractMessages() []ParsedMessage {
 	var out []ParsedMessage
 	for _, e := range p.Entry {
@@ -202,7 +199,6 @@ func (p *WebhookPayload) ExtractMessages() []ParsedMessage {
 	return out
 }
 
-// ExtractStatuses pulls status (delivered / read / failed) events.
 func (p *WebhookPayload) ExtractStatuses() []ParsedStatus {
 	var out []ParsedStatus
 	for _, e := range p.Entry {
@@ -227,7 +223,6 @@ func (p *WebhookPayload) ExtractStatuses() []ParsedStatus {
 	return out
 }
 
-// ExtractTemplateStatusUpdates pulls template approval/rejection events.
 func (p *WebhookPayload) ExtractTemplateStatusUpdates() []ParsedTemplateStatus {
 	var out []ParsedTemplateStatus
 	for _, e := range p.Entry {

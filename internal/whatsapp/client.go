@@ -24,7 +24,6 @@ const (
 	maxMediaDownloadBytes = 100 * 1024 * 1024
 )
 
-// Client is a thin wrapper around Meta's Graph API for WhatsApp Cloud.
 type Client struct {
 	httpClient  *http.Client
 	lo          *logf.Logger
@@ -32,7 +31,6 @@ type Client struct {
 	onAuthError func(acc Account)
 }
 
-// SetAuthErrorHook registers a callback fired whenever Meta rejects the account's token.
 func (c *Client) SetAuthErrorHook(fn func(acc Account)) { c.onAuthError = fn }
 
 func (c *Client) notifyAuthError(acc Account, err error) {
@@ -42,7 +40,6 @@ func (c *Client) notifyAuthError(acc Account, err error) {
 	}
 }
 
-// New returns a Client with default timeouts.
 func New(lo *logf.Logger) *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: defaultTimeout},
@@ -51,10 +48,8 @@ func New(lo *logf.Logger) *Client {
 	}
 }
 
-// SetBaseURL overrides the Graph API base URL (used by tests).
 func (c *Client) SetBaseURL(u string) { c.baseURL = strings.TrimRight(u, "/") }
 
-// ValidateCredentials hits Meta to confirm the token + IDs are valid.
 func (c *Client) ValidateCredentials(ctx context.Context, acc Account) error {
 	endpoint := fmt.Sprintf("%s/%s/%s", c.baseURL, acc.Version(), acc.PhoneNumberID)
 	if _, err := c.doRequest(ctx, http.MethodGet, endpoint, nil, acc); err != nil {
@@ -67,7 +62,6 @@ func (c *Client) ValidateCredentials(ctx context.Context, acc Account) error {
 	return nil
 }
 
-// SendText sends a plain text message and returns the Meta message ID.
 func (c *Client) SendText(ctx context.Context, acc Account, toPhone, body, replyToID string) (string, error) {
 	payload := map[string]any{
 		"messaging_product": "whatsapp",
@@ -104,7 +98,6 @@ func (c *Client) SendMedia(ctx context.Context, acc Account, toPhone, mediaType,
 	return c.sendMessage(ctx, acc, payload)
 }
 
-// SendTemplate sends an approved template message with components from BuildSendComponents.
 func (c *Client) SendTemplate(ctx context.Context, acc Account, toPhone, name, language string, components []map[string]any) (string, error) {
 	tmpl := map[string]any{
 		"name":     name,
@@ -139,7 +132,6 @@ func (c *Client) SubscribeWebhook(ctx context.Context, acc Account, callbackURL,
 	return nil
 }
 
-// MarkRead marks an inbound message as read on the Meta side.
 func (c *Client) MarkRead(ctx context.Context, acc Account, messageID string) error {
 	payload := map[string]any{
 		"messaging_product": "whatsapp",
@@ -151,7 +143,6 @@ func (c *Client) MarkRead(ctx context.Context, acc Account, messageID string) er
 	return err
 }
 
-// GetMediaURL fetches the temporary download URL + metadata for a media ID.
 func (c *Client) GetMediaURL(ctx context.Context, acc Account, mediaID string) (MediaInfo, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s", c.baseURL, acc.Version(), mediaID)
 	body, err := c.doRequest(ctx, http.MethodGet, endpoint, nil, acc)
@@ -165,7 +156,6 @@ func (c *Client) GetMediaURL(ctx context.Context, acc Account, mediaID string) (
 	return info, nil
 }
 
-// DownloadMedia fetches a media object's bytes from a GetMediaURL-issued CDN URL.
 func (c *Client) DownloadMedia(ctx context.Context, acc Account, mediaURL string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, mediaURL, nil)
 	if err != nil {
@@ -193,7 +183,6 @@ func (c *Client) DownloadMedia(ctx context.Context, acc Account, mediaURL string
 	return body, nil
 }
 
-// UploadMedia uploads bytes to Meta and returns the resulting media ID.
 func (c *Client) UploadMedia(ctx context.Context, acc Account, content []byte, contentType, filename string) (string, error) {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
@@ -262,7 +251,6 @@ func (c *Client) FetchTemplates(ctx context.Context, acc Account) ([]MetaTemplat
 	return out, nil
 }
 
-// SubmitTemplate creates a new template. Returns Meta's template ID.
 func (c *Client) SubmitTemplate(ctx context.Context, acc Account, t TemplateSubmission) (string, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s/message_templates", c.baseURL, acc.Version(), acc.WABAID)
 	body, err := c.doRequest(ctx, http.MethodPost, endpoint, t, acc)

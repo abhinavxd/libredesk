@@ -16,7 +16,6 @@ import (
 
 const whatsAppTemplateSyncInterval = 6 * time.Hour
 
-// whatsappTemplateSyncWorker periodically mirrors template status from Meta.
 func whatsappTemplateSyncWorker(ctx context.Context, app *App) {
 	initial := time.NewTimer(2 * time.Minute)
 	defer initial.Stop()
@@ -100,7 +99,6 @@ func handleListWhatsAppTemplates(r *fastglue.Request) error {
 	return r.SendEnvelope(templates)
 }
 
-// handleGetWhatsAppTemplate returns a single template by id.
 func handleGetWhatsAppTemplate(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	if whatsAppTemplateUnavailable(r, app) {
@@ -153,7 +151,6 @@ func handleDeleteWhatsAppTemplate(r *fastglue.Request) error {
 	return r.SendEnvelope(map[string]string{"status": "deleted"})
 }
 
-// handleSyncWhatsAppTemplates pulls templates from Meta and upserts locally.
 func handleSyncWhatsAppTemplates(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	if whatsAppTemplateUnavailable(r, app) {

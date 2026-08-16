@@ -7,9 +7,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
 )
 
-// The reserved CSAT template's URL button carries a {{1}} placeholder, so its
-// submission must ship a button example or Meta rejects it (and buildSubmission
-// errors on the missing sample value).
+// A URL button with a {{1}} placeholder must ship a button example or Meta rejects the submission.
 func TestBuildSubmissionCSATButtonExample(t *testing.T) {
 	buttons, _ := json.Marshal([]map[string]any{{
 		"type":    "URL",

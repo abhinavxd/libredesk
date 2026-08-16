@@ -959,7 +959,6 @@ func handleCreateConversation(r *fastglue.Request) error {
 	return r.SendEnvelope(conversation)
 }
 
-// validateCreateConversationRequest validates the request and returns the inbox channel.
 func validateCreateConversationRequest(req createConversationRequest, app *App) (string, error) {
 	if req.InboxID <= 0 {
 		return "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`inbox_id`"), nil)
@@ -1029,7 +1028,7 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 	return inbox.Channel, nil
 }
 
-// resolveWhatsAppContact returns the contact for an outbound WhatsApp conversation, creating one keyed by the wa_id when no existing contact is selected.
+// resolveWhatsAppContact returns the outbound contact, creating one keyed by the wa_id when none is selected.
 func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error) {
 	if req.ContactID > 0 {
 		return req.ContactID, nil

@@ -29,12 +29,10 @@ var (
 	ErrTemplateNotFound = errors.New("whatsapp template not found")
 )
 
-// AccountResolver returns the WhatsApp account credentials for an inbox.
 type AccountResolver interface {
 	WhatsAppAccount(inboxID int) (whatsapp.Account, error)
 }
 
-// Manager handles template CRUD and Meta sync.
 type Manager struct {
 	q        queries
 	lo       *logf.Logger
@@ -58,7 +56,6 @@ type queries struct {
 	UpdateStatusByNameLanguage *sqlx.Stmt `query:"update-status-by-name-language"`
 }
 
-// Opts holds dependencies.
 type Opts struct {
 	Lo       *logf.Logger
 	DB       *sqlx.DB
@@ -67,7 +64,6 @@ type Opts struct {
 	Resolver AccountResolver
 }
 
-// New creates a Manager.
 func New(opts Opts) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
@@ -82,7 +78,6 @@ func New(opts Opts) (*Manager, error) {
 	}, nil
 }
 
-// GetByInbox returns all templates for a given inbox.
 func (m *Manager) GetByInbox(inboxID int) ([]models.Template, error) {
 	out := make([]models.Template, 0)
 	if err := m.q.GetByInbox.Select(&out, inboxID); err != nil {
@@ -92,7 +87,6 @@ func (m *Manager) GetByInbox(inboxID int) ([]models.Template, error) {
 	return out, nil
 }
 
-// GetByID returns a template by id.
 func (m *Manager) GetByID(id int) (models.Template, error) {
 	var t models.Template
 	if err := m.q.GetByID.Get(&t, id); err != nil {
@@ -117,7 +111,6 @@ func (m *Manager) GetByName(inboxID int, name string) (models.Template, error) {
 	return t, nil
 }
 
-// GetApproved returns the approved template matching inbox + name + language.
 func (m *Manager) GetApproved(inboxID int, name, language string) (models.Template, error) {
 	var t models.Template
 	if err := m.q.GetByNameLanguage.Get(&t, inboxID, name, language); err != nil {
@@ -158,7 +151,7 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 	return m.submitNewToMeta(ctx, stored), nil
 }
 
-// EnsureReserved reconciles a reserved (fixed-name) template like the per-inbox CSAT one: creates it when absent, edits it in place when only its content changed, and no-ops when it already matches. A language change lands here as a fresh create since name+language is a new template on Meta.
+// EnsureReserved reconciles a fixed-name template such as the per-inbox CSAT one; a language change creates a new one since Meta keys templates by name+language.
 func (m *Manager) EnsureReserved(ctx context.Context, desired models.Template) error {
 	var existing models.Template
 	err := m.q.GetByNameLanguage.Get(&existing, desired.InboxID, desired.Name, desired.Language)
@@ -174,7 +167,7 @@ func (m *Manager) EnsureReserved(ctx context.Context, desired models.Template) e
 		m.lo.Debug("reserved template already matches desired content", "id", existing.ID, "name", existing.Name)
 		return nil
 	}
-	// Meta only allows editing a template in approved/rejected/paused state; an edit on a pending one is a guaranteed error, so wait for the current review to settle and reconcile on the next save.
+	// Meta only allows editing a template in approved/rejected/paused state; a pending one reconciles on the next save.
 	if strings.EqualFold(existing.Status, models.StatusPending) {
 		m.lo.Warn("skipping reserved template edit while pending meta review", "id", existing.ID, "name", existing.Name)
 		return nil
@@ -246,7 +239,6 @@ func (m *Manager) editReserved(ctx context.Context, existing, desired models.Tem
 	return nil
 }
 
-// updateContent overwrites the editable fields of a stored template.
 func (m *Manager) updateContent(id int, t models.Template) (models.Template, error) {
 	buttons := t.Buttons
 	if buttons == nil {
@@ -267,7 +259,6 @@ func (m *Manager) updateContent(id int, t models.Template) (models.Template, err
 	return updated, nil
 }
 
-// markRejected records a rejection reason on a template and returns the updated row.
 func (m *Manager) markRejected(t models.Template, reason string) models.Template {
 	if _, err := m.q.UpdateStatus.Exec(t.ID, models.StatusRejected, reason); err != nil {
 		m.lo.Error("error persisting template rejected status", "id", t.ID, "error", err)
@@ -300,7 +291,6 @@ func (m *Manager) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// SyncFromMeta pulls templates for an inbox from Meta and upserts them locally.
 func (m *Manager) SyncFromMeta(ctx context.Context, inboxID int) (int, error) {
 	if m.client == nil || m.resolver == nil {
 		return 0, fmt.Errorf("whatsapp client not configured")

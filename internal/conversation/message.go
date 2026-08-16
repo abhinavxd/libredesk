@@ -438,7 +438,6 @@ func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
 	return nil
 }
 
-// UpdateMessageSourceID sets the source_id on a message identified by UUID.
 func (m *Manager) UpdateMessageSourceID(messageUUID, sourceID string) error {
 	if messageUUID == "" || sourceID == "" {
 		return nil
@@ -450,7 +449,6 @@ func (m *Manager) UpdateMessageSourceID(messageUUID, sourceID string) error {
 	return nil
 }
 
-// UpdateMessageStatusBySourceID updates a message status keyed by transport source_id.
 func (m *Manager) UpdateMessageStatusBySourceID(sourceID, status string) error {
 	if sourceID == "" {
 		return nil
@@ -1109,7 +1107,7 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 	return msg, nil
 }
 
-// ProcessIncomingWhatsAppMessage uploads attachments, inserts the message, advances the 24h window clock and runs the shared incoming hooks.
+// ProcessIncomingWhatsAppMessage inserts an inbound message and advances the 24h window clock.
 func (m *Manager) ProcessIncomingWhatsAppMessage(msg models.Message, isNewConversation bool, inboundAt time.Time) (models.Message, error) {
 	if err := m.uploadMessageAttachments(&msg); err != nil {
 		return models.Message{}, fmt.Errorf("uploading whatsapp attachments: %w", err)
