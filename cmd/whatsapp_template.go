@@ -177,7 +177,7 @@ func handleSyncWhatsAppTemplates(r *fastglue.Request) error {
 	count, err := app.whatsappTemplate.SyncFromMeta(ctx, inboxID)
 	if err != nil {
 		app.lo.Error("error syncing whatsapp templates", "inbox_id", inboxID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadGateway, err.Error(), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadGateway, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 	return r.SendEnvelope(map[string]int{"synced": count})
 }

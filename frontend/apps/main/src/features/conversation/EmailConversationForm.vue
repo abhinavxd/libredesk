@@ -379,8 +379,9 @@ const createConversation = form.handleSubmit(async (values) => {
   loading.value = true
   try {
     values.inbox_id = Number(values.inbox_id)
-    values.team_id = values.team_id ? Number(values.team_id) : null
-    values.agent_id = values.agent_id ? Number(values.agent_id) : null
+    values.team_id = values.team_id && values.team_id !== 'none' ? Number(values.team_id) : null
+    values.agent_id =
+      values.agent_id && values.agent_id !== 'none' ? Number(values.agent_id) : null
     values.attachments = mediaFiles.value.map((file) => file.id)
     if (selectedContact.value?.external_user_id) {
       values.external_user_id = selectedContact.value.external_user_id
