@@ -416,6 +416,9 @@ func serveIndexPage(r *fastglue.Request) error {
 	r.RequestCtx.Response.Header.Add("Pragma", "no-cache")
 	r.RequestCtx.Response.Header.Add("Expires", "-1")
 
+	r.RequestCtx.Response.Header.Set("Content-Security-Policy", "frame-ancestors 'self'")
+	r.RequestCtx.Response.Header.Set("X-Frame-Options", "SAMEORIGIN")
+
 	// Serve the index.html file from the embedded filesystem.
 	file, err := app.fs.Get(path.Join(frontendDir, "index.html"))
 	if err != nil {
