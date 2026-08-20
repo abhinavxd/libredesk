@@ -20,8 +20,13 @@ export function parseJWT (token) {
     return JSON.parse(atob(base64))
 }
 
+// Mirrors what net/mail accepts for a bare address, so a send cannot fail at SMTP instead.
+const emailRegex =
+  /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/
+
 export function validateEmail (email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (typeof email !== 'string') return false
+  if (email.length > 254) return false
   return emailRegex.test(email)
 }
 
