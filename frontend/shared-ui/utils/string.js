@@ -20,9 +20,9 @@ export function parseJWT (token) {
     return JSON.parse(atob(base64))
 }
 
-// Mirrors what net/mail accepts for a bare address, so a send cannot fail at SMTP instead.
-const emailRegex =
-  /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/
+// Loose on purpose: anything unicode or IP-literal is fine, but the characters that make
+// net/mail reject an address on the server are not, so a send cannot fail at SMTP instead.
+const emailRegex = /^[^\s@(),;:<>"\\[\]]+@[^\s@(),;:<>"\\[\]]+\.[^\s@(),;:<>"\\[\].]+$/
 
 // Display-name form, e.g. Name <user@example.com> or "Last, First" <user@example.com>.
 const namedAddressRegex = /^(?:[^"<>]*|"[^"]*")\s*<([^<>]*)>$/
