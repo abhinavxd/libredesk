@@ -24,10 +24,14 @@ export function parseJWT (token) {
 const emailRegex =
   /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/
 
+// Display-name form, e.g. Name <user@example.com> or "Last, First" <user@example.com>.
+const namedAddressRegex = /^(?:[^"<>]*|"[^"]*")\s*<([^<>]*)>$/
+
 export function validateEmail (email) {
   if (typeof email !== 'string') return false
   if (email.length > 254) return false
-  return emailRegex.test(email)
+  const named = namedAddressRegex.exec(email)
+  return emailRegex.test(named ? named[1].trim() : email)
 }
 
 export const isGoDuration = (value) => {

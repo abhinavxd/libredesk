@@ -49,7 +49,17 @@ const valid = [
     'user@domain1.com',
     'user@123.example.com',
     'support@zerodha.com',
-    'agent.name+conv123@support.zerodha.com'
+    'agent.name+conv123@support.zerodha.com',
+
+    // Display-name form an agent can type into the reply box
+    'Name <user@example.com>',
+    'Full Name <user@example.com>',
+    'Name<user@example.com>',
+    '<user@example.com>',
+    '"Last, First" <user@example.com>',
+    "O'Brien <user@example.com>",
+    'Support Team <support@zerodha.com>',
+    'Name  <user@example.com>'
 ]
 
 const invalid = [
@@ -67,11 +77,18 @@ const invalid = [
     "user@example.com'",
     'user@example.com\\',
     '(user@example.com',
-    '<user@example.com>',
-    '"user"@example.com',
-    'Name <user@example.com>',
     'Name user@example.com',
     'user@example.com Name',
+    'Name <user@example.com',
+    'Name user@example.com>',
+    'Name <>',
+    'Name <not-an-email>',
+    'Name <user@example.com)>',
+    'Name <a@b.com> extra',
+    'Name <a@b.com><c@d.com>',
+    'Na<me <a@b.com>',
+    '"unclosed <a@b.com>',
+    'Name <a@b.com, c@d.com>',
 
     // Missing or repeated @
     '',
