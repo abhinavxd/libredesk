@@ -67,6 +67,22 @@ func (h *Hub) KickUser(userID int) {
 	}
 }
 
+// CloseAll sends a close frame to every connected client and returns the number closed.
+func (h *Hub) CloseAll() int {
+	h.clientsMutex.RLock()
+	var clients []*Client
+	for _, userClients := range h.clients {
+		clients = append(clients, userClients...)
+	}
+	h.clientsMutex.RUnlock()
+	closeMsg := websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutting down")
+	for _, c := range clients {
+		_ = c.Conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+		_ = c.Conn.Close()
+	}
+	return len(clients)
+}
+
 // SubscribeListReplace replaces list-source subs; open-source subs are untouched so deep links survive list refreshes.
 func (h *Hub) SubscribeListReplace(client *Client, uuids []string) {
 	h.subsMu.Lock()

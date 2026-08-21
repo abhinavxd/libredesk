@@ -95,6 +95,12 @@ func (sc *safeConn) WriteMessage(msgType int, data []byte) error {
 	return nil
 }
 
+func (sc *safeConn) Close() {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.conn.Close()
+}
+
 // allow throttles abusive clients that flood typing/page_visit/ping frames.
 func (sc *safeConn) allow(kind string, minInterval time.Duration) bool {
 	sc.rateMu.Lock()
@@ -254,6 +260,9 @@ func handleInboxJoin(app *App, sc *safeConn, data json.RawMessage, token, client
 
 	go func() {
 		defer func() {
+			// Closing the socket unblocks the read loop, which would otherwise hold the
+			// connection until its deadline after the channel is closed.
+			sc.Close()
 			if rec := recover(); rec != nil {
 				app.lo.Error("panic in widget ws forwarder", "panic", rec)
 			}
