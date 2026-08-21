@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bytes"
+	"runtime/pprof"
 	"sync"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/colorlog"
 	"github.com/valyala/fasthttp"
 )
+
+const goroutineDumpAfter = 5
 
 var inFlight sync.Map
 
@@ -26,6 +30,31 @@ func trackInFlight(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		})
 		defer inFlight.Delete(id)
 		next(ctx)
+	}
+}
+
+// watchShutdown reports open connections every second while the server drains, and dumps
+// goroutine stacks once if it is still draining after goroutineDumpAfter seconds.
+func watchShutdown(s *fasthttp.Server, done <-chan struct{}) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var elapsed int
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			elapsed++
+			colorlog.Red("shutdown: %ds elapsed, %d open connection(s), %d concurrent request(s)", elapsed, s.GetOpenConnectionsCount(), s.GetCurrentConcurrency())
+			if elapsed == goroutineDumpAfter {
+				var buf bytes.Buffer
+				if err := pprof.Lookup("goroutine").WriteTo(&buf, 1); err != nil {
+					colorlog.Red("error dumping goroutines: %v", err)
+					continue
+				}
+				colorlog.Red("goroutine dump while draining:\n%s", buf.String())
+			}
+		}
 	}
 }
 
