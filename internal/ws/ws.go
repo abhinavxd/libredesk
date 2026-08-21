@@ -242,8 +242,10 @@ func (h *Hub) BroadcastTypingToAllConversationClients(conversationUUID string, d
 
 func closeClients(clients []*Client, closeCode int, reason string) {
 	closeMsg := websocket.FormatCloseMessage(closeCode, reason)
+	// One deadline for the whole pass, else a stalled connection costs closeFrameWait each.
+	deadline := time.Now().Add(closeFrameWait)
 	for _, c := range clients {
-		_ = c.Conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(closeFrameWait))
+		_ = c.Conn.WriteControl(websocket.CloseMessage, closeMsg, deadline)
 		_ = c.Conn.Close()
 	}
 }

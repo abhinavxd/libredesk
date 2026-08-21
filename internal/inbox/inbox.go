@@ -495,7 +495,10 @@ func (m *Manager) CloseLiveChatClients() int {
 		if inb.Channel() != ChannelLiveChat {
 			continue
 		}
-		inb.Close()
+		if err := inb.Close(); err != nil {
+			m.lo.Error("error closing livechat inbox", "error", err)
+			continue
+		}
 		n++
 	}
 	return n
