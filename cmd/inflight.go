@@ -45,7 +45,7 @@ func watchShutdown(s *fasthttp.Server, done <-chan struct{}) {
 			return
 		case <-ticker.C:
 			elapsed++
-			colorlog.Red("shutdown: %ds elapsed, %d open connection(s), %d concurrent request(s)", elapsed, s.GetOpenConnectionsCount(), s.GetCurrentConcurrency())
+			colorlog.Red("shutdown: %ds elapsed, %d open connection(s), %d served connection(s)", elapsed, s.GetOpenConnectionsCount(), s.GetCurrentConcurrency())
 			if elapsed == goroutineDumpAfter {
 				var buf bytes.Buffer
 				if err := pprof.Lookup("goroutine").WriteTo(&buf, 1); err != nil {
