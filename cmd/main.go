@@ -88,7 +88,7 @@ var (
 const (
 	sampleEncKey = "your-32-char-random-string-here!"
 
-	serverShutdownTimeout = 15 * time.Second
+	serverShutdownTimeout = 3 * time.Second
 )
 
 // App is the global app context which is passed and injected in the http handlers.
