@@ -367,13 +367,13 @@ func main() {
 
 	// Wait for shutdown signal.
 	<-ctx.Done()
-	colorlog.Red("Closing %d agent and %d livechat websocket connections...", wsHub.CloseAll(), inbox.CloseLiveChatClients())
+	closedAgentConns := wsHub.CloseAll()
+	closedLiveChatInboxes := inbox.CloseLiveChatClients()
+	colorlog.Red("Closed %d agent websocket connections and %d livechat inboxes.", closedAgentConns, closedLiveChatInboxes)
 	colorlog.Red("Shutting down HTTP server...")
-	// Shutdown waits for every connection to go idle, which a websocket never does, so the
-	// timeout is only a backstop for a request that outlives it.
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	if err := s.ShutdownWithContext(shutdownCtx); err != nil {
-		colorlog.Red("HTTP server shutdown timed out, closing anyway: %v", err)
+		colorlog.Red("HTTP server did not finish within %s, abandoning in-flight requests: %v", serverShutdownTimeout, err)
 	}
 	cancelShutdown()
 	colorlog.Red("Shutting down AI agent...")

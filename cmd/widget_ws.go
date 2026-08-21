@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	realip "github.com/ferluci/fast-realip"
@@ -126,10 +127,12 @@ func handleWidgetWS(r *fastglue.Request) error {
 		sc := &safeConn{conn: conn}
 
 		var (
-			client    *livechat.Client
-			liveChat  *livechat.LiveChat
-			inboxUUID string
-			userID    int
+			client *livechat.Client
+			// superseded tells the forwarder for the previous join that it no longer owns the socket.
+			superseded = &atomic.Bool{}
+			liveChat   *livechat.LiveChat
+			inboxUUID  string
+			userID     int
 		)
 
 		defer func() {
@@ -152,13 +155,15 @@ func handleWidgetWS(r *fastglue.Request) error {
 			case WidgetMsgTypeJoin:
 				// Clean up previous client on re-join.
 				if client != nil && liveChat != nil {
+					superseded.Store(true)
+					superseded = &atomic.Bool{}
 					liveChat.RemoveClient(client)
 					client.CloseChannel()
 					client = nil
 					liveChat = nil
 				}
 
-				joinedClient, joinedLiveChat, joinedInboxUUID, joinedUserID, err := handleInboxJoin(app, sc, msg.Data, msg.Token, clientIP)
+				joinedClient, joinedLiveChat, joinedInboxUUID, joinedUserID, err := handleInboxJoin(app, sc, msg.Data, msg.Token, clientIP, superseded)
 				if err != nil {
 					app.lo.Error("error handling widget join", "error", err)
 					sendWidgetError(sc, "Failed to join conversation")
@@ -207,7 +212,7 @@ func handleWidgetWS(r *fastglue.Request) error {
 	return nil
 }
 
-func handleInboxJoin(app *App, sc *safeConn, data json.RawMessage, token, clientIP string) (*livechat.Client, *livechat.LiveChat, string, int, error) {
+func handleInboxJoin(app *App, sc *safeConn, data json.RawMessage, token, clientIP string, superseded *atomic.Bool) (*livechat.Client, *livechat.LiveChat, string, int, error) {
 	var joinData WidgetInboxJoinRequest
 	if err := json.Unmarshal(data, &joinData); err != nil {
 		return nil, nil, "", 0, fmt.Errorf("invalid join data: %w", err)
@@ -260,9 +265,10 @@ func handleInboxJoin(app *App, sc *safeConn, data json.RawMessage, token, client
 
 	go func() {
 		defer func() {
-			// Closing the socket unblocks the read loop, which would otherwise hold the
-			// connection until its deadline after the channel is closed.
-			sc.Close()
+			// A re-join hands the socket to a new forwarder; only the current one may close it.
+			if !superseded.Load() {
+				sc.Close()
+			}
 			if rec := recover(); rec != nil {
 				app.lo.Error("panic in widget ws forwarder", "panic", rec)
 			}

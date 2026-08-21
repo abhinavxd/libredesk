@@ -13,6 +13,7 @@ const (
 	pongWait        = 60 * time.Second
 	pingPeriod      = 25 * time.Second
 	writeWait       = 10 * time.Second
+	closeFrameWait  = 1 * time.Second
 	maxMessageSize  = 64 << 10
 	maxListSubUUIDs = 500
 )
