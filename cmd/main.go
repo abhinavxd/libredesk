@@ -349,7 +349,6 @@ func main() {
 		MaxKeepaliveDuration: ko.MustDuration("app.server.keepalive_timeout"),
 		ReadBufferSize:       ko.Int("app.server.read_buffer_size"),
 	}
-	s.Handler = trackInFlight(g.Handler())
 
 	go func() {
 		colorlog.Green("Server started at %s", ko.String("app.server.address"))
@@ -372,15 +371,10 @@ func main() {
 	closedLiveChatInboxes := inbox.CloseLiveChatClients()
 	colorlog.Red("Closed %d agent websocket connections and %d livechat inboxes.", closedAgentConns, closedLiveChatInboxes)
 	colorlog.Red("Shutting down HTTP server...")
-	logInFlight("at shutdown")
-	shutdownDone := make(chan struct{})
-	go watchShutdown(s, shutdownDone)
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	if err := s.ShutdownWithContext(shutdownCtx); err != nil {
 		colorlog.Red("HTTP server did not finish within %s, abandoning in-flight requests: %v", serverShutdownTimeout, err)
-		logInFlight("still running")
 	}
-	close(shutdownDone)
 	cancelShutdown()
 	colorlog.Red("Shutting down AI agent...")
 	aiAgent.Close()
