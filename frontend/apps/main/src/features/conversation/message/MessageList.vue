@@ -25,6 +25,7 @@
               <MessageBubble
                 :message="row.message"
                 :direction="row.message.type"
+                :dark-mode="colorMode === 'dark'"
                 :group-with-prev="row.groupWithPrev"
                 :group-with-next="row.groupWithNext"
               />
@@ -33,6 +34,7 @@
               <MessageBubble
                 :message="row.message"
                 direction="outgoing"
+                :dark-mode="colorMode === 'dark'"
                 :group-with-prev="row.groupWithPrev"
                 :group-with-next="row.groupWithNext"
               />
@@ -78,6 +80,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useColorMode } from '@vueuse/core'
 import { useRoute } from 'vue-router'
 import { useElementSize } from '@vueuse/core'
 import { useConversationRead } from '@main/composables/useConversationRead'
@@ -105,6 +108,7 @@ const HIGHLIGHT_MS = 2500
 const OLDER_MESSAGES_SCROLL_DISTANCE = 48
 
 const route = useRoute()
+const colorMode = useColorMode()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
