@@ -18,6 +18,7 @@ import (
 
 const (
 	WidgetMsgTypeJoin      = "join"
+	WidgetMsgTypeBridge    = "inbox_bridge"
 	WidgetMsgTypeTyping    = "typing"
 	WidgetMsgTypePing      = "ping"
 	WidgetMsgTypePong      = "pong"
@@ -50,6 +51,11 @@ type WidgetMessage struct {
 
 type WidgetInboxJoinRequest struct {
 	InboxID string `json:"inbox_id"`
+}
+
+type WidgetInboxBridgeRequest struct {
+	InboxID string `json:"inbox_id"`
+	JWT     string `json:"jwt"`
 }
 
 type WidgetTypingData struct {
@@ -150,6 +156,25 @@ func handleWidgetWS(r *fastglue.Request) error {
 			}
 
 			switch msg.Type {
+			case WidgetMsgTypeBridge:
+				// Clean up previous client on re-bridge
+				if client != nil && liveChat != nil {
+					liveChat.RemoveClient(client)
+					client.CloseChannel()
+				}
+				client, liveChat, inboxUUID, userID = nil, nil, "", 0
+
+				joinedClient, joinedLiveChat, joinedInboxUUID, joinedUserID, err := handleInboxBridge(app, sc, msg.Data, clientIP)
+				if err != nil {
+					app.lo.Error("error handling widget bridge", "error", err)
+					sendWidgetError(sc, "Failed to bridge inbox")
+					continue
+				}
+				client = joinedClient
+				liveChat = joinedLiveChat
+				inboxUUID = joinedInboxUUID
+				userID = joinedUserID
+
 			case WidgetMsgTypeJoin:
 				// Clean up previous client on re-join.
 				if client != nil && liveChat != nil {
@@ -205,6 +230,79 @@ func handleWidgetWS(r *fastglue.Request) error {
 		app.lo.Error("error upgrading widget websocket connection", "error", err)
 	}
 	return nil
+}
+
+func handleInboxBridge(app *App, sc *safeConn, data json.RawMessage, clientIP string) (*livechat.Client, *livechat.LiveChat, string, int, error) {
+	var bridgeData WidgetInboxBridgeRequest
+	if err := json.Unmarshal(data, &bridgeData); err != nil {
+		return nil, nil, "", 0, fmt.Errorf("invalid join data: %w", err)
+	}
+
+	inbox, err := app.inbox.GetDBRecord(bridgeData.InboxID)
+	if err != nil {
+		return nil, nil, "", 0, fmt.Errorf("inbox not found: %w", err)
+	}
+	if !inbox.Enabled {
+		return nil, nil, "", 0, fmt.Errorf("inbox is not enabled")
+	}
+
+	var config livechat.Config
+	if err := json.Unmarshal(inbox.Config, &config); err == nil {
+		if len(config.BlockedIPs) > 0 && httputil.IsIPBlocked(clientIP, config.BlockedIPs) {
+			return nil, nil, "", 0, fmt.Errorf("IP address is blocked")
+		}
+	}
+
+	claims, err := verifyStandardJWT(bridgeData.JWT, inbox.Secret.String)
+	if err != nil || claims.Email != "bridge@internal" {
+		return nil, nil, "", 0, fmt.Errorf("bridge token validation failed: %w", err)
+	}
+
+	lcInbox, err := app.inbox.Get(inbox.ID)
+	if err != nil {
+		return nil, nil, "", 0, fmt.Errorf("live chat inbox not found: %w", err)
+	}
+
+	liveChat, ok := lcInbox.(*livechat.LiveChat)
+	if !ok {
+		return nil, nil, "", 0, fmt.Errorf("inbox is not a live chat inbox")
+	}
+
+	userIDStr := "*"
+	// fasthttp makes Close a no-op on a hijacked conn; expiring the read deadline is what drops it.
+	client, err := liveChat.AddClient(userIDStr, func() {
+		sc.conn.SetReadDeadline(time.Now())
+	})
+	if err != nil {
+		return nil, nil, "", 0, fmt.Errorf("adding client to live chat: %w", err)
+	}
+
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				app.lo.Error("panic in widget ws forwarder", "panic", rec)
+			}
+		}()
+		for msgData := range client.Channel {
+			if err := sc.WriteMessage(websocket.TextMessage, msgData); err != nil {
+				app.lo.Error("error forwarding message to widget client", "error", err)
+				return
+			}
+		}
+	}()
+
+	if err := sc.WriteJSON(WidgetMessage{
+		Type: WidgetMsgTypeJoined,
+		Data: json.RawMessage(`{"message":"inbox bridge!"}`),
+	}); err != nil {
+		liveChat.RemoveClient(client)
+		client.CloseChannel()
+		return nil, nil, "", 0, err
+	}
+
+	app.lo.Debug("widget client joined live chat", "user_id", userIDStr, "inbox_uuid", bridgeData.InboxID)
+
+	return client, liveChat, bridgeData.InboxID, 0, nil
 }
 
 func handleInboxJoin(app *App, sc *safeConn, data json.RawMessage, token, clientIP string) (*livechat.Client, *livechat.LiveChat, string, int, error) {

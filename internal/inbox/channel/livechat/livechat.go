@@ -206,8 +206,11 @@ func (lc *LiveChat) Send(message models.OutboundMessage) error {
 	lc.clientsMutex.RLock()
 	defer lc.clientsMutex.RUnlock()
 
-	clients, exists := lc.clients[msgReceiverStr]
-	if !exists {
+	clients := lc.clients[msgReceiverStr]
+	if bridges, exists := lc.clients["*"]; exists {
+		clients = append(clients, bridges...)
+	}
+	if len(clients) == 0 {
 		lc.lo.Debug("websocket client not connected for live chat message", "receiver_id", msgReceiverStr, "message_id", message.UUID)
 		return ErrClientNotConnected
 	}
