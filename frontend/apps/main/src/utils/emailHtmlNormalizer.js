@@ -1,3 +1,4 @@
+import { serializeHex } from 'culori/fn'
 import {
   compositeCssColor,
   ensureColorContrast,
@@ -10,9 +11,13 @@ const DARK_MESSAGE_BACKGROUND = 'hsl(120 2.6% 7.6%)'
 const DARK_MESSAGE_FOREGROUND = 'hsl(150 6% 93%)'
 const COLOR_DECLARATION = /(^|;)(\s*)(color|background-color|background)(\s*:\s*)([^;}]+)/gi
 const CSS_RULE = /([^{}]+)\{([^{}]*)\}/g
+const BACKGROUND_IMAGE_DECLARATION = /(?:^|;)\s*background-image\s*:\s*([^;}]+)/gi
+const BACKGROUND_SHORTHAND_DECLARATION = /(?:^|;)\s*background\s*:\s*([^;}]+)/gi
+// Sender-provided theme rules must not be inverted again.
 const PREFERS_COLOR_SCHEME_BLOCK =
   /(@media[^{}]*prefers-color-scheme[^{}]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\})/gi
 const NON_CONTENT_TAGS = new Set(['style', 'script', 'title'])
+let imageBackgroundProbe
 
 const parseDeclarationValue = (value) => {
   const important = value.match(/\s*!important\s*$/i)?.[0] || ''
@@ -31,7 +36,7 @@ const collectColorDeclarations = (cssText) => {
 
     declarations.push({
       important: Boolean(parsed.important),
-      index: match.index,
+      order: match.index,
       property: property === 'background' ? 'background-color' : property,
       value: parsed.color
     })
@@ -40,37 +45,43 @@ const collectColorDeclarations = (cssText) => {
 }
 
 const findWinningDeclaration = (declarations, property) =>
-  declarations.reduce((winner, declaration) => {
-    if (declaration.property !== property) return winner
-    if (!winner || Number(declaration.important) > Number(winner.important)) return declaration
-    if (declaration.important === winner.important && declaration.index > winner.index) {
-      return declaration
-    }
-    return winner
-  }, null)
+  declarations.reduce(
+    (winner, declaration) =>
+      declaration.property === property && declarationWins(declaration, winner)
+        ? declaration
+        : winner,
+    null
+  )
+
+const remapBackgroundForDarkMode = (value) => {
+  const parsed = parseCssColor(value)
+  if (parsed?.a === 1) {
+    const lightest = Math.max(parsed.r, parsed.g, parsed.b)
+    const darkest = Math.min(parsed.r, parsed.g, parsed.b)
+    if (darkest >= 0.9 && lightest - darkest <= 0.04) return 'transparent'
+  }
+  return remapColorForDarkMode(value)
+}
 
 const normalizeDeclarations = (cssText, inheritedBackground) => {
   const declarations = collectColorDeclarations(cssText)
   const foreground = findWinningDeclaration(declarations, 'color')
   const background = findWinningDeclaration(declarations, 'background-color')
-  const replacements = new Map()
-
-  if (foreground && background) {
-    const pair = remapColorPairForDarkMode(foreground.value, background.value, inheritedBackground)
-    replacements.set(foreground.index, pair.color)
-    replacements.set(background.index, pair.backgroundColor)
-  }
-
-  declarations.forEach((declaration) => {
-    if (replacements.has(declaration.index)) return
-    const remapped = remapColorForDarkMode(declaration.value)
-    replacements.set(
-      declaration.index,
-      declaration.property === 'color'
-        ? ensureColorContrast(remapped, inheritedBackground)
-        : remapped
-    )
-  })
+  const backgroundColor = background && remapBackgroundForDarkMode(background.value)
+  const pair =
+    foreground &&
+    background &&
+    remapColorPairForDarkMode(foreground.value, background.value, inheritedBackground)
+  const replacements = new Map(
+    declarations.map((declaration) => [
+      declaration.order,
+      declaration === foreground && pair
+        ? ensureColorContrast(pair.color, resolvedBackground(backgroundColor, inheritedBackground))
+        : declaration.property === 'color'
+          ? ensureColorContrast(remapColorForDarkMode(declaration.value), inheritedBackground)
+          : remapBackgroundForDarkMode(declaration.value)
+    ])
+  )
 
   const normalizedCss = cssText.replace(
     COLOR_DECLARATION,
@@ -86,23 +97,112 @@ const normalizeDeclarations = (cssText, inheritedBackground) => {
 
   return {
     cssText: normalizedCss,
-    backgroundColor: background ? replacements.get(background.index) : null,
-    color: foreground ? replacements.get(foreground.index) : null
+    backgroundColor: background ? replacements.get(background.order) : null,
+    color: foreground ? replacements.get(foreground.order) : null
   }
 }
 
-const normalizeStyleRuleText = (cssText) =>
-  cssText.replace(/\{([^{}]*)\}/g, (rule, declarations) => {
-    return `{${normalizeDeclarations(declarations, DARK_MESSAGE_BACKGROUND).cssText}}`
-  })
+const normalizeStyleBlocks = ({
+  fragment,
+  imageBackedElements,
+  selectorMatches,
+  mixedStyleTargets
+}) => {
+  const normalizeRule = (rule, selector, declarations) => {
+    const targets = querySelectorAll(fragment, selector, selectorMatches)
+    if (hasImageBackground(declarations)) return rule
 
-const normalizeStyleBlocks = (fragment) => {
+    const protectedTargets = targets.filter((element) => imageBackedElements.has(element))
+    if (protectedTargets.length > 0) {
+      targets
+        .filter((element) => !imageBackedElements.has(element))
+        .forEach((element) => mixedStyleTargets.add(element))
+      return rule
+    }
+    return `${selector}{${normalizeDeclarations(declarations, DARK_MESSAGE_BACKGROUND).cssText}}`
+  }
   fragment.querySelectorAll('style').forEach((style) => {
     style.textContent = style.textContent
       .split(PREFERS_COLOR_SCHEME_BLOCK)
-      .map((segment, index) => (index % 2 === 1 ? segment : normalizeStyleRuleText(segment)))
+      .map((segment, index) =>
+        index % 2 === 1 ? segment : segment.replace(CSS_RULE, normalizeRule)
+      )
       .join('')
   })
+}
+
+// Reply chains can be too deep for recursive traversal.
+const walkElements = (fragment, initialContext, visit) => {
+  const stack = Array.from(fragment.children)
+    .reverse()
+    .map((element) => [element, initialContext])
+  while (stack.length) {
+    const [element, inherited] = stack.pop()
+    const context = visit(element, inherited)
+    Array.from(element.children)
+      .reverse()
+      .forEach((child) => stack.push([child, context]))
+  }
+}
+
+const hasImageBackground = (cssText) => {
+  const probe = (imageBackgroundProbe ??= document.createElement('div'))
+  probe.style.cssText = cssText
+  if (probe.style.backgroundImage && probe.style.backgroundImage !== 'none') return true
+
+  for (const match of cssText.matchAll(BACKGROUND_IMAGE_DECLARATION)) {
+    if (
+      match[1]
+        .replace(/\s*!important\s*$/i, '')
+        .trim()
+        .toLowerCase() !== 'none'
+    )
+      return true
+  }
+  for (const match of cssText.matchAll(BACKGROUND_SHORTHAND_DECLARATION)) {
+    if (/(?:url|gradient|image-set|cross-fade|var)\s*\(/i.test(match[1])) return true
+  }
+  return false
+}
+
+const collectImageBackedElements = (fragment, selectorMatches) => {
+  const roots = new WeakSet()
+
+  fragment.querySelectorAll('[style], td[background], th[background]').forEach((element) => {
+    const hasLegacyBackground =
+      ['td', 'th'].includes(element.tagName.toLowerCase()) &&
+      Boolean(element.getAttribute('background')?.trim())
+    const hasInlineBackground = hasImageBackground(element.getAttribute('style') || '')
+    if (hasLegacyBackground || hasInlineBackground) {
+      roots.add(element)
+    }
+  })
+
+  fragment.querySelectorAll('style').forEach((style) => {
+    for (const match of style.textContent.matchAll(CSS_RULE)) {
+      if (!hasImageBackground(match[2])) continue
+      querySelectorAll(fragment, match[1], selectorMatches).forEach((element) => roots.add(element))
+    }
+  })
+
+  const protectedElements = new WeakSet()
+  walkElements(fragment, false, (element, protectedByAncestor) => {
+    const isProtected = protectedByAncestor || roots.has(element)
+    if (isProtected) protectedElements.add(element)
+    return isProtected
+  })
+  return protectedElements
+}
+
+const preserveLegacyBackgroundImage = (element) => {
+  const background = element.getAttribute('background')
+  if (!background?.trim() || element.style.backgroundImage) return
+
+  const escaped = background
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/[\n\r\f]/g, '')
+  element.style.setProperty('background-image', `url("${escaped}")`)
 }
 
 const splitSelectors = (selectorText) => {
@@ -139,6 +239,12 @@ const compareSpecificity = (left, right) => {
   }
   return 0
 }
+
+const declarationWins = (candidate, current) =>
+  !current ||
+  (Number(candidate.important) - Number(current.important) ||
+    compareSpecificity(candidate.specificity ?? [], current.specificity ?? []) ||
+    candidate.order - current.order) > 0
 
 const collectCssRules = (cssText) => {
   if (typeof CSSStyleSheet !== 'undefined' && CSSStyleSheet.prototype.replaceSync) {
@@ -203,7 +309,7 @@ const collectStylesheetColors = (fragment, selectorMatches) => {
 
       splitSelectors(rule.selector).forEach((selector) => {
         const specificity = selectorSpecificity(selector)
-        const styles = selectorStyles.get(selector) || {}
+        const declarations = selectorStyles.get(selector) || {}
         for (const property of properties) {
           const candidate = {
             value: rule.style.getPropertyValue(property),
@@ -211,16 +317,9 @@ const collectStylesheetColors = (fragment, selectorMatches) => {
             specificity,
             order
           }
-          const current = styles[property]
-          if (
-            !current ||
-            Number(candidate.important) > Number(current.important) ||
-            (candidate.important === current.important && candidate.order > current.order)
-          ) {
-            styles[property] = candidate
-          }
+          if (declarationWins(candidate, declarations[property])) declarations[property] = candidate
         }
-        selectorStyles.set(selector, styles)
+        selectorStyles.set(selector, declarations)
       })
       order += 1
     })
@@ -229,17 +328,9 @@ const collectStylesheetColors = (fragment, selectorMatches) => {
   selectorStyles.forEach((declarations, selector) => {
     querySelectorAll(fragment, selector, selectorMatches).forEach((element) => {
       const styles = elementStyles.get(element) || {}
-      Object.entries(declarations).forEach(([property, candidate]) => {
-        const current = styles[property]
-        const wins =
-          !current ||
-          Number(candidate.important) > Number(current.important) ||
-          (candidate.important === current.important &&
-            (compareSpecificity(candidate.specificity, current.specificity) > 0 ||
-              (compareSpecificity(candidate.specificity, current.specificity) === 0 &&
-                candidate.order > current.order)))
-        if (wins) styles[property] = candidate
-      })
+      for (const [property, candidate] of Object.entries(declarations)) {
+        if (declarationWins(candidate, styles[property])) styles[property] = candidate
+      }
       elementStyles.set(element, styles)
     })
   })
@@ -250,23 +341,20 @@ const collectStylesheetColors = (fragment, selectorMatches) => {
 const resolvedBackground = (background, inheritedBackground) =>
   compositeCssColor(background, inheritedBackground) || inheritedBackground
 
-const formatLegacyColor = (color) => {
-  const parsed = parseCssColor(color)
-  if (!parsed) return color
+const formatLegacyColor = (color) => serializeHex(parseCssColor(color) ?? undefined) || color
 
-  const hex = [parsed.r, parsed.g, parsed.b]
-    .map((channel) =>
-      Math.round(channel * 255)
-        .toString(16)
-        .padStart(2, '0')
-    )
-    .join('')
-  return `#${hex}`
-}
+const stylesheetDeclarationWins = (declaration, style, property) =>
+  Boolean(
+    declaration &&
+    (!style.getPropertyValue(property) ||
+      (declaration.important && style.getPropertyPriority(property) !== 'important'))
+  )
 
-const normalizeElement = (element, inheritedBackground, inheritedForeground, stylesheetColors) => {
+const normalizeElement = (element, inherited, context) => {
+  const { background: inheritedBackground, foreground: inheritedForeground } = inherited
+  const { stylesheetColors, rawStylesheetColors, mixedStyleTargets } = context
   if (NON_CONTENT_TAGS.has(element.tagName.toLowerCase())) {
-    return
+    return inherited
   }
 
   let effectiveBackground = inheritedBackground
@@ -280,8 +368,10 @@ const normalizeElement = (element, inheritedBackground, inheritedForeground, sty
   const inlineBackground = element.style.getPropertyValue('background-color')
 
   if (legacyBackground && !stylesheetBackground && !inlineBackground) {
-    const normalizedBackground = remapColorForDarkMode(legacyBackground)
-    if (parseCssColor(normalizedBackground)) {
+    const normalizedBackground = remapBackgroundForDarkMode(legacyBackground)
+    if (normalizedBackground === 'transparent') {
+      element.removeAttribute('bgcolor')
+    } else if (parseCssColor(normalizedBackground)) {
       const renderedBackground = resolvedBackground(normalizedBackground, inheritedBackground)
       const legacyColor = formatLegacyColor(renderedBackground)
       element.setAttribute('bgcolor', legacyColor)
@@ -290,6 +380,7 @@ const normalizeElement = (element, inheritedBackground, inheritedForeground, sty
   }
 
   if (stylesheetBackground && parseCssColor(stylesheetBackground.value)?.a !== 0) {
+    // CSS replaces bgcolor; translucent colors composite over the ancestor, not the overridden fill.
     effectiveBackground = resolvedBackground(stylesheetBackground.value, inheritedBackground)
   }
   if (parseCssColor(stylesheet?.color?.value)) {
@@ -328,37 +419,91 @@ const normalizeElement = (element, inheritedBackground, inheritedForeground, sty
     }
   }
 
+  if (mixedStyleTargets.has(element)) {
+    const rawStylesheet = rawStylesheetColors.get(element)
+    const rawBackground = rawStylesheet?.['background-color']
+    const rawForeground = rawStylesheet?.color
+    const backgroundWins = stylesheetDeclarationWins(
+      rawBackground,
+      element.style,
+      'background-color'
+    )
+    const foregroundWins = stylesheetDeclarationWins(rawForeground, element.style, 'color')
+    const pair =
+      backgroundWins && foregroundWins
+        ? remapColorPairForDarkMode(rawForeground.value, rawBackground.value, inheritedBackground)
+        : null
+
+    if (backgroundWins) {
+      const normalizedBackground = remapBackgroundForDarkMode(rawBackground.value)
+      element.style.setProperty(
+        'background-color',
+        normalizedBackground,
+        rawBackground.important ? 'important' : ''
+      )
+      effectiveBackground =
+        parseCssColor(normalizedBackground)?.a === 0
+          ? inheritedBackground
+          : resolvedBackground(normalizedBackground, inheritedBackground)
+    }
+
+    if (foregroundWins) {
+      const normalizedForeground = ensureColorContrast(
+        pair?.color || remapColorForDarkMode(rawForeground.value),
+        effectiveBackground
+      )
+      element.style.setProperty(
+        'color',
+        normalizedForeground,
+        rawForeground.important ? 'important' : ''
+      )
+      effectiveForeground = normalizedForeground
+    }
+  }
+
   const adjustedForeground = ensureColorContrast(effectiveForeground, effectiveBackground)
   if (adjustedForeground !== effectiveForeground) {
     element.style.setProperty(
       'color',
       adjustedForeground,
-      stylesheet?.color?.important ? 'important' : ''
+      element.style.getPropertyPriority('color') ||
+        (stylesheet?.color?.important ? 'important' : '')
     )
     effectiveForeground = adjustedForeground
   }
 
-  Array.from(element.children).forEach((child) =>
-    normalizeElement(child, effectiveBackground, effectiveForeground, stylesheetColors)
-  )
+  return { background: effectiveBackground, foreground: effectiveForeground }
 }
 
-/**
- * Remaps email colors for dark mode, or returns the original HTML unchanged.
- * @param {string} html
- * @param {boolean} darkMode
- * @returns {string}
- */
 export const normalizeEmailHtml = (html, darkMode) => {
   if (!darkMode || typeof html !== 'string' || html.length === 0) return html
 
   try {
     const template = document.createElement('template')
     template.innerHTML = html
-    normalizeStyleBlocks(template.content)
-    const stylesheetColors = collectStylesheetColors(template.content, new Map())
-    Array.from(template.content.children).forEach((element) =>
-      normalizeElement(element, DARK_MESSAGE_BACKGROUND, DARK_MESSAGE_FOREGROUND, stylesheetColors)
+    const context = {
+      fragment: template.content,
+      selectorMatches: new Map(),
+      mixedStyleTargets: new WeakSet()
+    }
+    const { fragment, selectorMatches } = context
+    context.imageBackedElements = collectImageBackedElements(fragment, selectorMatches)
+    context.rawStylesheetColors = collectStylesheetColors(fragment, selectorMatches)
+    normalizeStyleBlocks(context)
+    context.stylesheetColors = collectStylesheetColors(fragment, selectorMatches)
+    walkElements(
+      fragment,
+      {
+        background: DARK_MESSAGE_BACKGROUND,
+        foreground: DARK_MESSAGE_FOREGROUND
+      },
+      (element, inherited) => {
+        if (!context.imageBackedElements.has(element))
+          return normalizeElement(element, inherited, context)
+        // Protected subtrees still need nested legacy banner URLs preserved before sanitization.
+        preserveLegacyBackgroundImage(element)
+        return inherited
+      }
     )
     return template.innerHTML
   } catch (error) {
