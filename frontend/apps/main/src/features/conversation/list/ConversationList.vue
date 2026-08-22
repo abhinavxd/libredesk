@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col">
+  <div class="h-full flex flex-col">
     <!-- Header -->
     <div class="flex items-center space-x-4 px-2 h-12 border-b shrink-0">
       <SidebarTrigger class="cursor-pointer" />
@@ -73,7 +73,7 @@
     </div>
 
     <!-- Content -->
-    <div class="flex-grow overflow-y-auto">
+    <div class="flex-grow overflow-y-auto overscroll-contain">
       <EmptyList
         v-if="showEmpty"
         key="empty"
@@ -131,7 +131,7 @@
           variant="outline"
           @click="conversationStore.fetchNextConversations"
           :disabled="conversationStore.conversations.fetching"
-          class="transition-all duration-200 ease-in-out transform hover:scale-105"
+          class="max-md:h-11 transition-all duration-200 ease-in-out transform hover:scale-105"
         >
           <Loader2 v-if="conversationStore.conversations.fetching" class="mr-2 h-4 w-4 animate-spin" />
           {{ conversationStore.conversations.fetching ? t('globals.terms.loading') : t('globals.terms.loadMore') }}

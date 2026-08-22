@@ -1,7 +1,7 @@
 <template>
   <div>
     <Dialog v-model:open="dialogOpen">
-      <DialogContent class="max-w-5xl w-full h-[90vh] flex flex-col">
+      <DialogContent class="max-w-5xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {{ $t('conversation.newConversation') }}

@@ -120,6 +120,10 @@ export default defineConfig(({ mode, command }) => {
       },
     },
     plugins: [vue()],
+    // `root` is the app dir, which would hide the tests living in the other app and in shared-ui.
+    test: {
+      dir: path.resolve(__dirname),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, `${appPath}/src`),

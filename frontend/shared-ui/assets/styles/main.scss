@@ -6,6 +6,10 @@
   font-size: 16px;
 }
 
+[data-sonner-toaster] {
+  font-family: inherit;
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 0.15s;
@@ -22,13 +26,21 @@
 @layer base {
   html,
   body {
-    font-family: 'Instrument Sans', sans-serif;
+    @apply font-sans;
+    --vis-font-family: theme('fontFamily.sans');
     min-height: 100%;
     overflow: hidden;
     margin: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     @apply bg-background text-foreground;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   ::selection {
@@ -238,8 +250,11 @@
 }
 
 .message-bubble {
-  @apply flex flex-col px-4 pt-2 pb-3 w-fit min-w-[30%] max-w-full border overflow-x-auto rounded-xl shadow-sm;
-  overflow-wrap: break-all;
+  @apply flex flex-col px-4 pt-2 pb-3 w-fit md:min-w-[30%] max-w-full border overflow-x-auto rounded-xl shadow-sm;
+
+  @media (max-width: 767px) {
+    overflow-wrap: break-word;
+  }
 
   * {
     max-width: 100%;
@@ -379,6 +394,13 @@
 
 .dark .v3-emoji-picker {
   --v3-group-image-filter: invert(1) !important;
+}
+
+// The picker's ~350px default overflows off-screen right on a 390px viewport.
+@media (max-width: 767px) {
+  .v3-emoji-picker {
+    width: min(20rem, calc(100vw - 2rem)) !important;
+  }
 }
 
 // Hide number input spinners.

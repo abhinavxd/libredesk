@@ -1409,7 +1409,8 @@ watch(
     }
 
     if (newValues.config?.home_apps) {
-      homeApps.value = [...newValues.config.home_apps]
+      // Copy each app: mutating a shared app object retriggers the watcher and resets the form.
+      homeApps.value = newValues.config.home_apps.map((app) => ({ ...app }))
     }
 
     if (newValues.config?.prechat_form) {

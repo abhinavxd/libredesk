@@ -73,6 +73,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	flag "github.com/spf13/pflag"
 	"github.com/volatiletech/null/v9"
+	goredis "github.com/zerodha/fastcache/stores/goredis/v9"
+	"github.com/zerodha/fastcache/v4"
 	"github.com/zerodha/logf"
 )
 
@@ -1008,6 +1010,10 @@ func initRedis() *redis.Client {
 		Password: ko.String("redis.password"),
 		DB:       ko.Int("redis.db"),
 	})
+}
+
+func initFastCache(rdb *redis.Client) *fastcache.FastCache {
+	return fastcache.New(goredis.New(goredis.Config{Prefix: fastCachePrefix}, rdb))
 }
 
 // initRedis inits postgres DB.

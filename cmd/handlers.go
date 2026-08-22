@@ -37,7 +37,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Settings.
 	g.GET("/api/v1/settings/general", auth(handleGetGeneralSettings))
-	g.PUT("/api/v1/settings/general", perm(handleUpdateGeneralSettings, "general_settings:manage"))
+	g.PUT("/api/v1/settings/general", perm(clearsHCCache(handleUpdateGeneralSettings), "general_settings:manage"))
 	g.GET("/api/v1/settings/notifications/email", perm(handleGetEmailNotificationSettings, "notification_settings:manage"))
 	g.PUT("/api/v1/settings/notifications/email", perm(handleUpdateEmailNotificationSettings, "notification_settings:manage"))
 
@@ -125,18 +125,18 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Agents.
 	g.GET("/api/v1/agents/me", auth(handleGetCurrentAgent))
-	g.PUT("/api/v1/agents/me", auth(handleUpdateCurrentAgent))
+	g.PUT("/api/v1/agents/me", auth(clearsHCCache(handleUpdateCurrentAgent)))
 	g.GET("/api/v1/agents/me/teams", auth(handleGetCurrentAgentTeams))
 	g.PUT("/api/v1/agents/me/availability", auth(handleUpdateAgentAvailability))
-	g.DELETE("/api/v1/agents/me/avatar", auth(handleDeleteCurrentAgentAvatar))
+	g.DELETE("/api/v1/agents/me/avatar", auth(clearsHCCache(handleDeleteCurrentAgentAvatar)))
 
 	g.GET("/api/v1/agents/compact", auth(handleGetAgentsCompact))
 	g.GET("/api/v1/agents", perm(handleGetAgents, "users:manage"))
 	g.GET("/api/v1/agents/{id}", perm(handleGetAgent, "users:manage"))
 	g.POST("/api/v1/agents", perm(handleCreateAgent, "users:manage"))
-	g.PUT("/api/v1/agents/{id}", perm(handleUpdateAgent, "users:manage"))
-	g.DELETE("/api/v1/agents/{id}", perm(handleDeleteAgent, "users:manage"))
-	g.POST("/api/v1/agents/import", perm(handleImportAgents, "users:manage"))
+	g.PUT("/api/v1/agents/{id}", perm(clearsHCCache(handleUpdateAgent), "users:manage"))
+	g.DELETE("/api/v1/agents/{id}", perm(clearsHCCache(handleDeleteAgent), "users:manage"))
+	g.POST("/api/v1/agents/import", perm(clearsHCCache(handleImportAgents), "users:manage"))
 	g.GET("/api/v1/agents/import/status", perm(handleGetAgentImportStatus, "users:manage"))
 	g.POST("/api/v1/agents/{id}/api-key", perm(handleGenerateAPIKey, "users:manage"))
 	g.DELETE("/api/v1/agents/{id}/api-key", perm(handleRevokeAPIKey, "users:manage"))
@@ -278,8 +278,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/ai/assistants", perm(handleGetAIAssistants, "ai:manage"))
 	g.GET("/api/v1/ai/assistants/{id}", perm(handleGetAIAssistant, "ai:manage"))
 	g.POST("/api/v1/ai/assistants", perm(handleCreateAIAssistant, "ai:manage"))
-	g.PUT("/api/v1/ai/assistants/{id}", perm(handleUpdateAIAssistant, "ai:manage"))
-	g.DELETE("/api/v1/ai/assistants/{id}", perm(handleDeleteAIAssistant, "ai:manage"))
+	g.PUT("/api/v1/ai/assistants/{id}", perm(clearsHCCache(handleUpdateAIAssistant), "ai:manage"))
+	g.DELETE("/api/v1/ai/assistants/{id}", perm(clearsHCCache(handleDeleteAIAssistant), "ai:manage"))
 	g.POST("/api/v1/ai/assistants/{id}/preview", perm(handleAIAssistantPreview, "ai:manage"))
 	g.GET("/api/v1/ai/assistants/{id}/stats", perm(handleGetAIAssistantStats, "ai:manage"))
 
@@ -295,31 +295,31 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/help-centers/locales", perm(handleGetHelpCenterLocales, "help_center:manage"))
 	g.GET("/api/v1/help-centers/{id}", perm(handleGetHelpCenter, "help_center:manage"))
 	g.GET("/api/v1/help-centers/{id}/tree", perm(handleGetHelpCenterTree, "help_center:manage"))
-	g.POST("/api/v1/help-centers", perm(handleCreateHelpCenter, "help_center:manage"))
-	g.PUT("/api/v1/help-centers/{id}", perm(handleUpdateHelpCenter, "help_center:manage"))
+	g.POST("/api/v1/help-centers", perm(clearsHCCache(handleCreateHelpCenter), "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{id}", perm(clearsHCCache(handleUpdateHelpCenter), "help_center:manage"))
 	g.POST("/api/v1/help-centers/{id}/preview", perm(handleHelpCenterPreview, "help_center:manage"))
-	g.PUT("/api/v1/help-centers/{id}/toggle", perm(handleToggleHelpCenterActive, "help_center:manage"))
-	g.DELETE("/api/v1/help-centers/{id}", perm(handleDeleteHelpCenter, "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{id}/toggle", perm(clearsHCCache(handleToggleHelpCenterActive), "help_center:manage"))
+	g.DELETE("/api/v1/help-centers/{id}", perm(clearsHCCache(handleDeleteHelpCenter), "help_center:manage"))
 	g.GET("/api/v1/help-centers/{hc_id}/collections", perm(handleGetCollections, "help_center:manage"))
-	g.POST("/api/v1/help-centers/{hc_id}/collections", perm(handleCreateCollection, "help_center:manage"))
-	g.PUT("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleUpdateCollection, "help_center:manage"))
-	g.DELETE("/api/v1/help-centers/{hc_id}/collections/{id}", perm(handleDeleteCollection, "help_center:manage"))
-	g.PUT("/api/v1/help-centers/{hc_id}/collection-sort-order", perm(handleUpdateCollectionSortOrders, "help_center:manage"))
-	g.PUT("/api/v1/collections/{id}/toggle", perm(handleToggleCollection, "help_center:manage"))
-	g.PUT("/api/v1/collections/{col_id}/article-sort-order", perm(handleUpdateArticleSortOrders, "help_center:manage"))
+	g.POST("/api/v1/help-centers/{hc_id}/collections", perm(clearsHCCache(handleCreateCollection), "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{hc_id}/collections/{id}", perm(clearsHCCache(handleUpdateCollection), "help_center:manage"))
+	g.DELETE("/api/v1/help-centers/{hc_id}/collections/{id}", perm(clearsHCCache(handleDeleteCollection), "help_center:manage"))
+	g.PUT("/api/v1/help-centers/{hc_id}/collection-sort-order", perm(clearsHCCache(handleUpdateCollectionSortOrders), "help_center:manage"))
+	g.PUT("/api/v1/collections/{id}/toggle", perm(clearsHCCache(handleToggleCollection), "help_center:manage"))
+	g.PUT("/api/v1/collections/{col_id}/article-sort-order", perm(clearsHCCache(handleUpdateArticleSortOrders), "help_center:manage"))
 	g.GET("/api/v1/collections/{col_id}/articles/{id}", perm(handleGetArticle, "help_center:manage"))
-	g.POST("/api/v1/collections/{col_id}/articles", perm(handleCreateArticle, "help_center:manage"))
-	g.DELETE("/api/v1/collections/{col_id}/articles/{id}", perm(handleDeleteArticle, "help_center:manage"))
-	g.PUT("/api/v1/articles/{id}", perm(handleUpdateArticle, "help_center:manage"))
-	g.PUT("/api/v1/articles/{id}/collection", perm(handleMoveArticle, "help_center:manage"))
-	g.PUT("/api/v1/articles/{id}/status", perm(handleUpdateArticleStatus, "help_center:manage"))
+	g.POST("/api/v1/collections/{col_id}/articles", perm(clearsHCCache(handleCreateArticle), "help_center:manage"))
+	g.DELETE("/api/v1/collections/{col_id}/articles/{id}", perm(clearsHCCache(handleDeleteArticle), "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}", perm(clearsHCCache(handleUpdateArticle), "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}/collection", perm(clearsHCCache(handleMoveArticle), "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}/status", perm(clearsHCCache(handleUpdateArticleStatus), "help_center:manage"))
 	g.GET("/api/v1/help-centers/{id}/insights", perm(handleGetHelpCenterInsights, "help_center:manage"))
 
 	// Public help center JSON API.
-	g.GET("/api/public/help-centers/{slug}/tree", rateLimit(handleGetPublicHelpCenterTree, "public"))
-	g.GET("/api/public/help-centers/{slug}/articles/{article_slug}", rateLimit(handleGetPublicHelpCenterArticle, "public"))
-	g.GET("/api/public/help-centers/{slug}/search", rateLimit(handlePublicHelpCenterSearch, "public"))
-	g.POST("/api/public/help-centers/{slug}/articles/{article_slug}/feedback", rateLimit(handleHelpCenterArticleFeedback, "public"))
+	g.GET("/api/v1/public/help-centers/{slug}/tree", rateLimit(handleGetPublicHelpCenterTree, "public"))
+	g.GET("/api/v1/public/help-centers/{slug}/articles/{article_slug}", rateLimit(handleGetPublicHelpCenterArticle, "public"))
+	g.GET("/api/v1/public/help-centers/{slug}/search", rateLimit(handlePublicHelpCenterSearch, "public"))
+	g.POST("/api/v1/public/help-centers/{slug}/articles/{article_slug}/feedback", rateLimit(handleHelpCenterArticleFeedback, "public"))
 
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))
@@ -404,11 +404,11 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	getAndHead("/robots.txt", rateLimit(handleRobotsTxt, "public"))
 	getAndHead("/sitemap.xml", rateLimit(handleSitemapIndex, "public"))
 	getAndHead("/hc/{slug}", rateLimit(handleRedirectHelpCenterHome, "public"))
-	getAndHead("/hc/{slug}/{locale}", rateLimit(handleShowHelpCenterHome, "public"))
+	getAndHead("/hc/{slug}/{locale}", rateLimit(cachedHCPage(handleShowHelpCenterHome), "public"))
 	getAndHead("/hc/{slug}/{locale}/sitemap.xml", rateLimit(handleHelpCenterSitemap, "public"))
-	getAndHead("/hc/{slug}/{locale}/search", rateLimit(handleHelpCenterSearch, "public"))
-	getAndHead("/hc/{slug}/{locale}/collections/{collection_slug}", rateLimit(handleShowHelpCenterCollection, "public"))
-	getAndHead("/hc/{slug}/{locale}/articles/{article_slug}", rateLimit(handleShowHelpCenterArticle, "public"))
+	getAndHead("/hc/{slug}/{locale}/search", rateLimit(cachedHCNoIndexPage(handleHelpCenterSearch), "public"))
+	getAndHead("/hc/{slug}/{locale}/collections/{collection_slug}", rateLimit(cachedHCPage(handleShowHelpCenterCollection), "public"))
+	getAndHead("/hc/{slug}/{locale}/articles/{article_slug}", rateLimit(countArticleView(cachedHCPage(handleShowHelpCenterArticle)), "public"))
 
 	g.GET("/csat/{uuid}", rateLimit(handleShowCSAT, "public"))
 	g.GET("/csat/{uuid}/widget", rateLimit(handleShowCSATWidget, "public"))
@@ -433,7 +433,7 @@ func serveIndexPage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
-	r.RequestCtx.SetBody(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(file.ReadBytes())
 
 	// Set CSRF cookie if not already set.
 	if err := app.auth.SetCSRFCookie(r); err != nil {
@@ -464,7 +464,7 @@ func serveWidgetIndexPage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
-	r.RequestCtx.SetBody(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(file.ReadBytes())
 
 	return nil
 }
@@ -480,14 +480,15 @@ func serveStaticFiles(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
+	body := file.ReadBytes()
 	ext := filepath.Ext(filePath)
 	contentType := mime.TypeByExtension(ext)
 	if contentType == "" {
-		contentType = http.DetectContentType(file.ReadBytes())
+		contentType = http.DetectContentType(body)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
 	r.RequestCtx.Response.Header.Set("Cache-Control", "public, max-age=86400")
-	r.RequestCtx.SetBody(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(body)
 	return nil
 }
 
@@ -505,14 +506,14 @@ func serveFrontendStaticFiles(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
-	// Set the appropriate Content-Type based on the file extension.
+	body := file.ReadBytes()
 	ext := filepath.Ext(filePath)
 	contentType := mime.TypeByExtension(ext)
 	if contentType == "" {
-		contentType = http.DetectContentType(file.ReadBytes())
+		contentType = http.DetectContentType(body)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
-	r.RequestCtx.SetBody(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(body)
 	return nil
 }
 
@@ -528,14 +529,14 @@ func serveWidgetStaticFiles(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
-	// Set the appropriate Content-Type based on the file extension.
+	body := file.ReadBytes()
 	ext := filepath.Ext(filePath)
 	contentType := mime.TypeByExtension(ext)
 	if contentType == "" {
-		contentType = http.DetectContentType(file.ReadBytes())
+		contentType = http.DetectContentType(body)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
-	r.RequestCtx.SetBody(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(body)
 	return nil
 }
 
@@ -551,7 +552,7 @@ func serveWidgetJS(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
-	r.RequestCtx.SetBody(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(file.ReadBytes())
 	return nil
 }
 

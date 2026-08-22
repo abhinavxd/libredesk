@@ -167,7 +167,7 @@
               <Editor
                 v-model:htmlContent="componentField.modelValue"
                 @update:htmlContent="(value) => componentField.onChange(value)"
-                :placeholder="t('editor.hint.newLineCtrlK')"
+                :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')"
                 :insertContent="insertContent"
                 :autoFocus="false"
                 :enableInlineImages="true"
@@ -262,11 +262,13 @@ import api from '@/api'
 import { useContactSearch } from '@/features/conversation/useContactSearch.js'
 import ContactSearchResults from '@/features/conversation/ContactSearchResults.vue'
 import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
+import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 
 const emit = defineEmits(['close'])
 
 const inboxStore = useInboxStore()
 const { t } = useI18n()
+const isCramped = useIsComposerCramped()
 const uStore = useUsersStore()
 const userStore = useUserStore()
 const teamStore = useTeamStore()

@@ -199,6 +199,7 @@ type Conversation struct {
 	SLAPolicyID               null.Int               `db:"sla_policy_id" json:"sla_policy_id"`
 	SlaPolicyName             null.String            `db:"sla_policy_name" json:"sla_policy_name"`
 	AppliedSLAID              null.Int               `db:"applied_sla_id" json:"applied_sla_id"`
+	NextSLADeadlineAt         null.Time              `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	FirstResponseDueAt        null.Time              `db:"first_response_deadline_at" json:"first_response_deadline_at"`
 	ResolutionDueAt           null.Time              `db:"resolution_deadline_at" json:"resolution_deadline_at"`
 	NextResponseDueAt         null.Time              `db:"next_response_deadline_at" json:"next_response_deadline_at"`

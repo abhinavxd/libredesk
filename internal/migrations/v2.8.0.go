@@ -186,5 +186,15 @@ func V2_8_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	if _, err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS index_users_on_availability_status_when_agent ON users(availability_status) WHERE type = 'agent' AND deleted_at IS NULL;
+		CREATE INDEX IF NOT EXISTS index_conversations_on_resolved_at ON conversations(resolved_at);
+		CREATE INDEX IF NOT EXISTS index_applied_slas_on_created_at ON applied_slas(created_at);
+		CREATE INDEX IF NOT EXISTS index_sla_events_on_created_at ON sla_events(created_at);
+		CREATE INDEX IF NOT EXISTS index_csat_responses_on_created_at ON csat_responses(created_at);
+	`); err != nil {
+		return err
+	}
+
 	return nil
 }

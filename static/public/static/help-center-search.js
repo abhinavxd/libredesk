@@ -12,7 +12,7 @@
 
     var DEBOUNCE = 250;
     var MIN_CHARS = 2;
-    var api = '/api/public/help-centers/' + encodeURIComponent(slug) + '/search';
+    var api = '/api/v1/public/help-centers/' + encodeURIComponent(slug) + '/search';
     var base = form.getAttribute('data-hc-base') || '/hc/' + slug + '/' + locale;
     var articleBase = base + '/articles/';
 

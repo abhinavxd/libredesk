@@ -101,7 +101,7 @@
                   <FormControl>
                     <SelectComboBox
                       v-bind="componentField"
-                      :items="localeItems"
+                      :items="localeItemsFor(index)"
                       :placeholder="t('placeholders.selectLanguage')"
                     />
                   </FormControl>
@@ -215,7 +215,7 @@
             <div v-show="isClassic">
               <FormField v-slot="{ componentField }" name="theme.header.background_type">
                 <FormItem>
-                  <FormLabel>{{ t('helpCenter.styling.headerBackground') }}</FormLabel>
+                  <FormLabel>{{ t('globals.terms.background') }}</FormLabel>
                   <FormControl>
                     <Select v-bind="componentField">
                       <SelectTrigger>
@@ -271,7 +271,7 @@
             <div v-show="isClassic && form.values.theme?.header?.background_type === 'image'">
               <FormField v-slot="{ componentField }" name="theme.header.background_image">
                 <FormItem>
-                  <FormLabel>{{ t('helpCenter.styling.headerImage') }}</FormLabel>
+                  <FormLabel>{{ t('globals.messages.backgroundImageUrl') }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
@@ -535,7 +535,7 @@
 
             <FormField v-slot="{ componentField }" name="theme.footer.tagline">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.styling.footerTagline') }}</FormLabel>
+                <FormLabel>{{ t('helpCenter.styling.tagline') }}</FormLabel>
                 <FormControl>
                   <Textarea
                     :rows="2"
@@ -548,7 +548,7 @@
               </FormItem>
             </FormField>
 
-            <LinkListField name="theme.footer_links" :label="t('helpCenter.styling.footerLinks')" />
+            <LinkListField name="theme.footer_links" :label="t('globals.terms.link', 2)" />
 
             <LinkListField
               name="theme.social_links"
@@ -816,7 +816,16 @@ const localeLabel = (code) => localeItems.value.find((i) => i.value === code)?.l
 
 const cleanLocales = (locales) => (locales || []).map((l) => (l || '').trim()).filter(Boolean)
 
-const localeOptions = computed(() => cleanLocales(form.values.allowed_locales))
+const pickedLocales = computed(() => new Set(cleanLocales(form.values.allowed_locales)))
+
+const localeItemsFor = (index) => {
+  const own = (form.values.allowed_locales?.[index] || '').trim()
+  return localeItems.value.filter(
+    (item) => item.value === own || !pickedLocales.value.has(item.value)
+  )
+}
+
+const localeOptions = computed(() => [...pickedLocales.value])
 
 // The backend forces the default language back into the supported list, so the select is
 // moved to a language that is actually still listed instead of showing a stale one.
@@ -852,7 +861,7 @@ const onSubmit = form.handleSubmit(
       activeTab.value = 'general'
     }
     await nextTick()
-    formEl.value?.querySelector('[role="alert"]')?.scrollIntoView({ block: 'center' })
+    formEl.value?.querySelector('[role="alert"]')?.scrollIntoView({ block: 'nearest' })
   }
 )
 

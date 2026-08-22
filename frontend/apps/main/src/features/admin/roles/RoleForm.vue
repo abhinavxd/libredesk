@@ -232,7 +232,8 @@ watch(
   () => props.initialValues,
   (newValues) => {
     form.setValues(newValues, false)
-    selectedPermissions.value = newValues.permissions || []
+    // Copy: mutating the shared array retriggers the watcher and resets the form.
+    selectedPermissions.value = [...(newValues.permissions || [])]
   },
   { deep: true, immediate: true }
 )

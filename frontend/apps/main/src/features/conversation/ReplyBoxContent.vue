@@ -10,21 +10,21 @@
         <TabsList class="bg-muted p-1 rounded-md">
           <TabsTrigger
             value="reply"
-            class="px-3 py-1 rounded-md transition-colors duration-200"
+            class="px-3 py-1 max-md:py-2.5 rounded-md transition-colors duration-200"
             :class="{ 'bg-background text-foreground': messageType === 'reply' }"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
           <TabsTrigger
             value="private_note"
-            class="px-3 py-1 rounded-md transition-colors duration-200"
+            class="px-3 py-1 max-md:py-2.5 rounded-md transition-colors duration-200"
             :class="{ 'bg-background text-foreground': messageType === 'private_note' }"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <Button class="text-muted-foreground" variant="ghost" @click="toggleFullscreen">
+      <Button class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0" variant="ghost" @click="toggleFullscreen">
         <component :is="isFullscreen ? Minimize2 : Maximize2" />
       </Button>
     </div>
@@ -90,7 +90,7 @@
         v-model:htmlContent="htmlContent"
         v-model:textContent="textContent"
         :message-type="messageType"
-        :placeholder="t('editor.hint.full')"
+        :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
         :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
@@ -147,6 +147,7 @@ import { Maximize2, Minimize2 } from 'lucide-vue-next'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
+import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
@@ -257,6 +258,7 @@ const emit = defineEmits([
 ])
 
 const conversationStore = useConversationStore()
+const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)

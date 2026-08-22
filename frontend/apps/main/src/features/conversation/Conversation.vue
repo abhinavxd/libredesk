@@ -1,11 +1,29 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <div class="h-12 flex-shrink-0 px-2 border-b flex items-center justify-between">
-      <div>
-        <span>{{ conversationStore.currentContactName }}</span>
+    <div class="h-12 flex-shrink-0 px-2 border-b flex items-center justify-between gap-2">
+      <div class="flex items-center gap-1 min-w-0">
+        <Button
+          v-if="isMobile"
+          variant="ghost"
+          class="w-11 h-11 md:w-8 md:h-8 p-0 shrink-0 -ml-2 md:-ml-1"
+          :aria-label="t('globals.messages.back')"
+          @click="goBackToList"
+        >
+          <ChevronLeft class="w-4 h-4" />
+        </Button>
+        <span class="truncate">{{ conversationStore.currentContactName }}</span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 shrink-0">
+        <Button
+          v-if="isMobile"
+          variant="ghost"
+          class="w-11 h-11 md:w-8 md:h-8 p-0"
+          :aria-label="t('globals.terms.contact')"
+          @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
+        >
+          <PanelRight class="w-4 h-4" />
+        </Button>
         <Tooltip v-if="isSnoozed && snoozedUntilLabel">
           <TooltipTrigger as-child>
             <span class="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
@@ -21,7 +39,7 @@
           <DropdownMenuTrigger>
             <div
               v-if="conversationStore.current?.status"
-              class="flex items-center space-x-1 cursor-pointer bg-primary px-2 py-1 rounded-md text-sm"
+              class="flex items-center space-x-1 cursor-pointer bg-primary px-3 py-3 md:px-2 md:py-1 rounded-md text-sm"
             >
               <span class="text-primary-foreground font-medium inline-block">
                 {{ conversationStore.current?.status }}
@@ -40,7 +58,7 @@
         </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <Button variant="ghost" class="w-8 h-8 p-0">
+            <Button variant="ghost" class="w-11 h-11 md:w-8 md:h-8 p-0">
               <MoreHorizontal class="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -73,7 +91,9 @@
 import { computed, ref } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { Clock, MoreHorizontal } from 'lucide-vue-next'
+import { Clock, MoreHorizontal, ChevronLeft, PanelRight } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { useIsMobile } from '@shared-ui/composables'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,6 +118,18 @@ const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const emitter = useEmitter()
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const isMobile = useIsMobile()
+
+// Each detail route is `<list route name>-conversation`.
+const goBackToList = () => {
+  const listName = String(route.name).replace(/-conversation$/, '')
+  const { uuid, ...params } = route.params
+  const target = router.resolve({ name: listName, params })
+  if (window.history.state?.back?.split('?')[0] === target.path) router.back()
+  else router.push(target)
+}
 
 const isSnoozed = computed(
   () => conversationStore.current?.status === CONVERSATION_DEFAULT_STATUSES.SNOOZED

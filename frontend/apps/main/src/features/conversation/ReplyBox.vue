@@ -41,8 +41,13 @@
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
-        class="max-w-[60%] max-h-[75%] h-[70%] bg-card text-card-foreground p-4 flex flex-col"
-        :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
+        class="bg-card text-card-foreground p-4 flex flex-col overflow-hidden"
+        :class="[
+          isCramped
+            ? 'top-0 left-0 translate-x-0 translate-y-0 w-full max-w-none h-[var(--visual-viewport-height,100dvh)] max-h-none rounded-none'
+            : 'max-w-[60%] h-[70%] max-h-[75%] rounded-lg',
+          { '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }
+        ]"
         @escapeKeyDown="isEditorFullscreen = false"
         :hide-close-button="true"
       >
@@ -77,11 +82,34 @@
       </DialogContent>
     </Dialog>
 
+    <div v-if="isCramped && !isEditorFullscreen" class="p-2">
+      <Button
+        type="button"
+        variant="outline"
+        class="w-full h-11 justify-start font-normal min-w-0"
+        :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
+        @click="isEditorFullscreen = true"
+      >
+        <Pencil class="shrink-0 text-muted-foreground" />
+        <span v-if="draftPreview" class="truncate">{{ draftPreview }}</span>
+        <span v-else class="truncate text-muted-foreground">
+          {{ messageType === 'private_note' ? $t('globals.terms.privateNote') : $t('globals.terms.reply') }}
+        </span>
+        <span
+          v-if="attachmentCount"
+          class="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+        >
+          <Paperclip class="w-3.5 h-3.5" />
+          {{ attachmentCount }}
+        </span>
+      </Button>
+    </div>
+
     <!-- Main Editor non-fullscreen -->
     <div
       class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
       :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
-      v-if="!isEditorFullscreen"
+      v-if="!isCramped && !isEditorFullscreen"
     >
       <ReplyBoxContent
         ref="replyBoxContentRef"
@@ -139,6 +167,10 @@ import {
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
 import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
+import { Button } from '@shared-ui/components/ui/button'
+import { Pencil, Paperclip } from 'lucide-vue-next'
+import { useVisualViewportHeight } from '@main/composables/useVisualViewportHeight'
+import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
@@ -151,6 +183,8 @@ const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
+const isCramped = useIsComposerCramped()
+useVisualViewportHeight()
 
 // Setup file upload composable
 const {
@@ -315,6 +349,10 @@ onUnmounted(() => {
 const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
+
+const draftPreview = computed(() => textContent.value.trim())
+
+const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.value.length)
 
 const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
   let hasMessageSendingErrored = false

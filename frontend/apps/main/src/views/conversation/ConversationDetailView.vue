@@ -5,7 +5,7 @@
       class="conv-progress absolute inset-x-0 top-0 h-0.5 z-50 pointer-events-none"
     />
     <ResizablePanelGroup
-      v-if="showContent"
+      v-if="showContent && !isMobile"
       direction="horizontal"
       class="h-full transition-opacity duration-200"
       :class="{ 'opacity-60': isDimmed }"
@@ -23,7 +23,7 @@
       <!-- Sidebar Panel (collapsible) -->
       <ResizablePanel
         ref="sidebarPanelRef"
-:default-size="panelSizes[1]"
+        :default-size="panelSizes[1]"
         :min-size="15"
         :max-size="40"
         :collapsible="true"
@@ -37,9 +37,29 @@
       </ResizablePanel>
     </ResizablePanelGroup>
 
-    <!-- Toggle button when sidebar is collapsed -->
+    <template v-else-if="showContent">
+      <div
+        class="h-full transition-opacity duration-200"
+        :class="{ 'opacity-60': isDimmed }"
+        :inert="isDimmed"
+      >
+        <Conversation />
+      </div>
+
+      <Sheet :open="sheetSidebarOpen" @update:open="sheetSidebarOpen = $event">
+        <SheetContent
+          side="right"
+          class="w-[85vw] max-w-sm p-0 overflow-y-auto [&>button]:hidden"
+          :aria-describedby="undefined"
+        >
+          <SheetTitle class="sr-only">{{ $t('globals.terms.contact') }}</SheetTitle>
+          <ConversationSideBar />
+        </SheetContent>
+      </Sheet>
+    </template>
+
     <button
-      v-if="showContent && !sidebarOpen"
+      v-if="showContent && !isMobile && !sidebarOpen"
       @click="toggleSidebar"
       class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-all duration-200 border shadow-md hover:scale-105 z-50"
     >
@@ -58,6 +78,8 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import Conversation from '@main/features/conversation/Conversation.vue'
 import ConversationSideBar from '@main/features/conversation/sidebar/ConversationSideBar.vue'
+import { useIsMobile } from '@shared-ui/composables'
+import { Sheet, SheetContent, SheetTitle } from '@shared-ui/components/ui/sheet'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@shared-ui/components/ui/resizable'
 
 const props = defineProps({
@@ -67,9 +89,11 @@ const props = defineProps({
 const conversationStore = useConversationStore()
 const route = useRoute()
 const emitter = useEmitter()
+const isMobile = useIsMobile()
 const sidebarPanelRef = ref(null)
 const sidebarOpen = useStorage('conversationSidebarOpen', true)
 const panelSizes = useStorage('conversationDetailPanelSizes', [70, 30])
+const sheetSidebarOpen = ref(false)
 
 const showContent = computed(
   () => conversationStore.current || conversationStore.conversation.loading
@@ -82,6 +106,10 @@ const isLoading = computed(
 const isDimmed = computed(() => conversationStore.conversation.loading)
 
 const toggleSidebar = () => {
+  if (isMobile.value) {
+    sheetSidebarOpen.value = !sheetSidebarOpen.value
+    return
+  }
   if (sidebarOpen.value) {
     sidebarPanelRef.value?.collapse()
   } else {
@@ -142,6 +170,7 @@ onMounted(() => {
 watch(
   () => props.uuid,
   (newUUID, oldUUID) => {
+    sheetSidebarOpen.value = false
     if (!newUUID || newUUID === oldUUID) return
     const canTransition = oldUUID && !route.query.scrollTo && typeof document.startViewTransition === 'function'
     if (!canTransition) {

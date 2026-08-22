@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"log"
@@ -59,6 +60,7 @@ import (
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
 	"github.com/valyala/fasthttp"
+	"github.com/zerodha/fastcache/v4"
 	"github.com/zerodha/fastglue"
 	"github.com/zerodha/logf"
 )
@@ -88,6 +90,8 @@ var (
 
 const (
 	sampleEncKey = "your-32-char-random-string-here!"
+
+	serverShutdownTimeout = 8 * time.Second
 )
 
 // App is the global app context which is passed and injected in the http handlers.
@@ -130,6 +134,7 @@ type App struct {
 	contextLink      *contextlink.Manager
 	rateLimit        *ratelimit.Limiter
 	redis            *redis.Client
+	fc               *fastcache.FastCache
 	importer         *importer.Importer
 	whatsappTemplate *whatsappTemplate.Manager
 	whatsappClient   *whatsappapi.Client
@@ -209,6 +214,8 @@ func main() {
 	loadSettings(settings)
 
 	validateConfig(ko)
+
+	startPprof()
 
 	// Fallback for config typo. Logs a warning but continues to work with the incorrect key.
 	// Uses 'message.message_outgoing_scan_interval' (correct key) as default key, falls back to the common typo.
@@ -329,12 +336,15 @@ func main() {
 		contextLink:      initContextLink(db, i18n),
 		rateLimit:        rateLimiter,
 		redis:            rdb,
+		fc:               initFastCache(rdb),
 		userNotification: userNotification,
 		whatsappClient:   waClient,
 		whatsappTemplate: waTemplates,
 		wsHub:            wsHub,
 	}
 	app.consts.Store(constants)
+	helpCenterCacheOpts.Logger = log.New(helpCenterCacheLogWriter{lo: app.lo}, "", 0)
+
 	whatsappIngester, err := newWhatsAppIngester(app)
 	if err != nil {
 		log.Fatalf("error initializing whatsapp ingester: %v", err)
@@ -351,6 +361,9 @@ func main() {
 	g.SetContext(app)
 	initHandlers(g, wsHub)
 	g.Router.NotFound = helpCenterHostNotFound(app, g)
+
+	// Buffers above this are dropped rather than reused, and the ones we keep stay with the connection until it closes.
+	fasthttp.SetBodySizePoolLimit(64<<10, 1<<20) // request: 64 KiB, response: 1 MiB
 
 	s := &fasthttp.Server{
 		Name:                 appName,
@@ -378,8 +391,19 @@ func main() {
 
 	// Wait for shutdown signal.
 	<-ctx.Done()
+	closedAgentConns := wsHub.CloseAll()
+	closedLiveChatInboxes := inbox.CloseLiveChatClients()
+	colorlog.Red("Closed %d agent websocket connections and %d livechat inboxes.", closedAgentConns, closedLiveChatInboxes)
 	colorlog.Red("Shutting down HTTP server...")
-	s.Shutdown()
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), serverShutdownTimeout)
+	if err := s.ShutdownWithContext(shutdownCtx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			colorlog.Red("HTTP server drain timed out after %s, exiting with connections still open: %v", serverShutdownTimeout, err)
+		} else {
+			colorlog.Red("error shutting down HTTP server: %v", err)
+		}
+	}
+	cancelShutdown()
 	colorlog.Red("Shutting down AI agent...")
 	aiAgent.Close()
 	colorlog.Red("Shutting down AI...")

@@ -71,7 +71,7 @@ const { editor, insertImages, focus } = useTextEditor({
   extensions: buildArticleExtensions({
     getPlaceholder: () => props.placeholder,
     embedTitle: t('editor.tooltip.youtube'),
-    defaultSummary: t('editor.collapsibleSummary')
+    defaultSummary: t('globals.terms.summary')
   }),
   htmlContent,
   textContent,

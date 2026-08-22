@@ -18,5 +18,5 @@ export const createFormSchema = (t) =>
       }),
     secret: z.string().optional(),
     token_expiry_seconds: z.coerce.number().int().min(1).default(1200),
-    is_active: z.boolean().default(true).optional()
+    is_active: z.boolean().optional().default(true)
   })

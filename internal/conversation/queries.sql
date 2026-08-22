@@ -209,6 +209,7 @@ SELECT
    c.subject,
    c.contact_id,
    c.sla_policy_id,
+   c.next_sla_deadline_at,
    c.meta,
    sla.name as sla_policy_name,
    c.last_message_at,
@@ -517,7 +518,8 @@ WHERE conversation_id =
 -- name: insert-conversation-participant
 INSERT INTO conversation_participants
 (user_id, conversation_id)
-VALUES($1, (SELECT id FROM conversations WHERE uuid = $2));
+VALUES($1, (SELECT id FROM conversations WHERE uuid = $2))
+ON CONFLICT (conversation_id, user_id) DO NOTHING;
 
 -- name: get-unassigned-conversations
 SELECT
@@ -637,6 +639,7 @@ WHERE
   AND status_id IN (
     SELECT id FROM conversation_statuses WHERE name NOT IN ('Open')
   )
+RETURNING id;
 
 -- name: get-conversation-by-message-id
 SELECT
@@ -659,7 +662,7 @@ DELETE FROM conversation_messages WHERE CASE
 END;
 
 -- name: delete-private-message
--- $1 = message uuid, $2 = conversation uuid, $3 = deleted placeholder text.
+-- $1 = message uuid, $2 = conversation uuid, $3 = deleted placeholder text, $4 = sender id, 0 to skip the sender check.
 WITH deleted AS (
     UPDATE conversation_messages
     SET content = $3, text_content = $3, updated_at = NOW(),
@@ -667,6 +670,7 @@ WITH deleted AS (
     WHERE uuid = $1
       AND private = true
       AND meta->>'deleted_at' IS NULL
+      AND ($4 = 0 OR sender_id = $4)
       AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
     RETURNING id, conversation_id, created_at
 ),

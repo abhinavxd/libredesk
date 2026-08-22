@@ -60,6 +60,8 @@ jobs:
           cp config.sample.toml config.toml
           sed -i 's/host = "db"/host = "127.0.0.1"/' config.toml
           sed -i 's/address = "redis:6379"/address = "localhost:6379"/' config.toml
+          # upload.fs.upload_path is not created by the app, so attachment uploads 500 without it
+          mkdir -p uploads
 
       - name: Run unit tests for frontend
         run: cd frontend && pnpm test:run
@@ -70,12 +72,21 @@ jobs:
           # E2E runs over plain HTTP, so the Secure session/csrf cookies must be off
           # or real login + writes would be rejected.
           LIBREDESK_APP__SERVER__DISABLE_SECURE_COOKIES: "true"
+          # The livechat widget suite makes far more than 100 widget requests a minute.
+          LIBREDESK_RATE_LIMIT__WIDGET__REQUESTS_PER_MINUTE: "100000"
+          LIBREDESK_RATE_LIMIT__PUBLIC__REQUESTS_PER_MINUTE: "100000"
           CYPRESS_SYSTEM_PASSWORD: "StrongPass!123"
           CYPRESS_MAILHOG_URL: "http://localhost:8025"
         run: |
           ./libredesk --install --idempotent-install --yes --config ./config.toml
           ./libredesk --upgrade --yes --config ./config.toml
           ./libredesk --config ./config.toml &
-          sleep 10
+          for i in $(seq 1 60); do
+            if [ "$(curl --connect-timeout 1 --max-time 2 -s -o /dev/null -w '%{http_code}' http://localhost:9000/ || true)" = "200" ]; then
+              echo "app is up"; break
+            fi
+            if [ "$i" = "60" ]; then echo "app did not start"; exit 1; fi
+            sleep 1
+          done
           cd frontend
           pnpm run test:e2e:ci

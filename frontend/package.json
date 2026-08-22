@@ -13,6 +13,7 @@
     "test:run": "vitest run",
     "test:e2e": "start-server-and-test preview http://localhost:4173 'cypress run --e2e'",
     "test:e2e:ci": "cypress run --e2e --headless",
+    "test:e2e:livechat": "cypress run --e2e --spec \"cypress/e2e/integration/livechat/*.cy.js\"",
     "test:e2e:dev": "start-server-and-test 'vite dev --port 4173' http://localhost:4173 'cypress open --e2e'",
     "test:unit": "cypress run --component",
     "test:unit:dev": "cypress open --component",

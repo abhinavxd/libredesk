@@ -34,6 +34,8 @@ export class WebSocketClient {
   connect () {
     if (this.isReconnecting || this.manualClose) return
 
+    if (this.socket) this.socket.close()
+
     try {
       this.socket = new WebSocket('/ws')
       this.socket.addEventListener('open', this.handleOpen.bind(this))
@@ -46,7 +48,8 @@ export class WebSocketClient {
     }
   }
 
-  handleOpen () {
+  handleOpen (event) {
+    if (event.target !== this.socket) return
     console.log('WebSocket connected')
     const wasReconnect = this.reconnectAttempts > 0
     this.reconnectInterval = 1000
@@ -67,6 +70,7 @@ export class WebSocketClient {
   }
 
   handleMessage (event) {
+    if (event.target !== this.socket) return
     try {
       if (!event.data) return
 
@@ -140,11 +144,13 @@ export class WebSocketClient {
   }
 
   handleError (event) {
+    if (event.target !== this.socket) return
     console.error('WebSocket error:', event)
     this.reconnect()
   }
 
-  handleClose () {
+  handleClose (event) {
+    if (event.target !== this.socket) return
     this.clearPing()
     if (!this.manualClose) {
       this.reconnect()

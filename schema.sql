@@ -196,6 +196,7 @@ CREATE TABLE users (
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
+CREATE INDEX index_users_on_availability_status_when_agent ON users(availability_status) WHERE type = 'agent' AND deleted_at IS NULL;
 CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
 	ON users(email)
 	WHERE type = 'agent' AND deleted_at IS NULL;
@@ -294,6 +295,7 @@ CREATE INDEX index_conversations_on_inbox_id ON conversations (inbox_id);
 CREATE INDEX index_conversations_on_status_id ON conversations (status_id);
 CREATE INDEX index_conversations_on_priority_id ON conversations (priority_id);
 CREATE INDEX index_conversations_on_created_at ON conversations (created_at);
+CREATE INDEX index_conversations_on_resolved_at ON conversations (resolved_at);
 CREATE INDEX index_conversations_on_last_message_at ON conversations (last_message_at);
 CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_interaction_at);
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
@@ -561,6 +563,7 @@ CREATE TABLE csat_responses (
 );
 CREATE INDEX index_csat_responses_on_uuid ON csat_responses(uuid);
 CREATE INDEX index_csat_responses_on_conversation_id ON csat_responses(conversation_id);
+CREATE INDEX index_csat_responses_on_created_at ON csat_responses(created_at);
 
 DROP TABLE IF EXISTS views CASCADE;
 CREATE TABLE views (
@@ -602,6 +605,7 @@ CREATE TABLE applied_slas (
 );
 CREATE INDEX index_applied_slas_on_conversation_id ON applied_slas(conversation_id);
 CREATE INDEX index_applied_slas_on_status ON applied_slas(status);
+CREATE INDEX index_applied_slas_on_created_at ON applied_slas(created_at);
 CREATE UNIQUE INDEX index_applied_slas_unique_pending_per_conv ON applied_slas(conversation_id) WHERE status = 'pending';
 
 DROP TABLE IF EXISTS sla_events CASCADE;
@@ -619,6 +623,7 @@ CREATE TABLE sla_events (
 );
 CREATE INDEX index_sla_events_on_applied_sla_id ON sla_events(applied_sla_id);
 CREATE INDEX index_sla_events_on_status ON sla_events(status);
+CREATE INDEX index_sla_events_on_created_at ON sla_events(created_at);
 
 DROP TABLE IF EXISTS scheduled_sla_notifications CASCADE;
 CREATE TABLE scheduled_sla_notifications (
@@ -1015,7 +1020,7 @@ INSERT INTO settings ("key", value)
 VALUES
     ('app.lang', '"en-US"'::jsonb),
     ('app.root_url', '"http://localhost:9000"'::jsonb),
-    ('app.logo_url', '"http://localhost:9000/logo.png"'::jsonb),
+    ('app.logo_url', '""'::jsonb),
     ('app.site_name', '"libredesk"'::jsonb),
     ('app.favicon_url', '"http://localhost:9000/favicon.ico"'::jsonb),
     ('app.max_file_upload_size', '20'::jsonb),

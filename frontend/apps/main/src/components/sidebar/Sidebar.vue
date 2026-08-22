@@ -110,6 +110,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
+import MobileDrawerNav from './MobileDrawerNav.vue'
+import MobileDrawerFooter from './MobileDrawerFooter.vue'
 import { filterNavItems } from '@main/utils/nav-permissions'
 import { permissions } from '@main/constants/permissions'
 import { useStorage } from '@vueuse/core'
@@ -117,6 +119,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
+import { useIsMobile } from '@shared-ui/composables'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
@@ -128,6 +131,7 @@ const conversationStore = useConversationStore()
 const settingsStore = useAppSettingsStore()
 const route = useRoute()
 const router = useRouter()
+const isMobile = useIsMobile()
 const { t } = useI18n()
 const emit = defineEmits(['createView', 'editView', 'deleteView', 'createConversation'])
 
@@ -160,9 +164,13 @@ const handleDeleteView = () => {
   }
 }
 
-// Navigation methods with conversation retention
+const keepConversationOpen = () =>
+  !isMobile.value &&
+  conversationStore.isConversationOpen &&
+  Boolean(conversationStore.conversation.data?.uuid)
+
 const navigateToInbox = (type) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
+  if (keepConversationOpen()) {
     router.push({
       name: 'inbox-conversation',
       params: {
@@ -179,7 +187,7 @@ const navigateToInbox = (type) => {
 }
 
 const navigateToTeamInbox = (teamID) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
+  if (keepConversationOpen()) {
     router.push({
       name: 'team-inbox-conversation',
       params: {
@@ -196,7 +204,7 @@ const navigateToTeamInbox = (teamID) => {
 }
 
 const navigateToViewInbox = (viewID) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
+  if (keepConversationOpen()) {
     router.push({
       name: 'view-inbox-conversation',
       params: {
@@ -242,9 +250,6 @@ const teamInboxOpen = useStorage('teamInboxOpen', true)
 const viewInboxOpen = useStorage('viewInboxOpen', true)
 const sharedViewInboxOpen = useStorage('sharedViewInboxOpen', true)
 
-// Track which view is being hovered for ellipsis menu visibility
-const hoveredViewId = ref(null)
-
 // Track delete confirmation dialog state
 const isDeleteOpen = ref(false)
 const viewToDelete = ref(null)
@@ -273,6 +278,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredContactsNavItems" :key="item.titleKey">
@@ -286,6 +292,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 
@@ -309,6 +316,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredReportsNavItems" :key="item.titleKey">
@@ -322,6 +330,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 
@@ -344,6 +353,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredAdminNavItems" :key="item.titleKey">
@@ -395,6 +405,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 
@@ -413,6 +424,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in accountNavItems" :key="item.titleKey">
@@ -429,6 +441,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 
@@ -453,6 +466,7 @@ const viewToDelete = ref(null)
         </SidebarHeader>
 
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -541,7 +555,7 @@ const viewToDelete = ref(null)
                           <Plus
                             size="18"
                             @click.stop="openCreateViewDialog"
-                            class="rounded-md cursor-pointer opacity-0 transition-colors duration-200 group-hover/item:opacity-100 hover:bg-sidebar-accent/50 text-muted-foreground hover:text-sidebar-accent-foreground p-1"
+                            class="rounded-md cursor-pointer transition-colors duration-200 can-hover:opacity-0 can-hover:group-hover/item:opacity-100 hover:bg-sidebar-accent/50 text-muted-foreground hover:text-sidebar-accent-foreground p-1"
                           />
                         </div>
                         <ChevronRight
@@ -555,8 +569,7 @@ const viewToDelete = ref(null)
                     <SidebarMenuSub>
                       <SidebarMenuSubItem
                         v-for="view in userViews" :key="view.id"
-                        @mouseenter="hoveredViewId = view.id"
-                        @mouseleave="hoveredViewId = null"
+                        class="group/view-item"
                       >
                         <SidebarMenuButton
                           size="sm"
@@ -565,28 +578,24 @@ const viewToDelete = ref(null)
                         >
                           <span class="flex-1 truncate" :title="view.name">{{ view.name }}</span>
                         </SidebarMenuButton>
-                        <SidebarMenuAction
-                          :class="[
-                            'mr-3',
-                            'md:opacity-0',
-                            'data-[state=open]:opacity-100',
-                            { 'md:opacity-100': hoveredViewId === view.id }
-                          ]"
-                        >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild @click.prevent>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger as-child>
+                            <SidebarMenuAction
+                              class="mr-3 can-hover:opacity-0 can-hover:group-hover/view-item:opacity-100 data-[state=open]:opacity-100"
+                              @click.prevent
+                            >
                               <EllipsisVertical />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem @click="() => editView(view)">
-                                <span>{{ t('globals.messages.edit') }}</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem @click="() => openDeleteConfirmation(view)">
-                                <span>{{ t('globals.messages.delete') }}</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </SidebarMenuAction>
+                            </SidebarMenuAction>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem @click="() => editView(view)">
+                              <span>{{ t('globals.messages.edit') }}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="() => openDeleteConfirmation(view)">
+                              <span>{{ t('globals.messages.delete') }}</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
                   </CollapsibleContent>
@@ -632,6 +641,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 

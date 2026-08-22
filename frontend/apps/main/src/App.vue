@@ -1,74 +1,12 @@
 <template>
-  <SmallScreenOverlay v-if="showSmallScreenOverlay" @dismiss="dismissSmallScreen" />
-
-  <div class="flex w-full h-screen text-foreground bg-canvas p-1.5">
-    <!-- Icon sidebar always visible -->
-    <SidebarProvider style="--sidebar-width: 3rem" class="w-auto z-50">
+  <div class="flex w-full h-dvh text-foreground bg-canvas p-1 md:p-1.5">
+    <SidebarProvider v-if="!isMobile" style="--sidebar-width: 3rem" class="w-auto z-50">
       <ShadcnSidebar collapsible="none" class="border border-sidebar-border rounded-lg overflow-hidden">
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/inboxes')">
-                        <router-link :to="lastInboxPath || { name: 'inboxes' }">
-                          <Inbox />
-                        </router-link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{{ t('globals.terms.inbox', 2) }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
-                <SidebarMenuItem v-if="userStore.can('contacts:read_all')">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/contacts')">
-                        <router-link :to="{ name: 'contacts' }">
-                          <BookUser />
-                        </router-link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{{ t('globals.terms.contact', 2) }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
-                <SidebarMenuItem v-if="userStore.hasReportTabPermissions">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/reports')">
-                        <router-link :to="{ name: 'reports' }">
-                          <FileLineChart />
-                        </router-link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{{ t('globals.terms.report', 2) }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
-                <SidebarMenuItem v-if="userStore.hasAdminTabPermissions">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/admin')">
-                        <router-link
-                          :to="{
-                            name: userStore.can('general_settings:manage') ? 'general' : 'admin'
-                          }"
-                        >
-                          <Shield />
-                        </router-link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{{ t('globals.terms.admin') }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
+                <PrimaryNavItems variant="rail" />
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -158,8 +96,6 @@ import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
-import { Inbox, Shield, FileLineChart, BookUser } from 'lucide-vue-next'
-import SmallScreenOverlay from '@/components/SmallScreenOverlay.vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import {
@@ -169,24 +105,19 @@ import {
   SidebarGroup,
   SidebarMenu,
   SidebarGroupContent,
-  SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider
 } from '@shared-ui/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import SidebarNavUser from '@main/components/sidebar/SidebarNavUser.vue'
 import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
+import PrimaryNavItems from '@main/components/sidebar/PrimaryNavItems.vue'
+import { useIsMobile } from '@shared-ui/composables'
 import api from '@main/api'
 
 const route = useRoute()
 const emitter = useEmitter()
-
-// Small screen overlay - shown once per session for screens < 768px.
-const showSmallScreenOverlay = ref(window.screen.width < 768 && !sessionStorage.getItem('smallScreenDismissed'))
-function dismissSmallScreen() {
-  sessionStorage.setItem('smallScreenDismissed', '1')
-  showSmallScreenOverlay.value = false
-}
+const isMobile = useIsMobile()
 
 // Remember last inbox path so navigating back from admin/contacts/reports restores it
 const lastInboxPath = useStorage('lastInboxPath', '')

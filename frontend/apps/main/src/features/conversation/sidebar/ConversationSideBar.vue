@@ -18,7 +18,7 @@
             <div>
               <SelectComboBox
                 v-model="conversationStore.current.assigned_user_id"
-                :items="[{ value: 'none', label: t('globals.terms.none') }, ...usersStore.options]"
+                :items="agentOptions"
                 :placeholder="t('placeholders.selectAgent')"
                 @select="selectAgent"
                 type="user"
@@ -177,18 +177,18 @@ import ConversationSideBarContact from '@/features/conversation/sidebar/Conversa
 import CopilotPanel from '@/features/conversation/sidebar/CopilotPanel.vue'
 import { SelectTag } from '@shared-ui/components/ui/select'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { useEmitter } from '@/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import { useStorage } from '@vueuse/core'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
-import { useCustomAttributeStore } from '../../../stores/customAttributes'
+import { useCustomAttributeStore } from '@/stores/customAttributes'
 import ContactNotes from '@/features/contact/ContactNotes.vue'
 import PreviousConversations from '@/features/conversation/sidebar/PreviousConversations.vue'
 import ConversationSideBarPageVisits from '@/features/conversation/sidebar/ConversationSideBarPageVisits.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import { TAG_ACTION } from '@/constants/conversation'
-import api from '../../../api'
+import api from '@/api'
 
 const customAttributeStore = useCustomAttributeStore()
 const emitter = useEmitter()
@@ -263,6 +263,14 @@ const applySuggestedTag = (tag) => {
 }
 
 const priorityOptions = computed(() => conversationStore.priorityOptions)
+
+const agentOptions = computed(() => {
+  const none = { value: 'none', label: t('globals.terms.none') }
+  const isMe = (option) => String(option.value) === String(userStore.userID)
+  const me = usersStore.options.find(isMe)
+  if (!me) return [none, ...usersStore.options]
+  return [none, me, ...usersStore.options.filter((option) => !isMe(option))]
+})
 
 const fetchTags = async () => {
   await tagStore.fetchTags()

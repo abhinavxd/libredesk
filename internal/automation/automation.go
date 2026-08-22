@@ -330,14 +330,14 @@ func (e *Engine) EvaluateConversationUpdateRules(conversation cmodels.Conversati
 	}
 }
 
-// EvaluateConversationUpdateRulesByID fetches conversation by ID and enqueues for rule evaluation.
+// EvaluateConversationUpdateRulesByID fetches conversation by ID and enqueues for rule evaluation; it has no pre-change snapshot, so previous_* filters never match.
 func (e *Engine) EvaluateConversationUpdateRulesByID(conversationID int, conversationUUID, eventType string, actor umodels.User) {
 	conversation, err := e.conversationStore.GetConversation(conversationID, conversationUUID, "")
 	if err != nil {
 		e.lo.Error("error fetching conversation", "conversation_id", conversationID, "error", err)
 		return
 	}
-	e.EvaluateConversationUpdateRules(conversation, eventType, models.PreviousValues(conversation), actor)
+	e.EvaluateConversationUpdateRules(conversation, eventType, nil, actor)
 }
 
 // handleNewConversation handles new conversation events.

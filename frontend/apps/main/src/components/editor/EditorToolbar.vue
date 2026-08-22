@@ -141,14 +141,14 @@
           type="button"
           size="sm"
           variant="ghost"
-          :aria-label="$t('editor.tooltip.link')"
+          :aria-label="$t('globals.terms.link')"
           @click.prevent="emit('openLink')"
           :class="{ 'bg-secondary': editor?.isActive('link') }"
         >
           <LinkIcon size="14" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ $t('editor.tooltip.link') }}</TooltipContent>
+      <TooltipContent>{{ $t('globals.terms.link') }}</TooltipContent>
     </Tooltip>
     <template v-if="showArticleTools">
       <DropdownMenu v-if="editor?.isActive('codeBlock')">
@@ -175,7 +175,7 @@
             class="text-destructive"
             @select="editor?.chain().focus().toggleCodeBlock().run()"
           >
-            {{ $t('editor.codeBlock.remove') }}
+            {{ $t('globals.terms.remove') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <div class="max-h-64 overflow-y-auto">
@@ -308,11 +308,14 @@
           <TooltipContent>{{ $t('editor.tooltip.callout') }}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('info').run()">{{ $t('editor.callout.info') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('success').run()">{{ $t('editor.callout.success') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('warning').run()">{{ $t('editor.callout.warning') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('danger').run()">{{ $t('editor.callout.danger') }}</DropdownMenuItem>
-          <DropdownMenuItem v-if="editor?.isActive('callout')" class="text-destructive" @select="editor?.chain().focus().unsetCallout().run()">{{ $t('editor.callout.remove') }}</DropdownMenuItem>
+          <template v-if="editor?.isActive('callout')">
+            <DropdownMenuItem class="text-destructive" @select="editor?.chain().focus().unsetCallout().run()">{{ $t('globals.terms.remove') }}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </template>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('info').run()">{{ $t('globals.terms.info') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('success').run()">{{ $t('globals.terms.success') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('warning').run()">{{ $t('globals.terms.warning') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('danger').run()">{{ $t('globals.terms.danger') }}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Tooltip>

@@ -4,7 +4,7 @@
     <div
       v-if="!groupWithPrev"
       class="mb-1 flex items-center gap-1"
-      :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'"
+      :class="isOutgoing ? 'pr-2 md:pr-[47px]' : 'pl-10 md:pl-[47px]'"
     >
       <router-link
         v-if="!isOutgoing"
@@ -51,16 +51,15 @@
         <div v-else class="w-8 flex-shrink-0" />
       </template>
 
-      <!-- Bubble Wrapper with max 80% width -->
       <div
-        class="w-4/5"
+        class="w-full md:w-4/5"
         :class="{ 'flex justify-end items-center gap-2': isOutgoing }"
         style="contain: inline-size"
       >
         <!-- Delete note menu (private notes, appears on hover, left of bubble) -->
         <div
-          v-if="isPrivateMessage && !isDeleted"
-          class="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200"
+          v-if="canDeleteNote"
+          class="flex-shrink-0 transition-opacity duration-200 can-hover:opacity-0 can-hover:group-hover:opacity-100 focus-within:!opacity-100"
         >
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
@@ -413,6 +412,12 @@ const bubbleClasses = computed(() => ({
 
 const isPrivateMessage = computed(() => isOutgoing.value && props.message.private)
 const isDeleted = computed(() => !!props.message.meta?.deleted_at)
+const canDeleteNote = computed(
+  () =>
+    isPrivateMessage.value &&
+    !isDeleted.value &&
+    (props.message.sender_id === userStore.userID || userStore.hasAdminRole)
+)
 const showCheckCheck = computed(
   () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
 )

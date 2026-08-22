@@ -124,6 +124,8 @@ const generateSlug = () => {
   form.setFieldValue(
     'slug',
     form.values.name
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
       .trim()
       .toLowerCase()
       .replace(/\s+/g, '-')

@@ -341,7 +341,7 @@ FROM help_articles a
 JOIN article_collections c ON c.id = a.collection_id AND c.locale = a.locale AND c.id IN (SELECT id FROM published_collections)
 LEFT JOIN users u ON u.id = a.author_id
 WHERE a.slug = $2 AND a.status = 'published' AND ($3 = '' OR a.locale = $3)
-ORDER BY c.sort_order, a.sort_order
+ORDER BY c.sort_order, a.sort_order, a.id
 LIMIT 1;
 
 -- name: get-published-article-locales
@@ -423,6 +423,27 @@ LIMIT $3;
 UPDATE help_articles
 SET view_count = view_count + 1
 WHERE id = $1;
+
+-- name: increment-published-article-view-count
+WITH RECURSIVE published_collections AS (
+    SELECT c.id FROM article_collections c
+    JOIN help_centers h ON h.id = c.help_center_id
+    WHERE h.slug = $1 AND c.parent_id IS NULL AND c.is_published = true
+    UNION
+    SELECT c.id FROM article_collections c
+    JOIN published_collections p ON c.parent_id = p.id
+    WHERE c.is_published = true
+)
+UPDATE help_articles
+SET view_count = view_count + 1
+WHERE id = (
+    SELECT a.id
+    FROM help_articles a
+    JOIN article_collections c ON c.id = a.collection_id AND c.locale = a.locale AND c.id IN (SELECT id FROM published_collections)
+    WHERE a.slug = $2 AND a.status = 'published' AND ($3 = '' OR a.locale = $3)
+    ORDER BY c.sort_order, a.sort_order, a.id
+    LIMIT 1
+);
 
 -- name: insert-article-feedback
 INSERT INTO help_article_feedback (article_id, is_helpful)

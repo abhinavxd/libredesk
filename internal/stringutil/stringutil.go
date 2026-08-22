@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/jaytaylor/html2text"
+	"github.com/inbucket/html2text"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"

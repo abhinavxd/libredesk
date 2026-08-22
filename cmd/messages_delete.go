@@ -23,7 +23,13 @@ func handleDeleteMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	content, err := app.conversation.DeletePrivateMessage(cuuid, uuid)
+	// Agents may delete only their own private notes, admins may delete any.
+	senderID := user.ID
+	if user.HasAdminRole() {
+		senderID = 0
+	}
+
+	content, err := app.conversation.DeletePrivateMessage(cuuid, uuid, senderID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

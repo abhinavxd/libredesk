@@ -30,7 +30,7 @@
             <div
               v-if="canBulkAct"
               class="absolute inset-0 items-center justify-center"
-              :class="showCheckbox ? 'flex' : 'hidden group-hover:flex'"
+              :class="showCheckbox ? 'flex' : 'hidden can-hover:group-hover:flex'"
               @click.prevent.stop="handleCheckboxClick"
             >
               <Checkbox
@@ -149,6 +149,11 @@
       </router-link>
     </ContextMenuTrigger>
     <ContextMenuContent>
+      <!-- Long press is the only way to reach the first checkbox on touch. -->
+      <ContextMenuItem v-if="canBulkAct && !showCheckbox" @click="handleSelect">
+        <SquareCheck class="w-4 h-4 mr-2" />
+        {{ $t('conversation.bulkActions.selectConversation') }}
+      </ContextMenuItem>
       <ContextMenuItem @click="handleMarkAsUnread">
         <MailOpen class="w-4 h-4 mr-2" />
         {{ $t('globals.messages.markAsUnread') }}
@@ -161,7 +166,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Mail, MessageSquare, Reply, MailOpen } from 'lucide-vue-next'
+import { Mail, MessageSquare, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
 import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
@@ -286,11 +291,15 @@ const showCheckbox = computed(() => {
 
 const avatarOpacityClass = computed(() => {
   if (showCheckbox.value) return 'opacity-0'
-  if (canBulkAct.value) return 'opacity-100 group-hover:opacity-0'
+  if (canBulkAct.value) return 'opacity-100 can-hover:group-hover:opacity-0'
   return 'opacity-100'
 })
 
 const handleCheckboxClick = (event) => {
   conversationStore.toggleSelect(props.conversation.uuid, event.shiftKey)
+}
+
+const handleSelect = () => {
+  conversationStore.toggleSelect(props.conversation.uuid, false)
 }
 </script>

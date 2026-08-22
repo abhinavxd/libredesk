@@ -76,7 +76,7 @@ func handleCreateWebhook(r *fastglue.Request) error {
 
 	// Validate webhook fields
 	if err := validateWebhook(app, webhook); err != nil {
-		return r.SendEnvelope(err)
+		return sendErrorEnvelope(r, err)
 	}
 
 	webhook, err := app.webhook.Create(webhook)
@@ -108,7 +108,7 @@ func handleUpdateWebhook(r *fastglue.Request) error {
 
 	// Validate webhook fields
 	if err := validateWebhook(app, webhook); err != nil {
-		return r.SendEnvelope(err)
+		return sendErrorEnvelope(r, err)
 	}
 
 	updatedWebhook, err := app.webhook.Update(id, webhook)

@@ -58,6 +58,8 @@ const mostRecentConversation = computed(() => {
 
 const canStartConversation = computed(() => {
   const userConfig = userStore.isVisitor ? config.value.visitors : config.value.users
+  // Mirrors the server check, else the button is offered and the send fails.
+  if (!userConfig?.allow_start_conversation) return false
   return userConfig?.prevent_multiple_conversations !== true || !chatStore.hasConversations
 })
 

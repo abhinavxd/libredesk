@@ -58,7 +58,7 @@ import {
   CommandList
 } from '../command'
 
-const RENDER_CAP = 200
+const RENDER_CAP = 300
 
 const props = defineProps({
   items: {
@@ -87,7 +87,11 @@ const passThroughFilter = (items) => items
 const filteredItems = computed(() => {
   const term = searchTerm.value?.trim().toLowerCase()
   if (!term) return props.items
-  return props.items.filter((item) => String(item.label).toLowerCase().includes(term))
+  return props.items.filter((item) =>
+    [item.label, item.calling_code]
+      .filter(Boolean)
+      .some((field) => String(field).toLowerCase().includes(term))
+  )
 })
 
 const visibleItems = computed(() => filteredItems.value.slice(0, RENDER_CAP))

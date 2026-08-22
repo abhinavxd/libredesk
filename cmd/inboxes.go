@@ -38,7 +38,7 @@ func handleGetInboxes(r *fastglue.Request) error {
 	for i := range inboxes {
 		if err := inboxes[i].ClearPasswords(); err != nil {
 			app.lo.Error("error clearing inbox passwords from response", "error", err)
-			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 		}
 		setComputedInboxFieldsWithRoot(app, &inboxes[i], rootURL)
 	}
@@ -57,7 +57,7 @@ func handleGetInbox(r *fastglue.Request) error {
 	}
 	if err := inbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	setComputedInboxFields(app, &inbox)
 	return r.SendEnvelope(inbox)
@@ -234,7 +234,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 	// Clear passwords before returning.
 	if err := createdInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	setComputedInboxFields(app, &createdInbox)
 
@@ -302,7 +302,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 	// Clear passwords before returning.
 	if err := updatedInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	setComputedInboxFields(app, &updatedInbox)
 
@@ -322,7 +322,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 
 	toggledInbox, err := app.inbox.Toggle(id)
 	if err != nil {
-		return err
+		return sendErrorEnvelope(r, err)
 	}
 
 	if err := reloadInbox(app, id); err != nil {
@@ -333,7 +333,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 	// Clear passwords before returning
 	if err := toggledInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	setComputedInboxFields(app, &toggledInbox)
 

@@ -60,6 +60,7 @@ func (m *Manager) reindexItemByID(src embedSource, id int) {
 
 // reindexItemWith embeds an eligible item (or drops its vectors when ineligible), gated by gen so an older job can't overwrite a newer one.
 func (m *Manager) reindexItemWith(ctx context.Context, src embedSource, item embedItem, baseURL, model string, dimensions int, gen uint64) {
+	m.lo.Debug("reindex item", "source_type", src.sourceType(), "id", item.ID, "eligible", item.Eligible, "model", model, "dimensions", dimensions)
 	if !item.Eligible {
 		m.reindexMu.Lock()
 		defer m.reindexMu.Unlock()
@@ -71,12 +72,14 @@ func (m *Manager) reindexItemWith(ctx context.Context, src embedSource, item emb
 			return
 		}
 		src.setFingerprint(item.ID, "")
+		m.lo.Debug("reindex removed embeddings", "source_type", src.sourceType(), "id", item.ID)
 		return
 	}
 
 	// Unchanged content on the same model is already embedded; don't pay the provider again.
 	fingerprint := itemFingerprint(item, baseURL, model, dimensions)
 	if item.Fingerprint == fingerprint {
+		m.lo.Debug("reindex skipped, fingerprint unchanged", "source_type", src.sourceType(), "id", item.ID)
 		return
 	}
 
@@ -96,6 +99,7 @@ func (m *Manager) reindexItemWith(ctx context.Context, src embedSource, item emb
 		return
 	}
 	src.setFingerprint(item.ID, fingerprint)
+	m.lo.Debug("reindex embedded", "source_type", src.sourceType(), "id", item.ID, "chunks", len(indexed))
 }
 
 // reconcileSource re-embeds every row whose stored fingerprint no longer matches its content and the active model.

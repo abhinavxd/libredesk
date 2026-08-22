@@ -1,13 +1,13 @@
 <template>
   <div class="overflow-y-auto">
     <div
-      class="p-6 w-[calc(100%-3rem)]"
+      class="p-4 md:p-6 w-full md:w-[calc(100%-3rem)]"
       :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
     >
       <Spinner v-if="isLoading" />
 
       <div class="space-y-6">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div class="flex items-center gap-3">
             <span class="text-sm text-muted-foreground">
               {{ $t('globals.terms.lastUpdated') }}: {{ lastUpdateFormatted }}
@@ -20,7 +20,7 @@
               </Button>
             </template>
           </div>
-          <div class="flex items-center gap-1">
+          <div class="flex flex-wrap items-center gap-1">
             <Button
               v-for="option in rangeOptions"
               :key="option"
@@ -56,7 +56,7 @@
         </div>
 
         <!-- Row 1: Open Conversations and Agent Status -->
-        <div class="flex w-full space-x-4">
+        <div class="flex flex-col w-full gap-4 md:flex-row">
           <Card
             class="flex-1"
             :title="$t('report.openConversations')"
@@ -74,11 +74,11 @@
         </div>
 
         <!-- Row 2: CSAT and Message Volume -->
-        <div class="flex w-full space-x-4">
+        <div class="flex flex-col w-full gap-4 md:flex-row">
           <!-- CSAT Card -->
           <div class="flex-1 box p-5">
             <p class="card-title mb-4">{{ $t('report.csat.cardTitle') }}</p>
-            <div class="grid grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{ formatRating(csatData.average_rating) }}</span>
                 <span class="metric-label">{{ $t('report.csat.avgRating') }}</span>
@@ -99,7 +99,7 @@
           <!-- Message Volume Card -->
           <div class="flex-1 box p-5">
             <p class="card-title mb-4">{{ $t('report.messages.cardTitle') }}</p>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{
                   formatCompactNumber(messageVolumeData.total_messages || 0)
@@ -404,7 +404,7 @@ const conversationCountLabels = computed(() => ({
   open: t('globals.terms.open'),
   awaiting_response: t('globals.terms.awaitingResponse'),
   unassigned: t('globals.terms.unassigned'),
-  pending: t('globals.terms.pending')
+  pending: t('report.awaitingFirstReply')
 }))
 
 const agentStatusLabels = computed(() => ({

@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col relative h-full">
-    <div ref="threadEl" class="flex-1 overflow-y-auto [overflow-anchor:none]" @scroll="handleScroll">
+    <div ref="threadEl" class="flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]" @scroll="handleScroll">
       <div ref="contentEl" class="min-h-full px-4 pb-10 relative">
         <div
           v-if="showLoadMore"
@@ -11,7 +11,7 @@
             variant="outline"
             @click="loadMore"
             :disabled="conversationStore.messages.fetching"
-            class="transition-all duration-200 hover:bg-accent hover:scale-105 active:scale-95"
+            class="max-md:h-11 transition-all duration-200 hover:bg-accent hover:scale-105 active:scale-95"
           >
             <Loader2
               v-if="conversationStore.messages.fetching"

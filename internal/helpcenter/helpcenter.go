@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -32,6 +33,9 @@ const (
 	maxCardAuthors     = 3
 	maxSearchQueryLen  = 200
 	maxSlugLen         = 200
+	maxNameLen         = 200
+	maxPageTitleLen    = 200
+	maxMetaDescLen     = 500
 
 	// minSearchQueryLen mirrors the typeahead's floor; shorter terms miss the trigram index and seq-scan.
 	minSearchQueryLen = 2
@@ -53,12 +57,13 @@ var (
 
 	cardIconPositions = []string{"inline", "top", "center"}
 
+	// First entry is the fallback for an unknown platform.
+	socialPlatforms = []string{"website", "twitter", "github", "linkedin", "facebook", "instagram", "youtube"}
+
 	hexColorRe = regexp.MustCompile(`^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$`)
 
-	// assetURLRe accepts http(s) and root-relative URLs; quotes, parens, whitespace, angle
-	// brackets and CSS block punctuation are excluded so a value can never escape a CSS
-	// url(), a <style> block or an HTML attribute.
-	assetURLRe = regexp.MustCompile(`^(?:https?://|/)[^"'()\s\\<>;{}]+$`)
+	// assetURLRe excludes quotes, parens, whitespace, angle brackets and CSS punctuation, else a value escapes url(), <style> or an attribute.
+	assetURLRe = regexp.MustCompile(`^(?:https?://[^"'()\s\\<>;{}]+|/[^"'()\s\\<>;{}]*)$`)
 
 	// iconNameRe matches lucide icon slugs, e.g. "rocket", "user-check".
 	iconNameRe = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
@@ -198,6 +203,7 @@ type queries struct {
 	GetPublishedArticlesByCollection *sqlx.Stmt `query:"get-published-articles-by-collection"`
 	SearchPublishedArticles          *sqlx.Stmt `query:"search-published-articles"`
 	IncrementArticleViewCount        *sqlx.Stmt `query:"increment-article-view-count"`
+	IncrementPublishedArticleView    *sqlx.Stmt `query:"increment-published-article-view-count"`
 
 	InsertArticleFeedback    *sqlx.Stmt `query:"insert-article-feedback"`
 	InsertSearchQuery        *sqlx.Stmt `query:"insert-search-query"`
@@ -270,8 +276,14 @@ func (m *Manager) GetHelpCenterBySlug(slug string) (models.HelpCenter, error) {
 // CreateHelpCenter creates a new help center.
 func (m *Manager) CreateHelpCenter(req HelpCenterRequest) (models.HelpCenter, error) {
 	var hc models.HelpCenter
-	req = normalizeHelpCenterRequest(req)
+	req, err := m.normalizeHelpCenterRequest(req)
+	if err != nil {
+		return hc, err
+	}
 	if err := m.validateHelpCenterSlug(req.Slug); err != nil {
+		return hc, err
+	}
+	if err := m.validateHelpCenterLengths(req); err != nil {
 		return hc, err
 	}
 	if err := m.validateLocales(req.DefaultLocale, req.AllowedLocales); err != nil {
@@ -296,7 +308,10 @@ func (m *Manager) DraftHelpCenter(id int, req HelpCenterRequest) (models.HelpCen
 	if err != nil {
 		return hc, err
 	}
-	req = normalizeHelpCenterRequest(req)
+	req, err = m.normalizeHelpCenterRequest(req)
+	if err != nil {
+		return hc, err
+	}
 	hc.Name = req.Name
 	hc.PageTitle = req.PageTitle
 	hc.MetaDescription = req.MetaDescription
@@ -313,8 +328,14 @@ func (m *Manager) DraftHelpCenter(id int, req HelpCenterRequest) (models.HelpCen
 // UpdateHelpCenter updates a help center.
 func (m *Manager) UpdateHelpCenter(id int, req HelpCenterRequest) (models.HelpCenter, error) {
 	var hc models.HelpCenter
-	req = normalizeHelpCenterRequest(req)
+	req, err := m.normalizeHelpCenterRequest(req)
+	if err != nil {
+		return hc, err
+	}
 	if err := m.validateHelpCenterSlug(req.Slug); err != nil {
+		return hc, err
+	}
+	if err := m.validateHelpCenterLengths(req); err != nil {
 		return hc, err
 	}
 	if err := m.validateLocales(req.DefaultLocale, req.AllowedLocales); err != nil {
@@ -937,6 +958,12 @@ func (m *Manager) IncrementArticleViewCount(id int) {
 	}
 }
 
+func (m *Manager) IncrementPublishedArticleView(helpCenterSlug, articleSlug, locale string) {
+	if _, err := m.q.IncrementPublishedArticleView.Exec(helpCenterSlug, articleSlug, locale); err != nil {
+		m.lo.Error("error incrementing article view count", "error", err, "slug", articleSlug)
+	}
+}
+
 // RecordArticleFeedback stores a reader's helpful/not-helpful vote for a published article.
 func (m *Manager) RecordArticleFeedback(articleID int, isHelpful bool) error {
 	if _, err := m.q.InsertArticleFeedback.Exec(articleID, isHelpful); err != nil {
@@ -1326,6 +1353,23 @@ func (m *Manager) validateHelpCenterSlug(slug string) error {
 	return nil
 }
 
+func (m *Manager) validateHelpCenterLengths(req HelpCenterRequest) error {
+	for _, f := range []struct {
+		name  string
+		value string
+		max   int
+	}{
+		{"name", req.Name, maxNameLen},
+		{"page_title", req.PageTitle, maxPageTitleLen},
+		{"meta_description", req.MetaDescription, maxMetaDescLen},
+	} {
+		if utf8.RuneCountInString(f.value) > f.max {
+			return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.fieldTooLong", "field", f.name, "max", strconv.Itoa(f.max)), nil)
+		}
+	}
+	return nil
+}
+
 // validateLocales rejects language codes outside the supported set.
 func (m *Manager) validateLocales(defaultLocale string, allowed json.RawMessage) error {
 	for _, l := range append(parseLocales(allowed), defaultLocale) {
@@ -1425,7 +1469,7 @@ func withSuffix(slug, suffix string) string {
 	return strings.Trim(truncateRunes(slug, maxSlugLen-len(suffix)), "-") + suffix
 }
 
-func normalizeHelpCenterRequest(req HelpCenterRequest) HelpCenterRequest {
+func (m *Manager) normalizeHelpCenterRequest(req HelpCenterRequest) (HelpCenterRequest, error) {
 	if req.DefaultLocale == "" {
 		req.DefaultLocale = defaultLocale
 	}
@@ -1438,19 +1482,23 @@ func normalizeHelpCenterRequest(req HelpCenterRequest) HelpCenterRequest {
 	if b, err := json.Marshal(locales); err == nil {
 		req.AllowedLocales = b
 	}
-	req.Theme = normalizeTheme(req.Theme)
-	return req
+	theme, err := normalizeTheme(req.Theme)
+	if err != nil {
+		m.lo.Error("error normalizing help center theme", "error", err)
+		return req, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidTheme"), nil)
+	}
+	req.Theme = theme
+	return req, nil
 }
 
-// normalizeTheme drops any theme color that isn't a valid hex code before it can reach
-// the injected CSS. Invalid JSON collapses to '{}'.
-func normalizeTheme(raw json.RawMessage) json.RawMessage {
+// normalizeTheme drops theme values that aren't safe to inject into CSS, and rejects a theme it can't read.
+func normalizeTheme(raw json.RawMessage) (json.RawMessage, error) {
 	if len(raw) == 0 {
-		return json.RawMessage("{}")
+		return json.RawMessage("{}"), nil
 	}
 	t := models.DefaultTheme()
 	if err := json.Unmarshal(raw, &t); err != nil {
-		return json.RawMessage("{}")
+		return nil, err
 	}
 	t.Color = sanitizeHexColor(t.Color)
 	if t.Color == "" {
@@ -1472,6 +1520,7 @@ func normalizeTheme(raw json.RawMessage) json.RawMessage {
 	t.Tagline = strings.TrimSpace(t.Tagline)
 	t.Footer.Tagline = strings.TrimSpace(t.Footer.Tagline)
 	t.Announcement.Text = strings.TrimSpace(t.Announcement.Text)
+	t.Announcement.LinkLabel = strings.TrimSpace(t.Announcement.LinkLabel)
 	t.Announcement.LinkURL = sanitizeAssetURL(t.Announcement.LinkURL)
 	if t.Announcement.Text == "" {
 		t.Announcement = models.AnnouncementTheme{}
@@ -1490,9 +1539,9 @@ func normalizeTheme(raw json.RawMessage) json.RawMessage {
 	}
 	b, err := json.Marshal(t)
 	if err != nil {
-		return json.RawMessage("{}")
+		return nil, err
 	}
-	return b
+	return b, nil
 }
 
 func sanitizeHexColor(c string) string {
@@ -1502,9 +1551,10 @@ func sanitizeHexColor(c string) string {
 	return c
 }
 
+// A leading "//" is protocol-relative and points off-site while reading as root-relative.
 func sanitizeAssetURL(u string) string {
 	u = strings.TrimSpace(u)
-	if !assetURLRe.MatchString(u) {
+	if !assetURLRe.MatchString(u) || strings.HasPrefix(u, "//") {
 		return ""
 	}
 	return u
@@ -1515,7 +1565,8 @@ func sanitizeNavLinks(links []models.NavLink) []models.NavLink {
 	out := make([]models.NavLink, 0, len(links))
 	for _, l := range links {
 		l.URL = sanitizeAssetURL(l.URL)
-		if l.URL == "" {
+		l.Label = strings.TrimSpace(l.Label)
+		if l.URL == "" || l.Label == "" {
 			continue
 		}
 		out = append(out, l)
@@ -1529,6 +1580,9 @@ func sanitizeSocialLinks(links []models.SocialLink) []models.SocialLink {
 		l.URL = sanitizeAssetURL(l.URL)
 		if l.URL == "" {
 			continue
+		}
+		if !slices.Contains(socialPlatforms, l.Platform) {
+			l.Platform = socialPlatforms[0]
 		}
 		out = append(out, l)
 	}

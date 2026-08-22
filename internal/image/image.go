@@ -22,6 +22,9 @@ const (
 	llmJPEGQuality = 85
 	// maxDecodePixels bounds width*height read from the header, blocking a small file that declares huge dimensions. 25 MP is ~100 MB of RGBA per agent worker.
 	maxDecodePixels = 25_000_000
+	// AvatarMaxDim caps an avatar's longest edge. The largest render is the 128px `lg` variant, at up to 4x DPI.
+	AvatarMaxDim      = 512
+	avatarJPEGQuality = 85
 )
 
 var (
@@ -102,4 +105,42 @@ func EncodeForLLM(content []byte) (data string, mediaType string, err error) {
 		return "", "", err
 	}
 	return base64.StdEncoding.EncodeToString(out.Bytes()), "image/jpeg", nil
+}
+
+// Downscale fits the image within maxDim on both edges and re-encodes it in its source format.
+func Downscale(maxDim int, r io.ReadSeeker) (*bytes.Reader, error) {
+	if _, err := r.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	cfg, format, err := image.DecodeConfig(r)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxDecodePixels/cfg.Height {
+		return nil, fmt.Errorf("invalid or too-large image dimensions %dx%d", cfg.Width, cfg.Height)
+	}
+	if _, err := r.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	// Re-encoding drops EXIF, so bake in the rotation the browser would otherwise have honoured.
+	img, err := imaging.Decode(r, imaging.AutoOrientation(true))
+	if err != nil {
+		return nil, err
+	}
+
+	img = imaging.Fit(img, maxDim, maxDim, imaging.Lanczos)
+
+	var out bytes.Buffer
+	switch format {
+	case "jpeg":
+		err = imaging.Encode(&out, img, imaging.JPEG, imaging.JPEGQuality(avatarJPEGQuality))
+	case "gif":
+		err = imaging.Encode(&out, img, imaging.GIF)
+	default:
+		err = imaging.Encode(&out, img, imaging.PNG)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(out.Bytes()), nil
 }

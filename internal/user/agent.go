@@ -2,6 +2,8 @@ package user
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -102,6 +104,10 @@ func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string)
 		if dbutil.IsUniqueViolationError(err) {
 			return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
 		}
+		// The insert joins the named roles, so an unknown role yields no row.
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.User{}, envelope.NewError(envelope.InputError, u.i18n.T("validation.invalidRole"), nil)
+		}
 		u.lo.Error("error creating user", "error", err)
 		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -129,7 +135,13 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 	}
 
 	// Update user in the database.
-	if _, err := u.q.UpdateAgent.Exec(id, firstName, lastName, email, pq.Array(roles), null.String{}, hashedPassword, enabled, availabilityStatus); err != nil {
+	// COALESCE preserves the stored status only on NULL, an empty string hits the enum cast.
+	availability := null.String{}
+	if availabilityStatus != "" {
+		availability = null.StringFrom(availabilityStatus)
+	}
+
+	if _, err := u.q.UpdateAgent.Exec(id, firstName, lastName, email, pq.Array(roles), null.String{}, hashedPassword, enabled, availability); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
 		}

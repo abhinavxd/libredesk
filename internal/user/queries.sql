@@ -402,8 +402,13 @@ UPDATE users
 SET api_key = NULL, api_secret = NULL, api_key_last_used_at = NULL, updated_at = now()
 WHERE id = $1;
 
+-- name: update-api-secret-hash
+UPDATE users
+SET api_secret = $3, updated_at = now()
+WHERE id = $1 AND api_secret = $2;
+
 -- name: update-api-key-last-used
-UPDATE users 
+UPDATE users
 SET api_key_last_used_at = now()
 WHERE id = $1;
 

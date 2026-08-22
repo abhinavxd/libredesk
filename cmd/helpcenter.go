@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"html/template"
+	"io"
 	"log"
 	"math"
 	"net"
@@ -25,7 +26,9 @@ import (
 	realip "github.com/ferluci/fast-realip"
 	"github.com/knadh/stuffbin"
 	"github.com/valyala/fasthttp"
+	"github.com/zerodha/fastcache/v4"
 	"github.com/zerodha/fastglue"
+	"github.com/zerodha/logf"
 )
 
 const (
@@ -43,7 +46,18 @@ const (
 	sitemapDate      = "2006-01-02"
 	schemaOrgContext = "https://schema.org"
 
-	helpCenterCacheControl = "public, max-age=300, stale-while-revalidate=3600"
+	helpCenterCacheControl = "public, no-cache"
+
+	fastCachePrefix = "libredesk:cache:"
+
+	helpCenterCacheTTL = 30 * time.Minute
+
+	helpCenterCacheGroup = "helpcenter"
+
+	helpCenterCacheNamespaceKey = "hc_cache_ns"
+	helpCenterCacheNamespace    = "hc"
+
+	helpCenterXMLCacheControl = "public, max-age=300, stale-while-revalidate=3600"
 
 	// articleFeedbackDedupTTL is how long a reader IP's vote on an article suppresses further votes.
 	articleFeedbackDedupTTL = 24 * time.Hour
@@ -60,6 +74,15 @@ const (
 )
 
 var (
+	// Logger is set because fastcache writes to the field when it finds it nil, racing across requests.
+	helpCenterCacheOpts = &fastcache.Options{
+		NamespaceKey:       helpCenterCacheNamespaceKey,
+		ETag:               true,
+		IncludeQueryString: true,
+		TTL:                helpCenterCacheTTL,
+		Logger:             log.New(io.Discard, "", 0),
+	}
+
 	// crawlerUARe matches search and preview bots, whose hits must not count as reader views.
 	crawlerUARe = regexp.MustCompile(`(?i)bot\b|bot/|crawler|spider|crawling|slurp|facebookexternalhit|preview|headlesschrome|lighthouse|feedfetcher|python-requests|curl/|wget/`)
 
@@ -82,6 +105,11 @@ var (
 		"/hc/*/*/search",
 	}
 )
+
+// helpCenterCacheLogWriter routes fastcache's log lines into the app logger.
+type helpCenterCacheLogWriter struct {
+	lo *logf.Logger
+}
 
 type sitemapURL struct {
 	Loc     string `xml:"loc"`
@@ -113,6 +141,11 @@ type localeLink struct {
 type previewTOCItem struct {
 	ID    string
 	Title string
+}
+
+func (w helpCenterCacheLogWriter) Write(p []byte) (int, error) {
+	w.lo.Error("help center page cache: " + strings.TrimSpace(string(p)))
+	return len(p), nil
 }
 
 // handleGetHelpCenterLocales returns the locales a help center can be authored in.
@@ -155,8 +188,8 @@ func handleCreateHelpCenter(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if err := validateHelpCenter(r, &req); err != nil {
-		return err
+	if err := validateHelpCenter(app, &req); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 	helpCenter, err := app.helpcenter.CreateHelpCenter(req)
 	if err != nil {
@@ -178,8 +211,8 @@ func handleUpdateHelpCenter(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if err := validateHelpCenter(r, &req); err != nil {
-		return err
+	if err := validateHelpCenter(app, &req); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 	helpCenter, err := app.helpcenter.UpdateHelpCenter(id, req)
 	if err != nil {
@@ -310,8 +343,8 @@ func handleCreateCollection(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if err := validateCollection(r, &req); err != nil {
-		return err
+	if err := validateCollection(app, &req); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 	req.Slug = helpcenter.GenerateSlug(req.Name)
 	collection, err := app.helpcenter.CreateCollection(helpCenterID, req)
@@ -334,8 +367,8 @@ func handleUpdateCollection(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if err := validateCollection(r, &req); err != nil {
-		return err
+	if err := validateCollection(app, &req); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 	existing, err := app.helpcenter.GetCollectionByID(id)
 	if err != nil {
@@ -428,8 +461,8 @@ func handleCreateArticle(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if err := validateArticle(r, &req); err != nil {
-		return err
+	if err := validateArticle(app, &req); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 	req.Slug = helpcenter.GenerateSlug(req.Title)
 	req.CollectionID = nil
@@ -689,12 +722,8 @@ func handleShowHelpCenterArticle(r *fastglue.Request) error {
 	}
 	// The JSON-LD embeds the author too, not just the byline.
 	hideArticleAuthor(helpCenterTheme(helpCenter), &article)
-	if !isCrawler(r) {
-		app.helpcenter.IncrementArticleViewCount(article.ID)
-	}
 
 	if markdown {
-		r.RequestCtx.Response.Header.Set("X-Robots-Tag", noIndexHeader)
 		r.RequestCtx.SetContentType("text/markdown; charset=utf-8")
 		fmt.Fprintf(r.RequestCtx, "# %s\n\n%s\n", article.Title, stringutil.HTML2Text(article.Content))
 		return nil
@@ -778,8 +807,7 @@ func handleHelpCenterSearch(r *fastglue.Request) error {
 		lcl     = localeI18n(app, locale)
 		pathFor = func(l string) string { return searchPath(helpCenter, l) }
 	)
-	r.RequestCtx.Response.Header.Set("X-Robots-Tag", noIndexHeader)
-	return app.tmpl.RenderWebPage(r.RequestCtx, hcPageName(helpCenter, "help-search"), map[string]interface{}{
+	return renderHelpCenterPage(r, hcPageName(helpCenter, "help-search"), map[string]interface{}{
 		"L": lcl,
 		"Data": map[string]interface{}{
 			"Title":       fmt.Sprintf("%s - %s", lcl.T("globals.terms.search"), helpCenter.Name),
@@ -1017,8 +1045,8 @@ func handleUpdateArticle(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if err := validateArticle(r, &req); err != nil {
-		return err
+	if err := validateArticle(app, &req); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 	existing, err := app.helpcenter.GetArticleByID(id)
 	if err != nil {
@@ -1055,11 +1083,13 @@ func handleUpdateArticle(r *fastglue.Request) error {
 // no-store default that RenderWebPage applies for the app's authenticated pages.
 func renderHelpCenterPage(r *fastglue.Request, name string, data map[string]interface{}) error {
 	app := r.Context.(*App)
-	err := app.tmpl.RenderWebPage(r.RequestCtx, name, data)
+	if err := app.tmpl.RenderWebPage(r.RequestCtx, name, data); err != nil {
+		return err
+	}
 	r.RequestCtx.Response.Header.Set("Cache-Control", helpCenterCacheControl)
 	r.RequestCtx.Response.Header.Del("Pragma")
 	r.RequestCtx.Response.Header.Del("Expires")
-	return err
+	return nil
 }
 
 // sendXML writes v as an XML document.
@@ -1069,10 +1099,86 @@ func sendXML(r *fastglue.Request, v any) error {
 		return sendErrorEnvelope(r, err)
 	}
 	r.RequestCtx.SetContentType("application/xml; charset=utf-8")
-	r.RequestCtx.Response.Header.Set("Cache-Control", helpCenterCacheControl)
+	r.RequestCtx.Response.Header.Set("Cache-Control", helpCenterXMLCacheControl)
 	fmt.Fprint(r.RequestCtx, xml.Header)
 	r.RequestCtx.Write(out)
 	return nil
+}
+
+// countArticleView records a view after the page is served, counting cache hits too.
+func countArticleView(h fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		err := h(r)
+		switch r.RequestCtx.Response.StatusCode() {
+		case fasthttp.StatusOK, fasthttp.StatusNotModified:
+			if !isCrawler(r) {
+				app := r.Context.(*App)
+				slug, _ := r.RequestCtx.UserValue("slug").(string)
+				articleSlug, _ := r.RequestCtx.UserValue("article_slug").(string)
+				locale, _ := r.RequestCtx.UserValue("locale").(string)
+				app.helpcenter.IncrementPublishedArticleView(slug, strings.TrimSuffix(articleSlug, markdownSlugExtension), locale)
+			}
+		}
+		return err
+	}
+}
+
+func cachedHCPage(h fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return cacheHCPage(h, false)
+}
+
+func cachedHCNoIndexPage(h fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return cacheHCPage(h, true)
+}
+
+// cacheHCPage owns every response header: the cache restores only body and content type.
+func cacheHCPage(h fastglue.FastRequestHandler, noIndex bool) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		app := r.Context.(*App)
+		r.RequestCtx.SetUserValue(helpCenterCacheNamespaceKey, helpCenterCacheNamespace)
+		miss := false
+		rendered := func(r *fastglue.Request) error {
+			miss = true
+			return h(r)
+		}
+		err := app.fc.Cached(rendered, helpCenterCacheOpts, helpCenterCacheGroup)(r)
+		switch r.RequestCtx.Response.StatusCode() {
+		case fasthttp.StatusOK, fasthttp.StatusNotModified:
+			r.RequestCtx.Response.Header.Set("Cache-Control", helpCenterCacheControl)
+			r.RequestCtx.Response.Header.Del("Pragma")
+			r.RequestCtx.Response.Header.Del("Expires")
+			status := "HIT"
+			if miss {
+				status = "MISS"
+			}
+			r.RequestCtx.Response.Header.Set("X-Cache", status)
+			r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+			r.RequestCtx.Response.Header.Set("X-Frame-Options", "SAMEORIGIN")
+			r.RequestCtx.Response.Header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			if noIndex || isMarkdownRequest(r) {
+				r.RequestCtx.Response.Header.Set("X-Robots-Tag", noIndexHeader)
+			}
+		}
+		return err
+	}
+}
+
+func isMarkdownRequest(r *fastglue.Request) bool {
+	slug, _ := r.RequestCtx.UserValue("article_slug").(string)
+	return strings.HasSuffix(slug, markdownSlugExtension)
+}
+
+func clearsHCCache(h fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		err := h(r)
+		if r.RequestCtx.Response.StatusCode() < fasthttp.StatusMultipleChoices {
+			app := r.Context.(*App)
+			if err := app.fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
+				app.lo.Error("error clearing help center cache", "error", err)
+			}
+		}
+		return err
+	}
 }
 
 // isCrawler reports whether the request came from a bot rather than a reader; HEAD probes never count as readers.
@@ -1711,36 +1817,39 @@ func renderHelpCenterStatusPage(r *fastglue.Request, hc *hcmodels.HelpCenter, st
 	return rerr
 }
 
-func validateHelpCenter(r *fastglue.Request, req *helpcenter.HelpCenterRequest) error {
-	app := r.Context.(*App)
+func validateHelpCenter(app *App, req *helpcenter.HelpCenterRequest) error {
+	req.Name = strings.TrimSpace(req.Name)
+	req.Slug = strings.TrimSpace(req.Slug)
+	req.PageTitle = strings.TrimSpace(req.PageTitle)
+	req.MetaDescription = strings.TrimSpace(req.MetaDescription)
 	if req.Name == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
 	}
 	if req.Slug == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`slug`"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`slug`"), nil)
 	}
 	if req.PageTitle == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`page_title`"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`page_title`"), nil)
 	}
 	req.Theme = json.RawMessage(publicAssetPaths(app, string(req.Theme)))
 	return nil
 }
 
-func validateCollection(r *fastglue.Request, req *helpcenter.CollectionRequest) error {
-	app := r.Context.(*App)
+func validateCollection(app *App, req *helpcenter.CollectionRequest) error {
+	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
 	}
 	return nil
 }
 
-func validateArticle(r *fastglue.Request, req *helpcenter.ArticleRequest) error {
-	app := r.Context.(*App)
+func validateArticle(app *App, req *helpcenter.ArticleRequest) error {
+	req.Title = strings.TrimSpace(req.Title)
 	if req.Title == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`title`"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`title`"), nil)
 	}
-	if req.Content == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`content`"), nil, envelope.InputError)
+	if strings.TrimSpace(req.Content) == "" {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`content`"), nil)
 	}
 	req.Content = publicAssetPaths(app, req.Content)
 	req.MetaImageURL = publicAssetPaths(app, req.MetaImageURL)
