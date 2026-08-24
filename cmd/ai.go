@@ -99,6 +99,9 @@ func handleUpdateAIConfig(r *fastglue.Request) error {
 		providerType = r.RequestCtx.UserValue("type").(string)
 		req          aimodels.ProviderConfig
 	)
+	if ko.Bool("app.is_cloud") {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, "AI provider settings are managed by LibreDesk Cloud.", nil, envelope.PermissionError)
+	}
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}

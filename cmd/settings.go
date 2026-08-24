@@ -57,6 +57,18 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	}
 	// Trim whitespace and trailing slash from root URL.
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
+	if ko.Bool("app.is_cloud") {
+		// The hosted service owns its public URL. Preserve the persisted value rather
+		// than trusting the value submitted by the client.
+		rootURL, err := app.setting.GetAppRootURL()
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		req.RootURL = rootURL
+		if req.MaxFileUploadSize > 25 {
+			req.MaxFileUploadSize = 25
+		}
+	}
 
 	// Get current language before update.
 	app.Lock()
@@ -118,6 +130,9 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 		req = models.EmailNotification{}
 		cur = models.EmailNotification{}
 	)
+	if ko.Bool("app.is_cloud") {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, "Email notification settings are managed by LibreDesk Cloud.", nil, envelope.PermissionError)
+	}
 
 	if err := r.Decode(&req, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
