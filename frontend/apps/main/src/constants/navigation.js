@@ -53,6 +53,7 @@ export const adminNavItems = [
         titleKey: 'globals.terms.provider',
         href: '/admin/ai/providers',
         permission: 'ai:manage',
+        hideInCloud: true,
         isTitleKeyPlural: true,
         icon: 'Sparkles'
       },
@@ -194,6 +195,7 @@ export const adminNavItems = [
         titleKey: 'globals.terms.email',
         href: '/admin/notification',
         permission: 'notification_settings:manage',
+        hideInCloud: true,
         icon: 'Mail'
       },
       {

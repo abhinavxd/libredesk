@@ -84,7 +84,7 @@
           {{ t('globals.terms.rootURL') }}
         </FormLabel>
         <FormControl>
-          <Input type="text" placeholder="" v-bind="field" />
+          <Input type="text" placeholder="" v-bind="field" :disabled="props.isCloud" />
         </FormControl>
         <FormDescription>
           {{ t('admin.general.rootURL.description') }}
@@ -123,7 +123,7 @@
           {{ t('admin.general.maxAllowedFileUploadSize') }}
         </FormLabel>
         <FormControl>
-          <Input type="number" placeholder="10" v-bind="field" />
+          <Input type="number" placeholder="10" v-bind="field" :max="props.isCloud ? 25 : 500" />
         </FormControl>
         <FormDescription>
           {{ t('admin.general.maxAllowedFileUploadSize.description') }}
@@ -234,12 +234,16 @@ const props = defineProps({
   isLoading: {
     type: Boolean,
     default: false
+  },
+  isCloud: {
+    type: Boolean,
+    default: false
   }
 })
 
 const submitLabel = props.submitLabel || t('globals.messages.save')
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(t, props.isCloud))
 })
 
 onMounted(() => {

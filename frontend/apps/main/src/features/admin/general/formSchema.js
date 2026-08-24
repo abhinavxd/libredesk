@@ -1,6 +1,6 @@
 import * as z from 'zod'
 
-export const createFormSchema = (t) => z.object({
+export const createFormSchema = (t, isCloud = false) => z.object({
   site_name: z
     .string({
       required_error: t('globals.messages.required'),
@@ -36,7 +36,7 @@ export const createFormSchema = (t) => z.object({
     .min(1, {
       message: t('admin.general.maxAllowedFileUploadSize.valid')
     })
-    .max(500, {
+    .max(isCloud ? 25 : 500, {
       message: t('admin.general.maxAllowedFileUploadSize.valid')
     }),
   allowed_file_upload_extensions: z.array(z.string()).nullable().optional().default([]),

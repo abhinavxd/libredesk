@@ -6,6 +6,7 @@
           :submitForm="submitForm"
           :initial-values="initialValues"
           :available-languages="availableLanguages"
+          :is-cloud="settingsStore.public_config?.['app.is_cloud'] === true"
         />
       </LoadingOverlay>
     </template>

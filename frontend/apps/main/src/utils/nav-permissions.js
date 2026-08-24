@@ -1,9 +1,10 @@
-export const filterNavItems = (navItems, can) => {
+export const filterNavItems = (navItems, can, isCloud = false) => {
     return navItems
         .map(item => {
+            if (isCloud && item.hideInCloud) return null
             // Process children first
             const filteredChildren = item.children
-                ? filterNavItems(item.children, can)
+                ? filterNavItems(item.children, can, isCloud)
                 : undefined
             // Check item's permission
             const hasAccess = item.permission ? can(item.permission) : true

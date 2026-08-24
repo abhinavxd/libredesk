@@ -218,7 +218,11 @@ const navigateToViewInbox = (viewID) => {
   }
 }
 
-const filteredAdminNavItems = computed(() => filterNavItems(adminNavItems, userStore.can))
+const filteredAdminNavItems = computed(() => filterNavItems(
+  adminNavItems,
+  userStore.can,
+  settingsStore.public_config?.['app.is_cloud'] === true
+))
 const filteredReportsNavItems = computed(() => filterNavItems(reportsNavItems, userStore.can))
 const filteredContactsNavItems = computed(() => filterNavItems(contactNavItems, userStore.can))
 
