@@ -1,4 +1,6 @@
 [app]
+# Enable hosted/cloud deployment restrictions. Leave false for self-hosted installs.
+is_cloud = false
 # Log level: info, debug, warn, error, fatal
 log_level = "debug"
 # Environment: dev, prod.

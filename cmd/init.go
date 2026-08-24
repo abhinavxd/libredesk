@@ -833,7 +833,7 @@ func initAuthz(i18n *i18n.I18n) *authz.Enforcer {
 // initSSRFControl builds the shared outbound-request guard from config.
 func initSSRFControl() ssrf.Control {
 	lo := initLogger("ssrf")
-	return ssrf.NewControl(ko.Bool("ssrf.enabled"), ko.Strings("ssrf.allowed_cidrs"), lo)
+	return ssrf.NewControl(ko.Bool("app.is_cloud") || ko.Bool("ssrf.enabled"), ko.Strings("ssrf.allowed_cidrs"), lo)
 }
 
 // initAuth initializes the authentication manager.
