@@ -13,51 +13,6 @@ import (
 	"github.com/zerodha/logf"
 )
 
-func testQueue(t *testing.T, mr *miniredis.Miniredis, opts Opts) *Queue {
-	t.Helper()
-	opts.Redis = redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	opts.Logger = ptrLogger()
-	if opts.Stream == "" {
-		opts.Stream = "test:stream"
-	}
-	if opts.Group == "" {
-		opts.Group = "test:group"
-	}
-	q, err := New(opts)
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	return q
-}
-
-func ptrLogger() *logf.Logger {
-	l := logf.New(logf.Opts{Level: logf.FatalLevel})
-	return &l
-}
-
-func readOne(t *testing.T, q *Queue, consumer string) redis.XMessage {
-	t.Helper()
-	res, err := q.rd.XReadGroup(context.Background(), &redis.XReadGroupArgs{
-		Group: q.group, Consumer: consumer, Streams: []string{q.stream, ">"}, Count: 1,
-	}).Result()
-	if err != nil {
-		t.Fatalf("XReadGroup: %v", err)
-	}
-	if len(res) == 0 || len(res[0].Messages) == 0 {
-		t.Fatalf("expected one message, got none")
-	}
-	return res[0].Messages[0]
-}
-
-func pendingCount(t *testing.T, q *Queue) int64 {
-	t.Helper()
-	p, err := q.rd.XPending(context.Background(), q.stream, q.group).Result()
-	if err != nil {
-		t.Fatalf("XPending: %v", err)
-	}
-	return p.Count
-}
-
 func TestQueueProcessesAndAcks(t *testing.T) {
 	mr := miniredis.RunT(t)
 	var got int64
@@ -227,4 +182,112 @@ func waitFor(t *testing.T, cond func() bool, msg string) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("condition not met: %s", msg)
+}
+
+func TestNewValidatesOpts(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rd := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	handler := func(context.Context, []byte) error { return nil }
+
+	tests := []struct {
+		name string
+		opts Opts
+	}{
+		{"no redis", Opts{Stream: "s", Group: "g", Handler: handler, Logger: ptrLogger()}},
+		{"no stream", Opts{Redis: rd, Group: "g", Handler: handler, Logger: ptrLogger()}},
+		{"no group", Opts{Redis: rd, Stream: "s", Handler: handler, Logger: ptrLogger()}},
+		{"no handler", Opts{Redis: rd, Stream: "s", Group: "g", Logger: ptrLogger()}},
+		{"no logger", Opts{Redis: rd, Stream: "s", Group: "g", Handler: handler}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := New(tc.opts); err == nil {
+				t.Fatal("expected an error")
+			}
+		})
+	}
+}
+
+func TestNewFailsWhenRedisIsUnreachable(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rd := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	mr.Close()
+	_, err := New(Opts{Redis: rd, Stream: "s", Group: "g", Handler: func(context.Context, []byte) error { return nil }, Logger: ptrLogger()})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+}
+
+// A panicking handler must leave the entry pending rather than take the worker down.
+func TestHandlerPanicIsContained(t *testing.T) {
+	mr := miniredis.RunT(t)
+	q := testQueue(t, mr, Opts{Handler: func(context.Context, []byte) error { panic("boom") }})
+	defer q.Close()
+
+	if err := q.Enqueue(context.Background(), []byte("payload")); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	msg := readOne(t, q, "worker")
+	q.process("worker", msg)
+
+	if got := pendingCount(t, q); got != 1 {
+		t.Fatalf("expected the entry to stay pending, got %d", got)
+	}
+}
+
+func TestSleepReturnsOnClose(t *testing.T) {
+	mr := miniredis.RunT(t)
+	q := testQueue(t, mr, Opts{Handler: func(context.Context, []byte) error { return nil }})
+
+	q.cancel()
+	start := time.Now()
+	q.sleep(5 * time.Second)
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("sleep ignored the cancelled context, waited %s", elapsed)
+	}
+}
+
+func testQueue(t *testing.T, mr *miniredis.Miniredis, opts Opts) *Queue {
+	t.Helper()
+	opts.Redis = redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	opts.Logger = ptrLogger()
+	if opts.Stream == "" {
+		opts.Stream = "test:stream"
+	}
+	if opts.Group == "" {
+		opts.Group = "test:group"
+	}
+	q, err := New(opts)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	return q
+}
+
+func ptrLogger() *logf.Logger {
+	l := logf.New(logf.Opts{Level: logf.FatalLevel})
+	return &l
+}
+
+func readOne(t *testing.T, q *Queue, consumer string) redis.XMessage {
+	t.Helper()
+	res, err := q.rd.XReadGroup(context.Background(), &redis.XReadGroupArgs{
+		Group: q.group, Consumer: consumer, Streams: []string{q.stream, ">"}, Count: 1,
+	}).Result()
+	if err != nil {
+		t.Fatalf("XReadGroup: %v", err)
+	}
+	if len(res) == 0 || len(res[0].Messages) == 0 {
+		t.Fatalf("expected one message, got none")
+	}
+	return res[0].Messages[0]
+}
+
+func pendingCount(t *testing.T, q *Queue) int64 {
+	t.Helper()
+	p, err := q.rd.XPending(context.Background(), q.stream, q.group).Result()
+	if err != nil {
+		t.Fatalf("XPending: %v", err)
+	}
+	return p.Count
 }

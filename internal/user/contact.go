@@ -250,8 +250,7 @@ func (u *Manager) UpsertContactByChannelIdentity(channel, identifier string, con
 	if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
 		return 0, err
 	}
-	// Contacts with no email and no ext_id have no uniqueness key, so ResolveContact + LinkChannelIdentity
-	// are not atomic - a failed link leaves an orphan user row that grows on retry. Use the atomic CTE instead.
+	// A contact with no email and no ext_id has no uniqueness key, so the non-atomic resolve + link orphans user rows on retry.
 	if contact.Email.String == "" && contact.ExternalUserID.String == "" {
 		return u.upsertContactWithChannelIdentity(channel, identifier, contact)
 	}
@@ -266,13 +265,22 @@ func (u *Manager) upsertContactWithChannelIdentity(channel, identifier string, c
 	if err != nil {
 		return 0, fmt.Errorf("generating password: %w", err)
 	}
-	var id int
+	var (
+		id         int
+		insertedID sql.NullInt64
+	)
 	if err := u.q.UpsertContactWithChannelIdentity.QueryRow(
 		contact.Email, contact.FirstName, contact.LastName, password, contact.AvatarURL,
 		channel, identifier,
-	).Scan(&id); err != nil {
+	).Scan(&id, &insertedID); err != nil {
 		u.lo.Error("error upserting contact with channel identity", "channel", channel, "identifier", identifier, "error", err)
 		return 0, fmt.Errorf("upserting contact with channel identity: %w", err)
+	}
+	// A concurrent upsert can win the identity insert; the row this statement created is then orphaned.
+	if insertedID.Valid && int(insertedID.Int64) != id {
+		if _, err := u.q.DeleteOrphanedContact.Exec(insertedID.Int64); err != nil {
+			u.lo.Error("error deleting orphaned contact after identity race", "user_id", insertedID.Int64, "error", err)
+		}
 	}
 	contact.ID = id
 	return id, nil

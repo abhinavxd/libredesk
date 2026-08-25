@@ -116,6 +116,7 @@ type queries struct {
 	InsertChannelIdentity            *sqlx.Stmt `query:"insert-channel-identity"`
 	UpdateChannelIdentity            *sqlx.Stmt `query:"update-channel-identity"`
 	UpsertContactWithChannelIdentity *sqlx.Stmt `query:"upsert-contact-with-channel-identity"`
+	DeleteOrphanedContact            *sqlx.Stmt `query:"delete-orphaned-contact"`
 	InsertNote                       *sqlx.Stmt `query:"insert-note"`
 	InsertVisitor                    *sqlx.Stmt `query:"insert-visitor"`
 	GetVisitorByEmail                *sqlx.Stmt `query:"get-visitor-by-email"`

@@ -887,6 +887,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	subject, appendRefNum := req.Subject, true
 	if channel == whatsappChannel.ChannelWhatsApp {
 		subject, appendRefNum = "", false
+		defer lockWhatsAppConversation(contactID, req.InboxID)()
 		// WhatsApp is one thread per contact; reuse the open conversation instead of creating a parallel one.
 		if id, uuid, lookupErr := app.conversation.GetLatestOpenConversationForContact(contactID, req.InboxID); lookupErr == nil {
 			conversationID, conversationUUID, createdNew = id, uuid, false
@@ -939,20 +940,18 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 	if sendErr != nil {
+		app.lo.Error("error sending first message of new conversation", "conversation_uuid", conversationUUID, "error", sendErr)
 		// Roll back only a conversation we created, not a reused one.
 		if createdNew {
 			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 				app.lo.Error("error deleting conversation", "error", err)
 			}
 		}
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
-	}
-
-	// Trigger webhook for agent-initiated conversation; contact-initiated is handled by the incoming message hooks.
-	if agentInitiated && createdNew {
-		if c, err := app.conversation.GetConversation(0, conversationUUID, ""); err == nil {
-			app.webhook.TriggerEvent(wmodels.EventConversationCreated, c)
+		// Only envelope errors carry a message that is safe to show the agent.
+		if _, ok := sendErr.(envelope.Error); ok {
+			return sendErrorEnvelope(r, sendErr)
 		}
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
 	}
 
 	// Don't reassign a reused conversation; team first as it clears the agent.
@@ -962,6 +961,13 @@ func handleCreateConversation(r *fastglue.Request) error {
 		}
 		if req.AssignedAgentID > 0 {
 			app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
+		}
+	}
+
+	// Contact-initiated conversations get this event from the incoming message hooks.
+	if agentInitiated && createdNew {
+		if c, err := app.conversation.GetConversation(0, conversationUUID, ""); err == nil {
+			app.webhook.TriggerEvent(wmodels.EventConversationCreated, c)
 		}
 	}
 
@@ -1048,9 +1054,9 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 	}
 	dialCode := countries.DialCodeForISO(req.PhoneNumberCountryCode)
 	if dialCode == "" {
-		return 0, envelope.NewError(envelope.InputError, "`phone_number_country_code` is invalid", nil)
+		return 0, envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneCountryCodeInvalid"), nil)
 	}
-	local, err := localPhoneNumber(req.PhoneNumber, dialCode)
+	local, err := localPhoneNumber(app, req.PhoneNumber, dialCode)
 	if err != nil {
 		return 0, err
 	}
@@ -1072,18 +1078,18 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 }
 
 // localPhoneNumber returns the digits after the country dial code, accepting numbers typed with a leading + or 00.
-func localPhoneNumber(phone, dialCode string) (string, error) {
+func localPhoneNumber(app *App, phone, dialCode string) (string, error) {
 	trimmed := strings.TrimSpace(phone)
 	digits := stringutil.NormalizeWhatsAppPhone(trimmed)
 	if strings.HasPrefix(trimmed, "+") || strings.HasPrefix(digits, "00") {
 		digits = strings.TrimPrefix(digits, "00")
 		if !strings.HasPrefix(digits, dialCode) {
-			return "", envelope.NewError(envelope.InputError, "`phone_number` does not match `phone_number_country_code`", nil)
+			return "", envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneCountryMismatch"), nil)
 		}
 		digits = strings.TrimPrefix(digits, dialCode)
 	}
 	if digits == "" {
-		return "", envelope.NewError(envelope.InputError, "`phone_number` is invalid", nil)
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneInvalid"), nil)
 	}
 	return digits, nil
 }

@@ -14,7 +14,7 @@
         </div>
       </div>
       <Button size="sm" variant="outline" @click="openTemplatePicker">
-        {{ $t('conversation.whatsapp.sendTemplate') }}
+        {{ $t('globals.messages.sendTemplate') }}
       </Button>
     </div>
     <div
@@ -30,10 +30,7 @@
     <Dialog v-model:open="pickerOpen">
       <DialogContent class="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{{ $t('conversation.whatsapp.sendTemplate') }}</DialogTitle>
-          <DialogDescription>
-            {{ $t('conversation.whatsapp.sendTemplate.description') }}
-          </DialogDescription>
+          <DialogTitle>{{ $t('globals.messages.sendTemplate') }}</DialogTitle>
         </DialogHeader>
 
         <WhatsAppTemplatePicker
@@ -54,7 +51,7 @@
             {{ $t('globals.messages.cancel') }}
           </Button>
           <Button :is-loading="isSending" :disabled="isSending || !allParamsFilled" @click="sendTemplate">
-            {{ $t('conversation.whatsapp.send') }}
+            {{ $t('globals.messages.send') }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -70,7 +67,6 @@ import { Button } from '@shared-ui/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle

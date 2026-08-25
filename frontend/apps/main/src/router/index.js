@@ -370,7 +370,7 @@ const routes = [
                 path: 'new',
                 name: 'whatsapp-template-new',
                 component: () => import('@main/views/admin/whatsapp/NewWhatsAppTemplate.vue'),
-                meta: { titleKey: 'admin.whatsappTemplates.newTemplate' }
+                meta: { titleKey: 'globals.messages.newTemplate' }
               }
             ]
           },
@@ -514,7 +514,7 @@ const routes = [
                 name: 'new-template',
                 props: true,
                 component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { titleKey: 'template.new' }
+                meta: { titleKey: 'globals.messages.newTemplate' }
               }
             ]
           },

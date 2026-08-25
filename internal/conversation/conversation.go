@@ -1745,7 +1745,7 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 	return nil
 }
 
-// SendCSATReply sends a CSAT reply message to a conversation. No-op if one was already sent or an email contact has no email.
+// SendCSATReply is a no-op if one was already sent or an email contact has no email.
 func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversation) error {
 	if conversation.InboxChannel == inbox.ChannelEmail && conversation.Contact.Email.String == "" {
 		m.lo.Info("CSAT reply skipped: contact has no email", "conversation_uuid", conversation.UUID)

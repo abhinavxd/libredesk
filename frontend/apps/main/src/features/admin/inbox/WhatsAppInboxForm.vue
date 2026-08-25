@@ -72,7 +72,7 @@
 
     <div v-show="csatEnabled" class="box p-4 space-y-4">
       <div>
-        <h3 class="font-semibold">{{ $t('admin.inbox.whatsapp.csatTemplate') }}</h3>
+        <h3 class="font-semibold">{{ $t('globals.terms.csatSurveyTemplate') }}</h3>
         <p class="!mt-1 text-sm text-muted-foreground flex items-start gap-1.5">
           <Lightbulb class="size-4 mt-0.5 shrink-0" />
           <span>{{ $t('admin.inbox.whatsapp.csatTemplate.description') }}</span>
@@ -81,7 +81,7 @@
 
       <FormField v-slot="{ componentField }" name="config.csat_template_body">
         <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.csatTemplateBody') }}</FormLabel>
+          <FormLabel>{{ $t('globals.terms.message', 1) }}</FormLabel>
           <FormControl>
             <Textarea rows="3" v-bind="componentField" />
           </FormControl>
@@ -95,7 +95,7 @@
       <div class="grid grid-cols-2 gap-4">
         <FormField v-slot="{ componentField }" name="config.csat_template_button_text">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.csatTemplateButtonText') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.buttonText') }}</FormLabel>
             <FormControl>
               <Input type="text" v-bind="componentField" />
             </FormControl>
@@ -105,7 +105,7 @@
 
         <FormField v-slot="{ componentField }" name="config.csat_template_language">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.csatTemplateLanguage') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.language', 1) }}</FormLabel>
             <FormControl>
               <ComboBox
                 v-bind="componentField"
@@ -124,11 +124,6 @@
 
     <div class="box p-4 space-y-4">
       <h3 class="font-semibold">{{ $t('admin.inbox.whatsapp.metaCredentials') }}</h3>
-      <p class="text-sm text-muted-foreground flex items-start gap-1.5">
-        <Lightbulb class="size-4 mt-0.5 shrink-0" />
-        <span>{{ $t('admin.inbox.whatsapp.metaCredentials.description') }}</span>
-      </p>
-
       <div class="grid grid-cols-2 gap-4">
         <FormField v-slot="{ componentField }" name="config.phone_number_id">
           <FormItem>
@@ -165,7 +160,7 @@
       <div class="grid grid-cols-2 gap-4">
         <FormField v-slot="{ componentField }" name="config.access_token">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.accessToken') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.accessToken') }}</FormLabel>
             <FormControl>
               <Input type="password" placeholder="••••••••" v-bind="componentField" />
             </FormControl>
@@ -178,7 +173,7 @@
 
         <FormField v-slot="{ componentField }" name="config.app_secret">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.appSecret') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.appSecret') }}</FormLabel>
             <FormControl>
               <Input type="password" placeholder="••••••••" v-bind="componentField" />
             </FormControl>
@@ -193,7 +188,7 @@
       <div class="grid grid-cols-2 gap-4">
         <FormField v-slot="{ componentField }" name="config.api_version">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.apiVersion') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.apiVersion') }}</FormLabel>
             <FormControl>
               <Input type="text" placeholder="v25.0" v-bind="componentField" />
             </FormControl>
@@ -207,7 +202,7 @@
     </div>
 
     <div class="box p-4 space-y-4">
-      <h3 class="font-semibold">{{ $t('admin.inbox.whatsapp.webhook') }}</h3>
+      <h3 class="font-semibold">{{ $t('globals.terms.webhook', 1) }}</h3>
       <p class="text-sm text-muted-foreground flex items-start gap-1.5">
         <Lightbulb class="size-4 mt-0.5 shrink-0" />
         <span>{{ $t('admin.inbox.whatsapp.webhook.description') }}</span>
@@ -232,7 +227,7 @@
         </FormField>
 
         <div class="space-y-2">
-          <Label class="text-muted-foreground">{{ $t('admin.inbox.whatsapp.webhookURL') }}</Label>
+          <Label class="text-muted-foreground">{{ $t('globals.terms.callbackURL') }}</Label>
           <div v-if="webhookURL" class="flex items-center gap-2">
             <Input :model-value="webhookURL" readonly class="font-mono text-xs" />
             <CopyButton :text="webhookURL" />
@@ -348,18 +343,21 @@ watch(
       return
     }
     // An unset reopen window is off (0), not the new-inbox default of 48.
-    form.setValues({
-      ...newValues,
-      reopen_window_hours: newValues.reopen_window_hours ?? 0,
-      config: {
-        ...(newValues.config || {}),
-        csat_template_language:
-          newValues.config?.csat_template_language || DEFAULT_CSAT_TEMPLATE_LANGUAGE,
-        csat_template_body: newValues.config?.csat_template_body || DEFAULT_CSAT_TEMPLATE_BODY,
-        csat_template_button_text:
-          newValues.config?.csat_template_button_text || DEFAULT_CSAT_TEMPLATE_BUTTON_TEXT
-      }
-    })
+    form.setValues(
+      {
+        ...newValues,
+        reopen_window_hours: newValues.reopen_window_hours ?? 0,
+        config: {
+          ...(newValues.config || {}),
+          csat_template_language:
+            newValues.config?.csat_template_language || DEFAULT_CSAT_TEMPLATE_LANGUAGE,
+          csat_template_body: newValues.config?.csat_template_body || DEFAULT_CSAT_TEMPLATE_BODY,
+          csat_template_button_text:
+            newValues.config?.csat_template_button_text || DEFAULT_CSAT_TEMPLATE_BUTTON_TEXT
+        }
+      },
+      false
+    )
   },
   { deep: true, immediate: true }
 )

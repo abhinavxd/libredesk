@@ -114,3 +114,125 @@ func TestVerifySignature(t *testing.T) {
 		t.Fatalf("expected empty secret to fail")
 	}
 }
+
+func TestOrderedPlaceholders(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want []string
+	}{
+		{"empty text", "", nil},
+		{"no placeholders", "plain copy", nil},
+		{"positional in order", "Hi {{1}}, order {{2}}", []string{"1", "2"}},
+		{"named in order", "Hi {{name}}, order {{order_id}}", []string{"name", "order_id"}},
+		{"repeats appear once", "{{name}} and {{name}} again", []string{"name"}},
+		{"order follows first use", "{{b}} then {{a}} then {{b}}", []string{"b", "a"}},
+		{"malformed braces ignored", "{{}} {{ x }} {{a-b}}", nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := OrderedPlaceholders(tc.text)
+			if len(got) != len(tc.want) {
+				t.Fatalf("expected %v, got %v", tc.want, got)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("expected %v, got %v", tc.want, got)
+				}
+			}
+		})
+	}
+}
+
+// A media header takes its file at send time, so it contributes no component here.
+func TestBuildSendComponents_MediaHeaderSkipped(t *testing.T) {
+	comps := BuildSendComponents(TemplateSendParts{
+		HeaderType:    "IMAGE",
+		HeaderContent: "ignored",
+		BodyContent:   "Hi there",
+	})
+	if len(comps) != 0 {
+		t.Fatalf("expected no components, got %+v", comps)
+	}
+}
+
+func TestBuildSendComponents_TextHeaderWithoutParams(t *testing.T) {
+	comps := BuildSendComponents(TemplateSendParts{
+		HeaderType:    "TEXT",
+		HeaderContent: "Static header",
+		BodyContent:   "Hi there",
+	})
+	if len(comps) != 0 {
+		t.Fatalf("expected no components for a static header and body, got %+v", comps)
+	}
+}
+
+func TestBuildSendComponents_ButtonVariants(t *testing.T) {
+	tests := []struct {
+		name    string
+		buttons []TemplateButton
+		params  map[string]string
+		want    int
+	}{
+		{
+			name:    "quick reply buttons take no parameters",
+			buttons: []TemplateButton{{Type: "QUICK_REPLY", Text: "Yes"}},
+			params:  map[string]string{"button_url_0": "ignored"},
+			want:    0,
+		},
+		{
+			name:    "dynamic url button with no value is skipped",
+			buttons: []TemplateButton{{Type: "URL", Text: "Track", URL: "https://x.test/{{1}}"}},
+			params:  nil,
+			want:    0,
+		},
+		{
+			name:    "dynamic url button with an empty value is skipped",
+			buttons: []TemplateButton{{Type: "URL", Text: "Track", URL: "https://x.test/{{1}}"}},
+			params:  map[string]string{"button_url_0": ""},
+			want:    0,
+		},
+		{
+			name:    "dynamic url button with a value is sent",
+			buttons: []TemplateButton{{Type: "URL", Text: "Track", URL: "https://x.test/{{1}}"}},
+			params:  map[string]string{"button_url_0": "A1"},
+			want:    1,
+		},
+		{
+			name: "only the dynamic button of several is sent",
+			buttons: []TemplateButton{
+				{Type: "QUICK_REPLY", Text: "No"},
+				{Type: "URL", Text: "Track", URL: "https://x.test/{{1}}"},
+			},
+			params: map[string]string{"button_url_1": "A1"},
+			want:   1,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			comps := BuildSendComponents(TemplateSendParts{
+				BodyContent: "Hi there",
+				Buttons:     tc.buttons,
+				Params:      tc.params,
+			})
+			if len(comps) != tc.want {
+				t.Fatalf("expected %d components, got %+v", tc.want, comps)
+			}
+		})
+	}
+}
+
+// The button index Meta needs is the button's position in the template, not the order it was filled.
+func TestBuildSendComponents_ButtonIndexMatchesPosition(t *testing.T) {
+	comps := BuildSendComponents(TemplateSendParts{
+		BodyContent: "Hi",
+		Buttons: []TemplateButton{
+			{Type: "QUICK_REPLY", Text: "No"},
+			{Type: "URL", Text: "Track", URL: "https://x.test/{{1}}"},
+		},
+		Params: map[string]string{"button_url_1": "A1"},
+	})
+	if len(comps) != 1 || comps[0]["index"] != "1" || comps[0]["sub_type"] != "url" {
+		t.Fatalf("unexpected button component: %+v", comps)
+	}
+}

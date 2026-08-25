@@ -88,7 +88,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	}
 
 	if strings.TrimRight(oldRootURL, "/") != req.RootURL {
-		go reconcileWhatsAppCSATTemplates(app)
+		go reconcileWhatsAppRootURL(app)
 	}
 
 	return r.SendEnvelope(true)

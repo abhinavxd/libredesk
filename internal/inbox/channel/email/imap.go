@@ -115,6 +115,7 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 			return fmt.Errorf("error logging in to the IMAP server: %w", err)
 		}
 	}
+	e.clearAuthError()
 
 	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: true}).Wait(); err != nil {
 		return fmt.Errorf("error selecting mailbox: %w", err)

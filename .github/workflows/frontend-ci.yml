@@ -75,6 +75,8 @@ jobs:
           # The livechat widget suite makes far more than 100 widget requests a minute.
           LIBREDESK_RATE_LIMIT__WIDGET__REQUESTS_PER_MINUTE: "100000"
           LIBREDESK_RATE_LIMIT__PUBLIC__REQUESTS_PER_MINUTE: "100000"
+          # The WhatsApp suite drives the channel against the stand-in Graph API cypress starts.
+          LIBREDESK_WHATSAPP__API_URL: "http://127.0.0.1:9099"
           CYPRESS_SYSTEM_PASSWORD: "StrongPass!123"
           CYPRESS_MAILHOG_URL: "http://localhost:8025"
         run: |

@@ -75,7 +75,7 @@
           :model-value="templateParams[btn.key]"
           @update:model-value="(v) => $emit('update:param', btn.key, v)"
           class="col-span-2"
-          :placeholder="btn.url"
+          :placeholder="btn.hint"
         />
       </div>
     </div>

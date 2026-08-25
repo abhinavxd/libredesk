@@ -417,9 +417,14 @@ func (m *Manager) SignAttachmentURLs(attachments attachment.Attachments) {
 
 // UpdateMessageStatus updates the status of a message.
 func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
-	if _, err := m.q.UpdateMessageStatus.Exec(status, messageUUID); err != nil {
+	res, err := m.q.UpdateMessageStatus.Exec(status, messageUUID)
+	if err != nil {
 		m.lo.Error("error updating message status", "message_uuid", messageUUID, "error", err)
 		return err
+	}
+	// The sent-onto-failed guard can make this a no-op; a status that wasn't applied must not be broadcast.
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil
 	}
 
 	// Broadcast message status update to all conversation subscribers.
@@ -614,7 +619,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	case inbox.ChannelWhatsApp:
 		// Meta accepts one media per message, so a multi-attachment reply must be sent as separate messages.
 		if len(media) > 1 {
-			return models.Message{}, envelope.NewError(envelope.InputError, "WhatsApp accepts one attachment per message", nil)
+			return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.oneAttachment"), nil)
 		}
 		// Reject unsendable media here; Meta's upload endpoint enforces the same caps and would only fail after the message is queued.
 		for _, md := range media {

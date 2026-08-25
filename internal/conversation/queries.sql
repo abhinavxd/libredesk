@@ -868,8 +868,18 @@ UPDATE conversation_messages SET status = $1::message_status, updated_at = NOW()
 WHERE uuid = $2 AND NOT ($1 = 'sent' AND status = 'failed');
 
 -- name: mark-message-pending-for-retry
-UPDATE conversation_messages SET status = 'pending', updated_at = NOW()
-WHERE uuid = $1 AND status IN ('failed', 'sent');
+-- Keeping the old wamid or provider_status would let a late webhook re-fail the retried row.
+UPDATE conversation_messages m
+SET status = 'pending',
+    source_id = CASE WHEN inb.channel = 'whatsapp' THEN NULL ELSE m.source_id END,
+    meta = COALESCE(m.meta, '{}'::jsonb)
+             - 'provider_status' - 'provider_status_updated_at' - 'provider_sent_at'
+             - 'provider_delivered_at' - 'provider_read_at' - 'provider_failed_at'
+             - 'provider_failure_reason',
+    updated_at = NOW()
+FROM conversations c
+JOIN inboxes inb ON inb.id = c.inbox_id
+WHERE m.uuid = $1 AND c.id = m.conversation_id AND m.status IN ('failed', 'sent');
 
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;

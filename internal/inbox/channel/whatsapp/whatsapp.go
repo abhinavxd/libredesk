@@ -1,4 +1,4 @@
-// Package whatsapp implements a WhatsApp Cloud API inbox; inbound arrives via the webhook handler in cmd/, so Receive() is a no-op like livechat.
+// Package whatsapp implements a WhatsApp Cloud API inbox.
 package whatsapp
 
 import (
@@ -298,7 +298,6 @@ func humanBytes(n int) string {
 	return fmt.Sprintf("%d B", n)
 }
 
-// normalizeMIME lowercases the content type and drops any ";" parameters (e.g. "image/jpeg; charset=binary" -> "image/jpeg") for lookup against the supported-type map.
 func normalizeMIME(contentType string) string {
 	mime := strings.ToLower(strings.TrimSpace(contentType))
 	if i := strings.Index(mime, ";"); i >= 0 {
@@ -307,7 +306,6 @@ func normalizeMIME(contentType string) string {
 	return mime
 }
 
-// mediaTypeForAttachment maps MIME to Meta's media type; the per-MIME size cap is enforced on upload, so an oversized image can't pass as a document.
 func mediaTypeForAttachment(att attachment.Attachment) string {
 	switch normalizeMIME(att.ContentType) {
 	case "image/jpeg", "image/png":

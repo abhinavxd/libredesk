@@ -14,14 +14,6 @@ type Account struct {
 	APIVersion    string
 }
 
-// Version returns the API version, falling back to the default.
-func (a Account) Version() string {
-	if a.APIVersion == "" {
-		return DefaultAPIVersion
-	}
-	return a.APIVersion
-}
-
 type MetaAPIError struct {
 	StatusCode int    `json:"-"`
 	Message    string `json:"message"`
@@ -30,13 +22,6 @@ type MetaAPIError struct {
 	Subcode    int    `json:"error_subcode"`
 	UserMsg    string `json:"error_user_msg"`
 	FBTraceID  string `json:"fbtrace_id"`
-}
-
-func (e *MetaAPIError) Error() string {
-	if e.UserMsg != "" {
-		return e.UserMsg
-	}
-	return e.Message
 }
 
 type metaErrorEnvelope struct {
@@ -117,6 +102,15 @@ type TemplateEdit struct {
 	Components      []TemplateComponent `json:"components"`
 }
 
+type phoneNumberListResponse struct {
+	Data []struct {
+		ID string `json:"id"`
+	} `json:"data"`
+	Paging struct {
+		Next string `json:"next"`
+	} `json:"paging"`
+}
+
 type templateListResponse struct {
 	Data   []MetaTemplate `json:"data"`
 	Paging struct {
@@ -161,4 +155,18 @@ type ParsedTemplateStatus struct {
 	Language       string
 	Reason         string
 	MetaTemplateID string
+}
+
+func (a Account) Version() string {
+	if a.APIVersion == "" {
+		return DefaultAPIVersion
+	}
+	return a.APIVersion
+}
+
+func (e *MetaAPIError) Error() string {
+	if e.UserMsg != "" {
+		return e.UserMsg
+	}
+	return e.Message
 }

@@ -3,7 +3,7 @@
     <div class="space-y-4 flex-shrink-0">
       <div class="grid grid-cols-4 gap-4">
         <div class="space-y-2 relative col-span-2 min-w-0">
-          <label class="text-sm font-medium">{{ $t('conversation.whatsapp.number') }}</label>
+          <label class="text-sm font-medium">{{ $t('globals.terms.phoneNumber') }}</label>
           <div class="flex items-end">
             <div class="w-fit shrink-0">
               <ComboBox
@@ -124,7 +124,7 @@
     </div>
 
     <div class="flex-1 flex flex-col min-h-0 mt-4">
-      <label class="text-sm font-medium mb-2">{{ $t('conversation.whatsapp.template') }}</label>
+      <label class="text-sm font-medium mb-2">{{ $t('globals.terms.template', 1) }}</label>
 
       <p v-if="!inboxId" class="text-sm text-muted-foreground">
         {{ $t('conversation.whatsapp.selectInboxFirst') }}

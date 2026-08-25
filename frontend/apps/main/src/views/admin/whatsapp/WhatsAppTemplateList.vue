@@ -26,7 +26,7 @@
               {{ $t('admin.whatsappTemplates.syncFromMeta') }}
             </Button>
             <Button :disabled="!selectedInboxID" @click="onNew">
-              {{ $t('admin.whatsappTemplates.newTemplate') }}
+              {{ $t('globals.messages.newTemplate') }}
             </Button>
           </div>
         </div>
@@ -176,7 +176,7 @@ const columns = [
   },
   {
     accessorKey: 'category',
-    header: () => h('div', t('admin.whatsappTemplates.category')),
+    header: () => h('div', t('globals.terms.category')),
     cell: ({ row }) => h(Badge, { variant: 'outline' }, () => row.getValue('category'))
   },
   {

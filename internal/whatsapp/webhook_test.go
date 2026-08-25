@@ -1,6 +1,9 @@
 package whatsapp
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestExtractMessages_Text(t *testing.T) {
 	body := []byte(`{
@@ -160,17 +163,6 @@ func TestExtractTemplateStatusUpdate_LargeID(t *testing.T) {
 	}
 }
 
-// wrapValue wraps a single change "value" object in the full webhook envelope and parses it.
-func wrapValue(t *testing.T, valueJSON string) *WebhookPayload {
-	t.Helper()
-	body := []byte(`{"object":"whatsapp_business_account","entry":[{"id":"WABA-1","changes":[{"field":"messages","value":` + valueJSON + `}]}]}`)
-	p, err := ParsePayload(body)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	return p
-}
-
 func TestParsePayload_InvalidJSON(t *testing.T) {
 	if _, err := ParsePayload([]byte(`{"entry": [`)); err == nil {
 		t.Fatal("expected error for malformed json, got nil")
@@ -310,4 +302,202 @@ func TestExtractStatuses_UnknownStatusDoesNotBreak(t *testing.T) {
 	if len(st) != 1 || st[0].Status != "deleted" {
 		t.Fatalf("unknown status not passed through: %+v", st)
 	}
+}
+
+func TestExtractMessages_Location(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload string
+		want    string
+	}{
+		{
+			name:    "name and address",
+			payload: `{"latitude":12.9716,"longitude":77.5946,"name":"Office","address":"MG Road"}`,
+			want:    "Office, MG Road\nhttps://www.google.com/maps?q=12.9716,77.5946",
+		},
+		{
+			name:    "coordinates only",
+			payload: `{"latitude":12.9716,"longitude":77.5946}`,
+			want:    "https://www.google.com/maps?q=12.9716,77.5946",
+		},
+		{
+			name:    "name without address",
+			payload: `{"latitude":1,"longitude":2,"name":"Office"}`,
+			want:    "Office\nhttps://www.google.com/maps?q=1,2",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			msgs := messagesFrom(t, `{"from":"91","id":"wamid.LOC","timestamp":"1716000000","type":"location","location":`+tc.payload+`}`)
+			if msgs[0].Text != tc.want {
+				t.Fatalf("expected %q, got %q", tc.want, msgs[0].Text)
+			}
+		})
+	}
+}
+
+func TestExtractMessages_LocationMissingPayload(t *testing.T) {
+	msgs := messagesFrom(t, `{"from":"91","id":"wamid.LOC2","timestamp":"1716000000","type":"location"}`)
+	if msgs[0].Text != "" {
+		t.Fatalf("expected no text, got %q", msgs[0].Text)
+	}
+}
+
+func TestExtractMessages_SharedContacts(t *testing.T) {
+	msgs := messagesFrom(t, `{"from":"91","id":"wamid.CON","timestamp":"1716000000","type":"contacts","contacts":[
+		{"name":{"formatted_name":"Anita Desai"},"phones":[{"phone":"+91 98765 43210","wa_id":"919876543210"}]},
+		{"name":{"formatted_name":"No Phone"}}
+	]}`)
+	want := "Anita Desai +91 98765 43210\nNo Phone"
+	if msgs[0].Text != want {
+		t.Fatalf("expected %q, got %q", want, msgs[0].Text)
+	}
+}
+
+// A customer moving to a new number arrives as a system event carrying the new wa_id.
+func TestExtractMessages_SystemNumberChange(t *testing.T) {
+	msgs := messagesFrom(t, `{"from":"919876543210","id":"wamid.SYS","timestamp":"1716000000","type":"system","system":{"type":"user_changed_number","body":"changed number","new_wa_id":"919999999999"}}`)
+	m := msgs[0]
+	if m.SystemType != "user_changed_number" || m.SystemNewWAID != "919999999999" || m.Text != "changed number" {
+		t.Fatalf("unexpected system message: %+v", m)
+	}
+}
+
+// Older payloads carry wa_id instead of new_wa_id.
+func TestExtractMessages_SystemNumberChangeLegacyField(t *testing.T) {
+	msgs := messagesFrom(t, `{"from":"919876543210","id":"wamid.SYS2","timestamp":"1716000000","type":"system","system":{"type":"user_changed_number","body":"changed","wa_id":"919999999999"}}`)
+	if msgs[0].SystemNewWAID != "919999999999" {
+		t.Fatalf("expected the legacy wa_id to be used, got %q", msgs[0].SystemNewWAID)
+	}
+}
+
+func TestExtractMessages_SystemMissingPayload(t *testing.T) {
+	msgs := messagesFrom(t, `{"from":"91","id":"wamid.SYS3","timestamp":"1716000000","type":"system"}`)
+	if msgs[0].SystemType != "" || msgs[0].SystemNewWAID != "" {
+		t.Fatalf("unexpected system message: %+v", msgs[0])
+	}
+}
+
+func TestExtractMessages_MediaWithoutPayload(t *testing.T) {
+	for _, typ := range []string{"image", "video", "audio", "voice", "document", "sticker"} {
+		msgs := messagesFrom(t, `{"from":"91","id":"wamid.M","timestamp":"1716000000","type":"`+typ+`"}`)
+		if msgs[0].MediaID != "" {
+			t.Errorf("%s: expected no media id, got %q", typ, msgs[0].MediaID)
+		}
+	}
+}
+
+func TestExtractMessages_TextWithoutPayload(t *testing.T) {
+	msgs := messagesFrom(t, `{"from":"91","id":"wamid.T","timestamp":"1716000000","type":"text"}`)
+	if msgs[0].Text != "" {
+		t.Fatalf("expected no text, got %q", msgs[0].Text)
+	}
+}
+
+func TestExtractMessages_InteractiveWithoutPayload(t *testing.T) {
+	msgs := messagesFrom(t, `{"from":"91","id":"wamid.I","timestamp":"1716000000","type":"interactive"}`)
+	if msgs[0].Text != "" || msgs[0].ButtonReplyID != "" || msgs[0].ListReplyID != "" {
+		t.Fatalf("unexpected message: %+v", msgs[0])
+	}
+}
+
+func TestExtractMessages_ButtonWithoutPayload(t *testing.T) {
+	msgs := messagesFrom(t, `{"from":"91","id":"wamid.B","timestamp":"1716000000","type":"button"}`)
+	if msgs[0].Text != "" || msgs[0].ButtonReplyID != "" {
+		t.Fatalf("unexpected message: %+v", msgs[0])
+	}
+}
+
+// Statuses and template updates share the payload shape, so each extractor must ignore the other's field.
+func TestExtractorsIgnoreForeignFields(t *testing.T) {
+	body := []byte(`{"object":"whatsapp_business_account","entry":[{"id":"WABA-1","changes":[
+		{"field":"message_template_status_update","value":{"event":"APPROVED","message_template_name":"t","message_template_language":"en_US"}},
+		{"field":"messages","value":{"statuses":[{"id":"wamid.S","status":"delivered","timestamp":"1716000000"}]}}
+	]}]}`)
+	p, err := ParsePayload(body)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(p.ExtractMessages()) != 0 {
+		t.Fatal("expected no messages")
+	}
+	if got := p.ExtractStatuses(); len(got) != 1 || got[0].MessageID != "wamid.S" {
+		t.Fatalf("unexpected statuses: %+v", got)
+	}
+	if got := p.ExtractTemplateStatusUpdates(); len(got) != 1 || got[0].TemplateName != "t" {
+		t.Fatalf("unexpected template updates: %+v", got)
+	}
+}
+
+func TestVerifySignatureRejectsMalformedHeaders(t *testing.T) {
+	body := []byte(`{"a":1}`)
+	for _, header := range []string{"abc", "sha1=abc", "=abc", "sha256"} {
+		if VerifySignature(body, header, "secret") {
+			t.Errorf("header %q must be rejected", header)
+		}
+	}
+}
+
+func TestParseUnixSeconds(t *testing.T) {
+	if got := parseUnixSeconds("1716000000"); got.Unix() != 1716000000 {
+		t.Fatalf("unexpected time %v", got)
+	}
+	if got := parseUnixSeconds(""); !got.IsZero() {
+		t.Fatalf("expected a zero time, got %v", got)
+	}
+	if got := parseUnixSeconds("not-a-number"); !got.IsZero() {
+		t.Fatalf("expected a zero time, got %v", got)
+	}
+}
+
+func TestFirstNonEmptyStr(t *testing.T) {
+	if got := firstNonEmptyStr("", "second", "third"); got != "second" {
+		t.Fatalf("unexpected value %q", got)
+	}
+	if got := firstNonEmptyStr("", ""); got != "" {
+		t.Fatalf("expected an empty string, got %q", got)
+	}
+}
+
+// Meta sends the template id as a bare number, which loses precision if decoded as a float.
+func TestStringifyTemplateID(t *testing.T) {
+	tests := []struct {
+		in   any
+		want string
+	}{
+		{"12345", "12345"},
+		{json.Number("1234567890123456789"), "1234567890123456789"},
+		{float64(12345), "12345"},
+		{nil, ""},
+		{true, ""},
+	}
+	for _, tc := range tests {
+		if got := stringifyTemplateID(tc.in); got != tc.want {
+			t.Errorf("%v: expected %q, got %q", tc.in, tc.want, got)
+		}
+	}
+}
+
+func messagesFrom(t *testing.T, message string) []ParsedMessage {
+	t.Helper()
+	body := []byte(`{"object":"whatsapp_business_account","entry":[{"id":"WABA-1","changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"PN-1"},"messages":[` + message + `]}}]}]}`)
+	p, err := ParsePayload(body)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	msgs := p.ExtractMessages()
+	if len(msgs) != 1 {
+		t.Fatalf("expected one message, got %d", len(msgs))
+	}
+	return msgs
+}
+
+func wrapValue(t *testing.T, valueJSON string) *WebhookPayload {
+	t.Helper()
+	body := []byte(`{"object":"whatsapp_business_account","entry":[{"id":"WABA-1","changes":[{"field":"messages","value":` + valueJSON + `}]}]}`)
+	p, err := ParsePayload(body)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	return p
 }

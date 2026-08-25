@@ -41,15 +41,15 @@ type Email struct {
 	userStore            inbox.UserStore
 	wg                   sync.WaitGroup
 	tokenRefreshCallback TokenRefreshCallback
-	authErrorCallback    AuthErrorCallback
+	authStatusCallback   AuthStatusCallback
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
 // It receives the inbox ID and the updated config with new tokens.
 type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
 
-// AuthErrorCallback is called when the inbox credentials are rejected by the provider.
-type AuthErrorCallback func(inboxID int)
+// AuthStatusCallback reports the provider's latest verdict on the inbox credentials; ok=true clears a previously flagged failure.
+type AuthStatusCallback func(inboxID int, ok bool)
 
 // Opts holds the options required for the email inbox.
 type Opts struct {
@@ -59,7 +59,7 @@ type Opts struct {
 	Config               models.Config
 	Lo                   *logf.Logger
 	TokenRefreshCallback TokenRefreshCallback // Optional callback for token refresh
-	AuthErrorCallback    AuthErrorCallback    // Optional callback for credential rejection
+	AuthStatusCallback   AuthStatusCallback
 }
 
 // New returns a new instance of the email inbox.
@@ -92,7 +92,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		authType:             opts.Config.AuthType,
 		enablePlusAddressing: opts.Config.EnablePlusAddressing,
 		tokenRefreshCallback: opts.TokenRefreshCallback,
-		authErrorCallback:    opts.AuthErrorCallback,
+		authStatusCallback:   opts.AuthStatusCallback,
 	}
 	return e, nil
 }
@@ -207,12 +207,19 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	}
 
 	e.lo.Info("Successfully refreshed OAuth token", "inbox_id", e.Identifier())
+	e.clearAuthError()
 	return oauthCopy, true, nil
 }
 
 func (e *Email) flagAuthError() {
-	if e.authErrorCallback != nil {
-		e.authErrorCallback(e.Identifier())
+	if e.authStatusCallback != nil {
+		e.authStatusCallback(e.Identifier(), false)
+	}
+}
+
+func (e *Email) clearAuthError() {
+	if e.authStatusCallback != nil {
+		e.authStatusCallback(e.Identifier(), true)
 	}
 }
 

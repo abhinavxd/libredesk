@@ -34,8 +34,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
-	whatsappapi "github.com/abhinavxd/libredesk/internal/whatsapp"
-	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp_template"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	"github.com/abhinavxd/libredesk/internal/media"
@@ -57,6 +55,8 @@ import (
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/view"
 	"github.com/abhinavxd/libredesk/internal/webhook"
+	whatsappapi "github.com/abhinavxd/libredesk/internal/whatsapp"
+	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp_template"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
@@ -697,7 +697,7 @@ func initNotifier() *notifier.Service {
 }
 
 // initEmailInbox loads inbox config from DB and initializes the email inbox.
-func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager, authErrorHook email.AuthErrorCallback) (inbox.Inbox, error) {
+func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager, authStatusHook email.AuthStatusCallback) (inbox.Inbox, error) {
 	var config imodels.Config
 
 	// Load JSON data into Koanf.
@@ -749,7 +749,7 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		Config:               config,
 		Lo:                   initLogger("email_inbox"),
 		TokenRefreshCallback: tokenRefreshCallback,
-		AuthErrorCallback:    authErrorHook,
+		AuthStatusCallback:   authStatusHook,
 	})
 
 	if err != nil {
@@ -815,11 +815,11 @@ func initWhatsAppInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, c
 }
 
 // makeInboxInitializer creates an inbox initializer function.
-func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String), waClient *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater, authErrorHook email.AuthErrorCallback) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
+func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String), waClient *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater, authStatusHook email.AuthStatusCallback) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
 	return func(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
 		switch inboxR.Channel {
 		case inbox.ChannelEmail:
-			return initEmailInbox(inboxR, msgStore, usrStore, mgr, authErrorHook)
+			return initEmailInbox(inboxR, msgStore, usrStore, mgr, authStatusHook)
 		case inbox.ChannelLiveChat:
 			return initLiveChatInbox(inboxR, msgStore, usrStore, signAvatarURL)
 		case inbox.ChannelWhatsApp:
@@ -834,15 +834,15 @@ func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String), 
 func reloadInbox(app *App, id int) error {
 	app.lo.Info("reloading inbox", "id", id)
 	app.inboxAuthErrors.Delete(id)
-	return app.inbox.ReloadInbox(app.ctx, id, makeInboxInitializer(app.inbox, app.conversation.SignAvatarURL, app.whatsappClient, app.conversation, makeInboxAuthErrorHook(app)))
+	return app.inbox.ReloadInbox(app.ctx, id, makeInboxInitializer(app.inbox, app.conversation.SignAvatarURL, app.whatsappClient, app.conversation, makeInboxAuthStatusHook(app)))
 }
 
 // startInboxes registers the active inboxes and starts receiver for each.
-func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.MessageStore, usrStore inbox.UserStore, signAvatarURL func(*null.String), waClient *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater, authErrorHook email.AuthErrorCallback) {
+func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.MessageStore, usrStore inbox.UserStore, signAvatarURL func(*null.String), waClient *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater, authStatusHook email.AuthStatusCallback) {
 	mgr.SetMessageStore(msgStore)
 	mgr.SetUserStore(usrStore)
 
-	if err := mgr.InitInboxes(makeInboxInitializer(mgr, signAvatarURL, waClient, sourceUpdater, authErrorHook)); err != nil {
+	if err := mgr.InitInboxes(makeInboxInitializer(mgr, signAvatarURL, waClient, sourceUpdater, authStatusHook)); err != nil {
 		log.Fatalf("error initializing inboxes: %v", err)
 	}
 
@@ -853,7 +853,13 @@ func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.Messag
 
 // initWhatsAppClient constructs the shared Meta Graph API client.
 func initWhatsAppClient() *whatsappapi.Client {
-	return whatsappapi.New(initLogger("whatsapp_client"))
+	client := whatsappapi.New(initLogger("whatsapp_client"))
+	// Points the client at a stand-in Graph API. Tests set it, production leaves it empty.
+	if url := strings.TrimSpace(ko.String("whatsapp.api_url")); url != "" {
+		log.Printf("WARNING: whatsapp api_url is overridden to %s, no message will reach Meta", url)
+		client.SetBaseURL(url)
+	}
+	return client
 }
 
 // inboxAccountResolver resolves per-inbox Meta credentials for the template manager.

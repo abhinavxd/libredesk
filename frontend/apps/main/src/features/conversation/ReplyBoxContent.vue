@@ -126,6 +126,7 @@
     <ReplyBoxMenuBar
       class="mt-1 shrink-0"
       :isFullscreen="isFullscreen"
+      :isWhatsApp="isWhatsAppConversation"
       :handleFileUpload="handleFileUpload"
       :isSending="isSending"
       :enableSend="enableSend"
@@ -147,6 +148,7 @@ import { Maximize2, Minimize2 } from 'lucide-vue-next'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
+import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
@@ -258,6 +260,9 @@ const emit = defineEmits([
 ])
 
 const conversationStore = useConversationStore()
+const isWhatsAppConversation = computed(
+  () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
+)
 const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
 const { t } = useI18n()

@@ -30,7 +30,7 @@ const WhatsAppWindowDuration = 24 * time.Hour
 // whatsAppMaxTextLength is Meta's cap on a text message body.
 const whatsAppMaxTextLength = 4096
 
-// WhatsAppStatus values mirror Meta's delivery lifecycle, kept in message.meta since the message_status enum collapses delivered/read into sent.
+// WhatsAppStatus values mirror Meta's delivery lifecycle, kept in message.meta.
 const (
 	WhatsAppStatusSent      = "sent"
 	WhatsAppStatusDelivered = "delivered"
@@ -236,15 +236,15 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 			return content, err
 		}
 		if contact.PhoneNumber.String == "" {
-			return content, envelope.NewError(envelope.InputError, "contact has no phone number", nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactNoPhone"), nil)
 		}
 		dialCode := countries.DialCodeForISO(contact.PhoneNumberCountryCode.String)
 		if dialCode == "" {
-			return content, envelope.NewError(envelope.InputError, "contact's phone country code is missing or invalid", nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
 		}
 		toPhone = stringutil.NormalizeWhatsAppPhone(dialCode + contact.PhoneNumber.String)
 		if toPhone == "" {
-			return content, envelope.NewError(envelope.InputError, "contact has no phone number", nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactNoPhone"), nil)
 		}
 		// Link the wa_id now so the contact's reply threads back to this contact instead of forking a duplicate.
 		linkedID, err := m.userStore.LinkChannelIdentity(conv.ContactID, whatsappChannel.ChannelWhatsApp, toPhone)
@@ -252,7 +252,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 			return content, err
 		}
 		if linkedID != conv.ContactID {
-			return content, envelope.NewError(envelope.ConflictError, "contact's phone number is already linked to another contact on WhatsApp", nil)
+			return content, envelope.NewError(envelope.ConflictError, m.i18n.T("conversation.whatsapp.error.numberLinkedToAnotherContact"), nil)
 		}
 	}
 
@@ -267,20 +267,20 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 
 	if templateID > 0 {
 		if m.whatsappTemplate == nil {
-			return content, envelope.NewError(envelope.GeneralError, "whatsapp template store unavailable", nil)
+			return content, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.whatsapp.error.templateStoreUnavailable"), nil)
 		}
 		t, err := m.whatsappTemplate.GetByID(templateID)
 		if err != nil {
 			return content, err
 		}
 		if t.InboxID != inboxRecord.ID {
-			return content, envelope.NewError(envelope.InputError, "template does not belong to this inbox", nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.templateWrongInbox"), nil)
 		}
 		if !strings.EqualFold(t.Status, wtmodels.StatusApproved) {
-			return content, envelope.NewError(envelope.InputError, fmt.Sprintf("template not approved (status: %s)", t.Status), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.templateNotApproved", "status", t.Status), nil)
 		}
 		if t.HeaderType.Valid && !slices.Contains(sendableTemplateHeaderTypes, strings.ToUpper(t.HeaderType.String)) {
-			return content, envelope.NewError(envelope.InputError, fmt.Sprintf("templates with a %s header can't be sent yet", strings.ToUpper(t.HeaderType.String)), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.templateHeaderUnsupported", "type", strings.ToUpper(t.HeaderType.String)), nil)
 		}
 		send.TemplateName = t.Name
 		send.TemplateLanguage = t.Language
@@ -298,19 +298,19 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 				send.TemplateButtons = btns
 			}
 		}
-		if err := validateTemplateParams(t, templateParams); err != nil {
+		if err := m.validateTemplateParams(t, templateParams); err != nil {
 			return content, err
 		}
 		rendered = renderTemplateBody(t.BodyContent, templateParams)
 	} else {
 		if !m.whatsAppWindowOpen(conv.ContactID, conv.InboxID) {
-			return content, envelope.NewError(envelope.InputError, "24h customer service window has expired; reply with an approved template", nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.windowClosed"), nil)
 		}
 		if strings.TrimSpace(content) == "" && !hasAttachments {
-			return content, envelope.NewError(envelope.InputError, "message content is required", nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contentRequired"), nil)
 		}
 		if utf8.RuneCountInString(stringutil.HTML2Text(content)) > whatsAppMaxTextLength {
-			return content, envelope.NewError(envelope.InputError, fmt.Sprintf("message exceeds WhatsApp's %d character limit", whatsAppMaxTextLength), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.tooLong", "limit", strconv.Itoa(whatsAppMaxTextLength)), nil)
 		}
 	}
 
@@ -324,16 +324,16 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 }
 
 // validateTemplateParams rejects unfilled body and text-header placeholders locally, ahead of Meta's opaque parameter-mismatch error.
-func validateTemplateParams(t wtmodels.Template, params map[string]string) error {
+func (m *Manager) validateTemplateParams(t wtmodels.Template, params map[string]string) error {
 	for _, key := range whatsapp.OrderedPlaceholders(t.BodyContent) {
 		if strings.TrimSpace(params["body:"+key]) == "" {
-			return envelope.NewError(envelope.InputError, fmt.Sprintf("missing value for template parameter {{%s}}", key), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.missingBodyParam", "placeholder", "{{"+key+"}}"), nil)
 		}
 	}
 	if t.HeaderType.Valid && strings.EqualFold(t.HeaderType.String, "TEXT") {
 		for _, key := range whatsapp.OrderedPlaceholders(t.HeaderContent.String) {
 			if strings.TrimSpace(params["header:"+key]) == "" {
-				return envelope.NewError(envelope.InputError, fmt.Sprintf("missing value for template header parameter {{%s}}", key), nil)
+				return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.missingHeaderParam", "placeholder", "{{"+key+"}}"), nil)
 			}
 		}
 	}
@@ -345,7 +345,7 @@ func validateTemplateParams(t wtmodels.Template, params map[string]string) error
 					continue
 				}
 				if strings.TrimSpace(params["button_url_"+strconv.Itoa(i)]) == "" {
-					return envelope.NewError(envelope.InputError, fmt.Sprintf("missing value for the %s button link", b.Text), nil)
+					return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.missingButtonParam", "button", b.Text), nil)
 				}
 			}
 		}

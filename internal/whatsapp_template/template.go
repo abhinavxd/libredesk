@@ -18,6 +18,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -47,6 +48,7 @@ type queries struct {
 	UpdateStatus               *sqlx.Stmt `query:"update-status"`
 	UpdateMetaID               *sqlx.Stmt `query:"update-meta-id"`
 	Delete                     *sqlx.Stmt `query:"delete"`
+	DeleteMissingFromMeta      *sqlx.Stmt `query:"delete-missing-from-meta"`
 	GetByID                    *sqlx.Stmt `query:"get-by-id"`
 	GetByInbox                 *sqlx.Stmt `query:"get-by-inbox"`
 	GetByName                  *sqlx.Stmt `query:"get-by-name"`
@@ -275,11 +277,12 @@ func (m *Manager) Delete(ctx context.Context, id int) error {
 		return err
 	}
 	if strings.HasPrefix(t.Name, models.CSATTemplateNamePrefix) {
-		return envelope.NewError(envelope.InputError, "this template is reserved for CSAT surveys and cannot be deleted", nil)
+		return envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.reserved"), nil)
 	}
-	if m.client != nil && m.resolver != nil {
+	// Without a Meta template ID nothing was registered; deleting by name alone would take out every language variant sharing it.
+	if m.client != nil && m.resolver != nil && t.MetaTemplateID.Valid && t.MetaTemplateID.String != "" {
 		if acc, err := m.resolver.WhatsAppAccount(t.InboxID); err == nil {
-			if err := m.client.DeleteTemplate(ctx, acc, t.Name); err != nil {
+			if err := m.client.DeleteTemplate(ctx, acc, t.Name, t.MetaTemplateID.String); err != nil {
 				m.lo.Error("error deleting template on meta", "id", id, "name", t.Name, "error", err)
 			}
 		}
@@ -304,7 +307,11 @@ func (m *Manager) SyncFromMeta(ctx context.Context, inboxID int) (int, error) {
 		return 0, err
 	}
 	count := 0
+	metaIDs := make([]string, 0, len(templates))
 	for _, mt := range templates {
+		if mt.ID != "" {
+			metaIDs = append(metaIDs, mt.ID)
+		}
 		row := metaToRow(inboxID, mt)
 		var stored models.Template
 		if err := m.q.UpsertFromMeta.Get(&stored,
@@ -316,6 +323,9 @@ func (m *Manager) SyncFromMeta(ctx context.Context, inboxID int) (int, error) {
 			continue
 		}
 		count++
+	}
+	if _, err := m.q.DeleteMissingFromMeta.Exec(inboxID, pq.Array(metaIDs)); err != nil {
+		m.lo.Error("error pruning templates deleted on meta", "inbox_id", inboxID, "error", err)
 	}
 	return count, nil
 }
@@ -329,6 +339,10 @@ func (m *Manager) HandleStatusUpdate(inboxID int, metaTemplateID, name, language
 	if status == "" {
 		m.lo.Info("ignoring unhandled whatsapp template status event", "name", name, "language", language, "event", event)
 		return nil
+	}
+	// Meta sends reason "NONE" on approval, which would read as a real rejection reason.
+	if strings.EqualFold(reason, "NONE") {
+		reason = ""
 	}
 	if metaTemplateID != "" {
 		res, err := m.q.UpdateStatusByMetaID.Exec(inboxID, metaTemplateID, status, reason)
@@ -385,7 +399,7 @@ func metaToRow(inboxID int, mt whatsapp.MetaTemplate) models.Template {
 			}
 		}
 	}
-	if mt.RejectedReason != "" {
+	if mt.RejectedReason != "" && !strings.EqualFold(mt.RejectedReason, "NONE") {
 		row.RejectionReason = null.StringFrom(mt.RejectedReason)
 	}
 	if row.Buttons == nil {

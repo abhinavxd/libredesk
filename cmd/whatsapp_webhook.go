@@ -33,7 +33,16 @@ const (
 	whatsAppStatusNotFoundGrace = 10 * time.Minute
 )
 
-var errNoEnabledWhatsAppInbox = errors.New("no enabled whatsapp inbox for event")
+var (
+	errNoEnabledWhatsAppInbox = errors.New("no enabled whatsapp inbox for event")
+
+	// whatsAppConversationLocks serializes the open-conversation lookup + create per contact and inbox, across webhook ingest and agent-initiated creates.
+	whatsAppConversationLocks = &keyedLock{entries: make(map[string]*keyedLockEntry)}
+)
+
+func lockWhatsAppConversation(contactID, inboxID int) func() {
+	return whatsAppConversationLocks.lock(strconv.Itoa(contactID) + ":" + strconv.Itoa(inboxID))
+}
 
 func handleWhatsAppWebhookVerify(r *fastglue.Request) error {
 	app := r.Context.(*App)
@@ -209,6 +218,8 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		return fmt.Errorf("resolving contact: %w", err)
 	}
 
+	defer lockWhatsAppConversation(contactID, inboxID)()
+
 	isNewConversation := false
 	conversationID, conversationUUID, err := app.conversation.GetLatestOpenConversationForContact(contactID, inboxID)
 	if errors.Is(err, sql.ErrNoRows) && inbRec.ReopenWindowHours > 0 {
@@ -370,8 +381,9 @@ func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel
 func isPermanentMediaError(err error) bool {
 	var me *whatsapp.MetaAPIError
 	if errors.As(err, &me) {
-		// 408 and 429 are 4xx but retryable; 5xx are transient.
-		if me.StatusCode == http.StatusRequestTimeout || me.StatusCode == http.StatusTooManyRequests {
+		// 408 and 429 are 4xx but retryable; 401/403 recover once the operator replaces the token; 5xx are transient.
+		if me.StatusCode == http.StatusRequestTimeout || me.StatusCode == http.StatusTooManyRequests ||
+			me.StatusCode == http.StatusUnauthorized || me.StatusCode == http.StatusForbidden {
 			return false
 		}
 		return me.StatusCode >= 400 && me.StatusCode < 500

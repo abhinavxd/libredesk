@@ -274,7 +274,14 @@ new_identity AS (
 SELECT COALESCE(
     (SELECT contact_id FROM new_identity),
     (SELECT contact_id FROM existing)
-) AS id;
+) AS id,
+(SELECT id FROM new_contact) AS inserted_id;
+
+-- name: delete-orphaned-contact
+-- Cleans up the losing row of a concurrent identity upsert; the guard keeps it a no-op for any contact that gained an identity.
+DELETE FROM users
+WHERE id = $1 AND type = 'contact'
+AND NOT EXISTS (SELECT 1 FROM contact_channel_identities WHERE contact_id = $1);
 
 -- name: insert-visitor
 INSERT INTO users (email, type, first_name, last_name, custom_attributes, phone_number, phone_number_country_code)

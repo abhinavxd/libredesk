@@ -25,7 +25,7 @@ RETURNING *;
 -- name: update-status
 UPDATE whatsapp_templates
 SET status = $2,
-    rejection_reason = $3,
+    rejection_reason = NULLIF($3, ''),
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
@@ -40,17 +40,33 @@ WHERE id = $1;
 -- name: delete
 DELETE FROM whatsapp_templates WHERE id = $1;
 
+-- name: delete-missing-from-meta
+-- Rows without a Meta template ID are local drafts that never reached Meta and must survive the prune.
+DELETE FROM whatsapp_templates
+WHERE inbox_id = $1
+  AND meta_template_id IS NOT NULL
+  AND meta_template_id != ''
+  AND NOT (meta_template_id = ANY($2::text[]));
+
 -- name: get-by-id
-SELECT * FROM whatsapp_templates WHERE id = $1;
+SELECT id, created_at, updated_at, inbox_id, meta_template_id, name, language, category, status,
+       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason
+FROM whatsapp_templates WHERE id = $1;
 
 -- name: get-by-inbox
-SELECT * FROM whatsapp_templates WHERE inbox_id = $1 ORDER BY updated_at DESC;
+SELECT id, created_at, updated_at, inbox_id, meta_template_id, name, language, category, status,
+       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason
+FROM whatsapp_templates WHERE inbox_id = $1 ORDER BY updated_at DESC;
 
 -- name: get-by-name-language
-SELECT * FROM whatsapp_templates WHERE inbox_id = $1 AND name = $2 AND language = $3;
+SELECT id, created_at, updated_at, inbox_id, meta_template_id, name, language, category, status,
+       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason
+FROM whatsapp_templates WHERE inbox_id = $1 AND name = $2 AND language = $3;
 
 -- name: get-by-name
-SELECT * FROM whatsapp_templates WHERE inbox_id = $1 AND name = $2 LIMIT 1;
+SELECT id, created_at, updated_at, inbox_id, meta_template_id, name, language, category, status,
+       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason
+FROM whatsapp_templates WHERE inbox_id = $1 AND name = $2 LIMIT 1;
 
 -- name: upsert-from-meta
 INSERT INTO whatsapp_templates (
@@ -85,7 +101,7 @@ RETURNING *;
 -- name: update-status-by-meta-id
 UPDATE whatsapp_templates
 SET status = $3,
-    rejection_reason = $4,
+    rejection_reason = NULLIF($4, ''),
     updated_at = NOW()
 WHERE inbox_id = $1
   AND meta_template_id = $2;
@@ -93,7 +109,7 @@ WHERE inbox_id = $1
 -- name: update-status-by-name-language
 UPDATE whatsapp_templates
 SET status = $3,
-    rejection_reason = $4,
+    rejection_reason = NULLIF($4, ''),
     updated_at = NOW()
 WHERE inbox_id = $1
   AND name = $2

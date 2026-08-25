@@ -71,6 +71,10 @@ export default defineConfig(({ mode, command }) => {
           target: apiTarget,
           changeOrigin: true,
         },
+        '/webhooks': {
+          target: apiTarget,
+          changeOrigin: true,
+        },
         '/ws': {
           target: wsTarget,
           ws: true,

@@ -58,11 +58,34 @@ func (c *Client) ValidateCredentials(ctx context.Context, acc Account) error {
 	if _, err := c.doRequest(ctx, http.MethodGet, endpoint, nil, acc); err != nil {
 		return err
 	}
-	endpoint = fmt.Sprintf("%s/%s/%s/phone_numbers", c.baseURL, acc.Version(), acc.WABAID)
-	if _, err := c.doRequest(ctx, http.MethodGet, endpoint, nil, acc); err != nil {
-		return err
+	return c.checkPhoneNumberInWABA(ctx, acc)
+}
+
+// checkPhoneNumberInWABA rejects a phone-number ID that belongs to a different WABA reachable with the same token.
+func (c *Client) checkPhoneNumberInWABA(ctx context.Context, acc Account) error {
+	endpoint := fmt.Sprintf("%s/%s/%s/phone_numbers?limit=100", c.baseURL, acc.Version(), acc.WABAID)
+	for page := 0; endpoint != "" && page < maxTemplatePages; page++ {
+		if page > 0 {
+			if err := c.checkAuthenticatedHost(endpoint); err != nil {
+				return err
+			}
+		}
+		body, err := c.doRequest(ctx, http.MethodGet, endpoint, nil, acc)
+		if err != nil {
+			return err
+		}
+		var resp phoneNumberListResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return fmt.Errorf("decoding phone number list: %w", err)
+		}
+		for _, pn := range resp.Data {
+			if pn.ID == acc.PhoneNumberID {
+				return nil
+			}
+		}
+		endpoint = resp.Paging.Next
 	}
-	return nil
+	return fmt.Errorf("phone number ID %s does not belong to WhatsApp business account %s", acc.PhoneNumberID, acc.WABAID)
 }
 
 func (c *Client) SendText(ctx context.Context, acc Account, toPhone, body, replyToID string) (string, error) {
@@ -279,9 +302,12 @@ func (c *Client) SubmitTemplate(ctx context.Context, acc Account, t TemplateSubm
 	return resp.ID, nil
 }
 
-// DeleteTemplate removes a template by name (Meta deletes all language variants).
-func (c *Client) DeleteTemplate(ctx context.Context, acc Account, name string) error {
+// DeleteTemplate without a Meta template ID deletes every language variant sharing the name.
+func (c *Client) DeleteTemplate(ctx context.Context, acc Account, name, metaTemplateID string) error {
 	endpoint := fmt.Sprintf("%s/%s/%s/message_templates?name=%s", c.baseURL, acc.Version(), acc.WABAID, url.QueryEscape(name))
+	if metaTemplateID != "" {
+		endpoint += "&hsm_id=" + url.QueryEscape(metaTemplateID)
+	}
 	_, err := c.doRequest(ctx, http.MethodDelete, endpoint, nil, acc)
 	return err
 }
@@ -365,12 +391,16 @@ func parseMetaError(statusCode int, respBody []byte) error {
 // checkAuthenticatedHost guards URLs read out of Meta response bodies before the access token is attached.
 func (c *Client) checkAuthenticatedHost(raw string) error {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" {
-		return fmt.Errorf("refusing to call non-https url %q", raw)
+	if err != nil || u.Host == "" {
+		return fmt.Errorf("refusing to call malformed url %q", raw)
 	}
 	host := strings.ToLower(u.Hostname())
-	if base, err := url.Parse(c.baseURL); err == nil && strings.EqualFold(base.Hostname(), host) {
+	// The configured API host is trusted on its own scheme, everything else must be https.
+	if base, err := url.Parse(c.baseURL); err == nil && strings.EqualFold(base.Hostname(), host) && base.Scheme == u.Scheme {
 		return nil
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("refusing to call non-https url %q", raw)
 	}
 	for _, suffix := range metaHostSuffixes {
 		if host == suffix || strings.HasSuffix(host, "."+suffix) {

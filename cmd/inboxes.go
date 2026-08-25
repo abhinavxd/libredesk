@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/mail"
 	"net/url"
 	"regexp"
@@ -63,8 +62,14 @@ func handleGetInbox(r *fastglue.Request) error {
 	return r.SendEnvelope(inbox)
 }
 
-func makeInboxAuthErrorHook(app *App) email.AuthErrorCallback {
-	return func(inboxID int) {
+func makeInboxAuthStatusHook(app *App) email.AuthStatusCallback {
+	return func(inboxID int, ok bool) {
+		if ok {
+			if _, flagged := app.inboxAuthErrors.LoadAndDelete(inboxID); flagged {
+				app.lo.Info("inbox credentials recovered", "inbox_id", inboxID)
+			}
+			return
+		}
 		if _, flagged := app.inboxAuthErrors.LoadOrStore(inboxID, time.Now()); !flagged {
 			app.lo.Error("inbox credentials rejected, messages will not be sent or received until they are updated", "inbox_id", inboxID)
 		}
@@ -135,10 +140,10 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	}
 	var cfg whatsappChannel.Config
 	if err := json.Unmarshal(inb.Config, &cfg); err != nil {
-		return envelope.NewError(envelope.InputError, "invalid whatsapp config format", nil)
+		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.whatsapp.error.invalidConfig"), nil)
 	}
 	if err := app.whatsappClient.ValidateCredentials(r.RequestCtx, cfg.Account()); err != nil {
-		return envelope.NewError(envelope.InputError, fmt.Sprintf("meta credential check failed: %s", err.Error()), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("admin.inbox.whatsapp.error.credentialCheckFailed", "error", err.Error()), nil)
 	}
 	return nil
 }
@@ -266,27 +271,24 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	var previousConfig json.RawMessage
+	// Credentials arrive masked; the check must run on the merged config, before anything is persisted.
 	if inbox.Channel == whatsappChannel.ChannelWhatsApp {
 		previous, err := app.inbox.GetDBRecord(id)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		previousConfig = previous.Config
+		merged, err := app.inbox.MergeWhatsAppSecrets(previous.Config, inbox.Config)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		inbox.Config = merged
+		if err := validateWhatsAppCredentials(r, app, inbox); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
 	}
 
 	updatedInbox, err := app.inbox.Update(id, inbox)
 	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-
-	if err := validateWhatsAppCredentials(r, app, updatedInbox); err != nil {
-		if rbErr := app.inbox.UpdateConfig(id, previousConfig); rbErr != nil {
-			app.lo.Error("error rolling back inbox config after failed validation", "id", id, "error", rbErr)
-		}
-		if rbErr := reloadInbox(app, id); rbErr != nil {
-			app.lo.Error("error reloading inbox after config rollback", "id", id, "error", rbErr)
-		}
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -346,6 +348,7 @@ func handleDeleteInbox(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
+	deleted, recErr := app.inbox.GetDBRecord(id)
 	err := app.inbox.SoftDelete(id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -354,7 +357,30 @@ func handleDeleteInbox(r *fastglue.Request) error {
 		app.lo.Error("error reloading inbox", "id", id, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
+	if recErr == nil && deleted.Channel == whatsappChannel.ChannelWhatsApp {
+		go repointWhatsAppWebhookAfterDelete(app, deleted)
+	}
 	return r.SendEnvelope(true)
+}
+
+// repointWhatsAppWebhookAfterDelete moves a shared WABA's callback to a surviving inbox, else Meta keeps posting every WABA event to the deleted inbox's dead URL.
+func repointWhatsAppWebhookAfterDelete(app *App, deleted imodels.Inbox) {
+	defer func() {
+		if r := recover(); r != nil {
+			app.lo.Error("recovered from panic in whatsapp webhook repoint", "inbox_id", deleted.ID, "panic", r)
+		}
+	}()
+	cfg, err := whatsAppConfigFromRecord(deleted)
+	if err != nil || cfg.WABAID == "" {
+		return
+	}
+	forEachEnabledWhatsAppInbox(app, func(rec imodels.Inbox, c whatsappChannel.Config) bool {
+		if rec.ID == deleted.ID || c.WABAID != cfg.WABAID {
+			return true
+		}
+		subscribeWhatsAppWebhook(app, rec.ID)
+		return false
+	})
 }
 
 func postSaveWhatsAppTasks(app *App, inboxID int) {
@@ -367,22 +393,23 @@ func postSaveWhatsAppTasks(app *App, inboxID int) {
 	ensureWhatsAppCSATTemplate(app, inboxID)
 }
 
-// reconcileWhatsAppCSATTemplates re-registers every enabled WhatsApp inbox's CSAT template, whose button embeds the root URL.
-func reconcileWhatsAppCSATTemplates(app *App) {
+// reconcileWhatsAppRootURL re-registers every enabled WhatsApp inbox's webhook callback and CSAT template, both of which embed the root URL.
+func reconcileWhatsAppRootURL(app *App) {
 	defer func() {
 		if r := recover(); r != nil {
-			app.lo.Error("recovered from panic in whatsapp csat template reconcile", "panic", r)
+			app.lo.Error("recovered from panic in whatsapp root url reconcile", "panic", r)
 		}
 	}()
 	inboxes, err := app.inbox.GetAll()
 	if err != nil {
-		app.lo.Error("error listing inboxes for csat template reconcile", "error", err)
+		app.lo.Error("error listing inboxes for whatsapp root url reconcile", "error", err)
 		return
 	}
 	for _, inb := range inboxes {
 		if inb.Channel != inbox.ChannelWhatsApp || !inb.Enabled {
 			continue
 		}
+		subscribeWhatsAppWebhook(app, inb.ID)
 		ensureWhatsAppCSATTemplate(app, inb.ID)
 	}
 }
@@ -417,21 +444,21 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 	if inbox.Channel == whatsappChannel.ChannelWhatsApp {
 		var cfg whatsappChannel.Config
 		if err := json.Unmarshal(inbox.Config, &cfg); err != nil {
-			return envelope.NewError(envelope.InputError, "invalid whatsapp config", nil)
+			return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.whatsapp.error.invalidConfig"), nil)
 		}
 		if cfg.PhoneNumberID == "" || cfg.WABAID == "" {
-			return envelope.NewError(envelope.InputError, "phone_number_id and waba_id are required", nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`phone_number_id`, `waba_id`"), nil)
 		}
 		if cfg.WebhookVerifyToken == "" {
-			return envelope.NewError(envelope.InputError, "webhook_verify_token is required", nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`webhook_verify_token`"), nil)
 		}
 		// On edit secrets arrive masked/empty and the config merge restores them.
 		if !isUpdate {
 			if cfg.AccessToken == "" {
-				return envelope.NewError(envelope.InputError, "access_token is required", nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`access_token`"), nil)
 			}
 			if cfg.AppSecret == "" {
-				return envelope.NewError(envelope.InputError, "app_secret is required", nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`app_secret`"), nil)
 			}
 		}
 	}

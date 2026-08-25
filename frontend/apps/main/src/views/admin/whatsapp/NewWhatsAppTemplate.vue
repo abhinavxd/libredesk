@@ -28,11 +28,11 @@
 
           <FormField v-slot="{ componentField }" name="category">
             <FormItem>
-              <FormLabel>{{ $t('admin.whatsappTemplates.category') }}</FormLabel>
+              <FormLabel>{{ $t('globals.terms.category') }}</FormLabel>
               <FormControl>
                 <Select v-bind="componentField">
                   <SelectTrigger>
-                    <SelectValue :placeholder="$t('admin.whatsappTemplates.selectCategory')" />
+                    <SelectValue :placeholder="$t('globals.messages.selectCategory')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem v-for="c in TEMPLATE_CATEGORIES" :key="c" :value="c">{{
@@ -52,7 +52,7 @@
         <div class="grid grid-cols-2 gap-4">
           <FormField v-slot="{ componentField }" name="name">
             <FormItem>
-              <FormLabel>{{ $t('admin.whatsappTemplates.name') }}</FormLabel>
+              <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
               <FormControl>
                 <Input type="text" placeholder="order_status" v-bind="componentField" />
               </FormControl>
@@ -82,12 +82,12 @@
         </div>
 
         <div class="box p-4 space-y-4">
-          <h3 class="font-semibold">{{ $t('admin.whatsappTemplates.header') }}</h3>
+          <h3 class="font-semibold">{{ $t('globals.terms.header') }}</h3>
 
           <div class="grid grid-cols-2 gap-4">
             <FormField v-slot="{ componentField }" name="header_type">
               <FormItem>
-                <FormLabel>{{ $t('admin.whatsappTemplates.headerType') }}</FormLabel>
+                <FormLabel>{{ $t('globals.terms.headerType') }}</FormLabel>
                 <FormControl>
                   <Select v-bind="componentField">
                     <SelectTrigger>
@@ -109,7 +109,7 @@
             name="header_content"
           >
             <FormItem>
-              <FormLabel>{{ $t('admin.whatsappTemplates.headerText') }}</FormLabel>
+              <FormLabel>{{ $t('globals.terms.headerText') }}</FormLabel>
               <FormControl>
                 <Input type="text" v-bind="componentField" />
               </FormControl>
@@ -122,11 +122,11 @@
         </div>
 
         <div class="box p-4 space-y-4">
-          <h3 class="font-semibold">{{ $t('admin.whatsappTemplates.body') }}</h3>
+          <h3 class="font-semibold">{{ $t('globals.terms.body') }}</h3>
 
           <FormField v-slot="{ componentField }" name="body_content">
             <FormItem>
-              <FormLabel>{{ $t('admin.whatsappTemplates.bodyText') }}</FormLabel>
+              <FormLabel>{{ $t('globals.terms.bodyText') }}</FormLabel>
               <FormControl>
                 <Textarea
                   :placeholder="$t('admin.whatsappTemplates.bodyText.placeholder')"
@@ -156,7 +156,7 @@
         </div>
 
         <div v-if="placeholders.length" class="box p-4 space-y-4">
-          <h3 class="font-semibold">{{ $t('admin.whatsappTemplates.sampleValues') }}</h3>
+          <h3 class="font-semibold">{{ $t('globals.terms.sampleValue', 2) }}</h3>
           <p class="text-xs text-muted-foreground">
             {{ $t('admin.whatsappTemplates.sampleValues.description') }}
           </p>
@@ -165,7 +165,7 @@
             <div class="col-span-2">
               <Input
                 v-model="sampleValues[key]"
-                :placeholder="$t('admin.whatsappTemplates.sampleValues.placeholder')"
+                :placeholder="$t('globals.terms.sampleValue')"
               />
               <p v-if="sampleErrors[key]" class="text-sm text-destructive mt-1">
                 {{ sampleErrors[key] }}
@@ -176,7 +176,7 @@
 
         <div class="box p-4 space-y-4">
           <div class="flex items-center justify-between">
-            <h3 class="font-semibold">{{ $t('globals.terms.buttons') }}</h3>
+            <h3 class="font-semibold">{{ $t('globals.terms.button', 2) }}</h3>
             <Button
               type="button"
               variant="outline"
@@ -185,7 +185,7 @@
               @click="addButton"
             >
               <Plus class="size-4" />
-              {{ $t('admin.whatsappTemplates.addButton') }}
+              {{ $t('globals.messages.addButton') }}
             </Button>
           </div>
 
@@ -242,7 +242,7 @@
       <div class="space-y-4">
         <div class="space-y-1">
           <p class="text-sm font-medium text-foreground">
-            {{ $t('admin.whatsappTemplates.newTemplate') }}
+            {{ $t('globals.messages.newTemplate') }}
           </p>
           <p class="text-sm text-muted-foreground">
             {{ $t('admin.whatsappTemplates.help.create') }}
@@ -315,7 +315,7 @@ const buttons = ref([])
 
 const breadcrumbLinks = [
   { path: 'whatsapp-templates', label: t('admin.whatsappTemplates.title') },
-  { path: '', label: t('admin.whatsappTemplates.newTemplate') }
+  { path: '', label: t('globals.messages.newTemplate') }
 ]
 
 const whatsappInboxes = computed(() =>
