@@ -340,7 +340,7 @@ func main() {
 	g.Router.NotFound = helpCenterHostNotFound(app, g)
 
 	// Buffers above this are dropped rather than reused, and the ones we keep stay with the connection until it closes.
-	fasthttp.SetBodySizePoolLimit(64<<10, 1<<20) // request: 64 KiB, response: 1 MiB
+	fasthttp.SetBodySizePoolLimit(64<<10, 64<<10) // 64 KiB
 
 	s := &fasthttp.Server{
 		Name:                 appName,

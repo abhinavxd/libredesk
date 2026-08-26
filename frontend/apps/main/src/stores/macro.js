@@ -9,6 +9,9 @@ import { permissions as perms } from '../constants/permissions.js'
 
 export const useMacroStore = defineStore('macroStore', () => {
     const macroList = ref([])
+    // Message content is not in the list response; it is fetched per macro and cached here.
+    const macroContents = ref({})
+    const contentFetches = {}
     const emitter = useEmitter()
     const userStore = useUserStore()
     const currentView = ref('')
@@ -51,8 +54,8 @@ export const useMacroStore = defineStore('macroStore', () => {
             })
         })
 
-        // Skip macros that do not have any actions left AND the macro field `message_content` is empty.
-        filtered = filtered.filter(macro => !(macro.actions.length === 0 && macro.message_content === ""))
+        // Skip macros that do not have any actions left AND no message content.
+        filtered = filtered.filter(macro => !(macro.actions.length === 0 && !macro.has_message_content))
 
         return filtered.map(macro => ({
             ...macro,
@@ -64,14 +67,31 @@ export const useMacroStore = defineStore('macroStore', () => {
     const loadMacros = async (force = false) => {
         if (!force && macroList.value.length) return
         try {
-            const response = await api.getAllMacros()
+            const response = await api.getAllMacrosCompact()
             macroList.value = response?.data?.data || []
+            if (force) macroContents.value = {}
         } catch (error) {
             emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
                 variant: 'destructive',
                 description: handleHTTPError(error).message
             })
         }
+    }
+
+    const fetchMacroContent = (id) => {
+        if (id in macroContents.value) return Promise.resolve(macroContents.value[id])
+        if (!contentFetches[id]) {
+            contentFetches[id] = api.getMacro(id)
+                .then(response => {
+                    const content = response?.data?.data?.message_content || ''
+                    macroContents.value[id] = content
+                    return content
+                })
+                .finally(() => {
+                    delete contentFetches[id]
+                })
+        }
+        return contentFetches[id]
     }
 
     const setCurrentView = (view) => {
@@ -81,8 +101,10 @@ export const useMacroStore = defineStore('macroStore', () => {
     return {
         macroList,
         macroOptions,
+        macroContents,
         currentView,
         loadMacros,
+        fetchMacroContent,
         setCurrentView
     }
 })

@@ -48,7 +48,7 @@ const refreshList = (data) => {
 const getMacros = async () => {
   try {
     formLoading.value = true
-    const resp = await api.getAllMacros()
+    const resp = await api.getAllMacrosCompact()
     macros.value = resp.data.data
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {

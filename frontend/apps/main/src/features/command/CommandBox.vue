@@ -75,7 +75,10 @@
               <div class="col-span-8 px-4 overflow-y-auto h-full pb-6">
                 <div class="space-y-3 text-sm">
                   <!-- Reply Preview -->
-                  <div v-if="replyContent" class="space-y-2">
+                  <div v-if="contentPending" class="flex items-center justify-center h-32">
+                    <Spinner />
+                  </div>
+                  <div v-else-if="replyContent" class="space-y-2">
                     <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       {{ $t('command.replyPreview') }}
                     </p>
@@ -126,7 +129,7 @@
 
                   <!-- Empty State -->
                   <div
-                    v-if="!replyContent && otherActions.length === 0"
+                    v-if="!contentPending && !replyContent && otherActions.length === 0"
                     class="flex flex-col items-center justify-center h-32 gap-2"
                   >
                     <Zap :size="20" class="text-muted-foreground/50" />
@@ -245,6 +248,8 @@ import { Button } from '@shared-ui/components/ui/button'
 import { Calendar } from '@shared-ui/components/ui/calendar'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
+import { Spinner } from '@shared-ui/components/ui/spinner'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import { Letter } from 'vue-letter'
 
@@ -325,9 +330,22 @@ watch([Meta_M, Ctrl_M], ([mac, win]) => {
 
 const highlightedMacro = ref(null)
 
-function handleApplyMacro(macro) {
+async function handleApplyMacro(macro) {
+  let messageContent = ''
+  if (macro.has_message_content) {
+    try {
+      messageContent = await macroStore.fetchMacroContent(macro.id)
+    } catch (error) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: handleHTTPError(error).message
+      })
+      return
+    }
+  }
   // Create a deep copy.
   const plainMacro = JSON.parse(JSON.stringify(macro))
+  plainMacro.message_content = messageContent
   if (nestedCommand.value === 'apply-macro-to-new-conversation') {
     conversationStore.setMacro(plainMacro, MACRO_CONTEXT.NEW_CONVERSATION)
   } else {
@@ -349,7 +367,25 @@ const getActionLabel = computed(() => (action) => {
   return `${prefixes[action.type]}: ${action.display_value.length > 0 ? action.display_value.join(', ') : action.value.join(', ')}`
 })
 
-const replyContent = computed(() => highlightedMacro.value?.message_content || '')
+const replyContent = computed(() => {
+  const macro = highlightedMacro.value
+  return macro ? macroStore.macroContents[macro.id] || '' : ''
+})
+
+const contentPending = computed(() => {
+  const macro = highlightedMacro.value
+  return Boolean(macro?.has_message_content && !(macro.id in macroStore.macroContents))
+})
+
+let contentFetchTimer = null
+
+watch(highlightedMacro, (macro) => {
+  clearTimeout(contentFetchTimer)
+  if (!macro?.has_message_content || macro.id in macroStore.macroContents) return
+  contentFetchTimer = setTimeout(() => {
+    macroStore.fetchMacroContent(macro.id).catch(() => {})
+  }, 150)
+})
 
 const otherActions = computed(
   () =>
@@ -443,5 +479,6 @@ onMounted(() => {
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.SET_NESTED_COMMAND, nestedCommandHandler)
   highlightObserver?.disconnect()
+  clearTimeout(contentFetchTimer)
 })
 </script>

@@ -31,6 +31,7 @@ type Manager struct {
 type queries struct {
 	Get            *sqlx.Stmt `query:"get"`
 	GetAll         *sqlx.Stmt `query:"get-all"`
+	GetAllCompact  *sqlx.Stmt `query:"get-all-compact"`
 	Create         *sqlx.Stmt `query:"create"`
 	Update         *sqlx.Stmt `query:"update"`
 	Delete         *sqlx.Stmt `query:"delete"`
@@ -93,6 +94,17 @@ func (m *Manager) Update(id int, name, messageContent string, userID, teamID *in
 func (m *Manager) GetAll() ([]models.Macro, error) {
 	macros := make([]models.Macro, 0)
 	err := m.q.GetAll.Select(&macros)
+	if err != nil {
+		m.lo.Error("error fetching macros", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return macros, nil
+}
+
+// GetAllCompact returns all macros without message content.
+func (m *Manager) GetAllCompact() ([]models.MacroCompact, error) {
+	macros := make([]models.MacroCompact, 0)
+	err := m.q.GetAllCompact.Select(&macros)
 	if err != nil {
 		m.lo.Error("error fetching macros", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

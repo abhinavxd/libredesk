@@ -34,6 +34,24 @@ FROM
 ORDER BY
     updated_at DESC;
 
+-- name: get-all-compact
+SELECT
+    id,
+    created_at,
+    updated_at,
+    name,
+    actions,
+    visibility,
+    visible_when,
+    message_content != '' AS has_message_content,
+    user_id,
+    team_id,
+    usage_count
+FROM
+    macros
+ORDER BY
+    updated_at DESC;
+
 -- name: create
 INSERT INTO
     macros (name, message_content, user_id, team_id, visibility, visible_when, actions)
