@@ -1,0 +1,116 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
+
+vi.mock('@main/api', () => ({
+  default: {
+    getAllMacrosCompact: vi.fn(),
+    getMacro: vi.fn()
+  }
+}))
+
+vi.mock('@main/composables/useEmitter', () => ({
+  useEmitter: () => ({ emit: vi.fn(), on: vi.fn(), off: vi.fn() })
+}))
+
+vi.mock('@main/stores/user', () => ({
+  useUserStore: () => ({ teams: [], userID: 1, can: () => true })
+}))
+
+import api from '@main/api'
+import { useMacroStore } from '@main/stores/macro'
+
+const compactMacro = (overrides = {}) => ({
+  id: 1,
+  name: 'Macro',
+  actions: [],
+  visibility: 'all',
+  visible_when: ['replying'],
+  has_message_content: true,
+  user_id: null,
+  team_id: null,
+  usage_count: 0,
+  ...overrides
+})
+
+describe('macro store', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('loads the list from the compact endpoint', async () => {
+    api.getAllMacrosCompact.mockResolvedValue({ data: { data: [compactMacro()] } })
+    const store = useMacroStore()
+
+    await store.loadMacros()
+
+    expect(api.getAllMacrosCompact).toHaveBeenCalledTimes(1)
+    expect(store.macroList).toHaveLength(1)
+  })
+
+  it('drops macros with no actions and no message content from the options', async () => {
+    api.getAllMacrosCompact.mockResolvedValue({
+      data: {
+        data: [
+          compactMacro({ id: 1, name: 'content only', has_message_content: true }),
+          compactMacro({ id: 2, name: 'actions only', has_message_content: false, actions: [{ type: 'add_tags', value: ['x'] }] }),
+          compactMacro({ id: 3, name: 'empty', has_message_content: false })
+        ]
+      }
+    })
+    const store = useMacroStore()
+    await store.loadMacros()
+
+    expect(store.macroOptions.map((m) => m.id)).toEqual([1, 2])
+  })
+
+  it('fetches macro content once and serves it from the cache after', async () => {
+    api.getMacro.mockResolvedValue({ data: { data: { id: 7, message_content: '<p>hi</p>' } } })
+    const store = useMacroStore()
+
+    const first = await store.fetchMacroContent(7)
+    const second = await store.fetchMacroContent(7)
+
+    expect(first).toBe('<p>hi</p>')
+    expect(second).toBe('<p>hi</p>')
+    expect(api.getMacro).toHaveBeenCalledTimes(1)
+    expect(store.macroContents[7]).toBe('<p>hi</p>')
+  })
+
+  it('dedupes concurrent fetches for the same macro', async () => {
+    let resolve
+    api.getMacro.mockReturnValue(new Promise((r) => (resolve = r)))
+    const store = useMacroStore()
+
+    const a = store.fetchMacroContent(7)
+    const b = store.fetchMacroContent(7)
+    resolve({ data: { data: { id: 7, message_content: '<p>hi</p>' } } })
+
+    expect(await a).toBe('<p>hi</p>')
+    expect(await b).toBe('<p>hi</p>')
+    expect(api.getMacro).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects and caches nothing when the fetch fails', async () => {
+    api.getMacro.mockRejectedValue(new Error('boom'))
+    const store = useMacroStore()
+
+    await expect(store.fetchMacroContent(7)).rejects.toThrow('boom')
+    expect(store.macroContents[7]).toBeUndefined()
+
+    api.getMacro.mockResolvedValue({ data: { data: { id: 7, message_content: '<p>hi</p>' } } })
+    expect(await store.fetchMacroContent(7)).toBe('<p>hi</p>')
+    expect(api.getMacro).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears the content cache on a forced list reload', async () => {
+    api.getAllMacrosCompact.mockResolvedValue({ data: { data: [compactMacro()] } })
+    api.getMacro.mockResolvedValue({ data: { data: { id: 7, message_content: '<p>hi</p>' } } })
+    const store = useMacroStore()
+
+    await store.fetchMacroContent(7)
+    await store.loadMacros(true)
+
+    expect(store.macroContents[7]).toBeUndefined()
+  })
+})
