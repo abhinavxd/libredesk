@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/setting/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
@@ -159,5 +160,55 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	app.restartRequired = true
 	app.Unlock()
 
+	return r.SendEnvelope(true)
+}
+
+func handleGetPortalSettings(r *fastglue.Request) error {
+	var (
+		app    = r.Context.(*App)
+		portal = models.Portal{}
+	)
+	out, err := app.setting.GetByPrefix("portal")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := json.Unmarshal(out, &portal); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
+	return r.SendEnvelope(portal)
+}
+
+func handleUpdatePortalSettings(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req = models.Portal{}
+	)
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+
+	if req.InboxID != 0 {
+		inboxRecord, err := app.inbox.GetDBRecord(req.InboxID)
+		if err != nil || !inboxRecord.Enabled || inboxRecord.Channel != inbox.ChannelEmail {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("portal.invalidInbox"), nil, envelope.InputError)
+		}
+	}
+	if req.HelpCenterID != 0 {
+		if _, err := app.helpcenter.GetHelpCenterByID(req.HelpCenterID); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
+	if req.LivechatInboxID != 0 {
+		inboxRecord, err := app.inbox.GetDBRecord(req.LivechatInboxID)
+		if err != nil || !inboxRecord.Enabled || inboxRecord.Channel != inbox.ChannelLiveChat {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("portal.invalidInbox"), nil, envelope.InputError)
+		}
+	}
+	if err := app.setting.Update(req); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := reloadSettings(app); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
 	return r.SendEnvelope(true)
 }

@@ -1,7 +1,7 @@
 {{ define "hc-announcement" }}
-    {{ if .Data.HelpCenter.AnnouncementHTML }}
-    <div class="hc-announcement" role="region" aria-label="{{ .L.T "globals.terms.announcement" }}" data-hc-announcement="{{ .Data.HelpCenter.AnnouncementKey }}">
-        <p>{{ .Data.HelpCenter.AnnouncementHTML }}{{ if .Data.HelpCenter.Theme.Announcement.LinkURL }} <a href="{{ .Data.HelpCenter.Theme.Announcement.LinkURL }}">{{ if .Data.HelpCenter.Theme.Announcement.LinkLabel }}{{ .Data.HelpCenter.Theme.Announcement.LinkLabel }}{{ else }}{{ .Data.HelpCenter.Theme.Announcement.LinkURL }}{{ end }}</a>{{ end }}</p>
+    {{ if .HTML }}
+    <div class="hc-announcement" role="region" aria-label="{{ .L.T "globals.terms.announcement" }}" data-hc-announcement="{{ .Key }}">
+        <p>{{ .HTML }}{{ if .LinkURL }} <a href="{{ .LinkURL }}">{{ if .LinkLabel }}{{ .LinkLabel }}{{ else }}{{ .LinkURL }}{{ end }}</a>{{ end }}</p>
         <button type="button" data-hc-announcement-close aria-label="{{ .L.T "globals.messages.close" }}">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>
         </button>
@@ -15,15 +15,22 @@
 
 {{ define "hc-lang-switcher" }}
                 <div class="hc-lang" data-hc-lang>
-                    <button type="button" class="hc-lang-btn" aria-expanded="false" aria-label="{{ .L.T "globals.terms.language" }}">
+                    <button type="button" class="hc-lang-btn" aria-expanded="false" aria-controls="hc-lang-menu" aria-label="{{ .L.T "globals.terms.language" }}">
                         <svg class="hc-lang-globe" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.5 2.4 2.5 12.6 0 15M10 2.5c-2.5 2.4-2.5 12.6 0 15" stroke-linecap="round"/></svg>
-                        <span class="hc-lang-current">{{ .Data.HelpCenter.CurrentLocale }}</span>
+                        <span class="hc-lang-current">{{ .Current }}</span>
                         <svg class="hc-lang-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
-                    <ul class="hc-lang-menu">
-                        {{ range .Data.LocaleLinks }}<li><a hreflang="{{ .Locale }}" href="{{ .Path }}"{{ if eq .Locale $.Data.HelpCenter.CurrentLocale }} class="hc-lang-active" aria-current="page"{{ end }}>{{ .Locale }}</a></li>{{ end }}
+                    <ul class="hc-lang-menu" id="hc-lang-menu">
+                        {{ range .Links }}<li><a hreflang="{{ .Locale }}" href="{{ .Path }}"{{ if eq .Locale $.Current }} class="hc-lang-active" aria-current="page"{{ end }}>{{ .Locale }}</a></li>{{ end }}
                     </ul>
                 </div>
+{{ end }}
+
+{{ define "hc-livechat-widget" }}
+{{ if .Data.HelpCenter.LivechatInboxUUID }}
+<script>window.LibredeskSettings = { baseURL: '{{ RootURL }}', inboxID: '{{ .Data.HelpCenter.LivechatInboxUUID }}', sessionPath: '{{ .Data.HelpCenter.LivechatSessionPath }}' };</script>
+<script async src="{{ RootURL }}/widget.js"></script>
+{{ end }}
 {{ end }}
 
 {{ define "hc-search-icon" }}<svg{{ with . }} class="{{ . }}"{{ end }} viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="m18 18-4.5-4.5" stroke-linecap="round" /></svg>{{ end }}
@@ -47,6 +54,15 @@
     <button type="button" data-helpful="false">{{ .L.T "globals.messages.no" }}</button>
     <span class="hc-helpful-thanks" hidden>{{ .L.T "helpCenter.feedbackThanks" }}</span>
 </div>
+{{ if .Data.HelpCenter.NewTicketPath }}
+<aside class="hc-still-stuck">
+    <div class="hc-still-stuck-copy">
+        <p class="hc-still-stuck-title">{{ .L.T "helpCenter.stillNeedHelp" }}</p>
+        <p class="hc-still-stuck-sub">{{ .L.T "helpCenter.stillNeedHelp.description" }}</p>
+    </div>
+    <a class="hc-still-stuck-cta" href="{{ .Data.HelpCenter.NewTicketPath }}?article={{ .Data.Article.Slug }}">{{ .L.T "helpCenter.contactSupport" }}</a>
+</aside>
+{{ end }}
 {{ end }}
 
 {{ define "hc-doc-icon" }}<svg class="hc-doc" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.5h5L12.5 5v9.5h-8.5z" stroke-linejoin="round"/><path d="M8.5 1.5V5h4" stroke-linejoin="round"/></svg>{{ end }}
@@ -88,4 +104,113 @@
 <span class="hc-avatars">
     {{ range . }}{{ if .Avatar }}<img class="hc-avatar" src="{{ .Avatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial" aria-hidden="true">{{ printf "%.1s" .Name }}</span>{{ end }}{{ end }}
 </span>
+{{ end }}
+
+{{ define "hc-navbar" }}
+        <nav class="hc-nav" aria-label="{{ .L.T "globals.terms.main" }}">
+            <a class="hc-brand" href="{{ .HomeURL }}">
+                {{ if .LogoURL }}<img src="{{ .LogoURL }}" alt="{{ .Name }}" />{{ else }}<span class="hc-name">{{ .Name }}</span>{{ end }}
+            </a>
+            {{ if or .NavLinks .PortalPath .HelpCenterURL .LangLinks .Logout }}
+            <button type="button" class="hc-nav-toggle" data-hc-nav-toggle aria-expanded="false" aria-controls="hc-nav-links" aria-label="{{ .L.T "globals.terms.menu" }}">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
+            </button>
+            <div class="hc-nav-links" id="hc-nav-links">
+                {{ range .NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
+                {{ if .HelpCenterURL }}<a href="{{ .HelpCenterURL }}">{{ .L.Tc "globals.terms.helpCenter" 1 }}</a>{{ end }}
+                {{ if .PortalPath }}<a href="{{ .PortalPath }}">{{ .L.T "portal.myTickets" }}</a>{{ end }}
+                {{ if .LangLinks }}{{ template "hc-lang-switcher" (map "Links" .LangLinks "Current" .Locale "L" .L) }}{{ end }}
+                {{ if .Logout }}{{ template "hc-logout" . }}{{ end }}
+            </div>
+            {{ end }}
+        </nav>
+{{ end }}
+
+{{ define "hcd-topbar" }}
+    <header class="hcd-topbar">
+        <div class="hcd-topbar-inner">
+            <div class="hcd-topbar-start">
+                {{ if .SidebarToggle }}
+                <button type="button" class="hcd-sidebar-toggle" data-hcd-sidebar-toggle aria-expanded="false" aria-controls="hcd-sidebar" aria-label="{{ .L.T "globals.terms.menu" }}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
+                </button>
+                {{ end }}
+                <a class="hcd-brand" href="{{ .HomeURL }}">
+                    {{ if .LogoURL }}<img src="{{ .LogoURL }}" alt="{{ .Name }}" />{{ else }}<span class="hcd-brand-name">{{ .Name }}</span>{{ end }}
+                </a>
+            </div>
+            {{ if .SearchPath }}
+            <a class="hcd-search-btn" href="{{ .SearchPath }}" data-hcd-search-open>
+                {{ template "hc-search-icon" }}
+                <span class="hcd-search-btn-label">{{ .L.T "globals.terms.search" }}</span>
+                <span class="hcd-kbd-combo" aria-hidden="true"><kbd class="hcd-kbd hcd-kbd-mod">Ctrl</kbd><kbd class="hcd-kbd">K</kbd></span>
+            </a>
+            {{ end }}
+            <div class="hcd-topbar-end">
+                {{ if .NavToggle }}
+                <button type="button" class="hc-nav-toggle" data-hc-nav-toggle aria-expanded="false" aria-controls="hc-nav-links" aria-label="{{ .L.T "globals.terms.menu" }}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
+                </button>
+                {{ end }}
+                {{ if or .NavLinks .PortalPath .HelpCenterURL .Logout }}
+                <nav class="hcd-topnav" id="hc-nav-links" aria-label="{{ .L.T "globals.terms.main" }}">
+                    {{ range .NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
+                    {{ if .HelpCenterURL }}<a href="{{ .HelpCenterURL }}">{{ .L.Tc "globals.terms.helpCenter" 1 }}</a>{{ end }}
+                    {{ if .PortalPath }}<a href="{{ .PortalPath }}">{{ .L.T "portal.myTickets" }}</a>{{ end }}
+                    {{ if .Logout }}{{ template "hc-logout" . }}{{ end }}
+                </nav>
+                {{ end }}
+                {{ if .LangLinks }}{{ template "hc-lang-switcher" (map "Links" .LangLinks "Current" .Locale "L" .L) }}{{ end }}
+            </div>
+        </div>
+    </header>
+{{ end }}
+
+{{ define "hc-logout" }}
+                <form class="hc-logout" action="/portal/logout" method="POST">
+                    <input type="hidden" name="csrf" value="{{ .CSRF }}" />
+                    <button type="submit">{{ .L.T "globals.messages.signOut" }}</button>
+                </form>
+{{ end }}
+
+{{ define "hc-footer" }}
+    <footer class="hc-footer">
+        <div class="hc-footer-inner">
+            {{ if .TaglineHTML }}<p class="hc-footer-tagline">{{ .TaglineHTML }}</p>{{ end }}
+            {{ if .Links }}
+            <nav class="hc-footer-links" aria-label="{{ .L.T "globals.terms.footer" }}">
+                {{ range .Links }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
+            </nav>
+            {{ end }}
+            {{ if .Social }}
+            <div class="hc-footer-social">
+                {{ range .Social }}<a href="{{ .URL }}" target="_blank" rel="noreferrer" aria-label="{{ .Platform }}">{{ template "hc-social-icon" .Platform }}</a>{{ end }}
+            </div>
+            {{ end }}
+            <p class="hc-footer-powered">{{ .L.T "helpCenter.poweredBy" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
+        </div>
+    </footer>
+{{ end }}
+
+{{ define "hc-nav-behavior" }}
+    <script>
+    (function () {
+        var toggle = document.querySelector('[data-hc-nav-toggle]');
+        var nav = toggle && toggle.closest('.hc-nav, .hcd-topbar-inner');
+        if (!nav) return;
+        var close = function () { nav.removeAttribute('data-nav-open'); toggle.setAttribute('aria-expanded', 'false'); };
+        toggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (nav.hasAttribute('data-nav-open')) { close(); return; }
+            nav.setAttribute('data-nav-open', '');
+            toggle.setAttribute('aria-expanded', 'true');
+        });
+        document.addEventListener('click', function (e) { if (!nav.contains(e.target)) close(); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape' || !nav.hasAttribute('data-nav-open')) return;
+            close();
+            toggle.focus();
+        });
+    })();
+    </script>
 {{ end }}

@@ -408,7 +408,7 @@ func handleAuthExchange(r *fastglue.Request) error {
 	}
 
 	ctx := context.Background()
-	reverseKey := fmt.Sprintf("widget_user:%d:%d", inbox.ID, contactID)
+	reverseKey := widgetUserKey(inbox.ID, contactID)
 	sessionTTL := getSessionDuration(config)
 
 	sendSession := func(token string) error {
@@ -948,6 +948,10 @@ func verifyStandardJWT(jwtToken string, inboxSecret string) (Claims, error) {
 	}
 
 	return *claims, nil
+}
+
+func widgetUserKey(inboxID, contactID int) string {
+	return fmt.Sprintf("widget_user:%d:%d", inboxID, contactID)
 }
 
 // generateSessionToken creates a random session token and stores it in Redis.

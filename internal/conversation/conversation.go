@@ -304,6 +304,7 @@ type queries struct {
 	GetUnassignedConversations          *sqlx.Stmt `query:"get-unassigned-conversations"`
 	GetConversations                    string     `query:"get-conversations"`
 	GetContactChatConversations         *sqlx.Stmt `query:"get-contact-chat-conversations"`
+	GetContactPortalConversations       *sqlx.Stmt `query:"get-contact-portal-conversations"`
 	GetChatConversation                 *sqlx.Stmt `query:"get-chat-conversation"`
 	GetContactPreviousConversations     *sqlx.Stmt `query:"get-contact-previous-conversations"`
 	GetContactConversationsForAI        *sqlx.Stmt `query:"get-contact-conversations-for-ai"`
@@ -494,6 +495,23 @@ func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.
 		c.SignAvatarURL(&conversations[i].LastChatMessage.Author.AvatarURL)
 	}
 	return conversations, nil
+}
+
+// GetContactPortalConversations returns one page of a contact's conversations and the total row count.
+func (c *Manager) GetContactPortalConversations(contactID int, statusFilter string, page, pageSize int) ([]models.PortalConversation, int, error) {
+	var conversations = make([]models.PortalConversation, 0)
+	if page < 1 {
+		page = 1
+	}
+	if err := c.q.GetContactPortalConversations.Select(&conversations, contactID, statusFilter, pageSize, (page-1)*pageSize); err != nil {
+		c.lo.Error("error fetching portal conversations", "contact_id", contactID, "error", err)
+		return nil, 0, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	total := 0
+	if len(conversations) > 0 {
+		total = conversations[0].Total
+	}
+	return conversations, total, nil
 }
 
 // GetChatConversation retrieves a single chat conversation by UUID

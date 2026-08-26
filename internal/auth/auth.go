@@ -191,19 +191,19 @@ func (a *Auth) Reload(cfg Config) error {
 	return nil
 }
 
-// LoginURL returns the login URL for the given provider.
-func (a *Auth) LoginURL(providerID int, state string) (string, error) {
+// LoginURL binds the flow to the nonce and PKCE verifier.
+func (a *Auth) LoginURL(providerID int, state, nonce, codeVerifier string) (string, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	oauthCfg, ok := a.oauthCfgs[providerID]
 	if !ok {
 		return "", envelope.NewError(envelope.InputError, a.i18n.T("validation.notFoundProvider"), nil)
 	}
-	return oauthCfg.AuthCodeURL(state), nil
+	return oauthCfg.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(codeVerifier)), nil
 }
 
-// ExchangeOIDCToken takes an OIDC authorization code, validates it, and returns an OIDC token for subsequent auth.
-func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code string) (string, OIDCclaim, error) {
+// ExchangeOIDCToken validates the code against the flow's PKCE verifier and nonce.
+func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code, codeVerifier, nonce string) (string, OIDCclaim, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
@@ -222,7 +222,7 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 	// Otherwise the token exchange and JWKS fetch use http.DefaultClient, which has no SSRF guard and no timeout.
 	ctx = oidc.ClientContext(ctx, a.oidcClient)
 
-	tk, err := oauthCfg.Exchange(ctx, code)
+	tk, err := oauthCfg.Exchange(ctx, code, oauth2.VerifierOption(codeVerifier))
 	if err != nil {
 		a.logger.Error("error exchanging oidc authorization code for token, check the provider client ID / client secret (it may have expired) and redirect URL", "provider_id", providerID, "error", err)
 		var retrieveErr *oauth2.RetrieveError
@@ -244,6 +244,11 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 	if err != nil {
 		a.logger.Error("error verifying oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, fmt.Errorf("error verifying ID token: %v", err)
+	}
+
+	if idTk.Nonce != nonce {
+		a.logger.Error("oidc id_token nonce mismatch", "provider_id", providerID)
+		return "", OIDCclaim{}, errors.New("nonce mismatch")
 	}
 
 	var claims OIDCclaim

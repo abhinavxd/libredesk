@@ -1,0 +1,18 @@
+{{ define "portal-verify" }}
+{{ template "portal-header" . }}
+<div class="pt-auth-card">
+    <h1>{{ .L.T "portal.enterCode" }}</h1>
+    <p class="pt-muted">{{ .L.Ts "portal.codeSentTo" "email" .Data.Email }}</p>
+    {{ if .Data.Error }}<p class="pt-error" role="alert">{{ .Data.Error }}</p>{{ end }}
+    <form action="/portal/verify" method="POST">
+        <input type="hidden" name="csrf" value="{{ .Data.CSRF }}" />
+        <input type="hidden" name="email" value="{{ .Data.Email }}" />
+        <input type="hidden" name="return" value="{{ .Data.Return }}" />
+        <label for="pt-code">{{ .L.T "globals.terms.code" }}</label>
+        <input id="pt-code" type="text" name="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autofocus />
+        <button type="submit">{{ .L.T "portal.verifyAndSignIn" }}</button>
+    </form>
+    <p class="pt-muted pt-auth-alt"><a href="/portal/login?return={{ .Data.Return }}">{{ .L.T "portal.useDifferentEmail" }}</a></p>
+</div>
+{{ template "portal-footer" . }}
+{{ end }}

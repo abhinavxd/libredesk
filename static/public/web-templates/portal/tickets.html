@@ -1,0 +1,56 @@
+{{ define "portal-tickets" }}
+{{ template "portal-header" . }}
+<div class="pt-wrap">
+    <div class="pt-page-head">
+        <h1>{{ .L.T "portal.myTickets" }}</h1>
+        {{ if .Data.CanCreate }}<a class="pt-btn" href="/portal/tickets/new">{{ .L.T "portal.newTicket" }}</a>{{ end }}
+    </div>
+    <nav class="pt-filters" aria-label="{{ .L.Tc "globals.terms.status" 1 }}">
+        <a href="/portal"{{ if eq .Data.StatusFilter "" }} aria-current="page"{{ end }}>{{ .L.T "globals.messages.all" }}</a>
+        <a href="/portal?status=open"{{ if eq .Data.StatusFilter "open" }} aria-current="page"{{ end }}>{{ .L.T "globals.terms.open" }}</a>
+        <a href="/portal?status=resolved"{{ if eq .Data.StatusFilter "resolved" }} aria-current="page"{{ end }}>{{ .L.T "globals.terms.resolved" }}</a>
+    </nav>
+    {{ if .Data.Tickets }}
+    <div class="pt-table-wrap">
+        <table class="pt-table" aria-label="{{ .L.T "portal.myTickets" }}">
+            <thead>
+                <tr>
+                    <th scope="col">{{ .L.T "globals.terms.number" }}</th>
+                    <th scope="col">{{ .L.Tc "globals.terms.subject" 1 }}</th>
+                    <th scope="col">{{ .L.Tc "globals.terms.status" 1 }}</th>
+                    <th scope="col" class="pt-created">{{ .L.T "globals.terms.createdAt" }}</th>
+                    <th scope="col">{{ .L.T "portal.lastActivity" }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Data.Tickets }}
+                <tr>
+                    <td class="pt-ref" data-label="{{ $.L.T "globals.terms.number" }}"><a href="/portal/tickets/{{ .ReferenceNumber }}">#{{ .ReferenceNumber }}</a></td>
+                    <td class="pt-subject" data-label="{{ $.L.Tc "globals.terms.subject" 1 }}"><a href="/portal/tickets/{{ .ReferenceNumber }}">{{ .Subject }}</a></td>
+                    <td class="pt-state" data-label="{{ $.L.Tc "globals.terms.status" 1 }}">
+                        {{ template "portal-status-badge" . }}
+                        <span class="pt-replies">{{ .ReplyLabel }}</span>
+                    </td>
+                    <td class="pt-created" data-label="{{ $.L.T "globals.terms.createdAt" }}"><time datetime="{{ .CreatedAtISO }}">{{ .CreatedAt }}</time></td>
+                    <td class="pt-activity" data-label="{{ $.L.T "portal.lastActivity" }}"><time datetime="{{ .LastActivityAtISO }}">{{ .LastActivityAt }}</time></td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ if gt .Data.TotalPages 1 }}
+    <nav class="pt-pager" aria-label="{{ .L.T "globals.terms.pagination" }}">
+        {{ if gt .Data.Page 1 }}<a href="/portal?status={{ .Data.StatusFilter }}&amp;page={{ .Data.PrevPage }}">{{ .L.T "globals.terms.previous" }}</a>{{ end }}
+        <span>{{ .Data.Page }} / {{ .Data.TotalPages }}</span>
+        {{ if lt .Data.Page .Data.TotalPages }}<a href="/portal?status={{ .Data.StatusFilter }}&amp;page={{ .Data.NextPage }}">{{ .L.T "globals.terms.next" }}</a>{{ end }}
+    </nav>
+    {{ end }}
+    {{ else }}
+    <div class="pt-empty">
+        <p>{{ .L.T "portal.noTickets" }}</p>
+        {{ if .Data.CanCreate }}<a class="pt-btn" href="/portal/tickets/new">{{ .L.T "portal.newTicket" }}</a>{{ end }}
+    </div>
+    {{ end }}
+</div>
+{{ template "portal-footer" . }}
+{{ end }}

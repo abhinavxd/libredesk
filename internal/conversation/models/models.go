@@ -235,6 +235,20 @@ func (c *ConversationContact) FullName() string {
 	return c.FirstName + " " + c.LastName
 }
 
+type PortalConversation struct {
+	Total             int         `db:"total" json:"-"`
+	CreatedAt         time.Time   `db:"created_at" json:"created_at"`
+	UUID              string      `db:"uuid" json:"uuid"`
+	ReferenceNumber   string      `db:"reference_number" json:"reference_number"`
+	Subject           null.String `db:"subject" json:"subject"`
+	LastMessage       null.String `db:"last_message" json:"last_message"`
+	LastMessageAt     null.Time   `db:"last_message_at" json:"last_message_at"`
+	LastMessageSender null.String `db:"last_message_sender" json:"last_message_sender"`
+	Status            null.String `db:"status" json:"status"`
+	StatusCategory    string      `db:"status_category" json:"status_category"`
+	ReplyCount        int         `db:"reply_count" json:"reply_count"`
+}
+
 type PreviousConversation struct {
 	ID            int                         `db:"id" json:"id"`
 	CreatedAt     time.Time                   `db:"created_at" json:"created_at"`

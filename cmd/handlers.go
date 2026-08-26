@@ -40,6 +40,13 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/settings/general", perm(clearsHCCache(handleUpdateGeneralSettings), "general_settings:manage"))
 	g.GET("/api/v1/settings/notifications/email", perm(handleGetEmailNotificationSettings, "notification_settings:manage"))
 	g.PUT("/api/v1/settings/notifications/email", perm(handleUpdateEmailNotificationSettings, "notification_settings:manage"))
+	g.GET("/api/v1/portal-forms", perm(handleGetPortalForms, "general_settings:manage"))
+	g.GET("/api/v1/portal-forms/{id}", perm(handleGetPortalForm, "general_settings:manage"))
+	g.POST("/api/v1/portal-forms", perm(clearsHCCache(handleCreatePortalForm), "general_settings:manage"))
+	g.PUT("/api/v1/portal-forms/{id}", perm(clearsHCCache(handleUpdatePortalForm), "general_settings:manage"))
+	g.DELETE("/api/v1/portal-forms/{id}", perm(clearsHCCache(handleDeletePortalForm), "general_settings:manage"))
+	g.GET("/api/v1/settings/portal", perm(handleGetPortalSettings, "general_settings:manage"))
+	g.PUT("/api/v1/settings/portal", perm(clearsHCCache(handleUpdatePortalSettings), "general_settings:manage"))
 
 	// OpenID connect single sign-on.
 	g.GET("/api/v1/oidc", perm(handleGetAllOIDC, "oidc:manage"))
@@ -398,6 +405,21 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	getAndHead("/hc/{slug}/{locale}/search", rateLimit(cachedHCNoIndexPage(handleHelpCenterSearch), "public"))
 	getAndHead("/hc/{slug}/{locale}/collections/{collection_slug}", rateLimit(cachedHCPage(handleShowHelpCenterCollection), "public"))
 	getAndHead("/hc/{slug}/{locale}/articles/{article_slug}", rateLimit(countArticleView(cachedHCPage(handleShowHelpCenterArticle)), "public"))
+
+	// Customer portal.
+	getAndHead("/portal", rateLimit(portalPage(handlePortalTickets), "portal"))
+	getAndHead("/portal/login", rateLimit(portalGuestPage(handlePortalLoginPage), "portal"))
+	g.POST("/portal/login", rateLimit(portalGuestPage(handlePortalSendCode), "portal_auth"))
+	g.GET("/portal/verify", rateLimit(portalGuestPage(handlePortalVerifyPage), "portal"))
+	g.POST("/portal/verify", rateLimit(portalGuestPage(handlePortalVerifyCode), "portal_auth"))
+	g.POST("/portal/logout", rateLimit(portalPage(handlePortalLogout), "portal"))
+	g.GET("/portal/locale", rateLimit(handlePortalSetLocale, "portal"))
+	g.GET("/portal/oidc/{id}/login", rateLimit(handlePortalOIDCLogin, "portal_auth"))
+	g.GET("/portal/widget-session", rateLimit(handlePortalWidgetSession, "portal"))
+	getAndHead("/portal/tickets/new", rateLimit(portalPage(handlePortalNewTicket), "portal"))
+	g.POST("/portal/tickets", rateLimit(portalPage(handlePortalCreateTicket), "portal"))
+	getAndHead("/portal/tickets/{number}", rateLimit(portalPage(handlePortalTicketView), "portal"))
+	g.POST("/portal/tickets/{number}/reply", rateLimit(portalPage(handlePortalTicketReply), "portal"))
 
 	g.GET("/csat/{uuid}", rateLimit(handleShowCSAT, "public"))
 	g.GET("/csat/{uuid}/widget", rateLimit(handleShowCSATWidget, "public"))

@@ -1,0 +1,18 @@
+{{ define "portal-login-code" }}
+{{ template "header" . }}
+
+<h1>{{ .Heading }}</h1>
+
+<p>{{ .Body }}</p>
+
+<div style="text-align: center; margin: 28px 0;">
+    <span
+        style="display: inline-block; background-color: #f4f4f5; border-radius: 6px; padding: 14px 28px; font-size: 26px; font-weight: 600; letter-spacing: 6px; font-family: monospace;">{{ .Code }}</span>
+</div>
+
+<p class="text-muted" style="color: #71717a; font-size: 14px;">
+    {{ .Ignore }}
+</p>
+
+{{ template "footer" . }}
+{{ end }}

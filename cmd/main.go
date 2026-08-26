@@ -45,6 +45,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/portalform"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/setting"
@@ -118,6 +119,7 @@ type App struct {
 	businessHours    *businesshours.Manager
 	sla              *sla.Manager
 	csat             *csat.Manager
+	portalForm       *portalform.Manager
 	view             *view.Manager
 	ai               *ai.Manager
 	aiAgent          *aiagent.Manager
@@ -234,6 +236,7 @@ func main() {
 		constants                   = initConstants()
 		i18n                        = initI18n(fs)
 		csat                        = initCSAT(db, i18n)
+		portalForm                  = initPortalForm(db, i18n)
 		oidc                        = initOIDC(db, settings, i18n)
 		status                      = initStatus(db, i18n)
 		priority                    = initPriority(db, i18n)
@@ -302,6 +305,7 @@ func main() {
 		user:             user,
 		team:             team,
 		csat:             csat,
+		portalForm:       portalForm,
 		status:           status,
 		priority:         priority,
 		tmpl:             template,

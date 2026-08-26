@@ -18,8 +18,9 @@ const (
 	TmplCSATRequest          = "CSAT request"
 
 	// Built-in templates fetched from memory stored in `static` directory.
-	TmplResetPassword = "reset-password"
-	TmplWelcome       = "welcome"
+	TmplResetPassword   = "reset-password"
+	TmplWelcome         = "welcome"
+	TmplPortalLoginCode = "portal-login-code"
 
 	// Template names for rendering.
 	TmplBase    = "base"

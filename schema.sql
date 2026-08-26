@@ -446,6 +446,7 @@ CREATE TABLE oidc (
 	client_id TEXT NOT NULL,
 	client_secret TEXT NOT NULL,
 	enabled bool DEFAULT TRUE NOT NULL,
+	enabled_for_portal bool DEFAULT FALSE NOT NULL,
 	provider VARCHAR NULL,
 	logo_url TEXT NOT NULL DEFAULT '',
 	CONSTRAINT constraint_oidc_on_name CHECK (length("name") <= 140)
@@ -667,6 +668,17 @@ CREATE TABLE embeddings (
 );
 CREATE INDEX index_embeddings_on_source_type_source_id ON embeddings(source_type, source_id);
 
+DROP TABLE IF EXISTS portal_forms CASCADE;
+CREATE TABLE portal_forms (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	"name" TEXT NOT NULL,
+	ask_subject BOOLEAN NOT NULL DEFAULT true,
+	fields JSONB NOT NULL DEFAULT '[]'::jsonb,
+	CONSTRAINT constraint_portal_forms_on_name CHECK (length("name") <= 140)
+);
+
 DROP TABLE IF EXISTS help_centers CASCADE;
 CREATE TABLE help_centers (
 	id SERIAL PRIMARY KEY,
@@ -727,6 +739,7 @@ CREATE TABLE help_articles (
 	view_count INTEGER NOT NULL DEFAULT 0,
 	ai_enabled BOOLEAN NOT NULL DEFAULT false,
 	embedded_fingerprint TEXT NOT NULL DEFAULT '',
+	portal_form_id INTEGER NULL REFERENCES portal_forms(id) ON DELETE SET NULL,
 	-- left() caps the indexed body below the 1MB tsvector limit so oversized articles still save.
 	search_tsv TSVECTOR GENERATED ALWAYS AS (
 		setweight(to_tsvector(help_article_search_config(locale), title), 'A') ||
@@ -983,6 +996,12 @@ VALUES
 	('app.business_hours_id', '""'::jsonb),
 	('app.show_conversation_subject', 'true'::jsonb),
 	('ai_agent.faq_learning_enabled', 'false'::jsonb),
+	('portal.enabled', 'false'::jsonb),
+	('portal.inbox_id', '0'::jsonb),
+	('portal.help_center_id', '0'::jsonb),
+	('portal.livechat_inbox_id', '0'::jsonb),
+	('portal.tickets_from_article_only', 'false'::jsonb),
+	('portal.form_id', '0'::jsonb),
     ('notification.email.username', '"admin@yourcompany.com"'::jsonb),
     ('notification.email.host', '""'::jsonb),
     ('notification.email.port', '587'::jsonb),

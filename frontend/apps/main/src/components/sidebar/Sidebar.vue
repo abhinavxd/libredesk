@@ -59,7 +59,8 @@ import {
   Wrench,
   Bot,
   Lightbulb,
-  BookOpen
+  BookOpen,
+  Ticket
 } from 'lucide-vue-next'
 
 const navIconMap = {
@@ -90,7 +91,8 @@ const navIconMap = {
   Wrench,
   Bot,
   Lightbulb,
-  BookOpen
+  BookOpen,
+  Ticket
 }
 import {
   DropdownMenu,

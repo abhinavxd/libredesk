@@ -451,12 +451,32 @@
                 return;
             }
 
-            var sessionToken = this.getCookie(this.getCookieName('session'));
-            this.postToIframe({
-                type: 'SESSION_DATA',
-                sessionToken: sessionToken || '',
-                visitorToken: visitorToken || ''
+            var self = this;
+            this.resolveSessionToken().then(function (sessionToken) {
+                self.postToIframe({
+                    type: 'SESSION_DATA',
+                    sessionToken: sessionToken || '',
+                    visitorToken: visitorToken || ''
+                });
             });
+        }
+
+        // resolveSessionToken prefers the portal's session for a signed-in contact over the cookie left by an earlier chat.
+        resolveSessionToken () {
+            var cookieToken = this.getCookie(this.getCookieName('session'));
+            if (!this.config.sessionPath) {
+                return Promise.resolve(cookieToken);
+            }
+            var self = this;
+            return fetch(this.config.baseURL + this.config.sessionPath, { credentials: 'same-origin' })
+                .then(function (resp) { return resp.ok ? resp.json() : null; })
+                .then(function (body) {
+                    var token = body && body.data && body.data.session_token;
+                    if (!token) return cookieToken;
+                    self.setCookie(self.getCookieName('session'), token);
+                    return token;
+                })
+                .catch(function () { return cookieToken; });
         }
 
         handleWidgetLoaded () {

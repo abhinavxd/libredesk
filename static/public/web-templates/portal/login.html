@@ -1,0 +1,27 @@
+{{ define "portal-login" }}
+{{ template "portal-header" . }}
+<div class="pt-auth-card">
+    <h1>{{ .L.T "auth.signInButton" }}</h1>
+    <p class="pt-muted">{{ .L.T "portal.signInText" }}</p>
+    {{ if .Data.Error }}<p class="pt-error" role="alert">{{ .Data.Error }}</p>{{ end }}
+    <form action="/portal/login" method="POST">
+        <input type="hidden" name="csrf" value="{{ .Data.CSRF }}" />
+        <input type="hidden" name="return" value="{{ .Data.Return }}" />
+        <label for="pt-email">{{ .L.Tc "globals.terms.email" 1 }}</label>
+        <input id="pt-email" type="email" name="email" required autocomplete="email" autofocus />
+        <button type="submit">{{ .L.T "portal.sendCode" }}</button>
+    </form>
+    {{ if .Data.Providers }}
+    <div class="pt-auth-divider" aria-hidden="true"><span>{{ .L.T "auth.orContinueWith" }}</span></div>
+    <div class="pt-auth-providers">
+        {{ range .Data.Providers }}
+        <a class="pt-provider" href="/portal/oidc/{{ .ID }}/login?return={{ $.Data.Return }}">
+            {{ if .LogoURL }}<img src="{{ .LogoURL }}" alt="" aria-hidden="true" />{{ end }}
+            <span>{{ .Name }}</span>
+        </a>
+        {{ end }}
+    </div>
+    {{ end }}
+</div>
+{{ template "portal-footer" . }}
+{{ end }}

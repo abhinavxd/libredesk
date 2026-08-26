@@ -195,6 +195,12 @@ const routes = [
             meta: { titleKey: 'globals.terms.general' }
           },
           {
+            path: 'customer-portal',
+            name: 'customer-portal',
+            component: () => import('@main/views/admin/portal/CustomerPortal.vue'),
+            meta: { titleKey: 'globals.terms.customerPortal' }
+          },
+          {
             path: 'ai',
             redirect: { name: 'ai-providers' }
           },

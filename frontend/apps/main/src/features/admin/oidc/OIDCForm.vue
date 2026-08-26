@@ -12,6 +12,19 @@
       </FormItem>
     </FormField>
 
+    <FormField name="enabled_for_portal" v-slot="{ value, handleChange }">
+      <FormItem>
+        <FormControl>
+          <div class="flex items-center space-x-2">
+            <Checkbox :checked="value" @update:checked="handleChange" />
+            <Label>{{ $t('admin.sso.enabledForPortal') }}</Label>
+          </div>
+        </FormControl>
+        <FormDescription>{{ $t('admin.sso.enabledForPortalDescription') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <div class="grid gap-6 md:grid-cols-2">
       <FormField v-slot="{ componentField }" name="provider">
         <FormItem>

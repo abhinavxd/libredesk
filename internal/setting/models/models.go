@@ -30,7 +30,17 @@ type EmailNotification struct {
 	Enabled       bool   `json:"notification.email.enabled" db:"notification.email.enabled"`
 }
 
+type Portal struct {
+	Enabled                bool `json:"portal.enabled"`
+	InboxID                int  `json:"portal.inbox_id"`
+	HelpCenterID           int  `json:"portal.help_center_id"`
+	LivechatInboxID        int  `json:"portal.livechat_inbox_id"`
+	TicketsFromArticleOnly bool `json:"portal.tickets_from_article_only"`
+	FormID                 int  `json:"portal.form_id"`
+}
+
 type Settings struct {
 	EmailNotification
 	General
+	Portal
 }

@@ -2,32 +2,19 @@
 {{ template "hc-head" . }}
 <body class="hcd">
     <a class="hc-skip-link" href="#hc-main">{{ .L.T "helpCenter.skipToContent" }}</a>
-    {{ template "hc-announcement" . }}
-    <header class="hcd-topbar">
-        <div class="hcd-topbar-inner">
-            <div class="hcd-topbar-start">
-                <button type="button" class="hcd-sidebar-toggle" data-hcd-sidebar-toggle aria-expanded="false" aria-controls="hcd-sidebar" aria-label="{{ .L.T "globals.terms.menu" }}">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
-                </button>
-                <a class="hcd-brand" href="{{ .Data.HelpCenter.BasePath }}">
-                    {{ if .Data.HelpCenter.LogoURL }}<img src="{{ .Data.HelpCenter.LogoURL }}" alt="{{ .Data.HelpCenter.Name }}" />{{ else }}<span class="hcd-brand-name">{{ .Data.HelpCenter.Name }}</span>{{ end }}
-                </a>
-            </div>
-            <a class="hcd-search-btn" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open>
-                {{ template "hc-search-icon" }}
-                <span class="hcd-search-btn-label">{{ .L.T "globals.terms.search" }}</span>
-                <span class="hcd-kbd-combo" aria-hidden="true"><kbd class="hcd-kbd hcd-kbd-mod">Ctrl</kbd><kbd class="hcd-kbd">K</kbd></span>
-            </a>
-            <div class="hcd-topbar-end">
-                {{ if .Data.HelpCenter.NavLinks }}
-                <nav class="hcd-topnav" aria-label="{{ .L.T "globals.terms.main" }}">
-                    {{ range .Data.HelpCenter.NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
-                </nav>
-                {{ end }}
-                {{ if gt (len .Data.HelpCenter.AvailableLocales) 1 }}{{ template "hc-lang-switcher" . }}{{ end }}
-            </div>
-        </div>
-    </header>
+    {{ template "hc-announcement" (map "HTML" .Data.HelpCenter.AnnouncementHTML "Key" .Data.HelpCenter.AnnouncementKey "LinkURL" .Data.HelpCenter.Theme.Announcement.LinkURL "LinkLabel" .Data.HelpCenter.Theme.Announcement.LinkLabel "L" .L) }}
+    {{ $langs := .Data.LocaleLinks }}{{ if le (len .Data.HelpCenter.AvailableLocales) 1 }}{{ $langs = "" }}{{ end }}
+    {{ template "hcd-topbar" (map
+        "HomeURL" .Data.HelpCenter.BasePath
+        "Name" .Data.HelpCenter.Name
+        "LogoURL" .Data.HelpCenter.LogoURL
+        "NavLinks" .Data.HelpCenter.NavLinks
+        "PortalPath" .Data.HelpCenter.PortalPath
+        "SearchPath" (print .Data.HelpCenter.BasePath "/search")
+        "SidebarToggle" true
+        "LangLinks" $langs
+        "Locale" .Data.HelpCenter.CurrentLocale
+        "L" .L) }}
 
     <div class="hcd-search-layer" data-hcd-search hidden>
         <div class="hcd-search-backdrop" data-hcd-search-close></div>
@@ -88,22 +75,7 @@
 {{ define "docs-footer" }}
         </main>
     </div>
-    <footer class="hcd-footer">
-        <div class="hcd-footer-inner">
-            {{ if .Data.HelpCenter.FooterTaglineHTML }}<p class="hcd-footer-tagline">{{ .Data.HelpCenter.FooterTaglineHTML }}</p>{{ end }}
-            {{ if .Data.HelpCenter.Theme.FooterLinks }}
-            <nav class="hcd-footer-links" aria-label="{{ .L.T "globals.terms.footer" }}">
-                {{ range .Data.HelpCenter.Theme.FooterLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
-            </nav>
-            {{ end }}
-            {{ if .Data.HelpCenter.Theme.SocialLinks }}
-            <div class="hcd-footer-social">
-                {{ range .Data.HelpCenter.Theme.SocialLinks }}<a href="{{ .URL }}" target="_blank" rel="noreferrer" aria-label="{{ .Platform }}">{{ template "hc-social-icon" .Platform }}</a>{{ end }}
-            </div>
-            {{ end }}
-            <p class="hcd-footer-powered">{{ .L.T "helpCenter.poweredBy" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
-        </div>
-    </footer>
+    {{ template "hc-footer" (map "TaglineHTML" .Data.HelpCenter.FooterTaglineHTML "Links" .Data.HelpCenter.Theme.FooterLinks "Social" .Data.HelpCenter.Theme.SocialLinks "L" .L) }}
     {{ template "hc-shared-behavior" }}
     <script>
     (function () {
@@ -186,6 +158,7 @@
     })();
     </script>
     <script src="/static/public/static/help-center-search.js?v={{ AssetVer }}" defer></script>
+    {{ template "hc-livechat-widget" . }}
     {{ if .Data.HelpCenter.CustomJS }}<script>{{ .Data.HelpCenter.CustomJS }}</script>{{ end }}
 </body>
 </html>

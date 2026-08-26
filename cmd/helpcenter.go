@@ -1686,30 +1686,47 @@ func helpCenterTemplateData(app *App, hc hcmodels.HelpCenter, locale string) map
 	if pageTemplate == "" {
 		pageTemplate = hcmodels.TemplateClassic
 	}
+	portalPath, newTicketPath, livechatInboxUUID, livechatSessionPath := "", "", "", ""
+	if consts := app.consts.Load().(*constants); consts.PortalHelpCenterID == hc.ID {
+		if consts.PortalEnabled {
+			portalPath = "/portal"
+			if consts.PortalInboxID > 0 {
+				newTicketPath = "/portal/tickets/new"
+			}
+		}
+		livechatInboxUUID = portalLivechatInboxUUID(app)
+		if livechatInboxUUID != "" && consts.PortalEnabled {
+			livechatSessionPath = portalWidgetSessionPath
+		}
+	}
 	return map[string]interface{}{
-		"Slug":              hc.Slug,
-		"Name":              hc.Name,
-		"Template":          pageTemplate,
-		"BaseURL":           helpCenterBaseURL(app, hc),
-		"BasePath":          helpCenterHomePath(hc, locale),
-		"PageTitle":         hc.PageTitle,
-		"HeaderText":        theme.Header.Heading,
-		"LogoURL":           publicAssetPaths(app, theme.LogoURL),
-		"Color":             theme.Color,
-		"DefaultLocale":     hc.DefaultLocale,
-		"CurrentLocale":     locale,
-		"OGLocale":          strings.ReplaceAll(locale, "-", "_"),
-		"Dir":               localeDir(locale),
-		"AvailableLocales":  helpCenterLocales(hc),
-		"NavLinks":          theme.NavLinks,
-		"Theme":             theme,
-		"ThemeCSS":          buildThemeCSSVars(theme),
-		"AnnouncementKey":   announcementKey(hc.Slug, theme.Announcement),
-		"TaglineHTML":       template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
-		"FooterTaglineHTML": template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
-		"AnnouncementHTML":  template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text)),
-		"CustomCSS":         template.CSS(hc.CustomCSS),
-		"CustomJS":          template.JS(hc.CustomJS),
+		"PortalPath":          portalPath,
+		"NewTicketPath":       newTicketPath,
+		"LivechatInboxUUID":   livechatInboxUUID,
+		"LivechatSessionPath": livechatSessionPath,
+		"Slug":                hc.Slug,
+		"Name":                hc.Name,
+		"Template":            pageTemplate,
+		"BaseURL":             helpCenterBaseURL(app, hc),
+		"BasePath":            helpCenterHomePath(hc, locale),
+		"PageTitle":           hc.PageTitle,
+		"HeaderText":          theme.Header.Heading,
+		"LogoURL":             publicAssetPaths(app, theme.LogoURL),
+		"Color":               theme.Color,
+		"DefaultLocale":       hc.DefaultLocale,
+		"CurrentLocale":       locale,
+		"OGLocale":            strings.ReplaceAll(locale, "-", "_"),
+		"Dir":                 localeDir(locale),
+		"AvailableLocales":    helpCenterLocales(hc),
+		"NavLinks":            theme.NavLinks,
+		"Theme":               theme,
+		"ThemeCSS":            buildThemeCSSVars(theme),
+		"AnnouncementKey":     announcementKey(hc.Slug, theme.Announcement),
+		"TaglineHTML":         template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
+		"FooterTaglineHTML":   template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
+		"AnnouncementHTML":    template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text)),
+		"CustomCSS":           template.CSS(hc.CustomCSS),
+		"CustomJS":            template.JS(hc.CustomJS),
 	}
 }
 

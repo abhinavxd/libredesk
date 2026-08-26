@@ -134,6 +134,7 @@ type ArticleRequest struct {
 	SortOrder       int    `json:"sort_order"`
 	Status          string `json:"status"`
 	AIEnabled       bool   `json:"ai_enabled"`
+	PortalFormID    *int   `json:"portal_form_id"`
 	CollectionID    *int   `json:"collection_id,omitempty"`
 	AuthorID        *int64 `json:"author_id"`
 	CreatedBy       *int64 `json:"-"`
@@ -659,7 +660,7 @@ func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Ar
 	req.Slug = slug
 	req.Content = articleSanitizer.Sanitize(req.Content)
 	req.Excerpt = strings.TrimSpace(req.Excerpt)
-	if err := tx.Stmtx(m.q.InsertArticle).Get(&article, collectionID, req.AuthorID, req.CreatedBy, req.Slug, req.Locale, req.Title, req.Content, req.Excerpt, req.MetaTitle, req.MetaDescription, req.MetaImageURL, req.SortOrder, req.Status, req.AIEnabled); err != nil {
+	if err := tx.Stmtx(m.q.InsertArticle).Get(&article, collectionID, req.AuthorID, req.CreatedBy, req.Slug, req.Locale, req.Title, req.Content, req.Excerpt, req.MetaTitle, req.MetaDescription, req.MetaImageURL, req.SortOrder, req.Status, req.AIEnabled, req.PortalFormID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}
@@ -724,7 +725,7 @@ func (m *Manager) UpdateArticle(id int, req ArticleRequest) (models.Article, err
 	if slugTaken {
 		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 	}
-	if err := tx.Stmtx(m.q.UpdateArticle).Get(&article, id, req.Slug, req.Locale, req.Title, req.Content, req.SortOrder, req.Status, req.AIEnabled, req.CollectionID, req.Excerpt, req.MetaTitle, req.MetaDescription, req.MetaImageURL, req.AuthorID); err != nil {
+	if err := tx.Stmtx(m.q.UpdateArticle).Get(&article, id, req.Slug, req.Locale, req.Title, req.Content, req.SortOrder, req.Status, req.AIEnabled, req.PortalFormID, req.CollectionID, req.Excerpt, req.MetaTitle, req.MetaDescription, req.MetaImageURL, req.AuthorID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}

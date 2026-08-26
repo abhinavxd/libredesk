@@ -257,6 +257,7 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 			"Subject":         conversation.Subject.String,
 			"Priority":        conversation.Priority.String,
 			"UUID":            conversation.UUID,
+			"PortalURL":       m.portalTicketURL(conversation.ReferenceNumber),
 		},
 		"Contact": map[string]any{
 			"FirstName": conversation.Contact.FirstName,
@@ -291,6 +292,23 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 	}
 
 	return data, nil
+}
+
+// portalTicketURL is empty when the portal is off or no root URL is configured.
+func (m *Manager) portalTicketURL(referenceNumber string) string {
+	enabled, err := m.settingsStore.Get("portal.enabled")
+	if err != nil {
+		return ""
+	}
+	var on bool
+	if err := json.Unmarshal(enabled, &on); err != nil || !on {
+		return ""
+	}
+	rootURL, err := m.settingsStore.GetAppRootURL()
+	if err != nil || rootURL == "" {
+		return ""
+	}
+	return strings.TrimSuffix(rootURL, "/") + "/portal/tickets/" + referenceNumber
 }
 
 // RenderMessageInTemplate renders message content in the email base template for sending.
@@ -978,6 +996,11 @@ func (m *Manager) isVisitorUpgradeSafe(conversation models.Conversation) bool {
 
 // ProcessIncomingLiveChatMessage handles incoming live chat messages.
 func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Message, error) {
+	return m.ProcessIncomingContactMessage(msg, false)
+}
+
+// ProcessIncomingContactMessage handles a message sent by a contact on any channel.
+func (m *Manager) ProcessIncomingContactMessage(msg models.Message, isNewConversation bool) (models.Message, error) {
 	// Upload message attachments.
 	if err := m.uploadMessageAttachments(&msg); err != nil {
 		return models.Message{}, fmt.Errorf("uploading message attachments: %w", err)
@@ -990,12 +1013,11 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 
 	// Advance contact_last_seen_at.
 	if err := m.UpdateConversationContactLastSeen(msg.ConversationUUID); err != nil {
-		m.lo.Error("error updating contact last seen after livechat message", "conversation_uuid", msg.ConversationUUID, "error", err)
+		m.lo.Error("error updating contact last seen after contact message", "conversation_uuid", msg.ConversationUUID, "error", err)
 	}
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
-	// isNewConversation = false since conversation always exists for live chat.
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, false); err != nil {
+	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 	}
 

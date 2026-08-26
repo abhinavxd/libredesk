@@ -41,6 +41,7 @@ import (
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/portalform"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/role"
@@ -77,13 +78,19 @@ import (
 
 // constants holds the app constants.
 type constants struct {
-	AppBaseURL                  string
-	FaviconURL                  string
-	LogoURL                     string
-	SiteName                    string
-	UploadProvider              string
-	AllowedUploadFileExtensions []string
-	MaxFileUploadSizeMB         int
+	AppBaseURL                   string
+	FaviconURL                   string
+	LogoURL                      string
+	SiteName                     string
+	UploadProvider               string
+	AllowedUploadFileExtensions  []string
+	MaxFileUploadSizeMB          int
+	PortalEnabled                bool
+	PortalInboxID                int
+	PortalHelpCenterID           int
+	PortalLivechatInboxID        int
+	PortalTicketsFromArticleOnly bool
+	PortalFormID                 int
 }
 
 // Config loads config from files and environment variables into koanf.
@@ -156,13 +163,19 @@ func initFlags() {
 // initConstants initializes the app constants.
 func initConstants() *constants {
 	return &constants{
-		AppBaseURL:                  ko.String("app.root_url"),
-		FaviconURL:                  ko.String("app.favicon_url"),
-		LogoURL:                     ko.String("app.logo_url"),
-		SiteName:                    ko.String("app.site_name"),
-		UploadProvider:              ko.MustString("upload.provider"),
-		AllowedUploadFileExtensions: ko.Strings("app.allowed_file_upload_extensions"),
-		MaxFileUploadSizeMB:         ko.Int("app.max_file_upload_size"),
+		AppBaseURL:                   ko.String("app.root_url"),
+		FaviconURL:                   ko.String("app.favicon_url"),
+		LogoURL:                      ko.String("app.logo_url"),
+		SiteName:                     ko.String("app.site_name"),
+		UploadProvider:               ko.MustString("upload.provider"),
+		AllowedUploadFileExtensions:  ko.Strings("app.allowed_file_upload_extensions"),
+		MaxFileUploadSizeMB:          ko.Int("app.max_file_upload_size"),
+		PortalEnabled:                ko.Bool("portal.enabled"),
+		PortalInboxID:                ko.Int("portal.inbox_id"),
+		PortalHelpCenterID:           ko.Int("portal.help_center_id"),
+		PortalLivechatInboxID:        ko.Int("portal.livechat_inbox_id"),
+		PortalTicketsFromArticleOnly: ko.Bool("portal.tickets_from_article_only"),
+		PortalFormID:                 ko.Int("portal.form_id"),
 	}
 }
 
@@ -405,6 +418,18 @@ func initCSAT(db *sqlx.DB, i18n *i18n.I18n) *csat.Manager {
 	return m
 }
 
+func initPortalForm(db *sqlx.DB, i18n *i18n.I18n) *portalform.Manager {
+	m, err := portalform.New(portalform.Opts{
+		DB:   db,
+		Lo:   initLogger("portal_form"),
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing portal form manager: %v", err)
+	}
+	return m
+}
+
 // initWS inits websocket hub.
 func initWS(user *user.Manager) *ws.Hub {
 	return ws.NewHub(initLogger("ws"), user)
@@ -545,6 +570,7 @@ func parseWebTemplates(funcMap template.FuncMap, fs stuffbin.FileSystem) (*templ
 	for _, pattern := range []string{
 		"/static/public/web-templates/*.html",
 		"/static/public/web-templates/help/*/*.html",
+		"/static/public/web-templates/portal/*.html",
 	} {
 		p, err := fs.Glob(pattern)
 		if err != nil {
@@ -1232,6 +1258,8 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 		{"auth", 30},
 		{"public", 100},
 		{"media", 300},
+		{"portal", 120},
+		{"portal_auth", 10},
 	}
 
 	for _, d := range defaults {

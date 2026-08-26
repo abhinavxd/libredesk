@@ -42,6 +42,12 @@ export const adminNavItems = [
         href: '/admin/help-center',
         permission: 'help_center:manage',
         icon: 'BookOpen'
+      },
+      {
+        titleKey: 'globals.terms.customerPortal',
+        href: '/admin/customer-portal',
+        permission: 'general_settings:manage',
+        icon: 'Ticket'
       }
     ]
   },

@@ -1,0 +1,95 @@
+<template>
+  <DropdownMenu>
+    <DropdownMenuTrigger as-child>
+      <Button variant="ghost" class="w-8 h-8 p-0">
+        <span class="sr-only"></span>
+        <MoreVertical class="w-4 h-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent>
+      <DropdownMenuItem @click="editForm">
+        <Pencil class="mr-2 h-4 w-4" />
+        {{ $t('globals.messages.edit') }}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        @click="() => (alertOpen = true)"
+        class="text-destructive focus:text-destructive"
+      >
+        <Trash class="mr-2 h-4 w-4" />
+        {{ $t('globals.messages.delete') }}
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+
+  <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogDescription>{{
+          $t('admin.portalForm.deletionConfirmation')
+        }}</AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction variant="destructive" @click="handleDelete">
+          {{ $t('globals.messages.delete') }}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@shared-ui/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import { Button } from '@shared-ui/components/ui/button'
+import { useEmitter } from '@main/composables/useEmitter'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import api from '@main/api'
+
+const alertOpen = ref(false)
+const emit = useEmitter()
+
+const props = defineProps({
+  form: {
+    type: Object,
+    required: true
+  }
+})
+
+async function handleDelete() {
+  try {
+    await api.deletePortalForm(props.form.id)
+    alertOpen.value = false
+    emit.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'portal-forms' })
+  } catch (error) {
+    emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  }
+}
+
+const editForm = () => {
+  emit.emit(EMITTER_EVENTS.EDIT_MODEL, { model: 'portal-forms', data: props.form })
+}
+</script>

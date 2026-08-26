@@ -13,6 +13,7 @@ import (
 	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -25,8 +26,10 @@ const (
 )
 
 var (
-	oidcStateSessKey = "oidc_state"
-	oidcNextSessKey  = "oidc_next"
+	oidcStateSessKey    = "oidc_state"
+	oidcNextSessKey     = "oidc_next"
+	oidcNonceSessKey    = "oidc_nonce"
+	oidcVerifierSessKey = "oidc_code_verifier"
 )
 
 // handleOIDCLogin redirects to the OIDC provider for login.
@@ -48,8 +51,17 @@ func handleOIDCLogin(r *fastglue.Request) error {
 		return redirectLoginError(r, oidcErrLoginFailed, next)
 	}
 
+	nonce, err := stringutil.RandomAlphanumeric(32)
+	if err != nil {
+		app.lo.Error("error generating nonce", "error", err)
+		return redirectLoginError(r, oidcErrLoginFailed, next)
+	}
+	codeVerifier := oauth2.GenerateVerifier()
+
 	sessionValues := map[string]any{
-		oidcStateSessKey: state,
+		oidcStateSessKey:    state,
+		oidcNonceSessKey:    nonce,
+		oidcVerifierSessKey: codeVerifier,
 		// For redirecting after login
 		oidcNextSessKey: next,
 	}
@@ -59,7 +71,7 @@ func handleOIDCLogin(r *fastglue.Request) error {
 		return redirectLoginError(r, oidcErrLoginFailed, next)
 	}
 
-	authURL, err := app.auth.LoginURL(providerID, state)
+	authURL, err := app.auth.LoginURL(providerID, state, nonce, codeVerifier)
 	if err != nil {
 		app.lo.Error("error getting oidc login url", "provider_id", providerID, "error", err)
 		return redirectLoginError(r, oidcErrLoginFailed, next)
@@ -77,6 +89,11 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		providerID, err = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 		ip              = realip.FromRequest(r.RequestCtx)
 	)
+	// Flows started from the customer portal login page finish there.
+	if strings.HasPrefix(state, portalOIDCStatePrefix) {
+		return handlePortalOIDCCallback(r)
+	}
+
 	next, _ := app.auth.GetSessionValue(r, oidcNextSessKey)
 	nextStr, _ := next.(string)
 
@@ -109,7 +126,20 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		return redirectLoginError(r, oidcErrSessionExpired, nextStr)
 	}
 
-	_, claims, err := app.auth.ExchangeOIDCToken(r.RequestCtx, providerID, code)
+	sessionNonce, err := app.auth.GetSessionValue(r, oidcNonceSessKey)
+	if err != nil {
+		app.lo.Error("error getting oidc nonce from session", "provider_id", providerID, "error", err)
+		return redirectLoginError(r, oidcErrSessionExpired, nextStr)
+	}
+	sessionVerifier, err := app.auth.GetSessionValue(r, oidcVerifierSessKey)
+	if err != nil {
+		app.lo.Error("error getting oidc code verifier from session", "provider_id", providerID, "error", err)
+		return redirectLoginError(r, oidcErrSessionExpired, nextStr)
+	}
+	nonceStr, _ := sessionNonce.(string)
+	verifierStr, _ := sessionVerifier.(string)
+
+	_, claims, err := app.auth.ExchangeOIDCToken(r.RequestCtx, providerID, code, verifierStr, nonceStr)
 	if err != nil {
 		if errors.Is(err, auth_.ErrOIDCInvalidClient) {
 			return redirectLoginError(r, oidcErrInvalidClient, nextStr)

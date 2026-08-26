@@ -42,9 +42,10 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	Insert *sqlx.Stmt `query:"insert"`
-	Get    *sqlx.Stmt `query:"get"`
-	Update *sqlx.Stmt `query:"update"`
+	Insert            *sqlx.Stmt `query:"insert"`
+	Get               *sqlx.Stmt `query:"get"`
+	GetByConversation *sqlx.Stmt `query:"get-by-conversation"`
+	Update            *sqlx.Stmt `query:"update"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -86,6 +87,19 @@ func (m *Manager) Get(uuid string) (models.CSATResponse, error) {
 			return csat, envelope.NewError(envelope.InputError, m.i18n.T("validation.notFoundCsatSurvey"), nil)
 		}
 		m.lo.Error("error getting CSAT", "error", err)
+		return csat, err
+	}
+	return csat, nil
+}
+
+// GetByConversationID returns the latest survey, sql.ErrNoRows when none was sent.
+func (m *Manager) GetByConversationID(conversationID int) (models.CSATResponse, error) {
+	var csat models.CSATResponse
+	if err := m.q.GetByConversation.Get(&csat, conversationID); err != nil {
+		if err == sql.ErrNoRows {
+			return csat, err
+		}
+		m.lo.Error("error getting CSAT by conversation", "conversation_id", conversationID, "error", err)
 		return csat, err
 	}
 	return csat, nil

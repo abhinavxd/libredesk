@@ -13,6 +13,7 @@ export const createArticleFormSchema = (t) =>
     collection_id: z.coerce.number().min(1, t('globals.messages.required')),
     sort_order: z.number().default(0),
     ai_enabled: z.boolean().default(false),
+    portal_form_id: z.string().default('0'),
     locale: z.string().default('en'),
     author_id: z.string().optional(),
     excerpt: z.string().default(''),

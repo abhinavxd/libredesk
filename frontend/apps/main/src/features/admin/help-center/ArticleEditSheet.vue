@@ -182,6 +182,29 @@
                 </FormField>
               </div>
 
+              <FormField v-slot="{ componentField }" name="portal_form_id">
+                <FormItem>
+                  <FormLabel>{{ t('admin.portalForm.tickets') }}</FormLabel>
+                  <FormControl>
+                    <Select v-bind="componentField">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="0">{{ t('admin.portalForm.usePortalDefault') }}</SelectItem>
+                          <SelectItem v-for="f in portalForms" :key="f.id" :value="f.id.toString()">
+                            {{ f.name }}
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormDescription>{{ t('admin.portalForm.articleForm.description') }}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
+
               <FormField v-slot="{ componentField, handleChange }" name="ai_enabled">
                 <FormItem>
                   <SwitchField
@@ -398,6 +421,7 @@ const assistantOptions = computed(() => usersStore.options.filter((o) => o.type 
 
 const isLoadingArticle = ref(false)
 const availableCollections = ref([])
+const portalForms = ref([])
 const editorText = ref('')
 const toolbarSlot = ref(null)
 const titleInput = ref(null)
@@ -418,6 +442,7 @@ const toFormValues = () => {
     collection_id: String(article?.collection_id || props.collectionId || ''),
     sort_order: article?.sort_order || 0,
     ai_enabled: article?.ai_enabled || false,
+    portal_form_id: String(article?.portal_form_id || 0),
     author_id: String(article?.author_id || (props.article ? '' : userStore.userID) || ''),
     locale: article?.locale || props.defaultLocale || props.helpCenterLocales?.[0] || 'en',
     excerpt: article?.excerpt || '',
@@ -482,7 +507,8 @@ watch(
     const [, , article] = await Promise.all([
       usersStore.fetchUsers(),
       fetchAvailableCollections(),
-      fetchArticle()
+      fetchArticle(),
+      fetchPortalForms()
     ])
     if (seq !== loadSeq) return
     loadedArticle.value = article
@@ -494,6 +520,15 @@ watch(
   },
   { immediate: true }
 )
+
+const fetchPortalForms = async () => {
+  try {
+    const { data } = await api.getPortalForms()
+    portalForms.value = data.data || []
+  } catch {
+    portalForms.value = []
+  }
+}
 
 const fetchAvailableCollections = async () => {
   try {
@@ -525,7 +560,8 @@ const onSubmit = form.handleSubmit(async (values) => {
   props.submitForm({
     ...values,
     content: highlightCodeBlocks(values.content),
-    author_id: values.author_id ? Number(values.author_id) : null
+    author_id: values.author_id ? Number(values.author_id) : null,
+    portal_form_id: Number(values.portal_form_id) || null
   })
 })
 </script>

@@ -1,0 +1,73 @@
+{{ define "portal-ticket" }}
+{{ template "portal-header" . }}
+<div class="pt-wrap pt-ticket">
+    <p class="pt-back"><a href="/portal">← {{ .L.T "portal.backToTickets" }}</a></p>
+    <div class="pt-ticket-head">
+        <h1>{{ .Data.Subject }}</h1>
+        <div class="pt-ticket-meta">
+            <button type="button" class="pt-ref-copy" data-pt-copy="{{ .Data.ReferenceNumber }}" data-copied="{{ .L.T "globals.messages.copied" }}" title="{{ .L.T "portal.copyTicketNumber" }}" aria-label="{{ .L.T "portal.copyTicketNumber" }} #{{ .Data.ReferenceNumber }}">
+                <span class="pt-ref" role="status" aria-live="polite">#{{ .Data.ReferenceNumber }}</span>
+            </button>
+            {{ template "portal-status-badge" .Data }}
+            <span class="pt-muted">{{ .L.T "globals.terms.createdAt" }} <time datetime="{{ .Data.CreatedAtISO }}">{{ .Data.CreatedAt }}</time></span>
+        </div>
+    </div>
+    {{ if .Data.Error }}<p class="pt-error" role="alert">{{ .Data.Error }}</p>{{ end }}
+    {{ if .Data.CSATWidgetURL }}
+    <section class="pt-csat">
+        <h2>{{ .L.T "portal.rateExperience" }}</h2>
+        <iframe src="{{ .Data.CSATWidgetURL }}" title="{{ .L.T "portal.rateExperience" }}" loading="lazy"></iframe>
+    </section>
+    {{ end }}
+    <ol class="pt-messages">
+        {{ range .Data.Messages }}
+        <li class="pt-message{{ if .IsAgent }} pt-message-agent{{ end }}{{ if .GroupWithPrev }} pt-message-grouped{{ end }}">
+            {{ if not .GroupWithPrev }}
+            <div class="pt-message-head">
+                <span class="pt-message-author">{{ .AuthorName }}</span>
+            </div>
+            {{ end }}
+            {{ if .HTML }}<div class="pt-message-body article-content{{ if .HasQuoted }} pt-hide-quoted{{ end }}">{{ .HTML }}</div>{{ else }}<div class="pt-message-body pt-message-text">{{ .Text }}</div>{{ end }}
+            {{ if .HasQuoted }}
+            <button type="button" class="pt-quote-toggle" data-pt-quote-toggle data-show="{{ $.L.T "conversation.showQuotedText" }}" data-hide="{{ $.L.T "conversation.hideQuotedText" }}">{{ $.L.T "conversation.showQuotedText" }}</button>
+            {{ end }}
+            {{ if .Attachments }}
+            <ul class="pt-attachments">
+                {{ range .Attachments }}<li><a href="{{ .URL }}" target="_blank" rel="noreferrer">{{ .Name }}</a></li>{{ end }}
+            </ul>
+            {{ end }}
+            {{ if not .GroupWithNext }}<time class="pt-message-time" datetime="{{ .CreatedAtISO }}">{{ .CreatedAt }}</time>{{ end }}
+        </li>
+        {{ end }}
+    </ol>
+    <form class="pt-reply" action="/portal/tickets/{{ .Data.ReferenceNumber }}/reply" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf" value="{{ .Data.CSRF }}" />
+        <label for="pt-reply-message">{{ .L.Tc "globals.terms.reply" 1 }}</label>
+        <textarea id="pt-reply-message" name="message" rows="5" maxlength="{{ .Data.MaxMessageLength }}" placeholder="{{ .L.T "portal.replyPlaceholder" }}"></textarea>
+        <label class="pt-file-label" for="pt-reply-files">{{ .L.Tc "globals.terms.attachment" 2 }}</label>
+        <input id="pt-reply-files" type="file" name="files" multiple{{ if .Data.AcceptAttachments }} accept="{{ .Data.AcceptAttachments }}"{{ end }} />
+        <button type="submit">{{ .L.T "actions.sendReply" }}</button>
+    </form>
+</div>
+<script>
+    document.querySelectorAll('[data-pt-copy]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            navigator.clipboard.writeText(btn.dataset.ptCopy).then(function () {
+                var label = btn.querySelector('.pt-ref');
+                var original = label.textContent;
+                label.textContent = btn.dataset.copied;
+                setTimeout(function () { label.textContent = original; }, 1500);
+            });
+        });
+    });
+
+    document.querySelectorAll('[data-pt-quote-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var body = btn.parentElement.querySelector('.pt-message-body');
+            var hidden = body.classList.toggle('pt-hide-quoted');
+            btn.textContent = hidden ? btn.dataset.show : btn.dataset.hide;
+        });
+    });
+</script>
+{{ template "portal-footer" . }}
+{{ end }}

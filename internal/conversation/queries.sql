@@ -424,6 +424,32 @@ WHERE c.contact_id = $1 AND c.inbox_id = $2
 ORDER BY c.created_at DESC
 LIMIT 200;
 
+-- name: get-contact-portal-conversations
+SELECT
+    COUNT(*) OVER() AS total,
+    c.created_at,
+    c.uuid,
+    c.reference_number,
+    c.subject,
+    c.last_message,
+    c.last_message_at,
+    c.last_message_sender,
+    cs.name AS status,
+    COALESCE(cs.category::TEXT, '') AS status_category,
+    (
+        SELECT COUNT(*)
+        FROM conversation_messages m
+        WHERE m.conversation_id = c.id
+            AND m.private IS FALSE
+            AND m.type IN ('incoming', 'outgoing')
+    ) - 1 AS reply_count
+FROM conversations c
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE c.contact_id = $1
+    AND ($2 = '' OR ($2 = 'resolved' AND cs.category = 'resolved') OR ($2 = 'open' AND COALESCE(cs.category::TEXT, '') != 'resolved'))
+ORDER BY COALESCE(c.last_message_at, c.created_at) DESC, c.id DESC
+LIMIT $3 OFFSET $4;
+
 -- name: get-conversation-uuid
 SELECT uuid from conversations where id = $1;
 

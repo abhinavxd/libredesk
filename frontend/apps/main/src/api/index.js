@@ -67,6 +67,21 @@ const updateCustomAttribute = (id, data) =>
     }
   })
 const deleteCustomAttribute = (id) => http.delete(`/api/v1/custom-attributes/${id}`)
+const getPortalForms = () => http.get('/api/v1/portal-forms')
+const getPortalForm = (id) => http.get(`/api/v1/portal-forms/${id}`)
+const createPortalForm = (data) =>
+  http.post('/api/v1/portal-forms', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const updatePortalForm = (id, data) =>
+  http.put(`/api/v1/portal-forms/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const deletePortalForm = (id) => http.delete(`/api/v1/portal-forms/${id}`)
 const searchConversations = (params) => http.get('/api/v1/conversations/search', { params })
 const searchMessages = (params) => http.get('/api/v1/messages/search', { params })
 const searchContacts = (params) => http.get('/api/v1/contacts/search', { params })
@@ -811,6 +826,11 @@ export default {
   updateCustomAttribute,
   deleteCustomAttribute,
   getCustomAttribute,
+  getPortalForms,
+  getPortalForm,
+  createPortalForm,
+  updatePortalForm,
+  deletePortalForm,
   getContactNotes,
   createContactNote,
   deleteContactNote,

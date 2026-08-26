@@ -16,17 +16,18 @@ var providerLogos = map[string]string{
 
 // OIDC represents an OpenID Connect configuration.
 type OIDC struct {
-	ID           int       `db:"id" json:"id"`
-	CreatedAt    time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
-	Name         string    `db:"name" json:"name"`
-	Enabled      bool      `db:"enabled" json:"enabled"`
-	ClientID     string    `db:"client_id" json:"client_id,omitempty"`
-	ClientSecret string    `db:"client_secret" json:"client_secret,omitempty"`
-	Provider     string    `db:"provider" json:"provider"`
-	ProviderURL  string    `db:"provider_url" json:"provider_url"`
-	LogoURL      string    `db:"logo_url" json:"logo_url"`
-	RedirectURI  string    `db:"-" json:"redirect_uri"`
+	ID               int       `db:"id" json:"id"`
+	CreatedAt        time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt        time.Time `db:"updated_at" json:"updated_at"`
+	Name             string    `db:"name" json:"name"`
+	Enabled          bool      `db:"enabled" json:"enabled"`
+	EnabledForPortal bool      `db:"enabled_for_portal" json:"enabled_for_portal"`
+	ClientID         string    `db:"client_id" json:"client_id,omitempty"`
+	ClientSecret     string    `db:"client_secret" json:"client_secret,omitempty"`
+	Provider         string    `db:"provider" json:"provider"`
+	ProviderURL      string    `db:"provider_url" json:"provider_url"`
+	LogoURL          string    `db:"logo_url" json:"logo_url"`
+	RedirectURI      string    `db:"-" json:"redirect_uri"`
 }
 
 // SetProviderLogo sets the logo URL if not already set.

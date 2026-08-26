@@ -1,0 +1,9 @@
+{{ define "portal-error" }}
+{{ template "portal-header" . }}
+<div class="pt-error-page">
+    <p class="pt-error-code">{{ .Data.ErrorCode }}</p>
+    <h1>{{ .Data.Title }}</h1>
+    <p><a href="/portal">{{ .L.T "portal.backToTickets" }}</a></p>
+</div>
+{{ template "portal-footer" . }}
+{{ end }}

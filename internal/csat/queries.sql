@@ -17,6 +17,21 @@ SELECT id,
 FROM csat_responses
 WHERE uuid = $1;
 
+-- name: get-by-conversation
+SELECT id,
+    uuid,
+    created_at,
+    updated_at,
+    conversation_id,
+    rating,
+    feedback,
+    meta,
+    response_timestamp
+FROM csat_responses
+WHERE conversation_id = $1
+ORDER BY created_at DESC, id DESC
+LIMIT 1;
+
 -- name: update
 UPDATE csat_responses
 SET rating = $2,
