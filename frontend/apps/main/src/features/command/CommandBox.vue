@@ -74,10 +74,10 @@
 
               <!-- Right Column: Macro Details (70%) -->
               <div class="col-span-8 px-4 overflow-y-auto h-full pb-6">
-                <div class="space-y-3 text-sm">
+                <div class="space-y-3 text-sm h-full">
                   <!-- Reply Preview -->
-                  <div v-if="contentPending" class="flex items-center justify-center h-32">
-                    <Spinner />
+                  <div v-if="contentPending" class="flex items-center justify-center h-full">
+                    <Spinner :absolute="false" />
                   </div>
                   <div v-else-if="replyContent" class="space-y-2">
                     <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
