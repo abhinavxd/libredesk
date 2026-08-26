@@ -21,12 +21,13 @@ func handleGetTeams(r *fastglue.Request) error {
 	return r.SendEnvelope(teams)
 }
 
-// handleGetTeamsCompact returns a list of all teams in a compact format.
+// handleGetTeamsCompact returns teams in a compact format, all of them without page params.
 func handleGetTeamsCompact(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
 	)
-	teams, err := app.team.GetAllCompact()
+	page, pageSize := getOptionalPagination(r)
+	teams, err := app.team.GetAllCompact(page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

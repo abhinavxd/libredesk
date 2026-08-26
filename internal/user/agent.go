@@ -79,10 +79,11 @@ func (u *Manager) InvalidateAllAgentCache() {
 	u.agentCache = make(map[int]cachedAgent)
 }
 
-// GetAgentsCompact returns a compact list of agents and AI assistants (both assignable identities).
-func (u *Manager) GetAgentsCompact() ([]models.UserCompact, error) {
+// GetAgentsCompact returns a compact list of agents and AI assistants (both assignable identities), all of them when pageSize is 0.
+func (u *Manager) GetAgentsCompact(page, pageSize int) ([]models.UserCompact, error) {
 	var users = make([]models.UserCompact, 0)
-	if err := u.db.Select(&users, u.q.GetUsersCompact, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant})); err != nil {
+	query := u.q.GetUsersCompact + " ORDER BY users.id LIMIT NULLIF($2, 0) OFFSET $3"
+	if err := u.db.Select(&users, query, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant}), pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
 		u.lo.Error("error fetching users from db", "error", err)
 		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

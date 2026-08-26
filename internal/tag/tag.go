@@ -53,10 +53,10 @@ func New(opts Opts) (*Manager, error) {
 	}, nil
 }
 
-// GetAll retrieves all tags.
-func (t *Manager) GetAll() ([]models.Tag, error) {
+// GetAll retrieves tags, all of them when pageSize is 0.
+func (t *Manager) GetAll(page, pageSize int) ([]models.Tag, error) {
 	var tags = make([]models.Tag, 0)
-	if err := t.q.GetAllTags.Select(&tags); err != nil {
+	if err := t.q.GetAllTags.Select(&tags, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
 		t.lo.Error("error fetching tags", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

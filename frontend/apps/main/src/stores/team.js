@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
+import { fetchAllPages } from '../utils/paged-fetch'
 import api from '../api'
 
 export const useTeamStore = defineStore('team', () => {
@@ -13,16 +14,22 @@ export const useTeamStore = defineStore('team', () => {
         value: String(team.id),
         emoji: team.emoji,
     })))
+    const showFetchError = (error) => {
+        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+            variant: 'destructive',
+            description: handleHTTPError(error).message
+        })
+    }
     const fetchTeams = async () => {
         if (teams.value.length) return
         try {
-            const response = await api.getTeamsCompact()
-            teams.value = response?.data?.data || []
+            await fetchAllPages(
+                (params) => api.getTeamsCompact(params),
+                (rows) => teams.value.push(...rows),
+                showFetchError
+            )
         } catch (error) {
-            emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-                variant: 'destructive',
-                description: handleHTTPError(error).message
-            })
+            showFetchError(error)
         }
     }
     return {

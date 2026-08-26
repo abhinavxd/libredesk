@@ -563,6 +563,22 @@ func getPagination(r *fastglue.Request) (page, pageSize int) {
 	return page, pageSize
 }
 
+// getOptionalPagination reads page/page_size, returning pageSize 0 (fetch everything) when absent.
+func getOptionalPagination(r *fastglue.Request) (page, pageSize int) {
+	page, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page")))
+	pageSize, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page_size")))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 0 {
+		pageSize = 0
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+	return page, pageSize
+}
+
 // sendErrorEnvelope sends a standardized error response to the client.
 func sendErrorEnvelope(r *fastglue.Request, err error) error {
 	e, ok := err.(envelope.Error)

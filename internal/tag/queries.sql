@@ -7,7 +7,8 @@ select
 from
     tags
 order by
-    name;
+    name
+limit NULLIF($1, 0) offset $2;
 
 -- name: insert-tag
 INSERT into

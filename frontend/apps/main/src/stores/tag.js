@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
+import { fetchAllPages } from '../utils/paged-fetch'
 import api from '../api'
 
 export const useTagStore = defineStore('tags', () => {
@@ -14,16 +15,22 @@ export const useTagStore = defineStore('tags', () => {
         value: String(tag.id),
     })))
 
+    const showFetchError = (error) => {
+        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+            variant: 'destructive',
+            description: handleHTTPError(error).message
+        })
+    }
     const fetchTags = async () => {
         if (tags.value.length) return
         try {
-            const response = await api.getTags()
-            tags.value = response?.data?.data || []
+            await fetchAllPages(
+                (params) => api.getTags(params),
+                (rows) => tags.value.push(...rows),
+                showFetchError
+            )
         } catch (error) {
-            emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-                variant: 'destructive',
-                description: handleHTTPError(error).message
-            })
+            showFetchError(error)
         }
     }
 

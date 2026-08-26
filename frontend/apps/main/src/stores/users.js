@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
+import { fetchAllPages } from '../utils/paged-fetch'
 import api from '../api'
 
 // TODO: rename this store to agents
@@ -16,16 +17,25 @@ export const useUsersStore = defineStore('users', () => {
         avatar_url: user.avatar_url,
         availability_status: user.availability_status,
     })))
+    let fetchSeq = 0
+    const showFetchError = (error) => {
+        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+            variant: 'destructive',
+            description: handleHTTPError(error).message
+        })
+    }
     const fetchUsers = async (force = false) => {
         if (!force && users.value.length) return
+        const seq = ++fetchSeq
         try {
-            const response = await api.getUsersCompact()
-            users.value = response?.data?.data || []
+            users.value = []
+            await fetchAllPages(
+                (params) => api.getUsersCompact(params),
+                (rows) => { if (seq === fetchSeq) users.value.push(...rows) },
+                showFetchError
+            )
         } catch (error) {
-            emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-                variant: 'destructive',
-                description: handleHTTPError(error).message
-            })
+            showFetchError(error)
         }
     }
     const setAvailability = (agentID, status) => {

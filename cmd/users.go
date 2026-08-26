@@ -65,10 +65,11 @@ func handleGetAgents(r *fastglue.Request) error {
 	return r.SendEnvelope(agents)
 }
 
-// handleGetAgentsCompact returns all agents in a compact format.
+// handleGetAgentsCompact returns agents in a compact format, all of them without page params.
 func handleGetAgentsCompact(r *fastglue.Request) error {
 	var app = r.Context.(*App)
-	agents, err := app.user.GetAgentsCompact()
+	page, pageSize := getOptionalPagination(r)
+	agents, err := app.user.GetAgentsCompact(page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

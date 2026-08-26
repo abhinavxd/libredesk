@@ -76,10 +76,10 @@ func (u *Manager) GetAll() ([]models.Team, error) {
 	return teams, nil
 }
 
-// GetAllCompact retrieves all teams with limited fields.
-func (u *Manager) GetAllCompact() ([]models.TeamCompact, error) {
+// GetAllCompact retrieves teams with limited fields, all of them when pageSize is 0.
+func (u *Manager) GetAllCompact(page, pageSize int) ([]models.TeamCompact, error) {
 	var teams = make([]models.TeamCompact, 0)
-	if err := u.q.GetTeamsCompact.Select(&teams); err != nil {
+	if err := u.q.GetTeamsCompact.Select(&teams, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return teams, nil
 		}
