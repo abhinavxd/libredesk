@@ -81,7 +81,6 @@ import { useInboxStore } from './stores/inbox'
 import { useUsersStore } from './stores/users'
 import { useTeamStore } from './stores/team'
 import { useSlaStore } from './stores/sla'
-import { useMacroStore } from './stores/macro'
 import { useSharedViewStore } from './stores/sharedView'
 import { useTagStore } from './stores/tag'
 import { useCustomAttributeStore } from './stores/customAttributes'
@@ -136,7 +135,6 @@ const usersStore = useUsersStore()
 const teamStore = useTeamStore()
 const inboxStore = useInboxStore()
 const slaStore = useSlaStore()
-const macroStore = useMacroStore()
 const sharedViewStore = useSharedViewStore()
 const tagStore = useTagStore()
 const customAttributeStore = useCustomAttributeStore()
@@ -187,7 +185,6 @@ const initStores = async () => {
     teamStore.fetchTeams(),
     inboxStore.fetchInboxes(),
     slaStore.fetchSlas(),
-    macroStore.loadMacros(),
     tagStore.fetchTags(),
     customAttributeStore.fetchCustomAttributes()
   ])

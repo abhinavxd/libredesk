@@ -36,6 +36,7 @@ ORDER BY
 
 -- name: get-all-compact
 SELECT
+    COUNT(*) OVER() AS total,
     id,
     created_at,
     updated_at,
@@ -49,8 +50,39 @@ SELECT
     usage_count
 FROM
     macros
+WHERE
+    ($1 = '' OR name ILIKE '%' || $1 || '%')
 ORDER BY
-    updated_at DESC;
+    updated_at DESC
+LIMIT $2 OFFSET $3;
+
+-- name: search-compact
+SELECT
+    id,
+    created_at,
+    updated_at,
+    name,
+    actions,
+    visibility,
+    visible_when,
+    message_content != '' AS has_message_content,
+    user_id,
+    team_id,
+    usage_count
+FROM
+    macros
+WHERE
+    ($1 = '' OR name ILIKE '%' || $1 || '%')
+    AND ($2 = '' OR $2 = ANY(visible_when::text[]))
+    AND (
+        visibility = 'all'
+        OR (visibility = 'user' AND user_id = $3)
+        OR (visibility = 'team' AND team_id = ANY($4::bigint[]))
+    )
+ORDER BY
+    usage_count DESC,
+    updated_at DESC
+LIMIT 30;
 
 -- name: create
 INSERT INTO

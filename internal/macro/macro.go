@@ -32,6 +32,7 @@ type queries struct {
 	Get            *sqlx.Stmt `query:"get"`
 	GetAll         *sqlx.Stmt `query:"get-all"`
 	GetAllCompact  *sqlx.Stmt `query:"get-all-compact"`
+	SearchCompact  *sqlx.Stmt `query:"search-compact"`
 	Create         *sqlx.Stmt `query:"create"`
 	Update         *sqlx.Stmt `query:"update"`
 	Delete         *sqlx.Stmt `query:"delete"`
@@ -101,12 +102,23 @@ func (m *Manager) GetAll() ([]models.Macro, error) {
 	return macros, nil
 }
 
-// GetAllCompact returns all macros without message content.
-func (m *Manager) GetAllCompact() ([]models.MacroCompact, error) {
+// GetAllCompact returns a page of macros without message content, filtered by name.
+func (m *Manager) GetAllCompact(query string, page, pageSize int) ([]models.MacroCompact, error) {
 	macros := make([]models.MacroCompact, 0)
-	err := m.q.GetAllCompact.Select(&macros)
+	err := m.q.GetAllCompact.Select(&macros, query, pageSize, (page-1)*pageSize)
 	if err != nil {
 		m.lo.Error("error fetching macros", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return macros, nil
+}
+
+// SearchCompact returns the top macros without message content visible to the given user.
+func (m *Manager) SearchCompact(query, view string, userID int, teamIDs []int) ([]models.MacroCompact, error) {
+	macros := make([]models.MacroCompact, 0)
+	err := m.q.SearchCompact.Select(&macros, query, view, userID, pq.Array(teamIDs))
+	if err != nil {
+		m.lo.Error("error searching macros", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return macros, nil

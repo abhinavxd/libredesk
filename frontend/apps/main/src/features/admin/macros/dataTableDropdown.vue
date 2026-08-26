@@ -82,7 +82,7 @@ const props = defineProps({
 const handleDelete = async () => {
   await api.deleteMacro(props.macro.id)
 
-  await macroStore.loadMacros(true)
+  macroStore.clearCache()
 
   isDeleteOpen.value = false
   emit.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'macros' })

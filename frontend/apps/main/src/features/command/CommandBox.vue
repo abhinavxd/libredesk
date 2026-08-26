@@ -11,7 +11,7 @@
       class="!min-h-[50vh] h-[50vh] !min-w-[50vw]"
       :class="{ 'overflow-hidden': nestedCommand === 'apply-macro' }"
     >
-      <CommandEmpty>
+      <CommandEmpty v-if="!isMacroMode || !macroStore.searchLoading">
         <p class="text-sm text-muted-foreground">{{ $t('command.noCommandAvailable') }}</p>
       </CommandEmpty>
 
@@ -48,7 +48,8 @@
 
       <!-- Macros -->
       <div v-if="isMacroMode">
-        <CommandGroup :heading="$t('actions.applyMacro')">
+        <!-- Mounted only with results: radix's group counts its items once on mount and stays hidden when they arrive async. -->
+        <CommandGroup v-if="visibleMacros.length" :heading="$t('actions.applyMacro')">
           <div class="min-h-[400px]">
             <div class="h-[60vh] grid grid-cols-12">
               <!-- Left Column: Macro List (30%) -->
@@ -219,7 +220,7 @@
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
-import { useMagicKeys } from '@vueuse/core'
+import { useMagicKeys, useDebounceFn } from '@vueuse/core'
 import { CalendarIcon } from 'lucide-vue-next'
 import { useConversationStore } from '@main/stores/conversation'
 import { useMacroStore } from '@main/stores/macro'
@@ -253,8 +254,6 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import { Letter } from 'vue-letter'
 
-const RENDER_CAP = 200
-
 const conversationStore = useConversationStore()
 const macroStore = useMacroStore()
 const { t } = useI18n()
@@ -276,22 +275,18 @@ const isMacroMode = computed(
     nestedCommand.value === 'apply-macro-to-new-conversation'
 )
 
-const macroSearchIndex = computed(() =>
-  macroStore.macroOptions.map((m) => ({ macro: m, labelLower: String(m.label).toLowerCase() }))
-)
+const visibleMacros = computed(() => macroStore.macroOptions)
 
-const visibleMacros = computed(() => {
-  const term = searchTerm.value?.trim().toLowerCase()
-  const index = macroSearchIndex.value
-  if (!term) {
-    const all = macroStore.macroOptions
-    return all.length > RENDER_CAP ? all.slice(0, RENDER_CAP) : all
-  }
-  const matched = []
-  for (let i = 0; i < index.length && matched.length < RENDER_CAP; i++) {
-    if (index[i].labelLower.includes(term)) matched.push(index[i].macro)
-  }
-  return matched
+const searchMacrosDebounced = useDebounceFn(() => {
+  macroStore.searchMacros(searchTerm.value?.trim() || '')
+}, 300)
+
+watch(isMacroMode, (on) => {
+  if (on) macroStore.searchMacros(searchTerm.value?.trim() || '')
+})
+
+watch(searchTerm, () => {
+  if (isMacroMode.value) searchMacrosDebounced()
 })
 
 function preventDefaultOnHotkey(key) {

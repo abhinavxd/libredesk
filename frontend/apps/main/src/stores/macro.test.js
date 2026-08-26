@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 
 vi.mock('@main/api', () => ({
   default: {
-    getAllMacrosCompact: vi.fn(),
+    searchMacros: vi.fn(),
     getMacro: vi.fn()
   }
 }))
@@ -38,18 +38,35 @@ describe('macro store', () => {
     vi.clearAllMocks()
   })
 
-  it('loads the list from the compact endpoint', async () => {
-    api.getAllMacrosCompact.mockResolvedValue({ data: { data: [compactMacro()] } })
+  it('searches with the query and the current view', async () => {
+    api.searchMacros.mockResolvedValue({ data: { data: [compactMacro()] } })
+    const store = useMacroStore()
+    store.setCurrentView('replying')
+
+    await store.searchMacros('refund')
+
+    expect(api.searchMacros).toHaveBeenCalledWith({ q: 'refund', view: 'replying' })
+    expect(store.searchResults).toHaveLength(1)
+  })
+
+  it('keeps only the newest search response', async () => {
+    let resolveFirst
+    api.searchMacros
+      .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)))
+      .mockResolvedValueOnce({ data: { data: [compactMacro({ id: 2, name: 'newer' })] } })
     const store = useMacroStore()
 
-    await store.loadMacros()
+    const first = store.searchMacros('a')
+    const second = store.searchMacros('ab')
+    resolveFirst({ data: { data: [compactMacro({ id: 1, name: 'stale' })] } })
+    await Promise.all([first, second])
 
-    expect(api.getAllMacrosCompact).toHaveBeenCalledTimes(1)
-    expect(store.macroList).toHaveLength(1)
+    expect(store.searchResults.map((m) => m.name)).toEqual(['newer'])
+    expect(store.searchLoading).toBe(false)
   })
 
   it('drops macros with no actions and no message content from the options', async () => {
-    api.getAllMacrosCompact.mockResolvedValue({
+    api.searchMacros.mockResolvedValue({
       data: {
         data: [
           compactMacro({ id: 1, name: 'content only', has_message_content: true }),
@@ -59,7 +76,7 @@ describe('macro store', () => {
       }
     })
     const store = useMacroStore()
-    await store.loadMacros()
+    await store.searchMacros()
 
     expect(store.macroOptions.map((m) => m.id)).toEqual([1, 2])
   })
@@ -103,14 +120,16 @@ describe('macro store', () => {
     expect(api.getMacro).toHaveBeenCalledTimes(2)
   })
 
-  it('clears the content cache on a forced list reload', async () => {
-    api.getAllMacrosCompact.mockResolvedValue({ data: { data: [compactMacro()] } })
+  it('clears results and cached content on clearCache', async () => {
+    api.searchMacros.mockResolvedValue({ data: { data: [compactMacro()] } })
     api.getMacro.mockResolvedValue({ data: { data: { id: 7, message_content: '<p>hi</p>' } } })
     const store = useMacroStore()
 
+    await store.searchMacros()
     await store.fetchMacroContent(7)
-    await store.loadMacros(true)
+    store.clearCache()
 
+    expect(store.searchResults).toEqual([])
     expect(store.macroContents[7]).toBeUndefined()
   })
 })

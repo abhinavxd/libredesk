@@ -350,7 +350,8 @@ const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
 const getAllMacros = () => http.get('/api/v1/macros')
-const getAllMacrosCompact = () => http.get('/api/v1/macros/compact')
+const getMacrosCompact = (params) => http.get('/api/v1/macros/compact', { params })
+const searchMacros = (params) => http.get('/api/v1/macros/search', { params })
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
 const createMacro = (data) =>
   http.post('/api/v1/macros', data, {
@@ -667,7 +668,8 @@ export default {
   getCurrentUser,
   getCurrentUserTeams,
   getAllMacros,
-  getAllMacrosCompact,
+  getMacrosCompact,
+  searchMacros,
   getMacro,
   createMacro,
   updateMacro,

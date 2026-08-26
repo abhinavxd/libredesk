@@ -8,7 +8,11 @@ const messageBody = `Canned reply from the macro form spec ${stamp}`
 const newPath = '/admin/conversations/macros/new'
 const listPath = '/admin/conversations/macros'
 
-const filterList = (text) => cy.get('input[placeholder="Search"]').clear().type(text)
+// The success toast sits over the search input until it expires, so wait it out first.
+const filterList = (text) => {
+  cy.get('[data-sonner-toast]', { timeout: 10000 }).should('not.exist')
+  return cy.get('input[placeholder="Search"]').clear().type(text)
+}
 
 describe('Macro form', () => {
   let macroId

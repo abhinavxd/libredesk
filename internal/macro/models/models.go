@@ -19,6 +19,8 @@ type MacroCompact struct {
 	UserID            *int            `db:"user_id" json:"user_id,string"`
 	TeamID            *int            `db:"team_id" json:"team_id,string"`
 	UsageCount        int             `db:"usage_count" json:"usage_count"`
+
+	Total int `db:"total" json:"-"`
 }
 
 type Macro struct {

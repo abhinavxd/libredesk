@@ -8,13 +8,15 @@ import api from '../api'
 import { permissions as perms } from '../constants/permissions.js'
 
 export const useMacroStore = defineStore('macroStore', () => {
-    const macroList = ref([])
-    // Message content is not in the list response; it is fetched per macro and cached here.
+    const searchResults = ref([])
+    const searchLoading = ref(false)
+    // Per-macro message content, fetched on demand (the search response carries none).
     const macroContents = ref({})
     const contentFetches = {}
     const emitter = useEmitter()
     const userStore = useUserStore()
     const currentView = ref('')
+    let searchSeq = 0
 
     // actionPermissions is a map of action names to their corresponding permissions that a user must have to perform the action.
     const actionPermissions = {
@@ -30,29 +32,14 @@ export const useMacroStore = defineStore('macroStore', () => {
     }
 
     const macroOptions = computed(() => {
-        // Filter macros based on visibility set.
-        const userTeams = userStore.teams.map(team => String(team.id))
-        let filtered = macroList.value.filter(macro =>
-            macro.visibility === 'all' ||
-            userTeams.includes(macro.team_id) ||
-            String(macro.user_id) === String(userStore.userID)
-        )
-
-        // Filter by visible_when if currentView is set.
-        if (currentView.value) {
-            filtered = filtered.filter(macro =>
-                !macro.visible_when?.length || macro.visible_when.includes(currentView.value)
-            )
-        }
-
-        // Filter macros based on permissions.
-        filtered.forEach(macro => {
-            macro.actions = macro.actions.filter(action => {
+        let filtered = searchResults.value.map(macro => ({
+            ...macro,
+            actions: macro.actions.filter(action => {
                 const permission = actionPermissions[action.type]
                 if (!permission) return true
                 return userStore.can(permission)
             })
-        })
+        }))
 
         // Skip macros that do not have any actions left AND no message content.
         filtered = filtered.filter(macro => !(macro.actions.length === 0 && !macro.has_message_content))
@@ -64,17 +51,21 @@ export const useMacroStore = defineStore('macroStore', () => {
         }))
     })
 
-    const loadMacros = async (force = false) => {
-        if (!force && macroList.value.length) return
+    const searchMacros = async (query = '') => {
+        const seq = ++searchSeq
+        searchLoading.value = true
         try {
-            const response = await api.getAllMacrosCompact()
-            macroList.value = response?.data?.data || []
-            if (force) macroContents.value = {}
+            const response = await api.searchMacros({ q: query, view: currentView.value })
+            if (seq !== searchSeq) return
+            searchResults.value = response?.data?.data || []
         } catch (error) {
+            if (seq !== searchSeq) return
             emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
                 variant: 'destructive',
                 description: handleHTTPError(error).message
             })
+        } finally {
+            if (seq === searchSeq) searchLoading.value = false
         }
     }
 
@@ -94,17 +85,24 @@ export const useMacroStore = defineStore('macroStore', () => {
         return contentFetches[id]
     }
 
+    const clearCache = () => {
+        searchResults.value = []
+        macroContents.value = {}
+    }
+
     const setCurrentView = (view) => {
         currentView.value = view
     }
 
     return {
-        macroList,
+        searchResults,
+        searchLoading,
         macroOptions,
         macroContents,
         currentView,
-        loadMacros,
+        searchMacros,
         fetchMacroContent,
+        clearCache,
         setCurrentView
     }
 })

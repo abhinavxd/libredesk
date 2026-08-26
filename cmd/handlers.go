@@ -117,7 +117,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Macros.
 	g.GET("/api/v1/macros", auth(handleGetMacros))
-	g.GET("/api/v1/macros/compact", auth(handleGetMacrosCompact))
+	g.GET("/api/v1/macros/compact", perm(handleGetMacrosCompact, "macros:manage"))
+	g.GET("/api/v1/macros/search", auth(handleSearchMacros))
 	g.GET("/api/v1/macros/{id}", auth(handleGetMacro))
 	g.POST("/api/v1/macros", perm(handleCreateMacro, "macros:manage"))
 	g.PUT("/api/v1/macros/{id}", perm(handleUpdateMacro, "macros:manage"))

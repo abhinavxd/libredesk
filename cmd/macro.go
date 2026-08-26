@@ -29,10 +29,54 @@ func handleGetMacros(r *fastglue.Request) error {
 	return r.SendEnvelope(macros)
 }
 
-// handleGetMacrosCompact returns all macros without message content.
+// handleGetMacrosCompact returns a page of macros without message content.
 func handleGetMacrosCompact(r *fastglue.Request) error {
-	var app = r.Context.(*App)
-	macros, err := app.macro.GetAllCompact()
+	var (
+		app   = r.Context.(*App)
+		query = string(r.RequestCtx.QueryArgs().Peek("q"))
+		total = 0
+	)
+	page, pageSize := getPagination(r)
+	macros, err := app.macro.GetAllCompact(query, page, pageSize)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	for i, m := range macros {
+		if macros[i].Actions, err = decorateMacroActions(app, m.Actions); err != nil {
+			app.lo.Error("error decorating macro actions", "macro_id", m.ID, "error", err)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		}
+	}
+	if len(macros) > 0 {
+		total = macros[0].Total
+	}
+	return r.SendEnvelope(envelope.PageResults{
+		Results:    macros,
+		Total:      total,
+		PerPage:    pageSize,
+		TotalPages: (total + pageSize - 1) / pageSize,
+		Page:       page,
+	})
+}
+
+// handleSearchMacros returns the top macros without message content visible to the requesting agent.
+func handleSearchMacros(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		query = string(r.RequestCtx.QueryArgs().Peek("q"))
+		view  = string(r.RequestCtx.QueryArgs().Peek("view"))
+	)
+	switch view {
+	case "", "replying", "starting_conversation", "adding_private_note":
+	default:
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	macros, err := app.macro.SearchCompact(query, view, user.ID, user.Teams.IDs())
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
