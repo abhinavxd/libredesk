@@ -113,9 +113,6 @@
                 :placeholder="$t('globals.terms.search')"
               />
             </FormControl>
-            <FormDescription>
-              {{ $t('admin.inbox.whatsapp.csatTemplateLanguage.description') }}
-            </FormDescription>
             <FormMessage />
           </FormItem>
         </FormField>
