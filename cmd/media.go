@@ -69,7 +69,6 @@ func handleMediaUpload(r *fastglue.Request) error {
 
 	// Only agents who manage the help center may upload publicly served media.
 	if mmodels.IsPublicModel(linkedModel) {
-		auser := r.RequestCtx.UserValue("user").(amodels.User)
 		agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
@@ -291,7 +290,6 @@ func bytesToMegabytes(bytes int64) float64 {
 }
 
 // getUnassociatedMedia fetches media by IDs that are owned by uploaderID and not yet attached to any message.
-// Only media uploaded by the requesting user is returned, preventing cross-agent file theft via sequential ID enumeration.
 func getUnassociatedMedia(app *App, ids []int, uploaderID int) ([]mmodels.Media, error) {
 	all, err := app.media.GetManyByUploader(ids, uploaderID)
 	if err != nil {

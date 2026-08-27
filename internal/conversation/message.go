@@ -1549,3 +1549,4 @@ func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) stri
 	addr.Name = name
 	return addr.String()
 }
+

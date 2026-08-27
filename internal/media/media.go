@@ -172,6 +172,7 @@ func (m *Manager) GetMany(ids []int) ([]models.Media, error) {
 	return out, nil
 }
 
+
 // GetManyByUploader fetches media records by IDs, returning only those uploaded by the given user.
 // Records with NULL uploaded_by (e.g. system/email-ingested media) are also returned to preserve
 // backward compatibility with existing messages.

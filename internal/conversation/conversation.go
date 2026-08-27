@@ -1,4 +1,3 @@
-// Package conversation manages conversations and messages.
 package conversation
 
 import (
@@ -2267,3 +2266,4 @@ func renderTagFilter(operator, value string, paramIndex int) (string, []any, err
 		return "", nil, fmt.Errorf("invalid operator for tags: %s", operator)
 	}
 }
+

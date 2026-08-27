@@ -25,7 +25,7 @@ WHERE
    ($2 != '' AND uuid = NULLIF($2, '')::uuid)
 
 -- name: get-media-uploaded-by
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, uploaded_by
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE id = $1
   AND (uploaded_by = $2 OR uploaded_by IS NULL)
