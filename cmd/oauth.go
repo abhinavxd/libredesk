@@ -177,8 +177,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 		return r.Redirect("/admin/inboxes?error=token_exchange_failed", fasthttp.StatusFound, nil, "")
 	}
 
-	// Get user email from provider
-	userEmail, err := getUserEmailFromProvider(provider, token)
+	userEmail, userUPN, err := getUserIdentityFromProvider(provider, token)
 	if err != nil {
 		app.lo.Error("Failed to get user email from provider", "error", err)
 		return r.Redirect("/admin/inboxes?error=email_fetch_failed", fasthttp.StatusFound, nil, "")
@@ -273,6 +272,13 @@ func handleOAuthCallback(r *fastglue.Request) error {
 		existingConfig.OAuth = oauthConfig
 		existingConfig.AuthType = imodels.AuthTypeOAuth2
 
+		for i := range existingConfig.SMTP {
+			existingConfig.SMTP[i].Username = userUPN
+		}
+		for i := range existingConfig.IMAP {
+			existingConfig.IMAP[i].Username = userUPN
+		}
+
 		// Marshal updated config
 		configJSON, err := json.Marshal(existingConfig)
 		if err != nil {
@@ -295,7 +301,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	}
 
 	// Get provider-specific defaults
-	smtpConfig, imapConfig := getProviderDefaults(provider, userEmail)
+	smtpConfig, imapConfig := getProviderDefaults(provider, userUPN)
 
 	// Create OAuth config for tokens
 	oauthConfig := &imodels.OAuthConfig{
@@ -349,42 +355,55 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	return r.Redirect("/admin/inboxes?success=oauth_connected", fasthttp.StatusFound, nil, "")
 }
 
-// getUserEmailFromProvider fetches the user's email from the OAuth provider.
-func getUserEmailFromProvider(provider string, token *oauth2.Token) (string, error) {
+// getUserIdentityFromProvider returns the mailbox address and the sign-in username, which differ on Microsoft accounts.
+func getUserIdentityFromProvider(provider string, token *oauth2.Token) (string, string, error) {
 	switch provider {
 	case string(oauth.ProviderMicrosoft):
 		idToken, ok := token.Extra("id_token").(string)
 		if !ok {
-			return "", fmt.Errorf("no id_token")
+			return "", "", fmt.Errorf("no id_token")
 		}
 
 		parts := strings.Split(idToken, ".")
 		if len(parts) < 2 {
-			return "", fmt.Errorf("invalid id_token")
+			return "", "", fmt.Errorf("invalid id_token")
 		}
 
 		payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		var claims map[string]any
 		json.Unmarshal(payload, &claims)
 
-		if email, ok := claims["email"].(string); ok && email != "" {
-			return email, nil
+		var email, upn string
+		if v, ok := claims["email"].(string); ok {
+			email = v
 		}
-		if upn, ok := claims["preferred_username"].(string); ok {
-			return upn, nil
+		if v, ok := claims["upn"].(string); ok && v != "" {
+			upn = v
+		} else if v, ok := claims["preferred_username"].(string); ok {
+			upn = v
 		}
-		return "", fmt.Errorf("email not found")
+
+		if email == "" {
+			email = upn
+		}
+		if upn == "" {
+			upn = email
+		}
+		if email == "" {
+			return "", "", fmt.Errorf("email not found")
+		}
+		return email, upn, nil
 	case string(oauth.ProviderGoogle):
 		req, _ := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
 		req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
 		resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		defer resp.Body.Close()
 
@@ -392,21 +411,21 @@ func getUserEmailFromProvider(provider string, token *oauth2.Token) (string, err
 		json.NewDecoder(resp.Body).Decode(&result)
 
 		if email, ok := result["email"].(string); ok {
-			return email, nil
+			return email, email, nil
 		}
-		return "", fmt.Errorf("email not found")
+		return "", "", fmt.Errorf("email not found")
 	}
 
-	return "", fmt.Errorf("unsupported provider")
+	return "", "", fmt.Errorf("unsupported provider")
 }
 
 // getProviderDefaults returns provider-specific SMTP and IMAP configurations.
-func getProviderDefaults(provider, emailAddr string) (imodels.SMTPConfig, imodels.IMAPConfig) {
+func getProviderDefaults(provider, username string) (imodels.SMTPConfig, imodels.IMAPConfig) {
 	var smtp imodels.SMTPConfig
 	var imap imodels.IMAPConfig
 
 	// Common settings
-	smtp.Username = emailAddr
+	smtp.Username = username
 	smtp.AuthProtocol = "login"
 	smtp.TLSSkipVerify = false
 	smtp.MaxConns = 5
@@ -414,7 +433,7 @@ func getProviderDefaults(provider, emailAddr string) (imodels.SMTPConfig, imodel
 	smtp.IdleTimeout = "20s"
 	smtp.PoolWaitTimeout = "120s"
 
-	imap.Username = emailAddr
+	imap.Username = username
 	imap.Mailbox = "INBOX"
 	imap.ReadInterval = "5m"
 	imap.ScanInboxSince = "24h"
