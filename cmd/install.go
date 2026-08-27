@@ -10,6 +10,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/colorlog"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/abhinavxd/libredesk/internal/migrations"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/stuffbin"
@@ -56,6 +57,11 @@ func install(ctx context.Context, db *sqlx.DB, fs stuffbin.FileSystem, idempoten
 	// Install schema.
 	if err := installSchema(db, fs); err != nil {
 		log.Fatalf("error installing schema: %v", err)
+	}
+
+	// Run post-schema migrations so fresh installs include columns not yet in schema.sql.
+	if err := migrations.V2_7_0(db, fs, ko); err != nil {
+		log.Fatalf("error running v2.7.0 migration: %v", err)
 	}
 
 	log.Println("database schema installed successfully")
