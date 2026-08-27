@@ -177,7 +177,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 		return r.Redirect("/admin/inboxes?error=token_exchange_failed", fasthttp.StatusFound, nil, "")
 	}
 
-	userEmail, userUPN, err := getUserIdentityFromProvider(provider, token)
+	userEmail, userUPN, err := getUserIdentityFromProvider(r.RequestCtx, provider, token)
 	if err != nil {
 		app.lo.Error("Failed to get user email from provider", "error", err)
 		return r.Redirect("/admin/inboxes?error=email_fetch_failed", fasthttp.StatusFound, nil, "")
@@ -356,7 +356,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 }
 
 // getUserIdentityFromProvider returns the mailbox address and the sign-in username, which differ on Microsoft accounts.
-func getUserIdentityFromProvider(provider string, token *oauth2.Token) (string, string, error) {
+func getUserIdentityFromProvider(ctx context.Context, provider string, token *oauth2.Token) (string, string, error) {
 	switch provider {
 	case string(oauth.ProviderMicrosoft):
 		idToken, ok := token.Extra("id_token").(string)
@@ -398,7 +398,10 @@ func getUserIdentityFromProvider(provider string, token *oauth2.Token) (string, 
 		}
 		return email, upn, nil
 	case string(oauth.ProviderGoogle):
-		req, _ := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+		if err != nil {
+			return "", "", err
+		}
 		req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
 		resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
