@@ -297,6 +297,9 @@ func handleUpdateAgent(r *fastglue.Request) error {
 		if err := app.activityLog.PasswordSet(auser.ID, auser.Email, ip, id, req.Email); err != nil {
 			app.lo.Error("error creating activity log", "error", err)
 		}
+		if err := app.auth.RevokeUserSessions(id); err != nil {
+			app.lo.Error("error revoking sessions after password change", "user_id", id, "error", err)
+		}
 	}
 
 	// Upsert agent teams.
@@ -469,6 +472,9 @@ func handleSetPassword(r *fastglue.Request) error {
 	}
 	app.user.InvalidateAgentCache(id)
 	app.wsHub.KickUser(id)
+	if err := app.auth.RevokeUserSessions(id); err != nil {
+		app.lo.Error("error revoking sessions after password reset", "user_id", id, "error", err)
+	}
 
 	return r.SendEnvelope(true)
 }

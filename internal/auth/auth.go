@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -59,17 +60,21 @@ type Config struct {
 // defaultSessionLifetime is used when Config.SessionLifetime is unset or non-positive.
 const defaultSessionLifetime = 9 * time.Hour
 
+const userSessionsKeyPrefix = "agent_sessions:"
+
 // Auth is the auth service it manages OIDC authentication and sessions
 type Auth struct {
-	mu         sync.RWMutex
-	cfg        Config
-	i18n       *i18n.I18n
-	oauthCfgs  map[int]oauth2.Config
-	verifiers  map[int]*oidc.IDTokenVerifier
-	sess       *simplesessions.Manager
-	logger     *logf.Logger
-	rd         *redis.Client
-	oidcClient *http.Client
+	mu              sync.RWMutex
+	cfg             Config
+	i18n            *i18n.I18n
+	oauthCfgs       map[int]oauth2.Config
+	verifiers       map[int]*oidc.IDTokenVerifier
+	sess            *simplesessions.Manager
+	store           *sessredisstore.Store
+	sessionLifetime time.Duration
+	logger          *logf.Logger
+	rd              *redis.Client
+	oidcClient      *http.Client
 }
 
 // New creates an Auth service with configured OIDC providers.
@@ -123,14 +128,16 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
 
 	return &Auth{
-		cfg:        cfg,
-		i18n:       i18n,
-		oauthCfgs:  oauthCfgs,
-		verifiers:  verifiers,
-		sess:       sess,
-		logger:     logger,
-		rd:         rd,
-		oidcClient: oidcClient,
+		cfg:             cfg,
+		i18n:            i18n,
+		oauthCfgs:       oauthCfgs,
+		verifiers:       verifiers,
+		sess:            sess,
+		store:           st,
+		sessionLifetime: lifetime,
+		logger:          logger,
+		rd:              rd,
+		oidcClient:      oidcClient,
 	}, nil
 }
 
@@ -275,6 +282,44 @@ func (a *Auth) SaveSession(user amodels.User, r *fastglue.Request) error {
 		a.logger.Error("error setting login session", "error", err)
 		return err
 	}
+
+	// Without this index there is no way to enumerate a user's sessions on a credential change.
+	key := userSessionsKey(user.ID)
+	if err := a.rd.SAdd(context.Background(), key, sess.ID()).Err(); err != nil {
+		a.logger.Error("error indexing user session", "user_id", user.ID, "error", err)
+		return err
+	}
+	if err := a.rd.Expire(context.Background(), key, a.sessionLifetime).Err(); err != nil {
+		a.logger.Error("error setting user session index expiry", "user_id", user.ID, "error", err)
+		return err
+	}
+	return nil
+}
+
+// RevokeUserSessions destroys every stored session of the user.
+func (a *Auth) RevokeUserSessions(userID int) error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	var (
+		ctx = context.Background()
+		key = userSessionsKey(userID)
+	)
+	ids, err := a.rd.SMembers(ctx, key).Result()
+	if err != nil {
+		a.logger.Error("error fetching user session index", "user_id", userID, "error", err)
+		return err
+	}
+	for _, id := range ids {
+		if err := a.store.Destroy(id); err != nil {
+			a.logger.Error("error destroying user session", "user_id", userID, "error", err)
+			return err
+		}
+	}
+	if err := a.rd.Del(ctx, key).Err(); err != nil {
+		a.logger.Error("error deleting user session index", "user_id", userID, "error", err)
+		return err
+	}
 	return nil
 }
 
@@ -382,11 +427,20 @@ func (a *Auth) DestroySession(r *fastglue.Request) error {
 		a.logger.Error("error acquiring session", "error", err)
 		return err
 	}
+	if userID, err := sess.Int(sess.Get("id")); err == nil && userID > 0 {
+		if err := a.rd.SRem(context.Background(), userSessionsKey(userID), sess.ID()).Err(); err != nil {
+			a.logger.Error("error removing session from user session index", "user_id", userID, "error", err)
+		}
+	}
 	if err := sess.Destroy(); err != nil {
 		a.logger.Error("error clearing session", "error", err)
 		return err
 	}
 	return nil
+}
+
+func userSessionsKey(userID int) string {
+	return userSessionsKeyPrefix + strconv.Itoa(userID)
 }
 
 // generateCSRFToken creates a random base64 encoded str.
