@@ -5,6 +5,7 @@
   "account.changeAvatar": "Change your avatar here.",
   "account.cropAvatar": "Crop avatar",
   "account.defaultInbox": "Default inbox",
+  "account.defaultInboxForbidden": "You do not have permission to open that inbox.",
   "account.defaultInboxHelp": "The inbox that opens when you sign in. It also sits first in the inbox list.",
   "account.editProfile": "Edit profile",
   "account.invalidDefaultInbox": "Choose My Inbox, Mentions, Unassigned, or All.",

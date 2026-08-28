@@ -23,3 +23,35 @@ func TestNormalizeDefaultInbox(t *testing.T) {
 		}
 	}
 }
+
+func TestCanAccessDefaultInbox(t *testing.T) {
+	restricted := []string{"conversations:read", "conversations:read_assigned"}
+	full := []string{
+		"conversations:read",
+		"conversations:read_assigned",
+		"conversations:read_unassigned",
+		"conversations:read_all",
+	}
+
+	cases := []struct {
+		inbox string
+		perms []string
+		want  bool
+	}{
+		{DefaultInboxAssigned, restricted, true},
+		{DefaultInboxMentioned, restricted, true},
+		{DefaultInboxUnassigned, restricted, false},
+		{DefaultInboxAll, restricted, false},
+		{DefaultInboxAssigned, full, true},
+		{DefaultInboxMentioned, full, true},
+		{DefaultInboxUnassigned, full, true},
+		{DefaultInboxAll, full, true},
+		{DefaultInboxAssigned, nil, false},
+		{"nope", full, false},
+	}
+	for _, tt := range cases {
+		if got := CanAccessDefaultInbox(tt.perms, tt.inbox); got != tt.want {
+			t.Errorf("CanAccessDefaultInbox(%v, %q) = %v, want %v", tt.perms, tt.inbox, got, tt.want)
+		}
+	}
+}

@@ -361,10 +361,13 @@ func (u *Manager) UpdateAvailability(id int, status string) error {
 }
 
 // UpdateDefaultInbox sets the inbox the agent lands on at login.
-func (u *Manager) UpdateDefaultInbox(id int, inbox string) error {
+func (u *Manager) UpdateDefaultInbox(id int, inbox string, permissions []string) error {
 	normalized, ok := models.NormalizeDefaultInbox(inbox)
 	if !ok {
 		return envelope.NewError(envelope.InputError, u.i18n.T("account.invalidDefaultInbox"), nil)
+	}
+	if !models.CanAccessDefaultInbox(permissions, normalized) {
+		return envelope.NewError(envelope.PermissionError, u.i18n.T("account.defaultInboxForbidden"), nil)
 	}
 	if _, err := u.q.UpdateDefaultInbox.Exec(id, normalized); err != nil {
 		u.lo.Error("error updating user default inbox", "error", err)

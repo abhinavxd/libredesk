@@ -36,10 +36,9 @@
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="assigned">{{ $t('globals.terms.myInbox') }}</SelectItem>
-              <SelectItem value="mentioned">{{ $t('globals.terms.mention', 2) }}</SelectItem>
-              <SelectItem value="unassigned">{{ $t('globals.terms.unassigned') }}</SelectItem>
-              <SelectItem value="all">{{ $t('globals.messages.all') }}</SelectItem>
+              <SelectItem v-for="type in userStore.accessibleDefaultInboxes" :key="type" :value="type">
+                {{ inboxLabel(type) }}
+              </SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -101,8 +100,16 @@ const saveUser = async () => {
   }
 }
 
+const inboxLabel = (type) => {
+  if (type === 'assigned') return t('globals.terms.myInbox')
+  if (type === 'mentioned') return t('globals.terms.mention', 2)
+  if (type === 'unassigned') return t('globals.terms.unassigned')
+  return t('globals.messages.all')
+}
+
 const saveDefaultInbox = async (inbox) => {
   if (!inbox || inbox === userStore.defaultInbox || isSavingInbox.value) return
+  if (!userStore.accessibleDefaultInboxes.includes(inbox)) return
   try {
     isSavingInbox.value = true
     await userStore.updateDefaultInbox(inbox)

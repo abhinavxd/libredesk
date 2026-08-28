@@ -116,6 +116,36 @@ func NormalizeDefaultInbox(v string) (string, bool) {
 	}
 }
 
+// PermissionForDefaultInbox is the conversation-read permission required to open that inbox.
+func PermissionForDefaultInbox(inbox string) string {
+	switch inbox {
+	case DefaultInboxAssigned:
+		return "conversations:read_assigned"
+	case DefaultInboxMentioned:
+		return "conversations:read"
+	case DefaultInboxUnassigned:
+		return "conversations:read_unassigned"
+	case DefaultInboxAll:
+		return "conversations:read_all"
+	default:
+		return ""
+	}
+}
+
+// CanAccessDefaultInbox reports whether permissions include the inbox's list endpoint.
+func CanAccessDefaultInbox(permissions []string, inbox string) bool {
+	need := PermissionForDefaultInbox(inbox)
+	if need == "" {
+		return false
+	}
+	for _, p := range permissions {
+		if p == need {
+			return true
+		}
+	}
+	return false
+}
+
 // ChatUser is a user with limited fields for live chat.
 type ChatUser struct {
 	ID                 int         `db:"id" json:"id"`

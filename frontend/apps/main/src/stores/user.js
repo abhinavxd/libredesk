@@ -118,10 +118,22 @@ export const useUserStore = defineStore('user', () => {
     return roles.value.some(r => r === role)
   }
 
+  const inboxPermission = {
+    assigned: 'conversations:read_assigned',
+    mentioned: 'conversations:read',
+    unassigned: 'conversations:read_unassigned',
+    all: 'conversations:read_all'
+  }
+
+  const accessibleDefaultInboxes = computed(() =>
+    ['assigned', 'mentioned', 'unassigned', 'all'].filter((type) => can(inboxPermission[type]))
+  )
+
   const defaultInbox = computed(() => {
+    const allowed = accessibleDefaultInboxes.value
     const v = user.value.default_inbox
-    if (v === 'mentioned' || v === 'unassigned' || v === 'all') return v
-    return 'assigned'
+    if (allowed.includes(v)) return v
+    return allowed[0] || 'assigned'
   })
 
   const updateDefaultInbox = async (inbox) => {
@@ -154,6 +166,7 @@ export const useUserStore = defineStore('user', () => {
     setAvatar,
     updateUserAvailability,
     defaultInbox,
+    accessibleDefaultInboxes,
     updateDefaultInbox,
     can
   }

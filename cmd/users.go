@@ -202,12 +202,16 @@ func handleUpdateCurrentAgentDefaultInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
-	if err := app.user.UpdateDefaultInbox(auser.ID, req.DefaultInbox); err != nil {
+	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := app.user.UpdateDefaultInbox(auser.ID, req.DefaultInbox, agent.Permissions); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	app.user.InvalidateAgentCache(auser.ID)
 
-	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	agent, err = app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
