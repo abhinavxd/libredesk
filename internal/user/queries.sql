@@ -46,6 +46,7 @@ SELECT
     u.api_key_last_used_at,
     u.external_user_id,
     u.api_secret,
+    u.default_inbox,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -118,6 +119,11 @@ WHERE id = $1;
 -- name: update-availability
 UPDATE users
 SET availability_status = $2
+WHERE id = $1;
+
+-- name: update-default-inbox
+UPDATE users
+SET default_inbox = $2, updated_at = now()
 WHERE id = $1;
 
 -- name: update-last-active-at

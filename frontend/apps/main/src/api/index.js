@@ -254,6 +254,11 @@ const updateCurrentUserAvailability = (data) => http.put('/api/v1/agents/me/avai
     'Content-Type': 'application/json'
   }
 })
+const updateCurrentUserDefaultInbox = (data) => http.put('/api/v1/agents/me/default-inbox', data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
 const resetPassword = (data) => http.post('/api/v1/agents/reset-password', data, {
   headers: {
     'Content-Type': 'application/json'
@@ -683,6 +688,7 @@ export default {
   markConversationAsUnread,
   updateUser,
   updateCurrentUserAvailability,
+  updateCurrentUserDefaultInbox,
   updateAutomationRule,
   updateAutomationRuleWeights,
   updateAutomationRulesExecutionMode,

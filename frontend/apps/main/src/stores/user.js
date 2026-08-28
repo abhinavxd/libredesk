@@ -19,6 +19,7 @@ export const useUserStore = defineStore('user', () => {
     permissions: [],
     roles: [],
     availability_status: 'offline',
+    default_inbox: 'assigned',
   })
   const emitter = useEmitter()
 
@@ -117,6 +118,20 @@ export const useUserStore = defineStore('user', () => {
     return roles.value.some(r => r === role)
   }
 
+  const defaultInbox = computed(() => {
+    const v = user.value.default_inbox
+    if (v === 'mentioned' || v === 'unassigned' || v === 'all') return v
+    return 'assigned'
+  })
+
+  const updateDefaultInbox = async (inbox) => {
+    const response = await api.updateCurrentUserDefaultInbox({ default_inbox: inbox })
+    const userData = response?.data?.data
+    if (userData) {
+      user.value = userData
+    }
+  }
+
   return {
     user,
     userID,
@@ -138,6 +153,8 @@ export const useUserStore = defineStore('user', () => {
     clearAvatar,
     setAvatar,
     updateUserAvailability,
+    defaultInbox,
+    updateDefaultInbox,
     can
   }
 })

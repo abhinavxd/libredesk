@@ -43,6 +43,10 @@ type availabilityRequest struct {
 
 const availabilitySourceIdle = "idle"
 
+type defaultInboxRequest struct {
+	DefaultInbox string `json:"default_inbox"`
+}
+
 type agentReq struct {
 	FirstName          string   `json:"first_name"`
 	LastName           string   `json:"last_name"`
@@ -183,6 +187,30 @@ func handleUpdateCurrentAgent(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	return r.SendEnvelope(agent)
+}
+
+// handleUpdateCurrentAgentDefaultInbox sets the inbox the current agent lands on at login.
+func handleUpdateCurrentAgentDefaultInbox(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   defaultInboxRequest
+	)
+
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+
+	if err := app.user.UpdateDefaultInbox(auser.ID, req.DefaultInbox); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	app.user.InvalidateAgentCache(auser.ID)
+
+	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	return r.SendEnvelope(agent)
 }
 

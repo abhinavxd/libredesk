@@ -185,12 +185,14 @@ CREATE TABLE users (
 	api_key TEXT NULL,
 	api_secret TEXT NULL,
 	api_key_last_used_at TIMESTAMPTZ NULL,
+	default_inbox TEXT NOT NULL DEFAULT 'assigned',
     CONSTRAINT constraint_users_on_country CHECK (LENGTH(country) <= 140),
     CONSTRAINT constraint_users_on_phone_number CHECK (LENGTH(phone_number) <= 20),
 	CONSTRAINT constraint_users_on_phone_number_country_code CHECK (LENGTH(phone_number_country_code) <= 10),
     CONSTRAINT constraint_users_on_email_length CHECK (LENGTH(email) <= 320),
     CONSTRAINT constraint_users_on_first_name CHECK (LENGTH(first_name) <= 140),
-    CONSTRAINT constraint_users_on_last_name CHECK (LENGTH(last_name) <= 140)
+    CONSTRAINT constraint_users_on_last_name CHECK (LENGTH(last_name) <= 140),
+	CONSTRAINT constraint_users_on_default_inbox CHECK (default_inbox IN ('assigned', 'mentioned', 'unassigned', 'all'))
 );
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);

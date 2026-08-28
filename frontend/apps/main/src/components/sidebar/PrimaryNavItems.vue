@@ -40,7 +40,7 @@ const isMobile = useIsMobile()
 const lastInboxPath = useStorage('lastInboxPath', '')
 
 const inboxTarget = computed(() => {
-  if (!lastInboxPath.value) return { name: 'inboxes' }
+  if (!lastInboxPath.value) return `/inboxes/${userStore.defaultInbox}`
   if (!isMobile.value) return lastInboxPath.value
   return lastInboxPath.value.replace(/\/conversation\/[^/]+$/, '') || { name: 'inboxes' }
 })

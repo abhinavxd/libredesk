@@ -97,7 +97,7 @@ import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -116,6 +116,7 @@ import { useIsMobile } from '@shared-ui/composables'
 import api from '@main/api'
 
 const route = useRoute()
+const router = useRouter()
 const emitter = useEmitter()
 const isMobile = useIsMobile()
 
@@ -177,6 +178,7 @@ const initStores = async () => {
   if (!userStore.userID) {
     await userStore.getCurrentUser()
   }
+  applyDefaultInboxLanding()
   await Promise.allSettled([
     getUserViews(),
     sharedViewStore.loadSharedViews(),
@@ -191,6 +193,14 @@ const initStores = async () => {
     tagStore.fetchTags(),
     customAttributeStore.fetchCustomAttributes()
   ])
+}
+
+const applyDefaultInboxLanding = () => {
+  const defaultInbox = userStore.defaultInbox
+  if (defaultInbox === 'assigned') return
+  if (route.path === '/inboxes/assigned' || route.path === '/inboxes') {
+    router.replace(`/inboxes/${defaultInbox}`)
+  }
 }
 
 const createView = () => {

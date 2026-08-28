@@ -128,6 +128,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/agents/me", auth(clearsHCCache(handleUpdateCurrentAgent)))
 	g.GET("/api/v1/agents/me/teams", auth(handleGetCurrentAgentTeams))
 	g.PUT("/api/v1/agents/me/availability", auth(handleUpdateAgentAvailability))
+	g.PUT("/api/v1/agents/me/default-inbox", auth(handleUpdateCurrentAgentDefaultInbox))
 	g.DELETE("/api/v1/agents/me/avatar", auth(clearsHCCache(handleDeleteCurrentAgentAvatar)))
 
 	g.GET("/api/v1/agents/compact", auth(handleGetAgentsCompact))

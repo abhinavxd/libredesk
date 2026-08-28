@@ -126,6 +126,21 @@ defineProps({
 })
 const userStore = useUserStore()
 const conversationStore = useConversationStore()
+const inboxNavItems = computed(() => {
+  const items = [
+    { type: 'assigned', icon: User, label: t('globals.terms.myInbox') },
+    { type: 'mentioned', icon: AtSign, label: t('globals.terms.mention', 2) },
+    { type: 'unassigned', icon: CircleDashed, label: t('globals.terms.unassigned') },
+    { type: 'all', icon: List, label: t('globals.messages.all') }
+  ]
+  const preferred = userStore.defaultInbox
+  const idx = items.findIndex((item) => item.type === preferred)
+  if (idx > 0) {
+    const [selected] = items.splice(idx, 1)
+    items.unshift(selected)
+  }
+  return items
+})
 const settingsStore = useAppSettingsStore()
 const route = useRoute()
 const router = useRouter()
@@ -473,37 +488,10 @@ const viewToDelete = ref(null)
                     <span>{{ t('conversation.newConversation') }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton :isActive="isActiveParent('/inboxes/assigned')" @click="navigateToInbox('assigned')">
-                    <User />
-                    <span>{{ t('globals.terms.myInbox') }}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton :isActive="isActiveParent('/inboxes/mentioned')" @click="navigateToInbox('mentioned')">
-                    <AtSign />
-                    <span>
-                      {{ t('globals.terms.mention', 2) }}
-                    </span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton :isActive="isActiveParent('/inboxes/unassigned')" @click="navigateToInbox('unassigned')">
-                    <CircleDashed />
-                    <span>
-                      {{ t('globals.terms.unassigned') }}
-                    </span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton :isActive="isActiveParent('/inboxes/all')" @click="navigateToInbox('all')">
-                    <List />
-                    <span>
-                      {{ t('globals.messages.all') }}
-                    </span>
+              <SidebarMenuItem v-for="item in inboxNavItems" :key="item.type">
+                <SidebarMenuButton :isActive="isActiveParent(`/inboxes/${item.type}`)" @click="navigateToInbox(item.type)">
+                    <component :is="item.icon" />
+                    <span>{{ item.label }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 

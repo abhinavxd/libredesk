@@ -92,6 +92,28 @@ type User struct {
 	APIKey           null.String `db:"api_key" json:"api_key"`
 	APIKeyLastUsedAt null.Time   `db:"api_key_last_used_at" json:"api_key_last_used_at"`
 	APISecret        null.String `db:"api_secret" json:"-"`
+
+	// DefaultInbox is the inbox the agent lands on at login: assigned, mentioned, unassigned, or all.
+	DefaultInbox string `db:"default_inbox" json:"default_inbox"`
+}
+
+const (
+	DefaultInboxAssigned   = "assigned"
+	DefaultInboxMentioned  = "mentioned"
+	DefaultInboxUnassigned = "unassigned"
+	DefaultInboxAll        = "all"
+)
+
+// NormalizeDefaultInbox returns a valid inbox type. Empty becomes assigned.
+func NormalizeDefaultInbox(v string) (string, bool) {
+	switch v {
+	case "", DefaultInboxAssigned:
+		return DefaultInboxAssigned, true
+	case DefaultInboxMentioned, DefaultInboxUnassigned, DefaultInboxAll:
+		return v, true
+	default:
+		return "", false
+	}
 }
 
 // ChatUser is a user with limited fields for live chat.

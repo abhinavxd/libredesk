@@ -243,7 +243,7 @@ const loginAction = () => {
       if (nextParam) {
         router.push(nextParam)
       } else {
-        router.push({ name: 'inboxes' })
+        router.push(`/inboxes/${userStore.defaultInbox || 'assigned'}`)
       }
     })
     .catch((error) => {
