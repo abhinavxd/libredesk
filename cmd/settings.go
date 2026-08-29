@@ -86,6 +86,14 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 		app.lo.Error("error reloading templates", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
+
+	// Rebuild auth providers, which snapshot settings such as app.root_url into
+	// their RedirectURL at construction time. Without this, a Root URL change
+	// leaves OIDC redirect URIs stale until the process restarts.
+	if err := reloadAuth(app); err != nil {
+		app.lo.Error("error reloading auth", "error", err)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
 	return r.SendEnvelope(true)
 }
 
