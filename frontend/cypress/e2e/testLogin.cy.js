@@ -77,7 +77,14 @@ describe('Login Component', () => {
                 data: {
                     id: 1,
                     email: 'System',
-                    name: 'System User'
+                    name: 'System User',
+                    permissions: [
+                        'conversations:read_assigned',
+                        'conversations:read',
+                        'conversations:read_unassigned',
+                        'conversations:read_all'
+                    ],
+                    default_inbox: 'assigned'
                 }
             }
         }).as('loginSuccess')
@@ -127,7 +134,14 @@ describe('Login Component', () => {
                 data: {
                     id: 1,
                     email: 'System',
-                    name: 'System User'
+                    name: 'System User',
+                    permissions: [
+                        'conversations:read_assigned',
+                        'conversations:read',
+                        'conversations:read_unassigned',
+                        'conversations:read_all'
+                    ],
+                    default_inbox: 'assigned'
                 }
             },
             delay: 1000

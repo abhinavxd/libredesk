@@ -46,7 +46,7 @@ export const useUserStore = defineStore('user', () => {
   })
 
   const can = (permission) => {
-    return user.value.permissions.includes(permission)
+    return (user.value.permissions || []).includes(permission)
   }
 
   const hasAdminTabPermissions = computed(() => {
