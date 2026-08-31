@@ -5,27 +5,36 @@
       <slot name="header-right"></slot>
     </div>
     <div :class="gridClass">
-      <div
+      <component
         v-for="(item, key) in filteredCounts"
         :key="key"
+        :is="hrefs[key] ? 'RouterLink' : 'div'"
+        :to="hrefs[key]"
         class="flex flex-col items-center gap-1 text-center"
+        :class="
+          hrefs[key]
+            ? 'rounded-md -m-1 p-1 hover:bg-muted/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+            : ''
+        "
       >
         <span :class="valueClass">{{ item }}</span>
         <span class="text-xs text-muted-foreground uppercase tracking-wider">{{ labels[key] }}</span>
-      </div>
+      </component>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 
 const props = defineProps({
   counts: { type: Object, required: true },
   labels: { type: Object, required: true },
   title: { type: String, required: true },
   size: { type: String, default: 'default' }, // 'default' | 'large'
-  columns: { type: Number, default: 4 }
+  columns: { type: Number, default: 4 },
+  hrefs: { type: Object, default: () => ({}) }
 })
 
 // Filter out counts that don't have a label

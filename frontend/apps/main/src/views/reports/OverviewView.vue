@@ -62,6 +62,7 @@
             :title="$t('report.openConversations')"
             :counts="cardCounts"
             :labels="conversationCountLabels"
+            :hrefs="conversationCountHrefs"
             size="large"
           />
           <Card
@@ -69,6 +70,7 @@
             :title="$t('report.agentStatus')"
             :counts="agentStatusCounts"
             :labels="agentStatusLabels"
+            :hrefs="agentStatusHrefs"
             size="large"
           />
         </div>
@@ -413,6 +415,21 @@ const agentStatusLabels = computed(() => ({
   agents_away: t('globals.terms.away'),
   agents_reassigning: t('globals.messages.reassigning')
 }))
+
+const inboxAll = { name: 'inbox', params: { type: 'all' } }
+const conversationCountHrefs = {
+  open: inboxAll,
+  awaiting_response: inboxAll,
+  unassigned: { name: 'inbox', params: { type: 'unassigned' } },
+  pending: inboxAll
+}
+const agentList = { name: 'agent-list' }
+const agentStatusHrefs = {
+  agents_online: agentList,
+  agents_offline: agentList,
+  agents_away: agentList,
+  agents_reassigning: agentList
+}
 
 const processedLineData = computed(() => {
   const { new_conversations = [], resolved_conversations = [] } = chartData.value
