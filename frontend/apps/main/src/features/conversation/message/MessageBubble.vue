@@ -18,6 +18,14 @@
         {{ getFullName }}
       </router-link>
       <router-link
+        v-else-if="canManageAI"
+        :to="aiAssistantRoute"
+        class="cursor-pointer text-sm font-semibold hover:underline hover:text-primary transition-colors duration-200"
+        :class="isZendesk ? 'text-foreground' : 'text-muted-foreground font-medium'"
+      >
+        {{ getFullName }}
+      </router-link>
+      <router-link
         v-else-if="canManageUsers"
         :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
         class="cursor-pointer text-sm font-semibold hover:underline hover:text-primary transition-colors duration-200"
@@ -54,7 +62,7 @@
     </div>
 
     <!-- Message Bubble -->
-    <div class="flex flex-row gap-2 w-full" :class="{ 'justify-end': isOutgoing && !isZendesk }">
+    <div class="flex flex-row gap-2 w-full group" :class="{ 'justify-end': isOutgoing && !isZendesk }">
       <!-- Avatar: left for incoming, and always left in Zendesk mode -->
       <template v-if="isZendesk">
         <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
@@ -83,13 +91,39 @@
 
       <!-- Bubble Wrapper (full width in Zendesk, max 80% otherwise) -->
       <div
-        :class="[isZendesk ? 'w-full min-w-0' : 'w-4/5', { 'flex justify-end': isOutgoing && !isZendesk }]"
+        :class="[isZendesk ? 'w-full min-w-0' : 'w-full md:w-4/5', { 'flex justify-end items-center gap-2': isOutgoing && !isZendesk }]"
         style="contain: inline-size"
       >
+        <div
+          v-if="canDeleteNote"
+          class="flex-shrink-0 transition-opacity duration-200 can-hover:opacity-0 can-hover:group-hover:opacity-100 focus-within:!opacity-100"
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" class="w-8 h-8 p-0 text-muted-foreground">
+                <MoreHorizontal class="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                class="text-destructive focus:text-destructive"
+                @click="alertOpen = true"
+              >
+                <Trash2 class="mr-2 h-4 w-4" />
+                {{ t('conversation.deletePrivateNote') }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
         <div
           class="flex flex-col justify-end message-bubble"
           :class="bubbleClasses"
         >
+          <div v-if="isDeleted" class="text-sm italic text-muted-foreground">
+            {{ message.content }}
+          </div>
+          <template v-else>
           <!-- Message Envelope -->
           <MessageEnvelope :message="message" v-if="showEnvelope" />
 
@@ -165,7 +199,22 @@
           <!-- Status Icons (outgoing only) -->
           <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
             <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
-            <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
+            <Tooltip v-if="isReadByContact">
+              <TooltipTrigger>
+                <CheckCheck :size="14" class="text-success" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{{ t('globals.terms.read') }}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip v-else-if="isDelivered">
+              <TooltipTrigger>
+                <Check :size="14" class="text-success" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{{ t('globals.terms.sent') }}</p>
+              </TooltipContent>
+            </Tooltip>
             <Tooltip v-if="message.meta?.continuity_emailed">
               <TooltipTrigger>
                 <Mail :size="12" class="text-muted-foreground" />
@@ -181,12 +230,25 @@
               v-if="showRetry"
             />
           </div>
+          </template>
         </div>
       </div>
 
       <!-- Avatar (right for outgoing, default layout only) -->
       <template v-if="isOutgoing && !isZendesk">
         <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
+        <router-link
+          v-else-if="canManageAI"
+          :to="aiAssistantRoute"
+          class="flex-shrink-0"
+        >
+          <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
+            <AvatarImage :src="getAvatar" />
+            <AvatarFallback class="font-medium">
+              {{ avatarFallback }}
+            </AvatarFallback>
+          </Avatar>
+        </router-link>
         <router-link
           v-else-if="canManageUsers"
           :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
@@ -222,6 +284,21 @@
       </Tooltip>
     </div>
   </div>
+
+  <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogDescription>
+          {{ t('conversation.deletePrivateNoteConfirmation') }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction variant="destructive" @click="deleteNote">{{ t('globals.messages.delete') }}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>
 
 <script setup>
@@ -229,8 +306,25 @@ import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, Maximize2, CornerUpLeft, StickyNote } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, CheckCheck, Maximize2, CornerUpLeft, StickyNote, Trash2, MoreHorizontal } from 'lucide-vue-next'
 import { useUiLayout, UI_LAYOUT_ZENDESK } from '@main/composables/useUiLayout'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from '@shared-ui/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import { Button } from '@shared-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
@@ -292,8 +386,25 @@ const { layout } = useUiLayout()
 
 const isZendesk = computed(() => layout.value === UI_LAYOUT_ZENDESK)
 
+const alertOpen = ref(false)
+
+const deleteNote = () => {
+  const conversationUUID = convStore.current?.uuid
+  if (!conversationUUID) return
+  convStore.deleteMessage(conversationUUID, props.message.uuid)
+  alertOpen.value = false
+}
+
 const isSystemUser = computed(() => props.message.author?.email === 'System')
-const canManageUsers = computed(() => !isSystemUser.value && userStore.can('users:manage'))
+const isAIAssistant = computed(() => props.message.author?.type === 'ai_assistant')
+const canManageUsers = computed(
+  () => !isSystemUser.value && !isAIAssistant.value && userStore.can('users:manage')
+)
+const canManageAI = computed(() => isAIAssistant.value && userStore.can('ai:manage'))
+const aiAssistantRoute = computed(() => {
+  const id = props.message.meta?.ai_assistant_id
+  return id ? { name: 'edit-ai-assistant', params: { id } } : { name: 'ai-assistants' }
+})
 
 const isOutgoing = computed(() => props.direction === 'outgoing')
 
@@ -351,7 +462,7 @@ const bubbleClasses = computed(() => {
   }
   return {
     'bg-private': isOutgoing.value && props.message.private,
-    'border border-border': isOutgoing.value && !props.message.private,
+    'bg-secondary border border-border': isOutgoing.value && !props.message.private,
     'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
     'border-destructive': isOutgoing.value && props.message.status === 'failed',
     relative: isOutgoing.value,
@@ -361,9 +472,23 @@ const bubbleClasses = computed(() => {
 })
 
 const isPrivateMessage = computed(() => isOutgoing.value && props.message.private)
-const showCheckCheck = computed(
+const isDeleted = computed(() => !!props.message.meta?.deleted_at)
+const canDeleteNote = computed(
+  () =>
+    isPrivateMessage.value &&
+    !isDeleted.value &&
+    (props.message.sender_id === userStore.userID || userStore.hasAdminRole)
+)
+const isDelivered = computed(
   () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
 )
+const isReadByContact = computed(() => {
+  const conversation = convStore.current
+  const lastSeenAt = conversation?.contact_last_seen_at
+  const isLiveChat = conversation?.inbox_channel === 'livechat'
+  if (!isDelivered.value || !lastSeenAt || !isLiveChat) return false
+  return new Date(props.message.created_at) <= new Date(lastSeenAt)
+})
 const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
 
 const retryMessage = (msg) => {

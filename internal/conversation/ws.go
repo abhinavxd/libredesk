@@ -11,6 +11,13 @@ import (
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
 )
 
+// broadcastConv shadows the per-user fields (another agent's unread state) out of the shared payload.
+type broadcastConv struct {
+	*cmodels.ConversationListItem
+	UnreadMessageCount   *struct{} `json:"unread_message_count,omitempty"`
+	MentionedMessageUUID *struct{} `json:"mentioned_message_uuid,omitempty"`
+}
+
 func (m *Manager) BroadcastNewConversation(conv *cmodels.ConversationListItem) {
 	m.broadcastConvToAuthorized(conv, nil)
 }
@@ -31,7 +38,7 @@ func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.Co
 		"preview":           preview,
 		"created_at":        message.CreatedAt.Format(time.RFC3339),
 		"sender_type":       message.SenderType,
-		"conversation":      convToBroadcastMap(conv),
+		"conversation":      convToBroadcast(conv),
 	}
 
 	var meta map[string]any
@@ -159,7 +166,7 @@ func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationL
 	}
 	m.broadcastToUsers(userIDs, wsmodels.Message{
 		Type: wsmodels.MessageTypeNewConversation,
-		Data: convToBroadcastMap(conv),
+		Data: convToBroadcast(conv),
 	})
 }
 
@@ -252,19 +259,9 @@ func (m *Manager) BroadcastConversationToWidget(conversationUUID string, contact
 	}
 }
 
-func convToBroadcastMap(conv *cmodels.ConversationListItem) map[string]any {
+func convToBroadcast(conv *cmodels.ConversationListItem) *broadcastConv {
 	if conv == nil {
 		return nil
 	}
-	b, err := json.Marshal(conv)
-	if err != nil {
-		return nil
-	}
-	var out map[string]any
-	if err := json.Unmarshal(b, &out); err != nil {
-		return nil
-	}
-	delete(out, "unread_message_count")
-	delete(out, "mentioned_message_uuid")
-	return out
+	return &broadcastConv{ConversationListItem: conv}
 }

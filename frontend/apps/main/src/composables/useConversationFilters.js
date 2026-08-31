@@ -29,11 +29,11 @@ export function useConversationFilters () {
     }
 
     const customAttributeDataTypeToFieldOperators = {
-        'text': FIELD_OPERATORS.TEXT,
+        'text': FIELD_OPERATORS.TEXT_AUTOMATION,
         'number': FIELD_OPERATORS.NUMBER,
         'checkbox': FIELD_OPERATORS.BOOLEAN,
         'date': FIELD_OPERATORS.DATE,
-        'link': FIELD_OPERATORS.TEXT,
+        'link': FIELD_OPERATORS.TEXT_AUTOMATION,
         'list': FIELD_OPERATORS.SELECT,
     }
 
@@ -164,17 +164,17 @@ export function useConversationFilters () {
         contact_email: {
             label: t('globals.terms.email'),
             type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.TEXT
+            operators: FIELD_OPERATORS.TEXT_AUTOMATION
         },
         content: {
             label: t('globals.terms.content'),
             type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.TEXT
+            operators: FIELD_OPERATORS.TEXT_AUTOMATION
         },
         subject: {
             label: t('globals.terms.subject'),
             type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.TEXT
+            operators: FIELD_OPERATORS.TEXT_AUTOMATION
         },
         status: {
             label: t('globals.terms.status'),
@@ -258,6 +258,30 @@ export function useConversationFilters () {
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: iStore.options
+        },
+        previous_status: {
+            label: t('admin.automation.previousStatus'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.SELECT,
+            options: cStore.statusOptions
+        },
+        previous_priority: {
+            label: t('admin.automation.previousPriority'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.SELECT,
+            options: cStore.priorityOptions
+        },
+        previous_assigned_user: {
+            label: t('admin.automation.previousAssignedUser'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.SELECT,
+            options: uStore.options
+        },
+        previous_assigned_team: {
+            label: t('admin.automation.previousAssignedTeam'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.SELECT,
+            options: tStore.options
         }
     }))
 
@@ -309,6 +333,18 @@ export function useConversationFilters () {
         remove_tags: {
             label: t('actions.removeTags'),
             type: FIELD_TYPE.TAG
+        },
+        notify: {
+            label: t('actions.notify'),
+            type: FIELD_TYPE.RECIPIENTS
+        },
+        snooze: {
+            label: t('globals.terms.snooze'),
+            type: FIELD_TYPE.TEXT
+        },
+        trigger_webhook: {
+            label: t('actions.triggerWebhook'),
+            type: FIELD_TYPE.WEBHOOK
         }
     }))
 

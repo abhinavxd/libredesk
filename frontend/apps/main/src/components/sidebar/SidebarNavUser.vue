@@ -3,17 +3,19 @@
     <DropdownMenuTrigger as-child>
       <SidebarMenuButton
         v-if="!zendesk"
-        size="md"
-        class="p-0"
+        size="default"
+        class="p-0 !overflow-visible"
       >
         <div class="relative">
-          <Avatar class="h-8 w-8 rounded">
-            <AvatarImage :src="userStore.avatar" alt="U" class="rounded" />
-            <AvatarFallback class="rounded">{{ userStore.getInitials }}</AvatarFallback>
+          <Avatar class="h-8 w-8 rounded-md">
+            <AvatarImage :src="userStore.avatar" alt="U" class="rounded-md" />
+            <AvatarFallback class="rounded-md">
+              {{ userStore.getInitials }}
+            </AvatarFallback>
           </Avatar>
           <StatusDot
             :status="userStore.user.availability_status"
-            size="md"
+            size="sm"
             class="absolute bottom-0 right-0 border border-background"
           />
         </div>
@@ -44,17 +46,17 @@
     </DropdownMenuTrigger>
     <DropdownMenuContent
       class="min-w-56"
-      :side="menuSide"
-      align="end"
+      :side="zendesk ? menuSide : (isMobile ? 'bottom' : 'right')"
+      :align="isMobile && !zendesk ? 'start' : 'end'"
       :side-offset="8"
-      :align-offset="menuSide === 'top' ? 8 : 40"
+      :align-offset="zendesk && menuSide === 'top' ? 8 : (isMobile ? 0 : 40)"
     >
       <DropdownMenuLabel class="font-normal space-y-2 px-2">
         <!-- User header -->
         <div class="flex items-center gap-2 py-1.5 text-left text-sm">
-          <Avatar class="h-8 w-8 rounded">
+          <Avatar class="h-8 w-8 rounded-md">
             <AvatarImage :src="userStore.avatar" alt="U" />
-            <AvatarFallback class="rounded">
+            <AvatarFallback class="rounded-md">
               {{ userStore.getInitials }}
             </AvatarFallback>
           </Avatar>
@@ -124,15 +126,25 @@
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem @click="showShortcuts = true">
+          <Keyboard size="18" class="mr-2" />
+          {{ t('navigation.keyboardShortcuts') }}
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
       <DropdownMenuItem @click="logout">
         <LogOut size="18" class="mr-2" />
         {{ t('navigation.logout') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
+
+  <KeyboardShortcutsDialog v-model:open="showShortcuts" />
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   DropdownMenu,
@@ -154,22 +166,26 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { ChevronsUpDown, CircleUserRound, LogOut } from 'lucide-vue-next'
-import { useUserStore } from '../../stores/user'
+import { ChevronsUpDown, CircleUserRound, Keyboard, LogOut } from 'lucide-vue-next'
+import { useUserStore } from '@main/stores/user'
+import { useIsMobile } from '@shared-ui/composables'
 import { useRouter } from 'vue-router'
+import KeyboardShortcutsDialog from '@main/components/KeyboardShortcutsDialog.vue'
 import { useColorMode } from '@vueuse/core'
-import { useUiLayout, UI_LAYOUT_DEFAULT, UI_LAYOUT_ZENDESK } from '../../composables/useUiLayout'
+import { useUiLayout, UI_LAYOUT_DEFAULT, UI_LAYOUT_ZENDESK } from '@main/composables/useUiLayout'
 
 defineProps({
   zendesk: { type: Boolean, default: false },
   menuSide: { type: String, default: 'right' }
 })
 
+const isMobile = useIsMobile()
 const mode = useColorMode()
 const userStore = useUserStore()
 const router = useRouter()
 const { t } = useI18n()
 const { layout, setLayout } = useUiLayout()
+const showShortcuts = ref(false)
 
 const logout = () => {
   window.location.href = '/logout'

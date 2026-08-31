@@ -26,7 +26,7 @@ func TestMakeHeader(t *testing.T) {
 			want: textproto.MIMEHeader{
 				"Content-Disposition":       []string{"inline"},
 				"Content-Id":                []string{"<123>"},
-				"Content-Type":              []string{"image/jpeg; name=\"test.jpg\""},
+				"Content-Type":              []string{"image/jpeg; name=test.jpg"},
 				"Content-Transfer-Encoding": []string{"base64"},
 			},
 		},
@@ -38,8 +38,21 @@ func TestMakeHeader(t *testing.T) {
 			encoding:    "base64",
 			disposition: "attachment",
 			want: textproto.MIMEHeader{
-				"Content-Disposition":       []string{"attachment; filename=\"doc.pdf\""},
-				"Content-Type":              []string{"application/pdf; name=\"doc.pdf\""},
+				"Content-Disposition":       []string{"attachment; filename=doc.pdf"},
+				"Content-Type":              []string{"application/pdf; name=doc.pdf"},
+				"Content-Transfer-Encoding": []string{"base64"},
+			},
+		},
+		{
+			name:        "content type with params keeps them",
+			contentType: "text/plain; charset=utf-8",
+			contentID:   "",
+			fileName:    "notes.txt",
+			encoding:    "base64",
+			disposition: "attachment",
+			want: textproto.MIMEHeader{
+				"Content-Disposition":       []string{"attachment; filename=notes.txt"},
+				"Content-Type":              []string{"text/plain; charset=utf-8; name=notes.txt"},
 				"Content-Transfer-Encoding": []string{"base64"},
 			},
 		},
@@ -51,8 +64,8 @@ func TestMakeHeader(t *testing.T) {
 			encoding:    "",
 			disposition: "",
 			want: textproto.MIMEHeader{
-				"Content-Disposition":       []string{"attachment; filename=\"file.txt\""},
-				"Content-Type":              []string{"application/octet-stream; name=\"file.txt\""},
+				"Content-Disposition":       []string{"attachment; filename=file.txt"},
+				"Content-Type":              []string{"application/octet-stream; name=file.txt"},
 				"Content-Transfer-Encoding": []string{"base64"},
 			},
 		},

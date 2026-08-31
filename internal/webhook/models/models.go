@@ -47,6 +47,12 @@ func (w Webhook) IsDiscordURL() bool {
 	return IsDiscordWebhookURL(w.URL)
 }
 
+// WebhookCompact is a minimal webhook representation for dropdowns.
+type WebhookCompact struct {
+	ID   int    `db:"id" json:"id"`
+	Name string `db:"name" json:"name"`
+}
+
 // WebhookEvent represents an event that can trigger a webhook
 type WebhookEvent string
 

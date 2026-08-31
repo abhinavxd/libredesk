@@ -20,7 +20,7 @@
       <Button
         variant="ghost"
         size="icon"
-        class="h-7 w-7"
+        class="h-11 w-11 md:h-7 md:w-7"
         @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
       >
         <ViewVerticalIcon />
@@ -44,8 +44,8 @@
       <Mail size="16" class="text-muted-foreground flex-shrink-0" />
       <Tooltip v-if="isLivechat">
         <TooltipTrigger as-child>
-          <ShieldCheck v-if="isVerified" size="14" class="flex-shrink-0 text-green-600" />
-          <ShieldQuestion v-else size="14" class="flex-shrink-0 text-amber-500" />
+          <ShieldCheck v-if="isVerified" size="14" class="flex-shrink-0 text-success" />
+          <ShieldQuestion v-else size="14" class="flex-shrink-0 text-warning-600" />
         </TooltipTrigger>
         <TooltipContent>{{
           isVerified ? t('contact.identityVerified') : t('contact.identityNotVerified')
@@ -125,7 +125,7 @@ import {
   ShieldQuestion
 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import countries from '@/constants/countries.js'
+import countries from '@shared-ui/constants/countries.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'

@@ -73,14 +73,14 @@
     </div>
 
     <!-- Content -->
-    <div class="flex-grow overflow-y-auto">
+    <div class="flex-grow overflow-y-auto overscroll-contain">
       <EmptyList
         v-if="showEmpty"
         key="empty"
         class="px-4 py-8"
         :title="t('conversation.noConversationsFound')"
         :message="t('conversation.tryAdjustingFilters')"
-        :icon="MessageCircleQuestion"
+        :icon="Inbox"
       />
 
       <EmptyList
@@ -131,7 +131,7 @@
           variant="outline"
           @click="conversationStore.fetchNextConversations"
           :disabled="conversationStore.conversations.fetching"
-          class="transition-all duration-200 ease-in-out transform hover:scale-105"
+          class="max-md:h-11 transition-all duration-200 ease-in-out transform hover:scale-105"
         >
           <Loader2 v-if="conversationStore.conversations.fetching" class="mr-2 h-4 w-4 animate-spin" />
           {{ conversationStore.conversations.fetching ? t('globals.terms.loading') : t('globals.terms.loadMore') }}
@@ -151,7 +151,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
+import { Inbox, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,

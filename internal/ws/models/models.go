@@ -1,18 +1,20 @@
 package models
 
+import "encoding/json"
+
 // Action constants for WebSocket messages.
 const (
-	MessageTypeMessageUpdate          = "message_update"
-	MessageTypeConversationUpdate     = "conversation_update"
-	MessageTypeNewMessage             = "new_message"
-	MessageTypeNewConversation        = "new_conversation"
-	MessageTypeNewNotification        = "new_notification"
-	MessageTypeError                  = "error"
-	MessageTypeConversationSubscribe  = "conversation_subscribe"
-	MessageTypeTyping                 = "typing"
-	MessageTypeListSubscribeReplace   = "list_subscribe_replace"
-	MessageTypeAgentAvailability      = "agent_availability_update"
-	MessageTypeConversationViewers    = "conversation_viewers"
+	MessageTypeMessageUpdate         = "message_update"
+	MessageTypeConversationUpdate    = "conversation_update"
+	MessageTypeNewMessage            = "new_message"
+	MessageTypeNewConversation       = "new_conversation"
+	MessageTypeNewNotification       = "new_notification"
+	MessageTypeError                 = "error"
+	MessageTypeConversationSubscribe = "conversation_subscribe"
+	MessageTypeTyping                = "typing"
+	MessageTypeListSubscribeReplace  = "list_subscribe_replace"
+	MessageTypeAgentAvailability     = "agent_availability_update"
+	MessageTypeConversationViewers   = "conversation_viewers"
 )
 
 // WSMessage represents a WS message.
@@ -25,6 +27,12 @@ type WSMessage struct {
 type Message struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
+}
+
+// IncomingMessage is an inbound client frame with its payload kept raw for the per-type handlers.
+type IncomingMessage struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
 }
 
 // BroadcastMessage represents a message to be pushed to users.

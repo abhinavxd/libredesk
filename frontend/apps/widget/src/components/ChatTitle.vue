@@ -16,6 +16,9 @@
       >
         {{ chatTitle.name }}
       </h3>
+      <p v-if="chatTitle.expectation" class="text-xs text-muted-foreground">
+        {{ chatTitle.expectation }}
+      </p>
       <p class="text-xs text-muted-foreground">
         <!-- Agent availability always wins so the online dot stays visible while they are assigned. -->
         <span
@@ -26,8 +29,8 @@
           <span
             class="inline-block w-2 h-2 rounded-full mr-1"
             :class="{
-              'bg-green-500': chatTitle.availability_status === 'online',
-              'bg-amber-500': chatTitle.availability_status === 'away'
+              'bg-success': chatTitle.availability_status === 'online',
+              'bg-warning': chatTitle.availability_status === 'away'
             }"
           ></span>
           {{ chatTitle.availability_status === 'online' ? $t('globals.terms.online') : $t('globals.terms.away') }}
@@ -60,6 +63,11 @@ const { t } = useI18n()
 
 const businessHoursStatus = computed(() => {
   const config = widgetStore.config
+
+  // While the AI assistant is handling the chat, its own expectation is shown instead.
+  if (chatStore.currentConversation?.assignee?.expectation) {
+    return null
+  }
 
   // Show business hrs?
   if (!config.show_office_hours_in_chat) {
@@ -119,6 +127,7 @@ const chatTitle = computed(() => {
       avatarUrl: assignee.avatar_url || '',
       avatarFallback: assignee.first_name.charAt(0).toUpperCase(),
       availability_status: assignee.availability_status?.startsWith('away') ? 'away' : assignee.availability_status,
+      expectation: assignee.expectation || '',
       hasAssignee: true
     }
   }

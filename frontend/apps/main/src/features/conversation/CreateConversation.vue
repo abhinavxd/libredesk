@@ -100,7 +100,7 @@ import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachmen
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import CreateConversationFields from '@/features/conversation/CreateConversationFields.vue'
-import Editor from '@/components/editor/TextEditor.vue'
+import Editor from '@/components/editor/ConversationEditor.vue'
 import { useCreateConversationForm } from '@main/composables/useCreateConversationForm'
 
 const dialogOpen = defineModel({

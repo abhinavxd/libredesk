@@ -3,10 +3,13 @@ package main
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -16,6 +19,7 @@ import (
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
 	"github.com/abhinavxd/libredesk/internal/ai"
+	"github.com/abhinavxd/libredesk/internal/aiagent"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
@@ -36,6 +40,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/priority"
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
@@ -53,6 +58,7 @@ import (
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
 	"github.com/valyala/fasthttp"
+	"github.com/zerodha/fastcache/v4"
 	"github.com/zerodha/fastglue"
 	"github.com/zerodha/logf"
 )
@@ -67,10 +73,23 @@ var (
 	// Injected at build time.
 	buildString   string
 	versionString string
+
+	// assetVersion is hashed from buildString so public cache-bust URLs don't leak the version.
+	assetVersion = func() string {
+		src := buildString
+		if src == "" {
+			src = strconv.FormatInt(time.Now().Unix(), 36)
+		}
+		h := fnv.New32a()
+		h.Write([]byte(src))
+		return strconv.FormatUint(uint64(h.Sum32()), 36)
+	}()
 )
 
 const (
 	sampleEncKey = "your-32-char-random-string-here!"
+
+	serverShutdownTimeout = 8 * time.Second
 )
 
 // App is the global app context which is passed and injected in the http handlers.
@@ -101,6 +120,8 @@ type App struct {
 	csat             *csat.Manager
 	view             *view.Manager
 	ai               *ai.Manager
+	aiAgent          *aiagent.Manager
+	helpcenter       *helpcenter.Manager
 	search           *search.Manager
 	activityLog      *activitylog.Manager
 	notifier         *notifier.Service
@@ -111,6 +132,7 @@ type App struct {
 	contextLink      *contextlink.Manager
 	rateLimit        *ratelimit.Limiter
 	redis            *redis.Client
+	fc               *fastcache.FastCache
 	importer         *importer.Importer
 	wsHub            *ws.Hub
 
@@ -186,6 +208,8 @@ func main() {
 
 	validateConfig(ko)
 
+	startPprof()
+
 	// Fallback for config typo. Logs a warning but continues to work with the incorrect key.
 	// Uses 'message.message_outgoing_scan_interval' (correct key) as default key, falls back to the common typo.
 	msgOutgoingScanIntervalKey := "message.message_outgoing_scan_interval"
@@ -213,27 +237,37 @@ func main() {
 		oidc                        = initOIDC(db, settings, i18n)
 		status                      = initStatus(db, i18n)
 		priority                    = initPriority(db, i18n)
-		auth                        = initAuth(oidc, rdb, i18n)
+		ssrfControl                 = initSSRFControl()
+		auth                        = initAuth(oidc, rdb, i18n, ssrfControl)
 		template                    = initTemplate(db, fs, constants, i18n)
 		media                       = initMedia(db, i18n, settings)
 		inbox                       = initInbox(db, i18n)
 		team                        = initTeam(db, i18n)
 		businessHours               = initBusinessHours(db, i18n)
-		webhook                     = initWebhook(db, i18n, settings)
+		webhook                     = initWebhook(db, i18n, settings, ssrfControl)
 		user                        = initUser(i18n, db)
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
 		userNotification            = initUserNotification(db, i18n)
 		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub, ko.Bool("notification.email.enabled"))
 		automation                  = initAutomationEngine(db, i18n)
+		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
+		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings, user, notifier, rdb)
+		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
 	)
 
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
+	systemUser, err := user.GetSystemUser()
+	if err != nil {
+		log.Fatalf("error fetching system user: %v", err)
+	}
+	automation.SetSystemUserID(systemUser.ID)
+	conversation.SetAIAgent(aiAgent)
 
 	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL)
 
@@ -250,6 +284,9 @@ func main() {
 	go user.MonitorUserAvailability(ctx, onUsersOffline(conversation))
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
+	go helpCenter.RunSearchLogCleaner(ctx)
+	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
+	go ai.Run(ctx)
 
 	var app = &App{
 		ctx:              ctx,
@@ -282,20 +319,28 @@ func main() {
 		role:             initRole(db, i18n),
 		tag:              initTag(db, i18n),
 		macro:            initMacro(db, i18n),
-		ai:               initAI(db, i18n),
+		ai:               ai,
+		aiAgent:          aiAgent,
+		helpcenter:       helpCenter,
 		importer:         initImporter(i18n),
 		webhook:          webhook,
 		contextLink:      initContextLink(db, i18n),
 		rateLimit:        rateLimiter,
 		redis:            rdb,
+		fc:               initFastCache(rdb),
 		userNotification: userNotification,
 		wsHub:            wsHub,
 	}
 	app.consts.Store(constants)
+	helpCenterCacheOpts.Logger = log.New(helpCenterCacheLogWriter{lo: app.lo}, "", 0)
 
 	g := fastglue.NewGlue()
 	g.SetContext(app)
 	initHandlers(g, wsHub)
+	g.Router.NotFound = helpCenterHostNotFound(app, g)
+
+	// Buffers above this are dropped rather than reused, and the ones we keep stay with the connection until it closes.
+	fasthttp.SetBodySizePoolLimit(64<<10, 1<<20) // request: 64 KiB, response: 1 MiB
 
 	s := &fasthttp.Server{
 		Name:                 appName,
@@ -323,8 +368,23 @@ func main() {
 
 	// Wait for shutdown signal.
 	<-ctx.Done()
+	closedAgentConns := wsHub.CloseAll()
+	closedLiveChatInboxes := inbox.CloseLiveChatClients()
+	colorlog.Red("Closed %d agent websocket connections and %d livechat inboxes.", closedAgentConns, closedLiveChatInboxes)
 	colorlog.Red("Shutting down HTTP server...")
-	s.Shutdown()
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), serverShutdownTimeout)
+	if err := s.ShutdownWithContext(shutdownCtx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			colorlog.Red("HTTP server drain timed out after %s, exiting with connections still open: %v", serverShutdownTimeout, err)
+		} else {
+			colorlog.Red("error shutting down HTTP server: %v", err)
+		}
+	}
+	cancelShutdown()
+	colorlog.Red("Shutting down AI agent...")
+	aiAgent.Close()
+	colorlog.Red("Shutting down AI...")
+	ai.Close()
 	colorlog.Red("Shutting down inboxes...")
 	inbox.Close()
 	colorlog.Red("Shutting down automation...")

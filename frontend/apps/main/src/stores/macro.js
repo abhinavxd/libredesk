@@ -19,7 +19,7 @@ export const useMacroStore = defineStore('macroStore', () => {
         assign_user: perms.CONVERSATIONS_UPDATE_USER_ASSIGNEE,
         set_status: perms.CONVERSATIONS_UPDATE_STATUS,
         set_priority: perms.CONVERSATIONS_UPDATE_PRIORITY,
-        send_private_note: perms.MESSAGES_WRITE,
+        send_private_note: perms.MESSAGES_WRITE_PRIVATE,
         send_reply: perms.MESSAGES_WRITE,
         add_tags: perms.CONVERSATIONS_UPDATE_TAGS,
         set_tags: perms.CONVERSATIONS_UPDATE_TAGS,
@@ -43,13 +43,14 @@ export const useMacroStore = defineStore('macroStore', () => {
         }
 
         // Filter macros based on permissions.
-        filtered.forEach(macro => {
-            macro.actions = macro.actions.filter(action => {
+        filtered = filtered.map(macro => ({
+            ...macro,
+            actions: macro.actions.filter(action => {
                 const permission = actionPermissions[action.type]
                 if (!permission) return true
                 return userStore.can(permission)
             })
-        })
+        }))
 
         // Skip macros that do not have any actions left AND the macro field `message_content` is empty.
         filtered = filtered.filter(macro => !(macro.actions.length === 0 && macro.message_content === ""))

@@ -14,7 +14,12 @@
     >
       <Conversation />
       <Sheet :open="mobileSidebarOpen" @update:open="mobileSidebarOpen = $event">
-        <SheetContent side="right" class="w-[min(100vw,24rem)] p-0">
+        <SheetContent
+          side="right"
+          class="w-[min(100vw,24rem)] p-0 overflow-y-auto [&>button]:hidden"
+          :aria-describedby="undefined"
+        >
+          <SheetTitle class="sr-only">{{ $t('globals.terms.contact') }}</SheetTitle>
           <div class="h-full overflow-y-auto overflow-x-hidden">
             <ConversationSideBar />
           </div>
@@ -49,7 +54,7 @@
         @collapse="onSidebarCollapse"
         @expand="onSidebarExpand"
       >
-        <div class="h-full overflow-y-auto overflow-x-hidden">
+        <div class="h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
           <ConversationSideBar />
         </div>
       </ResizablePanel>
@@ -59,7 +64,7 @@
     <button
       v-if="showContent && !sidebarOpen && !isMobile"
       @click="toggleSidebar"
-      class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-all duration-200 border shadow hover:scale-105 z-50"
+      class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-all duration-200 border shadow-md hover:scale-105 z-50"
     >
       <ChevronLeft size="16" />
     </button>
@@ -77,8 +82,8 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import Conversation from '@main/features/conversation/Conversation.vue'
 import ConversationSideBar from '@main/features/conversation/sidebar/ConversationSideBar.vue'
+import { Sheet, SheetContent, SheetTitle } from '@shared-ui/components/ui/sheet'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@shared-ui/components/ui/resizable'
-import { Sheet, SheetContent } from '@shared-ui/components/ui/sheet'
 
 const props = defineProps({
   uuid: String
@@ -168,6 +173,7 @@ const fetchConversation = async (uuid) => {
 watch(
   () => props.uuid,
   (newUUID, oldUUID) => {
+    mobileSidebarOpen.value = false
     if (!newUUID || newUUID === oldUUID) return
     const canTransition = oldUUID && !route.query.scrollTo && typeof document.startViewTransition === 'function'
     if (!canTransition) {

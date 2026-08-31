@@ -1,17 +1,17 @@
 {{ define "header" }}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />	
+	<meta charset="utf-8" />	
 	<title>{{ .Data.Title }} - {{ SiteName }}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 
-	<link href="/static/public/static/style.css" rel="stylesheet" type="text/css" />
+	<link rel="preload" href="/static/public/static/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
+	<link href="/static/public/static/fonts.css?v={{ AssetVer }}" rel="stylesheet" type="text/css" />
+	<link href="/static/public/static/style.css?v={{ AssetVer }}" rel="stylesheet" type="text/css" />
 
 	{{ if ne FaviconURL "" }}
 		<link rel="icon" href="{{ FaviconURL }}" type="image/x-icon" />
-	{{ else }}
-		<link rel="icon" href="/public/static/favicon.png" type="image/png" />
 	{{ end }}
 </head>
 <body>
@@ -21,9 +21,8 @@
 				{{ if ne LogoURL "" }}
 					<img src="{{ LogoURL }}" alt="{{ SiteName }}" />
 				{{ else }}
-					<img src="/public/static/logo.svg" alt="{{ SiteName }}" />
+					<span class="site-name">{{ SiteName }}</span>
 				{{ end }}
-				</a>
 			</div>
 		</header>
 {{ end }}

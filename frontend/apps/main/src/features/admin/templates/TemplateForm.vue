@@ -125,7 +125,7 @@ const hideSubject = computed(() => {
 watch(
   () => props.initialValues,
   (newValues) => {
-    form.setValues(newValues)
+    form.setValues(newValues, false)
   },
   { deep: true }
 )

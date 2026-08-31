@@ -24,7 +24,7 @@ func (c *Manager) RunUnsnoozer(ctx context.Context, unsnoozeInterval time.Durati
 func (c *Manager) unsnoozeAll(ctx context.Context) {
 	res, err := c.q.UnsnoozeAll.ExecContext(ctx)
 	if err != nil {
-		c.lo.Error("error unsnoozing all conversations", err)
+		c.lo.Error("error unsnoozing all conversations", "error", err)
 		return
 	}
 	rows, _ := res.RowsAffected()

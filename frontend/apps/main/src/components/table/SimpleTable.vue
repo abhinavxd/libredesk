@@ -25,7 +25,7 @@
             <Skeleton class="h-4 w-[85%]" />
           </td>
           <td v-if="showDelete" class="px-6 py-4 text-sm text-muted-foreground">
-            <Skeleton class="h-8 w-8 rounded" />
+            <Skeleton class="h-8 w-8 rounded-md" />
           </td>
         </tr>
       </template>

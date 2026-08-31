@@ -37,44 +37,6 @@
     </AlertDialogContent>
   </AlertDialog>
 
-  <Dialog :open="openAIKeyPrompt" @update:open="openAIKeyPrompt = false">
-    <DialogContent class="sm:max-w-lg">
-      <DialogHeader class="space-y-2">
-        <DialogTitle>{{ $t('ai.enterOpenAIAPIKey') }}</DialogTitle>
-        <DialogDescription>
-          {{
-            $t('ai.apiKey.description', {
-              provider: 'OpenAI'
-            })
-          }}
-        </DialogDescription>
-      </DialogHeader>
-      <Form v-slot="{ handleSubmit }" as="" keep-values :validation-schema="formSchema">
-        <form id="apiKeyForm" @submit="handleSubmit($event, updateProvider)">
-          <FormField v-slot="{ componentField }" name="apiKey">
-            <FormItem>
-              <FormLabel>{{ $t('globals.terms.apiKey') }}</FormLabel>
-              <FormControl>
-                <Input type="text" placeholder="sk-am1RLw7XUWGX.." v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </form>
-        <DialogFooter>
-          <Button
-            type="submit"
-            form="apiKeyForm"
-            :is-loading="isOpenAIKeyUpdating"
-            :disabled="isOpenAIKeyUpdating"
-          >
-            {{ $t('globals.messages.save') }}
-          </Button>
-        </DialogFooter>
-      </Form>
-    </DialogContent>
-  </Dialog>
-
   <Dialog :open="showDraftReplyDialog" @update:open="showDraftReplyDialog = $event">
     <DialogContent class="sm:max-w-lg">
       <DialogHeader class="space-y-2">
@@ -107,8 +69,13 @@
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
-        class="max-w-[60%] max-h-[75%] h-[70%] bg-card text-card-foreground p-4 flex flex-col"
-        :class="{ '!bg-private': messageType === 'private_note' }"
+        class="bg-card text-card-foreground p-4 flex flex-col overflow-hidden"
+        :class="[
+          isCramped
+            ? 'top-0 left-0 translate-x-0 translate-y-0 w-full max-w-none h-[var(--visual-viewport-height,100dvh)] max-h-none rounded-none'
+            : 'max-w-[60%] h-[70%] max-h-[75%] rounded-lg',
+          { '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }
+        ]"
         @escapeKeyDown="isEditorFullscreen = false"
         :hide-close-button="true"
       >
@@ -138,19 +105,46 @@
           @filesDropped="uploadFiles"
           @aiPromptSelected="handleAiPromptSelected"
           @draftReplyRequested="openDraftReplyDialog"
+          :isGenerating="isGenerating"
+          :canSendReply="canSendReply"
+          :canSendPrivateNote="canSendPrivateNote"
+          @generateReply="handleGenerateReply"
           class="h-full flex-grow"
         />
       </DialogContent>
     </Dialog>
 
+    <div v-if="isCramped && !isEditorFullscreen" class="p-2">
+      <Button
+        type="button"
+        variant="outline"
+        class="w-full h-11 justify-start font-normal min-w-0"
+        :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
+        @click="isEditorFullscreen = true"
+      >
+        <Pencil class="shrink-0 text-muted-foreground" />
+        <span v-if="draftPreview" class="truncate">{{ draftPreview }}</span>
+        <span v-else class="truncate text-muted-foreground">
+          {{ messageType === 'private_note' ? $t('globals.terms.privateNote') : $t('globals.terms.reply') }}
+        </span>
+        <span
+          v-if="attachmentCount"
+          class="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+        >
+          <Paperclip class="w-3.5 h-3.5" />
+          {{ attachmentCount }}
+        </span>
+      </Button>
+    </div>
+
     <!-- Main Editor non-fullscreen -->
     <div
-      class="bg-background text-card-foreground flex flex-col"
+      class="bg-background text-card-foreground flex flex-col relative"
       :class="[
         isZendeskLayout ? 'zendesk-reply-box' : 'box m-2 px-2 pt-2',
-        { '!bg-private': messageType === 'private_note' }
+        { '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }
       ]"
-      v-if="!isEditorFullscreen"
+      v-if="!isCramped && !isEditorFullscreen"
     >
       <ReplyBoxContent
         ref="replyBoxContentRef"
@@ -178,6 +172,10 @@
         @filesDropped="uploadFiles"
         @aiPromptSelected="handleAiPromptSelected"
         @draftReplyRequested="openDraftReplyDialog"
+        :isGenerating="isGenerating"
+        :canSendReply="canSendReply"
+        :canSendPrivateNote="canSendPrivateNote"
+        @generateReply="handleGenerateReply"
       />
     </div>
   </div>
@@ -185,8 +183,6 @@
 
 <script setup>
 import { ref, watch, computed, toRaw, onMounted, onUnmounted } from 'vue'
-import { useStorage } from '@vueuse/core'
-import { useUiLayout, UI_LAYOUT_ZENDESK } from '@main/composables/useUiLayout'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
@@ -197,6 +193,7 @@ import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
 import { useAiPromptStore } from '@main/stores/aiPrompt'
+import { useNotificationStore } from '@main/stores/notification'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -207,7 +204,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { Button } from '@shared-ui/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -216,41 +212,40 @@ import {
   DialogHeader,
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
-import { Input } from '@shared-ui/components/ui/input'
+import { Button } from '@shared-ui/components/ui/button'
 import { Textarea } from '@shared-ui/components/ui/textarea'
+import { Pencil, Paperclip } from 'lucide-vue-next'
+import { useUiLayout, UI_LAYOUT_ZENDESK } from '@main/composables/useUiLayout'
+import { useVisualViewportHeight } from '@main/composables/useVisualViewportHeight'
+import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage
-} from '@shared-ui/components/ui/form'
-import { toTypedSchema } from '@vee-validate/zod'
-import * as z from 'zod'
-
-const formSchema = toTypedSchema(
-  z.object({
-    apiKey: z.string().min(1, 'API key is required')
-  })
-)
+import { permissions as perms } from '@main/constants/permissions.js'
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
+const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
+const isCramped = useIsComposerCramped()
+useVisualViewportHeight()
 const { layout } = useUiLayout()
-
-// In Zendesk mode the composer's inline Send is hidden; the bottom submit bar
-// is the single submit control (avoids the duplicate-submit confusion).
 const isZendeskLayout = computed(() => layout.value === UI_LAYOUT_ZENDESK)
 const showSendButton = computed(() => !isZendeskLayout.value)
+
+const canSendReply = computed(() => userStore.can(perms.MESSAGES_WRITE))
+const canSendPrivateNote = computed(() => userStore.can(perms.MESSAGES_WRITE_PRIVATE))
+const defaultMessageType = computed(() => (canSendReply.value ? 'reply' : 'private_note'))
+const isAllowedMessageType = (type) =>
+  (type === 'reply' && canSendReply.value) || (type === 'private_note' && canSendPrivateNote.value)
+const resolveAllowedDraftType = (uuid) => {
+  const type = conversationStore.resolveDraftType(uuid)
+  return isAllowedMessageType(type) ? type : defaultMessageType.value
+}
 
 // Setup file upload composable
 const {
@@ -265,26 +260,43 @@ const {
   linkedModel: 'messages'
 })
 
-// Setup draft management composable
-const currentDraftKey = computed(() => conversationStore.current?.uuid || null)
+const messageType = ref('reply')
+const currentConversationUUID = computed(() => conversationStore.current?.uuid || null)
+watch(
+  currentConversationUUID,
+  async (uuid, prevUuid) => {
+    if (prevUuid) conversationStore.setSelectedDraftType(prevUuid, messageType.value)
+    if (!uuid) {
+      messageType.value = defaultMessageType.value
+      return
+    }
+    messageType.value = resolveAllowedDraftType(uuid)
+    // Prefetch may still be in flight on first load; re-resolve once drafts land.
+    await conversationStore.draftsReady
+    if (uuid !== currentConversationUUID.value) return
+    messageType.value = resolveAllowedDraftType(uuid)
+  },
+  { immediate: true }
+)
+
+// Setup draft management composable, keyed per conversation and message type.
 const {
   htmlContent,
   textContent,
   isLoading: isDraftLoading,
   clearDraft,
   loadedAttachments,
-  loadedMacroActions
-} = useDraftManager(currentDraftKey, mediaFiles)
+  loadedMacroActions,
+  loadedMacroID
+} = useDraftManager(currentConversationUUID, messageType, mediaFiles)
 
 // Rest of existing state
-const openAIKeyPrompt = ref(false)
-const isOpenAIKeyUpdating = ref(false)
+const isEditorFullscreen = ref(false)
+const isSending = ref(false)
+const isGenerating = ref(false)
 const showDraftReplyDialog = ref(false)
 const draftReplyInstructions = ref('')
 const isDraftReplyGenerating = ref(false)
-const isEditorFullscreen = ref(false)
-const isSending = ref(false)
-const messageType = useStorage('replyBoxMessageType', 'reply')
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
@@ -300,30 +312,32 @@ const mentions = ref([])
 
 aiPromptStore.fetchPrompts()
 
-/**
- * Handles the AI prompt selection event.
- * Sends the selected prompt key and the current text content to the server for completion.
- * Sets the response as the new content in the editor.
- * @param {String} key - The key of the selected AI prompt
- */
-const handleAiPromptSelected = async (key) => {
+const runAiGeneration = async (requestFn) => {
+  if (isGenerating.value) return
+  const uuid = currentConversationUUID.value
+  if (!uuid) return
+  isGenerating.value = true
   try {
-    const resp = await api.aiCompletion({
-      prompt_key: key,
-      content: textContent.value
-    })
-    htmlContent.value = resp.data.data.replace(/\n/g, '<br>')
+    const resp = await requestFn(uuid)
+    if (uuid !== currentConversationUUID.value) return
+    htmlContent.value = resp.data.data || ''
   } catch (error) {
-    // Check if user needs to enter OpenAI API key and has permission to do so.
-    if (error.response?.status === 400 && userStore.can('ai:manage')) {
-      openAIKeyPrompt.value = true
-    }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  } finally {
+    isGenerating.value = false
   }
 }
+
+const handleAiPromptSelected = (key) =>
+  runAiGeneration(() => api.aiCompletion({ prompt_key: key, content: htmlContent.value }))
+
+const handleGenerateReply = () =>
+  runAiGeneration((uuid) =>
+    api.aiGenerateReply({ conversation_uuid: uuid, instruction: textContent.value })
+  )
 
 const openDraftReplyDialog = () => {
   draftReplyInstructions.value = ''
@@ -352,9 +366,6 @@ const submitDraftReply = async () => {
     htmlContent.value = resp.data.data.replace(/\n/g, '<br>')
     showDraftReplyDialog.value = false
   } catch (error) {
-    if (error.response?.status === 400 && userStore.can('ai:manage')) {
-      openAIKeyPrompt.value = true
-    }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
@@ -364,27 +375,25 @@ const submitDraftReply = async () => {
   }
 }
 
-/**
- * updateProvider updates the OpenAI API key.
- * @param {Object} values - The form values containing the API key
- */
-const updateProvider = async (values) => {
-  try {
-    isOpenAIKeyUpdating.value = true
-    await api.updateAIProvider({ api_key: values.apiKey, provider: 'openai' })
-    openAIKeyPrompt.value = false
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
-    })
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    isOpenAIKeyUpdating.value = false
-  }
+// Copilot's "Insert into reply" replaces the draft with its answer (already HTML from the panel),
+// forcing reply mode so a private note in progress does not silently receive customer-facing text.
+const handleCopilotInsertReply = (html) => {
+  if (!html || !canSendReply.value) return
+  if (messageType.value === 'private_note') messageType.value = 'reply'
+  htmlContent.value = html
 }
+
+const handleExternalSubmit = (status) => processSendAndSetStatus(status)
+
+onMounted(() => {
+  emitter.on(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
+  emitter.on(EMITTER_EVENTS.CONVERSATION_SUBMIT_AS, handleExternalSubmit)
+})
+
+onUnmounted(() => {
+  emitter.off(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
+  emitter.off(EMITTER_EVENTS.CONVERSATION_SUBMIT_AS, handleExternalSubmit)
+})
 
 /**
  * Returns true if the editor has text content.
@@ -392,6 +401,10 @@ const updateProvider = async (values) => {
 const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
+
+const draftPreview = computed(() => textContent.value.trim())
+
+const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.value.length)
 
 const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
   let hasMessageSendingErrored = false
@@ -402,6 +415,8 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   const hasContent = hasTextContent.value || hasInlineImage(html) || mediaFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
   const isPrivate = messageType.value === 'private_note'
+
+  if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
 
   const currentInbox = inboxStore.inboxes.find(
     (i) => i.id === conversationStore.current.inbox_id
@@ -510,11 +525,12 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
         echo_id: isPrivate ? '' : tempUUID
       })
 
-      // Replace the optimistic pending bubble with the server message so the
-      // thread updates without waiting on websocket echo delivery.
-      if (response?.data?.data) {
+      // Private notes are sent immediately so replace immediately.
+      if (isPrivate && response?.data?.data) {
         conversationStore.replacePendingMessage(convUUID, tempUUID, response.data.data)
       }
+
+      notificationStore.markAssignmentAsReadForConversation(convUUID)
     } catch (error) {
       hasMessageSendingErrored = true
       // Remove pending message and restore editor content.
@@ -531,7 +547,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   if (!hasMessageSendingErrored) {
     const macroID = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.id
     const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
-    if (macroID > 0 && macroActions.length > 0) {
+    if (macroID > 0) {
       try {
         await api.applyMacro(convUUID, macroID, macroActions)
       } catch (error) {
@@ -545,7 +561,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
 
   // Clear state on success.
   if (!hasMessageSendingErrored) {
-    clearDraft(currentDraftKey.value)
+    clearDraft(convUUID, isPrivate ? 'private_note' : 'reply')
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
     clearMediaFiles()
     emailErrors.value = []
@@ -560,11 +576,6 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
 }
 
 const processSendAndSetStatus = (status) => processSend(false, false, status)
-
-// Zendesk submit bar drives the composer via the emitter.
-const handleExternalSubmit = (status) => processSendAndSetStatus(status)
-onMounted(() => emitter.on(EMITTER_EVENTS.CONVERSATION_SUBMIT_AS, handleExternalSubmit))
-onUnmounted(() => emitter.off(EMITTER_EVENTS.CONVERSATION_SUBMIT_AS, handleExternalSubmit))
 
 /**
  * Watches for changes in the conversation's macro id and update message content.
@@ -583,15 +594,13 @@ watch(
   { deep: true }
 )
 
-/**
- * Watch loaded macro actions from draft and update conversation store.
- */
+// Reset first so a loaded draft never inherits the previous conversation's macro (drafts store no message_content).
 watch(
-  loadedMacroActions,
-  (actions) => {
-    if (actions.length > 0) {
-      conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
-    }
+  [loadedMacroID, loadedMacroActions],
+  ([id, actions]) => {
+    conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
+    if (id > 0) conversationStore.setMacro({ id, actions: [...toRaw(actions)] }, MACRO_CONTEXT.REPLY)
+    else if (actions.length) conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
   },
   { deep: true }
 )
@@ -602,9 +611,7 @@ watch(
 watch(
   loadedAttachments,
   (attachments) => {
-    if (attachments.length > 0) {
-      setMediaFiles([...attachments])
-    }
+    setMediaFiles([...attachments])
   },
   { deep: true }
 )
@@ -639,16 +646,69 @@ watch(
   { deep: true, immediate: true }
 )
 
-// Clear media files and reset macro when conversation changes.
+// Media files and macro state are restored per draft by the draft manager; resetting here would race ahead of the save and drop them.
 watch(
   () => conversationStore.current?.uuid,
   () => {
-    clearMediaFiles()
-    conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
-    // Focus editor on conversation change
     setTimeout(() => {
       replyBoxContentRef.value?.focus()
     }, 100)
   }
 )
 </script>
+
+<style scoped>
+/* While the AI drafts a reply, a point of light orbits the reply box: a bright
+   comet head that fades to a transparent tail, with its glow travelling along. */
+@property --ai-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.ai-generating {
+  box-shadow: 0 6px 22px -10px hsl(var(--primary) / 0.28);
+}
+
+.ai-generating::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--ai-angle),
+    hsl(var(--primary)) 0deg,
+    hsl(var(--primary) / 0) 90deg,
+    hsl(var(--primary) / 0) 180deg,
+    hsl(var(--primary)) 180deg,
+    hsl(var(--primary) / 0) 270deg,
+    hsl(var(--primary) / 0) 360deg
+  );
+  filter: drop-shadow(0 0 5px hsl(var(--primary) / 0.5));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ai-border-spin 2.4s linear infinite;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@keyframes ai-border-spin {
+  to {
+    --ai-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Steady even glow so the active state stays legible without motion. */
+  .ai-generating {
+    box-shadow: 0 0 0 1.5px hsl(var(--primary) / 0.4);
+  }
+  .ai-generating::after {
+    display: none;
+  }
+}
+</style>

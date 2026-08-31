@@ -23,7 +23,7 @@ export const createColumns = (t, { onEdit } = {}) => [
       return h('div', { class: 'text-center' },
         onEdit && !isDefault
           ? h('span', {
-              class: 'text-primary hover:underline cursor-pointer',
+              class: 'text-foreground font-medium hover:underline cursor-pointer',
               onClick: () => onEdit(row.original)
             }, label)
           : label
