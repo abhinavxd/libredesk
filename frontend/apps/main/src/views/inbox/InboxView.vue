@@ -22,10 +22,21 @@ let lastFetchedKey = ''
 
 const storeHasCurrentList = () => {
   const c = conversationStore.conversations
+
   if (!c.initialized) return false
-  if (viewID.value) return c.listType === CONVERSATION_LIST_TYPE.VIEW && String(c.viewID) === String(viewID.value)
-  if (type.value) return c.listType === type.value
-  if (teamID.value) return c.listType === CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED && String(c.teamID) === String(teamID.value)
+
+  if (viewID.value) {
+    return c.listType === CONVERSATION_LIST_TYPE.VIEW && String(c.viewID) === String(viewID.value)
+  }
+
+  if (type.value) {
+    return c.listType === type.value
+  }
+
+  if (teamID.value) {
+    return c.listType === CONVERSATION_LIST_TYPE.TEAM && String(c.teamID) === String(teamID.value)
+  }
+
   return false
 }
 
@@ -33,10 +44,13 @@ const fetchForCurrentRoute = () => {
   if (!type.value && !teamID.value && !viewID.value) return
 
   const key = `${type.value || ''}|${teamID.value || ''}|${viewID.value || ''}`
+
   if (key === lastFetchedKey) return
+
   lastFetchedKey = key
 
-  // List already loaded: soft-refresh in place. A full fetch resets the list first and blanks it.
+  // List already loaded: soft-refresh in place.
+  // A full fetch resets the list first and blanks it.
   if (storeHasCurrentList()) {
     conversationStore.refreshConversationList()
     return
@@ -51,20 +65,23 @@ const fetchForCurrentRoute = () => {
   if (!conversationStore.getListStatus) {
     conversationStore.setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN, false)
   }
+
   if (type.value) {
     conversationStore.fetchConversationsList(true, type.value)
   } else {
-    conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.TEAM_UNASSIGNED, teamID.value)
+    conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.TEAM, teamID.value)
   }
 }
 
 onMounted(fetchForCurrentRoute)
 
 const visibility = useDocumentVisibility()
+
 const { pause, resume } = useIntervalFn(
   () => conversationStore.refreshConversationList(),
   120000
 )
+
 watch(visibility, v => {
   if (v === 'visible') {
     conversationStore.refreshConversationList()
