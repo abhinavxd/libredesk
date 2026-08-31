@@ -454,10 +454,6 @@ SELECT
 -- name: get-user-ids-by-role
 SELECT user_id FROM user_roles WHERE role_id = $1;
 
--- name: delete-contact
-DELETE FROM users
-WHERE id = $1 AND type IN ('contact', 'visitor');
-
 -- name: export-contact-data
 SELECT jsonb_build_object(
     'contact', (
