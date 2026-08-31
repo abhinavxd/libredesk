@@ -240,6 +240,18 @@ jobs:
       github.ref == 'refs/heads/main'
     runs-on: [self-hosted, kubero]
     steps:
+      - name: Install kubectl
+        run: |
+          if command -v kubectl >/dev/null 2>&1; then
+            kubectl version --client
+            exit 0
+          fi
+          install -d "$RUNNER_TEMP/bin"
+          curl -fsSL "https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl" \
+            -o "$RUNNER_TEMP/bin/kubectl"
+          chmod +x "$RUNNER_TEMP/bin/kubectl"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
       - name: Deploy to leaseweb-montreal
         env:
           IMAGE_REF: ${{ env.IMAGE }}@${{ needs.docker.outputs.digest }}
