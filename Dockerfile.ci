@@ -12,6 +12,8 @@ COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN --mount=type=cache,id=libredesk-pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 COPY frontend/ ./
+# ArticleEditor imports help-center CSS via @public-static → ../static/public/static
+COPY static/public/static /app/static/public/static
 ARG VITE_APP_VERSION=dev
 ENV VITE_APP_VERSION=${VITE_APP_VERSION}
 RUN pnpm build:main && pnpm build:widget
