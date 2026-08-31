@@ -1,7 +1,8 @@
 name: Pipeline
 
 # Single pipeline for the repo: run the frontend + Go test suites, and only
-# once both pass build & publish the Docker image and roll it out to prod.
+# once both pass build & publish the Docker image and roll it out to
+# leaseweb-montreal (ns libredesk).
 # Replaces the separate CI / Go / Docker workflows so a push to main produces
 # one ordered run instead of several competing for the single self-hosted runner.
 
@@ -226,9 +227,9 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
-    # Roll the freshly built image out to prod (kubero-prod / ns libredesk).
-    # Only on main builds; uses a namespace-scoped ServiceAccount (patch the
-    # single libredesk Deployment, nothing else).
+    # Roll the freshly built image out to leaseweb-montreal (ns libredesk).
+    # The pod command already runs `--upgrade --yes` before start, so schema
+    # migrations (e.g. webhook delivery) apply on rollout.
     needs: docker
     # Same status-function requirement as `docker`: deploy sits downstream of the
     # skipped test jobs, so without !cancelled() GitHub skips it even when the
@@ -239,20 +240,26 @@ jobs:
       github.ref == 'refs/heads/main'
     runs-on: [self-hosted, kubero]
     steps:
-      - name: Deploy to prod
+      - name: Deploy to leaseweb-montreal
         env:
           IMAGE_REF: ${{ env.IMAGE }}@${{ needs.docker.outputs.digest }}
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_PROD_B64 }}
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_MONTREAL_B64 }}
         run: |
           set -euo pipefail
           KCFG="$RUNNER_TEMP/kubeconfig"
           trap 'rm -f "$KCFG"' EXIT
           printf '%s' "$KUBECONFIG_B64" | base64 -d > "$KCFG"
           export KUBECONFIG="$KCFG"
+          ctx="$(kubectl config current-context)"
+          echo "Cluster context: $ctx"
+          if [ "$ctx" != "montreal" ]; then
+            echo "Refusing to deploy: context is '$ctx', expected 'montreal'"
+            exit 1
+          fi
           echo "Rolling out image: $IMAGE_REF"
           kubectl -n libredesk set image deploy/libredesk libredesk="$IMAGE_REF"
           kubectl -n libredesk rollout status deploy/libredesk --timeout=300s
-          echo "### Deployed to prod" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Deployed to leaseweb-montreal ($ctx)" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "$IMAGE_REF" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"

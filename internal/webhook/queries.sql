@@ -7,7 +7,8 @@ SELECT
     url,
     events,
     secret,
-    is_active
+    is_active,
+    delivery
 FROM
     webhooks
 ORDER BY created_at DESC;
@@ -21,7 +22,8 @@ SELECT
     url,
     events,
     secret,
-    is_active
+    is_active,
+    delivery
 FROM
     webhooks
 WHERE
@@ -44,7 +46,8 @@ SELECT
     url,
     events,
     secret,
-    is_active
+    is_active,
+    delivery
 FROM
     webhooks
 WHERE
@@ -60,7 +63,8 @@ SELECT
     url,
     events,
     secret,
-    is_active
+    is_active,
+    delivery
 FROM
     webhooks
 WHERE
@@ -69,9 +73,9 @@ WHERE
 
 -- name: insert-webhook
 INSERT INTO
-    webhooks (name, url, events, secret, is_active)
+    webhooks (name, url, events, secret, is_active, delivery)
 VALUES
-    ($1, $2, $3, $4, $5)
+    ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: update-webhook
@@ -83,6 +87,7 @@ SET
     events = $4,
     secret = $5,
     is_active = $6,
+    delivery = $7,
     updated_at = NOW()
 WHERE
     id = $1

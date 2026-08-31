@@ -178,5 +178,11 @@ func validateWebhook(app *App, webhook models.Webhook) error {
 	if len(webhook.Events) == 0 {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`events`"), nil)
 	}
+	if webhook.Delivery != "" && webhook.Delivery != models.DeliveryHTTP && webhook.Delivery != models.DeliveryDiscord {
+		return envelope.NewError(envelope.InputError, app.i18n.T("admin.webhook.invalidDelivery"), nil)
+	}
+	if webhook.Delivery == models.DeliveryDiscord && !webhook.IsDiscordURL() {
+		return envelope.NewError(envelope.InputError, app.i18n.T("admin.webhook.invalidDiscordURL"), nil)
+	}
 	return nil
 }

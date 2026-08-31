@@ -656,10 +656,12 @@ CREATE TABLE webhooks (
 	events webhook_event[] NOT NULL DEFAULT '{}',
 	secret TEXT DEFAULT '',
 	is_active BOOLEAN DEFAULT true,
+	delivery TEXT NOT NULL DEFAULT 'http',
 	CONSTRAINT constraint_webhooks_on_name CHECK (length(name) <= 255),
 	CONSTRAINT constraint_webhooks_on_url CHECK (length(url) <= 2048),
 	CONSTRAINT constraint_webhooks_on_secret CHECK (length(secret) <= 255),
-	CONSTRAINT constraint_webhooks_on_events_not_empty CHECK (array_length(events, 1) > 0)
+	CONSTRAINT constraint_webhooks_on_events_not_empty CHECK (array_length(events, 1) > 0),
+	CONSTRAINT constraint_webhooks_on_delivery CHECK (delivery IN ('http', 'discord'))
 );
 
 DROP TABLE IF EXISTS context_links CASCADE;

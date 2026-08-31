@@ -60,6 +60,7 @@ const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t)),
   initialValues: {
     name: '',
+    delivery: 'http',
     url: '',
     events: [],
     secret: '',

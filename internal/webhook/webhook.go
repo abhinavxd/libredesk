@@ -50,6 +50,7 @@ type Manager struct {
 	closedMu      sync.RWMutex
 	wg            sync.WaitGroup
 	encryptionKey string
+	rootURL       func() string
 }
 
 // Opts contains options for initializing the Manager.
@@ -62,6 +63,7 @@ type Opts struct {
 	Timeout       time.Duration
 	EncryptionKey string
 	AllowedHosts  []string // CIDR prefixes allowed to bypass SSRF protection
+	RootURL       func() string
 }
 
 // DeliveryTask represents a webhook delivery task
@@ -115,6 +117,7 @@ func New(opts Opts) (*Manager, error) {
 		},
 		workers:       opts.Workers,
 		encryptionKey: opts.EncryptionKey,
+		rootURL:       opts.RootURL,
 	}, nil
 }
 
@@ -161,7 +164,12 @@ func (m *Manager) Create(webhook models.Webhook) (models.Webhook, error) {
 		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive); err != nil {
+	delivery, err := normalizeDelivery(webhook.URL, webhook.Delivery)
+	if err != nil {
+		return models.Webhook{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.webhook.invalidDiscordURL"), nil)
+	}
+
+	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return models.Webhook{}, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}
@@ -199,7 +207,12 @@ func (m *Manager) Update(id int, webhook models.Webhook) (models.Webhook, error)
 		}
 	}
 
-	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive); err != nil {
+	delivery, err := normalizeDelivery(webhook.URL, webhook.Delivery)
+	if err != nil {
+		return models.Webhook{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.webhook.invalidDiscordURL"), nil)
+	}
+
+	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery); err != nil {
 		m.lo.Error("error updating webhook", "error", err)
 		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -320,13 +333,7 @@ func (m *Manager) deliverWebhook(task DeliveryTask) {
 
 // deliverSingleWebhook delivers a webhook to a single endpoint.
 func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask) {
-	basePayload := map[string]any{
-		"event":     task.Event,
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-		"payload":   task.Payload,
-	}
-
-	payloadBytes, err := json.Marshal(basePayload)
+	payloadBytes, err := m.marshalDeliveryPayload(webhook, task)
 	if err != nil {
 		m.lo.Error("error marshaling webhook payload", "webhook_id", webhook.ID, "event", task.Event, "error", err)
 		return
@@ -343,8 +350,8 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Libredesk-Webhook/"+version.Version)
 
-	// Add signature if secret is provided
-	if webhook.Secret != "" {
+	// Discord incoming webhooks authenticate via the URL; skip HMAC on those.
+	if webhook.Secret != "" && !usesDiscordPayload(webhook) {
 		signature := m.generateSignature(payloadBytes, webhook.Secret)
 		req.Header.Set("X-Libredesk-Signature", signature)
 	}
@@ -393,6 +400,24 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 			"status_code", resp.StatusCode,
 			"response", string(responseBody))
 	}
+}
+
+func (m *Manager) marshalDeliveryPayload(webhook models.Webhook, task DeliveryTask) ([]byte, error) {
+	if usesDiscordPayload(webhook) {
+		return buildDiscordPayload(task, m.appRootURL())
+	}
+	return json.Marshal(map[string]any{
+		"event":     task.Event,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"payload":   task.Payload,
+	})
+}
+
+func (m *Manager) appRootURL() string {
+	if m.rootURL == nil {
+		return ""
+	}
+	return m.rootURL()
 }
 
 // generateSignature generates HMAC-SHA256 signature for webhook payload.

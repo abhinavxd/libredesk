@@ -11,15 +11,19 @@ export const createColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      const delivery = row.original.delivery
+      return h('div', { class: 'text-center flex items-center justify-center gap-2' }, [
         h(RouterLink,
           {
             to: { name: 'edit-webhook', params: { id: row.original.id } },
             class: 'text-primary hover:underline'
           },
           () => row.getValue('name')
-        )
-      )
+        ),
+        delivery === 'discord'
+          ? h(Badge, { variant: 'secondary', class: 'text-xs' }, () => t('globals.terms.discord'))
+          : null
+      ])
     }
   },
   {

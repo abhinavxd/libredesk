@@ -22,12 +22,44 @@
       </FormItem>
     </FormField>
 
+    <FormField v-slot="{ componentField }" name="delivery">
+      <FormItem>
+        <FormLabel>{{ $t('globals.terms.delivery') }}</FormLabel>
+        <FormControl>
+          <Select v-bind="componentField">
+            <SelectTrigger class="w-full">
+              <SelectValue :placeholder="$t('admin.webhook.delivery.placeholder')" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="http">{{ $t('admin.webhook.delivery.http') }}</SelectItem>
+                <SelectItem value="discord">{{ $t('admin.webhook.delivery.discord') }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </FormControl>
+        <FormDescription>{{ $t('admin.webhook.delivery.description') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <FormField v-slot="{ componentField }" name="url">
       <FormItem>
         <FormLabel>{{ $t('globals.terms.url') }}</FormLabel>
         <FormControl>
-          <Input type="url" placeholder="https://your-app.com/webhook" v-bind="componentField" />
+          <Input
+            type="url"
+            :placeholder="
+              isDiscord
+                ? 'https://discord.com/api/webhooks/…'
+                : 'https://your-app.com/webhook'
+            "
+            v-bind="componentField"
+          />
         </FormControl>
+        <FormDescription v-if="isDiscord">
+          {{ $t('admin.webhook.discord.description') }}
+        </FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -76,7 +108,7 @@
       </FormItem>
     </FormField>
 
-    <FormField v-slot="{ componentField }" name="secret">
+    <FormField v-if="!isDiscord" v-slot="{ componentField }" name="secret">
       <FormItem>
         <FormLabel>{{ $t('globals.terms.secret') }}</FormLabel>
         <FormControl>
@@ -93,10 +125,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Label } from '@shared-ui/components/ui/label'
 import { useI18n } from 'vue-i18n'
+import { useFieldValue } from 'vee-validate'
 import {
   FormControl,
   FormField,
@@ -106,6 +139,14 @@ import {
   FormDescription
 } from '@shared-ui/components/ui/form'
 import { Input } from '@shared-ui/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@shared-ui/components/ui/select'
 
 defineProps({
   form: {
@@ -118,6 +159,8 @@ defineProps({
 })
 
 const { t } = useI18n()
+const delivery = useFieldValue('delivery')
+const isDiscord = computed(() => delivery.value === 'discord')
 
 const webhookEvents = ref([
   {

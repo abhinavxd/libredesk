@@ -219,7 +219,7 @@ func main() {
 		inbox                       = initInbox(db, i18n)
 		team                        = initTeam(db, i18n)
 		businessHours               = initBusinessHours(db, i18n)
-		webhook                     = initWebhook(db, i18n)
+		webhook                     = initWebhook(db, i18n, settings)
 		user                        = initUser(i18n, db)
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()

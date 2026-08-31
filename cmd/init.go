@@ -1054,7 +1054,7 @@ func initContextLink(db *sqlx.DB, i18n *i18n.I18n) *contextlink.Manager {
 }
 
 // initWebhook inits webhook manager.
-func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
+func initWebhook(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *webhook.Manager {
 	var lo = initLogger("webhook")
 	m, err := webhook.New(webhook.Opts{
 		DB:            db,
@@ -1065,6 +1065,13 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
 		AllowedHosts:  ko.Strings("webhook.allowed_hosts"),
+		RootURL: func() string {
+			rootURL, err := settings.GetAppRootURL()
+			if err != nil || rootURL == "" {
+				return ko.String("app.root_url")
+			}
+			return rootURL
+		},
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)
