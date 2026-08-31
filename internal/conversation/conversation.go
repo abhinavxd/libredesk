@@ -1,4 +1,3 @@
-// Package conversation manages conversations and messages.
 package conversation
 
 import (
@@ -182,7 +181,7 @@ type mediaStore interface {
 	GetDraftInlineMedia(uuid string, conversationID int) (mmodels.Media, error)
 	ContentIDExists(contentID, conversationUUID string) (bool, string, error)
 	Upload(fileName, contentType string, content io.ReadSeeker) (string, string, error)
-	UploadAndInsert(fileName, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (mmodels.Media, error)
+	UploadAndInsert(fileName, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool, uploaderID int) (mmodels.Media, error)
 }
 
 type inboxStore interface {
@@ -2271,3 +2270,4 @@ func renderTagFilter(operator, value string, paramIndex int) (string, []any, err
 		return "", nil, fmt.Errorf("invalid operator for tags: %s", operator)
 	}
 }
+

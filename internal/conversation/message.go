@@ -1166,7 +1166,8 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
-			true,          /** private **/
+			true, /** private **/
+			0,    /** uploaderID: 0 = system/email-ingested, stored as NULL **/
 		)
 		if err != nil {
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
@@ -1551,3 +1552,4 @@ func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) stri
 	addr.Name = name
 	return addr.String()
 }
+

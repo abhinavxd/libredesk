@@ -37,6 +37,7 @@ type Media struct {
 	Size        int             `db:"size" json:"size"`
 	Meta        json.RawMessage `db:"meta" json:"meta"`
 	Private     bool            `db:"private" json:"private"`
+	UploadedBy  null.Int        `db:"uploaded_by" json:"-"`
 
 	// Pseudo fields
 	URL     string `json:"url"`

@@ -853,7 +853,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 
 	// Get media for the attachment ids, skip any already associated with a model.
-	media, err := getUnassociatedMedia(app, req.Attachments)
+	media, err := getUnassociatedMedia(app, req.Attachments, auser.ID)
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}

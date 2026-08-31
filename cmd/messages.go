@@ -240,7 +240,7 @@ func handleSendMessage(r *fastglue.Request) error {
 	}
 
 	// Get media for all attachments, skip any already associated with a model.
-	media, err := getUnassociatedMedia(app, req.Attachments)
+	media, err := getUnassociatedMedia(app, req.Attachments, auser.ID)
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
