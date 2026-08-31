@@ -1,37 +1,38 @@
 <template>
-  <template v-if="!isSearchRoute">
-    <!-- Mobile: one panel at a time (list OR conversation detail) -->
-    <div v-if="isMobile" class="h-full w-full min-h-0">
-      <ConversationList v-if="!hasOpenConversation" class="h-full" />
-      <router-view v-else v-slot="{ Component }">
+  <ResizablePanelGroup
+    v-if="!isSearchRoute && !isMobile"
+    direction="horizontal"
+    class="h-full w-full min-h-0"
+    @layout="onLayoutChange"
+  >
+    <!-- Conversation List Panel -->
+    <ResizablePanel :default-size="panelSizes[0]" :min-size="20" :max-size="45">
+      <ConversationList />
+    </ResizablePanel>
+
+    <ResizableHandle />
+
+    <!-- Conversation Detail Panel -->
+    <ResizablePanel :default-size="panelSizes[1]" :min-size="30">
+      <router-view v-slot="{ Component }">
+        <keep-alive>
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
+    </ResizablePanel>
+  </ResizablePanelGroup>
+
+  <!-- v-show, not v-if: the list keeps its scroll position. -->
+  <div v-else-if="!isSearchRoute" class="h-full w-full min-h-0">
+    <ConversationList v-show="isListRoute" />
+    <div v-show="!isListRoute" class="h-full">
+      <router-view v-slot="{ Component }">
         <keep-alive>
           <component :is="Component" />
         </keep-alive>
       </router-view>
     </div>
-
-    <!-- Desktop: resizable split view -->
-    <ResizablePanelGroup
-      v-else
-      direction="horizontal"
-      class="h-full w-full min-h-0"
-      @layout="onLayoutChange"
-    >
-      <ResizablePanel :default-size="panelSizes[0]" :min-size="20" :max-size="45">
-        <ConversationList />
-      </ResizablePanel>
-
-      <ResizableHandle />
-
-      <ResizablePanel :default-size="panelSizes[1]" :min-size="30">
-        <router-view v-slot="{ Component }">
-          <keep-alive>
-            <component :is="Component" />
-          </keep-alive>
-        </router-view>
-      </ResizablePanel>
-    </ResizablePanelGroup>
-  </template>
+  </div>
 </template>
 
 <script setup>
@@ -51,7 +52,7 @@ defineOptions({ name: 'InboxLayout' })
 const route = useRoute()
 const isMobile = useIsMobileLayout()
 const isSearchRoute = computed(() => route.name === 'search')
-const hasOpenConversation = computed(() => Boolean(route.params.uuid))
+const isListRoute = computed(() => !String(route.name).endsWith('-conversation'))
 
 const panelSizes = useStorage('inboxPanelSizes', [25, 75])
 

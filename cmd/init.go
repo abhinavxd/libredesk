@@ -15,6 +15,7 @@ import (
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
 	"github.com/abhinavxd/libredesk/internal/ai"
+	"github.com/abhinavxd/libredesk/internal/aiagent"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	"github.com/abhinavxd/libredesk/internal/autoassigner"
@@ -27,6 +28,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
@@ -45,6 +47,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/sla"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
@@ -67,6 +70,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	flag "github.com/spf13/pflag"
 	"github.com/volatiletech/null/v9"
+	goredis "github.com/zerodha/fastcache/stores/goredis/v9"
+	"github.com/zerodha/fastcache/v4"
 	"github.com/zerodha/logf"
 )
 
@@ -203,7 +208,7 @@ func initFS(staticDir string) stuffbin.FileSystem {
 		// Only include paths that exist in the custom dir.
 		var sf []string
 		for _, def := range staticFiles {
-			src := strings.Split(def, ":")[0]
+			src, _, _ := strings.Cut(def, ":")
 			if _, err := os.Stat(filepath.Join(staticDir, src)); err == nil {
 				sf = append(sf, def)
 			}
@@ -243,7 +248,7 @@ func loadSettings(m *setting.Manager) {
 
 	// Setting keys are dot separated, eg: app.favicon_url. Unflatten them into
 	// nested maps {app: {favicon_url}}.
-	var out map[string]interface{}
+	var out map[string]any
 
 	if err := json.Unmarshal(j, &out); err != nil {
 		log.Fatalf("error unmarshalling settings from DB: %v", err)
@@ -425,13 +430,13 @@ func getCustomStaticDir() string {
 func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *i18n.I18n) *tmpl.Manager {
 	var (
 		lo      = initLogger("template")
-		funcMap = getTmplFuncs(consts, i18n)
+		funcMap = getTmplFuncs(consts, i18n, fs)
 	)
 	tpls, err := stuffbin.ParseTemplatesGlob(funcMap, fs, "/static/email-templates/*.html")
 	if err != nil {
 		log.Fatalf("error parsing e-mail templates: %v", err)
 	}
-	webTpls, err := stuffbin.ParseTemplatesGlob(funcMap, fs, "/static/public/web-templates/*.html")
+	webTpls, err := parseWebTemplates(funcMap, fs)
 	if err != nil {
 		log.Fatalf("error parsing web templates: %v", err)
 	}
@@ -444,13 +449,20 @@ func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *
 }
 
 // getTmplFuncs returns the template functions.
-func getTmplFuncs(consts *constants, i18n *i18n.I18n) template.FuncMap {
+func getTmplFuncs(consts *constants, i18n *i18n.I18n, fs stuffbin.FileSystem) template.FuncMap {
+	lucideIcons := loadLucideIcons(fs)
 	return template.FuncMap{
+		"LucideIcon": func(name string) template.HTML {
+			return lucideIcons[name]
+		},
 		"RootURL": func() string {
 			return consts.AppBaseURL
 		},
 		"FaviconURL": func() string {
 			return consts.FaviconURL
+		},
+		"AssetVer": func() string {
+			return assetVersion
 		},
 		"Date": func(layout string) string {
 			if layout == "" {
@@ -473,8 +485,22 @@ func getTmplFuncs(consts *constants, i18n *i18n.I18n) template.FuncMap {
 		"SiteName": func() string {
 			return consts.SiteName
 		},
-		"L": func() interface{} {
+		"L": func() any {
 			return i18n
+		},
+		"map": func(pairs ...any) (map[string]any, error) {
+			if len(pairs)%2 != 0 {
+				return nil, fmt.Errorf("map: odd number of arguments")
+			}
+			out := make(map[string]any, len(pairs)/2)
+			for i := 0; i < len(pairs); i += 2 {
+				key, ok := pairs[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("map: key %v is not a string", pairs[i])
+				}
+				out[key] = pairs[i+1]
+			}
+			return out, nil
 		},
 	}
 }
@@ -487,7 +513,7 @@ func reloadSettings(app *App) error {
 		app.lo.Error("error parsing settings from DB", "error", err)
 		return err
 	}
-	var out map[string]interface{}
+	var out map[string]any
 	if err := json.Unmarshal(j, &out); err != nil {
 		app.lo.Error("error unmarshalling settings from DB", "error", err)
 		return err
@@ -507,19 +533,35 @@ func reloadSettings(app *App) error {
 // reloadTemplates reloads the templates from the filesystem.
 func reloadTemplates(app *App) error {
 	app.lo.Info("reloading templates")
-	funcMap := getTmplFuncs(app.consts.Load().(*constants), app.i18n)
+	funcMap := getTmplFuncs(app.consts.Load().(*constants), app.i18n, app.fs)
 	tpls, err := stuffbin.ParseTemplatesGlob(funcMap, app.fs, "/static/email-templates/*.html")
 	if err != nil {
 		app.lo.Error("error parsing email templates", "error", err)
 		return err
 	}
-	webTpls, err := stuffbin.ParseTemplatesGlob(funcMap, app.fs, "/static/public/web-templates/*.html")
+	webTpls, err := parseWebTemplates(funcMap, app.fs)
 	if err != nil {
 		app.lo.Error("error parsing web templates", "error", err)
 		return err
 	}
 
 	return app.tmpl.Reload(webTpls, tpls, funcMap)
+}
+
+// parseWebTemplates parses the top-level web templates and the per-template help center pages.
+func parseWebTemplates(funcMap template.FuncMap, fs stuffbin.FileSystem) (*template.Template, error) {
+	var paths []string
+	for _, pattern := range []string{
+		"/static/public/web-templates/*.html",
+		"/static/public/web-templates/help/*/*.html",
+	} {
+		p, err := fs.Glob(pattern)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p...)
+	}
+	return stuffbin.ParseTemplates(funcMap, fs, paths...)
 }
 
 // initTeam inits team manager.
@@ -543,6 +585,14 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 		err   error
 		lo    = initLogger("media")
 	)
+	rootURL := func() string {
+		u, err := settings.GetAppRootURL()
+		if err != nil {
+			// Fallback to config if settings fetch fails
+			return ko.String("app.root_url")
+		}
+		return u
+	}
 	switch s := ko.MustString("upload.provider"); s {
 	case "s3":
 		store, err = s3.New(s3.Opt{
@@ -567,16 +617,9 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 			fsExpiry = 1 * time.Hour
 		}
 		store, err = fs.New(fs.Opts{
-			UploadURI:  "/uploads",
+			UploadURI:  media.PublicURI,
 			UploadPath: filepath.Clean(ko.String("upload.fs.upload_path")),
-			RootURL: func() string {
-				rootURL, err := settings.GetAppRootURL()
-				if err != nil {
-					// Fallback to config if settings fetch fails
-					return ko.String("app.root_url")
-				}
-				return rootURL
-			},
+			RootURL:    rootURL,
 			SigningKey: ko.MustString("app.encryption_key"),
 			Expiry:     fsExpiry,
 		})
@@ -588,10 +631,11 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 	}
 
 	media, err := media.New(media.Opts{
-		Store: store,
-		Lo:    lo,
-		DB:    db,
-		I18n:  i18n,
+		Store:   store,
+		Lo:      lo,
+		DB:      db,
+		I18n:    i18n,
+		RootURL: rootURL,
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)
@@ -795,8 +839,14 @@ func initAuthz(i18n *i18n.I18n) *authz.Enforcer {
 	return enforcer
 }
 
+// initSSRFControl builds the shared outbound-request guard from config.
+func initSSRFControl() ssrf.Control {
+	lo := initLogger("ssrf")
+	return ssrf.NewControl(ko.Bool("ssrf.enabled"), ko.Strings("ssrf.allowed_cidrs"), lo)
+}
+
 // initAuth initializes the authentication manager.
-func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n) *auth_.Auth {
+func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n, dialControl ssrf.Control) *auth_.Auth {
 	lo := initLogger("auth")
 
 	providers, err := buildProviders(o)
@@ -806,7 +856,7 @@ func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n) *auth_.Auth {
 
 	secure := !ko.Bool("app.server.disable_secure_cookies")
 	sessionLifetime := ko.Duration("app.server.session_lifetime")
-	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure, SessionLifetime: sessionLifetime}, i18n, rd, lo)
+	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure, SessionLifetime: sessionLifetime}, i18n, rd, lo, dialControl)
 	if err != nil {
 		log.Fatalf("error initializing auth: %v", err)
 	}
@@ -819,7 +869,8 @@ func reloadAuth(app *App) error {
 	app.lo.Info("reloading auth manager")
 	providers, err := buildProviders(app.oidc)
 	if err != nil {
-		log.Fatalf("error reloading auth: %v", err)
+		app.lo.Error("error reloading auth", "error", err)
+		return err
 	}
 	if err := app.auth.Reload(auth_.Config{Providers: providers}); err != nil {
 		app.lo.Error("error reloading auth", "error", err)
@@ -844,7 +895,7 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 			ID:           config.ID,
 			Provider:     config.Provider,
 			ProviderURL:  config.ProviderURL,
-			RedirectURL:  config.RedirectURI,
+			RedirectURL:  func() (string, error) { return o.RedirectURL(config.ID) },
 			ClientID:     config.ClientID,
 			ClientSecret: config.ClientSecret,
 		})
@@ -869,13 +920,12 @@ func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Man
 
 // initI18n inits i18n.
 func initI18n(fs stuffbin.FileSystem) *i18n.I18n {
-	fileName := cmp.Or(ko.String("app.lang"), defLang)
-	log.Printf("loading i18n language file: %s", fileName)
-	file, err := fs.Get("i18n/" + fileName + ".json")
-	if err != nil {
-		log.Fatalf("error reading i18n language file `%s` : %v", fileName, err)
+	lang := cmp.Or(ko.String("app.lang"), defLang)
+	log.Printf("loading i18n language file: %s", lang)
+	if _, err := fs.Read("/i18n/" + lang + ".json"); err != nil {
+		log.Fatalf("error reading i18n language file `%s` : %v", lang, err)
 	}
-	i18n, err := i18n.New(file.ReadBytes())
+	i18n, err := loadI18nLang(lang, fs)
 	if err != nil {
 		log.Fatalf("error initializing i18n: %v", err)
 	}
@@ -900,6 +950,10 @@ func initRedis() *redis.Client {
 		Password: ko.String("redis.password"),
 		DB:       ko.Int("redis.db"),
 	})
+}
+
+func initFastCache(rdb *redis.Client) *fastcache.FastCache {
+	return fastcache.New(goredis.New(goredis.Config{Prefix: fastCachePrefix}, rdb))
 }
 
 // initRedis inits postgres DB.
@@ -968,16 +1022,48 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(db *sqlx.DB, i18n *i18n.I18n) *ai.Manager {
+func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
+		Ctx:           ctx,
 		DB:            db,
 		Lo:            lo,
 		I18n:          i18n,
 		EncryptionKey: ko.MustString("app.encryption_key"),
+		DialControl:   dialControl,
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)
+	}
+	return m
+}
+
+// initHelpCenter inits the help center manager.
+func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleIndexer) *helpcenter.Manager {
+	m, err := helpcenter.New(helpcenter.Opts{
+		DB:      db,
+		Lo:      initLogger("helpcenter"),
+		I18n:    i18n,
+		Indexer: indexer,
+	})
+	if err != nil {
+		log.Fatalf("error initializing help center manager: %v", err)
+	}
+	return m
+}
+
+// initAIAgent inits the autonomous AI agent manager.
+func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
+	m, err := aiagent.New(aiagent.Opts{
+		DB:                 db,
+		Lo:                 initLogger("ai_agent"),
+		I18n:               i18n,
+		QueueSize:          cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
+		MaxSteps:           min(max(cmp.Or(ko.Int("ai_agent.max_steps"), 6), 1), 20),
+		MaxHistoryMessages: min(max(cmp.Or(ko.Int("ai_agent.max_history_messages"), 30), 5), 100),
+	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
+	if err != nil {
+		log.Fatalf("error initializing AI agent manager: %v", err)
 	}
 	return m
 }
@@ -1054,7 +1140,7 @@ func initContextLink(db *sqlx.DB, i18n *i18n.I18n) *contextlink.Manager {
 }
 
 // initWebhook inits webhook manager.
-func initWebhook(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *webhook.Manager {
+func initWebhook(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager, dialControl ssrf.Control) *webhook.Manager {
 	var lo = initLogger("webhook")
 	m, err := webhook.New(webhook.Opts{
 		DB:            db,
@@ -1064,7 +1150,7 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *webho
 		QueueSize:     ko.MustInt("webhook.queue_size"),
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
-		AllowedHosts:  ko.Strings("webhook.allowed_hosts"),
+		DialControl:   dialControl,
 		RootURL: func() string {
 			rootURL, err := settings.GetAppRootURL()
 			if err != nil || rootURL == "" {
@@ -1162,6 +1248,7 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 		{"widget", 100},
 		{"auth", 30},
 		{"public", 100},
+		{"media", 300},
 	}
 
 	for _, d := range defaults {

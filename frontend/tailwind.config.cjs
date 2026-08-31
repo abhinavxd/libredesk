@@ -1,5 +1,9 @@
 const animate = require("tailwindcss-animate")
 const typography = require("@tailwindcss/typography")
+const plugin = require("tailwindcss/plugin")
+const defaultTheme = require("tailwindcss/defaultTheme")
+
+const canHover = plugin(({ addVariant }) => addVariant("can-hover", "@media (hover: hover)"))
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -23,6 +27,9 @@ module.exports = {
       }
     },
     extend: {
+      fontFamily: {
+        sans: ['Geist', ...defaultTheme.fontFamily.sans]
+      },
       height: {
         screen: '100dvh'
       },
@@ -35,6 +42,7 @@ module.exports = {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        'foreground-lighter': 'hsl(var(--foreground-lighter))',
         sidebar: {
           DEFAULT: 'hsl(var(--sidebar-background))',
           foreground: 'hsl(var(--sidebar-foreground))',
@@ -57,6 +65,16 @@ module.exports = {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))'
         },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))'
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+          600: 'hsl(var(--warning-600))'
+        },
+        link: 'hsl(var(--link))',
         muted: {
           DEFAULT: 'hsl(var(--muted))',
           foreground: 'hsl(var(--muted-foreground))'
@@ -207,5 +225,5 @@ module.exports = {
       }
     }
   },
-  plugins: [animate, typography],
+  plugins: [animate, typography, canHover],
 }

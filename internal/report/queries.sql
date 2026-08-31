@@ -1,79 +1,78 @@
 -- name: get-overview-counts
-SELECT
-    json_build_object(
-        'open',
-        COUNT(*),
-        'awaiting_response',
-        COUNT(
-            CASE
-                WHEN c.last_message_sender = 'contact' THEN 1
-            END
-        ),
-        'unassigned',
-        COUNT(
-            CASE
-                WHEN c.assigned_user_id IS NULL THEN 1
-            END
-        ),
-        'pending',
-        COUNT(
-            CASE
-                WHEN c.first_reply_at IS NULL THEN 1
-            END
-        ),
-        'agents_online',
-        (
-            SELECT
-                COUNT(*)
-            FROM
-                users
+WITH convs AS (
+    SELECT
+        COUNT(*) AS open,
+        COUNT(*) FILTER (
+            WHERE
+                c.last_message_sender = 'contact'
+        ) AS awaiting_response,
+        COUNT(*) FILTER (
+            WHERE
+                c.assigned_user_id IS NULL
+        ) AS unassigned,
+        COUNT(*) FILTER (
+            WHERE
+                c.first_reply_at IS NULL
+        ) AS pending
+    FROM
+        conversations c
+        INNER JOIN conversation_statuses s ON c.status_id = s.id
+    WHERE
+        s.category != 'resolved'
+),
+agents AS (
+    SELECT
+        COUNT(*) FILTER (
             WHERE
                 availability_status = 'online'
-                AND type = 'agent'
-                AND deleted_at is null
-        ),
-        'agents_away',
-        (
-            SELECT
-                COUNT(*)
-            FROM
-                users
+        ) AS agents_online,
+        COUNT(*) FILTER (
             WHERE
                 availability_status = 'away_manual'
-                AND type = 'agent'
-                AND deleted_at is null
-        ),
-        'agents_reassigning',
-        (
-            SELECT
-                COUNT(*)
-            FROM
-                users
+        ) AS agents_away,
+        COUNT(*) FILTER (
             WHERE
                 availability_status = 'away_and_reassigning'
-                AND type = 'agent'
-                AND deleted_at is null
-        ),
-        'agents_offline',
-        (
-            SELECT
-                COUNT(*)
-            FROM
-                users
+        ) AS agents_reassigning,
+        COUNT(*) FILTER (
             WHERE
-                availability_status = 'offline'
-                AND type = 'agent'
-                AND deleted_at is null
-        )
+                availability_status IN ('offline', 'away')
+        ) AS agents_offline
+    FROM
+        users
+    WHERE
+        type = 'agent'
+        AND deleted_at IS NULL
+)
+SELECT
+    json_build_object(
+        'open', open,
+        'awaiting_response', awaiting_response,
+        'unassigned', unassigned,
+        'pending', pending,
+        'agents_online', agents_online,
+        'agents_away', agents_away,
+        'agents_reassigning', agents_reassigning,
+        'agents_offline', agents_offline
     )
 FROM
-    conversations c
-    INNER JOIN conversation_statuses s ON c.status_id = s.id
-WHERE
-    s.category != 'resolved';
+    convs,
+    agents;
 
 -- name: get-overview-sla-counts
-WITH first_and_resolution AS (
+-- Count only each conversation's latest applied SLA; superseded rows are kept as history and would double-count.
+WITH latest_applied AS (
+    SELECT DISTINCT ON (conversation_id)
+        created_at, first_response_met_at, first_response_breached_at,
+        resolution_met_at, resolution_breached_at
+    FROM applied_slas
+    WHERE created_at >= CASE
+        WHEN %d = 0 THEN CURRENT_DATE
+        ELSE NOW() - INTERVAL '%d days'
+    END
+    ORDER BY conversation_id, created_at DESC, id DESC
+),
+first_and_resolution AS (
     SELECT
         COUNT(*) FILTER (
             WHERE
@@ -118,22 +117,19 @@ WITH first_and_resolution AS (
             0
         ) AS avg_resolution_time_sec
     FROM
-        applied_slas
-    WHERE
-        created_at >= CASE
-            WHEN %d = 0 THEN CURRENT_DATE
-            ELSE NOW() - INTERVAL '%d days'
-        END
+        latest_applied
 ),
 next_response AS (
+    -- A reply after the deadline carries both met_at and breached_at, so counting the
+    -- timestamps puts one event in both buckets. status holds a single terminal verdict.
     SELECT
         COUNT(*) FILTER (
             WHERE
-                met_at IS NOT NULL
+                status = 'met'
         ) AS next_response_met_count,
         COUNT(*) FILTER (
             WHERE
-                breached_at IS NOT NULL
+                status = 'breached'
         ) AS next_response_breached_count,
         COALESCE(
             AVG(
@@ -144,7 +140,7 @@ next_response AS (
                 )
             ) FILTER (
                 WHERE
-                    met_at IS NOT NULL
+                    status = 'met'
             ),
             0
         ) AS avg_next_response_time_sec
@@ -219,8 +215,7 @@ resolved_conversations AS (
             FROM
                 conversations c
             WHERE
-                c.resolved_at IS NOT NULL
-                AND c.created_at >= CASE
+                c.resolved_at >= CASE
                     WHEN %d = 0 THEN CURRENT_DATE
                     ELSE NOW() - INTERVAL '%d days'
                 END
@@ -273,20 +268,33 @@ WHERE
     END;
 
 -- name: get-overview-message-volume
-WITH stats AS (
+WITH per_conversation AS (
     SELECT
+        conversation_id,
         COUNT(*) AS total,
         COUNT(*) FILTER (WHERE type = 'incoming') AS incoming,
-        COUNT(*) FILTER (WHERE type = 'outgoing') AS outgoing,
-        COUNT(DISTINCT conversation_id) AS convos
+        COUNT(*) FILTER (WHERE type = 'outgoing') AS outgoing
     FROM
         conversation_messages
     WHERE
         type IN ('incoming', 'outgoing')
+        AND private = false
+        AND (type = 'incoming' OR status = 'sent')
         AND created_at >= CASE
             WHEN %d = 0 THEN CURRENT_DATE
             ELSE NOW() - INTERVAL '%d days'
         END
+    GROUP BY
+        conversation_id
+),
+stats AS (
+    SELECT
+        COALESCE(SUM(total), 0) AS total,
+        COALESCE(SUM(incoming), 0) AS incoming,
+        COALESCE(SUM(outgoing), 0) AS outgoing,
+        COUNT(*) AS convos
+    FROM
+        per_conversation
 )
 SELECT
     json_build_object(
@@ -307,37 +315,30 @@ WITH tag_counts AS (
     SELECT
         t.id AS tag_id,
         t.name AS tag_name,
-        COUNT(ct.conversation_id) AS count
+        COUNT(c.id) AS count
     FROM
         tags t
         LEFT JOIN conversation_tags ct ON t.id = ct.tag_id
         LEFT JOIN conversations c ON ct.conversation_id = c.id
-    WHERE
-        c.created_at >= CASE
-            WHEN %d = 0 THEN CURRENT_DATE
-            ELSE NOW() - INTERVAL '%d days'
-        END
-        OR c.id IS NULL
+            AND c.created_at >= CASE
+                WHEN %d = 0 THEN CURRENT_DATE
+                ELSE NOW() - INTERVAL '%d days'
+            END
     GROUP BY
         t.id, t.name
     ORDER BY
-        count DESC
+        count DESC, t.id
     LIMIT 10
 ),
 tagging AS (
     SELECT
-        COUNT(DISTINCT c.id) FILTER (
+        COUNT(*) AS total,
+        COUNT(*) FILTER (
             WHERE EXISTS (
                 SELECT 1 FROM conversation_tags ct
                 WHERE ct.conversation_id = c.id
             )
-        ) AS tagged,
-        COUNT(DISTINCT c.id) FILTER (
-            WHERE NOT EXISTS (
-                SELECT 1 FROM conversation_tags ct
-                WHERE ct.conversation_id = c.id
-            )
-        ) AS untagged
+        ) AS tagged
     FROM
         conversations c
     WHERE
@@ -351,11 +352,11 @@ SELECT
         'top_tags',
         COALESCE((SELECT json_agg(row_to_json(tc)) FROM tag_counts tc), '[]'::json),
         'tagged_conversations', tagged,
-        'untagged_conversations', untagged,
+        'untagged_conversations', total - tagged,
         'tagged_percentage',
         CASE
-            WHEN (tagged + untagged) > 0
-            THEN ROUND((tagged::numeric / (tagged + untagged)::numeric) * 100, 1)
+            WHEN total > 0
+            THEN ROUND((tagged::numeric / total::numeric) * 100, 1)
             ELSE 0
         END
     ) AS result

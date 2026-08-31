@@ -1,0 +1,17 @@
+{{ define "docs-help-notfound" }}
+{{ template "docs-header" . }}
+
+<section class="hcd-notfound">
+    <p class="hcd-code">{{ .Data.ErrorCode }}</p>
+    <h1>{{ .Data.ErrorTitle }}</h1>
+    <p>{{ .Data.ErrorText }}</p>
+    <a class="hcd-notfound-search" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open>
+        {{ template "hc-search-icon" }}
+        <span>{{ .L.T "helpCenter.searchPlaceholder" }}</span>
+        <span class="hcd-kbd-combo" aria-hidden="true"><kbd class="hcd-kbd hcd-kbd-mod">Ctrl</kbd><kbd class="hcd-kbd">K</kbd></span>
+    </a>
+    <p><a class="hcd-back" href="{{ .Data.HelpCenter.BasePath }}">{{ .L.T "helpCenter.backToHelpCenter" }}</a></p>
+</section>
+
+{{ template "docs-footer" . }}
+{{ end }}

@@ -140,15 +140,21 @@ const orderByField = ref('users.created_at')
 const orderByDirection = ref('desc')
 const total = ref(0)
 const emitter = useEmitter()
+let fetchRequestId = 0
 
 const fetchContactsDebounced = useDebounceFn(() => {
-  fetchContacts()
+  if (page.value === 1) {
+    fetchContacts()
+  } else {
+    page.value = 1
+  }
 }, 300)
 
 const fetchContacts = async () => {
+  const requestId = ++fetchRequestId
   loading.value = true
   let filterJSON = ''
-  if (searchTerm.value && searchTerm.value.length > 3) {
+  if (searchTerm.value && searchTerm.value.length >= 3) {
     filterJSON = JSON.stringify([
       {
         model: 'users',
@@ -166,16 +172,18 @@ const fetchContacts = async () => {
       order: orderByDirection.value,
       order_by: orderByField.value
     })
+    if (requestId !== fetchRequestId) return
     contacts.value = response.data.data.results
     totalPages.value = response.data.data.total_pages
     total.value = response.data.data.total
   } catch (error) {
+    if (requestId !== fetchRequestId) return
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
   } finally {
-    loading.value = false
+    if (requestId === fetchRequestId) loading.value = false
   }
 }
 

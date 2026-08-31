@@ -53,16 +53,16 @@
           <span class="sidebar-value break-all" v-if="attribute.data_type !== 'checkbox'">
             {{ customAttributes?.[attribute.key] ?? '-' }}
           </span>
-          <div class="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 flex-shrink-0">
+          <div class="flex items-center gap-0.5 transition-opacity duration-200 flex-shrink-0 can-hover:opacity-0 can-hover:group-hover/item:opacity-100">
             <button
-              class="p-1 rounded hover:bg-muted cursor-pointer transition-colors"
+              class="p-1 rounded-md hover:bg-muted cursor-pointer transition-colors"
               @click="startEditing(attribute)"
             >
               <Pencil size="12" class="text-muted-foreground" />
             </button>
             <button
               v-if="customAttributes?.[attribute.key]"
-              class="p-1 rounded hover:bg-destructive/10 cursor-pointer transition-colors"
+              class="p-1 rounded-md hover:bg-destructive/10 cursor-pointer transition-colors"
               @click="deleteAttribute(attribute)"
             >
               <Trash2 size="12" class="text-muted-foreground hover:text-destructive" />

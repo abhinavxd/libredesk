@@ -1,0 +1,36 @@
+{{ define "docs-help-article" }}
+{{ template "docs-header" . }}
+
+{{ template "docs-breadcrumb" (map "L" .L "Data" .Data "Collection" .Data.Collection "Current" .Data.Article.Title) }}
+
+<article class="hc-article hcd-article">
+    <h1>{{ .Data.Article.Title }}</h1>
+    {{ if .Data.Article.Excerpt }}<p class="hcd-lead">{{ .Data.Article.Excerpt }}</p>{{ end }}
+    {{ $showAuthor := and .Data.HelpCenter.Theme.Article.ShowAuthor .Data.Article.AuthorName }}
+    <div class="hcd-meta{{ if $showAuthor }} hcd-meta-byline{{ end }}">
+        {{ if $showAuthor }}
+        {{ if .Data.Article.AuthorAvatar }}<img class="hc-avatar hcd-byline-avatar" src="{{ .Data.Article.AuthorAvatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial hcd-byline-avatar">{{ .Data.AuthorInitial }}</span>{{ end }}
+        {{ end }}
+        <span>{{ if $showAuthor }}<span class="hcd-author">{{ .Data.Article.AuthorName }}</span> &middot; {{ end }}{{ .L.T "globals.terms.lastUpdated" }} <time class="hc-date" datetime="{{ .Data.ModifiedTime }}">{{ .Data.Article.UpdatedAt.Format "Jan 2, 2006" }}</time></span>
+    </div>
+    <div class="hc-article-body hcd-article-body">
+        {{ template "hc-article-toc" . }}
+        <div class="hc-prose" id="hc-prose">{{ .Data.Content }}</div>
+    </div>
+</article>
+
+<div class="hcd-article-foot">
+    {{ template "hc-helpful" . }}
+
+    {{ if and .Data.Related (not .Data.HelpCenter.Theme.Article.HideRelated) }}
+    <aside class="hcd-related">
+        <h2>{{ .L.T "helpCenter.relatedArticles" }}</h2>
+        {{ template "docs-article-rows" (map "Articles" .Data.Related "Base" .Data.HelpCenter.BasePath) }}
+    </aside>
+    {{ end }}
+</div>
+
+{{ template "hc-article-behavior" . }}
+
+{{ template "docs-footer" . }}
+{{ end }}

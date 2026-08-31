@@ -10,5 +10,6 @@ export const EMITTER_EVENTS = {
     OPEN_VIEW_FORM: 'open-view-form',
     OPEN_CREATE_CONVERSATION: 'open-create-conversation',
     CONVERSATION_SUBMIT_AS: 'conversation-submit-as',
-    CONVERSATION_SUBMITTED: 'conversation-submitted'
+    CONVERSATION_SUBMITTED: 'conversation-submitted',
+    COPILOT_INSERT_REPLY: 'copilot-insert-reply'
 }

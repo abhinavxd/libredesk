@@ -5,6 +5,7 @@ package s3
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -96,7 +97,7 @@ func (c *Client) GetURL(name string, disposition, fileName string) string {
 			Method:                     "GET",
 			Timestamp:                  time.Now(),
 			ExpirySeconds:              int(c.opts.Expiry.Seconds()),
-			ResponseContentDisposition: fmt.Sprintf("%s; filename=\"%s\"", disposition, fileName),
+			ResponseContentDisposition: mime.FormatMediaType(disposition, map[string]string{"filename": fileName}),
 		})
 		return u
 	}

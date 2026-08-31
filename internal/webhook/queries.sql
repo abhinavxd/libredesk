@@ -1,3 +1,6 @@
+-- name: get-webhooks-compact
+SELECT id, name FROM webhooks ORDER BY name;
+
 -- name: get-all-webhooks
 SELECT
     id,
@@ -8,7 +11,10 @@ SELECT
     events,
     secret,
     is_active,
-    delivery
+    delivery,
+    inbox_ids,
+    team_ids,
+    user_ids
 FROM
     webhooks
 ORDER BY created_at DESC;
@@ -23,7 +29,10 @@ SELECT
     events,
     secret,
     is_active,
-    delivery
+    delivery,
+    inbox_ids,
+    team_ids,
+    user_ids
 FROM
     webhooks
 WHERE
@@ -47,7 +56,10 @@ SELECT
     events,
     secret,
     is_active,
-    delivery
+    delivery,
+    inbox_ids,
+    team_ids,
+    user_ids
 FROM
     webhooks
 WHERE
@@ -64,7 +76,10 @@ SELECT
     events,
     secret,
     is_active,
-    delivery
+    delivery,
+    inbox_ids,
+    team_ids,
+    user_ids
 FROM
     webhooks
 WHERE
@@ -73,9 +88,9 @@ WHERE
 
 -- name: insert-webhook
 INSERT INTO
-    webhooks (name, url, events, secret, is_active, delivery)
+    webhooks (name, url, events, secret, is_active, delivery, inbox_ids, team_ids, user_ids)
 VALUES
-    ($1, $2, $3, $4, $5, $6)
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: update-webhook
@@ -88,6 +103,9 @@ SET
     secret = $5,
     is_active = $6,
     delivery = $7,
+    inbox_ids = $8,
+    team_ids = $9,
+    user_ids = $10,
     updated_at = NOW()
 WHERE
     id = $1

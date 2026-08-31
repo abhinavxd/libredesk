@@ -5,7 +5,9 @@ select
     updated_at,
     name
 from
-    tags;
+    tags
+order by
+    name;
 
 -- name: insert-tag
 INSERT into

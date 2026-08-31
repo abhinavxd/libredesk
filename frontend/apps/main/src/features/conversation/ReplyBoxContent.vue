@@ -6,25 +6,27 @@
       class="flex justify-between items-center"
       :class="{ 'mb-4': !isFullscreen, 'border-b border-border pb-4': isFullscreen }"
     >
-      <Tabs v-model="messageType" class="rounded border">
-        <TabsList class="bg-muted p-1 rounded">
+      <Tabs v-model="messageType" class="rounded-md border">
+        <TabsList class="bg-muted p-1 rounded-md">
           <TabsTrigger
+            v-if="canSendReply"
             value="reply"
-            class="px-3 py-1 rounded transition-colors duration-200"
+            class="px-3 py-1 max-md:py-2.5 rounded-md transition-colors duration-200"
             :class="{ 'bg-background text-foreground': messageType === 'reply' }"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
           <TabsTrigger
+            v-if="canSendPrivateNote"
             value="private_note"
-            class="px-3 py-1 rounded transition-colors duration-200"
+            class="px-3 py-1 max-md:py-2.5 rounded-md transition-colors duration-200"
             :class="{ 'bg-background text-foreground': messageType === 'private_note' }"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <Button class="text-muted-foreground" variant="ghost" @click="toggleFullscreen">
+      <Button class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0" variant="ghost" @click="toggleFullscreen">
         <component :is="isFullscreen ? Minimize2 : Maximize2" />
       </Button>
     </div>
@@ -41,7 +43,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="to"
-            class="flex-grow px-3 py-2 text-sm border rounded focus:ring-2 focus:ring-ring"
+            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
             @blur="validateEmails"
           />
         </div>
@@ -51,7 +53,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="cc"
-            class="flex-grow px-3 py-2 text-sm border rounded focus:ring-2 focus:ring-ring"
+            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
             @blur="validateEmails"
           />
           <Button
@@ -68,7 +70,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="bcc"
-            class="flex-grow px-3 py-2 text-sm border rounded focus:ring-2 focus:ring-ring"
+            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
             @blur="validateEmails"
           />
         </div>
@@ -77,7 +79,7 @@
       <!-- email errors -->
       <div
         v-if="emailErrors.length > 0"
-        class="mb-4 px-2 py-1 bg-destructive/10 border border-destructive text-destructive rounded"
+        class="mb-4 px-2 py-1 bg-destructive/10 border border-destructive text-destructive rounded-md"
       >
         <p v-for="error in emailErrors" :key="error" class="text-sm">{{ error }}</p>
       </div>
@@ -90,14 +92,13 @@
         v-model:htmlContent="htmlContent"
         v-model:textContent="textContent"
         :message-type="messageType"
-        :placeholder="t('editor.hint.full')"
+        :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
         :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
-        :enableDraftReply="messageType === 'reply' && aiPrompts.length > 0"
         :getSuggestions="getSuggestions"
         @aiPromptSelected="handleAiPromptSelected"
         @draftReplyRequested="handleDraftReplyRequested"
@@ -131,12 +132,16 @@
       :handleFileUpload="handleFileUpload"
       :isSending="isSending"
       :enableSend="enableSend"
+      :handleSend="handleSend"
+      :handleSendAndSetStatus="handleSendAndSetStatus"
       :showSendButton="showSendButton"
       :showFormatting="!showSendButton"
       :editorApi="editorRef"
-      :handleSend="handleSend"
-      :handleSendAndSetStatus="handleSendAndSetStatus"
+      :isGenerating="isGenerating"
+      :showGenerateReply="messageType !== 'private_note'"
       @emojiSelect="handleEmojiSelect"
+      @generateReply="$emit('generateReply')"
+      @draftReplyRequested="handleDraftReplyRequested"
     />
   </div>
 </template>
@@ -146,9 +151,10 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { Maximize2, Minimize2 } from 'lucide-vue-next'
-import Editor from '@main/components/editor/TextEditor.vue'
+import Editor from '@main/components/editor/ConversationEditor.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
+import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
@@ -187,7 +193,7 @@ const getSuggestions = async (query) => {
   const q = query.toLowerCase()
 
   const users = usersStore.users
-    .filter((u) => u.enabled)
+    .filter((u) => u.enabled && u.type !== 'ai_assistant')
     .filter((u) => `${u.first_name} ${u.last_name}`.toLowerCase().includes(q))
     .map((u) => ({
       id: u.id,
@@ -243,6 +249,18 @@ const props = defineProps({
   showSendButton: {
     type: Boolean,
     default: true
+  },
+  isGenerating: {
+    type: Boolean,
+    default: false
+  },
+  canSendReply: {
+    type: Boolean,
+    required: true
+  },
+  canSendPrivateNote: {
+    type: Boolean,
+    required: true
   }
 })
 
@@ -255,10 +273,12 @@ const emit = defineEmits([
   'fileDelete',
   'filesDropped',
   'aiPromptSelected',
+  'generateReply',
   'draftReplyRequested'
 ])
 
 const conversationStore = useConversationStore()
+const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)

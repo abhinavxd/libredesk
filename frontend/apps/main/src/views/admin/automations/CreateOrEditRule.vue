@@ -5,8 +5,8 @@
   <LoadingOverlay :loading="isLoading">
     <div class="space-y-4">
       <form @submit="onSubmit">
-        <div class="space-y-5">
-          <div class="space-y-5">
+        <div class="space-y-6">
+          <div class="space-y-6">
             <FormField
               v-slot="{ value, handleChange }"
               type="checkbox"
@@ -95,7 +95,9 @@
             </div>
           </div>
 
-          <p class="font-semibold">{{ $t('admin.automation.matchTheseRules') }}</p>
+          <h4 class="text-base font-semibold text-foreground">
+            {{ $t('admin.automation.matchTheseRules') }}
+          </h4>
 
           <RuleBox
             v-if="form.values.type"
@@ -110,12 +112,14 @@
           <div class="flex justify-center">
             <div class="flex items-center space-x-2">
               <Button
+                type="button"
                 :variant="groupOperator === 'AND' ? 'default' : 'outline'"
                 @click.prevent="toggleGroupOperator('AND')"
               >
                 {{ $t('admin.automation.and') }}
               </Button>
               <Button
+                type="button"
                 :variant="groupOperator === 'OR' ? 'default' : 'outline'"
                 @click.prevent="toggleGroupOperator('OR')"
               >
@@ -133,7 +137,9 @@
             :type="form.values.type"
             :groupIndex="1"
           />
-          <p class="font-semibold mt-2">{{ $t('admin.automation.performTheseActions') }}</p>
+          <h4 class="text-base font-semibold text-foreground mt-2">
+            {{ $t('admin.automation.performTheseActions') }}
+          </h4>
 
           <ActionBox
             :actions="getActions()"
@@ -402,6 +408,14 @@ const getRulesValidationError = () => {
       action.value = ['0']
     }
 
+    // Notify uses its own fields instead of value.
+    if (action.type === 'notify') {
+      if (!action.subject?.trim() || !action.message?.trim() || !action.recipients?.length) {
+        return t('admin.automation.validation.setActionValue')
+      }
+      continue
+    }
+
     // Empty array, no value selected.
     if (action.value.length === 0) {
       return t('admin.automation.validation.setActionValue')
@@ -426,7 +440,7 @@ onMounted(async () => {
       if (resp.data.data.type === 'conversation_update') {
         rule.value.rules.events = []
       }
-      form.setValues(resp.data.data)
+      form.setValues(resp.data.data, false)
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',

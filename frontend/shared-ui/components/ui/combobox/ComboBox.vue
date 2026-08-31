@@ -8,8 +8,10 @@
           :aria-expanded="open"
           :class="['w-full justify-between', buttonClass]"
         >
-          <span class="min-w-0 flex-1 truncate text-left">
-            <slot name="selected" :selected="selectedItem">{{ selectedLabel }}</slot>
+          <span class="flex min-w-0 flex-1 items-center text-left">
+            <slot name="selected" :selected="selectedItem">
+              <span class="min-w-0 truncate">{{ selectedLabel }}</span>
+            </slot>
           </span>
           <CaretSortIcon class="h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -56,7 +58,7 @@ import {
   CommandList
 } from '../command'
 
-const RENDER_CAP = 200
+const RENDER_CAP = 300
 
 const props = defineProps({
   items: {
@@ -85,7 +87,11 @@ const passThroughFilter = (items) => items
 const filteredItems = computed(() => {
   const term = searchTerm.value?.trim().toLowerCase()
   if (!term) return props.items
-  return props.items.filter((item) => String(item.label).toLowerCase().includes(term))
+  return props.items.filter((item) =>
+    [item.label, item.calling_code]
+      .filter(Boolean)
+      .some((field) => String(field).toLowerCase().includes(term))
+  )
 })
 
 const visibleItems = computed(() => filteredItems.value.slice(0, RENDER_CAP))

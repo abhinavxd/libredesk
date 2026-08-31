@@ -17,9 +17,10 @@ const (
 	SystemUserEmail = "System"
 
 	// User types
-	UserTypeAgent   = "agent"
-	UserTypeContact = "contact"
-	UserTypeVisitor = "visitor"
+	UserTypeAgent       = "agent"
+	UserTypeContact     = "contact"
+	UserTypeVisitor     = "visitor"
+	UserTypeAIAssistant = "ai_assistant"
 
 	// User availability statuses
 	Online  = "online"
@@ -29,6 +30,16 @@ const (
 	// Away due to manual setting from sidebar
 	AwayManual         = "away_manual"
 	AwayAndReassigning = "away_and_reassigning"
+)
+
+// ContactPolicy controls whether contact resolution may modify a matched contact.
+type ContactPolicy int
+
+const (
+	// ContactReuse resolves to the existing contact without modifying it.
+	ContactReuse ContactPolicy = iota
+	// ContactSync also updates name/email and enriches external_user_id on a match.
+	ContactSync
 )
 
 type UserCompact struct {
@@ -93,6 +104,7 @@ type ChatUser struct {
 	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
 	Type               string      `db:"type" json:"type"`
 	ActiveAt           null.Time   `db:"active_at" json:"active_at"`
+	Expectation        string      `db:"expectation" json:"expectation,omitempty"`
 }
 
 type Note struct {

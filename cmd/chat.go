@@ -41,6 +41,10 @@ const (
 	maxEmailLength                  = 254
 	maxNameLength                   = 128
 	maxExternalUserIDLength         = 128
+	maxPhoneNumberLength            = 20
+	maxPhoneCountryCodeLength       = 10
+	fieldTypePhone                  = "phone"
+	phoneCountryCodeSuffix          = "_country_code"
 )
 
 // WidgetSession holds session data stored in Redis.
@@ -59,6 +63,8 @@ type Claims struct {
 	Email                   string         `json:"email,omitempty"`
 	FirstName               string         `json:"first_name,omitempty"`
 	LastName                string         `json:"last_name,omitempty"`
+	PhoneNumber             string         `json:"phone_number,omitempty"`
+	PhoneNumberCountryCode  string         `json:"phone_number_country_code,omitempty"`
 	ContactCustomAttributes map[string]any `json:"contact_custom_attributes,omitempty"`
 	jwt.RegisteredClaims
 }
@@ -219,8 +225,7 @@ func handleChatInit(r *fastglue.Request) error {
 		isVisitor = true
 		visitor, newSessionToken, conversationAttrs, err = createVisitorContact(app, req.FormData, config, inbox)
 		if err != nil {
-			app.lo.Error("error creating visitor contact", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+			return sendErrorEnvelope(r, err)
 		}
 		contactID = visitor.ID
 	}
@@ -329,7 +334,7 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 
 	_, conversation, err := getContactConversation(r, conversationUUID)
 	if err != nil {
-		return err
+		return sendErrorEnvelope(r, err)
 	}
 
 	if err := app.conversation.UpdateConversationContactLastSeen(conversation.UUID); err != nil {
@@ -379,7 +384,14 @@ func handleAuthExchange(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "first_name"), nil, envelope.InputError)
 	}
 	if len(claims.LastName) > maxNameLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxNameLength)), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.name}", "max", strconv.Itoa(maxNameLength)), nil, envelope.InputError)
+	}
+	if len(claims.PhoneNumber) > maxPhoneNumberLength {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.phoneNumber}", "max", strconv.Itoa(maxPhoneNumberLength)), nil, envelope.InputError)
+	}
+	// Country code is cosmetic - drop an invalid one instead of failing the whole exchange.
+	if len(claims.PhoneNumberCountryCode) > maxPhoneCountryCodeLength {
+		claims.PhoneNumberCountryCode = ""
 	}
 
 	// Resolve or create the contact.
@@ -465,7 +477,7 @@ func handleChatGetConversation(r *fastglue.Request) error {
 
 	_, conversation, err := getContactConversation(r, conversationUUID)
 	if err != nil {
-		return err
+		return sendErrorEnvelope(r, err)
 	}
 
 	// Build conversation response with messages and attachments.
@@ -529,7 +541,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 
 	senderID, conversation, err := getContactConversation(r, conversationUUID)
 	if err != nil {
-		return err
+		return sendErrorEnvelope(r, err)
 	}
 
 	if err := canReply(r, conversation); err != nil {
@@ -575,7 +587,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 
 	senderID, conversation, err := getContactConversation(r, conversationUUID)
 	if err != nil {
-		return err
+		return sendErrorEnvelope(r, err)
 	}
 
 	if err := canReply(r, conversation); err != nil {
@@ -677,9 +689,6 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
-	for i := range message.Attachments {
-		message.Attachments[i].URL = app.media.GetSignedURL(message.Attachments[i].UUID)
-	}
 	app.conversation.SignAvatarURL(&message.Author.AvatarURL)
 
 	// Strip agent email from widget responses.
@@ -706,24 +715,24 @@ func getContactConversation(r *fastglue.Request, conversationUUID string) (int, 
 	contactID, err := getWidgetContactID(r)
 	if err != nil {
 		app.lo.Error("error getting contact ID from middleware context", "error", err)
-		return 0, cmodels.Conversation{}, r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return 0, cmodels.Conversation{}, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
 		app.lo.Error("error getting inbox from middleware context", "error", err)
-		return 0, cmodels.Conversation{}, r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return 0, cmodels.Conversation{}, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching conversation", "conversation_uuid", conversationUUID, "error", err)
-		return 0, cmodels.Conversation{}, sendErrorEnvelope(r, err)
+		return 0, cmodels.Conversation{}, err
 	}
 
 	if conversation.ContactID != contactID || conversation.InboxID != inbox.ID {
 		app.lo.Error("unauthorized access to conversation", "conversation_uuid", conversationUUID, "contact_id", contactID, "conversation_contact_id", conversation.ContactID, "session_inbox_id", inbox.ID, "conversation_inbox_id", conversation.InboxID)
-		return 0, cmodels.Conversation{}, r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+		return 0, cmodels.Conversation{}, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
 	}
 
 	return contactID, conversation, nil
@@ -756,9 +765,7 @@ func saveContactAttrsAndCollectConvoAttrs(app *App, contactID int, claims *Claim
 	return formConvoAttrs
 }
 
-// resolveOrCreateExternalContact finds or creates a contact from JWT claims.
-// It tries: 1) lookup by external_user_id, 2) create new (which internally enriches by email if possible).
-// On every call it syncs name/email from JWT claims if they differ from stored values, to keep contact info up to date.
+// resolveOrCreateExternalContact finds a contact by external_user_id (syncing changed JWT fields) or creates one.
 func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 	user, err := resolveUserFromClaims(app, claims)
 	if err != nil {
@@ -767,10 +774,11 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 		}
 	}
 
-	// Sync name/email from JWT only if changed.
+	// Sync name/email/phone from JWT only if changed.
 	if user.ID > 0 && claims.ExternalUserID != "" {
-		if user.FirstName != claims.FirstName || user.LastName != claims.LastName || user.Email.String != claims.Email {
-			if err := app.user.UpdateContactBasicInfo(user.ID, claims.FirstName, claims.LastName, claims.Email); err != nil {
+		if user.FirstName != claims.FirstName || user.LastName != claims.LastName || user.Email.String != claims.Email ||
+			user.PhoneNumber.String != claims.PhoneNumber || user.PhoneNumberCountryCode.String != claims.PhoneNumberCountryCode {
+			if err := app.user.UpdateContactBasicInfo(user.ID, claims.FirstName, claims.LastName, claims.Email, claims.PhoneNumber, claims.PhoneNumberCountryCode); err != nil {
 				app.lo.Error("error updating contact basic info", "contact_id", user.ID, "error", err)
 			}
 		}
@@ -780,13 +788,15 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 	// Create contact if not found.
 	if claims.ExternalUserID != "" {
 		user := umodels.User{
-			FirstName:        claims.FirstName,
-			LastName:         claims.LastName,
-			Email:            null.NewString(claims.Email, true),
-			ExternalUserID:   null.NewString(claims.ExternalUserID, true),
-			CustomAttributes: marshalCustomAttributes(claims.ContactCustomAttributes, app),
+			FirstName:              claims.FirstName,
+			LastName:               claims.LastName,
+			Email:                  null.NewString(claims.Email, claims.Email != ""),
+			PhoneNumber:            null.NewString(claims.PhoneNumber, claims.PhoneNumber != ""),
+			PhoneNumberCountryCode: null.NewString(claims.PhoneNumberCountryCode, claims.PhoneNumberCountryCode != ""),
+			ExternalUserID:         null.NewString(claims.ExternalUserID, true),
+			CustomAttributes:       marshalCustomAttributes(claims.ContactCustomAttributes, app),
 		}
-		if err := app.user.CreateContact(&user); err != nil {
+		if err := app.user.ResolveContact(&user, umodels.ContactSync); err != nil {
 			return 0, err
 		}
 		return user.ID, nil
@@ -797,8 +807,8 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 
 // createVisitorContact creates a new visitor contact from form data.
 func createVisitorContact(app *App, formData map[string]any, config livechat.Config, inbox imodels.Inbox) (umodels.User, string, map[string]any, error) {
-	// Validate form data and get final name/email for new visitor.
-	finalName, finalEmail, err := validateFormData(formData, config, nil)
+	// Validate form data and get final name/email/phone for new visitor.
+	finalName, finalEmail, finalPhone, finalPhoneCountryCode, err := validateFormData(app, formData, config, nil)
 	if err != nil {
 		return umodels.User{}, "", nil, err
 	}
@@ -807,20 +817,22 @@ func createVisitorContact(app *App, formData map[string]any, config livechat.Con
 	formContactAttrs, formConvoAttrs := validateCustomAttributes(formData, config, app)
 
 	visitor := umodels.User{
-		Email:            null.NewString(finalEmail, finalEmail != ""),
-		FirstName:        finalName,
-		CustomAttributes: marshalCustomAttributes(formContactAttrs, app),
+		Email:                  null.NewString(finalEmail, finalEmail != ""),
+		FirstName:              finalName,
+		PhoneNumber:            null.NewString(finalPhone, finalPhone != ""),
+		PhoneNumberCountryCode: null.NewString(finalPhoneCountryCode, finalPhoneCountryCode != ""),
+		CustomAttributes:       marshalCustomAttributes(formContactAttrs, app),
 	}
 
 	if err := app.user.CreateVisitor(&visitor); err != nil {
 		app.lo.Error("error creating visitor contact", "error", err)
-		return umodels.User{}, "", nil, err
+		return umodels.User{}, "", nil, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	token, err := generateSessionToken(app, visitor.ID, inbox.ID, true, "", defaultSessionTTL)
 	if err != nil {
 		app.lo.Error("error generating session token for visitor", "error", err)
-		return umodels.User{}, "", nil, err
+		return umodels.User{}, "", nil, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	return visitor, token, formConvoAttrs, nil
@@ -888,7 +900,7 @@ func resolveUserFromClaims(app *App, claims Claims) (umodels.User, error) {
 	case claims.UserID > 0:
 		user, err = app.user.Get(claims.UserID, "", []string{umodels.UserTypeContact, umodels.UserTypeVisitor})
 	case claims.ExternalUserID != "":
-		user, err = app.user.GetByExternalID(claims.ExternalUserID)
+		user, err = app.user.GetContactByExternalID(claims.ExternalUserID)
 	default:
 		return umodels.User{}, errors.New("error fetching user")
 	}
@@ -1042,9 +1054,13 @@ func validateCustomAttributes(formData map[string]any, config livechat.Config, a
 
 	// Create a map of valid field keys for quick lookup
 	validFields := make(map[string]livechat.PreChatFormField)
+	phoneCompanionKeys := make(map[string]bool)
 	for _, field := range config.PreChatForm.Fields {
 		if field.Enabled {
 			validFields[field.Key] = field
+			if field.Type == fieldTypePhone {
+				phoneCompanionKeys[field.Key+phoneCountryCodeSuffix] = true
+			}
 		}
 	}
 
@@ -1054,6 +1070,10 @@ func validateCustomAttributes(formData map[string]any, config livechat.Config, a
 		const maxKeyLength = 100
 		if len(key) > maxKeyLength {
 			app.lo.Warn("form field key exceeds maximum length", "key", key, "length", len(key), "max", maxKeyLength)
+			continue
+		}
+
+		if phoneCompanionKeys[key] {
 			continue
 		}
 
@@ -1129,67 +1149,78 @@ func validateAttributeValue(key string, value any, app *App) any {
 	return nil
 }
 
-// validateFormData validates form data against pre-chat form configuration
-// Returns the final name/email to use and any validation errors
-func validateFormData(formData map[string]any, config livechat.Config, existingUser *umodels.User) (string, string, error) {
-	var finalName, finalEmail string
+// validateFormData returns the final name/email/phone/phone country code to persist from the pre-chat form.
+func validateFormData(app *App, formData map[string]any, config livechat.Config, existingUser *umodels.User) (string, string, string, string, error) {
+	var finalName, finalEmail, finalPhone, finalPhoneCountryCode string
 
 	if !config.PreChatForm.Enabled {
-		return finalName, finalEmail, nil
+		return finalName, finalEmail, finalPhone, finalPhoneCountryCode, nil
 	}
 
-	// Process each enabled field in the pre-chat form
+	var exName, exEmail, exPhone, exPhoneCountryCode string
+	if existingUser != nil {
+		exName = existingUser.FirstName
+		exEmail = existingUser.Email.String
+		exPhone = existingUser.PhoneNumber.String
+		exPhoneCountryCode = existingUser.PhoneNumberCountryCode.String
+	}
+
 	for _, field := range config.PreChatForm.Fields {
-		if !field.Enabled {
+		if !field.Enabled || !field.IsDefault {
 			continue
 		}
 
 		switch field.Key {
 		case "name":
-			if value, exists := formData[field.Key]; exists {
-				if nameStr, ok := value.(string); ok {
-					// For existing users, ignore form name if they already have one
-					if existingUser != nil && existingUser.FirstName != "" {
-						finalName = existingUser.FirstName
-					} else {
-						finalName = nameStr
-					}
-				}
-			}
-			// Validate required field
+			finalName = resolveFormField(formData, field.Key, exName)
 			if field.Required && finalName == "" {
-				return "", "", fmt.Errorf("name is required")
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.name}"), nil)
 			}
 			if len(finalName) > maxNameLength {
-				return "", "", fmt.Errorf("name too long")
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.name}", "max", strconv.Itoa(maxNameLength)), nil)
 			}
 
 		case "email":
-			if value, exists := formData[field.Key]; exists {
-				if emailStr, ok := value.(string); ok {
-					// For existing users, ignore form email if they already have one
-					if existingUser != nil && existingUser.Email.Valid && existingUser.Email.String != "" {
-						finalEmail = existingUser.Email.String
-					} else {
-						finalEmail = emailStr
-					}
-				}
-			}
-			// Validate required field
+			finalEmail = resolveFormField(formData, field.Key, exEmail)
 			if field.Required && finalEmail == "" {
-				return "", "", fmt.Errorf("email is required")
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.email}"), nil)
 			}
 			if len(finalEmail) > maxEmailLength {
-				return "", "", fmt.Errorf("email too long")
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.email}", "max", strconv.Itoa(maxEmailLength)), nil)
 			}
-			// Validate email format if provided
 			if finalEmail != "" && !stringutil.ValidEmail(finalEmail) {
-				return "", "", fmt.Errorf("invalid email format")
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+			}
+
+		case fieldTypePhone:
+			finalPhone = resolveFormField(formData, field.Key, exPhone)
+			finalPhoneCountryCode = resolveFormField(formData, field.Key+phoneCountryCodeSuffix, exPhoneCountryCode)
+			if field.Required && (finalPhone == "" || finalPhoneCountryCode == "") {
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.phoneNumber}"), nil)
+			}
+			if len(finalPhone) > maxPhoneNumberLength {
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.phoneNumber}", "max", strconv.Itoa(maxPhoneNumberLength)), nil)
+			}
+			if len(finalPhoneCountryCode) > maxPhoneCountryCodeLength {
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.countryCode}", "max", strconv.Itoa(maxPhoneCountryCodeLength)), nil)
+			}
+			if finalPhone == "" {
+				finalPhoneCountryCode = ""
 			}
 		}
 	}
 
-	return finalName, finalEmail, nil
+	return finalName, finalEmail, finalPhone, finalPhoneCountryCode, nil
+}
+
+func resolveFormField(formData map[string]any, key, existing string) string {
+	if existing != "" {
+		return existing
+	}
+	if value, ok := formData[key].(string); ok {
+		return value
+	}
+	return ""
 }
 
 // filterPreChatFormFields filters out pre-chat form fields that reference non-existent custom attributes while retaining the default fields

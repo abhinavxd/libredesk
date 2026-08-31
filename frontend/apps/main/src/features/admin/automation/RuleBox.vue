@@ -25,9 +25,9 @@
       </RadioGroup>
     </div>
 
-    <div class="space-y-5 rounded" :class="{ 'box p-5': ruleGroup.rules?.length > 0 }">
-      <div class="space-y-5">
-        <div v-for="(rule, index) in ruleGroup.rules" :key="rule" class="space-y-5">
+    <div class="space-y-6" :class="{ 'box p-5': ruleGroup.rules?.length > 0 }">
+      <div class="space-y-6">
+        <div v-for="(rule, index) in ruleGroup.rules" :key="rule" class="space-y-6">
           <div v-if="index > 0">
             <hr class="border-t-2 border-dotted border-border" />
           </div>
@@ -184,7 +184,7 @@
         </div>
       </div>
       <div>
-        <Button variant="outline" size="sm" @click.prevent="addCondition">
+        <Button type="button" variant="outline" size="sm" @click.prevent="addCondition">
           {{
             $t('actions.addCondition')
           }}
@@ -250,9 +250,14 @@ const { t } = useI18n()
 
 // Computed property to get the correct filters based on type
 const currentFilters = computed(() => {
-  return props.type === 'new_conversation'
-    ? newConversationFilters.value
-    : conversationFilters.value
+  if (props.type === 'new_conversation') return newConversationFilters.value
+  if (props.type === 'conversation_update') return conversationFilters.value
+  // previous_* values only exist on conversation update events.
+  const filters = { ...conversationFilters.value }
+  for (const key of Object.keys(filters)) {
+    if (key.startsWith('previous_')) delete filters[key]
+  }
+  return filters
 })
 
 // Watch for type change and reset the rules as the fields will change

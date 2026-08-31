@@ -12,9 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -22,10 +20,10 @@ import (
 	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/version"
 	"github.com/abhinavxd/libredesk/internal/webhook/models"
-	"github.com/abhinavxd/ssrfguard"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
@@ -62,7 +60,7 @@ type Opts struct {
 	QueueSize     int
 	Timeout       time.Duration
 	EncryptionKey string
-	AllowedHosts  []string // CIDR prefixes allowed to bypass SSRF protection
+	DialControl   ssrf.Control
 	RootURL       func() string
 }
 
@@ -70,10 +68,13 @@ type Opts struct {
 type DeliveryTask struct {
 	Event   models.WebhookEvent
 	Payload any
+	// Zero means fan out to all subscribers of Event.
+	WebhookID int
 }
 
 // queries contains prepared SQL queries.
 type queries struct {
+	GetWebhooksCompact *sqlx.Stmt `query:"get-webhooks-compact"`
 	GetAllWebhooks     *sqlx.Stmt `query:"get-all-webhooks"`
 	GetWebhook         *sqlx.Stmt `query:"get-webhook"`
 	GetWebhookSecret   *sqlx.Stmt `query:"get-webhook-secret"`
@@ -93,9 +94,9 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 
-	// Parse allowed host CIDRs for SSRF exceptions.
-	allowed := parseAllowedHosts(opts.AllowedHosts, opts.Lo)
-	guard := ssrfguard.New(allowed...)
+	transport := ssrf.NewTransport(opts.DialControl, 3*time.Second)
+	transport.TLSHandshakeTimeout = 3 * time.Second
+	transport.ResponseHeaderTimeout = 3 * time.Second
 
 	return &Manager{
 		q:             q,
@@ -104,21 +105,23 @@ func New(opts Opts) (*Manager, error) {
 		db:            opts.DB,
 		deliveryQueue: make(chan DeliveryTask, opts.QueueSize),
 		httpClient: &http.Client{
-			Timeout: opts.Timeout,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   3 * time.Second,
-					KeepAlive: 30 * time.Second,
-					Control:   guard.Control,
-				}).DialContext,
-				TLSHandshakeTimeout:   3 * time.Second,
-				ResponseHeaderTimeout: 3 * time.Second,
-			},
+			Timeout:   opts.Timeout,
+			Transport: transport,
 		},
 		workers:       opts.Workers,
 		encryptionKey: opts.EncryptionKey,
 		rootURL:       opts.RootURL,
 	}, nil
+}
+
+// GetAllCompact retrieves all webhooks with only id and name.
+func (m *Manager) GetAllCompact() ([]models.WebhookCompact, error) {
+	var webhooks = make([]models.WebhookCompact, 0)
+	if err := m.q.GetWebhooksCompact.Select(&webhooks); err != nil {
+		m.lo.Error("error fetching webhooks", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return webhooks, nil
 }
 
 // GetAll retrieves all webhooks.
@@ -169,7 +172,7 @@ func (m *Manager) Create(webhook models.Webhook) (models.Webhook, error) {
 		return models.Webhook{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.webhook.invalidDiscordURL"), nil)
 	}
 
-	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery); err != nil {
+	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery, normalizeIDs(webhook.InboxIDs), normalizeIDs(webhook.TeamIDs), normalizeIDs(webhook.UserIDs)); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return models.Webhook{}, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}
@@ -212,7 +215,7 @@ func (m *Manager) Update(id int, webhook models.Webhook) (models.Webhook, error)
 		return models.Webhook{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.webhook.invalidDiscordURL"), nil)
 	}
 
-	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery); err != nil {
+	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery, normalizeIDs(webhook.InboxIDs), normalizeIDs(webhook.TeamIDs), normalizeIDs(webhook.UserIDs)); err != nil {
 		m.lo.Error("error updating webhook", "error", err)
 		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -280,6 +283,31 @@ func (m *Manager) TriggerEvent(event models.WebhookEvent, data any) {
 	}
 }
 
+// TriggerWebhook enqueues a delivery of the given event to one specific webhook.
+func (m *Manager) TriggerWebhook(webhookID int, event models.WebhookEvent, data any) {
+	// A non-positive ID would be treated as a fan out to every subscriber of the event.
+	if webhookID <= 0 {
+		m.lo.Warn("dropping targeted webhook delivery, webhook ID is not positive", "webhook_id", webhookID, "event", event)
+		return
+	}
+
+	m.closedMu.RLock()
+	defer m.closedMu.RUnlock()
+	if m.closed {
+		return
+	}
+
+	select {
+	case m.deliveryQueue <- DeliveryTask{
+		Event:     event,
+		Payload:   data,
+		WebhookID: webhookID,
+	}:
+	default:
+		m.lo.Warn("webhook delivery queue is full, dropping webhook delivery", "event", event, "webhook_id", webhookID, "queue_size", len(m.deliveryQueue))
+	}
+}
+
 // Run starts the webhook delivery worker pool.
 func (m *Manager) Run(ctx context.Context) {
 	for i := 0; i < m.workers; i++ {
@@ -320,6 +348,20 @@ func (m *Manager) worker(ctx context.Context) {
 
 // deliverWebhook delivers webhooks for an event by making HTTP requests.
 func (m *Manager) deliverWebhook(task DeliveryTask) {
+	if task.WebhookID > 0 {
+		webhook, err := m.Get(task.WebhookID)
+		if err != nil {
+			m.lo.Error("error fetching webhook for delivery", "webhook_id", task.WebhookID, "event", task.Event, "error", err)
+			return
+		}
+		if !webhook.IsActive {
+			m.lo.Debug("skipping delivery, webhook is inactive", "webhook_id", webhook.ID, "event", task.Event)
+			return
+		}
+		m.deliverSingleWebhook(webhook, task)
+		return
+	}
+
 	webhooks, err := m.getWebhooksByEvent(string(task.Event))
 	if err != nil {
 		m.lo.Error("error fetching webhooks for event", "event", task.Event, "error", err)
@@ -327,6 +369,11 @@ func (m *Manager) deliverWebhook(task DeliveryTask) {
 	}
 
 	for _, webhook := range webhooks {
+		if !matchesWebhookFilters(webhook, task) {
+			m.lo.Debug("skipping webhook, event does not match inbox/team/user filters",
+				"webhook_id", webhook.ID, "event", task.Event)
+			continue
+		}
 		m.deliverSingleWebhook(webhook, task)
 	}
 }
@@ -427,6 +474,25 @@ func (m *Manager) generateSignature(payload []byte, secret string) string {
 	return "sha256=" + hex.EncodeToString(h.Sum(nil))
 }
 
+func normalizeIDs(ids pq.Int64Array) pq.Int64Array {
+	if len(ids) == 0 {
+		return pq.Int64Array{}
+	}
+	out := make(pq.Int64Array, 0, len(ids))
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
 // getWebhooksByEvent retrieves active webhooks that are subscribed to a specific event.
 func (m *Manager) getWebhooksByEvent(event string) ([]models.Webhook, error) {
 	var webhooks = make([]models.Webhook, 0)
@@ -438,18 +504,4 @@ func (m *Manager) getWebhooksByEvent(event string) ([]models.Webhook, error) {
 	m.decryptWebhooks(webhooks)
 
 	return webhooks, nil
-}
-
-// parseAllowedHosts parses CIDR strings into netip.Prefix slices.
-func parseAllowedHosts(hosts []string, lo *logf.Logger) []netip.Prefix {
-	var prefixes []netip.Prefix
-	for _, h := range hosts {
-		prefix, err := netip.ParsePrefix(h)
-		if err != nil {
-			lo.Warn("ignoring invalid webhook `allowed_hosts` entry", "entry", h, "error", err)
-			continue
-		}
-		prefixes = append(prefixes, prefix)
-	}
-	return prefixes
 }

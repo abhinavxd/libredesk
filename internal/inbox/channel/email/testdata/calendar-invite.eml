@@ -1,0 +1,33 @@
+From: Bob Organizer <bob@example.com>
+To: support@example.org
+Subject: Meeting: Onboarding call
+Message-ID: <calendar-invite-test@example.com>
+Date: Wed, 15 Jul 2026 15:10:00 +0200
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="----=_Mixed_CAL"
+
+------=_Mixed_CAL
+Content-Type: multipart/alternative; boundary="----=_Alt_CAL"
+
+------=_Alt_CAL
+Content-Type: text/plain; charset="utf-8"
+
+You are invited to an onboarding call.
+------=_Alt_CAL
+Content-Type: text/calendar; charset="utf-8"; method=REQUEST
+
+BEGIN:VCALENDAR
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:evt-1@example.com
+SUMMARY:Onboarding call
+END:VEVENT
+END:VCALENDAR
+------=_Alt_CAL--
+------=_Mixed_CAL
+Content-Type: application/ics; name="invite.ics"
+Content-Disposition: attachment; filename="invite.ics"
+Content-Transfer-Encoding: base64
+
+QkVHSU46VkNBTEVOREFSDQpNRVRIT0Q6UkVRVUVTVA0KRU5EOlZDQUxFTkRBUg0K
+------=_Mixed_CAL--

@@ -1,0 +1,36 @@
+{{ define "docs-help-center" }}
+{{ template "docs-header" . }}
+
+<div class="hcd-hero">
+    {{ $heroText := .Data.HelpCenter.HeaderText }}{{ if not $heroText }}{{ $heroText = .Data.HelpCenter.PageTitle }}{{ end }}
+    <h1>{{ $heroText }}</h1>
+    {{ if .Data.HelpCenter.TaglineHTML }}<p class="hcd-hero-tagline">{{ .Data.HelpCenter.TaglineHTML }}</p>{{ end }}
+    <a class="hcd-hero-search" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open>
+        {{ template "hc-search-icon" }}
+        <span>{{ .L.T "helpCenter.searchPlaceholder" }}</span>
+        <span class="hcd-kbd-combo" aria-hidden="true"><kbd class="hcd-kbd hcd-kbd-mod">Ctrl</kbd><kbd class="hcd-kbd">K</kbd></span>
+    </a>
+</div>
+
+{{ if and .Data.Popular .Data.HelpCenter.Theme.Layout.ShowPopularArticles }}
+<section class="hcd-popular">
+    {{ with .Data.HelpCenter.Theme.Layout.PopularArticlesLabel }}<h2>{{ . }}</h2>{{ end }}
+    <ul>
+        {{ range .Data.Popular }}
+        <li><a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}"><span>{{ .Title }}</span>{{ template "hc-arrow-icon" }}</a></li>
+        {{ end }}
+    </ul>
+</section>
+{{ end }}
+
+{{ if .Data.Tree }}
+<section class="hcd-collections-section">
+<h2 class="hcd-section-label">{{ .L.Tc "globals.terms.collection" 2 }}</h2>
+{{ template "hc-collections-grid" (map "HelpCenter" .Data.HelpCenter "Tree" .Data.Tree "L" .L "Heading" "h3") }}
+</section>
+{{ else }}
+<p class="hcd-empty">{{ .L.T "helpCenter.noPublishedContent" }}</p>
+{{ end }}
+
+{{ template "docs-footer" . }}
+{{ end }}

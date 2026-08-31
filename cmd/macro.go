@@ -199,7 +199,7 @@ func handleApplyMacro(r *fastglue.Request) error {
 		}
 	}
 
-	if successCount == 0 {
+	if len(incomingActions) > 0 && successCount == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("macro.couldNotApply"), nil, envelope.GeneralError)
 	}
 

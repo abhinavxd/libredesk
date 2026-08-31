@@ -1,0 +1,214 @@
+// Moving placeholder to the top.
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+  font-size: 0.875rem;
+}
+
+.editor-wrapper div[aria-expanded='false'] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tiptap.ProseMirror {
+  flex: 1;
+  min-height: 70px;
+  overflow-y: auto;
+  overflow-wrap: anywhere !important;
+  white-space: pre-wrap;
+  max-width: 100%;
+}
+
+.tiptap {
+  .tableWrapper {
+    margin: 1.5rem 0;
+    overflow-x: auto;
+  }
+
+  table {
+    border-collapse: collapse;
+
+    td,
+    th {
+      border: 1px solid #dee2e6;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8f9fa;
+      font-weight: bold;
+      text-align: left;
+    }
+  }
+
+  a {
+    color: hsl(var(--link));
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .ld-mention {
+    background-color: hsl(var(--primary) / 0.1);
+    border-radius: 0.25rem;
+    padding: 0 0.25rem;
+    color: hsl(var(--primary));
+    font-weight: 500;
+  }
+
+  .image-resizer {
+    display: inline-block;
+    position: relative;
+    margin: 4px 5px;
+
+    .image-upload-placeholder {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 32px;
+      min-width: 360px;
+      min-height: 220px;
+      max-width: 100%;
+      background: hsl(var(--muted));
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+      line-height: 1.4;
+      gap: 12px;
+    }
+
+    .image-upload-placeholder-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .image-upload-placeholder-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 320px;
+    }
+
+    &.uploading {
+      .inline-image {
+        display: none;
+      }
+      .image-upload-placeholder {
+        display: inline-flex;
+      }
+    }
+
+    .image-resize-handle {
+      display: none;
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: hsl(var(--primary));
+      border: 2px solid hsl(var(--background));
+      border-radius: 2px;
+      z-index: 10;
+      box-shadow: 0 0 0 1px hsl(var(--border));
+    }
+
+    .image-resize-handle-tl {
+      top: -6px;
+      left: -6px;
+      cursor: nwse-resize;
+    }
+    .image-resize-handle-tr {
+      top: -6px;
+      right: -6px;
+      cursor: nesw-resize;
+    }
+    .image-resize-handle-bl {
+      bottom: -6px;
+      left: -6px;
+      cursor: nesw-resize;
+    }
+    .image-resize-handle-br {
+      bottom: -6px;
+      right: -6px;
+      cursor: nwse-resize;
+    }
+
+    // Anchored to the image's left edge (no centering) so the toolbar
+    // never extends past the image's left side and into adjacent UI when
+    // the image sits near the editor's left edge.
+    .image-size-toolbar {
+      display: none;
+      position: absolute;
+      top: 4px;
+      left: 0;
+      background: hsl(var(--background) / 0.95);
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      padding: 2px;
+      z-index: 10000;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px hsl(var(--foreground) / 0.15);
+      backdrop-filter: blur(4px);
+
+      button {
+        padding: 2px 8px;
+        font-size: 11px;
+        color: hsl(var(--muted-foreground));
+        background: none;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        line-height: 1.6;
+
+        &:hover {
+          background: hsl(var(--accent));
+          color: hsl(var(--accent-foreground));
+        }
+      }
+
+      .image-toolbar-sep {
+        width: 1px;
+        height: 14px;
+        background: hsl(var(--border));
+        margin: 0 2px;
+        align-self: center;
+      }
+
+      .image-toolbar-remove {
+        color: hsl(var(--destructive)) !important;
+
+        &:hover {
+          background: hsl(var(--destructive) / 0.1) !important;
+          color: hsl(var(--destructive)) !important;
+        }
+      }
+    }
+
+    &.ProseMirror-selectednode .image-resize-handle,
+    &.resizing .image-resize-handle {
+      display: block;
+    }
+
+    &.ProseMirror-selectednode .image-size-toolbar {
+      display: flex;
+    }
+
+    &.ProseMirror-selectednode .inline-image,
+    &.resizing .inline-image {
+      outline: 2px solid hsl(var(--link));
+    }
+
+    &.resizing .inline-image {
+      opacity: 0.8;
+    }
+  }
+}

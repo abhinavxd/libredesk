@@ -195,7 +195,7 @@ watch(
         normalizeToTwoLevel(newVal.filters),
         filterFields.value
       )
-      form.setValues(processedVal)
+      form.setValues(processedVal, false)
     }
   },
   { immediate: true }

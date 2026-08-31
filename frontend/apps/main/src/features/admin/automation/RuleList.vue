@@ -4,7 +4,7 @@
       <div class="flex items-center gap-3">
         <router-link
           :to="{ name: 'edit-automation', params: { id: rule.id } }"
-          class="text-base text-primary hover:underline"
+          class="text-base text-foreground font-medium hover:underline"
         >
           {{ rule.name }}
         </router-link>
@@ -24,16 +24,23 @@
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem @click="navigateToEditRule(rule.id)">
+            <Pencil class="mr-2 h-4 w-4" />
             <span>{{ $t('globals.messages.edit') }}</span>
           </DropdownMenuItem>
           <DropdownMenuItem @click="$emit('toggle-rule', rule.id)" v-if="rule.enabled">
+            <PowerOff class="mr-2 h-4 w-4" />
             <span>{{ $t('globals.messages.disable') }}</span>
           </DropdownMenuItem>
           <DropdownMenuItem @click="$emit('toggle-rule', rule.id)" v-else>
+            <Power class="mr-2 h-4 w-4" />
             <span>{{ $t('globals.messages.enable') }}</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem class="text-destructive" @click="() => (alertOpen = true)">
+          <DropdownMenuItem
+            class="text-destructive focus:text-destructive"
+            @click="() => (alertOpen = true)"
+          >
+            <Trash class="mr-2 h-4 w-4" />
             <span>{{ $t('globals.messages.delete') }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -47,14 +54,12 @@
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{
-            $t('automation.deletionConfirmation')
-          }}
+          {{ $t('automation.deletionConfirmation') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="handleDelete">{{
+        <AlertDialogAction variant="destructive" @click="handleDelete">{{
           $t('globals.messages.delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
@@ -81,7 +86,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { EllipsisVertical } from 'lucide-vue-next'
+import { EllipsisVertical, Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'

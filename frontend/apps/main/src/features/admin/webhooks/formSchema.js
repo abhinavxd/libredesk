@@ -26,6 +26,9 @@ export const createFormSchema = (t) =>
       events: z.array(z.string()).min(1, {
         message: t('globals.messages.required')
       }),
+      inbox_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
+      team_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
+      user_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
       secret: z.string().optional(),
       is_active: z.boolean().default(true).optional(),
       headers: z.string().optional()

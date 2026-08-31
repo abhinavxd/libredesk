@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"strings"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
-	"github.com/jhillyerd/enmime"
+	"github.com/jhillyerd/enmime/v2"
 	"github.com/volatiletech/null/v9"
 )
 
@@ -22,6 +23,9 @@ const (
 	defaultReadInterval   = time.Duration(5 * time.Minute)
 	defaultScanInboxSince = time.Duration(48 * time.Hour)
 )
+
+// Charset autodetection is disabled: it overrides the declared charset and misreads mostly-ASCII UTF-8 bodies as ISO-8859-1.
+var mimeParser = enmime.NewParser(enmime.DisableCharacterDetection(true))
 
 // ReadIncomingMessages reads and processes incoming messages from an IMAP server based on the provided configuration.
 func (e *Email) ReadIncomingMessages(ctx context.Context, cfg imodels.IMAPConfig) error {
@@ -247,7 +251,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 
 			// Body section.
 			if bs, ok := item.(imapclient.FetchItemDataBodySection); ok && bs.Literal != nil {
-				envelope, err := enmime.ReadEnvelope(bs.Literal)
+				envelope, err := mimeParser.ReadEnvelope(bs.Literal)
 				if err != nil {
 					e.lo.Error("error reading envelope", "error", err)
 					continue
@@ -386,7 +390,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		}
 	}
 
-	meta, err := json.Marshal(map[string]interface{}{
+	meta, err := json.Marshal(map[string]any{
 		"from":    fromAddr,
 		"cc":      ccAddr,
 		"bcc":     bccAddr,
@@ -442,12 +446,9 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 // processFullMessage processes the full message and enqueues it for inserting into the database.
 func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, incomingMsg models.IncomingMessage) error {
-	envelope, err := enmime.ReadEnvelope(item.Literal)
+	envelope, err := mimeParser.ReadEnvelope(item.Literal)
 	if err != nil {
 		e.lo.Error("error parsing email envelope", "error", err, "message_id", incomingMsg.SourceID.String)
-		for _, err := range envelope.Errors {
-			e.lo.Error("error parsing email envelope. envelope_error: ", "error", err.Error(), "message_id", incomingMsg.SourceID.String)
-		}
 		return fmt.Errorf("parsing email envelope: %w", err)
 	}
 
@@ -503,34 +504,7 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 			"message_id", incomingMsg.SourceID.String)
 	}
 
-	// Process attachments
-	for _, att := range envelope.Attachments {
-		incomingMsg.Attachments = append(incomingMsg.Attachments, attachment.Attachment{
-			Name:        att.FileName,
-			Content:     att.Content,
-			ContentType: att.ContentType,
-			ContentID:   att.ContentID,
-			Size:        len(att.Content),
-			Disposition: attachment.DispositionAttachment,
-		})
-	}
-
-	// Process inlines - treat ones without ContentID as regular attachments
-	for _, inline := range envelope.Inlines {
-		disposition := attachment.DispositionInline
-		if inline.ContentID == "" {
-			disposition = attachment.DispositionAttachment
-		}
-
-		incomingMsg.Attachments = append(incomingMsg.Attachments, attachment.Attachment{
-			Name:        inline.FileName,
-			Content:     inline.Content,
-			ContentType: inline.ContentType,
-			ContentID:   inline.ContentID,
-			Size:        len(inline.Content),
-			Disposition: disposition,
-		})
-	}
+	incomingMsg.Attachments = collectAttachments(envelope)
 
 	incomingMsg.Content = stringutil.SanitizeUTF8(incomingMsg.Content)
 	incomingMsg.Subject = stringutil.SanitizeUTF8(incomingMsg.Subject)
@@ -538,25 +512,70 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 	incomingMsg.Contact.LastName = stringutil.SanitizeUTF8(incomingMsg.Contact.LastName)
 
 	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.SourceID.String,
-		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines))
+		"collected_attachments", len(incomingMsg.Attachments),
+		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines),
+		"other_parts", len(envelope.OtherParts))
 
-	if err := e.messageStore.EnqueueIncoming(incomingMsg); err != nil {
-		return err
+	return e.messageStore.EnqueueIncoming(incomingMsg)
+}
+
+// collectAttachments builds the attachment list from an envelope's attachment, inline, and unclassified parts.
+func collectAttachments(envelope *enmime.Envelope) []attachment.Attachment {
+	attachments := make([]attachment.Attachment, 0, len(envelope.Attachments)+len(envelope.Inlines)+len(envelope.OtherParts))
+
+	for _, att := range envelope.Attachments {
+		attachments = append(attachments, partToAttachment(att, attachment.DispositionAttachment))
 	}
-	return nil
+
+	for _, part := range envelope.Inlines {
+		attachments = append(attachments, partToAttachment(part, dispositionForPart(part)))
+	}
+
+	// OtherParts with neither a ContentID nor a filename are transport noise (DSN reports, signature blobs).
+	for _, part := range envelope.OtherParts {
+		if part.ContentID == "" && part.FileName == "" {
+			continue
+		}
+		attachments = append(attachments, partToAttachment(part, dispositionForPart(part)))
+	}
+
+	return attachments
+}
+
+// dispositionForPart returns inline for parts that have a ContentID, attachment otherwise.
+func dispositionForPart(part *enmime.Part) string {
+	if part.ContentID == "" {
+		return attachment.DispositionAttachment
+	}
+	return attachment.DispositionInline
+}
+
+// partToAttachment converts an enmime part and makes up a filename if the part has none.
+func partToAttachment(part *enmime.Part, disposition string) attachment.Attachment {
+	name := part.FileName
+	if name == "" {
+		name = "attachment"
+		if exts, _ := mime.ExtensionsByType(part.ContentType); len(exts) > 0 {
+			name += exts[0]
+		}
+	}
+	return attachment.Attachment{
+		Name:        name,
+		Content:     part.Content,
+		ContentType: part.ContentType,
+		ContentID:   part.ContentID,
+		Size:        len(part.Content),
+		Disposition: disposition,
+	}
 }
 
 // getContactName extracts the contact's first and last name from the IMAP address.
 func getContactName(imapAddr imap.Address) (string, string) {
-	from := strings.TrimSpace(imapAddr.Name)
-	names := strings.Fields(from)
-	if len(names) == 0 {
-		return imapAddr.Host, ""
+	first, last := stringutil.SplitName(imapAddr.Name)
+	if first == "" {
+		return imapAddr.Mailbox, ""
 	}
-	if len(names) == 1 {
-		return names[0], ""
-	}
-	return names[0], names[1]
+	return first, last
 }
 
 // isAutoReply checks if a given email envelope indicates an auto-reply message.

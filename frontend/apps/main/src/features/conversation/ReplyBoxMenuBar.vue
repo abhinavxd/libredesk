@@ -7,7 +7,7 @@
       ref="emojiPickerRef"
       :native="true"
       @select="onSelectEmoji"
-      class="absolute bottom-14 left-14"
+      class="absolute bottom-14 left-0 md:left-14 z-20"
       v-if="isEmojiPickerVisible"
     />
     <div class="flex justify-items-start items-center gap-2">
@@ -78,7 +78,7 @@
       </template>
       <!-- Editor buttons -->
       <Toggle
-        class="px-2 py-2 border-0"
+        class="px-2 py-2 max-md:min-h-11 max-md:min-w-11 border-0"
         variant="outline"
         @click="triggerFileUpload"
         :pressed="false"
@@ -86,7 +86,7 @@
         <Paperclip class="h-4 w-4" />
       </Toggle>
       <Toggle
-        class="px-2 py-2 border-0"
+        class="px-2 py-2 max-md:min-h-11 max-md:min-w-11 border-0"
         variant="outline"
         @click="toggleEmojiPicker"
         :pressed="isEmojiPickerVisible"
@@ -103,10 +103,33 @@
       >
         <LinkIcon class="h-4 w-4" />
       </Toggle>
+      <Toggle
+        v-if="showGenerateReply"
+        class="px-2 py-2 max-md:min-h-11 max-md:min-w-11 border-0"
+        variant="outline"
+        :pressed="false"
+        :disabled="isGenerating"
+        :title="$t('replyBox.generateReply')"
+        @click="emit('generateReply')"
+      >
+        <Loader2 v-if="isGenerating" class="h-4 w-4 animate-spin" />
+        <Sparkles v-else class="h-4 w-4" />
+      </Toggle>
+      <Toggle
+        v-if="showGenerateReply"
+        class="px-2 py-2 max-md:min-h-11 max-md:min-w-11 border-0"
+        variant="outline"
+        :pressed="false"
+        :disabled="isGenerating"
+        :title="$t('ai.draftReplyTitle')"
+        @click="emit('draftReplyRequested')"
+      >
+        <Bot class="h-4 w-4" />
+      </Toggle>
     </div>
     <div class="flex items-center">
       <Button
-        class="h-8 px-4 rounded-r-none"
+        class="h-8 max-md:h-11 px-4 rounded-r-none"
         @click="handleSend"
         :disabled="!enableSend"
         :isLoading="isSending"
@@ -117,7 +140,7 @@
       <DropdownMenu v-if="showSendButton">
         <DropdownMenuTrigger as-child>
           <Button
-            class="h-8 px-2 rounded-l-none border-l border-primary-foreground/30 [&[data-state=open]>svg]:rotate-180"
+            class="h-8 max-md:h-11 px-2 rounded-l-none border-l border-primary-foreground/30 [&[data-state=open]>svg]:rotate-180"
             :disabled="!enableSend"
           >
             <ChevronDownIcon class="text-primary-foreground transition-transform" />
@@ -154,7 +177,10 @@ import {
   List,
   ListOrdered,
   Link as LinkIcon,
-  RemoveFormatting
+  RemoveFormatting,
+  Sparkles,
+  Loader2,
+  Bot
 } from 'lucide-vue-next'
 import {
   DropdownMenu,
@@ -178,12 +204,13 @@ const attachmentInput = ref(null)
 // const inlineImageInput = ref(null)
 const isEmojiPickerVisible = ref(false)
 const emojiPickerRef = ref(null)
-const emit = defineEmits(['emojiSelect'])
+const emit = defineEmits(['emojiSelect', 'generateReply', 'draftReplyRequested'])
 
 // Using defineProps for props that don't need two-way binding
 const props = defineProps({
   isFullscreen: Boolean,
   isSending: Boolean,
+  isGenerating: Boolean,
   enableSend: Boolean,
   handleSend: Function,
   handleSendAndSetStatus: Function,
@@ -195,10 +222,13 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  // Exposed editor API ({ format, formatState }) from TextEditor.
   editorApi: {
     type: Object,
     default: null
+  },
+  showGenerateReply: {
+    type: Boolean,
+    default: true
   },
   handleFileUpload: Function,
   handleInlineImageUpload: Function

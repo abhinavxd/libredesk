@@ -3,8 +3,11 @@ package user
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -101,6 +104,7 @@ type queries struct {
 	InsertAgent                   *sqlx.Stmt `query:"insert-agent"`
 	InsertContactWithExtID        *sqlx.Stmt `query:"insert-contact-with-external-id"`
 	InsertContactNoExtID          *sqlx.Stmt `query:"insert-contact-without-external-id"`
+	InsertContactIfAbsent         *sqlx.Stmt `query:"insert-contact-if-absent"`
 	GetContactByEmail             *sqlx.Stmt `query:"get-contact-by-email"`
 	GetContactByEmailWithoutExtID *sqlx.Stmt `query:"get-contact-by-email-without-ext-id"`
 	IsEmailBlocked                *sqlx.Stmt `query:"is-email-blocked"`
@@ -115,9 +119,12 @@ type queries struct {
 	GetUserByAPIKey      *sqlx.Stmt `query:"get-user-by-api-key"`
 	SetAPIKey            *sqlx.Stmt `query:"set-api-key"`
 	RevokeAPIKey         *sqlx.Stmt `query:"revoke-api-key"`
+	UpdateAPISecretHash  *sqlx.Stmt `query:"update-api-secret-hash"`
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
 
 	MergeVisitorToContact *sqlx.Stmt `query:"merge-visitor-to-contact"`
+	DeleteContact         *sqlx.Stmt `query:"delete-contact"`
+	ExportContactData     *sqlx.Stmt `query:"export-contact-data"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -206,8 +213,8 @@ func (u *Manager) GetSystemUser() (models.User, error) {
 	return u.Get(0, models.SystemUserEmail, []string{models.UserTypeAgent})
 }
 
-// GetByExternalID retrieves a user by external user ID.
-func (u *Manager) GetByExternalID(externalUserID string) (models.User, error) {
+// GetContactByExternalID retrieves a contact by external user ID.
+func (u *Manager) GetContactByExternalID(externalUserID string) (models.User, error) {
 	var user models.User
 	if err := u.q.GetUserByExternalID.Get(&user, externalUserID); err != nil {
 		if err == sql.ErrNoRows {
@@ -277,13 +284,18 @@ func (u *Manager) UpgradeVisitorToContact(visitorID int) error {
 	return nil
 }
 
-// SetExternalUserID sets the external_user_id on an existing contact.
-func (u *Manager) SetExternalUserID(id int, externalUserID string) error {
-	if _, err := u.q.SetExternalUserID.Exec(id, externalUserID); err != nil {
+// SetExternalUserID sets the external_user_id on an existing contact, reporting whether a row was updated.
+func (u *Manager) SetExternalUserID(id int, externalUserID string) (bool, error) {
+	res, err := u.q.SetExternalUserID.Exec(id, externalUserID)
+	if err != nil {
 		u.lo.Error("error setting external user ID", "id", id, "external_user_id", externalUserID, "error", err)
-		return fmt.Errorf("setting external user ID: %w", err)
+		return false, fmt.Errorf("setting external user ID: %w", err)
 	}
-	return nil
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("setting external user ID: %w", err)
+	}
+	return rows > 0, nil
 }
 
 // UpdateAvatar updates the user avatar.
@@ -424,15 +436,8 @@ func (u *Manager) GenerateAPIKey(userID int) (string, string, error) {
 		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Hash the API secret for storage
-	secretHash, err := bcrypt.GenerateFromPassword([]byte(apiSecret), bcrypt.DefaultCost)
-	if err != nil {
-		u.lo.Error("error hashing API secret", "error", err, "user_id", userID)
-		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
 	// Update user with API key.
-	if _, err := u.q.SetAPIKey.Exec(userID, apiKey, string(secretHash)); err != nil {
+	if _, err := u.q.SetAPIKey.Exec(userID, apiKey, hashAPISecret(apiSecret)); err != nil {
 		u.lo.Error("error saving API key", "error", err, "user_id", userID)
 		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -453,7 +458,16 @@ func (u *Manager) ValidateAPIKey(apiKey, apiSecret string) (models.User, error) 
 	}
 
 	// Verify API secret.
-	if err := bcrypt.CompareHashAndPassword([]byte(user.APISecret.String), []byte(apiSecret)); err != nil {
+	storedHash := user.APISecret.String
+	if strings.HasPrefix(storedHash, "$2") {
+		if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(apiSecret)); err != nil {
+			return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.T("validation.invalidCredential"), nil)
+		}
+		// Matching on storedHash keeps a rotation that landed meanwhile from being overwritten.
+		if _, err := u.q.UpdateAPISecretHash.Exec(user.ID, storedHash, hashAPISecret(apiSecret)); err != nil {
+			u.lo.Error("failed to upgrade API secret hash", "error", err, "user_id", user.ID)
+		}
+	} else if subtle.ConstantTimeCompare([]byte(storedHash), []byte(hashAPISecret(apiSecret))) != 1 {
 		return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.T("validation.invalidCredential"), nil)
 	}
 
@@ -639,4 +653,10 @@ func (u *Manager) reserveFlush(id int) bool {
 	// Stamp timestamp.
 	u.lastActiveFlushAt[id] = time.Now()
 	return true
+}
+
+// hashAPISecret returns the hex SHA-256 of an API secret (a 64 char random token, so no work factor needed).
+func hashAPISecret(secret string) string {
+	sum := sha256.Sum256([]byte(secret))
+	return hex.EncodeToString(sum[:])
 }

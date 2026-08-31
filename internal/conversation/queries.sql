@@ -186,6 +186,7 @@ SELECT
    c.updated_at,
    c.closed_at,
    c.resolved_at,
+   c.contact_last_seen_at,
    c.inbox_id,
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
@@ -195,16 +196,19 @@ SELECT
    c.priority_id,
    p.name as priority,
    s.name as status,
+   s.category as status_category,
    c.uuid,
    c.reference_number,
    c.first_reply_at,
    c.last_reply_at,
    c.waiting_since,
+   c.snoozed_until,
    c.assigned_user_id,
    c.assigned_team_id,
    c.subject,
    c.contact_id,
    c.sla_policy_id,
+   c.next_sla_deadline_at,
    c.meta,
    sla.name as sla_policy_name,
    c.last_message_at,
@@ -308,6 +312,43 @@ WHERE c.contact_id = $1
 ORDER BY c.created_at DESC
 LIMIT $2;
 
+-- name: get-contact-conversations-for-ai
+SELECT
+    c.id,
+    c.reference_number,
+    c.subject,
+    cs.name AS status,
+    c.created_at,
+    c.last_message_at,
+    c.assigned_user_id,
+    c.assigned_team_id
+FROM conversations c
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE c.contact_id = $1
+  AND c.id != $2
+ORDER BY c.created_at DESC
+LIMIT 50;
+
+-- name: get-conversations-by-contact-email-for-ai
+SELECT
+    c.id,
+    c.reference_number,
+    c.subject,
+    cs.name AS status,
+    c.created_at,
+    c.last_message_at,
+    c.assigned_user_id,
+    c.assigned_team_id,
+    TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) AS contact_name
+FROM conversations c
+JOIN users u ON c.contact_id = u.id
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE LOWER(u.email) = LOWER($1)
+  AND u.type = 'contact'
+  AND u.deleted_at IS NULL
+ORDER BY c.created_at DESC
+LIMIT 50;
+
 -- name: get-chat-conversation
 SELECT
     c.created_at,
@@ -334,11 +375,13 @@ SELECT
     COALESCE(au.first_name, '') as "assignee.first_name",
     COALESCE(au.id, 0) as "assignee.id",
     COALESCE(au.last_name, '') as "assignee.last_name",
-    COALESCE(au.type::TEXT, '') as "assignee.type"
+    COALESCE(au.type::TEXT, '') as "assignee.type",
+    COALESCE(aa.expectation, '') as "assignee.expectation"
 FROM conversations c
 INNER JOIN inboxes inb on c.inbox_id = inb.id
 LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 LEFT JOIN users au ON c.assigned_user_id = au.id
+LEFT JOIN ai_assistants aa ON aa.user_id = au.id
 LEFT JOIN users lis ON c.last_interaction_sender_id = lis.id
 WHERE c.uuid = $1
   AND inb.deleted_at IS NULL;
@@ -401,7 +444,8 @@ WHERE uuid = $1 AND assigned_user_id IS NULL AND assigned_team_id = $3;
 UPDATE conversations
 SET contact_last_seen_at = NOW(),
 updated_at = NOW()
-WHERE uuid = $1;
+WHERE uuid = $1
+RETURNING contact_last_seen_at;
 
 -- name: update-conversation-assigned-team
 UPDATE conversations
@@ -466,7 +510,8 @@ WHERE conversation_id =
 -- name: insert-conversation-participant
 INSERT INTO conversation_participants
 (user_id, conversation_id)
-VALUES($1, (SELECT id FROM conversations WHERE uuid = $2));
+VALUES($1, (SELECT id FROM conversations WHERE uuid = $2))
+ON CONFLICT (conversation_id, user_id) DO NOTHING;
 
 -- name: get-unassigned-conversations
 SELECT
@@ -586,6 +631,7 @@ WHERE
   AND status_id IN (
     SELECT id FROM conversation_statuses WHERE name NOT IN ('Open')
   )
+RETURNING id;
 
 -- name: get-conversation-by-message-id
 SELECT
@@ -602,10 +648,43 @@ DELETE FROM conversations WHERE uuid = $1;
 
 -- MESSAGE queries.
 -- name: delete-message
-DELETE FROM conversation_messages WHERE CASE 
-    WHEN $1 > 0 THEN id = $1 
-    ELSE uuid = $2 
+DELETE FROM conversation_messages WHERE CASE
+    WHEN $1 > 0 THEN id = $1
+    ELSE uuid = $2
 END;
+
+-- name: delete-private-message
+-- $1 = message uuid, $2 = conversation uuid, $3 = deleted placeholder text, $4 = sender id, 0 to skip the sender check.
+WITH deleted AS (
+    UPDATE conversation_messages
+    SET content = $3, text_content = $3, updated_at = NOW(),
+        meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('deleted_at', NOW())
+    WHERE uuid = $1
+      AND private = true
+      AND meta->>'deleted_at' IS NULL
+      AND ($4 = 0 OR sender_id = $4)
+      AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
+    RETURNING id, conversation_id, created_at
+),
+media_unlink AS (
+    UPDATE media SET model_id = 0
+    FROM deleted d
+    WHERE media.model_type = 'messages' AND media.model_id = d.id
+),
+preview AS (
+    UPDATE conversations c
+    SET last_message = $3, updated_at = NOW()
+    FROM deleted d
+    WHERE c.id = d.conversation_id
+      AND NOT EXISTS (
+          SELECT 1 FROM conversation_messages m2
+          WHERE m2.conversation_id = d.conversation_id
+            AND m2.created_at > d.created_at
+      )
+    RETURNING c.id
+)
+SELECT EXISTS (SELECT 1 FROM preview) AS preview_updated
+FROM deleted d;
 
 -- name: get-message-source-ids
 SELECT 
@@ -668,6 +747,9 @@ SELECT
     m.sender_id,
     m.meta,
     c.uuid as conversation_uuid,
+    c.inbox_id,
+    c.assigned_user_id,
+    c.assigned_team_id,
     u.id AS "author.id",
     u.first_name AS "author.first_name",
     u.last_name AS "author.last_name",
@@ -696,6 +778,7 @@ LEFT JOIN media ON media.model_type = 'messages' AND media.model_id = m.id
 WHERE m.uuid = $1
 GROUP BY
     m.id, m.created_at, m.updated_at, m.status, m.type, m.content, m.uuid, m.private, m.sender_type, c.uuid,
+    c.inbox_id, c.assigned_user_id, c.assigned_team_id,
     u.id, u.first_name, u.last_name, u.email, u.avatar_url, u.availability_status, u.type, u.last_active_at
 ORDER BY m.created_at;
 
@@ -859,14 +942,14 @@ SET last_continuity_email_sent_at = NOW(),
 WHERE id = $1;
 
 -- name: upsert-conversation-draft
-INSERT INTO conversation_drafts (conversation_id, user_id, content, meta, updated_at)
-VALUES ($1, $2, $3, $4, NOW())
-ON CONFLICT (conversation_id, user_id)
+INSERT INTO conversation_drafts (conversation_id, user_id, type, content, meta, updated_at)
+VALUES ($1, $2, $3, $4, $5, NOW())
+ON CONFLICT (conversation_id, user_id, type)
 DO UPDATE SET content = EXCLUDED.content, meta = EXCLUDED.meta, updated_at = NOW()
 RETURNING *;
 
 -- name: get-all-user-drafts
-SELECT cd.id, cd.conversation_id, cd.user_id, cd.content, cd.meta, cd.created_at, cd.updated_at, c.uuid as conversation_uuid
+SELECT cd.id, cd.conversation_id, cd.user_id, cd.type, cd.content, cd.meta, cd.created_at, cd.updated_at, c.uuid as conversation_uuid
 FROM conversation_drafts cd
 INNER JOIN conversations c ON cd.conversation_id = c.id
 WHERE cd.user_id = $1
@@ -877,7 +960,8 @@ DELETE FROM conversation_drafts
 WHERE conversation_id IN (
   SELECT id FROM conversations
   WHERE ($1 > 0 AND id = $1) OR (NULLIF($2, '')::uuid IS NOT NULL AND uuid = NULLIF($2, '')::uuid)
-) AND user_id = $3;
+) AND user_id = $3
+AND ($4::text = '' OR type = $4::text);
 
 -- name: delete-stale-drafts
 DELETE FROM conversation_drafts

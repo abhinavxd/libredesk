@@ -16,6 +16,7 @@ const (
 	PermConversationWrite               = "conversations:write"
 	PermMessagesRead                    = "messages:read"
 	PermMessagesWrite                   = "messages:write"
+	PermMessagesWritePrivate            = "messages:write_private"
 	PermMessagesWriteAsContact          = "messages:write_as_contact"
 
 	// View
@@ -76,12 +77,16 @@ const (
 	// AI
 	PermAIManage = "ai:manage"
 
+	// Help center
+	PermHelpCenterManage = "help_center:manage"
+
 	// Contacts
 	PermContactsReadAll = "contacts:read_all"
 	PermContactsRead    = "contacts:read"
 	PermContactsWrite   = "contacts:write"
 	PermContactsBlock   = "contacts:block"
 	PermContactsDelete  = "contacts:delete"
+	PermContactsExport  = "contacts:export"
 
 	// Contact Notes
 	PermContactNotesRead   = "contact_notes:read"
@@ -110,6 +115,7 @@ var validPermissions = map[string]struct{}{
 	PermConversationWrite:               {},
 	PermMessagesRead:                    {},
 	PermMessagesWrite:                   {},
+	PermMessagesWritePrivate:            {},
 	PermMessagesWriteAsContact:          {},
 	PermViewManage:                      {},
 	PermSharedViewsManage:               {},
@@ -129,12 +135,14 @@ var validPermissions = map[string]struct{}{
 	PermNotificationSettingsManage:      {},
 	PermOIDCManage:                      {},
 	PermAIManage:                        {},
+	PermHelpCenterManage:                {},
 	PermCustomAttributesManage:          {},
 	PermContactsReadAll:                 {},
 	PermContactsRead:                    {},
 	PermContactsWrite:                   {},
 	PermContactsBlock:                   {},
 	PermContactsDelete:                  {},
+	PermContactsExport:                  {},
 	PermContactNotesRead:                {},
 	PermContactNotesWrite:               {},
 	PermContactNotesDelete:              {},

@@ -145,7 +145,7 @@ const uploadMedia = (conversationUUID, files) => {
     }
     return http.post('/api/v1/widget/media/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 30000
+        timeout: 120000
     })
 }
 const updateConversationLastSeen = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/update-last-seen`)

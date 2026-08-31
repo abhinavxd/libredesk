@@ -19,7 +19,7 @@ SELECT
 FROM conversations
 JOIN users ON conversations.contact_id = users.id
 LEFT JOIN conversation_statuses cs ON conversations.status_id = cs.id
-WHERE users.email = $1
+WHERE users.email ILIKE '%' || $1 || '%'
 ORDER BY conversations.created_at DESC
 LIMIT 1000;
 

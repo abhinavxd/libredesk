@@ -1,5 +1,5 @@
 <script setup>
-import { DialogRoot, useForwardPropsEmits } from 'reka-ui';
+import { DialogRoot, useForwardPropsEmits } from 'radix-vue';
 
 const props = defineProps({
   open: { type: Boolean, required: false },

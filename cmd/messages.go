@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
@@ -22,6 +23,7 @@ type messageReq struct {
 	SenderType  string                 `json:"sender_type"`
 	Mentions    []cmodels.MentionInput `json:"mentions"`
 	EchoID      string                 `json:"echo_id"`
+	SourceID    string                 `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact sender only.
 }
 
 // handleGetMessages returns messages for a conversation.
@@ -66,11 +68,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	rootURL, _ := app.setting.GetAppRootURL()
 	for i := range messages {
 		total = messages[i].Total
-		// Populate attachment URLs
-		for j := range messages[i].Attachments {
-			att := messages[i].Attachments[j]
-			messages[i].Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
-		}
+		app.conversation.SignAttachmentURLs(messages[i].Attachments)
 		resolveQuotedCIDs(app, &messages[i])
 		resolveAttachmentCIDs(&messages[i], rootURL)
 	}
@@ -79,7 +77,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	app.conversation.ProcessCSATStatus(messages)
 
 	// Strip CSAT UUID from agent sessions to prevent self-rating.
-	if r.RequestCtx.UserValue("auth_method") != "api_key" {
+	if r.RequestCtx.UserValue("auth_method") != authMethodAPIKey {
 		for i := range messages {
 			if messages[i].HasCSAT() {
 				messages[i].StripCSATUUID()
@@ -130,15 +128,12 @@ func handleGetMessage(r *fastglue.Request) error {
 	message = messages[0]
 
 	// Strip CSAT UUID from agent sessions to prevent self-rating.
-	if r.RequestCtx.UserValue("auth_method") != "api_key" && message.HasCSAT() {
+	if r.RequestCtx.UserValue("auth_method") != authMethodAPIKey && message.HasCSAT() {
 		message.StripCSATUUID()
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
-	for j := range message.Attachments {
-		att := message.Attachments[j]
-		message.Attachments[j].URL = app.media.GetURL(att.UUID, att.ContentType, att.Name)
-	}
+	app.conversation.SignAttachmentURLs(message.Attachments)
 	resolveQuotedCIDs(app, &message)
 	resolveAttachmentCIDs(&message, rootURL)
 
@@ -205,6 +200,10 @@ func handleSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
+	if !canCreateConversationMessage(user, req) {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+	}
+
 	// Make sure the inbox is enabled.
 	inbox, err := app.inbox.GetDBRecord(conv.InboxID)
 	if err != nil {
@@ -250,7 +249,7 @@ func handleSendMessage(r *fastglue.Request) error {
 
 	// Create contact message.
 	if req.SenderType == umodels.UserTypeContact {
-		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false)
+		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false, req.SourceID)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -278,6 +277,7 @@ func handleSendMessage(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	markAssignmentNotificationRead(app, conv, user)
 	resolveQuotedCIDs(app, &message)
 	resolveAttachmentCIDs(&message, rootURL)
 	return r.SendEnvelope(message)
@@ -308,4 +308,13 @@ func resolveQuotedCIDs(app *App, msg *cmodels.Message) {
 		url := app.media.GetURL(ref.UUID, ref.ContentType, ref.Filename)
 		msg.Content = strings.ReplaceAll(msg.Content, "cid:"+ref.ContentID, url)
 	}
+}
+
+// canCreateConversationMessage returns whether the user may create a message of the requested visibility.
+func canCreateConversationMessage(user umodels.User, req messageReq) bool {
+	requiredPermission := authzModels.PermMessagesWrite
+	if req.Private {
+		requiredPermission = authzModels.PermMessagesWritePrivate
+	}
+	return slices.Contains(user.Permissions, requiredPermission)
 }

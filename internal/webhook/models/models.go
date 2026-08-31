@@ -27,6 +27,9 @@ type Webhook struct {
 	Secret    string         `db:"secret" json:"secret"`
 	IsActive  bool           `db:"is_active" json:"is_active"`
 	Delivery  string         `db:"delivery" json:"delivery"`
+	InboxIDs  pq.Int64Array  `db:"inbox_ids" json:"inbox_ids"`
+	TeamIDs   pq.Int64Array  `db:"team_ids" json:"team_ids"`
+	UserIDs   pq.Int64Array  `db:"user_ids" json:"user_ids"`
 }
 
 func IsDiscordWebhookURL(raw string) bool {
@@ -45,6 +48,12 @@ func IsDiscordWebhookURL(raw string) bool {
 
 func (w Webhook) IsDiscordURL() bool {
 	return IsDiscordWebhookURL(w.URL)
+}
+
+// WebhookCompact is a minimal webhook representation for dropdowns.
+type WebhookCompact struct {
+	ID   int    `db:"id" json:"id"`
+	Name string `db:"name" json:"name"`
 }
 
 // WebhookEvent represents an event that can trigger a webhook
