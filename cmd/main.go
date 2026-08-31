@@ -361,7 +361,8 @@ func main() {
 		}
 	}()
 
-	// Start the app update checker.
+	// Start the app update checker. The Stackblaze fork defaults this off
+	// (config.sample.toml) so we do not nag about upstream Libredesk releases.
 	if ko.Bool("app.check_updates") {
 		go checkUpdates(versionString, time.Hour*1, app)
 	}

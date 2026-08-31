@@ -175,7 +175,10 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -z "$VERSION" ]; then
+            VERSION="v2.8.0-sb"
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building version ${VERSION}"
 
