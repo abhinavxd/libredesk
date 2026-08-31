@@ -27,6 +27,9 @@ type Webhook struct {
 	Secret    string         `db:"secret" json:"secret"`
 	IsActive  bool           `db:"is_active" json:"is_active"`
 	Delivery  string         `db:"delivery" json:"delivery"`
+	InboxIDs  pq.Int64Array  `db:"inbox_ids" json:"inbox_ids"`
+	TeamIDs   pq.Int64Array  `db:"team_ids" json:"team_ids"`
+	UserIDs   pq.Int64Array  `db:"user_ids" json:"user_ids"`
 }
 
 func IsDiscordWebhookURL(raw string) bool {

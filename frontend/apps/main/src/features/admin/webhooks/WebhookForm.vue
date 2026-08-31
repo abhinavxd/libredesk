@@ -64,6 +64,61 @@
       </FormItem>
     </FormField>
 
+    <div class="space-y-4 rounded-md border border-border bg-card p-5">
+      <div>
+        <h4 class="font-medium text-card-foreground">{{ $t('admin.webhook.filters.title') }}</h4>
+        <p class="text-sm text-muted-foreground mt-1">{{ $t('admin.webhook.filters.description') }}</p>
+      </div>
+
+      <FormField name="inbox_ids" v-slot="{ componentField, handleChange }">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.inbox', 2) }}</FormLabel>
+          <FormControl>
+            <SelectTag
+              :items="inboxStore.options"
+              :placeholder="$t('placeholders.selectInbox')"
+              v-model="componentField.modelValue"
+              @update:modelValue="handleChange"
+            />
+          </FormControl>
+          <FormDescription>{{ $t('admin.webhook.filters.emptyMeansAll') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField name="team_ids" v-slot="{ componentField, handleChange }">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.team', 2) }}</FormLabel>
+          <FormControl>
+            <SelectTag
+              :items="teamStore.options"
+              :placeholder="$t('placeholders.selectTeams')"
+              v-model="componentField.modelValue"
+              @update:modelValue="handleChange"
+            />
+          </FormControl>
+          <FormDescription>{{ $t('admin.webhook.filters.emptyMeansAll') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField name="user_ids" v-slot="{ componentField, handleChange }">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.agent', 2) }}</FormLabel>
+          <FormControl>
+            <SelectTag
+              :items="agentOptions"
+              :placeholder="$t('placeholders.selectAgent')"
+              v-model="componentField.modelValue"
+              @update:modelValue="handleChange"
+            />
+          </FormControl>
+          <FormDescription>{{ $t('admin.webhook.filters.emptyMeansAll') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </div>
+
     <FormField name="events" v-slot="{ componentField, handleChange }">
       <FormItem>
         <FormLabel>{{ $t('globals.terms.event', 2) }}</FormLabel>
@@ -125,11 +180,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Label } from '@shared-ui/components/ui/label'
 import { useI18n } from 'vue-i18n'
 import { useFieldValue } from 'vee-validate'
+import { useInboxStore } from '@/stores/inbox'
+import { useTeamStore } from '@/stores/team'
+import { useUsersStore } from '@/stores/users'
 import {
   FormControl,
   FormField,
@@ -145,7 +203,8 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
+  SelectTag
 } from '@shared-ui/components/ui/select'
 
 defineProps({
@@ -161,6 +220,18 @@ defineProps({
 const { t } = useI18n()
 const delivery = useFieldValue('delivery')
 const isDiscord = computed(() => delivery.value === 'discord')
+const inboxStore = useInboxStore()
+const teamStore = useTeamStore()
+const usersStore = useUsersStore()
+const agentOptions = computed(() =>
+  usersStore.options.filter((o) => o.type !== 'ai_assistant')
+)
+
+onMounted(() => {
+  inboxStore.fetchInboxes()
+  teamStore.fetchTeams()
+  usersStore.fetchUsers()
+})
 
 const webhookEvents = ref([
   {

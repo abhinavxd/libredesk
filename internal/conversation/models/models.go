@@ -322,7 +322,9 @@ type Message struct {
 	SourceID          null.String            `db:"source_id" json:"-"`
 	SenderID          int                    `db:"sender_id" json:"sender_id"`
 	SenderType        string                 `db:"sender_type" json:"sender_type"`
-	InboxID           int                    `db:"inbox_id" json:"-"`
+	InboxID           int                    `db:"inbox_id" json:"inbox_id"`
+	AssignedUserID    null.Int               `db:"assigned_user_id" json:"assigned_user_id,omitempty"`
+	AssignedTeamID    null.Int               `db:"assigned_team_id" json:"assigned_team_id,omitempty"`
 	Meta              json.RawMessage        `db:"meta" json:"meta"`
 	Attachments       attachment.Attachments `db:"attachments" json:"attachments"`
 	From              string                 `db:"from"  json:"-"`

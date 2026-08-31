@@ -63,6 +63,9 @@ const form = useForm({
     delivery: 'http',
     url: '',
     events: [],
+    inbox_ids: [],
+    team_ids: [],
+    user_ids: [],
     secret: '',
     is_active: true,
     headers: '{}'
@@ -134,7 +137,17 @@ onMounted(async () => {
     try {
       isLoading.value = true
       const resp = await api.getWebhook(props.id)
-      form.setValues(resp.data.data, false)
+      const data = resp.data.data
+      const toIDs = (ids) => (ids || []).map((id) => String(id))
+      form.setValues(
+        {
+          ...data,
+          inbox_ids: toIDs(data.inbox_ids),
+          team_ids: toIDs(data.team_ids),
+          user_ids: toIDs(data.user_ids)
+        },
+        false
+      )
       // The secret is already masked by the backend, no need to modify it here
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

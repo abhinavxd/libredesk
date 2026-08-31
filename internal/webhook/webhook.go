@@ -172,7 +172,7 @@ func (m *Manager) Create(webhook models.Webhook) (models.Webhook, error) {
 		return models.Webhook{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.webhook.invalidDiscordURL"), nil)
 	}
 
-	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery); err != nil {
+	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery, normalizeIDs(webhook.InboxIDs), normalizeIDs(webhook.TeamIDs), normalizeIDs(webhook.UserIDs)); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return models.Webhook{}, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}
@@ -215,7 +215,7 @@ func (m *Manager) Update(id int, webhook models.Webhook) (models.Webhook, error)
 		return models.Webhook{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.webhook.invalidDiscordURL"), nil)
 	}
 
-	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery); err != nil {
+	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive, delivery, normalizeIDs(webhook.InboxIDs), normalizeIDs(webhook.TeamIDs), normalizeIDs(webhook.UserIDs)); err != nil {
 		m.lo.Error("error updating webhook", "error", err)
 		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -369,6 +369,11 @@ func (m *Manager) deliverWebhook(task DeliveryTask) {
 	}
 
 	for _, webhook := range webhooks {
+		if !matchesWebhookFilters(webhook, task) {
+			m.lo.Debug("skipping webhook, event does not match inbox/team/user filters",
+				"webhook_id", webhook.ID, "event", task.Event)
+			continue
+		}
 		m.deliverSingleWebhook(webhook, task)
 	}
 }
@@ -467,6 +472,25 @@ func (m *Manager) generateSignature(payload []byte, secret string) string {
 	h := hmac.New(sha256.New, []byte(secret))
 	h.Write(payload)
 	return "sha256=" + hex.EncodeToString(h.Sum(nil))
+}
+
+func normalizeIDs(ids pq.Int64Array) pq.Int64Array {
+	if len(ids) == 0 {
+		return pq.Int64Array{}
+	}
+	out := make(pq.Int64Array, 0, len(ids))
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
 
 // getWebhooksByEvent retrieves active webhooks that are subscribed to a specific event.
