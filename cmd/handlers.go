@@ -57,6 +57,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/teams/{id}/conversations/unassigned", perm(handleGetTeamUnassignedConversations, "conversations:read_team_inbox"))
 	g.GET("/api/v1/views/{id}/conversations", perm(handleGetViewConversations, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}", perm(handleGetConversation, "conversations:read"))
+	g.DELETE("/api/v1/conversations/{uuid}", perm(handleDeleteConversation, "conversations:write"))
 	g.GET("/api/v1/conversations/{uuid}/participants", perm(handleGetConversationParticipants, "conversations:read"))
 	g.PUT("/api/v1/conversations/{uuid}/assignee/user", perm(handleUpdateUserAssignee, "conversations:update_user_assignee"))
 	g.PUT("/api/v1/conversations/{uuid}/assignee/team", perm(handleUpdateTeamAssignee, "conversations:update_team_assignee"))
@@ -151,6 +152,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.DELETE("/api/v1/contacts/{id}", perm(handleDeleteContact, "contacts:delete"))
 	g.PUT("/api/v1/contacts/{id}/block", perm(handleBlockContact, "contacts:block"))
 	g.GET("/api/v1/contacts/{id}/export", perm(handleExportContact, "contacts:export"))
+	g.GET("/api/v1/contacts/{id}/conversations", perm(handleGetContactConversations, "contacts:read"))
 
 	// Contact notes.
 	g.GET("/api/v1/contacts/{id}/notes", perm(handleGetContactNotes, "contact_notes:read"))

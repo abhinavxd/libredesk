@@ -66,6 +66,43 @@ func handleGetContact(r *fastglue.Request) error {
 	return r.SendEnvelope(c)
 }
 
+const contactConversationLimit = 100
+
+// handleGetContactConversations returns this contact's tickets the agent is allowed to read.
+func handleGetContactConversations(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	if _, err := app.user.GetContactOrVisitor(id, ""); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	convs, err := app.conversation.GetContactPreviousConversations(id, contactConversationLimit)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	uuids := make([]string, len(convs))
+	for i, c := range convs {
+		uuids[i] = c.UUID
+	}
+	allowed, err := app.conversation.FilterAuthorizedListUUIDs(auser.ID, uuids)
+	if err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
+	set := uuidSet(allowed)
+	out := convs[:0]
+	for _, c := range convs {
+		if _, ok := set[c.UUID]; ok {
+			out = append(out, c)
+		}
+	}
+	return r.SendEnvelope(out)
+}
+
 // handleUpdateContact updates a contact in the database.
 func handleUpdateContact(r *fastglue.Request) error {
 	var (

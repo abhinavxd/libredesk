@@ -396,6 +396,15 @@ describe('API: conversations', () => {
     })
   })
 
+  it('deletes the conversation', () => {
+    cy.api('DELETE', `/api/v1/conversations/${uuid}`).its('status').should('eq', 200)
+    cy.api('GET', `/api/v1/conversations/${uuid}`, null, { failOnStatusCode: false })
+      .then(({ status, body }) => {
+        expect(status).to.eq(404)
+        expect(body.error_type).to.eq('NotFoundException')
+      })
+  })
+
   // A uuid that is not a uuid reaches the query and comes back as a 500 GeneralException.
   it.skip('rejects a malformed conversation uuid', () => {
     cy.api('GET', '/api/v1/conversations/not-a-uuid', null, { failOnStatusCode: false })

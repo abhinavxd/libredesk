@@ -70,6 +70,10 @@
       <p class="prop-label">{{ t('globals.terms.macro', 2) }}</p>
       <ZendeskMacroPicker />
     </div>
+
+    <div class="pt-4">
+      <ConversationSpamActions />
+    </div>
   </aside>
 </template>
 
@@ -84,6 +88,7 @@ import { useTagStore } from '@main/stores/tag'
 import { TAG_ACTION } from '@/constants/conversation'
 import { useTeamFilteredAgentOptions } from '@main/composables/useTeamFilteredAgentOptions'
 import ZendeskMacroPicker from './ZendeskMacroPicker.vue'
+import ConversationSpamActions from '@/features/conversation/ConversationSpamActions.vue'
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()

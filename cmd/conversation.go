@@ -333,6 +333,27 @@ func handleGetConversation(r *fastglue.Request) error {
 	return r.SendEnvelope(conv)
 }
 
+// handleDeleteConversation permanently deletes a conversation the agent can access.
+func handleDeleteConversation(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := app.conversation.DeleteConversation(uuid); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	app.conversation.BroadcastConversationUpdate(uuid, map[string]any{"deleted": true})
+	return r.SendEnvelope(true)
+}
+
 // handleDownloadConversationTranscript sends the conversation transcript as a text file download.
 func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	var (

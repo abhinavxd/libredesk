@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full min-h-0 overflow-y-auto px-4 sm:px-6 md:px-12 lg:px-24 xl:px-24 2xl:px-96 pt-6 pb-12">
+  <div class="w-full h-full min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-10 pt-6 pb-12">
     <slot></slot>
   </div>
 </template>

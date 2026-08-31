@@ -301,6 +301,8 @@ SELECT
     c.updated_at,
     c.uuid,
     c.subject,
+    c.reference_number,
+    cs.name AS status,
     u.first_name AS "contact.first_name",
     u.last_name AS "contact.last_name",
     u.avatar_url AS "contact.avatar_url",
@@ -308,8 +310,9 @@ SELECT
     c.last_message_at as last_message_at
 FROM users u
 JOIN conversations c ON c.contact_id = u.id
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 WHERE c.contact_id = $1
-ORDER BY c.created_at DESC
+ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
 LIMIT $2;
 
 -- name: get-contact-conversations-for-ai

@@ -204,6 +204,7 @@ const updateRole = (id, data) =>
 const deleteRole = (id) => http.delete(`/api/v1/roles/${id}`)
 const getContacts = (params) => http.get('/api/v1/contacts', { params })
 const getContact = (id) => http.get(`/api/v1/contacts/${id}`)
+const getContactConversations = (id) => http.get(`/api/v1/contacts/${id}/conversations`)
 const updateContact = (id, data) =>
   http.put(`/api/v1/contacts/${id}`, data, {
     headers: {
@@ -346,6 +347,7 @@ const sendMessage = (uuid, data) =>
     }
   })
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
+const deleteConversation = (uuid) => http.delete(`/api/v1/conversations/${uuid}`)
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
@@ -648,6 +650,7 @@ export default {
   getLanguage,
   getAvailableLanguages,
   getConversation,
+  deleteConversation,
   getAutomationRule,
   getAutomationRules,
   getAllBusinessHours,
@@ -817,6 +820,7 @@ export default {
   removeAssignee,
   getContacts,
   getContact,
+  getContactConversations,
   updateContact,
   blockContact,
   deleteContact,

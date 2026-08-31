@@ -974,6 +974,10 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function handleConvPush (payload) {
     if (!payload || !payload.uuid) return
+    if (payload.deleted) {
+      removeConversation(payload.uuid)
+      return
+    }
     if (mergeIntoList(payload.uuid, payload)) {
       if (conversation.data?.uuid === payload.uuid) {
         deepMerge(conversation.data, payload)
@@ -989,10 +993,42 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function mergeConversationUpdate (update) {
+    if (update.deleted) {
+      removeConversation(update.uuid)
+      return
+    }
     if (conversation.data?.uuid === update.uuid) {
       deepMerge(conversation.data, update)
     }
     mergeIntoList(update.uuid, update)
+  }
+
+  function removeConversation (uuid) {
+    if (!uuid) return
+    if (conversations.data?.length) {
+      const before = conversations.data.length
+      conversations.data = conversations.data.filter((c) => c.uuid !== uuid)
+      if (conversations.data.length < before && conversations.total > 0) {
+        conversations.total -= 1
+      }
+    }
+    if (selectedUUIDs.value.has(uuid)) {
+      const next = new Set(selectedUUIDs.value)
+      next.delete(uuid)
+      selectedUUIDs.value = next
+    }
+    if (conversation.data?.uuid === uuid) {
+      conversation.data = null
+    }
+    conversationDataCache.delete(uuid)
+    staleConversationUUIDs.delete(uuid)
+  }
+
+  async function deleteCurrentConversation () {
+    const uuid = conversation.data?.uuid
+    if (!uuid) return
+    await api.deleteConversation(uuid)
+    removeConversation(uuid)
   }
 
   function mergeContactUpdate (update) {
@@ -1196,6 +1232,8 @@ export const useConversationStore = defineStore('conversation', () => {
     snoozeConversation,
     fetchConversation,
     fetchConversationsList,
+    deleteCurrentConversation,
+    removeConversation,
     fetchMessages,
     updateConversationTags,
     updateAssignee,
