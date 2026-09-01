@@ -30,6 +30,7 @@ var (
 	regexpSlugChars       = regexp.MustCompile(`[^a-z0-9\-_]+`)
 	regexpHyphens         = regexp.MustCompile(`-+`)
 	regexpConvUUID        = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+	regexpSideUUID        = regexp.MustCompile(`(?i)\+side-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
 
 	// markdownRenderer escapes raw HTML in the input; single newlines render as <br>.
 	markdownRenderer = goldmark.New(
@@ -257,6 +258,15 @@ func ExtractConvUUID(email string) string {
 		return ""
 	}
 	// match is "+conv-{uuid}@", extract just the UUID (skip "+conv-" prefix and "@" suffix)
+	return match[6 : len(match)-1]
+}
+
+// ExtractSideUUID extracts a side-conversation UUID from a plus-addressed email.
+func ExtractSideUUID(email string) string {
+	match := regexpSideUUID.FindString(email)
+	if match == "" {
+		return ""
+	}
 	return match[6 : len(match)-1]
 }
 

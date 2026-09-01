@@ -525,6 +525,7 @@ type IncomingMessage struct {
 
 	// Email threading
 	ConversationUUIDFromReplyTo string // UUID extracted from plus-addressed recipient (inbox+conv-{uuid}@domain)
+	SideConversationUUID        string // UUID extracted from plus-addressed recipient (inbox+side-{uuid}@domain)
 	InReplyTo                   string
 	References                  []string
 }
@@ -607,4 +608,30 @@ func Transcript(msgs []Message, max int) string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+type SideConversation struct {
+	ID             int            `db:"id" json:"id"`
+	UUID           string         `db:"uuid" json:"uuid"`
+	CreatedAt      time.Time      `db:"created_at" json:"created_at"`
+	UpdatedAt      time.Time      `db:"updated_at" json:"updated_at"`
+	ConversationID int            `db:"conversation_id" json:"conversation_id"`
+	Subject        string         `db:"subject" json:"subject"`
+	Recipients     pq.StringArray `db:"recipients" json:"recipients"`
+	CreatedBy      int            `db:"created_by" json:"created_by"`
+	Messages       []SideMessage  `db:"-" json:"messages,omitempty"`
+}
+
+type SideMessage struct {
+	ID                 int         `db:"id" json:"id"`
+	UUID               string      `db:"uuid" json:"uuid"`
+	CreatedAt          time.Time   `db:"created_at" json:"created_at"`
+	SideConversationID int         `db:"side_conversation_id" json:"side_conversation_id"`
+	SenderID           int         `db:"sender_id" json:"sender_id"`
+	Direction          string      `db:"direction" json:"direction"`
+	Content            string      `db:"content" json:"content"`
+	ContentType        string      `db:"content_type" json:"content_type"`
+	SourceID           null.String `db:"source_id" json:"source_id"`
+	AuthorFirstName    string      `db:"author_first_name" json:"author_first_name"`
+	AuthorLastName     string      `db:"author_last_name" json:"author_last_name"`
 }

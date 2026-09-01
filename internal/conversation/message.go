@@ -799,6 +799,23 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 // conversations, and creates a new conversation if necessary. It also
 // inserts the message, uploads any attachments, and queues the conversation evaluation of automation rules.
 func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Message, error) {
+	if in.SideConversationUUID != "" {
+		user := umodels.User{
+			FirstName: in.Contact.FirstName,
+			LastName:  in.Contact.LastName,
+			Email:     in.Contact.Email,
+			Type:      umodels.UserTypeContact,
+		}
+		if err := m.userStore.ResolveContact(&user, umodels.ContactSync); err != nil {
+			m.lo.Error("error resolving side-conversation sender", "error", err)
+			return models.Message{}, nil
+		}
+		if err := m.AppendInboundSideMessage(in.SideConversationUUID, user.ID, in.Content); err != nil {
+			m.lo.Error("error appending inbound side conversation", "error", err, "side_uuid", in.SideConversationUUID)
+		}
+		return models.Message{}, nil
+	}
+
 	// Return early if this message already exists (same source ID).
 	dupConvID, err := m.messageExistsBySourceID([]string{in.SourceID.String})
 	if err != nil && err != errConversationNotFound {

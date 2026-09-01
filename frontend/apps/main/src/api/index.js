@@ -89,6 +89,15 @@ const setContactOrganization = (id, data) =>
   http.put(`/api/v1/contacts/${id}/organization`, data, {
     headers: { 'Content-Type': 'application/json' }
   })
+const getSideConversations = (uuid) => http.get(`/api/v1/conversations/${uuid}/side-conversations`)
+const createSideConversation = (uuid, data) =>
+  http.post(`/api/v1/conversations/${uuid}/side-conversations`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const replySideConversation = (uuid, sideUuid, data) =>
+  http.post(`/api/v1/conversations/${uuid}/side-conversations/${sideUuid}/reply`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
 const getTemplate = (id) => http.get(`/api/v1/templates/${id}`)
 const getTemplates = (type) => http.get('/api/v1/templates', { params: { type: type } })
 const createTemplate = (data) =>
@@ -765,6 +774,9 @@ export default {
   updateOrganization,
   deleteOrganization,
   setContactOrganization,
+  getSideConversations,
+  createSideConversation,
+  replySideConversation,
   getStatuses,
   getPriorities,
   createStatus,
