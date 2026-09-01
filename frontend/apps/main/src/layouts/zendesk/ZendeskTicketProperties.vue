@@ -5,6 +5,19 @@
       <p class="text-sm font-medium truncate">
         {{ conversationStore.currentContactName }}
       </p>
+      <p
+        v-if="conversationStore.current?.contact?.organization_name"
+        class="text-xs text-muted-foreground truncate"
+      >
+        {{ conversationStore.current.contact.organization_name }}
+      </p>
+      <OrganizationPicker
+        v-if="conversationStore.current?.contact_id"
+        class="mt-1"
+        :model-value="conversationStore.current?.contact?.organization_id"
+        :label="t('globals.terms.organization')"
+        @change="onOrganizationChange"
+      />
     </div>
 
     <div class="prop-field">
@@ -91,6 +104,8 @@ import { useTeamFilteredAgentOptions } from '@main/composables/useTeamFilteredAg
 import ZendeskMacroPicker from './ZendeskMacroPicker.vue'
 import ConversationSpamActions from '@/features/conversation/ConversationSpamActions.vue'
 import ConversationMergeDialog from '@/features/conversation/ConversationMergeDialog.vue'
+import OrganizationPicker from '@/features/organization/OrganizationPicker.vue'
+import api from '@/api'
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
@@ -147,6 +162,20 @@ const selectPriority = (priority) => {
 
 const selectStatus = (status) => {
   conversationStore.updateStatus(status.value)
+}
+
+const onOrganizationChange = async (orgId) => {
+  const conv = conversationStore.current
+  if (!conv?.contact_id) return
+  try {
+    const { data } = await api.setContactOrganization(conv.contact_id, { organization_id: orgId })
+    if (conversationStore.current?.contact) {
+      conversationStore.current.contact.organization_id = data.data.organization_id
+      conversationStore.current.contact.organization_name = data.data.organization_name
+    }
+  } catch {
+    // keep previous selection
+  }
 }
 
 const onTagsChange = async (newTags) => {

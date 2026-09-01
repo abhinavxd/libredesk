@@ -25,6 +25,7 @@ func (u *Manager) CreateVisitor(user *models.User) error {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
 	}
+	u.notifyContactCreated(user.ID, user.Email.String)
 	return nil
 }
 

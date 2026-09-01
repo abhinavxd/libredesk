@@ -189,6 +189,13 @@ export const adminNavItems = [
         permission: 'activity_logs:manage',
         isTitleKeyPlural: true,
         icon: 'ScrollText'
+      },
+      {
+        titleKey: 'globals.terms.organization',
+        href: '/admin/organizations',
+        permission: 'organizations:manage',
+        isTitleKeyPlural: true,
+        icon: 'Building2'
       }
     ]
   },

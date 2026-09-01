@@ -230,6 +230,8 @@ type ConversationContact struct {
 	LastActiveAt           null.Time       `db:"last_active_at" json:"last_active_at"`
 	LastLoginAt            null.Time       `db:"last_login_at" json:"last_login_at"`
 	ExternalUserID         null.String     `db:"external_user_id" json:"external_user_id"`
+	OrganizationID         null.Int        `db:"organization_id" json:"organization_id"`
+	OrganizationName       null.String     `db:"organization_name" json:"organization_name"`
 }
 
 func (c *ConversationContact) FullName() string {

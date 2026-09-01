@@ -49,6 +49,32 @@ type mergeConversationReq struct {
 	TargetUUID string `json:"target_uuid"`
 }
 
+func conversationListFilters(r *fastglue.Request) string {
+	return appendOrganizationFilter(
+		string(r.RequestCtx.QueryArgs().Peek("filters")),
+		string(r.RequestCtx.QueryArgs().Peek("organization_id")),
+	)
+}
+
+func appendOrganizationFilter(filters, orgID string) string {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return filters
+	}
+	if _, err := strconv.Atoi(orgID); err != nil {
+		return filters
+	}
+	rule := fmt.Sprintf(`{"model":"users","field":"organization_id","operator":"equals","value":%q}`, orgID)
+	if filters == "" || filters == "[]" {
+		return "[" + rule + "]"
+	}
+	var arr []json.RawMessage
+	if err := json.Unmarshal([]byte(filters), &arr); err == nil {
+		return filters[:len(filters)-1] + "," + rule + "]"
+	}
+	return fmt.Sprintf(`{"logic":"AND","rules":[%s,%s]}`, filters, rule)
+}
+
 type createConversationRequest struct {
 	InboxID          int            `json:"inbox_id"`
 	AssignedAgentID  int            `json:"agent_id"`
@@ -73,7 +99,7 @@ func handleGetAllConversations(r *fastglue.Request) error {
 		user    = r.RequestCtx.UserValue("user").(amodels.User)
 		order   = string(r.RequestCtx.QueryArgs().Peek("order"))
 		orderBy = string(r.RequestCtx.QueryArgs().Peek("order_by"))
-		filters = string(r.RequestCtx.QueryArgs().Peek("filters"))
+		filters = conversationListFilters(r)
 		total   = 0
 	)
 	page, pageSize := getPagination(r)
@@ -103,7 +129,7 @@ func handleGetAssignedConversations(r *fastglue.Request) error {
 		user    = r.RequestCtx.UserValue("user").(amodels.User)
 		order   = string(r.RequestCtx.QueryArgs().Peek("order"))
 		orderBy = string(r.RequestCtx.QueryArgs().Peek("order_by"))
-		filters = string(r.RequestCtx.QueryArgs().Peek("filters"))
+		filters = conversationListFilters(r)
 		total   = 0
 	)
 	page, pageSize := getPagination(r)
@@ -131,7 +157,7 @@ func handleGetUnassignedConversations(r *fastglue.Request) error {
 		user    = r.RequestCtx.UserValue("user").(amodels.User)
 		order   = string(r.RequestCtx.QueryArgs().Peek("order"))
 		orderBy = string(r.RequestCtx.QueryArgs().Peek("order_by"))
-		filters = string(r.RequestCtx.QueryArgs().Peek("filters"))
+		filters = conversationListFilters(r)
 		total   = 0
 	)
 	page, pageSize := getPagination(r)
@@ -160,7 +186,7 @@ func handleGetMentionedConversations(r *fastglue.Request) error {
 		user    = r.RequestCtx.UserValue("user").(amodels.User)
 		order   = string(r.RequestCtx.QueryArgs().Peek("order"))
 		orderBy = string(r.RequestCtx.QueryArgs().Peek("order_by"))
-		filters = string(r.RequestCtx.QueryArgs().Peek("filters"))
+		filters = conversationListFilters(r)
 		total   = 0
 	)
 	page, pageSize := getPagination(r)
@@ -278,7 +304,7 @@ func handleGetTeamUnassignedConversations(r *fastglue.Request) error {
 		teamIDStr = r.RequestCtx.UserValue("id").(string)
 		order     = string(r.RequestCtx.QueryArgs().Peek("order"))
 		orderBy   = string(r.RequestCtx.QueryArgs().Peek("order_by"))
-		filters   = string(r.RequestCtx.QueryArgs().Peek("filters"))
+		filters   = conversationListFilters(r)
 		total     = 0
 	)
 	page, pageSize := getPagination(r)

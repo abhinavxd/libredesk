@@ -66,6 +66,12 @@
         {{ phoneNumber }}
       </span>
     </div>
+    <OrganizationPicker
+      v-if="conversation?.contact_id"
+      :model-value="conversation?.contact?.organization_id"
+      :label="t('globals.terms.organization')"
+      @change="onOrganizationChange"
+    />
     <div class="flex gap-2 items-center" v-if="conversation?.contact?.external_user_id">
       <IdCard size="16" class="text-muted-foreground flex-shrink-0" />
       <span class="sidebar-value">
@@ -136,6 +142,7 @@ import { useI18n } from 'vue-i18n'
 import api from '../../../api'
 import ConversationSpamActions from '@/features/conversation/ConversationSpamActions.vue'
 import ConversationMergeDialog from '@/features/conversation/ConversationMergeDialog.vue'
+import OrganizationPicker from '@/features/organization/OrganizationPicker.vue'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
 const conversation = computed(() => conversationStore.current)
@@ -200,6 +207,20 @@ const openContextLink = async (app) => {
     // Silently ignore.
   } finally {
     loadingAppId.value = null
+  }
+}
+
+const onOrganizationChange = async (orgId) => {
+  const conv = conversation.value
+  if (!conv?.contact_id) return
+  try {
+    const resp = await api.setContactOrganization(conv.contact_id, { organization_id: orgId })
+    if (conversationStore.current?.contact) {
+      conversationStore.current.contact.organization_id = resp.data.data.organization_id
+      conversationStore.current.contact.organization_name = resp.data.data.organization_name
+    }
+  } catch {
+    // keep previous selection
   }
 }
 </script>

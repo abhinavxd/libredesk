@@ -53,7 +53,7 @@ var (
 	ErrConversationAlreadyAssigned  = errors.New("conversation already assigned")
 	conversationsAllowedFields      = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since", "next_sla_deadline_at", "snoozed_until", "sla_policy_id"}
 	conversationStatusAllowedFields = []string{"id", "name"}
-	usersAllowedFields              = []string{"email", "external_user_id"}
+	usersAllowedFields              = []string{"email", "external_user_id", "organization_id"}
 	inboxesAllowedFields            = []string{"channel"}
 )
 

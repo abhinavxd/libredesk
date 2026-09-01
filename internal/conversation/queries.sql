@@ -242,6 +242,8 @@ SELECT
    ct.last_active_at as "contact.last_active_at",
    ct.last_login_at as "contact.last_login_at",
    ct.external_user_id as "contact.external_user_id",
+   ct.organization_id as "contact.organization_id",
+   org.name as "contact.organization_name",
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
    as_latest.id as applied_sla_id,
@@ -255,6 +257,7 @@ SELECT
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
+LEFT JOIN organizations org ON org.id = ct.organization_id
 LEFT JOIN LATERAL (
     SELECT rating, feedback, response_timestamp
     FROM csat_responses
