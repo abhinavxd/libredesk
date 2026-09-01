@@ -1,20 +1,16 @@
 <template>
-  <a :href="link.url" target="_blank" rel="noopener noreferrer" class="block no-underline">
-    <Card class="hover:bg-accent transition-colors cursor-pointer rounded-md">
-      <CardContent class="p-4">
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-foreground font-medium">
-            {{ link.text }}
-          </span>
-          <ExternalLink size="18" class="text-muted-foreground" />
-        </div>
-      </CardContent>
-    </Card>
+  <a
+    :href="link.url"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="widget-starter no-underline"
+  >
+    <span>{{ link.text }}</span>
+    <ExternalLink class="widget-starter__icon" />
   </a>
 </template>
 
 <script setup>
-import { Card, CardContent } from '@shared-ui/components/ui/card'
 import { ExternalLink } from 'lucide-vue-next'
 
 defineProps({

@@ -52,7 +52,7 @@
                         ? 'bg-destructive/60'
                         : 'bg-primary'
                   ]
-                : 'bg-muted text-foreground rounded-bl-sm',
+                : 'widget-agent-bubble bg-muted text-foreground rounded-bl-sm',
               {
                 'show-quoted-text': isQuotedTextVisible(message.uuid),
                 'hide-quoted-text': !isQuotedTextVisible(message.uuid)

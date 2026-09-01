@@ -1,24 +1,17 @@
 <template>
-  <div
-    v-if="starters.length"
-    :class="['flex flex-col gap-2 px-4 pb-4 bg-background', heading ? 'pt-3' : 'pt-1']"
-  >
-    <div v-if="heading" class="text-sm font-medium text-foreground">{{ heading }}</div>
-    <div class="space-y-1.5">
-      <Card
+  <div v-if="starters.length" class="widget-starters" :class="{ 'pt-2': heading }">
+    <div v-if="heading" class="widget-starters__heading">{{ heading }}</div>
+    <div class="widget-starters__list">
+      <button
         v-for="(starter, index) in starters"
         :key="index"
-        class="hover:bg-accent transition-colors cursor-pointer rounded-md"
-        role="button"
+        type="button"
+        class="widget-starter"
         @click="start(starter)"
       >
-        <CardContent class="px-4 py-2.5">
-          <div class="flex justify-between items-center gap-3">
-            <span class="text-sm text-foreground font-medium">{{ starter.text }}</span>
-            <ArrowRight size="16" class="text-muted-foreground shrink-0" />
-          </div>
-        </CardContent>
-      </Card>
+        <span>{{ starter.text }}</span>
+        <ArrowRight class="widget-starter__icon" />
+      </button>
     </div>
   </div>
 </template>
@@ -26,7 +19,6 @@
 <script setup>
 import { computed } from 'vue'
 import { ArrowRight } from 'lucide-vue-next'
-import { Card, CardContent } from '@shared-ui/components/ui/card'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
 

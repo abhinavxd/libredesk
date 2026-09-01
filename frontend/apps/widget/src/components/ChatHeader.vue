@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center p-2 border-b border-border bg-background gap-2 relative min-w-0">
+  <div class="widget-chat-header flex items-center px-2 py-2.5 border-b border-border bg-background gap-2 relative min-w-0">
     <div class="flex items-center gap-2 justify-start">
       <Button @click="$emit('goBack')" variant="ghost" size="sm" :aria-label="$t('globals.messages.goBack')">
         <ArrowLeft />

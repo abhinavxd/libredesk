@@ -1,0 +1,246 @@
+/* Live-chat widget theme.
+ *
+ * Light mode is a white panel meant to sit on marketing/status pages, not an
+ * inverted copy of the dark Intercom-style surface. Dark mode keeps the
+ * existing tokens from :root/.dark. */
+
+.libredesk-widget-app.light,
+.libredesk-widget-preview.light {
+  color-scheme: light;
+
+  --background: 0 0% 100%;
+  --foreground: 240 10% 8%;
+  --foreground-lighter: 240 5% 46%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 8%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 8%;
+
+  --secondary: 240 6% 96.5%;
+  --secondary-foreground: 240 10% 8%;
+
+  --muted: 240 5% 96.5%;
+  --muted-foreground: 240 4% 42%;
+
+  --accent: 240 6% 97%;
+  --accent-foreground: 240 10% 8%;
+
+  --border: 240 6% 90%;
+  --input: 240 6% 86%;
+  --radius: 0.75rem;
+
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
+}
+
+.libredesk-widget-app.dark,
+.libredesk-widget-preview.dark {
+  color-scheme: dark;
+}
+
+/* --- Home header --- */
+
+.widget-home-header__greeting {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.widget-home-header__intro {
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.libredesk-widget-app.light .widget-home-header__greeting,
+.libredesk-widget-preview.light .widget-home-header__greeting {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 1.625rem;
+  font-weight: 700;
+}
+
+/* --- Primary CTA --- */
+
+.widget-home-cta {
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.libredesk-widget-app.light .widget-home-cta,
+.libredesk-widget-preview.light .widget-home-cta {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.libredesk-widget-app.light .widget-home-cta:hover,
+.libredesk-widget-preview.light .widget-home-cta:hover {
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+}
+
+/* --- Conversation starters / list rows --- */
+
+.widget-starters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 1rem 1.25rem;
+  background: hsl(var(--background));
+}
+
+.widget-starters__heading {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.widget-starters__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.widget-starter {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8125rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.widget-starter:hover,
+.widget-starter:focus-visible {
+  background: hsl(var(--accent));
+  border-color: hsl(var(--border));
+  outline: none;
+}
+
+.libredesk-widget-app.light .widget-starter,
+.libredesk-widget-preview.light .widget-starter {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.libredesk-widget-app.light .widget-starter:hover,
+.libredesk-widget-preview.light .widget-starter:hover {
+  border-color: hsl(var(--foreground) / 0.12);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.widget-starter__icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: hsl(var(--muted-foreground));
+}
+
+/* --- Bottom nav --- */
+
+.widget-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+}
+
+.libredesk-widget-app.light .widget-nav,
+.libredesk-widget-preview.light .widget-nav {
+  background: hsl(0 0% 100%);
+}
+
+.widget-nav-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.5rem 0 0.625rem;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  transition: color 0.15s ease;
+}
+
+.widget-nav-tab span {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.widget-nav-tab[data-state='active'],
+.widget-nav-tab.is-active {
+  background: transparent;
+  box-shadow: none;
+  color: hsl(var(--foreground));
+}
+
+.libredesk-widget-app.light .widget-nav-tab[data-state='active'],
+.libredesk-widget-preview.light .widget-nav-tab.is-active {
+  color: hsl(var(--primary));
+}
+
+/* --- Chat chrome --- */
+
+.libredesk-widget-app.light .widget-chat-header,
+.libredesk-widget-preview.light .widget-chat-header {
+  background: hsl(0 0% 100%);
+}
+
+.libredesk-widget-app.light .widget-agent-bubble,
+.libredesk-widget-preview.light .widget-agent-bubble {
+  background: hsl(240 6% 96%);
+  color: hsl(var(--foreground));
+}
+
+.libredesk-widget-app.light .message-composer,
+.libredesk-widget-preview.light .message-composer {
+  background: hsl(0 0% 100%);
+  border-color: hsl(var(--border));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.libredesk-widget-app.light .message-composer:focus-within,
+.libredesk-widget-preview.light .message-composer:focus-within {
+  border-color: hsl(var(--primary) / 0.45);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
+
+.libredesk-widget-app.light .prechat-form__field .prechat-form__input {
+  background-color: hsl(0 0% 100%);
+  border-color: hsl(var(--border));
+}
+
+.libredesk-widget-preview.light {
+  box-shadow:
+    0 8px 32px rgba(15, 23, 42, 0.12),
+    0 2px 8px rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+.libredesk-widget-preview.dark {
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.25);
+}

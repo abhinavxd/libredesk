@@ -9,7 +9,7 @@
             :conversation="mostRecentConversation"
           />
           <div v-else-if="canStartConversation">
-            <Button @click="startConversation" class="w-full flex items-center justify-center">
+            <Button @click="startConversation" class="widget-home-cta h-11 rounded-xl w-full flex items-center justify-center">
               {{ startButtonText }}
               <ArrowRight size="16" />
             </Button>
@@ -21,9 +21,9 @@
         <ConversationStarters v-if="canStartConversation" />
 
         <!-- Home Apps (announcements + external links) sit on the normal background. -->
-        <div v-if="config.home_apps?.length" class="flex flex-col gap-3 p-4 bg-background">
+        <div v-if="displayHomeApps.length" class="flex flex-col gap-3 px-4 pb-4 bg-background">
           <div class="space-y-3">
-            <template v-for="(item, index) in config.home_apps" :key="index">
+            <template v-for="(item, index) in displayHomeApps" :key="index">
               <AnnouncementCard v-if="item.type === 'announcement'" :announcement="item" />
               <HomeExternalLink v-else-if="item.type === 'external_link'" :link="item" />
             </template>
@@ -53,6 +53,12 @@ const chatStore = useChatStore()
 const userStore = useUserStore()
 const { t } = useI18n()
 const config = computed(() => widgetStore.config)
+
+const displayHomeApps = computed(() =>
+  (config.value.home_apps || []).filter(
+    (item) => item.type === 'announcement' || item.type === 'external_link'
+  )
+)
 
 const mostRecentConversation = computed(() => {
   const conversations = chatStore.getConversations

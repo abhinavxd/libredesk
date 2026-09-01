@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col h-full relative">
-    <div className="absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] z-20">
+    <div class="absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] z-20">
       <CloseWidgetButton />
     </div>
     <Tabs :modelValue="widgetStore.currentView" @update:modelValue="handleTabChange" class="flex flex-col h-full">
@@ -15,21 +15,23 @@
       </div>
       <TabsList
         v-if="!widgetStore.isChatView"
-        class="grid grid-cols-2 h-auto bg-background border-t rounded-none p-0 pb-[env(safe-area-inset-bottom)]"
+        class="widget-nav h-auto w-full rounded-none bg-background p-0 text-muted-foreground"
       >
         <TabsTrigger
           value="home"
-          class="nav-tab"
+          class="widget-nav-tab flex-col gap-0.5 rounded-none shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
           :aria-label="$t('globals.terms.home')"
         >
           <House class="w-5 h-5" />
+          <span>{{ $t('globals.terms.home') }}</span>
         </TabsTrigger>
         <TabsTrigger
           value="messages"
-          class="nav-tab"
+          class="widget-nav-tab flex-col gap-0.5 rounded-none shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
           :aria-label="$t('globals.terms.message', 2)"
         >
           <MessagesSquare class="w-5 h-5" />
+          <span>{{ $t('globals.terms.message', 2) }}</span>
         </TabsTrigger>
       </TabsList>
       <div
@@ -72,14 +74,3 @@ const handleTabChange = (value) => {
   }
 }
 </script>
-
-<style scoped>
-.nav-tab {
-  @apply flex items-center justify-center w-full px-0 py-1.5
-         rounded-none shadow-none cursor-pointer transition-colors
-         text-muted-foreground min-h-0;
-}
-.nav-tab[data-state='active'] {
-  @apply bg-transparent shadow-none text-primary;
-}
-</style>

@@ -3,7 +3,11 @@
     <Toaster class="pointer-events-auto" position="top-center" />
     <div
       class="libredesk-widget-app text-foreground bg-background"
-      :class="{ dark: widgetStore.config.dark_mode, mobile: widgetStore.isMobileFullScreen }"
+      :class="{
+        dark: isDark,
+        light: !isDark,
+        mobile: widgetStore.isMobileFullScreen
+      }"
       :style="customColorStyle"
       @click.once="initAudioContext"
       @touchstart.once="initAudioContext"
@@ -45,6 +49,8 @@ if (widgetConfig) {
   widgetStore.updateConfig(widgetConfig)
 }
 
+const isDark = computed(() => Boolean(widgetStore.config.dark_mode))
+
 const customColorStyle = computed(() => {
   const style = {}
   const colors = widgetStore.config.colors
@@ -54,6 +60,18 @@ const customColorStyle = computed(() => {
   }
   return style
 })
+
+const applyDocumentTheme = (dark) => {
+  document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+  document.documentElement.classList.toggle('dark', dark)
+  document.documentElement.classList.toggle('light', !dark)
+  document.body.classList.toggle('dark', dark)
+  document.body.classList.toggle('light', !dark)
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', dark ? '#1a1a1d' : '#ffffff')
+}
+
+watch(isDark, (dark) => applyDocumentTheme(dark), { immediate: true })
 
 onMounted(() => {
   setupParentMessageListeners()

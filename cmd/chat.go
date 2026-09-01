@@ -115,8 +115,9 @@ func handleGetChatLauncherSettings(r *fastglue.Request) error {
 	}
 
 	return r.SendEnvelope(map[string]any{
-		"launcher": config.Launcher,
-		"colors":   config.Colors,
+		"launcher":  config.Launcher,
+		"colors":    config.Colors,
+		"dark_mode": config.DarkMode,
 	})
 }
 

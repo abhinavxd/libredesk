@@ -2,7 +2,7 @@
   <div class="message-input border-t border-border/60 bg-background">
     <div class="p-3 pt-2">
       <div
-        class="message-composer rounded-xl border border-input/70 bg-muted/20 transition-[border-color,box-shadow] focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/10"
+        class="message-composer rounded-xl border border-input/70 bg-background transition-[border-color,box-shadow] focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/10"
         :class="{ 'ring-2 ring-primary/10 border-primary/35': isFocused }"
       >
         <div class="px-3 pt-3 pb-1">

@@ -20,7 +20,6 @@
             }
 
             this.IFRAME_BORDER_RADIUS = '16px';
-            this.IFRAME_BOX_SHADOW = '0 12px 48px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.25)';
             this.IFRAME_WIDTH = '400px';
             this.IFRAME_HEIGHT = '700px';
             // Expanded view: noticeably larger, capped to the viewport on smaller screens.
@@ -168,6 +167,30 @@
             }
         }
 
+        isDarkMode () {
+            return Boolean(this.widgetSettings && this.widgetSettings.dark_mode);
+        }
+
+        getIframeBoxShadow () {
+            return this.isDarkMode()
+                ? '0 12px 48px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.25)'
+                : '0 8px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)';
+        }
+
+        getIframeBorder () {
+            return this.isDarkMode() ? 'none' : '1px solid rgba(15, 23, 42, 0.08)';
+        }
+
+        getIframeBackground () {
+            return this.isDarkMode() ? '#1a1a1e' : '#ffffff';
+        }
+
+        getLauncherBoxShadow () {
+            return this.isDarkMode()
+                ? '0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25)'
+                : '0 4px 16px rgba(15, 23, 42, 0.16), 0 1px 4px rgba(15, 23, 42, 0.08)';
+        }
+
         createElements () {
             const launcher = this.widgetSettings.launcher;
             const colors = this.widgetSettings.colors;
@@ -184,7 +207,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);
+                box-shadow: ${this.getLauncherBoxShadow()};
                 transition: transform 0.3s ease;
             `;
 
@@ -278,12 +301,14 @@
             this.iframe.setAttribute('title', 'StackBlaze support chat');
             this.iframe.style.cssText = `
                 position: fixed;
-                border: none;
+                border: ${this.getIframeBorder()};
                 border-radius: ${this.IFRAME_BORDER_RADIUS};
-                box-shadow: ${this.IFRAME_BOX_SHADOW};
+                box-shadow: ${this.getIframeBoxShadow()};
+                background-color: ${this.getIframeBackground()};
                 z-index: 9999;
                 width: ${this.IFRAME_WIDTH};
                 height: ${this.IFRAME_HEIGHT};
+                color-scheme: ${this.isDarkMode() ? 'dark' : 'light'};
                 transition: ${iframeTransition};
             `;
 
@@ -371,6 +396,7 @@
                 iframe.style.minHeight = '100dvh';
                 iframe.style.borderRadius = '0';
                 iframe.style.boxShadow = 'none';
+                iframe.style.border = 'none';
                 return;
             }
 
@@ -381,7 +407,9 @@
             iframe.style.left = '';
             iframe.style.right = '';
             iframe.style.borderRadius = this.IFRAME_BORDER_RADIUS;
-            iframe.style.boxShadow = this.IFRAME_BOX_SHADOW;
+            iframe.style.boxShadow = this.getIframeBoxShadow();
+            iframe.style.border = this.getIframeBorder();
+            iframe.style.backgroundColor = this.getIframeBackground();
             iframe.style[side] = `${spacing.side}px`;
 
             if (this.isExpanded) {

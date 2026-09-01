@@ -8,14 +8,14 @@
         :style="{ bottom: windowBottom + 'px' }"
       >
         <div
-          class="libredesk-widget-preview flex flex-col h-full bg-background text-foreground rounded-2xl overflow-hidden shadow-2xl border border-border"
+          class="libredesk-widget-preview flex flex-col h-full bg-background text-foreground rounded-2xl overflow-hidden border border-border"
           :class="isDark ? 'dark' : 'light'"
           :style="primaryStyle"
         >
           <!-- Chat view -->
           <template v-if="view === 'chat'">
             <!-- Chat header -->
-            <div class="flex items-center p-2 border-b border-border gap-3 shrink-0">
+            <div class="widget-chat-header flex items-center p-2 border-b border-border gap-3 shrink-0">
               <button
                 type="button"
                 class="flex items-center justify-center size-8 rounded-md hover:bg-accent text-foreground"
@@ -144,7 +144,7 @@
                       :class="
                         m.type === 'user'
                           ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-foreground'
+                          : 'widget-agent-bubble bg-muted text-foreground'
                       "
                     >
                       {{ m.content }}
@@ -158,8 +158,8 @@
 
               <!-- Message input -->
               <div class="border-t border-border shrink-0">
-                <div class="p-2">
-                  <div class="border border-input rounded-lg bg-background">
+                <div class="p-3 pt-2">
+                  <div class="message-composer border border-input rounded-xl bg-background">
                     <div class="p-2">
                       <textarea
                         :placeholder="$t('globals.terms.typeMessage')"
@@ -199,17 +199,17 @@
             <div class="flex-1 min-h-0 relative">
               <!-- Home -->
               <div v-if="view === 'home'" class="h-full overflow-y-auto flex flex-col">
-                <div class="relative" :style="headerStyle">
-                  <div class="p-6">
+                <div class="widget-home-header relative" :style="headerStyle">
+                  <div class="px-5 pt-7 pb-2">
                     <img
                       v-if="config.logo_url"
                       :src="config.logo_url"
                       :alt="config.brand_name"
-                      class="max-h-7 max-w-full"
+                      class="max-h-8 max-w-full"
                     />
-                    <div class="mt-16 font-bold text-3xl leading-tight" :class="textColorClass">
-                      <h2 class="break-words">{{ parsedGreeting }}</h2>
-                      <p class="mt-1 font-semibold" :class="subTextColorClass">
+                    <div class="mt-7" :class="textColorClass">
+                      <h2 class="widget-home-header__greeting break-words">{{ parsedGreeting }}</h2>
+                      <p class="widget-home-header__intro" :class="subTextColorClass">
                         {{ parsedIntroduction }}
                       </p>
                     </div>
@@ -217,7 +217,7 @@
                   <div v-if="canStartConversation" class="relative z-10 px-4 pb-4">
                     <Button
                       type="button"
-                      class="w-full flex items-center justify-center gap-1"
+                      class="widget-home-cta h-11 rounded-xl w-full flex items-center justify-center gap-1"
                       @click="startNew"
                     >
                       {{ startButtonText }}
@@ -231,11 +231,26 @@
                   ></div>
                 </div>
 
-                <div v-if="homeApps.length" class="flex flex-col gap-3 p-4 bg-background">
-                  <template v-for="(item, index) in homeApps" :key="index">
+                <div v-if="previewStarters.length" class="widget-starters">
+                  <div class="widget-starters__list">
+                    <button
+                      v-for="(starter, index) in previewStarters"
+                      :key="'starter-' + index"
+                      type="button"
+                      class="widget-starter"
+                      @click="startNew"
+                    >
+                      <span>{{ starter.text }}</span>
+                      <ArrowRight class="widget-starter__icon" />
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="previewHomeApps.length" class="flex flex-col gap-3 p-4 bg-background">
+                  <template v-for="(item, index) in previewHomeApps" :key="index">
                     <Card
                       v-if="item.type === 'announcement'"
-                      class="overflow-hidden rounded-md hover:bg-accent transition-colors"
+                      class="overflow-hidden rounded-xl shadow-none hover:bg-accent transition-colors"
                     >
                       <img
                         v-if="item.image_url"
@@ -244,7 +259,7 @@
                         class="w-full h-auto"
                       />
                       <CardContent class="p-3 text-sm">
-                        <div class="font-bold">
+                        <div class="font-semibold">
                           {{ item.title || $t('globals.terms.announcement') }}
                         </div>
                         <div v-if="item.description" class="text-muted-foreground mt-1">
@@ -252,16 +267,14 @@
                         </div>
                       </CardContent>
                     </Card>
-                    <Card v-else class="rounded-md hover:bg-accent transition-colors">
-                      <CardContent class="p-4">
-                        <div class="flex justify-between items-center">
-                          <span class="text-sm text-primary font-medium">{{
-                            item.text || item.url
-                          }}</span>
-                          <ExternalLink :size="18" class="text-muted-foreground" />
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <button
+                      v-else
+                      type="button"
+                      class="widget-starter"
+                    >
+                      <span>{{ item.text || item.url }}</span>
+                      <ExternalLink class="widget-starter__icon" />
+                    </button>
                   </template>
                 </div>
               </div>
@@ -308,24 +321,24 @@
             </div>
 
             <!-- Bottom nav -->
-            <div class="grid grid-cols-2 border-t border-border bg-background shrink-0">
+            <div class="widget-nav shrink-0">
               <button
                 type="button"
-                class="flex flex-col items-center gap-1 py-2"
-                :class="view === 'home' ? 'text-foreground' : 'text-muted-foreground'"
+                class="widget-nav-tab"
+                :class="{ 'is-active': view === 'home' }"
                 @click="view = 'home'"
               >
                 <House class="w-5 h-5" />
-                <span class="text-xs font-medium">{{ $t('globals.terms.home') }}</span>
+                <span>{{ $t('globals.terms.home') }}</span>
               </button>
               <button
                 type="button"
-                class="flex flex-col items-center gap-1 py-2"
-                :class="view === 'messages' ? 'text-foreground' : 'text-muted-foreground'"
+                class="widget-nav-tab"
+                :class="{ 'is-active': view === 'messages' }"
                 @click="view = 'messages'"
               >
                 <MessagesSquare class="w-5 h-5" />
-                <span class="text-xs font-medium">{{ $t('globals.terms.message', 2) }}</span>
+                <span>{{ $t('globals.terms.message', 2) }}</span>
               </button>
             </div>
           </template>
@@ -449,16 +462,53 @@ const headerStyle = computed(() => {
 })
 
 const headerTextColor = computed(() => props.config.home_screen?.header_text_color)
-const textColorClass = computed(() => {
-  if (headerTextColor.value === 'black') return 'text-black'
-  if (headerTextColor.value === 'white') return 'text-white'
-  return ''
+
+const parseHex = (hex) => {
+  if (!hex || typeof hex !== 'string') return null
+  let h = hex.replace('#', '')
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('')
+  if (!/^[0-9a-f]{6}$/i.test(h)) return null
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16)
+  }
+}
+
+const isHexDark = (hex) => {
+  const rgb = parseHex(hex)
+  if (!rgb) return false
+  const L = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255
+  return L < 0.55
+}
+
+const headerIsDark = computed(() => {
+  const bg = props.config.home_screen?.background
+  if (!bg?.type) return false
+  switch (bg.type) {
+    case 'solid':
+      return isHexDark(bg.color)
+    case 'gradient':
+      return isHexDark(bg.gradient_start) || isHexDark(bg.gradient_end)
+    case 'image':
+      return Boolean(bg.image_url)
+    default:
+      return false
+  }
 })
-const subTextColorClass = computed(() => {
-  if (headerTextColor.value === 'black') return 'text-black/70'
-  if (headerTextColor.value === 'white') return 'text-white/70'
-  return 'text-muted-foreground'
+
+const useDarkText = computed(() => {
+  if (headerTextColor.value === 'black') return true
+  if (headerTextColor.value === 'white') {
+    return !isDark.value && !headerIsDark.value
+  }
+  return !isDark.value
 })
+
+const textColorClass = computed(() => (useDarkText.value ? 'text-foreground' : 'text-white'))
+const subTextColorClass = computed(() =>
+  useDarkText.value ? 'text-muted-foreground' : 'text-white/70'
+)
 
 const showFade = computed(
   () =>
@@ -499,6 +549,25 @@ const sampleLastMessage = computed(
 )
 
 const homeApps = computed(() => props.config.home_apps || [])
+
+const DEFAULT_STARTERS = [
+  { text: 'Talk to sales' },
+  { text: 'Get help with my account' },
+  { text: 'Pricing & plans' },
+  { text: 'Book a demo' }
+]
+
+const previewStarters = computed(() => {
+  const configured = homeApps.value
+    .filter((item) => item.type === 'conversation_starter' && item.text)
+    .map((item) => ({ text: item.text }))
+  if (configured.length) return configured
+  return canStartConversation.value ? DEFAULT_STARTERS : []
+})
+
+const previewHomeApps = computed(() =>
+  homeApps.value.filter((item) => item.type !== 'conversation_starter')
+)
 
 const prechatFields = computed(() =>
   (props.config.prechat_form?.fields || [])
