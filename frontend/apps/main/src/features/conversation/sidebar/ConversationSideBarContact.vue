@@ -41,6 +41,7 @@
       </span>
     </div>
     <ConversationMergeDialog class="pt-1" />
+    <RelatedTicketsPanel class="pt-2" />
     <SideConversationsPanel class="pt-2" />
     <ConversationSpamActions class="pt-1" />
     <div class="flex gap-2 items-center">
@@ -143,6 +144,7 @@ import { useI18n } from 'vue-i18n'
 import api from '../../../api'
 import ConversationSpamActions from '@/features/conversation/ConversationSpamActions.vue'
 import ConversationMergeDialog from '@/features/conversation/ConversationMergeDialog.vue'
+import RelatedTicketsPanel from '@/features/conversation/RelatedTicketsPanel.vue'
 import SideConversationsPanel from '@/features/conversation/SideConversationsPanel.vue'
 import OrganizationPicker from '@/features/organization/OrganizationPicker.vue'
 const conversationStore = useConversationStore()

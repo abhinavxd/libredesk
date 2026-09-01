@@ -67,6 +67,7 @@
 
   <!-- Create conversation dialog -->
   <CreateConversation v-model="openCreateConversationDialog" v-if="openCreateConversationDialog" />
+  <ConversationMergeDialog global />
 </template>
 
 <script setup>
@@ -98,6 +99,7 @@ import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
+import ConversationMergeDialog from '@/features/conversation/ConversationMergeDialog.vue'
 import MobileBottomNav from '@main/components/MobileBottomNav.vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -116,6 +118,7 @@ import SidebarNavUser from '@main/components/sidebar/SidebarNavUser.vue'
 import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
 import PrimaryNavItems from '@main/components/sidebar/PrimaryNavItems.vue'
 import api from '@main/api'
+import { useZendeskShortcuts } from '@main/composables/useZendeskShortcuts'
 
 const route = useRoute()
 const emitter = useEmitter()
@@ -149,6 +152,7 @@ const { t } = useI18n()
 
 initWS()
 useIdleDetection()
+useZendeskShortcuts()
 
 // Unlock audio on first user interaction (browser autoplay policy)
 const unlockAudio = () => {
@@ -162,6 +166,7 @@ document.addEventListener('touchstart', unlockAudio)
 onMounted(() => {
   initToaster()
   listenViewRefresh()
+  listenCreateConversationOpen()
   initStores()
 })
 
@@ -240,6 +245,12 @@ const initToaster = () => {
 
 const listenViewRefresh = () => {
   emitter.on(EMITTER_EVENTS.REFRESH_LIST, refreshViews)
+}
+
+const listenCreateConversationOpen = () => {
+  emitter.on(EMITTER_EVENTS.OPEN_CREATE_CONVERSATION, () => {
+    openCreateConversationDialog.value = true
+  })
 }
 
 const refreshViews = async (data) => {

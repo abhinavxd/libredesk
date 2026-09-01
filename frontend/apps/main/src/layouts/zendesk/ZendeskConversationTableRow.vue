@@ -1,10 +1,13 @@
 <template>
+  <ContextMenu>
+    <ContextMenuTrigger asChild>
   <tr
     class="cursor-pointer"
     :class="{ selected: isCurrent || isSelected }"
     @click="openConversation"
     @mouseenter="onRowEnter"
     @mouseleave="onRowLeave"
+    @contextmenu="onRowLeave"
   >
     <td @click.stop>
       <Checkbox
@@ -55,6 +58,9 @@
       <ZendeskSlaIndicator :conversation="conversation" />
     </td>
   </tr>
+    </ContextMenuTrigger>
+    <TicketContextMenuItems :conversation="conversation" />
+  </ContextMenu>
 
   <ZendeskRowPreview
     v-if="previewRect && !isCurrent"
@@ -76,6 +82,8 @@ import { useStatusCategory } from '@main/composables/useStatusCategory'
 import { priorityDotClass } from '@main/composables/useConversationPriority'
 import { channelMeta } from '@main/composables/useConversationChannel'
 import { useAgentLookup } from '@main/composables/useAgentLookup'
+import { ContextMenu, ContextMenuTrigger } from '@shared-ui/components/ui/context-menu'
+import TicketContextMenuItems from '@/features/conversation/TicketContextMenuItems.vue'
 import ZendeskSlaIndicator from './ZendeskSlaIndicator.vue'
 import ZendeskRowPreview from './ZendeskRowPreview.vue'
 

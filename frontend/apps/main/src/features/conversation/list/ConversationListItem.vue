@@ -149,17 +149,7 @@
         </div>
       </router-link>
     </ContextMenuTrigger>
-    <ContextMenuContent>
-      <!-- Long press is the only way to reach the first checkbox on touch. -->
-      <ContextMenuItem v-if="canBulkAct && !showCheckbox" @click="handleSelect">
-        <SquareCheck class="w-4 h-4 mr-2" />
-        {{ $t('conversation.bulkActions.selectConversation') }}
-      </ContextMenuItem>
-      <ContextMenuItem @click="handleMarkAsUnread">
-        <MailOpen class="w-4 h-4 mr-2" />
-        {{ $t('globals.messages.markAsUnread') }}
-      </ContextMenuItem>
-    </ContextMenuContent>
+    <TicketContextMenuItems :conversation="conversation" />
   </ContextMenu>
 </template>
 
@@ -167,14 +157,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Mail, MessageSquare, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
+import { Mail, MessageSquare, Reply } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger
 } from '@shared-ui/components/ui/context-menu'
+import TicketContextMenuItems from '@/features/conversation/TicketContextMenuItems.vue'
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
@@ -199,10 +188,6 @@ const props = defineProps({
   currentConversation: Object,
   contactFullName: String
 })
-
-const handleMarkAsUnread = () => {
-  conversationStore.markAsUnread(props.conversation.uuid)
-}
 
 const conversationRoute = computed(() => {
   const baseRoute = route.params.teamID
@@ -292,7 +277,4 @@ const handleCheckboxClick = (event) => {
   conversationStore.toggleSelect(props.conversation.uuid, event.shiftKey)
 }
 
-const handleSelect = () => {
-  conversationStore.toggleSelect(props.conversation.uuid, false)
-}
 </script>

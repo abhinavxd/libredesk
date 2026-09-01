@@ -56,6 +56,12 @@ var (
 	ActivityParticipantAdded   = "participant_added"
 	ActivityMergedFrom         = "merged_from"
 	ActivityMergedInto         = "merged_into"
+	ActivityChildCreated       = "child_created"
+	ActivityFollowUpCreated    = "follow_up_created"
+	ActivityOpenedFromParent   = "opened_from_parent"
+
+	OriginChild    = "child"
+	OriginFollowUp = "follow_up"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"
@@ -206,10 +212,14 @@ type Conversation struct {
 	NextResponseMetAt         null.Time              `db:"next_response_met_at" json:"next_response_met_at"`
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
 	MergedIntoUUID            null.String            `db:"merged_into_uuid" json:"merged_into_uuid"`
+	ParentUUID                null.String            `db:"parent_uuid" json:"parent_uuid"`
+	ParentReferenceNumber     null.String            `db:"parent_reference_number" json:"parent_reference_number"`
+	Origin                    string                 `db:"origin" json:"origin"`
 	CSATRating                null.Int               `db:"csat_rating" json:"csat_rating"`
 	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
 	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
+	RelatedConversations      []RelatedConversation  `db:"-" json:"related_conversations"`
 }
 
 type ConversationContact struct {
@@ -252,6 +262,12 @@ type PreviousConversation struct {
 	Contact         PreviousConversationContact `db:"contact" json:"contact"`
 	LastMessage     null.String                 `db:"last_message" json:"last_message"`
 	LastMessageAt   null.Time                   `db:"last_message_at" json:"last_message_at"`
+}
+
+type RelatedConversation struct {
+	PreviousConversation
+	Origin   string `db:"origin" json:"origin"`
+	Relation string `db:"-" json:"relation"`
 }
 
 type PreviousConversationContact struct {

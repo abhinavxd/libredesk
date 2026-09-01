@@ -251,12 +251,16 @@ SELECT
    nxt_resp_event.met_at as next_response_met_at,
    c.last_continuity_email_sent_at,
    c.merged_into_uuid,
+   c.parent_uuid,
+   c.origin,
+   p.reference_number as parent_reference_number,
    csat.rating as csat_rating,
    csat.feedback as csat_feedback,
    csat.response_timestamp as csat_responded_at
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
+LEFT JOIN conversations p ON p.uuid = c.parent_uuid
 LEFT JOIN organizations org ON org.id = ct.organization_id
 LEFT JOIN LATERAL (
     SELECT rating, feedback, response_timestamp
@@ -1106,3 +1110,32 @@ FROM side_messages sm
 JOIN users u ON u.id = sm.sender_id
 WHERE sm.side_conversation_id = $1
 ORDER BY sm.created_at ASC;
+
+-- name: set-conversation-parent
+UPDATE conversations
+SET parent_uuid = $2, origin = $3, updated_at = NOW()
+WHERE uuid = $1;
+
+-- name: list-related-conversations
+SELECT
+    c.id,
+    c.created_at,
+    c.updated_at,
+    c.uuid,
+    COALESCE(c.subject, '') AS subject,
+    c.reference_number,
+    s.name AS status,
+    c.last_message,
+    c.last_message_at,
+    c.origin,
+    ct.first_name AS "contact.first_name",
+    ct.last_name AS "contact.last_name"
+FROM conversations c
+JOIN users ct ON ct.id = c.contact_id
+LEFT JOIN conversation_statuses s ON s.id = c.status_id
+WHERE c.uuid <> $1
+  AND (
+    c.parent_uuid = $1::uuid
+    OR c.uuid = (SELECT parent_uuid FROM conversations WHERE uuid = $1::uuid)
+  )
+ORDER BY c.created_at DESC;

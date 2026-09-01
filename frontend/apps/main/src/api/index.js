@@ -373,6 +373,16 @@ const mergeConversation = (uuid, data) =>
   http.post(`/api/v1/conversations/${uuid}/merge`, data, {
     headers: { 'Content-Type': 'application/json' }
   })
+const getRelatedConversations = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/related`, { abortOnRoute: true })
+const createChildConversation = (uuid, data = {}) =>
+  http.post(`/api/v1/conversations/${uuid}/children`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const createFollowUpConversation = (uuid, data = {}) =>
+  http.post(`/api/v1/conversations/${uuid}/follow-up`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
@@ -690,6 +700,9 @@ export default {
   getConversation,
   deleteConversation,
   mergeConversation,
+  getRelatedConversations,
+  createChildConversation,
+  createFollowUpConversation,
   getAutomationRule,
   getAutomationRules,
   getAllBusinessHours,

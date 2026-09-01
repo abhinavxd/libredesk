@@ -32,6 +32,7 @@
 
   <Command />
   <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
+  <ConversationMergeDialog global />
 </template>
 
 <script setup>
@@ -61,6 +62,7 @@ import AdminBanner from '@/components/banner/AdminBanner.vue'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import { toast as sooner } from 'vue-sonner'
 import Command from '@/features/command/CommandBox.vue'
+import ConversationMergeDialog from '@/features/conversation/ConversationMergeDialog.vue'
 import ZendeskNavRail from './ZendeskNavRail.vue'
 import ZendeskTopBar from './ZendeskTopBar.vue'
 import { useI18n } from 'vue-i18n'
