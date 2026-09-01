@@ -192,6 +192,7 @@ const permissions = ref([
       { name: perms.CONTACTS_WRITE, label: t('admin.role.contacts.write') },
       { name: perms.CONTACTS_BLOCK, label: t('admin.role.contacts.block') },
       { name: perms.CONTACTS_DELETE, label: t('admin.role.contacts.delete') },
+      { name: perms.CONTACTS_MERGE, label: t('admin.role.contacts.merge') },
       { name: perms.CONTACTS_EXPORT, label: t('admin.role.contacts.export') },
       { name: perms.CONTACT_NOTES_READ, label: t('admin.role.contactNotes.read') },
       { name: perms.CONTACT_NOTES_WRITE, label: t('admin.role.contactNotes.write') },

@@ -451,6 +451,56 @@ SELECT
     (SELECT COUNT(*) FROM transfer_messages) as messages_transferred,
     (SELECT COUNT(*) FROM delete_visitor) as visitor_deleted;
 
+-- name: merge-contacts
+WITH transfer_conversations AS (
+    UPDATE conversations
+    SET contact_id = $2, updated_at = now()
+    WHERE contact_id = $1
+    RETURNING id
+),
+transfer_messages AS (
+    UPDATE conversation_messages
+    SET sender_id = $2
+    WHERE sender_id = $1
+    RETURNING id
+),
+transfer_participants AS (
+    UPDATE conversation_participants
+    SET user_id = $2
+    WHERE user_id = $1 AND NOT EXISTS (
+        SELECT 1 FROM conversation_participants
+        WHERE user_id = $2 AND conversation_id = conversation_participants.conversation_id
+    )
+    RETURNING id
+),
+delete_remaining_participants AS (
+    DELETE FROM conversation_participants WHERE user_id = $1 RETURNING id
+),
+transfer_notes AS (
+    UPDATE contact_notes SET contact_id = $2 WHERE contact_id = $1 RETURNING id
+),
+fill_profile AS (
+    UPDATE users survivor
+    SET
+        phone_number = COALESCE(NULLIF(survivor.phone_number, ''), loser.phone_number),
+        phone_number_country_code = COALESCE(NULLIF(survivor.phone_number_country_code, ''), loser.phone_number_country_code),
+        avatar_url = COALESCE(NULLIF(survivor.avatar_url, ''), loser.avatar_url),
+        custom_attributes = COALESCE(loser.custom_attributes, '{}'::jsonb) || COALESCE(survivor.custom_attributes, '{}'::jsonb),
+        updated_at = now()
+    FROM users loser
+    WHERE survivor.id = $2 AND loser.id = $1
+    RETURNING survivor.id
+),
+soft_delete_loser AS (
+    UPDATE users
+    SET deleted_at = now(), email = NULL, external_user_id = NULL, updated_at = now()
+    WHERE id = $1 AND type IN ('contact', 'visitor') AND deleted_at IS NULL
+    RETURNING id
+)
+SELECT
+    (SELECT COUNT(*) FROM transfer_conversations) as conversations_transferred,
+    (SELECT COUNT(*) FROM soft_delete_loser) as loser_deleted;
+
 -- name: get-user-ids-by-role
 SELECT user_id FROM user_roles WHERE role_id = $1;
 
