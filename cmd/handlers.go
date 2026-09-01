@@ -432,6 +432,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	getAndHead("/hc/{slug}/{locale}/collections/{collection_slug}", rateLimit(cachedHCPage(handleShowHelpCenterCollection), "public"))
 	getAndHead("/hc/{slug}/{locale}/articles/{article_slug}", rateLimit(countArticleView(cachedHCPage(handleShowHelpCenterArticle)), "public"))
 
+	g.POST("/api/v1/portal/login", rateLimit(handlePortalLogin, "public"))
+	g.GET("/portal", rateLimit(handlePortalHome, "public"))
+	g.POST("/portal/logout", rateLimit(handlePortalLogout, "public"))
+	g.GET("/portal/conversations/{uuid}", rateLimit(handlePortalConversation, "public"))
+	g.POST("/portal/conversations/{uuid}", rateLimit(handlePortalReply, "public"))
+
 	g.GET("/csat/{uuid}", rateLimit(handleShowCSAT, "public"))
 	g.GET("/csat/{uuid}/widget", rateLimit(handleShowCSATWidget, "public"))
 	g.POST("/csat/{uuid}", rateLimit(handleUpdateCSATResponse, "public"))

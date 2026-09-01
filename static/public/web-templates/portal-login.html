@@ -1,0 +1,29 @@
+{{ define "portal-login" }}
+{{ template "header" . }}
+<div class="csat-container">
+    <p class="csat-title">{{ L.T "portal.title" }}</p>
+    <p>{{ L.T "portal.loginHelp" }}</p>
+    <form id="portal-login-form" class="csat-form" novalidate>
+        <div class="feedback-group">
+            <label for="email">{{ L.T "globals.terms.email" }}</label>
+            <input id="email" name="email" type="email" required />
+        </div>
+        <button type="submit" class="button submit-button">{{ L.T "portal.sendLink" }}</button>
+        <p id="portal-login-msg" style="display:none;margin-top:12px">{{ L.T "portal.linkSent" }}</p>
+    </form>
+</div>
+<script>
+document.getElementById('portal-login-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = document.getElementById('email').value;
+    fetch('/api/v1/portal/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+    }).finally(function () {
+        document.getElementById('portal-login-msg').style.display = 'block';
+    });
+});
+</script>
+{{ template "footer" }}
+{{ end }}

@@ -1,0 +1,26 @@
+{{ define "portal-conversation" }}
+{{ template "header" . }}
+<div class="csat-container" style="max-width:720px;text-align:left">
+    <p><a href="/portal">{{ L.T "portal.back" }}</a></p>
+    <p class="csat-title">{{ if .Data.Conversation.Subject.String }}{{ .Data.Conversation.Subject.String }}{{ else }}{{ L.T "portal.noSubject" }}{{ end }}</p>
+    <p>#{{ .Data.Conversation.ReferenceNumber }} · {{ .Data.Conversation.Status }}</p>
+    <div style="margin:24px 0">
+        {{ range .Data.Messages }}
+        <div style="border-left:2px solid #e0e0e0;padding-left:12px;margin-bottom:16px">
+            <div style="font-size:12px;color:#888;margin-bottom:4px">
+                <strong>{{ .Author.FirstName }} {{ .Author.LastName }}</strong>
+            </div>
+            <div>{{ .Content }}</div>
+        </div>
+        {{ end }}
+    </div>
+    <form action="/portal/conversations/{{ .Data.Conversation.UUID }}" method="POST" class="csat-form">
+        <div class="feedback-group">
+            <label for="content">{{ L.T "portal.reply" }}</label>
+            <textarea id="content" name="content" rows="4" required></textarea>
+        </div>
+        <button type="submit" class="button submit-button">{{ L.T "globals.messages.send" }}</button>
+    </form>
+</div>
+{{ template "footer" }}
+{{ end }}

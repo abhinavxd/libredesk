@@ -1,0 +1,33 @@
+{{ define "portal" }}
+{{ template "header" . }}
+<div class="csat-container" style="max-width:720px;text-align:left">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <p class="csat-title" style="margin:0">{{ L.T "portal.title" }}</p>
+        <form action="/portal/logout" method="POST"><button type="submit" class="button">{{ L.T "portal.logout" }}</button></form>
+    </div>
+    <p>{{ L.Ts "portal.hello" "name" .Data.ContactName }}</p>
+    {{ if not .Data.Conversations }}
+    <p>{{ L.T "portal.empty" }}</p>
+    {{ else }}
+    <table style="width:100%;border-collapse:collapse">
+        <thead>
+            <tr>
+                <th style="text-align:left;padding:8px 0">{{ L.T "globals.terms.subject" }}</th>
+                <th style="text-align:left;padding:8px 0">#</th>
+                <th style="text-align:left;padding:8px 0">{{ L.T "globals.terms.status" }}</th>
+            </tr>
+        </thead>
+        <tbody>
+        {{ range .Data.Conversations }}
+            <tr>
+                <td style="padding:8px 0"><a href="/portal/conversations/{{ .UUID }}">{{ if .Subject }}{{ .Subject }}{{ else }}{{ $.L.T "portal.noSubject" }}{{ end }}</a></td>
+                <td style="padding:8px 0">#{{ .ReferenceNumber }}</td>
+                <td style="padding:8px 0">{{ .Status }}</td>
+            </tr>
+        {{ end }}
+        </tbody>
+    </table>
+    {{ end }}
+</div>
+{{ template "footer" }}
+{{ end }}

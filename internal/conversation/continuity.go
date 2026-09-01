@@ -320,8 +320,16 @@ func (m *Manager) buildContinuityEmailContent(unreadMessages []models.Continuity
 			"link", fmt.Sprintf(`<a href="%s" style="color:#2563eb">`, html.EscapeString(websiteURL)),
 			"endlink", "</a>")
 	}
+	portalNote := m.i18n.Ts("portal.loginEmailBody", "link", `<a href="`+html.EscapeString(websiteURL)+`/portal" style="color:#2563eb">`+html.EscapeString(websiteURL)+`/portal</a>`)
+	if websiteURL == "" {
+		portalNote = ""
+	}
 	fmt.Fprintf(&content, `<div style="border-top:1px solid #e0e0e0;margin-top:12px;padding-top:8px">`+
-		`<div style="font-size:12px;color:#999">%s</div></div>`, footerText)
+		`<div style="font-size:12px;color:#999">%s</div>`, footerText)
+	if portalNote != "" {
+		fmt.Fprintf(&content, `<div style="font-size:12px;color:#999;margin-top:6px">%s</div>`, portalNote)
+	}
+	content.WriteString("</div>")
 
 	return content.String()
 }
