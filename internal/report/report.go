@@ -48,6 +48,8 @@ type queries struct {
 	GetOverviewCSAT            string `query:"get-overview-csat"`
 	GetOverviewMessageVolume   string `query:"get-overview-message-volume"`
 	GetOverviewTagDistribution string `query:"get-overview-tag-distribution"`
+	GetAgentReports            string `query:"get-agent-reports"`
+	GetTeamReports             string `query:"get-team-reports"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -205,6 +207,28 @@ func (m *Manager) GetOverviewTagDistribution(days int) (json.RawMessage, error) 
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return stats, nil
+}
+
+func (m *Manager) GetAgentReports(days int) ([]models.AgentReport, error) {
+	days = clampDays(days)
+	out := make([]models.AgentReport, 0)
+	query := fmt.Sprintf(m.q.GetAgentReports, days, days, days, days, days, days)
+	if err := m.db.Select(&out, query); err != nil {
+		m.lo.Error("error fetching agent reports", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return out, nil
+}
+
+func (m *Manager) GetTeamReports(days int) ([]models.TeamReport, error) {
+	days = clampDays(days)
+	out := make([]models.TeamReport, 0)
+	query := fmt.Sprintf(m.q.GetTeamReports, days, days, days, days, days, days)
+	if err := m.db.Select(&out, query); err != nil {
+		m.lo.Error("error fetching team reports", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return out, nil
 }
 
 func clampDays(days int) int {

@@ -4,6 +4,18 @@ export const reportsNavItems = [
     href: '/reports/overview',
     permission: 'reports:manage',
     icon: 'BarChart3'
+  },
+  {
+    titleKey: 'report.agents',
+    href: '/reports/agents',
+    permission: 'reports:manage',
+    icon: 'UserRound'
+  },
+  {
+    titleKey: 'report.teams',
+    href: '/reports/teams',
+    permission: 'reports:manage',
+    icon: 'UsersRound'
   }
 ]
 

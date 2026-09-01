@@ -82,3 +82,23 @@ func handleOverviewTagDistribution(r *fastglue.Request) error {
 	}
 	return r.SendEnvelope(tags)
 }
+
+func handleAgentReports(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	days, _ := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
+	rows, err := app.report.GetAgentReports(days)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(rows)
+}
+
+func handleTeamReports(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	days, _ := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
+	rows, err := app.report.GetTeamReports(days)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(rows)
+}
