@@ -610,6 +610,17 @@ const generateAPIKey = (id) =>
 
 const revokeAPIKey = (id) => http.delete(`/api/v1/agents/${id}/api-key`)
 
+const generateMyAPIKey = () =>
+  http.post('/api/v1/agents/me/api-key', {}, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+
+const getMyAPIKey = () => http.get('/api/v1/agents/me/api-key')
+
+const revokeMyAPIKey = () => http.delete('/api/v1/agents/me/api-key')
+
 const initiateOAuthFlow = (provider, data) =>
   http.post(`/api/v1/inboxes/oauth/${provider}/authorize`, data, {
     headers: {
@@ -852,6 +863,9 @@ export default {
   getContextLinkURL,
   generateAPIKey,
   revokeAPIKey,
+  generateMyAPIKey,
+  getMyAPIKey,
+  revokeMyAPIKey,
   initiateOAuthFlow,
   getNotifications,
   getNotificationStats,

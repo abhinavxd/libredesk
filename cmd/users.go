@@ -549,6 +549,70 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 	return nil
 }
 
+// handleGetCurrentAgentAPIKey returns the logged-in agent's API key and secret when stored encrypted.
+func handleGetCurrentAgentAPIKey(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	creds, err := app.user.GetAPICredentials(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(struct {
+		APIKey           string     `json:"api_key"`
+		APISecret        string     `json:"api_secret"`
+		APIKeyLastUsedAt null.Time  `json:"api_key_last_used_at"`
+		SecretAvailable  bool       `json:"secret_available"`
+	}{
+		APIKey:           creds.APIKey,
+		APISecret:        creds.APISecret,
+		APIKeyLastUsedAt: creds.APIKeyLastUsedAt,
+		SecretAvailable:  creds.SecretAvailable,
+	})
+}
+
+// handleGenerateCurrentAgentAPIKey generates an API key for the logged-in agent.
+func handleGenerateCurrentAgentAPIKey(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	return sendGeneratedAPIKey(r, app, auser.ID)
+}
+
+// handleRevokeCurrentAgentAPIKey revokes the logged-in agent's API key.
+func handleRevokeCurrentAgentAPIKey(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	return revokeAgentAPIKey(r, app, auser.ID)
+}
+
+func sendGeneratedAPIKey(r *fastglue.Request, app *App, userID int) error {
+	apiKey, apiSecret, err := app.user.GenerateAPIKey(userID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	app.user.InvalidateAgentCache(userID)
+	return r.SendEnvelope(struct {
+		APIKey    string `json:"api_key"`
+		APISecret string `json:"api_secret"`
+	}{
+		APIKey:    apiKey,
+		APISecret: apiSecret,
+	})
+}
+
+func revokeAgentAPIKey(r *fastglue.Request, app *App, userID int) error {
+	if err := app.user.RevokeAPIKey(userID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	app.user.InvalidateAgentCache(userID)
+	return r.SendEnvelope(true)
+}
+
 // handleGenerateAPIKey generates a new API key for a user
 func handleGenerateAPIKey(r *fastglue.Request) error {
 	var (
@@ -568,23 +632,7 @@ func handleGenerateAPIKey(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", app.i18n.T("globals.terms.agent")), nil, envelope.NotFoundError)
 	}
 
-	// Generate API key and secret
-	apiKey, apiSecret, err := app.user.GenerateAPIKey(user.ID)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	app.user.InvalidateAgentCache(user.ID)
-
-	// Return the API key and secret (only shown once)
-	response := struct {
-		APIKey    string `json:"api_key"`
-		APISecret string `json:"api_secret"`
-	}{
-		APIKey:    apiKey,
-		APISecret: apiSecret,
-	}
-
-	return r.SendEnvelope(response)
+	return sendGeneratedAPIKey(r, app, user.ID)
 }
 
 // handleRevokeAPIKey revokes a user's API key
@@ -606,13 +654,7 @@ func handleRevokeAPIKey(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", app.i18n.T("globals.terms.agent")), nil, envelope.NotFoundError)
 	}
 
-	// Revoke API key
-	if err := app.user.RevokeAPIKey(id); err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	app.user.InvalidateAgentCache(id)
-
-	return r.SendEnvelope(true)
+	return revokeAgentAPIKey(r, app, id)
 }
 
 func validateAgentRequest(app *App, req *agentReq) error {

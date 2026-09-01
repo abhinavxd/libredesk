@@ -181,8 +181,9 @@
             <Key class="w-4 h-4 text-muted-foreground" />
             <div>
               <p class="text-sm font-medium">{{ $t('globals.terms.apiKey') }}</p>
-              <p class="text-xs text-muted-foreground font-mono">{{ apiKeyData.api_key }}</p>
+              <p class="text-xs text-muted-foreground font-mono break-all">{{ apiKeyData.api_key }}</p>
             </div>
+            <CopyButton :text="apiKeyData.api_key" variant="outline" size="sm" :show-text="false" />
           </div>
           <div class="flex gap-2">
             <Button

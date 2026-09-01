@@ -32,6 +32,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Public config for app initialization.
 	g.GET("/api/v1/config", handleGetConfig)
 
+	// Built-in MCP (API key only).
+	g.OPTIONS("/mcp", handleMCPOptions)
+	g.GET("/mcp", mcpAuth(handleMCP))
+	g.POST("/mcp", mcpAuth(handleMCP))
+	g.DELETE("/mcp", mcpAuth(handleMCP))
+
 	// Media - supports both authenticated access and signed URLs.
 	g.GET("/uploads/{uuid}", authOrSignedURL(handleServeMedia))
 	g.POST("/api/v1/media", auth(handleMediaUpload))
@@ -131,6 +137,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/agents/me/teams", auth(handleGetCurrentAgentTeams))
 	g.PUT("/api/v1/agents/me/availability", auth(handleUpdateAgentAvailability))
 	g.DELETE("/api/v1/agents/me/avatar", auth(clearsHCCache(handleDeleteCurrentAgentAvatar)))
+	g.GET("/api/v1/agents/me/api-key", auth(handleGetCurrentAgentAPIKey))
+	g.POST("/api/v1/agents/me/api-key", auth(handleGenerateCurrentAgentAPIKey))
+	g.DELETE("/api/v1/agents/me/api-key", auth(handleRevokeCurrentAgentAPIKey))
 
 	g.GET("/api/v1/agents/compact", auth(handleGetAgentsCompact))
 	g.GET("/api/v1/agents", perm(handleGetAgents, "users:manage"))

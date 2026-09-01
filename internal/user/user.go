@@ -19,6 +19,7 @@ import (
 
 	"log"
 
+	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	rmodels "github.com/abhinavxd/libredesk/internal/role/models"
@@ -54,12 +55,13 @@ const (
 
 // Manager handles user-related operations.
 type Manager struct {
-	lo           *logf.Logger
-	i18n         *i18n.I18n
-	q            queries
-	db           *sqlx.DB
-	agentCache   map[int]cachedAgent
-	agentCacheMu sync.RWMutex
+	lo            *logf.Logger
+	i18n          *i18n.I18n
+	q             queries
+	db            *sqlx.DB
+	encryptionKey string
+	agentCache    map[int]cachedAgent
+	agentCacheMu  sync.RWMutex
 
 	lastActiveFlushAt   map[int]time.Time
 	lastActiveFlushAtMu sync.Mutex
@@ -72,8 +74,9 @@ type cachedAgent struct {
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
-	DB *sqlx.DB
-	Lo *logf.Logger
+	DB            *sqlx.DB
+	Lo            *logf.Logger
+	EncryptionKey string
 }
 
 // queries contains prepared SQL queries.
@@ -137,6 +140,7 @@ func New(i18n *i18n.I18n, opts Opts) (*Manager, error) {
 		lo:                opts.Lo,
 		i18n:              i18n,
 		db:                opts.DB,
+		encryptionKey:     opts.EncryptionKey,
 		agentCache:        make(map[int]cachedAgent),
 		lastActiveFlushAt: make(map[int]time.Time),
 	}, nil
@@ -435,8 +439,14 @@ func (u *Manager) GenerateAPIKey(userID int) (string, string, error) {
 		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	storedSecret, err := u.storeAPISecret(apiSecret)
+	if err != nil {
+		u.lo.Error("error protecting API secret", "error", err, "user_id", userID)
+		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
 	// Update user with API key.
-	if _, err := u.q.SetAPIKey.Exec(userID, apiKey, hashAPISecret(apiSecret)); err != nil {
+	if _, err := u.q.SetAPIKey.Exec(userID, apiKey, storedSecret); err != nil {
 		u.lo.Error("error saving API key", "error", err, "user_id", userID)
 		return "", "", envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -457,16 +467,23 @@ func (u *Manager) ValidateAPIKey(apiKey, apiSecret string) (models.User, error) 
 	}
 
 	// Verify API secret.
-	storedHash := user.APISecret.String
-	if strings.HasPrefix(storedHash, "$2") {
-		if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(apiSecret)); err != nil {
+	stored := user.APISecret.String
+	if crypto.IsEncrypted(stored) {
+		plain, err := crypto.Decrypt(stored, u.encryptionKey)
+		if err != nil || subtle.ConstantTimeCompare([]byte(plain), []byte(apiSecret)) != 1 {
 			return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.T("validation.invalidCredential"), nil)
 		}
-		// Matching on storedHash keeps a rotation that landed meanwhile from being overwritten.
-		if _, err := u.q.UpdateAPISecretHash.Exec(user.ID, storedHash, hashAPISecret(apiSecret)); err != nil {
-			u.lo.Error("failed to upgrade API secret hash", "error", err, "user_id", user.ID)
+	} else if strings.HasPrefix(stored, "$2") {
+		if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(apiSecret)); err != nil {
+			return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.T("validation.invalidCredential"), nil)
 		}
-	} else if subtle.ConstantTimeCompare([]byte(storedHash), []byte(hashAPISecret(apiSecret))) != 1 {
+		// Matching on stored keeps a rotation that landed meanwhile from being overwritten.
+		if upgraded, err := u.storeAPISecret(apiSecret); err == nil {
+			if _, err := u.q.UpdateAPISecretHash.Exec(user.ID, stored, upgraded); err != nil {
+				u.lo.Error("failed to upgrade API secret hash", "error", err, "user_id", user.ID)
+			}
+		}
+	} else if subtle.ConstantTimeCompare([]byte(stored), []byte(hashAPISecret(apiSecret))) != 1 {
 		return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.T("validation.invalidCredential"), nil)
 	}
 
@@ -652,6 +669,46 @@ func (u *Manager) reserveFlush(id int) bool {
 	// Stamp timestamp.
 	u.lastActiveFlushAt[id] = time.Now()
 	return true
+}
+
+// APICredentials is the agent's API key plus a revealable secret when one exists.
+type APICredentials struct {
+	APIKey           string
+	APISecret        string
+	APIKeyLastUsedAt null.Time
+	SecretAvailable  bool
+}
+
+// GetAPICredentials returns the agent's API key and, when stored encrypted, the secret.
+func (u *Manager) GetAPICredentials(userID int) (APICredentials, error) {
+	var out APICredentials
+	user, err := u.GetAgent(userID, "")
+	if err != nil {
+		return out, err
+	}
+	out.APIKey = user.APIKey.String
+	out.APIKeyLastUsedAt = user.APIKeyLastUsedAt
+	if crypto.IsEncrypted(user.APISecret.String) {
+		plain, err := crypto.Decrypt(user.APISecret.String, u.encryptionKey)
+		if err != nil {
+			u.lo.Error("error decrypting API secret", "error", err, "user_id", userID)
+			return out, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		out.APISecret = plain
+		out.SecretAvailable = plain != ""
+	}
+	return out, nil
+}
+
+func (u *Manager) storeAPISecret(secret string) (string, error) {
+	if u.encryptionKey != "" {
+		enc, err := crypto.Encrypt(secret, u.encryptionKey)
+		if err != nil {
+			return "", err
+		}
+		return enc, nil
+	}
+	return hashAPISecret(secret), nil
 }
 
 // hashAPISecret returns the hex SHA-256 of an API secret (a 64 char random token, so no work factor needed).

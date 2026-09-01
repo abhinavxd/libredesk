@@ -274,8 +274,9 @@ func initSettings(db *sqlx.DB) *setting.Manager {
 // initUser inits user manager.
 func initUser(i18n *i18n.I18n, DB *sqlx.DB) *user.Manager {
 	mgr, err := user.New(i18n, user.Opts{
-		DB: DB,
-		Lo: initLogger("user_manager"),
+		DB:            DB,
+		Lo:            initLogger("user_manager"),
+		EncryptionKey: ko.MustString("app.encryption_key"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing user manager: %v", err)

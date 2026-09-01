@@ -23,6 +23,18 @@
         {{ $t('globals.messages.saveChanges') }}
       </Button>
     </div>
+
+    <ApiKeyManager
+      class="max-w-xl mt-8"
+      :api-key="userStore.user.api_key"
+      :last-used-at="userStore.user.api_key_last_used_at"
+      :description="t('account.apiKey.description')"
+      :empty-label="t('account.apiKey.noKey')"
+      :generate-fn="api.generateMyAPIKey"
+      :revoke-fn="api.revokeMyAPIKey"
+      :fetch-fn="api.getMyAPIKey"
+      @updated="onApiKeyUpdated"
+    />
   </div>
 </template>
 
@@ -36,6 +48,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'
 import api from '../../../api'
+import ApiKeyManager from '@/features/account/ApiKeyManager.vue'
 
 const emitter = useEmitter()
 const { t } = useI18n()
@@ -85,5 +98,10 @@ const removeAvatar = async () => {
       description: handleHTTPError(error).message
     })
   }
+}
+
+const onApiKeyUpdated = ({ api_key, api_key_last_used_at }) => {
+  userStore.user.api_key = api_key
+  userStore.user.api_key_last_used_at = api_key_last_used_at
 }
 </script>
