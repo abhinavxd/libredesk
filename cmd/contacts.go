@@ -24,6 +24,10 @@ type blockContactReq struct {
 	Enabled bool `json:"enabled"`
 }
 
+type mergeContactReq struct {
+	IntoID int `json:"into_id"`
+}
+
 // handleGetContacts returns a list of contacts from the database.
 func handleGetContacts(r *fastglue.Request) error {
 	var (
@@ -251,6 +255,32 @@ func handleDeleteContact(r *fastglue.Request) error {
 	}
 
 	return r.SendEnvelope(true)
+}
+
+// handleMergeContact folds the contact into another contact and soft-deletes the source.
+func handleMergeContact(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+		req   = mergeContactReq{}
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	if req.IntoID <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("contact.merge.targetRequired"), nil, envelope.InputError)
+	}
+	if err := app.user.MergeContacts(id, req.IntoID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	survivor, err := app.user.GetContactOrVisitor(req.IntoID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(survivor)
 }
 
 // handleExportContact sends all stored data for a contact as a JSON file download.

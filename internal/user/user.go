@@ -126,6 +126,7 @@ type queries struct {
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
 
 	MergeVisitorToContact *sqlx.Stmt `query:"merge-visitor-to-contact"`
+	MergeContacts         *sqlx.Stmt `query:"merge-contacts"`
 	ExportContactData     *sqlx.Stmt `query:"export-contact-data"`
 }
 
@@ -509,6 +510,32 @@ func (u *Manager) MergeVisitorToContact(visitorID, contactID int) error {
 	if _, err := u.q.MergeVisitorToContact.Exec(visitorID, contactID); err != nil {
 		u.lo.Error("error merging visitor to contact", "visitor_id", visitorID, "contact_id", contactID, "error", err)
 		return fmt.Errorf("merging visitor to contact: %w", err)
+	}
+	return nil
+}
+
+// MergeContacts moves tickets, notes, and profile gaps from loserID onto intoID, then soft-deletes the loser.
+func (u *Manager) MergeContacts(loserID, intoID int) error {
+	if loserID <= 0 || intoID <= 0 || loserID == intoID {
+		return envelope.NewError(envelope.InputError, u.i18n.T("contact.merge.sameContact"), nil)
+	}
+	loser, err := u.GetContactOrVisitor(loserID, "")
+	if err != nil {
+		return err
+	}
+	survivor, err := u.GetContactOrVisitor(intoID, "")
+	if err != nil {
+		return err
+	}
+	if loser.Type != models.UserTypeContact && loser.Type != models.UserTypeVisitor {
+		return envelope.NewError(envelope.InputError, u.i18n.T("contact.merge.sameContact"), nil)
+	}
+	if survivor.Type != models.UserTypeContact && survivor.Type != models.UserTypeVisitor {
+		return envelope.NewError(envelope.InputError, u.i18n.T("contact.merge.sameContact"), nil)
+	}
+	if _, err := u.q.MergeContacts.Exec(loserID, intoID); err != nil {
+		u.lo.Error("error merging contacts", "loser_id", loserID, "into_id", intoID, "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

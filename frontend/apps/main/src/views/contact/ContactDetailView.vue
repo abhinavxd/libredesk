@@ -53,6 +53,14 @@
                     {{ t(contact.enabled ? 'globals.messages.block' : 'globals.messages.unblock') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
+                    v-if="userStore.can('contacts:merge')"
+                    class="cursor-pointer"
+                    @click="showMerge = true"
+                  >
+                    <GitMergeIcon class="mr-2" size="15" />
+                    {{ t('contact.merge.action') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     v-if="userStore.can('contacts:export')"
                     class="cursor-pointer"
                     @click="exportContact"
@@ -138,6 +146,40 @@
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog :open="showMerge" @update:open="onMergeOpen">
+        <DialogContent class="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{{ t('contact.merge.title') }}</DialogTitle>
+            <DialogDescription>{{ t('contact.merge.confirm') }}</DialogDescription>
+          </DialogHeader>
+          <Input
+            v-model="mergeQuery"
+            type="search"
+            :placeholder="t('contact.merge.searchPlaceholder')"
+            @input="onMergeSearch"
+          />
+          <div class="max-h-64 overflow-y-auto rounded-md border divide-y">
+            <button
+              v-for="item in mergeResults"
+              :key="item.id"
+              type="button"
+              class="w-full text-left px-3 py-2 text-sm hover:bg-muted"
+              :class="{ 'bg-muted': mergeTarget === item.id }"
+              @click="mergeTarget = item.id"
+            >
+              <span class="font-medium">{{ item.first_name }} {{ item.last_name }}</span>
+              <span class="ml-2 text-muted-foreground">{{ item.email }}</span>
+            </button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" @click="showMerge = false">{{ t('globals.messages.cancel') }}</Button>
+            <Button :disabled="!mergeTarget || formLoading" @click="runMerge">
+              {{ t('contact.merge.action') }}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   </ContactDetail>
 </template>
@@ -151,6 +193,15 @@ import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { AvatarUpload } from '@shared-ui/components/ui/avatar'
 import { Button } from '@shared-ui/components/ui/button'
+import { Input } from '@shared-ui/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@shared-ui/components/ui/dialog'
 import { Badge } from '@shared-ui/components/ui/badge'
 import {
   AlertDialog,
@@ -177,6 +228,7 @@ import {
   CalendarIcon,
   DownloadIcon,
   Trash2Icon,
+  GitMerge as GitMergeIcon,
   MoreVerticalIcon
 } from 'lucide-vue-next'
 import ContactDetail from '@/layouts/contact/ContactDetail.vue'
@@ -206,10 +258,16 @@ const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t))
 })
 
+const showMerge = ref(false)
+const mergeQuery = ref('')
+const mergeTarget = ref(0)
+const mergeResults = ref([])
+
 const canOpenActionsMenu = computed(
   () =>
     userStore.can('contacts:block') ||
     userStore.can('contacts:export') ||
+    userStore.can('contacts:merge') ||
     userStore.can('contacts:delete')
 )
 
@@ -265,6 +323,48 @@ async function confirmDelete() {
     await api.deleteContact(contact.value.id)
     emitToast(t('globals.messages.deletedSuccessfully'))
     router.push({ name: 'contacts' })
+  } catch (err) {
+    showError(err)
+  } finally {
+    formLoading.value = false
+  }
+}
+
+const onMergeOpen = (value) => {
+  showMerge.value = value
+  if (!value) {
+    mergeQuery.value = ''
+    mergeTarget.value = 0
+    mergeResults.value = []
+  }
+}
+
+let mergeTimer
+const onMergeSearch = () => {
+  clearTimeout(mergeTimer)
+  const q = mergeQuery.value.trim()
+  if (q.length < 3) {
+    mergeResults.value = []
+    return
+  }
+  mergeTimer = setTimeout(async () => {
+    try {
+      const { data } = await api.searchContacts({ query: q })
+      mergeResults.value = (data.data || []).filter((c) => c.id !== contact.value?.id)
+    } catch {
+      mergeResults.value = []
+    }
+  }, 250)
+}
+
+async function runMerge() {
+  if (!contact.value?.id || !mergeTarget.value) return
+  try {
+    formLoading.value = true
+    await api.mergeContact(contact.value.id, { into_id: mergeTarget.value })
+    emitToast(t('contact.merge.success'))
+    showMerge.value = false
+    router.push({ name: 'contact-detail', params: { id: mergeTarget.value } })
   } catch (err) {
     showError(err)
   } finally {
