@@ -45,6 +45,10 @@ type tagsUpdateReq struct {
 	Action string   `json:"action,omitempty"`
 }
 
+type mergeConversationReq struct {
+	TargetUUID string `json:"target_uuid"`
+}
+
 type createConversationRequest struct {
 	InboxID          int            `json:"inbox_id"`
 	AssignedAgentID  int            `json:"agent_id"`
@@ -352,6 +356,37 @@ func handleDeleteConversation(r *fastglue.Request) error {
 	}
 	app.conversation.BroadcastConversationUpdate(uuid, map[string]any{"deleted": true})
 	return r.SendEnvelope(true)
+}
+
+// handleMergeConversation merges the source ticket into the target and closes the source.
+func handleMergeConversation(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   = mergeConversationReq{}
+	)
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	if strings.TrimSpace(req.TargetUUID) == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("conversation.merge.targetRequired"), nil, envelope.InputError)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, req.TargetUUID, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	merged, err := app.conversation.MergeConversations(uuid, req.TargetUUID, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(merged)
 }
 
 // handleDownloadConversationTranscript sends the conversation transcript as a text file download.

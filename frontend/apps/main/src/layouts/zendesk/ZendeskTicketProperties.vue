@@ -71,7 +71,8 @@
       <ZendeskMacroPicker />
     </div>
 
-    <div class="pt-4">
+    <div class="pt-4 space-y-2">
+      <ConversationMergeDialog />
       <ConversationSpamActions />
     </div>
   </aside>
@@ -89,6 +90,7 @@ import { TAG_ACTION } from '@/constants/conversation'
 import { useTeamFilteredAgentOptions } from '@main/composables/useTeamFilteredAgentOptions'
 import ZendeskMacroPicker from './ZendeskMacroPicker.vue'
 import ConversationSpamActions from '@/features/conversation/ConversationSpamActions.vue'
+import ConversationMergeDialog from '@/features/conversation/ConversationMergeDialog.vue'
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
