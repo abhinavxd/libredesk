@@ -54,7 +54,37 @@ const mod = isMac ? '⌘' : 'Ctrl'
 const groups = computed(() => [
   {
     title: t('globals.terms.general'),
-    items: [{ label: t('shortcuts.openCommandBar'), keys: [mod, 'K'] }]
+    items: [
+      { label: t('shortcuts.openCommandBar'), keys: [mod, 'K'] },
+      { label: t('shortcuts.search'), keys: ['/'] },
+      { label: t('shortcuts.showHelp'), keys: ['?'] },
+      { label: t('shortcuts.newTicket'), keys: ['C'] }
+    ]
+  },
+  {
+    title: t('shortcuts.views'),
+    items: [
+      { label: t('shortcuts.nextTicket'), keys: ['J'] },
+      { label: t('shortcuts.previousTicket'), keys: ['K'] },
+      { label: t('shortcuts.openTicket'), keys: ['Enter'] },
+      { label: t('shortcuts.selectTicket'), keys: ['X'] },
+      { label: t('shortcuts.prevTab'), keys: ['['] },
+      { label: t('shortcuts.nextTab'), keys: [']'] }
+    ]
+  },
+  {
+    title: t('shortcuts.tickets'),
+    items: [
+      { label: t('shortcuts.assignToMe'), keys: ['='] },
+      { label: t('shortcuts.reply'), keys: ['R'] },
+      { label: t('shortcuts.note'), keys: ['N'] },
+      { label: t('shortcuts.macros'), keys: ['M'] },
+      { label: t('shortcuts.closeTicket'), keys: ['#'] },
+      { label: t('shortcuts.submitOpen'), keys: ['S', 'O'] },
+      { label: t('shortcuts.submitPending'), keys: ['S', 'P'] },
+      { label: t('shortcuts.submitSolved'), keys: ['S', 'S'] },
+      { label: t('shortcuts.submitClosed'), keys: ['S', 'C'] }
+    ]
   },
   {
     title: t('shortcuts.replyEditor'),

@@ -46,7 +46,12 @@ type tagsUpdateReq struct {
 }
 
 type mergeConversationReq struct {
-	TargetUUID string `json:"target_uuid"`
+	TargetUUID     string `json:"target_uuid"`
+	MergeContacts  bool   `json:"merge_contacts"`
+}
+
+type linkedConversationReq struct {
+	Subject string `json:"subject"`
 }
 
 func conversationListFilters(r *fastglue.Request) string {
@@ -360,6 +365,9 @@ func handleGetConversation(r *fastglue.Request) error {
 
 	prev, _ := app.conversation.GetContactPreviousConversations(conv.ContactID, 10)
 	conv.PreviousConversations = filterCurrentPreviousConv(prev, conv.UUID)
+	if related, err := app.conversation.ListRelatedConversations(conv.UUID); err == nil {
+		conv.RelatedConversations = related
+	}
 	return r.SendEnvelope(conv)
 }
 
@@ -408,11 +416,79 @@ func handleMergeConversation(r *fastglue.Request) error {
 	if _, err := enforceConversationAccess(app, req.TargetUUID, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	source, err := app.conversation.GetConversation(0, uuid, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	target, err := app.conversation.GetConversation(0, req.TargetUUID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	merged, err := app.conversation.MergeConversations(uuid, req.TargetUUID, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if req.MergeContacts && source.ContactID > 0 && target.ContactID > 0 && source.ContactID != target.ContactID {
+		if !slices.Contains(user.Permissions, "contacts:merge") {
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("globals.messages.permissionDenied"), nil, envelope.PermissionError)
+		}
+		if err := app.user.MergeContacts(source.ContactID, target.ContactID); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
 	return r.SendEnvelope(merged)
+}
+
+func handleCreateChildConversation(r *fastglue.Request) error {
+	return handleCreateLinkedConversation(r, cmodels.OriginChild)
+}
+
+func handleCreateFollowUpConversation(r *fastglue.Request) error {
+	return handleCreateLinkedConversation(r, cmodels.OriginFollowUp)
+}
+
+func handleCreateLinkedConversation(r *fastglue.Request, origin string) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   = linkedConversationReq{}
+	)
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := r.Decode(&req, "json"); err != nil && len(r.RequestCtx.PostBody()) > 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	created, err := app.conversation.CreateLinkedConversation(uuid, origin, req.Subject, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(created)
+}
+
+func handleGetRelatedConversations(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	related, err := app.conversation.ListRelatedConversations(uuid)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(related)
 }
 
 // handleDownloadConversationTranscript sends the conversation transcript as a text file download.

@@ -788,6 +788,12 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("%s merged #%s into this conversation", actorName, newValue)
 	case models.ActivityMergedInto:
 		content = fmt.Sprintf("%s merged this conversation into #%s", actorName, newValue)
+	case models.ActivityChildCreated:
+		content = fmt.Sprintf("%s opened child ticket #%s", actorName, newValue)
+	case models.ActivityFollowUpCreated:
+		content = fmt.Sprintf("%s opened follow-up ticket #%s", actorName, newValue)
+	case models.ActivityOpenedFromParent:
+		content = fmt.Sprintf("%s opened this ticket from #%s", actorName, newValue)
 	default:
 		return "", fmt.Errorf("invalid activity type %s", activityType)
 	}

@@ -9,6 +9,9 @@ export const EMITTER_EVENTS = {
     SCROLL_TO_MESSAGE: 'scroll-to-message',
     OPEN_VIEW_FORM: 'open-view-form',
     OPEN_CREATE_CONVERSATION: 'open-create-conversation',
+    OPEN_MERGE_DIALOG: 'open-merge-dialog',
+    SHOW_KEYBOARD_SHORTCUTS: 'show-keyboard-shortcuts',
+    FOCUS_COMPOSER: 'focus-composer',
     CONVERSATION_SUBMIT_AS: 'conversation-submit-as',
     CONVERSATION_SUBMITTED: 'conversation-submitted',
     COPILOT_INSERT_REPLY: 'copilot-insert-reply'

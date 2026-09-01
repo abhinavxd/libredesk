@@ -381,6 +381,9 @@ type queries struct {
 	GetSideConversation    *sqlx.Stmt `query:"get-side-conversation"`
 	InsertSideMessage      *sqlx.Stmt `query:"insert-side-message"`
 	ListSideMessages       *sqlx.Stmt `query:"list-side-messages"`
+
+	SetConversationParent     *sqlx.Stmt `query:"set-conversation-parent"`
+	ListRelatedConversations  *sqlx.Stmt `query:"list-related-conversations"`
 }
 
 // CreateConversation creates a new conversation. If maxConversations > 0, the insert is

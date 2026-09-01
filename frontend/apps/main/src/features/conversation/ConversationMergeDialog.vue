@@ -1,6 +1,7 @@
 <template>
   <div v-if="canMerge">
     <Button
+      v-if="!global"
       variant="outline"
       size="sm"
       :class="compact ? 'h-7 text-xs shrink-0 px-2' : 'w-full justify-start'"
@@ -42,6 +43,14 @@
           </p>
         </div>
 
+        <label v-if="canMergeContacts" class="flex items-start gap-2 text-sm cursor-pointer">
+          <Checkbox :checked="mergeContacts" @update:checked="mergeContacts = $event" class="mt-0.5" />
+          <span>
+            {{ t('conversation.merge.mergeContacts') }}
+            <span class="block text-xs text-muted-foreground">{{ t('conversation.merge.mergeContactsHint') }}</span>
+          </span>
+        </label>
+
         <DialogFooter>
           <Button variant="outline" @click="open = false">{{ t('globals.messages.cancel') }}</Button>
           <Button :disabled="!selected || busy" @click="runMerge">
@@ -54,12 +63,13 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { GitMerge } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
+import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -74,9 +84,11 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
+import { conversationRouteForContext } from '@main/composables/useZendeskTabs'
 
-defineProps({
-  compact: { type: Boolean, default: false }
+const props = defineProps({
+  compact: { type: Boolean, default: false },
+  global: { type: Boolean, default: false }
 })
 
 const { t } = useI18n()
@@ -91,9 +103,12 @@ const busy = ref(false)
 const query = ref('')
 const selected = ref('')
 const extras = ref([])
+const mergeContacts = ref(false)
+const sourceUUID = ref('')
 
 const canMerge = computed(() => userStore.can('conversations:write'))
-const currentUUID = computed(() => conversationStore.current?.uuid)
+const canMergeContacts = computed(() => userStore.can('contacts:merge'))
+const currentUUID = computed(() => sourceUUID.value || conversationStore.current?.uuid)
 
 const contactTickets = computed(() => {
   const list = conversationStore.current?.previous_conversations || []
@@ -118,7 +133,14 @@ const onOpen = (value) => {
     query.value = ''
     selected.value = ''
     extras.value = []
+    mergeContacts.value = false
+    sourceUUID.value = ''
   }
+}
+
+const onOpenMerge = (payload) => {
+  sourceUUID.value = payload?.uuid || conversationStore.current?.uuid || ''
+  open.value = true
 }
 
 let searchTimer
@@ -143,13 +165,13 @@ const runMerge = async () => {
   if (!currentUUID.value || !selected.value) return
   busy.value = true
   try {
-    await api.mergeConversation(currentUUID.value, { target_uuid: selected.value })
+    await api.mergeConversation(currentUUID.value, {
+      target_uuid: selected.value,
+      merge_contacts: canMergeContacts.value && mergeContacts.value
+    })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('conversation.merge.success') })
     open.value = false
-    await router.push({
-      name: route.name,
-      params: { ...route.params, uuid: selected.value }
-    })
+    await router.push(conversationRouteForContext(route, selected.value))
   } catch (err) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -159,4 +181,12 @@ const runMerge = async () => {
     busy.value = false
   }
 }
+
+onMounted(() => {
+  if (props.global) emitter.on(EMITTER_EVENTS.OPEN_MERGE_DIALOG, onOpenMerge)
+})
+
+onUnmounted(() => {
+  if (props.global) emitter.off(EMITTER_EVENTS.OPEN_MERGE_DIALOG, onOpenMerge)
+})
 </script>

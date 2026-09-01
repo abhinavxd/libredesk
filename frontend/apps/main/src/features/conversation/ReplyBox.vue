@@ -385,14 +385,23 @@ const handleCopilotInsertReply = (html) => {
 
 const handleExternalSubmit = (status) => processSendAndSetStatus(status)
 
+const handleFocusComposer = (payload) => {
+  const type = payload?.type === 'private_note' ? 'private_note' : 'reply'
+  if (!isAllowedMessageType(type)) return
+  messageType.value = type
+  setTimeout(() => replyBoxContentRef.value?.focus(), 50)
+}
+
 onMounted(() => {
   emitter.on(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
   emitter.on(EMITTER_EVENTS.CONVERSATION_SUBMIT_AS, handleExternalSubmit)
+  emitter.on(EMITTER_EVENTS.FOCUS_COMPOSER, handleFocusComposer)
 })
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
   emitter.off(EMITTER_EVENTS.CONVERSATION_SUBMIT_AS, handleExternalSubmit)
+  emitter.off(EMITTER_EVENTS.FOCUS_COMPOSER, handleFocusComposer)
 })
 
 /**

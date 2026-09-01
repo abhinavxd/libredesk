@@ -144,7 +144,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   DropdownMenu,
@@ -173,6 +173,8 @@ import { useRouter } from 'vue-router'
 import KeyboardShortcutsDialog from '@main/components/KeyboardShortcutsDialog.vue'
 import { useColorMode } from '@vueuse/core'
 import { useUiLayout, UI_LAYOUT_DEFAULT, UI_LAYOUT_ZENDESK } from '@main/composables/useUiLayout'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 
 defineProps({
   zendesk: { type: Boolean, default: false },
@@ -186,6 +188,19 @@ const router = useRouter()
 const { t } = useI18n()
 const { layout, setLayout } = useUiLayout()
 const showShortcuts = ref(false)
+const emitter = useEmitter()
+
+const onShowShortcuts = () => {
+  showShortcuts.value = true
+}
+
+onMounted(() => {
+  emitter.on(EMITTER_EVENTS.SHOW_KEYBOARD_SHORTCUTS, onShowShortcuts)
+})
+
+onUnmounted(() => {
+  emitter.off(EMITTER_EVENTS.SHOW_KEYBOARD_SHORTCUTS, onShowShortcuts)
+})
 
 const logout = () => {
   window.location.href = '/logout'
