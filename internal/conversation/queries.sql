@@ -1073,7 +1073,7 @@ WHERE t.id = $2 AND s.id = $1
 -- name: merge-close-source
 UPDATE conversations
 SET
-    merged_into_uuid = $2,
+    merged_into_uuid = $2::uuid,
     meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('merged_into_uuid', $2::text),
     updated_at = NOW()
 WHERE uuid = $1;
