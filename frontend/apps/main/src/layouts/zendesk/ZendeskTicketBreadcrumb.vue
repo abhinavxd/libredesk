@@ -29,7 +29,6 @@
 
     <div class="zendesk-breadcrumb-meta flex items-stretch shrink-0">
       <div class="flex items-center px-3 gap-2 h-full">
-        <ZendeskTicketViewers />
         <Button variant="ghost" size="sm" class="h-7 text-xs hidden lg:inline-flex" @click="emit('next')" :disabled="!hasNext">
           {{ t('zendesk.next') }}
           <ArrowRight class="size-3.5 ml-1" />
@@ -48,7 +47,6 @@ import { useInboxViewContext } from '@main/composables/useInboxViewContext'
 import { useStatusCategory } from '@main/composables/useStatusCategory'
 import { useConversationStore } from '@main/stores/conversation'
 import ZendeskSlaIndicator from './ZendeskSlaIndicator.vue'
-import ZendeskTicketViewers from './ZendeskTicketViewers.vue'
 
 const props = defineProps({
   requesterName: { type: String, default: '' },

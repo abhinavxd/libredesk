@@ -18,16 +18,19 @@
         <ZendeskTicketProperties />
 
         <div class="zendesk-ticket-center">
-          <div class="px-4 py-2.5 border-b shrink-0 bg-background">
-          <h2 class="zendesk-title truncate leading-snug">
-            {{ conversationStore.current?.subject || t('zendesk.noSubject') }}
-          </h2>
-          <p
-            v-if="conversationStore.current?.inbox_name"
-            class="zendesk-meta mt-0.5"
-          >
-            {{ t('zendesk.viaInbox', { inbox: conversationStore.current.inbox_name }) }}
-          </p>
+          <div class="px-4 py-2.5 border-b shrink-0 bg-background flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="zendesk-title truncate leading-snug">
+              {{ conversationStore.current?.subject || t('zendesk.noSubject') }}
+            </h2>
+            <p
+              v-if="conversationStore.current?.inbox_name"
+              class="zendesk-meta mt-0.5"
+            >
+              {{ t('zendesk.viaInbox', { inbox: conversationStore.current.inbox_name }) }}
+            </p>
+          </div>
+          <ConversationViewers class="shrink-0 mt-0.5" />
         </div>
 
         <div class="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -58,6 +61,7 @@ import ZendeskTicketProperties from './ZendeskTicketProperties.vue'
 import ZendeskCustomerContext from './ZendeskCustomerContext.vue'
 import ZendeskTicketChrome from './ZendeskTicketChrome.vue'
 import ZendeskSubmitBar from './ZendeskSubmitBar.vue'
+import ConversationViewers from '@/features/conversation/ConversationViewers.vue'
 
 const props = defineProps({
   uuid: String

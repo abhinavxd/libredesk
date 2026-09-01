@@ -16,6 +16,7 @@
         <span class="truncate">{{ conversationStore.currentContactName }}</span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        <ConversationViewers />
         <Button
           v-if="isMobile"
           variant="ghost"
@@ -104,6 +105,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
+import ConversationViewers from '@/features/conversation/ConversationViewers.vue'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
