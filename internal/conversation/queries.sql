@@ -248,6 +248,7 @@ SELECT
    nxt_resp_event.deadline_at AS next_response_deadline_at,
    nxt_resp_event.met_at as next_response_met_at,
    c.last_continuity_email_sent_at,
+   c.merged_into_uuid,
    csat.rating as csat_rating,
    csat.feedback as csat_feedback,
    csat.response_timestamp as csat_responded_at
@@ -1033,3 +1034,43 @@ FROM conversations
 WHERE contact_id = $1
 ORDER BY last_message_at DESC NULLS LAST
 LIMIT 200;
+
+-- name: merge-move-messages
+UPDATE conversation_messages
+SET conversation_id = $2
+WHERE conversation_id = $1;
+
+-- name: merge-copy-tags
+INSERT INTO conversation_tags (conversation_id, tag_id)
+SELECT $2, tag_id FROM conversation_tags WHERE conversation_id = $1
+ON CONFLICT (conversation_id, tag_id) DO NOTHING;
+
+-- name: merge-copy-participants
+INSERT INTO conversation_participants (conversation_id, user_id)
+SELECT $2, user_id FROM conversation_participants WHERE conversation_id = $1
+ON CONFLICT (conversation_id, user_id) DO NOTHING;
+
+-- name: merge-refresh-target-last-message
+UPDATE conversations t
+SET
+    last_message = s.last_message,
+    last_message_at = s.last_message_at,
+    last_message_sender = s.last_message_sender,
+    last_message_sender_id = s.last_message_sender_id,
+    last_interaction = s.last_interaction,
+    last_interaction_at = s.last_interaction_at,
+    last_interaction_sender = s.last_interaction_sender,
+    last_interaction_sender_id = s.last_interaction_sender_id,
+    updated_at = NOW()
+FROM conversations s
+WHERE t.id = $2 AND s.id = $1
+  AND s.last_message_at IS NOT NULL
+  AND (t.last_message_at IS NULL OR s.last_message_at > t.last_message_at);
+
+-- name: merge-close-source
+UPDATE conversations
+SET
+    merged_into_uuid = $2,
+    meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('merged_into_uuid', $2::text),
+    updated_at = NOW()
+WHERE uuid = $1;

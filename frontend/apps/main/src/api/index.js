@@ -348,6 +348,10 @@ const sendMessage = (uuid, data) =>
   })
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
 const deleteConversation = (uuid) => http.delete(`/api/v1/conversations/${uuid}`)
+const mergeConversation = (uuid, data) =>
+  http.post(`/api/v1/conversations/${uuid}/merge`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
@@ -662,6 +666,7 @@ export default {
   getAvailableLanguages,
   getConversation,
   deleteConversation,
+  mergeConversation,
   getAutomationRule,
   getAutomationRules,
   getAllBusinessHours,

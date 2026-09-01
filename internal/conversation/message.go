@@ -784,6 +784,10 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("%s set %s SLA policy", actorName, newValue)
 	case models.ActivityParticipantAdded:
 		content = fmt.Sprintf("%s joined the conversation", newValue)
+	case models.ActivityMergedFrom:
+		content = fmt.Sprintf("%s merged #%s into this conversation", actorName, newValue)
+	case models.ActivityMergedInto:
+		content = fmt.Sprintf("%s merged this conversation into #%s", actorName, newValue)
 	default:
 		return "", fmt.Errorf("invalid activity type %s", activityType)
 	}
@@ -903,7 +907,7 @@ func (m *Manager) resolveSender(in *models.IncomingMessage) (senderID, conversat
 // (e.g., inbox+conv-{uuid}@domain). If the conversation contact is a visitor, it upgrades
 // them to a contact (proving email ownership). Returns senderID > 0 if resolved.
 func (m *Manager) resolveByPlusAddress(in *models.IncomingMessage) (senderID, conversationID int, conversationUUID string, err error) {
-	conversation, err := m.GetConversation(0, in.ConversationUUIDFromReplyTo, "")
+	conversation, err := m.followMergedConversation(in.ConversationUUIDFromReplyTo)
 	if err != nil {
 		// Not found return with no error.
 		if envErr, ok := err.(envelope.Error); ok && envErr.ErrorType == envelope.NotFoundError {

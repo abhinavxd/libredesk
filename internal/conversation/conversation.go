@@ -369,6 +369,12 @@ type queries struct {
 	// WS list-subscribe authz.
 	FilterAuthorizedListUUIDs     *sqlx.Stmt `query:"filter-authorized-list-uuids"`
 	GetConversationUUIDsByContact *sqlx.Stmt `query:"get-conversation-uuids-by-contact"`
+
+	MergeMoveMessages             *sqlx.Stmt `query:"merge-move-messages"`
+	MergeCopyTags                 *sqlx.Stmt `query:"merge-copy-tags"`
+	MergeCopyParticipants         *sqlx.Stmt `query:"merge-copy-participants"`
+	MergeRefreshTargetLastMessage *sqlx.Stmt `query:"merge-refresh-target-last-message"`
+	MergeCloseSource              *sqlx.Stmt `query:"merge-close-source"`
 }
 
 // CreateConversation creates a new conversation. If maxConversations > 0, the insert is

@@ -281,8 +281,10 @@ CREATE TABLE conversations (
 	last_interaction_at TIMESTAMPTZ NULL,
 	next_sla_deadline_at TIMESTAMPTZ NULL,
 	snoozed_until TIMESTAMPTZ NULL,
-	last_continuity_email_sent_at TIMESTAMPTZ NULL
+	last_continuity_email_sent_at TIMESTAMPTZ NULL,
+	merged_into_uuid UUID REFERENCES conversations(uuid) ON DELETE SET NULL ON UPDATE CASCADE
 );
+CREATE INDEX index_conversations_on_merged_into_uuid ON conversations (merged_into_uuid) WHERE merged_into_uuid IS NOT NULL;
 CREATE INDEX index_conversations_on_assigned_user_id ON conversations (assigned_user_id);
 CREATE INDEX index_conversations_on_assigned_team_id ON conversations (assigned_team_id);
 CREATE INDEX index_conversations_on_snoozed_until ON conversations (snoozed_until);

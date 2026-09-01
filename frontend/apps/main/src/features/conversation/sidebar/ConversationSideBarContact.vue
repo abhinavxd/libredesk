@@ -40,6 +40,7 @@
         {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
       </span>
     </div>
+    <ConversationMergeDialog class="pt-1" />
     <ConversationSpamActions class="pt-1" />
     <div class="flex gap-2 items-center">
       <Mail size="16" class="text-muted-foreground flex-shrink-0" />
@@ -134,6 +135,7 @@ import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import api from '../../../api'
 import ConversationSpamActions from '@/features/conversation/ConversationSpamActions.vue'
+import ConversationMergeDialog from '@/features/conversation/ConversationMergeDialog.vue'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
 const conversation = computed(() => conversationStore.current)

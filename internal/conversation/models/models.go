@@ -54,6 +54,8 @@ var (
 	ActivityTagRemoved         = "tag_removed"
 	ActivitySLASet             = "sla_set"
 	ActivityParticipantAdded   = "participant_added"
+	ActivityMergedFrom         = "merged_from"
+	ActivityMergedInto         = "merged_into"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"
@@ -203,6 +205,7 @@ type Conversation struct {
 	NextResponseDueAt         null.Time              `db:"next_response_deadline_at" json:"next_response_deadline_at"`
 	NextResponseMetAt         null.Time              `db:"next_response_met_at" json:"next_response_met_at"`
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
+	MergedIntoUUID            null.String            `db:"merged_into_uuid" json:"merged_into_uuid"`
 	CSATRating                null.Int               `db:"csat_rating" json:"csat_rating"`
 	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
 	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
