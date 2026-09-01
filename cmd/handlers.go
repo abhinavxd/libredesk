@@ -21,6 +21,7 @@ const maxPageSize = 500
 func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Authentication.
 	g.POST("/api/v1/auth/login", rateLimit(handleLogin, "auth"))
+	g.POST("/api/v1/auth/totp/verify", rateLimit(handleVerifyTOTP, "auth"))
 	g.GET("/logout", auth(handleLogout))
 	g.GET("/api/v1/oidc/{id}/login", rateLimit(handleOIDCLogin, "auth"))
 	g.GET("/api/v1/oidc/{id}/finish", rateLimit(handleOIDCCallback, "auth"))
@@ -68,6 +69,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/conversations/{uuid}/related", perm(handleGetRelatedConversations, "conversations:read"))
 	g.POST("/api/v1/conversations/{uuid}/children", perm(handleCreateChildConversation, "conversations:write"))
 	g.POST("/api/v1/conversations/{uuid}/follow-up", perm(handleCreateFollowUpConversation, "conversations:write"))
+	g.POST("/api/v1/conversations/{uuid}/split", perm(handleSplitConversation, "conversations:write"))
 	g.GET("/api/v1/conversations/{uuid}/side-conversations", perm(handleListSideConversations, "messages:write"))
 	g.POST("/api/v1/conversations/{uuid}/side-conversations", perm(handleCreateSideConversation, "messages:write"))
 	g.POST("/api/v1/conversations/{uuid}/side-conversations/{side_uuid}/reply", perm(handleReplySideConversation, "messages:write"))
@@ -154,6 +156,15 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/agents/me/api-key", auth(handleGetCurrentAgentAPIKey))
 	g.POST("/api/v1/agents/me/api-key", auth(handleGenerateCurrentAgentAPIKey))
 	g.DELETE("/api/v1/agents/me/api-key", auth(handleRevokeCurrentAgentAPIKey))
+	g.POST("/api/v1/agents/me/totp/enroll", auth(handleEnrollTOTP))
+	g.POST("/api/v1/agents/me/totp/confirm", auth(handleConfirmTOTP))
+	g.DELETE("/api/v1/agents/me/totp", auth(handleDisableTOTP))
+	g.GET("/api/v1/skills", auth(handleGetSkills))
+	g.POST("/api/v1/skills", perm(handleCreateSkill, "users:manage"))
+	g.PUT("/api/v1/skills/{id}", perm(handleUpdateSkill, "users:manage"))
+	g.DELETE("/api/v1/skills/{id}", perm(handleDeleteSkill, "users:manage"))
+	g.GET("/api/v1/agents/{id}/skills", perm(handleGetAgentSkills, "users:manage"))
+	g.PUT("/api/v1/agents/{id}/skills", perm(handleSetAgentSkills, "users:manage"))
 
 	g.GET("/api/v1/agents/compact", auth(handleGetAgentsCompact))
 	g.GET("/api/v1/agents", perm(handleGetAgents, "users:manage"))

@@ -51,6 +51,7 @@ type TypingMessage struct {
 	ConversationUUID string `json:"conversation_uuid"`
 	IsTyping         bool   `json:"is_typing"`
 	IsPrivateMessage bool   `json:"is_private_message"`
+	UserID           int    `json:"user_id,omitempty"`
 }
 
 // ConversationViewers lists agents currently viewing a conversation (open-tab subscribe).

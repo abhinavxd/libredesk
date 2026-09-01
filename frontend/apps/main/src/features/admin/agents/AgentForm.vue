@@ -287,6 +287,29 @@
       </FormItem>
     </FormField>
 
+    <div v-if="!isNewForm && initialValues?.id" class="space-y-3">
+      <div>
+        <p class="text-base font-semibold text-foreground">{{ t('admin.skill.assign') }}</p>
+        <p class="text-sm text-muted-foreground">{{ t('admin.skill.help') }}</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <label v-for="skill in skills" :key="skill.id" class="flex items-center gap-2 text-sm">
+          <Checkbox :checked="selectedSkillIds.includes(skill.id)" @update:checked="() => toggleSkill(skill.id)" />
+          {{ skill.name }}
+        </label>
+        <p v-if="!skills.length" class="text-sm text-muted-foreground">{{ t('admin.skill.empty') }}</p>
+      </div>
+      <div class="flex gap-2 max-w-md">
+        <Input v-model.trim="newSkillName" :placeholder="t('admin.skill.name')" />
+        <Button type="button" variant="outline" :disabled="!newSkillName || skillBusy" @click="createSkill">
+          {{ t('admin.skill.create') }}
+        </Button>
+      </div>
+      <Button type="button" variant="outline" :disabled="skillBusy" @click="saveSkills">
+        {{ t('admin.skill.save') }}
+      </Button>
+    </div>
+
     <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
   </form>
 </template>
@@ -382,12 +405,28 @@ const newAPIKeyData = ref({
 })
 const showAPIKeyDialog = ref(false)
 const isAPIKeyLoading = ref(false)
+const skills = ref([])
+const selectedSkillIds = ref([])
+const newSkillName = ref('')
+const skillBusy = ref(false)
+
+const loadSkills = async () => {
+  const [allResp, agentResp] = await Promise.allSettled([
+    api.getSkills(),
+    props.initialValues?.id ? api.getAgentSkills(props.initialValues.id) : Promise.resolve(null)
+  ])
+  if (allResp.status === 'fulfilled') skills.value = allResp.value.data.data || []
+  if (agentResp.status === 'fulfilled' && agentResp.value) {
+    selectedSkillIds.value = (agentResp.value.data.data || []).map((s) => s.id)
+  }
+}
 
 onMounted(async () => {
   try {
     const [teamsResp, rolesResp] = await Promise.allSettled([api.getTeamsCompact(), api.getRoles()])
     if (teamsResp.status === 'fulfilled') teams.value = teamsResp.value.data.data
     if (rolesResp.status === 'fulfilled') roles.value = rolesResp.value.data.data
+    await loadSkills()
   } catch (err) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -492,6 +531,52 @@ const revokeAPIKey = async () => {
 const closeAPIKeyModal = () => {
   showAPIKeyDialog.value = false
   newAPIKeyData.value = { api_key: '', api_secret: '' }
+}
+
+const toggleSkill = (id) => {
+  if (selectedSkillIds.value.includes(id)) {
+    selectedSkillIds.value = selectedSkillIds.value.filter((x) => x !== id)
+  } else {
+    selectedSkillIds.value = [...selectedSkillIds.value, id]
+  }
+}
+
+const createSkill = async () => {
+  if (!newSkillName.value) return
+  skillBusy.value = true
+  try {
+    const { data } = await api.createSkill({ name: newSkillName.value })
+    if (data.data) {
+      skills.value = [...skills.value, data.data].sort((a, b) => a.name.localeCompare(b.name))
+      selectedSkillIds.value = [...selectedSkillIds.value, data.data.id]
+      newSkillName.value = ''
+    }
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: t('globals.messages.somethingWentWrong')
+    })
+  } finally {
+    skillBusy.value = false
+  }
+}
+
+const saveSkills = async () => {
+  if (!props.initialValues?.id) return
+  skillBusy.value = true
+  try {
+    await api.setAgentSkills(props.initialValues.id, { skill_ids: selectedSkillIds.value })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('globals.messages.savedSuccessfully')
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: t('globals.messages.somethingWentWrong')
+    })
+  } finally {
+    skillBusy.value = false
+  }
 }
 
 watch(

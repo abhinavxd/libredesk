@@ -794,6 +794,10 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("%s opened follow-up ticket #%s", actorName, newValue)
 	case models.ActivityOpenedFromParent:
 		content = fmt.Sprintf("%s opened this ticket from #%s", actorName, newValue)
+	case models.ActivitySplitFrom:
+		content = fmt.Sprintf("%s split messages into #%s", actorName, newValue)
+	case models.ActivitySplitInto:
+		content = fmt.Sprintf("%s opened this ticket from a split of #%s", actorName, newValue)
 	default:
 		return "", fmt.Errorf("invalid activity type %s", activityType)
 	}

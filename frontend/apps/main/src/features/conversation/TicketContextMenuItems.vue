@@ -52,6 +52,10 @@
       <GitMerge class="w-4 h-4 mr-2" />
       {{ t('conversation.merge.action') }}
     </ContextMenuItem>
+    <ContextMenuItem v-if="canWrite" @click="actions.startSplit(conversation.uuid)">
+      <Scissors class="w-4 h-4 mr-2" />
+      {{ t('conversation.split.start') }}
+    </ContextMenuItem>
 
     <ContextMenuSeparator v-if="canReply || canNote" />
 
@@ -77,6 +81,7 @@ import {
   GitBranch,
   GitMerge,
   MailOpen,
+  Scissors,
   Reply,
   SquareCheck,
   StickyNote,

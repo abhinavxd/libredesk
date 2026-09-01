@@ -59,9 +59,12 @@ var (
 	ActivityChildCreated       = "child_created"
 	ActivityFollowUpCreated    = "follow_up_created"
 	ActivityOpenedFromParent   = "opened_from_parent"
+	ActivitySplitFrom          = "split_from"
+	ActivitySplitInto          = "split_into"
 
 	OriginChild    = "child"
 	OriginFollowUp = "follow_up"
+	OriginSplit    = "split"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"

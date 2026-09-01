@@ -184,7 +184,8 @@ export const useConversationStore = defineStore('conversation', () => {
     data: null,
     loading: false,
     errorMessage: '',
-    isTyping: false
+    isTyping: false,
+    replyCollisionUserId: 0
   })
 
   const messages = reactive({
@@ -407,6 +408,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function resetTypingState () {
     conversation.isTyping = false
+    conversation.replyCollisionUserId = 0
     if (typingTimeout) {
       clearTimeout(typingTimeout)
       typingTimeout = null
@@ -1024,6 +1026,13 @@ export const useConversationStore = defineStore('conversation', () => {
     staleConversationUUIDs.delete(uuid)
   }
 
+  function invalidateConversation (uuid) {
+    if (!uuid) return
+    messages.data.purgeConversation(uuid)
+    conversationDataCache.delete(uuid)
+    incrementMessageVersion()
+  }
+
   async function deleteCurrentConversation () {
     const uuid = conversation.data?.uuid
     if (!uuid) return
@@ -1081,7 +1090,9 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function updateTypingStatus (typingData) {
-    const { conversation_uuid: uuid, is_typing } = typingData
+    const { conversation_uuid: uuid, is_typing, is_private_message: isPrivate, user_id: userId } = typingData
+    const selfId = Number(userStore.userID)
+    const otherAgent = Number(userId) && Number(userId) !== selfId
 
     if (conversation.data?.uuid === uuid) {
       if (typingTimeout) {
@@ -1089,9 +1100,13 @@ export const useConversationStore = defineStore('conversation', () => {
         typingTimeout = null
       }
       conversation.isTyping = is_typing
+      if (otherAgent && !isPrivate) {
+        conversation.replyCollisionUserId = is_typing ? Number(userId) : 0
+      }
       if (is_typing) {
         typingTimeout = setTimeout(() => {
           conversation.isTyping = false
+          conversation.replyCollisionUserId = 0
           typingTimeout = null
         }, TYPING_RECEIVE_TIMEOUT)
       }
@@ -1232,6 +1247,7 @@ export const useConversationStore = defineStore('conversation', () => {
     snoozeConversation,
     fetchConversation,
     fetchConversationsList,
+    invalidateConversation,
     deleteCurrentConversation,
     removeConversation,
     fetchMessages,
@@ -1263,6 +1279,7 @@ export const useConversationStore = defineStore('conversation', () => {
     updateTypingStatus,
     typingByUUID,
     sendTyping,
+    replyCollisionUserId: computed(() => conversation.replyCollisionUserId),
     drafts,
     draftsReady,
     fetchAllDrafts,

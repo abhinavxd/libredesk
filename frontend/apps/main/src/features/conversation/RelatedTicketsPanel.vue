@@ -24,6 +24,9 @@
       <Button size="sm" variant="outline" :disabled="busy" @click="create('follow_up')">
         {{ t('conversation.related.createFollowUp') }}
       </Button>
+      <Button size="sm" variant="outline" @click="actions.startSplit(conversationStore.current?.uuid)">
+        {{ t('conversation.split.start') }}
+      </Button>
     </div>
   </div>
 </template>
@@ -50,6 +53,9 @@ const relationLabel = (item) => {
   if (item.relation === 'parent') return t('conversation.related.parent')
   if (item.relation === 'follow_up' || item.origin === 'follow_up') {
     return t('conversation.related.followUp')
+  }
+  if (item.relation === 'split' || item.origin === 'split') {
+    return t('conversation.related.split')
   }
   return t('conversation.related.child')
 }

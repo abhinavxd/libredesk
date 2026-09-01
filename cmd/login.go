@@ -41,6 +41,22 @@ func handleLogin(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("user.accountDisabled"), nil))
 	}
 
+	enabled, err := app.user.TOTPEnabled(user.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if enabled {
+		token, err := issueTOTPPending(app, user.ID)
+		if err != nil {
+			app.lo.Error("error creating totp pending token", "error", err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
+		return r.SendEnvelope(map[string]any{
+			"requires_totp": true,
+			"pending_token": token,
+		})
+	}
+
 	if err := app.auth.SaveSession(amodels.User{
 		ID:        user.ID,
 		Email:     user.Email.String,

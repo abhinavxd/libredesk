@@ -172,6 +172,7 @@ func (c *Client) handleTyping(data json.RawMessage) {
 		c.SendError("conversation_uuid is required for typing")
 		return
 	}
+	typingMsg.UserID = c.ID
 
 	c.Hub.BroadcastTypingToConversation(typingMsg.ConversationUUID, typingMsg)
 }

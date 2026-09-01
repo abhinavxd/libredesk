@@ -51,7 +51,7 @@
         </div>
 
         <form @submit.prevent="loginAction" class="space-y-4">
-          <div class="space-y-2">
+          <div v-if="!pendingToken" class="space-y-2">
             <Label for="email" class="text-muted-foreground">{{ t('globals.terms.email') }}</Label>
             <Input
               id="email"
@@ -65,7 +65,7 @@
             />
           </div>
 
-          <div class="space-y-2">
+          <div v-if="!pendingToken" class="space-y-2">
             <Label for="password" class="text-muted-foreground">
               {{ t('globals.terms.password') }}
             </Label>
@@ -90,13 +90,18 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between">
+          <div v-if="!pendingToken" class="flex items-center justify-between">
             <router-link
               to="/reset-password"
               class="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {{ t('auth.forgotPassword') }}
             </router-link>
+          </div>
+
+          <div v-if="pendingToken" class="space-y-2">
+            <Label for="totp">{{ t('auth.totp.code') }}</Label>
+            <Input id="totp" v-model.trim="totpCode" inputmode="numeric" autocomplete="one-time-code" class="h-11" />
           </div>
 
           <Button
@@ -110,7 +115,7 @@
               ></div>
               {{ t('auth.loggingIn') }}
             </span>
-            <span v-else>{{ t('auth.signInButton') }}</span>
+            <span v-else>{{ pendingToken ? t('auth.totp.verify') : t('auth.signInButton') }}</span>
           </Button>
         </form>
 
@@ -158,6 +163,8 @@ const loginForm = ref({
   email: '',
   password: ''
 })
+const pendingToken = ref('')
+const totpCode = ref('')
 const oidcProviders = ref([])
 const appSettingsStore = useAppSettingsStore()
 
@@ -241,32 +248,39 @@ const validateForm = () => {
   return true
 }
 
+const finishLogin = (user) => {
+  if (user) userStore.setCurrentUser(user)
+  appSettingsStore.fetchSettings('general')
+  const nextParam = router.currentRoute.value.query.next
+  router.push(nextParam || { name: 'inboxes' })
+}
+
 const loginAction = () => {
   submitted.value = true
-  if (!validateForm()) return
+  if (!pendingToken.value && !validateForm()) return
+  if (pendingToken.value && !totpCode.value) {
+    errorMessage.value = t('auth.totp.codeRequired')
+    return
+  }
 
   errorMessage.value = ''
   isLoading.value = true
 
-  api
-    .login({
-      email: loginForm.value.email,
-      password: loginForm.value.password
-    })
-    .then((resp) => {
-      if (resp?.data?.data) {
-        userStore.setCurrentUser(resp.data.data)
-      }
-      // Also fetch general setting as user's logged in.
-      appSettingsStore.fetchSettings('general')
+  const req = pendingToken.value
+    ? api.verifyTOTP({ pending_token: pendingToken.value, code: totpCode.value })
+    : api.login({
+        email: loginForm.value.email,
+        password: loginForm.value.password
+      })
 
-      // Redirect to the 'next' parameter if it exists
-      const nextParam = router.currentRoute.value.query.next
-      if (nextParam) {
-        router.push(nextParam)
-      } else {
-        router.push({ name: 'inboxes' })
+  req
+    .then((resp) => {
+      const data = resp?.data?.data
+      if (data?.requires_totp) {
+        pendingToken.value = data.pending_token
+        return
       }
+      finishLogin(data)
     })
     .catch((error) => {
       errorMessage.value = handleHTTPError(error).message

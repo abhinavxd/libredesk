@@ -173,6 +173,26 @@ const login = (data) => http.post(`/api/v1/auth/login`, data, {
     'Content-Type': 'application/json'
   }
 })
+const verifyTOTP = (data) => http.post(`/api/v1/auth/totp/verify`, data, {
+  headers: { 'Content-Type': 'application/json' }
+})
+const enrollTOTP = () => http.post(`/api/v1/agents/me/totp/enroll`)
+const confirmTOTP = (data) => http.post(`/api/v1/agents/me/totp/confirm`, data, {
+  headers: { 'Content-Type': 'application/json' }
+})
+const disableTOTP = () => http.delete(`/api/v1/agents/me/totp`)
+const getSkills = () => http.get('/api/v1/skills')
+const createSkill = (data) => http.post('/api/v1/skills', data, {
+  headers: { 'Content-Type': 'application/json' }
+})
+const getAgentSkills = (id) => http.get(`/api/v1/agents/${id}/skills`)
+const setAgentSkills = (id, data) => http.put(`/api/v1/agents/${id}/skills`, data, {
+  headers: { 'Content-Type': 'application/json' }
+})
+const splitConversation = (uuid, data) =>
+  http.post(`/api/v1/conversations/${uuid}/split`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
 const getAutomationRules = (type) =>
   http.get(`/api/v1/automations/rules`, {
     params: { type: type }
@@ -675,6 +695,15 @@ const deleteAllNotifications = () => http.delete('/api/v1/notifications')
 
 export default {
   login,
+  verifyTOTP,
+  enrollTOTP,
+  confirmTOTP,
+  disableTOTP,
+  getSkills,
+  createSkill,
+  getAgentSkills,
+  setAgentSkills,
+  splitConversation,
   deleteUser,
   importAgents,
   getAgentImportStatus,

@@ -102,6 +102,15 @@ type queries struct {
 	UpdateInactiveOffline         *sqlx.Stmt `query:"update-inactive-offline"`
 	GetAvailabilityStatus         *sqlx.Stmt `query:"get-availability-status"`
 	UpdateLastLoginAt             *sqlx.Stmt `query:"update-last-login-at"`
+	GetAllSkills                  *sqlx.Stmt `query:"get-all-skills"`
+	InsertSkill                   *sqlx.Stmt `query:"insert-skill"`
+	UpdateSkill                   *sqlx.Stmt `query:"update-skill"`
+	DeleteSkill                   *sqlx.Stmt `query:"delete-skill"`
+	ListAgentSkills               *sqlx.Stmt `query:"list-agent-skills"`
+	SetAgentSkills                *sqlx.Stmt `query:"set-agent-skills"`
+	PickAgentBySkill              *sqlx.Stmt `query:"pick-agent-by-skill"`
+	GetTOTPSecret                 *sqlx.Stmt `query:"get-totp-secret"`
+	SetTOTPSecret                 *sqlx.Stmt `query:"set-totp-secret"`
 	SoftDeleteAgent               *sqlx.Stmt `query:"soft-delete-agent"`
 	SetUserPassword               *sqlx.Stmt `query:"set-user-password"`
 	SetResetPasswordToken         *sqlx.Stmt `query:"set-reset-password-token"`

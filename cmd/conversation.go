@@ -54,6 +54,11 @@ type linkedConversationReq struct {
 	Subject string `json:"subject"`
 }
 
+type splitConversationReq struct {
+	MessageUUIDs []string `json:"message_uuids"`
+	Subject      string   `json:"subject"`
+}
+
 func conversationListFilters(r *fastglue.Request) string {
 	return appendOrganizationFilter(
 		string(r.RequestCtx.QueryArgs().Peek("filters")),
@@ -465,6 +470,30 @@ func handleCreateLinkedConversation(r *fastglue.Request, origin string) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 	created, err := app.conversation.CreateLinkedConversation(uuid, origin, req.Subject, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(created)
+}
+
+func handleSplitConversation(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   = splitConversationReq{}
+	)
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	created, err := app.conversation.SplitConversation(uuid, req.MessageUUIDs, req.Subject, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

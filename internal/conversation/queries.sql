@@ -1139,3 +1139,39 @@ WHERE c.uuid <> $1
     OR c.uuid = (SELECT parent_uuid FROM conversations WHERE uuid = $1::uuid)
   )
 ORDER BY c.created_at DESC;
+
+-- name: split-move-messages
+UPDATE conversation_messages
+SET conversation_id = $2
+WHERE conversation_id = $1
+  AND uuid = ANY($3::uuid[])
+  AND type <> 'activity';
+
+-- name: split-move-mentions
+UPDATE conversation_mentions cm
+SET conversation_id = $1
+FROM conversation_messages m
+WHERE cm.message_id = m.id
+  AND m.conversation_id = $1
+  AND m.uuid = ANY($2::uuid[]);
+
+-- name: split-refresh-last-message
+UPDATE conversations c
+SET
+    last_message = LEFT(COALESCE(m.text_content, m.content, ''), 500),
+    last_message_at = m.created_at,
+    last_message_sender = CASE WHEN m.type = 'incoming' THEN 'contact' ELSE 'agent' END,
+    last_message_sender_id = m.sender_id,
+    last_interaction = LEFT(COALESCE(m.text_content, m.content, ''), 500),
+    last_interaction_at = m.created_at,
+    last_interaction_sender = CASE WHEN m.type = 'incoming' THEN 'contact' ELSE 'agent' END,
+    last_interaction_sender_id = m.sender_id,
+    updated_at = NOW()
+FROM (
+    SELECT text_content, content, created_at, type, sender_id
+    FROM conversation_messages
+    WHERE conversation_id = $1 AND type IN ('incoming', 'outgoing')
+    ORDER BY created_at DESC
+    LIMIT 1
+) m
+WHERE c.id = $1;

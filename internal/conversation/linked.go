@@ -100,6 +100,10 @@ func (m *Manager) ListRelatedConversations(uuid string) ([]models.RelatedConvers
 			rows[i].Relation = models.OriginFollowUp
 			continue
 		}
+		if rows[i].Origin == models.OriginSplit {
+			rows[i].Relation = models.OriginSplit
+			continue
+		}
 		rows[i].Relation = models.OriginChild
 	}
 	return rows, nil

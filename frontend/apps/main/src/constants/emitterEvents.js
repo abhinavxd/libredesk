@@ -12,6 +12,7 @@ export const EMITTER_EVENTS = {
     OPEN_MERGE_DIALOG: 'open-merge-dialog',
     SHOW_KEYBOARD_SHORTCUTS: 'show-keyboard-shortcuts',
     FOCUS_COMPOSER: 'focus-composer',
+    START_SPLIT_MODE: 'start-split-mode',
     CONVERSATION_SUBMIT_AS: 'conversation-submit-as',
     CONVERSATION_SUBMITTED: 'conversation-submitted',
     COPILOT_INSERT_REPLY: 'copilot-insert-reply'

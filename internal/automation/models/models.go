@@ -13,6 +13,7 @@ import (
 const (
 	ActionAssignTeam      = "assign_team"
 	ActionAssignUser      = "assign_user"
+	ActionAssignBySkill   = "assign_by_skill"
 	ActionSetStatus       = "set_status"
 	ActionSetPriority     = "set_priority"
 	ActionSendPrivateNote = "send_private_note"
@@ -86,6 +87,7 @@ const (
 var ActionPermissions = map[string]string{
 	ActionAssignTeam:      authzModels.PermConversationsUpdateTeamAssignee,
 	ActionAssignUser:      authzModels.PermConversationsUpdateUserAssignee,
+	ActionAssignBySkill:   authzModels.PermConversationsUpdateUserAssignee,
 	ActionSetStatus:       authzModels.PermConversationsUpdateStatus,
 	ActionSetPriority:     authzModels.PermConversationsUpdatePriority,
 	ActionSendPrivateNote: authzModels.PermMessagesWritePrivate,

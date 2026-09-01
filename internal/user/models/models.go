@@ -95,6 +95,15 @@ type User struct {
 	APIKey           null.String `db:"api_key" json:"api_key"`
 	APIKeyLastUsedAt null.Time   `db:"api_key_last_used_at" json:"api_key_last_used_at"`
 	APISecret        null.String `db:"api_secret" json:"-"`
+	TOTPEnabled      bool        `db:"totp_enabled" json:"totp_enabled"`
+	TOTPSecret       null.String `db:"totp_secret" json:"-"`
+}
+
+type Skill struct {
+	ID        int       `db:"id" json:"id"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+	Name      string    `db:"name" json:"name"`
 }
 
 // ChatUser is a user with limited fields for live chat.

@@ -55,6 +55,7 @@ SELECT
     u.organization_id,
     o.name AS organization_name,
     u.api_secret,
+    COALESCE(u.totp_enabled, FALSE) AS totp_enabled,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -563,3 +564,51 @@ SELECT jsonb_build_object(
         WHERE c.contact_id = $1
     )
 );
+
+-- name: get-all-skills
+SELECT id, created_at, updated_at, name FROM skills ORDER BY name;
+
+-- name: insert-skill
+INSERT INTO skills (name) VALUES ($1) RETURNING *;
+
+-- name: update-skill
+UPDATE skills SET name = $2, updated_at = NOW() WHERE id = $1 RETURNING *;
+
+-- name: delete-skill
+DELETE FROM skills WHERE id = $1;
+
+-- name: list-agent-skills
+SELECT s.id, s.created_at, s.updated_at, s.name
+FROM skills s
+JOIN agent_skills a ON a.skill_id = s.id
+WHERE a.user_id = $1
+ORDER BY s.name;
+
+-- name: set-agent-skills
+WITH cleared AS (
+    DELETE FROM agent_skills WHERE user_id = $1
+)
+INSERT INTO agent_skills (user_id, skill_id)
+SELECT $1, x FROM unnest($2::int[]) AS x
+ON CONFLICT DO NOTHING;
+
+-- name: pick-agent-by-skill
+SELECT u.id
+FROM users u
+JOIN agent_skills a ON a.user_id = u.id
+WHERE a.skill_id = $1
+  AND u.type = 'agent'
+  AND u.enabled
+  AND u.deleted_at IS NULL
+  AND u.availability_status NOT IN ('away_manual', 'away_and_reassigning')
+  AND ($2 = 0 OR EXISTS (
+    SELECT 1 FROM team_members tm WHERE tm.user_id = u.id AND tm.team_id = $2
+  ))
+ORDER BY u.last_active_at DESC NULLS LAST, u.id
+LIMIT 1;
+
+-- name: get-totp-secret
+SELECT totp_secret, totp_enabled FROM users WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: set-totp-secret
+UPDATE users SET totp_secret = $2, totp_enabled = $3, updated_at = NOW() WHERE id = $1;

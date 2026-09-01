@@ -102,6 +102,19 @@ export function useTicketActions () {
     emitter.emit(EMITTER_EVENTS.FOCUS_COMPOSER, { type })
   }
 
+  const startSplit = async (uuid) => {
+    if (!uuid) return
+    if (route.params.uuid !== uuid) {
+      await router.push(conversationRouteForContext(route, uuid))
+      await nextTick()
+      setTimeout(() => {
+        emitter.emit(EMITTER_EVENTS.START_SPLIT_MODE)
+      }, 200)
+      return
+    }
+    emitter.emit(EMITTER_EVENTS.START_SPLIT_MODE)
+  }
+
   return {
     openTicket,
     setStatus,
@@ -110,6 +123,7 @@ export function useTicketActions () {
     toggleSelect,
     openMerge,
     createLinked,
-    focusComposer
+    focusComposer,
+    startSplit
   }
 }

@@ -1,5 +1,14 @@
 <template>
   <div class="flex flex-col relative h-full">
+    <div v-if="splitMode" class="flex items-center gap-2 px-4 py-2 border-b bg-background shrink-0">
+      <p class="text-sm text-muted-foreground flex-1">
+        {{ t('conversation.split.selected', selectedMessages.size, { count: selectedMessages.size }) }}
+      </p>
+      <Button size="sm" variant="outline" @click="cancelSplit">{{ t('globals.messages.cancel') }}</Button>
+      <Button size="sm" :disabled="!selectedMessages.size || splitting" @click="runSplit">
+        {{ t('conversation.split.action') }}
+      </Button>
+    </div>
     <div ref="threadEl" class="flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]" @scroll="handleScroll">
       <div ref="contentEl" class="min-h-full px-4 pb-10 relative">
         <div
@@ -37,8 +46,16 @@
               :date="row.message.created_at"
               class="mb-4"
             />
-            <div v-if="!row.message.private && row.message.type !== 'activity'">
+            <div v-if="!row.message.private && row.message.type !== 'activity'" class="flex gap-2 items-start">
+              <input
+                v-if="splitMode"
+                type="checkbox"
+                class="mt-2"
+                :checked="selectedMessages.has(row.message.uuid)"
+                @change="toggleMessage(row.message.uuid)"
+              />
               <MessageBubble
+                class="flex-1 min-w-0"
                 :message="row.message"
                 :direction="row.message.type"
                 :group-with-prev="row.groupWithPrev"
@@ -84,8 +101,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import MessageBubble from './MessageBubble.vue'
+import api from '@/api'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
@@ -108,6 +128,11 @@ const MENTION_MAX_ANCHOR_FRAMES = 90
 const HIGHLIGHT_MS = 2500
 
 const route = useRoute()
+const router = useRouter()
+const { t } = useI18n()
+const splitMode = ref(false)
+const selectedMessages = ref(new Set())
+const splitting = ref(false)
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
@@ -122,6 +147,42 @@ let openScrollDone = false
 
 const assignToSelf = () => {
   conversationStore.updateAssignee('user', { assignee_id: userStore.userID })
+}
+
+const toggleMessage = (uuid) => {
+  const next = new Set(selectedMessages.value)
+  if (next.has(uuid)) next.delete(uuid)
+  else next.add(uuid)
+  selectedMessages.value = next
+}
+
+const cancelSplit = () => {
+  splitMode.value = false
+  selectedMessages.value = new Set()
+}
+
+const runSplit = async () => {
+  const uuid = conversationStore.current?.uuid
+  if (!uuid || !selectedMessages.value.size) return
+  splitting.value = true
+  try {
+    const { data } = await api.splitConversation(uuid, {
+      message_uuids: [...selectedMessages.value]
+    })
+    conversationStore.invalidateConversation(uuid)
+    cancelSplit()
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('conversation.split.success') })
+    if (data.data?.uuid) {
+      router.push({ name: route.name, params: { ...route.params, uuid: data.data.uuid } })
+    }
+  } catch (err) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(err).message
+    })
+  } finally {
+    splitting.value = false
+  }
 }
 
 const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(threadEl, contentEl, {
@@ -181,10 +242,14 @@ const newMessageHandler = (data) => {
 
 onMounted(() => {
   emitter.on(EMITTER_EVENTS.NEW_MESSAGE, newMessageHandler)
+  emitter.on(EMITTER_EVENTS.START_SPLIT_MODE, () => {
+    splitMode.value = true
+  })
 })
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.NEW_MESSAGE, newMessageHandler)
+  emitter.off(EMITTER_EVENTS.START_SPLIT_MODE)
 })
 
 watch(
@@ -195,6 +260,7 @@ watch(
     unReadMessages.value = 0
     openScrollDone = false
     showAssignNudge.value = false
+    cancelSplit()
   }
 )
 

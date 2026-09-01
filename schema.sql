@@ -185,6 +185,8 @@ CREATE TABLE users (
 	api_key TEXT NULL,
 	api_secret TEXT NULL,
 	api_key_last_used_at TIMESTAMPTZ NULL,
+	totp_secret TEXT NULL,
+	totp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT constraint_users_on_country CHECK (LENGTH(country) <= 140),
     CONSTRAINT constraint_users_on_phone_number CHECK (LENGTH(phone_number) <= 20),
 	CONSTRAINT constraint_users_on_phone_number_country_code CHECK (LENGTH(phone_number_country_code) <= 10),
@@ -218,6 +220,22 @@ CREATE TABLE user_roles (
 	CONSTRAINT constraint_user_roles_on_user_id_and_role_id_unique UNIQUE (user_id, role_id)
 );
 CREATE INDEX index_user_roles_on_user_id ON user_roles(user_id);
+
+DROP TABLE IF EXISTS skills CASCADE;
+CREATE TABLE skills (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	name TEXT NOT NULL UNIQUE
+);
+
+DROP TABLE IF EXISTS agent_skills CASCADE;
+CREATE TABLE agent_skills (
+	user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	skill_id INT REFERENCES skills(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	PRIMARY KEY (user_id, skill_id)
+);
+CREATE INDEX index_agent_skills_on_skill_id ON agent_skills (skill_id);
 
 DROP TABLE IF EXISTS conversation_statuses CASCADE;
 CREATE TABLE conversation_statuses (
@@ -1080,6 +1098,15 @@ VALUES
 		'Admin',
 		'Role for users who have complete access to everything.',
 		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contacts:delete,contacts:export,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,help_center:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,messages:write_private,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
+	);
+
+INSERT INTO
+	roles ("name", description, permissions)
+VALUES
+	(
+		'Light agent',
+		'Can view tickets and add private notes. Cannot reply to customers or change assignees.',
+		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,messages:read,messages:write_private,view:manage}'
 	);
 
 

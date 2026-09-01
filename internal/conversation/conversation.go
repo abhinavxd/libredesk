@@ -168,6 +168,7 @@ type userStore interface {
 	GetSystemUser() (umodels.User, error)
 	ResolveContact(user *umodels.User, policy umodels.ContactPolicy) error
 	UpgradeVisitorToContact(visitorID int) error
+	PickAgentBySkill(skillID int, teamID int) (int, error)
 }
 
 type mediaStore interface {
@@ -384,6 +385,9 @@ type queries struct {
 
 	SetConversationParent     *sqlx.Stmt `query:"set-conversation-parent"`
 	ListRelatedConversations  *sqlx.Stmt `query:"list-related-conversations"`
+	SplitMoveMessages         *sqlx.Stmt `query:"split-move-messages"`
+	SplitMoveMentions         *sqlx.Stmt `query:"split-move-mentions"`
+	SplitRefreshLastMessage   *sqlx.Stmt `query:"split-refresh-last-message"`
 }
 
 // CreateConversation creates a new conversation. If maxConversations > 0, the insert is
@@ -1455,6 +1459,20 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 		agentID, err := strconv.Atoi(action.Value[0])
 		if err != nil {
 			return fmt.Errorf("invalid agent ID %q: %w", action.Value[0], err)
+		}
+		return m.UpdateConversationUserAssignee(conv.UUID, agentID, user)
+	case amodels.ActionAssignBySkill:
+		skillID, err := strconv.Atoi(action.Value[0])
+		if err != nil {
+			return fmt.Errorf("invalid skill ID %q: %w", action.Value[0], err)
+		}
+		teamID := 0
+		if conv.AssignedTeamID.Valid {
+			teamID = int(conv.AssignedTeamID.Int)
+		}
+		agentID, err := m.userStore.PickAgentBySkill(skillID, teamID)
+		if err != nil {
+			return fmt.Errorf("assign by skill: %w", err)
 		}
 		return m.UpdateConversationUserAssignee(conv.UUID, agentID, user)
 	case amodels.ActionSetPriority:

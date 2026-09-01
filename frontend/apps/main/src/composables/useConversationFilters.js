@@ -1,4 +1,5 @@
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import api from '@/api'
 import { useConversationStore } from '@/stores/conversation'
 import { useInboxStore } from '@/stores/inbox'
 import { useUsersStore } from '@/stores/users'
@@ -18,6 +19,10 @@ export function useConversationFilters () {
     const customAttributeStore = useCustomAttributeStore()
     const tagStore = useTagStore()
     const { t } = useI18n()
+    const skillOptions = ref([])
+    api.getSkills().then((r) => {
+      skillOptions.value = (r.data.data || []).map((s) => ({ label: s.name, value: String(s.id) }))
+    }).catch(() => {})
 
     const customAttributeDataTypeToFieldType = {
         'text': FIELD_TYPE.TEXT,
@@ -295,6 +300,11 @@ export function useConversationFilters () {
             label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             options: uStore.options
+        },
+        assign_by_skill: {
+            label: t('actions.assignBySkill'),
+            type: FIELD_TYPE.SELECT,
+            options: skillOptions.value
         },
         set_status: {
             label: t('actions.setStatus'),

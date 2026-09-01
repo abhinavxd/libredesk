@@ -285,6 +285,10 @@ func (h *Hub) BroadcastMessage(msg models.BroadcastMessage) {
 }
 
 func (h *Hub) BroadcastTypingToConversation(conversationUUID string, typingMsg models.TypingMessage) {
+	payload, err := json.Marshal(models.Message{Type: models.MessageTypeTyping, Data: typingMsg})
+	if err == nil {
+		h.BroadcastTypingToAllConversationClients(conversationUUID, payload)
+	}
 	if h.conversationStore != nil && !typingMsg.IsPrivateMessage {
 		h.conversationStore.BroadcastTypingToWidgetClientsOnly(conversationUUID, typingMsg.IsTyping)
 	}
