@@ -253,14 +253,14 @@ SELECT
    c.merged_into_uuid,
    c.parent_uuid,
    c.origin,
-   p.reference_number as parent_reference_number,
+   parent.reference_number as parent_reference_number,
    csat.rating as csat_rating,
    csat.feedback as csat_feedback,
    csat.response_timestamp as csat_responded_at
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
-LEFT JOIN conversations p ON p.uuid = c.parent_uuid
+LEFT JOIN conversations parent ON parent.uuid = c.parent_uuid
 LEFT JOIN organizations org ON org.id = ct.organization_id
 LEFT JOIN LATERAL (
     SELECT rating, feedback, response_timestamp
