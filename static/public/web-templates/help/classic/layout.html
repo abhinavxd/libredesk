@@ -49,7 +49,7 @@
                 {{ range .Data.HelpCenter.Theme.SocialLinks }}<a href="{{ .URL }}" target="_blank" rel="noreferrer" aria-label="{{ .Platform }}">{{ template "hc-social-icon" .Platform }}</a>{{ end }}
             </div>
             {{ end }}
-            <p class="hc-footer-powered">{{ $.L.T "helpCenter.poweredBy" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
+            <p class="hc-footer-powered"><a href="/portal">{{ $.L.T "portal.title" }}</a> · {{ $.L.T "helpCenter.poweredBy" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
         </div>
     </footer>
     {{ template "hc-shared-behavior" }}
