@@ -362,3 +362,83 @@ SELECT
     ) AS result
 FROM
     tagging;
+
+-- name: get-agent-reports
+SELECT
+    u.id,
+    u.first_name,
+    u.last_name,
+    COUNT(DISTINCT c.id) AS tickets_assigned,
+    COUNT(DISTINCT c.id) FILTER (
+        WHERE s.category = 'resolved' AND c.resolved_at >= CASE
+            WHEN %d = 0 THEN CURRENT_DATE
+            ELSE NOW() - INTERVAL '%d days'
+        END
+    ) AS tickets_resolved,
+    COALESCE((
+        SELECT COUNT(*)
+        FROM conversation_messages m
+        WHERE m.sender_id = u.id AND m.type = 'outgoing' AND m.private = false
+          AND m.created_at >= CASE
+              WHEN %d = 0 THEN CURRENT_DATE
+              ELSE NOW() - INTERVAL '%d days'
+          END
+    ), 0) AS replies,
+    COALESCE(AVG(EXTRACT(EPOCH FROM (c.first_reply_at - c.created_at))) FILTER (WHERE c.first_reply_at IS NOT NULL), 0) AS avg_first_reply_seconds,
+    COALESCE(AVG(cs.rating), 0) AS csat_avg
+FROM conversations c
+JOIN users u ON u.id = c.assigned_user_id
+LEFT JOIN conversation_statuses s ON s.id = c.status_id
+LEFT JOIN LATERAL (
+    SELECT rating FROM csat_responses
+    WHERE conversation_id = c.id
+    ORDER BY response_timestamp DESC NULLS LAST, created_at DESC
+    LIMIT 1
+) cs ON true
+WHERE c.assigned_user_id IS NOT NULL
+  AND c.created_at >= CASE
+      WHEN %d = 0 THEN CURRENT_DATE
+      ELSE NOW() - INTERVAL '%d days'
+  END
+GROUP BY u.id, u.first_name, u.last_name
+ORDER BY tickets_assigned DESC;
+
+-- name: get-team-reports
+SELECT
+    t.id,
+    t.name,
+    COUNT(DISTINCT c.id) AS tickets_assigned,
+    COUNT(DISTINCT c.id) FILTER (
+        WHERE s.category = 'resolved' AND c.resolved_at >= CASE
+            WHEN %d = 0 THEN CURRENT_DATE
+            ELSE NOW() - INTERVAL '%d days'
+        END
+    ) AS tickets_resolved,
+    COALESCE((
+        SELECT COUNT(*)
+        FROM conversation_messages m
+        JOIN conversations c2 ON c2.id = m.conversation_id
+        WHERE c2.assigned_team_id = t.id AND m.type = 'outgoing' AND m.private = false
+          AND m.created_at >= CASE
+              WHEN %d = 0 THEN CURRENT_DATE
+              ELSE NOW() - INTERVAL '%d days'
+          END
+    ), 0) AS replies,
+    COALESCE(AVG(EXTRACT(EPOCH FROM (c.first_reply_at - c.created_at))) FILTER (WHERE c.first_reply_at IS NOT NULL), 0) AS avg_first_reply_seconds,
+    COALESCE(AVG(cs.rating), 0) AS csat_avg
+FROM conversations c
+JOIN teams t ON t.id = c.assigned_team_id
+LEFT JOIN conversation_statuses s ON s.id = c.status_id
+LEFT JOIN LATERAL (
+    SELECT rating FROM csat_responses
+    WHERE conversation_id = c.id
+    ORDER BY response_timestamp DESC NULLS LAST, created_at DESC
+    LIMIT 1
+) cs ON true
+WHERE c.assigned_team_id IS NOT NULL
+  AND c.created_at >= CASE
+      WHEN %d = 0 THEN CURRENT_DATE
+      ELSE NOW() - INTERVAL '%d days'
+  END
+GROUP BY t.id, t.name
+ORDER BY tickets_assigned DESC;

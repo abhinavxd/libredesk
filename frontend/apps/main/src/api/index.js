@@ -421,6 +421,8 @@ const getOverviewSLA = (params) => http.get('/api/v1/reports/overview/sla', { pa
 const getOverviewCSAT = (params) => http.get('/api/v1/reports/overview/csat', { params })
 const getOverviewMessageVolume = (params) => http.get('/api/v1/reports/overview/messages', { params })
 const getOverviewTagDistribution = (params) => http.get('/api/v1/reports/overview/tags', { params })
+const getAgentReports = (params) => http.get('/api/v1/reports/agents', { params })
+const getTeamReports = (params) => http.get('/api/v1/reports/teams', { params })
 const getLanguage = (lang) => http.get(`/api/v1/lang/${lang}`)
 const getAvailableLanguages = () => http.get('/api/v1/lang')
 const createInbox = (data) =>
@@ -712,6 +714,8 @@ export default {
   getOverviewCSAT,
   getOverviewMessageVolume,
   getOverviewTagDistribution,
+  getAgentReports,
+  getTeamReports,
   getConversationMessage,
   getConversationMessages,
   getConversationTranscript,
