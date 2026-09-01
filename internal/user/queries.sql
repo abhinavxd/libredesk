@@ -52,6 +52,8 @@ SELECT
     u.api_key,
     u.api_key_last_used_at,
     u.external_user_id,
+    u.organization_id,
+    o.name AS organization_name,
     u.api_secret,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
@@ -63,6 +65,7 @@ SELECT
     ) AS teams,
     array_agg(DISTINCT p ORDER BY p) FILTER (WHERE p IS NOT NULL) AS permissions
 FROM users u
+LEFT JOIN organizations o ON o.id = u.organization_id
 LEFT JOIN user_roles ur ON ur.user_id = u.id
 LEFT JOIN roles r ON r.id = ur.role_id
 LEFT JOIN LATERAL unnest(r.permissions) AS p ON true
@@ -70,7 +73,7 @@ WHERE u.deleted_at IS NULL
     AND ($1 = 0 OR u.id = $1)
     AND ($2 = '' OR u.email = $2)
     AND (cardinality($3::text[]) = 0 OR u.type::text = ANY($3::text[]))
-GROUP BY u.id
+GROUP BY u.id, o.name
 ORDER BY u.id ASC
 LIMIT 1;
 

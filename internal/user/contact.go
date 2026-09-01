@@ -118,6 +118,7 @@ func (u *Manager) reuseContact(user *models.User) error {
 
 	err = u.q.InsertContactIfAbsent.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes).Scan(&user.ID)
 	if err == nil {
+		u.notifyContactCreated(user.ID, user.Email.String)
 		return nil
 	}
 	if err != sql.ErrNoRows {
@@ -168,6 +169,7 @@ func (u *Manager) syncContact(user *models.User) error {
 			u.lo.Error("error inserting contact with external ID", "error", err)
 			return fmt.Errorf("inserting contact with external ID: %w", err)
 		}
+		u.notifyContactCreated(user.ID, user.Email.String)
 		return nil
 	}
 
@@ -197,6 +199,7 @@ func (u *Manager) syncContact(user *models.User) error {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
 	}
+	u.notifyContactCreated(user.ID, user.Email.String)
 	return nil
 }
 

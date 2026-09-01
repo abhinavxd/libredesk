@@ -81,6 +81,14 @@ const deleteStatus = (id) => http.delete(`/api/v1/statuses/${id}`)
 const createTag = (data) => http.post('/api/v1/tags', data)
 const updateTag = (id, data) => http.put(`/api/v1/tags/${id}`, data)
 const deleteTag = (id) => http.delete(`/api/v1/tags/${id}`)
+const getOrganizations = () => http.get('/api/v1/organizations')
+const createOrganization = (data) => http.post('/api/v1/organizations', data)
+const updateOrganization = (id, data) => http.put(`/api/v1/organizations/${id}`, data)
+const deleteOrganization = (id) => http.delete(`/api/v1/organizations/${id}`)
+const setContactOrganization = (id, data) =>
+  http.put(`/api/v1/contacts/${id}/organization`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
 const getTemplate = (id) => http.get(`/api/v1/templates/${id}`)
 const getTemplates = (type) => http.get('/api/v1/templates', { params: { type: type } })
 const createTemplate = (data) =>
@@ -752,6 +760,11 @@ export default {
   createTag,
   updateTag,
   deleteTag,
+  getOrganizations,
+  createOrganization,
+  updateOrganization,
+  deleteOrganization,
+  setContactOrganization,
   getStatuses,
   getPriorities,
   createStatus,

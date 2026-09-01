@@ -387,6 +387,12 @@ const routes = [
             meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
           },
           {
+            path: 'organizations',
+            component: () => import('@main/views/admin/organizations/OrganizationsView.vue'),
+            name: 'organizations',
+            meta: { titleKey: 'globals.terms.organization', titleCount: 2 }
+          },
+          {
             path: 'teams',
             meta: { titleKey: 'globals.terms.team', titleCount: 2 },
             children: [

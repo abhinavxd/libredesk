@@ -65,6 +65,9 @@ type Manager struct {
 
 	lastActiveFlushAt   map[int]time.Time
 	lastActiveFlushAtMu sync.Mutex
+
+	// OnContactCreated is called after a contact or visitor is inserted. Used to auto-attach organizations.
+	OnContactCreated func(id int, email string)
 }
 
 type cachedAgent struct {
@@ -145,6 +148,13 @@ func New(i18n *i18n.I18n, opts Opts) (*Manager, error) {
 		agentCache:        make(map[int]cachedAgent),
 		lastActiveFlushAt: make(map[int]time.Time),
 	}, nil
+}
+
+func (u *Manager) notifyContactCreated(id int, email string) {
+	if u.OnContactCreated == nil || id <= 0 {
+		return
+	}
+	u.OnContactCreated(id, email)
 }
 
 // VerifyPassword authenticates an user by email and password, returning the user if successful.
@@ -281,10 +291,12 @@ func (u *Manager) GetVisitorByEmail(email string) (models.User, error) {
 
 // UpgradeVisitorToContact changes a visitor's type to contact.
 func (u *Manager) UpgradeVisitorToContact(visitorID int) error {
+	visitor, _ := u.GetVisitor(visitorID)
 	if _, err := u.q.UpgradeVisitorToContact.Exec(visitorID); err != nil {
 		u.lo.Error("error upgrading visitor to contact", "visitor_id", visitorID, "error", err)
 		return fmt.Errorf("upgrading visitor to contact: %w", err)
 	}
+	u.notifyContactCreated(visitorID, visitor.Email.String)
 	return nil
 }
 

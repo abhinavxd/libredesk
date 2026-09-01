@@ -81,6 +81,8 @@ type User struct {
 	Meta                   json.RawMessage      `db:"meta" json:"meta"`
 	CustomAttributes       json.RawMessage      `db:"custom_attributes" json:"custom_attributes"`
 	ExternalUserID         null.String          `db:"external_user_id" json:"external_user_id"`
+	OrganizationID         null.Int             `db:"organization_id" json:"organization_id"`
+	OrganizationName       null.String          `db:"organization_name" json:"organization_name"`
 	Teams                  tmodels.TeamsCompact `db:"teams" json:"teams"`
 	ContactChannelID       int                  `db:"contact_channel_id" json:"contact_channel_id,omitempty"`
 	NewPassword            string               `db:"-" json:"new_password,omitempty"`

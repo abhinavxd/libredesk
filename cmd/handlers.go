@@ -124,6 +124,13 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/tags/import", perm(handleImportTags, "tags:manage"))
 	g.GET("/api/v1/tags/import/status", perm(handleGetTagImportStatus, "tags:manage"))
 
+	// Organizations.
+	g.GET("/api/v1/organizations", auth(handleGetOrganizations))
+	g.GET("/api/v1/organizations/{id}", perm(handleGetOrganization, "organizations:manage"))
+	g.POST("/api/v1/organizations", perm(handleCreateOrganization, "organizations:manage"))
+	g.PUT("/api/v1/organizations/{id}", perm(handleUpdateOrganization, "organizations:manage"))
+	g.DELETE("/api/v1/organizations/{id}", perm(handleDeleteOrganization, "organizations:manage"))
+
 	// Macros.
 	g.GET("/api/v1/macros", auth(handleGetMacros))
 	g.GET("/api/v1/macros/{id}", perm(handleGetMacro, "macros:manage"))
@@ -161,6 +168,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/contacts/{id}", perm(handleUpdateContact, "contacts:write"))
 	g.DELETE("/api/v1/contacts/{id}", perm(handleDeleteContact, "contacts:delete"))
 	g.POST("/api/v1/contacts/{id}/merge", perm(handleMergeContact, "contacts:merge"))
+	g.PUT("/api/v1/contacts/{id}/organization", perm(handleSetContactOrganization, "contacts:write"))
 	g.PUT("/api/v1/contacts/{id}/block", perm(handleBlockContact, "contacts:block"))
 	g.GET("/api/v1/contacts/{id}/export", perm(handleExportContact, "contacts:export"))
 	g.GET("/api/v1/contacts/{id}/conversations", perm(handleGetContactConversations, "contacts:read"))

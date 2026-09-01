@@ -95,6 +95,14 @@
               {{ $t('globals.terms.createdOn') }}
               {{ contact.created_at ? format(new Date(contact.created_at), 'PPP') : 'N/A' }}
             </div>
+            <div class="pt-2 max-w-sm">
+              <OrganizationPicker
+                :model-value="contact.organization_id"
+                :label="t('globals.terms.organization')"
+                :disabled="!userStore.can('contacts:write')"
+                @change="onOrganizationChange"
+              />
+            </div>
           </div>
 
           <div class="mt-8 space-y-10 w-full">
@@ -236,6 +244,7 @@ import api from '@/api'
 import ContactForm from '@/features/contact/ContactForm.vue'
 import ContactNotes from '@/features/contact/ContactNotes.vue'
 import ContactConversations from '@/features/contact/ContactConversations.vue'
+import OrganizationPicker from '@/features/organization/OrganizationPicker.vue'
 import { createFormSchema } from '@/features/contact/formSchema.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
@@ -277,6 +286,17 @@ const breadcrumbLinks = [
 ]
 
 onMounted(fetchContact)
+
+async function onOrganizationChange(orgId) {
+  if (!contact.value?.id) return
+  try {
+    const { data } = await api.setContactOrganization(contact.value.id, { organization_id: orgId })
+    contact.value = data.data
+    emitToast(t('globals.messages.savedSuccessfully'))
+  } catch (err) {
+    showError(err)
+  }
+}
 
 async function fetchContact() {
   formLoading.value = true
