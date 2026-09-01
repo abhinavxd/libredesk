@@ -9,7 +9,7 @@
             :conversation="mostRecentConversation"
           />
           <div v-else-if="canStartConversation">
-            <Button @click="startConversation" class="widget-home-cta h-11 rounded-xl w-full flex items-center justify-center">
+            <Button @click="startConversation" class="widget-home-cta h-12 rounded-xl w-full flex items-center justify-center">
               {{ startButtonText }}
               <ArrowRight size="16" />
             </Button>

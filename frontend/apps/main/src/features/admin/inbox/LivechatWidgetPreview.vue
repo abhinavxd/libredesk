@@ -217,7 +217,7 @@
                   <div v-if="canStartConversation" class="relative z-10 px-4 pb-4">
                     <Button
                       type="button"
-                      class="widget-home-cta h-11 rounded-xl w-full flex items-center justify-center gap-1"
+                      class="widget-home-cta h-12 rounded-xl w-full flex items-center justify-center gap-1"
                       @click="startNew"
                     >
                       {{ startButtonText }}
@@ -328,7 +328,7 @@
                 :class="{ 'is-active': view === 'home' }"
                 @click="view = 'home'"
               >
-                <House class="w-5 h-5" />
+                <House class="w-6 h-6" />
                 <span>{{ $t('globals.terms.home') }}</span>
               </button>
               <button
@@ -337,7 +337,7 @@
                 :class="{ 'is-active': view === 'messages' }"
                 @click="view = 'messages'"
               >
-                <MessagesSquare class="w-5 h-5" />
+                <MessagesSquare class="w-6 h-6" />
                 <span>{{ $t('globals.terms.message', 2) }}</span>
               </button>
             </div>
@@ -417,6 +417,12 @@ const openExisting = () => {
 const isDark = computed(() => Boolean(props.config.dark_mode))
 
 const primaryStyle = computed(() => {
+  if (!isDark.value) {
+    return {
+      '--primary': '240 10% 8%',
+      '--primary-foreground': '0 0% 100%'
+    }
+  }
   const primary = props.config.colors?.primary
   if (!HEX_COLOR.test(primary)) return {}
   return {

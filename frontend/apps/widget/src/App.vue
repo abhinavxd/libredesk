@@ -51,8 +51,18 @@ if (widgetConfig) {
 
 const isDark = computed(() => Boolean(widgetStore.config.dark_mode))
 
+// Light mode uses the marketing-site primary (near-black). Inbox violet is
+// only applied in dark mode, where it still reads as an accent.
+const SITE_LIGHT_PRIMARY = '240 10% 8%'
+const SITE_LIGHT_PRIMARY_FG = '0 0% 100%'
+
 const customColorStyle = computed(() => {
   const style = {}
+  if (!isDark.value) {
+    style['--primary'] = SITE_LIGHT_PRIMARY
+    style['--primary-foreground'] = SITE_LIGHT_PRIMARY_FG
+    return style
+  }
   const colors = widgetStore.config.colors
   if (colors?.primary) {
     style['--primary'] = hexToHSL(colors.primary)

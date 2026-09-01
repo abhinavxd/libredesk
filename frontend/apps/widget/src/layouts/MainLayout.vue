@@ -19,18 +19,18 @@
       >
         <TabsTrigger
           value="home"
-          class="widget-nav-tab flex-col gap-0.5 rounded-none shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          class="widget-nav-tab flex-col gap-1.5 rounded-none shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
           :aria-label="$t('globals.terms.home')"
         >
-          <House class="w-5 h-5" />
+          <House class="w-6 h-6" />
           <span>{{ $t('globals.terms.home') }}</span>
         </TabsTrigger>
         <TabsTrigger
           value="messages"
-          class="widget-nav-tab flex-col gap-0.5 rounded-none shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          class="widget-nav-tab flex-col gap-1.5 rounded-none shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
           :aria-label="$t('globals.terms.message', 2)"
         >
-          <MessagesSquare class="w-5 h-5" />
+          <MessagesSquare class="w-6 h-6" />
           <span>{{ $t('globals.terms.message', 2) }}</span>
         </TabsTrigger>
       </TabsList>
