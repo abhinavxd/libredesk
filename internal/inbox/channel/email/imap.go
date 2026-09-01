@@ -498,6 +498,7 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 
 	// Extract conversation UUID from plus-addressed recipient (e.g., inbox+conv-{uuid}@domain)
 	incomingMsg.ConversationUUIDFromReplyTo = extractConversationUUIDFromRecipient(envelope)
+	incomingMsg.SideConversationUUID = extractSideUUIDFromRecipient(envelope)
 	if incomingMsg.ConversationUUIDFromReplyTo != "" {
 		e.lo.Debug("extracted conversation UUID from plus-addressed recipient",
 			"conversation_uuid", incomingMsg.ConversationUUIDFromReplyTo,
@@ -670,6 +671,17 @@ func extractConversationUUIDFromRecipient(envelope *enmime.Envelope) string {
 	for _, h := range headers {
 		addr := envelope.GetHeader(h)
 		if uuid := stringutil.ExtractConvUUID(addr); uuid != "" {
+			return uuid
+		}
+	}
+	return ""
+}
+
+func extractSideUUIDFromRecipient(envelope *enmime.Envelope) string {
+	headers := []string{"Delivered-To", "X-Original-To", "To"}
+	for _, h := range headers {
+		addr := envelope.GetHeader(h)
+		if uuid := stringutil.ExtractSideUUID(addr); uuid != "" {
 			return uuid
 		}
 	}

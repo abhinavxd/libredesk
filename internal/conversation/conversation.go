@@ -375,6 +375,12 @@ type queries struct {
 	MergeCopyParticipants         *sqlx.Stmt `query:"merge-copy-participants"`
 	MergeRefreshTargetLastMessage *sqlx.Stmt `query:"merge-refresh-target-last-message"`
 	MergeCloseSource              *sqlx.Stmt `query:"merge-close-source"`
+
+	InsertSideConversation *sqlx.Stmt `query:"insert-side-conversation"`
+	ListSideConversations  *sqlx.Stmt `query:"list-side-conversations"`
+	GetSideConversation    *sqlx.Stmt `query:"get-side-conversation"`
+	InsertSideMessage      *sqlx.Stmt `query:"insert-side-message"`
+	ListSideMessages       *sqlx.Stmt `query:"list-side-messages"`
 }
 
 // CreateConversation creates a new conversation. If maxConversations > 0, the insert is

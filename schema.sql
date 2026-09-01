@@ -316,6 +316,32 @@ CREATE TABLE organizations (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id INT REFERENCES organizations(id) ON DELETE SET NULL ON UPDATE CASCADE;
 CREATE INDEX IF NOT EXISTS index_users_on_organization_id ON users (organization_id);
 
+DROP TABLE IF EXISTS side_messages CASCADE;
+DROP TABLE IF EXISTS side_conversations CASCADE;
+CREATE TABLE side_conversations (
+	id SERIAL PRIMARY KEY,
+	uuid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	conversation_id INT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	subject TEXT NOT NULL DEFAULT '',
+	recipients TEXT[] NOT NULL DEFAULT '{}',
+	created_by INT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX index_side_conversations_on_conversation_id ON side_conversations (conversation_id);
+CREATE TABLE side_messages (
+	id SERIAL PRIMARY KEY,
+	uuid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	side_conversation_id INT NOT NULL REFERENCES side_conversations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	sender_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	direction TEXT NOT NULL DEFAULT 'outgoing',
+	content TEXT NOT NULL DEFAULT '',
+	content_type TEXT NOT NULL DEFAULT 'html',
+	source_id TEXT NULL
+);
+CREATE INDEX index_side_messages_on_side_conversation_id ON side_messages (side_conversation_id);
+
 DROP TABLE IF EXISTS conversation_messages CASCADE;
 CREATE TABLE conversation_messages (
     id BIGSERIAL PRIMARY KEY,

@@ -1077,3 +1077,32 @@ SET
     meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('merged_into_uuid', $2::text),
     updated_at = NOW()
 WHERE uuid = $1;
+
+-- name: insert-side-conversation
+INSERT INTO side_conversations (conversation_id, subject, recipients, created_by)
+VALUES ($1, $2, $3, $4)
+RETURNING id, uuid, created_at, updated_at, conversation_id, subject, recipients, created_by;
+
+-- name: list-side-conversations
+SELECT id, uuid, created_at, updated_at, conversation_id, subject, recipients, created_by
+FROM side_conversations
+WHERE conversation_id = $1
+ORDER BY created_at DESC;
+
+-- name: get-side-conversation
+SELECT id, uuid, created_at, updated_at, conversation_id, subject, recipients, created_by
+FROM side_conversations
+WHERE uuid = $1;
+
+-- name: insert-side-message
+INSERT INTO side_messages (side_conversation_id, sender_id, direction, content, content_type, source_id)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, uuid, created_at, side_conversation_id, sender_id, direction, content, content_type, source_id;
+
+-- name: list-side-messages
+SELECT sm.id, sm.uuid, sm.created_at, sm.side_conversation_id, sm.sender_id, sm.direction, sm.content, sm.content_type, sm.source_id,
+       u.first_name AS author_first_name, u.last_name AS author_last_name
+FROM side_messages sm
+JOIN users u ON u.id = sm.sender_id
+WHERE sm.side_conversation_id = $1
+ORDER BY sm.created_at ASC;

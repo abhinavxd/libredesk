@@ -85,6 +85,7 @@
     </div>
 
     <div class="pt-4 space-y-2">
+      <SideConversationsPanel />
       <ConversationMergeDialog />
       <ConversationSpamActions />
     </div>
@@ -104,6 +105,7 @@ import { useTeamFilteredAgentOptions } from '@main/composables/useTeamFilteredAg
 import ZendeskMacroPicker from './ZendeskMacroPicker.vue'
 import ConversationSpamActions from '@/features/conversation/ConversationSpamActions.vue'
 import ConversationMergeDialog from '@/features/conversation/ConversationMergeDialog.vue'
+import SideConversationsPanel from '@/features/conversation/SideConversationsPanel.vue'
 import OrganizationPicker from '@/features/organization/OrganizationPicker.vue'
 import api from '@/api'
 
