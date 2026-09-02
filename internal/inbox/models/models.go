@@ -2,6 +2,7 @@ package models
 
 import (
 	"crypto/tls"
+	"database/sql/driver"
 	"encoding/json"
 	"net/smtp"
 	"strings"
@@ -24,15 +25,87 @@ type Inbox struct {
 	CreatedAt          time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time       `db:"updated_at" json:"updated_at"`
 	Name               string          `db:"name" json:"name"`
+	DeletedAt          *time.Time      `db:"deleted_at" json:"-"`
 	Channel            string          `db:"channel" json:"channel"`
 	Enabled            bool            `db:"enabled" json:"enabled"`
 	CSATEnabled        bool            `db:"csat_enabled" json:"csat_enabled"`
 	PromptTagsOnReply  bool            `db:"prompt_tags_on_reply" json:"prompt_tags_on_reply"`
 	From               string          `db:"from" json:"from"`
+	Aliases            EmailAliases    `db:"aliases" json:"aliases"`
 	FromNameTemplate   string          `db:"from_name_template" json:"from_name_template"`
 	Config             json.RawMessage `db:"config" json:"config"`
 	Secret             null.String     `db:"secret" json:"secret"`
 	LinkedEmailInboxID null.Int        `db:"linked_email_inbox_id" json:"linked_email_inbox_id"`
+}
+
+const (
+	AliasVerificationNotVerified = "not_verified"
+	AliasVerificationPending     = "pending"
+	AliasVerificationVerified    = "verified"
+	AliasVerificationFailed      = "failed"
+)
+
+// EmailAlias is an owned non-primary inbox address.
+type EmailAlias struct {
+	Email              string     `json:"email"`
+	VerificationStatus string     `json:"verification_status"`
+	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
+}
+
+// EmailAliases is the JSON representation returned by inbox queries. It also
+// accepts the old string-array form for existing clients.
+type EmailAliases []EmailAlias
+
+func (a *EmailAliases) Scan(value any) error {
+	if value == nil {
+		*a = EmailAliases{}
+		return nil
+	}
+	var data []byte
+	switch v := value.(type) {
+	case []byte:
+		data = v
+	case string:
+		data = []byte(v)
+	default:
+		return nil
+	}
+	return json.Unmarshal(data, a)
+}
+
+func (a EmailAliases) Value() (driver.Value, error) {
+	data, err := json.Marshal(a)
+	return data, err
+}
+
+func (a *EmailAliases) UnmarshalJSON(data []byte) error {
+	var values []json.RawMessage
+	if err := json.Unmarshal(data, &values); err != nil {
+		return err
+	}
+	aliases := make(EmailAliases, 0, len(values))
+	for _, value := range values {
+		var email string
+		if err := json.Unmarshal(value, &email); err == nil {
+			aliases = append(aliases, EmailAlias{Email: email, VerificationStatus: AliasVerificationNotVerified})
+			continue
+		}
+		var alias struct {
+			Email              string     `json:"email"`
+			VerificationStatus string     `json:"verification_status"`
+			VerifiedAt         *time.Time `json:"verified_at"`
+		}
+		if err := json.Unmarshal(value, &alias); err != nil {
+			return err
+		}
+		status := alias.VerificationStatus
+		if status == "" {
+			status = AliasVerificationNotVerified
+		}
+		aliases = append(aliases, EmailAlias{Email: alias.Email, VerificationStatus: status, VerifiedAt: alias.VerifiedAt})
+	}
+	*a = aliases
+	return nil
 }
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.

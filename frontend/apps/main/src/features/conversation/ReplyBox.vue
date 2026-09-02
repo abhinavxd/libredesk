@@ -64,6 +64,7 @@
           v-model:to="to"
           v-model:cc="cc"
           v-model:bcc="bcc"
+          v-model:sendFrom="sendFrom"
           v-model:emailErrors="emailErrors"
           v-model:messageType="messageType"
           v-model:showBcc="showBcc"
@@ -126,6 +127,7 @@
         v-model:to="to"
         v-model:cc="cc"
         v-model:bcc="bcc"
+        v-model:sendFrom="sendFrom"
         v-model:emailErrors="emailErrors"
         v-model:messageType="messageType"
         v-model:showBcc="showBcc"
@@ -251,6 +253,7 @@ const isGenerating = ref(false)
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
+const sendFrom = ref('')
 const showBcc = ref(false)
 const emailErrors = ref([])
 const aiPromptStore = useAiPromptStore()
@@ -408,6 +411,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     if (parsedTo.length) meta.to = parsedTo
     if (parsedCC.length) meta.cc = parsedCC
     if (parsedBCC.length) meta.bcc = parsedBCC
+    if (!isPrivate && sendFrom.value) meta.send_from = sendFrom.value
 
     tempUUID = conversationStore.addPendingMessage(
       convUUID,
@@ -433,7 +437,8 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
         cc: parsedCC,
         bcc: parsedBCC,
         to: parsedTo,
-        echo_id: isPrivate ? '' : tempUUID
+        echo_id: isPrivate ? '' : tempUUID,
+        send_from: isPrivate ? '' : sendFrom.value
       })
 
       // Private notes are sent immediately so replace immediately.
@@ -499,6 +504,12 @@ watch(
     }
   },
   { deep: true }
+)
+
+watch(
+  () => conversationStore.currentFrom,
+  (value) => { sendFrom.value = value || '' },
+  { immediate: true }
 )
 
 // Reset first so a loaded draft never inherits the previous conversation's macro (drafts store no message_content).

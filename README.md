@@ -21,6 +21,18 @@
 
 Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live demo**](https://demo.libredesk.io/).
 
+## Email aliases
+
+Email inboxes can own aliases from any domain. Aliases must forward to the
+inbox's IMAP mailbox and must pass the admin **Verify sending** check before
+they can be selected as an outgoing `From` address. Sending verification uses
+the inbox's existing SMTP/OAuth connection and waits for the verification
+message on that inbox's IMAP mailbox.
+
+All aliases use the inbox's existing SMTP credentials. The SMTP provider must
+authorize Send As for each alias. Successful LibreDesk verification confirms
+that this SMTP path accepted and preserved the alias sender.
+
 ## Features
 
 - **Omnichannel inbox**  

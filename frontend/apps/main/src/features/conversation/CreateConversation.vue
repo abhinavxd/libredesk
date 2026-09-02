@@ -138,6 +138,27 @@
                 </FormField>
               </div>
 
+              <FormField v-if="fromOptions.length > 1" v-slot="{ componentField }" name="send_from">
+                <FormItem>
+                  <FormLabel>{{ $t('replyBox.from') }}</FormLabel>
+                  <FormControl>
+                    <Select v-bind="componentField">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem v-for="address in fromOptions" :key="address" :value="address">
+                            {{ address }}
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
+
               <!-- Assignment Group -->
               <div class="grid grid-cols-2 gap-4">
                 <!-- Set assigned team -->
@@ -343,6 +364,7 @@ const formSchema = z.object({
     }),
   team_id: z.any().optional(),
   agent_id: z.any().optional(),
+  send_from: z.string().optional(),
   contact_email: z.string().email(t('validation.invalidEmail')),
   first_name: z.string().min(1, t('globals.messages.required')),
   last_name: z.string().optional()
@@ -377,6 +399,7 @@ const form = useForm({
     inbox_id: null,
     team_id: null,
     agent_id: null,
+    send_from: '',
     subject: '',
     content: '',
     contact_email: '',
@@ -384,6 +407,25 @@ const form = useForm({
     last_name: ''
   }
 })
+
+const fromOptions = computed(() => {
+  const inbox = inboxStore.inboxes.find((item) => String(item.id) === String(form.values.inbox_id))
+  if (!inbox) return []
+
+  const primary = inbox.from?.match(/<([^>]+)>/)?.[1] || inbox.from || ''
+  return [
+    primary.trim(),
+    ...(inbox.aliases || [])
+      .filter((alias) => alias.verification_status === 'verified')
+      .map((alias) => alias.email)
+  ].filter(Boolean)
+})
+
+watch(fromOptions, (options) => {
+  if (!options.includes(form.values.send_from)) {
+    form.setFieldValue('send_from', options[0] || '')
+  }
+}, { immediate: true })
 
 watch(emailQuery, (newVal) => {
   form.setFieldValue('contact_email', newVal)

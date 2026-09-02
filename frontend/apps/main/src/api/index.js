@@ -415,6 +415,7 @@ const updateInbox = (id, data) =>
     }
   })
 const deleteInbox = (id) => http.delete(`/api/v1/inboxes/${id}`)
+const verifyInboxAlias = (id, data) => http.post(`/api/v1/inboxes/${id}/aliases/verify`, data)
 const saveDraft = (uuid, type, data) =>
   http.post(`/api/v1/conversations/${uuid}/draft`, { ...data, type }, {
     headers: {
@@ -704,6 +705,7 @@ export default {
   updateInbox,
   deleteInbox,
   toggleInbox,
+  verifyInboxAlias,
   createTeam,
   updateTeam,
   getSettings,

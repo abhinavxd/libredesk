@@ -1472,6 +1472,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			[]string{conv.Contact.Email.String},
 			nil,
 			nil,
+			"",
 			map[string]any{"is_automated": true},
 		)
 		if err != nil {
@@ -1754,7 +1755,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 	}
 
 	// Only send CSAT to contact.
-	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, []string{conversation.Contact.Email.String}, nil, nil, meta)
+	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, []string{conversation.Contact.Email.String}, nil, nil, "", meta)
 	if err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

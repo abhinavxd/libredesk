@@ -125,6 +125,23 @@ CREATE TABLE inboxes (
 	CONSTRAINT constraint_inboxes_on_name CHECK (length("name") <= 140)
 );
 
+DROP TABLE IF EXISTS inbox_email_addresses CASCADE;
+CREATE TABLE inbox_email_addresses (
+	id BIGSERIAL PRIMARY KEY,
+	inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+	email TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	position INTEGER NOT NULL DEFAULT 0,
+	verification_status TEXT NOT NULL DEFAULT 'not_verified',
+	verification_token TEXT NULL,
+	verification_started_at TIMESTAMPTZ NULL,
+	verified_at TIMESTAMPTZ NULL,
+	CONSTRAINT constraint_inbox_email_addresses_on_kind CHECK (kind IN ('primary', 'alias'))
+);
+CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_email ON inbox_email_addresses (LOWER(email));
+CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_primary ON inbox_email_addresses (inbox_id) WHERE kind = 'primary';
+CREATE INDEX index_inbox_email_addresses_on_inbox_id ON inbox_email_addresses (inbox_id);
+
 DROP TABLE IF EXISTS teams CASCADE;
 CREATE TABLE teams (
 	id SERIAL PRIMARY KEY,
