@@ -892,3 +892,53 @@ func managerOnClosedDB(t *testing.T) *Manager {
 	}
 	return m
 }
+
+// A typo'd or reassigned WABA id answers 200 with an empty page, and pruned sample values are unrecoverable.
+func TestSyncFromMetaEmptyListDoesNotPrune(t *testing.T) {
+	empty := false
+	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			metaOK("KEEP1")(w, r)
+			return
+		}
+		if empty {
+			writeJSON(w, map[string]any{"data": []any{}})
+			return
+		}
+		writeJSON(w, map[string]any{"data": []map[string]any{
+			{"id": "KEEP1", "name": "keeper", "language": "en_US", "category": "UTILITY", "status": "APPROVED",
+				"components": []map[string]any{{"type": "BODY", "text": "Hi {{1}}"}}},
+		}})
+	})
+	inboxID := seedInbox(t, m)
+
+	if _, err := m.Create(context.Background(), models.Template{
+		InboxID: inboxID, Name: "keeper", Language: "en_US", Category: models.CategoryUtility,
+		BodyContent: "Hi {{1}}", SampleValues: json.RawMessage(`{"1":"Ravi"}`),
+	}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := m.SyncFromMeta(context.Background(), inboxID); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+
+	empty = true
+	count, err := m.SyncFromMeta(context.Background(), inboxID)
+	if err != nil {
+		t.Fatalf("empty sync: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected nothing synced, got %d", count)
+	}
+
+	list, err := m.GetByInbox(inboxID)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("an empty response from Meta wiped %d local template(s)", 1-len(list))
+	}
+	if string(list[0].SampleValues) == "" || string(list[0].SampleValues) == "{}" {
+		t.Fatalf("sample values lost: %s", list[0].SampleValues)
+	}
+}

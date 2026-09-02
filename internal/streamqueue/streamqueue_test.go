@@ -291,3 +291,26 @@ func pendingCount(t *testing.T, q *Queue) int64 {
 	}
 	return p.Count
 }
+
+func TestCloseDuringStartupWaitsForWorkers(t *testing.T) {
+	for range 50 {
+		mr := miniredis.RunT(t)
+		q := testQueue(t, mr, Opts{
+			Consumer: "c",
+			Handler:  func(ctx context.Context, payload []byte) error { return nil },
+		})
+
+		done := make(chan struct{})
+		go func() {
+			q.Run()
+			close(done)
+		}()
+		q.Close()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Run never returned after Close")
+		}
+	}
+}

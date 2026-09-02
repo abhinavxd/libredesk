@@ -834,6 +834,9 @@ func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String), 
 func reloadInbox(app *App, id int) error {
 	app.lo.Info("reloading inbox", "id", id)
 	app.inboxAuthErrors.Delete(id)
+	if err := ensureWhatsAppIngester(app); err != nil {
+		app.lo.Error("error starting whatsapp ingester after an inbox change", "id", id, "error", err)
+	}
 	return app.inbox.ReloadInbox(app.ctx, id, makeInboxInitializer(app.inbox, app.conversation.SignAvatarURL, app.whatsappClient, app.conversation, makeInboxAuthStatusHook(app)))
 }
 

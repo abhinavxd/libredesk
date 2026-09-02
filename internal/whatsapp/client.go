@@ -22,16 +22,21 @@ const (
 	defaultTimeout  = 30 * time.Second
 	// maxMediaDownloadBytes matches Meta's largest media cap (100MB documents).
 	maxMediaDownloadBytes = 100 * 1024 * 1024
+	mediaTimeout          = 5 * time.Minute
 	maxTemplatePages      = 100
 )
+
+// ErrMediaTooLarge is permanent, a retry cannot help.
+var ErrMediaTooLarge = errors.New("media exceeds the configured size limit")
 
 var metaHostSuffixes = []string{"facebook.com", "fbcdn.net", "fbsbx.com", "whatsapp.net", "whatsapp.com"}
 
 type Client struct {
-	httpClient  *http.Client
-	lo          *logf.Logger
-	baseURL     string
-	onAuthError func(acc Account)
+	httpClient      *http.Client
+	mediaHTTPClient *http.Client
+	lo              *logf.Logger
+	baseURL         string
+	onAuthError     func(acc Account)
 }
 
 func (c *Client) SetAuthErrorHook(fn func(acc Account)) { c.onAuthError = fn }
@@ -45,10 +50,15 @@ func (c *Client) notifyAuthError(acc Account, err error) {
 
 func New(lo *logf.Logger) *Client {
 	return &Client{
-		httpClient: &http.Client{Timeout: defaultTimeout},
-		lo:         lo,
-		baseURL:    defaultGraphURL,
+		httpClient:      &http.Client{Timeout: defaultTimeout},
+		mediaHTTPClient: &http.Client{Timeout: mediaTimeout},
+		lo:              lo,
+		baseURL:         defaultGraphURL,
 	}
+}
+
+func MediaExceedsCap(info MediaInfo, maxBytes int64) bool {
+	return maxBytes > 0 && info.FileSize > maxBytes
 }
 
 func (c *Client) SetBaseURL(u string) { c.baseURL = strings.TrimRight(u, "/") }
@@ -182,7 +192,8 @@ func (c *Client) GetMediaURL(ctx context.Context, acc Account, mediaID string) (
 	return info, nil
 }
 
-func (c *Client) DownloadMedia(ctx context.Context, acc Account, mediaURL string) ([]byte, error) {
+// DownloadMedia caps the body at maxBytes, or at the package default when maxBytes is 0.
+func (c *Client) DownloadMedia(ctx context.Context, acc Account, mediaURL string, maxBytes int64) ([]byte, error) {
 	if err := c.checkAuthenticatedHost(mediaURL); err != nil {
 		return nil, err
 	}
@@ -191,7 +202,7 @@ func (c *Client) DownloadMedia(ctx context.Context, acc Account, mediaURL string
 		return nil, fmt.Errorf("building media request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+acc.AccessToken)
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.mediaClient().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("downloading media: %w", err)
 	}
@@ -202,14 +213,25 @@ func (c *Client) DownloadMedia(ctx context.Context, acc Account, mediaURL string
 		c.notifyAuthError(acc, metaErr)
 		return nil, metaErr
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxMediaDownloadBytes+1))
+	limit := int64(maxMediaDownloadBytes)
+	if maxBytes > 0 && maxBytes < limit {
+		limit = maxBytes
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, fmt.Errorf("reading media body: %w", err)
 	}
-	if len(body) > maxMediaDownloadBytes {
-		return nil, fmt.Errorf("media exceeds %d bytes", maxMediaDownloadBytes)
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("%w: %d bytes", ErrMediaTooLarge, limit)
 	}
 	return body, nil
+}
+
+func (c *Client) mediaClient() *http.Client {
+	if c.mediaHTTPClient != nil {
+		return c.mediaHTTPClient
+	}
+	return c.httpClient
 }
 
 func (c *Client) UploadMedia(ctx context.Context, acc Account, content []byte, contentType, filename string) (string, error) {

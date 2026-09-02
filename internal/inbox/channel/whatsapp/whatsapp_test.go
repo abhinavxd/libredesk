@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -545,4 +547,77 @@ func (f *fakeSourceUpdater) UpdateMessageSourceID(messageUUID, sourceID string) 
 	f.calls++
 	f.uuid, f.sourceID = messageUUID, sourceID
 	return f.err
+}
+
+func TestSendRetriesWhenMetaRefuses(t *testing.T) {
+	var attempts int32
+	inb := testInbox(t, func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&attempts, 1) < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error":{"message":"rate limit","code":130429}}`))
+			return
+		}
+		writeSendResponse(w, "wamid.AFTER_RETRY")
+	}, nil)
+	inb.retryBackoff = time.Millisecond
+
+	if err := inb.Send(textMessage("hello")); err != nil {
+		t.Fatalf("a 429 must be retried, not failed: %v", err)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 3 {
+		t.Fatalf("expected three attempts, got %d", got)
+	}
+}
+
+func TestSendDoesNotRetryAPermanentRejection(t *testing.T) {
+	var attempts int32
+	inb := testInbox(t, func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&attempts, 1)
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":{"message":"bad recipient","code":131000}}`))
+	}, nil)
+	inb.retryBackoff = time.Millisecond
+
+	if err := inb.Send(textMessage("hello")); err == nil {
+		t.Fatal("expected a permanent rejection to surface")
+	}
+	if got := atomic.LoadInt32(&attempts); got != 1 {
+		t.Fatalf("a permanent rejection must be attempted once, got %d attempts", got)
+	}
+}
+
+// Meta may have accepted the message before the connection dropped, so a retry would send it twice.
+func TestSendDoesNotRetryATransportFailure(t *testing.T) {
+	var attempts int32
+	inb := testInbox(t, func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&attempts, 1)
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("expected a hijackable response")
+			return
+		}
+		conn, _, err := hj.Hijack()
+		if err != nil {
+			t.Errorf("hijack: %v", err)
+			return
+		}
+		conn.Close()
+	}, nil)
+	inb.retryBackoff = time.Millisecond
+
+	if err := inb.Send(textMessage("hello")); err == nil {
+		t.Fatal("expected the transport failure to surface")
+	}
+	if got := atomic.LoadInt32(&attempts); got != 1 {
+		t.Fatalf("a dropped connection may already have been accepted by Meta; expected one attempt, got %d", got)
+	}
+}
+
+func textMessage(body string) models.OutboundMessage {
+	return models.OutboundMessage{
+		UUID:        "msg-uuid",
+		Content:     body,
+		ContentType: models.ContentTypeHTML,
+		Meta:        json.RawMessage(`{"whatsapp":{"to_phone":"919876543210"}}`),
+	}
 }

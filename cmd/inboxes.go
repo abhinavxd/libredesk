@@ -374,13 +374,15 @@ func repointWhatsAppWebhookAfterDelete(app *App, deleted imodels.Inbox) {
 	if err != nil || cfg.WABAID == "" {
 		return
 	}
-	forEachEnabledWhatsAppInbox(app, func(rec imodels.Inbox, c whatsappChannel.Config) bool {
+	if err := forEachEnabledWhatsAppInbox(app, func(rec imodels.Inbox, c whatsappChannel.Config) bool {
 		if rec.ID == deleted.ID || c.WABAID != cfg.WABAID {
 			return true
 		}
 		subscribeWhatsAppWebhook(app, rec.ID)
 		return false
-	})
+	}); err != nil {
+		app.lo.Error("error repointing whatsapp webhook after delete", "inbox_id", deleted.ID, "waba_id", cfg.WABAID, "error", err)
+	}
 }
 
 func postSaveWhatsAppTasks(app *App, inboxID int) {

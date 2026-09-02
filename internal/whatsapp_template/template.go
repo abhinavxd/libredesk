@@ -324,8 +324,13 @@ func (m *Manager) SyncFromMeta(ctx context.Context, inboxID int) (int, error) {
 		}
 		count++
 	}
-	if _, err := m.q.DeleteMissingFromMeta.Exec(inboxID, pq.Array(metaIDs)); err != nil {
-		m.lo.Error("error pruning templates deleted on meta", "inbox_id", inboxID, "error", err)
+	// An empty list is indistinguishable from a wrong WABA id answering 200, and pruned sample values are unrecoverable.
+	if len(metaIDs) > 0 {
+		if _, err := m.q.DeleteMissingFromMeta.Exec(inboxID, pq.Array(metaIDs)); err != nil {
+			m.lo.Error("error pruning templates deleted on meta", "inbox_id", inboxID, "error", err)
+		}
+	} else if len(templates) > 0 {
+		m.lo.Warn("skipping template prune, meta returned rows without ids", "inbox_id", inboxID, "count", len(templates))
 	}
 	return count, nil
 }

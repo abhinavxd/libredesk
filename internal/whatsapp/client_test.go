@@ -3,6 +3,7 @@ package whatsapp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -367,7 +368,7 @@ func TestDownloadMedia(t *testing.T) {
 		}
 		w.Write([]byte("filebytes"))
 	})
-	body, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/MEDIA1")
+	body, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/MEDIA1", maxMediaDownloadBytes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -381,14 +382,14 @@ func TestDownloadMediaErrors(t *testing.T) {
 		c, srv := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 			metaError(w, 404, "expired", 100)
 		})
-		if _, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/x"); err == nil {
+		if _, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/x", maxMediaDownloadBytes); err == nil {
 			t.Fatal("expected an error")
 		}
 	})
 
 	t.Run("unexpected host", func(t *testing.T) {
 		c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) {})
-		_, err := c.DownloadMedia(context.Background(), testAccount(), "https://evil.example.com/media/x")
+		_, err := c.DownloadMedia(context.Background(), testAccount(), "https://evil.example.com/media/x", maxMediaDownloadBytes)
 		if err == nil || !strings.Contains(err.Error(), "unexpected host") {
 			t.Fatalf("expected a host check failure, got %v", err)
 		}
@@ -398,7 +399,7 @@ func TestDownloadMediaErrors(t *testing.T) {
 		c, srv := testClient(t, func(w http.ResponseWriter, r *http.Request) {})
 		url := srv.URL + "/media/x"
 		srv.Close()
-		if _, err := c.DownloadMedia(context.Background(), testAccount(), url); err == nil {
+		if _, err := c.DownloadMedia(context.Background(), testAccount(), url, maxMediaDownloadBytes); err == nil {
 			t.Fatal("expected a transport error")
 		}
 	})
@@ -407,7 +408,7 @@ func TestDownloadMediaErrors(t *testing.T) {
 		c, srv := testClient(t, func(w http.ResponseWriter, r *http.Request) {})
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		if _, err := c.DownloadMedia(ctx, testAccount(), srv.URL+"/media/x"); err == nil {
+		if _, err := c.DownloadMedia(ctx, testAccount(), srv.URL+"/media/x", maxMediaDownloadBytes); err == nil {
 			t.Fatal("expected the cancelled context to fail the request")
 		}
 	})
@@ -423,7 +424,7 @@ func TestDownloadMediaSizeCap(t *testing.T) {
 			}
 		}
 	})
-	_, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/big")
+	_, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/big", maxMediaDownloadBytes)
 	if err == nil || !strings.Contains(err.Error(), "exceeds") {
 		t.Fatalf("expected a size error, got %v", err)
 	}
@@ -867,7 +868,7 @@ func TestAuthErrorHookOnMediaDownload(t *testing.T) {
 	})
 	fired := 0
 	c.SetAuthErrorHook(func(acc Account) { fired++ })
-	c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/x")
+	c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/x", maxMediaDownloadBytes)
 	if fired != 1 {
 		t.Fatalf("expected the hook to fire once, got %d", fired)
 	}
@@ -930,7 +931,7 @@ func TestDownloadMediaTruncatedBody(t *testing.T) {
 		}
 		panic(http.ErrAbortHandler)
 	})
-	if _, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/x"); err == nil {
+	if _, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/x", maxMediaDownloadBytes); err == nil {
 		t.Fatal("expected a read error")
 	}
 }
@@ -959,6 +960,7 @@ func testClient(t *testing.T, handler http.HandlerFunc) (*Client, *httptest.Serv
 	c.SetBaseURL(srv.URL)
 	c.httpClient = srv.Client()
 	c.httpClient.Timeout = 5 * time.Second
+	c.mediaHTTPClient = c.httpClient
 	return c, srv
 }
 
@@ -997,5 +999,39 @@ func decode(t *testing.T, r *http.Request, out any) {
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
 		t.Fatalf("unmarshal body %q: %v", raw, err)
+	}
+}
+
+func TestDownloadMediaHonoursTheCallersCap(t *testing.T) {
+	c, srv := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write(make([]byte, 4096))
+	})
+
+	if _, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/x", 8192); err != nil {
+		t.Fatalf("a body inside the cap must download: %v", err)
+	}
+
+	_, err := c.DownloadMedia(context.Background(), testAccount(), srv.URL+"/media/x", 1024)
+	if err == nil {
+		t.Fatal("a body over the caller's cap must be rejected")
+	}
+	if !errors.Is(err, ErrMediaTooLarge) {
+		t.Fatalf("expected ErrMediaTooLarge so the caller can store a placeholder instead of retrying, got %v", err)
+	}
+}
+
+func TestMediaExceedsCap(t *testing.T) {
+	if !MediaExceedsCap(MediaInfo{FileSize: 20 << 20}, 10<<20) {
+		t.Fatal("a declared size over the cap must be refused up front")
+	}
+	if MediaExceedsCap(MediaInfo{FileSize: 5 << 20}, 10<<20) {
+		t.Fatal("a declared size inside the cap must be allowed")
+	}
+	// Meta does not always send file_size.
+	if MediaExceedsCap(MediaInfo{}, 10<<20) {
+		t.Fatal("an unknown size must not be treated as oversized")
+	}
+	if MediaExceedsCap(MediaInfo{FileSize: 20 << 20}, 0) {
+		t.Fatal("an unset cap must not reject everything")
 	}
 }

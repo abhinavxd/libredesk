@@ -4,7 +4,9 @@ package whatsapp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -19,6 +21,11 @@ import (
 const ChannelWhatsApp = "whatsapp"
 
 const MetaCallTimeout = 30 * time.Second
+
+const (
+	sendMaxAttempts  = 3
+	sendRetryBackoff = 2 * time.Second
+)
 
 // Meta's published per-media-type upload size caps.
 const (
@@ -100,6 +107,7 @@ type WhatsApp struct {
 	lo            *logf.Logger
 	messageStore  inbox.MessageStore
 	sourceUpdater SourceIDUpdater
+	retryBackoff  time.Duration
 }
 
 type Opts struct {
@@ -129,6 +137,7 @@ func New(store inbox.MessageStore, opts Opts) (*WhatsApp, error) {
 		lo:            opts.Lo,
 		messageStore:  store,
 		sourceUpdater: opts.SourceUpdater,
+		retryBackoff:  sendRetryBackoff,
 	}, nil
 }
 
@@ -144,7 +153,28 @@ func (w *WhatsApp) Close() error             { return nil }
 // Receive is a no-op; inbound messages arrive via the webhook handler.
 func (w *WhatsApp) Receive(ctx context.Context) error { return nil }
 
+// Retries a 429 or 5xx only, since a send carries no idempotency key and Meta may already have accepted it.
 func (w *WhatsApp) Send(message models.OutboundMessage) error {
+	var err error
+	for attempt := 1; ; attempt++ {
+		err = w.send(message)
+		if err == nil || attempt >= sendMaxAttempts || !metaRefusedSend(err) {
+			return err
+		}
+		w.lo.Warn("meta refused the whatsapp send, retrying", "message_uuid", message.UUID, "attempt", attempt, "error", err)
+		time.Sleep(w.retryBackoff * time.Duration(attempt))
+	}
+}
+
+func metaRefusedSend(err error) bool {
+	var me *whatsapp.MetaAPIError
+	if !errors.As(err, &me) {
+		return false
+	}
+	return me.StatusCode == http.StatusTooManyRequests || me.StatusCode >= http.StatusInternalServerError
+}
+
+func (w *WhatsApp) send(message models.OutboundMessage) error {
 	meta, err := parseSendMeta(message.Meta)
 	if err != nil {
 		return fmt.Errorf("parsing whatsapp send meta: %w", err)

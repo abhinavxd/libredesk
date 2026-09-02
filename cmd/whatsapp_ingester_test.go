@@ -214,3 +214,64 @@ func testIngesterApp(t *testing.T) (*App, *miniredis.Miniredis) {
 func parsedMessage(typ string) whatsapp.ParsedMessage {
 	return whatsapp.ParsedMessage{ID: "wamid.X", From: "919876543210", Type: typ}
 }
+
+// No unique constraint backs source_id, so this lock is the only thing suppressing a Meta redelivery.
+func TestSenderLockSerializesCheckAndInsert(t *testing.T) {
+	app, _ := testIngesterApp(t)
+	ing, err := newWhatsAppIngester(app)
+	if err != nil {
+		t.Fatalf("newWhatsAppIngester: %v", err)
+	}
+	t.Cleanup(ing.Close)
+
+	const sender = "919876543210"
+	var (
+		inserted  int32
+		seen      int32
+		wg        sync.WaitGroup
+		duplicate = make(chan struct{})
+	)
+
+	// Two deliveries of the same wamid, as a Meta retry arrives.
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			unlock := ing.lockSender(sender)
+			defer unlock()
+
+			// Stand-in for MessageExists followed by the insert.
+			if atomic.LoadInt32(&seen) == 0 {
+				time.Sleep(20 * time.Millisecond)
+				atomic.AddInt32(&inserted, 1)
+				atomic.StoreInt32(&seen, 1)
+				return
+			}
+			close(duplicate)
+		}()
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt32(&inserted); got != 1 {
+		t.Fatalf("a redelivered message was inserted %d times", got)
+	}
+	select {
+	case <-duplicate:
+	default:
+		t.Fatal("the second delivery never observed the first one's write")
+	}
+
+	// A slow sender must not stall other senders.
+	release := ing.lockSender("911111111111")
+	done := make(chan struct{})
+	go func() {
+		ing.lockSender("922222222222")()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("a second sender blocked behind an unrelated sender's lock")
+	}
+	release()
+}

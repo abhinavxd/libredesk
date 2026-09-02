@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
+	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	"github.com/abhinavxd/libredesk/internal/streamqueue"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 )
@@ -124,4 +126,42 @@ func (k *keyedLock) lock(key string) func() {
 		}
 		k.mu.Unlock()
 	}
+}
+
+func (app *App) ingester() *WhatsAppIngester { return app.whatsappIngester.Load() }
+
+func ensureWhatsAppIngester(app *App) error {
+	if app.ingester() != nil {
+		return nil
+	}
+
+	inboxes, err := app.inbox.GetAll()
+	if err != nil {
+		return fmt.Errorf("listing inboxes: %w", err)
+	}
+	configured := false
+	for _, rec := range inboxes {
+		if rec.Channel == whatsappChannel.ChannelWhatsApp && rec.Enabled {
+			configured = true
+			break
+		}
+	}
+	if !configured {
+		return nil
+	}
+
+	app.whatsappIngesterMu.Lock()
+	defer app.whatsappIngesterMu.Unlock()
+	if app.ingester() != nil {
+		return nil
+	}
+
+	ing, err := newWhatsAppIngester(app)
+	if err != nil {
+		return err
+	}
+	app.whatsappIngester.Store(ing)
+	go ing.Run()
+	app.lo.Info("whatsapp inbound pipeline started")
+	return nil
 }

@@ -11,8 +11,16 @@ import (
 	"path/filepath"
 	"testing"
 
+	"strings"
+
+	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/testdb"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/redis/go-redis/v9"
+	"github.com/zerodha/logf"
 )
 
 func TestTextPreview(t *testing.T) {
@@ -203,4 +211,134 @@ func testI18nApp(t *testing.T) *App {
 		t.Fatalf("loading i18n: %v", err)
 	}
 	return &App{i18n: lang}
+}
+
+// GetAll fails wholesale when any single inbox row cannot be decoded, and reporting that as "no inbox" drops the message.
+func TestResolveWhatsAppInboxSeparatesLookupFailureFromUnroutable(t *testing.T) {
+	app, db := testInboxApp(t)
+
+	var okID int
+	if err := db.QueryRow(`INSERT INTO inboxes (channel, config, "name", enabled, "from")
+		VALUES ('whatsapp', '{"phone_number_id":"PN-A"}'::jsonb, 'wa-ok', true, '') RETURNING id`).Scan(&okID); err != nil {
+		t.Fatalf("seeding the routable inbox: %v", err)
+	}
+
+	// An unknown phone number id with every inbox readable is genuinely unroutable: drop it.
+	if _, _, err := resolveWhatsAppInbox(app, okID, "PN-UNKNOWN"); !errors.Is(err, errNoEnabledWhatsAppInbox) {
+		t.Fatalf("expected an unroutable message to stay droppable, got %v", err)
+	}
+
+	// One undecodable row makes GetAll fail for every caller, and the message is still deliverable on a retry.
+	if _, err := db.Exec(`INSERT INTO inboxes (channel, config, "name", enabled, "from")
+		VALUES ('whatsapp', '"corrupt"'::jsonb, 'wa-corrupt', true, '')`); err != nil {
+		t.Fatalf("seeding the undecodable inbox: %v", err)
+	}
+	_, _, err := resolveWhatsAppInbox(app, okID, "PN-B")
+	if err == nil {
+		t.Fatal("expected the lookup failure to surface")
+	}
+	if errors.Is(err, errNoEnabledWhatsAppInbox) {
+		t.Fatal("a failed inbox lookup was reported as unroutable, so the queue acks and drops the customer's message")
+	}
+}
+
+func testInboxApp(t *testing.T) (*App, *sqlx.DB) {
+	app, db, _ := testInboxAppWithRedis(t, "")
+	return app, db
+}
+
+// addr "" points the app at a redis that is not listening.
+func testInboxAppWithRedis(t *testing.T, addr string) (*App, *sqlx.DB, *miniredis.Miniredis) {
+	t.Helper()
+	var mr *miniredis.Miniredis
+	if addr == "" {
+		addr = "127.0.0.1:1"
+	} else if addr == "live" {
+		mr = miniredis.RunT(t)
+		addr = mr.Addr()
+	}
+	app, db := newInboxApp(t)
+	app.redis = redis.NewClient(&redis.Options{Addr: addr})
+	t.Cleanup(func() { app.redis.Close() })
+	return app, db, mr
+}
+
+func newInboxApp(t *testing.T) (*App, *sqlx.DB) {
+	t.Helper()
+	testdb.New(t, "cmd")
+	db, err := sqlx.Connect("postgres", strings.Replace(os.Getenv("LIBREDESK_TEST_DB_DSN"), "/libredesk?", "/libredesk_test_cmd?", 1))
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if _, err := db.Exec(`DELETE FROM inboxes`); err != nil {
+		t.Fatalf("clearing inboxes: %v", err)
+	}
+
+	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
+	raw, err := os.ReadFile(filepath.Join("..", "i18n", "en-US.json"))
+	if err != nil {
+		t.Fatalf("reading the language file: %v", err)
+	}
+	lang, err := i18n.New(raw)
+	if err != nil {
+		t.Fatalf("loading i18n: %v", err)
+	}
+	mgr, err := inbox.New(&lo, db, lang, "0123456789abcdef0123456789abcdef")
+	if err != nil {
+		t.Fatalf("inbox.New: %v", err)
+	}
+	return &App{lo: &lo, i18n: lang, inbox: mgr}, db
+}
+
+// An install with no WhatsApp inbox must boot with Redis unreachable.
+func TestWhatsAppIngesterStaysOffWithoutAWhatsAppInbox(t *testing.T) {
+	app, db, _ := testInboxAppWithRedis(t, "")
+
+	if _, err := db.Exec(`INSERT INTO inboxes (channel, config, "name", enabled, "from")
+		VALUES ('email', '{}'::jsonb, 'mail', true, 'a@b.test')`); err != nil {
+		t.Fatalf("seeding an email inbox: %v", err)
+	}
+
+	if err := ensureWhatsAppIngester(app); err != nil {
+		t.Fatalf("an install with no whatsapp inbox must boot with redis down, got %v", err)
+	}
+	if app.ingester() != nil {
+		t.Fatal("expected no ingester workers on an install with no whatsapp inbox")
+	}
+}
+
+func TestWhatsAppIngesterStartsForAWhatsAppInbox(t *testing.T) {
+	app, db, mr := testInboxAppWithRedis(t, "live")
+
+	if err := ensureWhatsAppIngester(app); err != nil {
+		t.Fatalf("ensure with no whatsapp inbox: %v", err)
+	}
+	if app.ingester() != nil {
+		t.Fatal("expected the ingester to stay off before a whatsapp inbox exists")
+	}
+
+	if _, err := db.Exec(`INSERT INTO inboxes (channel, config, "name", enabled, "from")
+		VALUES ('whatsapp', '{"phone_number_id":"PN-A"}'::jsonb, 'wa', true, '')`); err != nil {
+		t.Fatalf("seeding a whatsapp inbox: %v", err)
+	}
+	if err := ensureWhatsAppIngester(app); err != nil {
+		t.Fatalf("ensure after the inbox exists: %v", err)
+	}
+	started := app.ingester()
+	if started == nil {
+		t.Fatal("expected the ingester to start once a whatsapp inbox exists")
+	}
+	t.Cleanup(started.Close)
+	if !mr.Exists(whatsAppStream) {
+		t.Fatal("expected the durable stream to be created")
+	}
+
+	// Every inbox save calls this, so it must not replace a running ingester.
+	if err := ensureWhatsAppIngester(app); err != nil {
+		t.Fatalf("repeat ensure: %v", err)
+	}
+	if app.ingester() != started {
+		t.Fatal("a second call replaced the running ingester")
+	}
 }

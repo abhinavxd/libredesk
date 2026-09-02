@@ -96,49 +96,50 @@ const (
 
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
-	ctx              context.Context
-	fs               stuffbin.FileSystem
-	consts           atomic.Value
-	auth             *auth_.Auth
-	authz            *authz.Enforcer
-	i18n             *i18n.I18n
-	lo               *logf.Logger
-	oidc             *oidc.Manager
-	media            *media.Manager
-	setting          *setting.Manager
-	role             *role.Manager
-	user             *user.Manager
-	team             *team.Manager
-	status           *status.Manager
-	priority         *priority.Manager
-	tag              *tag.Manager
-	inbox            *inbox.Manager
-	tmpl             *template.Manager
-	macro            *macro.Manager
-	conversation     *conversation.Manager
-	automation       *automation.Engine
-	businessHours    *businesshours.Manager
-	sla              *sla.Manager
-	csat             *csat.Manager
-	view             *view.Manager
-	ai               *ai.Manager
-	aiAgent          *aiagent.Manager
-	helpcenter       *helpcenter.Manager
-	search           *search.Manager
-	activityLog      *activitylog.Manager
-	notifier         *notifier.Service
-	userNotification *notifier.UserNotificationManager
-	customAttribute  *customAttribute.Manager
-	report           *report.Manager
-	webhook          *webhook.Manager
-	contextLink      *contextlink.Manager
-	rateLimit        *ratelimit.Limiter
-	redis            *redis.Client
-	fc               *fastcache.FastCache
-	importer         *importer.Importer
-	whatsappTemplate *whatsappTemplate.Manager
-	whatsappClient   *whatsappapi.Client
-	whatsappIngester *WhatsAppIngester
+	ctx                context.Context
+	fs                 stuffbin.FileSystem
+	consts             atomic.Value
+	auth               *auth_.Auth
+	authz              *authz.Enforcer
+	i18n               *i18n.I18n
+	lo                 *logf.Logger
+	oidc               *oidc.Manager
+	media              *media.Manager
+	setting            *setting.Manager
+	role               *role.Manager
+	user               *user.Manager
+	team               *team.Manager
+	status             *status.Manager
+	priority           *priority.Manager
+	tag                *tag.Manager
+	inbox              *inbox.Manager
+	tmpl               *template.Manager
+	macro              *macro.Manager
+	conversation       *conversation.Manager
+	automation         *automation.Engine
+	businessHours      *businesshours.Manager
+	sla                *sla.Manager
+	csat               *csat.Manager
+	view               *view.Manager
+	ai                 *ai.Manager
+	aiAgent            *aiagent.Manager
+	helpcenter         *helpcenter.Manager
+	search             *search.Manager
+	activityLog        *activitylog.Manager
+	notifier           *notifier.Service
+	userNotification   *notifier.UserNotificationManager
+	customAttribute    *customAttribute.Manager
+	report             *report.Manager
+	webhook            *webhook.Manager
+	contextLink        *contextlink.Manager
+	rateLimit          *ratelimit.Limiter
+	redis              *redis.Client
+	fc                 *fastcache.FastCache
+	importer           *importer.Importer
+	whatsappTemplate   *whatsappTemplate.Manager
+	whatsappClient     *whatsappapi.Client
+	whatsappIngester   atomic.Pointer[WhatsAppIngester]
+	whatsappIngesterMu sync.Mutex
 	// Inbox IDs whose provider credentials were recently rejected, keyed to the last error time.
 	inboxAuthErrors sync.Map
 	wsHub           *ws.Hub
@@ -345,12 +346,9 @@ func main() {
 	app.consts.Store(constants)
 	helpCenterCacheOpts.Logger = log.New(helpCenterCacheLogWriter{lo: app.lo}, "", 0)
 
-	whatsappIngester, err := newWhatsAppIngester(app)
-	if err != nil {
-		log.Fatalf("error initializing whatsapp ingester: %v", err)
+	if err := ensureWhatsAppIngester(app); err != nil {
+		app.lo.Error("error starting whatsapp ingester, inbound whatsapp messages will not be processed", "error", err)
 	}
-	app.whatsappIngester = whatsappIngester
-	go app.whatsappIngester.Run()
 	waClient.SetAuthErrorHook(makeWhatsAppAuthErrorHook(app))
 
 	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, conversation, makeInboxAuthStatusHook(app))
@@ -418,9 +416,9 @@ func main() {
 	notifier.Close()
 	colorlog.Red("Shutting down webhook...")
 	webhook.Close()
-	if app.whatsappIngester != nil {
+	if ing := app.ingester(); ing != nil {
 		colorlog.Red("Shutting down whatsapp ingester...")
-		app.whatsappIngester.Close()
+		ing.Close()
 	}
 	colorlog.Red("Shutting down conversation...")
 	conversation.Close()

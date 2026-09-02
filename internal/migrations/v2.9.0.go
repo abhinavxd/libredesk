@@ -1,10 +1,15 @@
 package migrations
 
 import (
+	"database/sql"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
+	"github.com/lib/pq"
 )
+
+const lastResolvedAtBatchSize = 10000
 
 func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	_, err := db.Exec(`ALTER TYPE channels ADD VALUE IF NOT EXISTS 'whatsapp';`)
@@ -22,8 +27,7 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS index_conversations_on_last_inbound_at ON conversations (last_inbound_at);`)
-	if err != nil {
+	if err := createIndexConcurrently(db, "index_conversations_on_last_inbound_at", `CREATE INDEX CONCURRENTLY IF NOT EXISTS index_conversations_on_last_inbound_at ON conversations (last_inbound_at)`); err != nil {
 		return err
 	}
 
@@ -32,8 +36,7 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
-	_, err = db.Exec(`UPDATE conversations SET last_resolved_at = resolved_at WHERE resolved_at IS NOT NULL AND last_resolved_at IS NULL;`)
-	if err != nil {
+	if _, err := backfillLastResolvedAt(db, lastResolvedAtBatchSize); err != nil {
 		return err
 	}
 
@@ -106,14 +109,52 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops);`)
-	if err != nil {
+	if err := createIndexConcurrently(db, "index_tgrm_users_on_phone_number", `CREATE INDEX CONCURRENTLY IF NOT EXISTS index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops)`); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS index_conversation_messages_on_source_id ON conversation_messages (source_id);`)
-	if err != nil {
+	if err := createIndexConcurrently(db, "index_conversation_messages_on_source_id", `CREATE INDEX CONCURRENTLY IF NOT EXISTS index_conversation_messages_on_source_id ON conversation_messages (source_id)`); err != nil {
 		return err
 	}
 	return nil
+}
+
+func backfillLastResolvedAt(db *sqlx.DB, batchSize int) (int, error) {
+	batches := 0
+	for {
+		res, err := db.Exec(`
+			UPDATE conversations SET last_resolved_at = resolved_at
+			WHERE id IN (
+				SELECT id FROM conversations
+				WHERE resolved_at IS NOT NULL AND last_resolved_at IS NULL
+				LIMIT $1
+			);`, batchSize)
+		if err != nil {
+			return batches, err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return batches, err
+		}
+		if n == 0 {
+			return batches, nil
+		}
+		batches++
+	}
+}
+
+// createIndexConcurrently drops an invalid leftover first, which IF NOT EXISTS would otherwise accept.
+func createIndexConcurrently(db *sqlx.DB, name, ddl string) error {
+	var invalid bool
+	err := db.Get(&invalid, `SELECT NOT indisvalid FROM pg_index WHERE indexrelid = to_regclass($1)`, name)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err == nil && invalid {
+		if _, err := db.Exec(`DROP INDEX IF EXISTS ` + pq.QuoteIdentifier(name)); err != nil {
+			return err
+		}
+	}
+	_, err = db.Exec(ddl)
+	return err
 }

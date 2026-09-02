@@ -60,6 +60,7 @@ type Queue struct {
 	claimMinIdle time.Duration
 	ctx          context.Context
 	cancel       context.CancelFunc
+	startMu      sync.Mutex
 	wg           sync.WaitGroup
 }
 
@@ -113,18 +114,25 @@ func (q *Queue) Enqueue(ctx context.Context, payload []byte) error {
 
 // Run starts the workers and the reclaimer and blocks until Close is called.
 func (q *Queue) Run() {
-	for i := range q.workers {
+	// Serialised with Close's cancel so its wg.Wait cannot see a zero counter while workers are still registering.
+	q.startMu.Lock()
+	if q.ctx.Err() == nil {
+		for i := range q.workers {
+			q.wg.Add(1)
+			go q.worker(fmt.Sprintf("%s:%d", q.consumer, i))
+		}
 		q.wg.Add(1)
-		go q.worker(fmt.Sprintf("%s:%d", q.consumer, i))
+		go q.reclaimer()
 	}
-	q.wg.Add(1)
-	go q.reclaimer()
+	q.startMu.Unlock()
 	q.wg.Wait()
 }
 
 // Close stops consuming and waits for in-flight handlers to finish; un-acked entries stay durable for the next start.
 func (q *Queue) Close() {
+	q.startMu.Lock()
 	q.cancel()
+	q.startMu.Unlock()
 	q.wg.Wait()
 }
 
