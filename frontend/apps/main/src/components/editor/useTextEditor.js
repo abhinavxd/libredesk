@@ -1,7 +1,6 @@
 import { ref, watch, onUnmounted } from 'vue'
 import { useEditor } from '@tiptap/vue-3'
 import { useInlineImageUpload } from '@main/composables/useInlineImageUpload'
-import { isSafeTicketReferenceHref } from './ticketReferenceExtension'
 
 export function useTextEditor({
   extensions,
@@ -57,20 +56,6 @@ export function useTextEditor({
       enableMentions,
       getTicketSuggestions,
       ticketReferencesEnabled,
-      handleDOMEvents: {
-        click: (_view, event) => {
-          const target =
-            event.target instanceof HTMLElement
-              ? event.target.closest('a.ld-ticket-reference')
-              : null
-          if (!target) return false
-          event.preventDefault()
-          if (isSafeTicketReferenceHref(target.getAttribute('href'))) {
-            window.open(target.href, '_blank', 'noopener,noreferrer')
-          }
-          return true
-        }
-      },
       handlePaste,
       handleDrop,
       handleKeyDown: (view, event) => {

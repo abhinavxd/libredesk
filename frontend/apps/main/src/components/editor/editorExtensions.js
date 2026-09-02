@@ -137,9 +137,7 @@ const sharedExtensions = ({
   CustomLink
 ]
 
-export function buildConversationExtensions({
-  getPlaceholder
-}) {
+export function buildConversationExtensions({ getPlaceholder }) {
   return [
     ...sharedExtensions({ getPlaceholder }),
     CustomMention.configure({

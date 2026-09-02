@@ -168,10 +168,10 @@ import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api'
+import { getTicketSuggestions as fetchTicketSuggestions } from '@main/components/editor/ticketReference'
 
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
-import { getTicketSuggestions as fetchTicketSuggestions } from '@main/components/editor/ticketReference'
 
 const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
@@ -217,10 +217,12 @@ const getSuggestions = async (query) => {
   return (await debouncedFetchSuggestions(query)) || []
 }
 
+const debouncedFetchTicketSuggestions = useDebounceFn(fetchTicketSuggestions, MENTION_DEBOUNCE_MS)
+
 const getTicketSuggestions = async (query) => {
   if (messageType.value !== 'private_note') return []
   const messageTypeAtRequest = messageType.value
-  const suggestions = await fetchTicketSuggestions(query)
+  const suggestions = (await debouncedFetchTicketSuggestions(query)) || []
   return messageType.value === messageTypeAtRequest ? suggestions : []
 }
 

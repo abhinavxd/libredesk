@@ -859,7 +859,6 @@
   "globals.messages.noInternetConnection": "No internet connection",
   "globals.messages.noMessagesYet": "No messages yet",
   "globals.messages.noResultsFound": "No results found",
-  "globals.messages.typeAtLeastDigitsToSearchTickets": "Type at least {count} digits to search tickets",
   "globals.messages.notAllowed": "Not allowed",
   "globals.messages.notFound": "Not found",
   "globals.messages.options": "Options",

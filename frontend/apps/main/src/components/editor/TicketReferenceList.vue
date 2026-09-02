@@ -22,8 +22,8 @@
   <div v-else class="ticket-reference-list bg-background border rounded-lg shadow-lg p-3">
     <span v-if="query.length < MIN_REFERENCE_QUERY_LENGTH" class="text-sm text-muted-foreground">
       {{
-        $t('globals.messages.typeAtLeastDigitsToSearchTickets', {
-          count: MIN_REFERENCE_QUERY_LENGTH
+        $t('search.minQueryLength', {
+          length: MIN_REFERENCE_QUERY_LENGTH
         })
       }}
     </span>

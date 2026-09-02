@@ -1,36 +1,39 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest'
-import StarterKit from '@tiptap/starter-kit'
 import { Editor } from '@tiptap/vue-3'
-import { isSafeTicketReferenceHref, TicketReference } from './ticketReferenceExtension'
+import { buildConversationExtensions } from './editorExtensions'
+import { conversationReferenceHref } from './ticketReferenceExtension'
 
 describe('ticket reference editor extension', () => {
-  it.each([
-    ['/inboxes/all/conversation/conversation-uuid', true],
-    ['http://localhost:3000/inboxes/all/conversation/conversation-uuid', true],
-    ['https://evil.example/inboxes/all/conversation/conversation-uuid', false],
-    ['//evil.example/inboxes/all/conversation/conversation-uuid', false],
-    ['javascript:alert(1)', false],
-    ['data:text/html,<script>alert(1)</script>', false]
-  ])('validates ticket reference href %s', (href, expected) => {
-    expect(isSafeTicketReferenceHref(href)).toBe(expected)
+  it('builds a root-relative conversation link', () => {
+    expect(conversationReferenceHref('abc')).toBe('/inboxes/all/conversation/abc')
   })
 
-  it('round-trips a ticket reference through HTML', () => {
+  it('round-trips a ticket reference through HTML in the conversation editor', () => {
     const content =
-      '<p><a data-id="conversation-uuid" data-label="108" data-type="ticket-reference" href="/inboxes/all/conversation/conversation-uuid" class="ld-ticket-reference">#108</a></p>'
-    const editor = new Editor({ extensions: [StarterKit, TicketReference], content })
+      '<p><a data-id="conversation-uuid" data-label="108" href="/inboxes/all/conversation/conversation-uuid" class="ld-ticket-reference">#108</a></p>'
+    const editor = new Editor({
+      extensions: buildConversationExtensions({ getPlaceholder: () => '' }),
+      content
+    })
     expect(editor.getJSON().content[0].content[0]).toMatchObject({
       type: 'ticketReference',
-      attrs: {
-        id: 'conversation-uuid',
-        label: '108',
-        href: '/inboxes/all/conversation/conversation-uuid',
-        type: 'ticket-reference'
-      }
+      attrs: { id: 'conversation-uuid', label: '108' }
     })
     expect(editor.getHTML()).toContain('href="/inboxes/all/conversation/conversation-uuid"')
+    editor.destroy()
+  })
+
+  it('derives the link from the conversation id, ignoring a stored href', () => {
+    const content =
+      '<p><a data-id="conversation-uuid" data-label="108" href="https://evil.example/x" class="ld-ticket-reference">#108</a></p>'
+    const editor = new Editor({
+      extensions: buildConversationExtensions({ getPlaceholder: () => '' }),
+      content
+    })
+    expect(editor.getHTML()).toContain('href="/inboxes/all/conversation/conversation-uuid"')
+    expect(editor.getHTML()).not.toContain('evil.example')
     editor.destroy()
   })
 })
