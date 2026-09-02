@@ -1,11 +1,34 @@
 import Mention from '@tiptap/extension-mention'
 
+const conversationPath = /^\/inboxes\/all\/conversation\/[^/?#]+$/
+
+export const isSafeTicketReferenceHref = (href) => {
+  if (!href || href.startsWith('//')) return false
+
+  try {
+    const url = new URL(href, window.location.origin)
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      url.origin === window.location.origin &&
+      conversationPath.test(url.pathname)
+    )
+  } catch {
+    return false
+  }
+}
+
 export const TicketReference = Mention.extend({
   name: 'ticketReference',
   addAttributes() {
     return {
       ...this.parent?.(),
-      href: { default: null, parseHTML: (element) => element.getAttribute('href') },
+      href: {
+        default: null,
+        parseHTML: (element) => {
+          const href = element.getAttribute('href')
+          return isSafeTicketReferenceHref(href) ? href : null
+        }
+      },
       type: {
         default: 'ticket-reference',
         parseHTML: (element) => element.getAttribute('data-type') || 'ticket-reference',

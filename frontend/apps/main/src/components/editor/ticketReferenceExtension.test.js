@@ -3,9 +3,20 @@
 import { describe, expect, it } from 'vitest'
 import StarterKit from '@tiptap/starter-kit'
 import { Editor } from '@tiptap/vue-3'
-import { TicketReference } from './ticketReferenceExtension'
+import { isSafeTicketReferenceHref, TicketReference } from './ticketReferenceExtension'
 
 describe('ticket reference editor extension', () => {
+  it.each([
+    ['/inboxes/all/conversation/conversation-uuid', true],
+    ['http://localhost:3000/inboxes/all/conversation/conversation-uuid', true],
+    ['https://evil.example/inboxes/all/conversation/conversation-uuid', false],
+    ['//evil.example/inboxes/all/conversation/conversation-uuid', false],
+    ['javascript:alert(1)', false],
+    ['data:text/html,<script>alert(1)</script>', false]
+  ])('validates ticket reference href %s', (href, expected) => {
+    expect(isSafeTicketReferenceHref(href)).toBe(expected)
+  })
+
   it('round-trips a ticket reference through HTML', () => {
     const content =
       '<p><a data-id="conversation-uuid" data-label="108" data-type="ticket-reference" href="/inboxes/all/conversation/conversation-uuid" class="ld-ticket-reference">#108</a></p>'

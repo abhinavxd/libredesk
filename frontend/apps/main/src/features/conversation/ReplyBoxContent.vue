@@ -220,8 +220,6 @@ const getSuggestions = async (query) => {
 const getTicketSuggestions = async (query) => {
   if (messageType.value !== 'private_note') return []
   return fetchTicketSuggestions(query)
-  if (messageType.value !== 'private_note') return []
-  return fetchTicketSuggestions(query)
 }
 
 // Handle mentions changed from editor
