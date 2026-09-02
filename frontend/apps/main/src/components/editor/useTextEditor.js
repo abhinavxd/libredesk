@@ -13,6 +13,8 @@ export function useTextEditor({
   linkedModel = 'messages',
   getSuggestions = null,
   enableMentions = () => false,
+  getTicketSuggestions = null,
+  ticketReferencesEnabled = () => false,
   onSend = () => {},
   onUpdate = () => {},
   onBlur = () => {},
@@ -52,6 +54,20 @@ export function useTextEditor({
       attributes: { class: 'outline-none' },
       getSuggestions,
       enableMentions,
+      getTicketSuggestions,
+      ticketReferencesEnabled,
+      handleDOMEvents: {
+        click: (_view, event) => {
+          const target =
+            event.target instanceof HTMLElement
+              ? event.target.closest('a.ld-ticket-reference')
+              : null
+          if (!target) return false
+          event.preventDefault()
+          window.open(target.href, '_blank', 'noopener,noreferrer')
+          return true
+        }
+      },
       handlePaste,
       handleDrop,
       handleKeyDown: (view, event) => {

@@ -96,8 +96,10 @@
         :autoFocus="true"
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
+        :enableTicketReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
+        :getTicketSuggestions="getTicketSuggestions"
         @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
@@ -169,6 +171,7 @@ import api from '@main/api'
 
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
+import { getTicketSuggestions as fetchTicketSuggestions } from '@main/components/editor/ticketReference'
 
 const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
@@ -212,6 +215,13 @@ const debouncedFetchSuggestions = useDebounceFn(fetchSuggestions, MENTION_DEBOUN
 const getSuggestions = async (query) => {
   if (messageType.value !== 'private_note') return []
   return (await debouncedFetchSuggestions(query)) || []
+}
+
+const getTicketSuggestions = async (query) => {
+  if (messageType.value !== 'private_note') return []
+  return fetchTicketSuggestions(query)
+  if (messageType.value !== 'private_note') return []
+  return fetchTicketSuggestions(query)
 }
 
 // Handle mentions changed from editor
@@ -383,7 +393,7 @@ const handleAiPromptSelected = (key) => {
 // Watch and update macro view based on message type this filters our macros.
 watch(
   messageType,
-  (newType, oldType) => {
+  (newType) => {
     if (newType === 'reply') {
       macroStore.setCurrentView('replying')
     } else if (newType === 'private_note') {

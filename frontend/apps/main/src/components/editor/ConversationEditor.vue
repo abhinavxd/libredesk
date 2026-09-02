@@ -45,6 +45,8 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   enableMentions: { type: Boolean, default: false },
   getSuggestions: { type: Function, default: null },
+  enableTicketReferences: { type: Boolean, default: false },
+  getTicketSuggestions: { type: Function, default: null },
   enableInlineImages: { type: Boolean, default: false },
   linkedModel: { type: String, default: 'messages' }
 })
@@ -85,6 +87,8 @@ const { editor, extractMentions, focus } = useTextEditor({
   linkedModel: props.linkedModel,
   getSuggestions: props.getSuggestions,
   enableMentions: () => props.enableMentions,
+  getTicketSuggestions: props.getTicketSuggestions,
+  ticketReferencesEnabled: () => props.enableTicketReferences,
   onSend: () => {
     emit('send')
     stopTyping()
