@@ -219,7 +219,9 @@ const getSuggestions = async (query) => {
 
 const getTicketSuggestions = async (query) => {
   if (messageType.value !== 'private_note') return []
-  return fetchTicketSuggestions(query)
+  const messageTypeAtRequest = messageType.value
+  const suggestions = await fetchTicketSuggestions(query)
+  return messageType.value === messageTypeAtRequest ? suggestions : []
 }
 
 // Handle mentions changed from editor
