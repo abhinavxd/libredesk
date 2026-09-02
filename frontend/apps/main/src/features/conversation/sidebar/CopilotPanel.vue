@@ -100,7 +100,7 @@
               </TooltipTrigger>
               <TooltipContent>{{ $t('globals.terms.copy') }}</TooltipContent>
             </Tooltip>
-            <Tooltip>
+            <Tooltip v-if="canSendReply">
               <TooltipTrigger as-child>
                 <Button
                   type="button"
@@ -114,7 +114,7 @@
               </TooltipTrigger>
               <TooltipContent>{{ $t('copilot.insertIntoReply') }}</TooltipContent>
             </Tooltip>
-            <Tooltip>
+            <Tooltip v-if="canSendPrivateNote">
               <TooltipTrigger as-child>
                 <Button
                   type="button"
@@ -178,20 +178,25 @@ import { Eraser, Bot, Copy, Reply, StickyNote } from 'lucide-vue-next'
 import { useConversationStore } from '@/stores/conversation'
 import { useCopilotStore } from '@/stores/copilot'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
+import { useUserStore } from '@/stores/user'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { getTextFromHTML } from '@shared-ui/utils/string.js'
 import { UserTypeAgent } from '@/constants/user'
 import { COPILOT_NAME } from '@/constants/copilot'
+import { permissions as perms } from '@/constants/permissions.js'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 
 const conversationStore = useConversationStore()
 const copilotStore = useCopilotStore()
 const aiAssistantStore = useAIAssistantStore()
+const userStore = useUserStore()
 const emitter = useEmitter()
 const { t } = useI18n()
+const canSendReply = computed(() => userStore.can(perms.MESSAGES_WRITE))
+const canSendPrivateNote = computed(() => userStore.can(perms.MESSAGES_WRITE_PRIVATE))
 
 const presets = computed(() => [
   t('copilot.preset.summarize'),
@@ -338,10 +343,12 @@ const copyAnswer = async (content) => {
 }
 
 const insertIntoReply = (content) => {
+  if (!canSendReply.value) return
   emitter.emit(EMITTER_EVENTS.COPILOT_INSERT_REPLY, content)
 }
 
 const addAsPrivateNote = async (content) => {
+  if (!canSendPrivateNote.value) return
   const uuid = conversationStore.current?.uuid || ''
   if (!uuid) return
   const rev = revision(uuid)

@@ -65,10 +65,28 @@ func handleGetAgents(r *fastglue.Request) error {
 	return r.SendEnvelope(agents)
 }
 
-// handleGetAgentsCompact returns all agents in a compact format.
+// handleGetAgentsCompact returns agents in a compact format, all of them without page params.
 func handleGetAgentsCompact(r *fastglue.Request) error {
-	var app = r.Context.(*App)
-	agents, err := app.user.GetAgentsCompact()
+	var (
+		app         = r.Context.(*App)
+		query       = string(r.RequestCtx.QueryArgs().Peek("q"))
+		userType    = string(r.RequestCtx.QueryArgs().Peek("type"))
+		enabledOnly = string(r.RequestCtx.QueryArgs().Peek("enabled")) == "true"
+	)
+	switch userType {
+	case "", models.UserTypeAgent, models.UserTypeAIAssistant:
+	default:
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	if ids := getIDsParam(r, "ids"); len(ids) > 0 {
+		agents, err := app.user.GetAgentsCompactByIDs(ids)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		return r.SendEnvelope(agents)
+	}
+	page, pageSize := getOptionalPagination(r)
+	agents, err := app.user.GetAgentsCompact(query, userType, enabledOnly, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

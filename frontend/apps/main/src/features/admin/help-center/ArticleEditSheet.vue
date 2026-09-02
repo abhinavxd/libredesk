@@ -153,29 +153,7 @@
                 <FormField v-slot="{ componentField }" name="author_id">
                   <FormItem>
                     <FormControl>
-                      <Select v-bind="componentField">
-                        <SelectTrigger>
-                          <SelectValue>{{ authorLabel }}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup v-if="agentOptions.length">
-                            <SelectLabel>{{ t('globals.terms.agent', 2) }}</SelectLabel>
-                            <SelectItem v-for="o in agentOptions" :key="o.value" :value="o.value">
-                              {{ o.label }}
-                            </SelectItem>
-                          </SelectGroup>
-                          <SelectGroup v-if="assistantOptions.length">
-                            <SelectLabel>{{ t('admin.ai.assistants') }}</SelectLabel>
-                            <SelectItem
-                              v-for="o in assistantOptions"
-                              :key="o.value"
-                              :value="o.value"
-                            >
-                              {{ o.label }}
-                            </SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
+                      <SelectAgentCombobox v-bind="componentField" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -319,12 +297,11 @@ import SwitchField from '@shared-ui/components/SwitchField.vue'
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
+import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@shared-ui/components/ui/sheet'
 import {
   FormControl,
@@ -343,7 +320,6 @@ import api from '@/api'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { useUsersStore } from '@/stores/users'
 import { useUserStore } from '@/stores/user'
 import { format } from 'date-fns'
 
@@ -390,11 +366,8 @@ const props = defineProps({
 
 defineEmits(['update:open', 'cancel'])
 const emitter = useEmitter()
-const usersStore = useUsersStore()
 const userStore = useUserStore()
 
-const agentOptions = computed(() => usersStore.options.filter((o) => o.type === 'agent'))
-const assistantOptions = computed(() => usersStore.options.filter((o) => o.type === 'ai_assistant'))
 
 const isLoadingArticle = ref(false)
 const availableCollections = ref([])
@@ -447,10 +420,6 @@ const collectionLabel = computed(
     )?.name || ''
 )
 
-const authorLabel = computed(
-  () => usersStore.options.find((o) => o.value === String(form.values.author_id))?.label || ''
-)
-
 // A collection from another language is not a valid home for this article, so the choice is
 // cleared rather than silently swapped for one the author never picked.
 watch(localeCollections, (collections) => {
@@ -479,11 +448,7 @@ watch(
     const seq = ++loadSeq
     loadedArticle.value = null
     isLoadingArticle.value = Boolean(props.article)
-    const [, , article] = await Promise.all([
-      usersStore.fetchUsers(),
-      fetchAvailableCollections(),
-      fetchArticle()
-    ])
+    const [, article] = await Promise.all([fetchAvailableCollections(), fetchArticle()])
     if (seq !== loadSeq) return
     loadedArticle.value = article
     isLoadingArticle.value = false

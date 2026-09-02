@@ -44,7 +44,7 @@ type Provider struct {
 	ID           int
 	Provider     string
 	ProviderURL  string
-	RedirectURL  string
+	RedirectURL  func() (string, error)
 	ClientID     string
 	ClientSecret string
 }
@@ -61,21 +61,23 @@ const defaultSessionLifetime = 9 * time.Hour
 
 // Auth is the auth service it manages OIDC authentication and sessions
 type Auth struct {
-	mu         sync.RWMutex
-	cfg        Config
-	i18n       *i18n.I18n
-	oauthCfgs  map[int]oauth2.Config
-	verifiers  map[int]*oidc.IDTokenVerifier
-	sess       *simplesessions.Manager
-	logger     *logf.Logger
-	rd         *redis.Client
-	oidcClient *http.Client
+	mu           sync.RWMutex
+	cfg          Config
+	i18n         *i18n.I18n
+	oauthCfgs    map[int]oauth2.Config
+	verifiers    map[int]*oidc.IDTokenVerifier
+	redirectURLs map[int]func() (string, error)
+	sess         *simplesessions.Manager
+	logger       *logf.Logger
+	rd           *redis.Client
+	oidcClient   *http.Client
 }
 
 // New creates an Auth service with configured OIDC providers.
 func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control) (*Auth, error) {
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
+	redirectURLs := make(map[int]func() (string, error))
 
 	oidcClient := newOIDCClient(dialControl)
 
@@ -90,7 +92,6 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 			ClientID:     provider.ClientID,
 			ClientSecret: provider.ClientSecret,
 			Endpoint:     oidcProv.Endpoint(),
-			RedirectURL:  provider.RedirectURL,
 			Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 		}
 
@@ -98,6 +99,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 
 		oauthCfgs[provider.ID] = oauthCfg
 		verifiers[provider.ID] = verifier
+		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
 	lifetime := cfg.SessionLifetime
@@ -123,14 +125,15 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
 
 	return &Auth{
-		cfg:        cfg,
-		i18n:       i18n,
-		oauthCfgs:  oauthCfgs,
-		verifiers:  verifiers,
-		sess:       sess,
-		logger:     logger,
-		rd:         rd,
-		oidcClient: oidcClient,
+		cfg:          cfg,
+		i18n:         i18n,
+		oauthCfgs:    oauthCfgs,
+		verifiers:    verifiers,
+		redirectURLs: redirectURLs,
+		sess:         sess,
+		logger:       logger,
+		rd:           rd,
+		oidcClient:   oidcClient,
 	}, nil
 }
 
@@ -162,6 +165,7 @@ func (a *Auth) Reload(cfg Config) error {
 
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
+	redirectURLs := make(map[int]func() (string, error))
 
 	for _, provider := range cfg.Providers {
 		oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), a.oidcClient), provider.ProviderURL)
@@ -174,7 +178,6 @@ func (a *Auth) Reload(cfg Config) error {
 			ClientID:     provider.ClientID,
 			ClientSecret: provider.ClientSecret,
 			Endpoint:     oidcProv.Endpoint(),
-			RedirectURL:  provider.RedirectURL,
 			Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 		}
 
@@ -182,11 +185,13 @@ func (a *Auth) Reload(cfg Config) error {
 
 		oauthCfgs[provider.ID] = oauthCfg
 		verifiers[provider.ID] = verifier
+		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
 	a.cfg = cfg
 	a.oauthCfgs = oauthCfgs
 	a.verifiers = verifiers
+	a.redirectURLs = redirectURLs
 
 	return nil
 }
@@ -199,10 +204,14 @@ func (a *Auth) LoginURL(providerID int, state string) (string, error) {
 	if !ok {
 		return "", envelope.NewError(envelope.InputError, a.i18n.T("validation.notFoundProvider"), nil)
 	}
+	redirectURL, err := a.resolveRedirectURL(providerID)
+	if err != nil {
+		a.logger.Error("error resolving oidc redirect url", "provider_id", providerID, "error", err)
+		return "", envelope.NewError(envelope.GeneralError, a.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	oauthCfg.RedirectURL = redirectURL
 	return oauthCfg.AuthCodeURL(state), nil
 }
-
-// ExchangeOIDCToken takes an OIDC authorization code, validates it, and returns an OIDC token for subsequent auth.
 func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code string) (string, OIDCclaim, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -212,6 +221,12 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 		a.logger.Error("oidc provider not configured, it may have failed to initialize at startup", "provider_id", providerID)
 		return "", OIDCclaim{}, fmt.Errorf("invalid provider ID: %d", providerID)
 	}
+	redirectURL, err := a.resolveRedirectURL(providerID)
+	if err != nil {
+		a.logger.Error("error resolving oidc redirect url", "provider_id", providerID, "error", err)
+		return "", OIDCclaim{}, err
+	}
+	oauthCfg.RedirectURL = redirectURL
 
 	verifier, ok := a.verifiers[providerID]
 	if !ok {
@@ -387,6 +402,15 @@ func (a *Auth) DestroySession(r *fastglue.Request) error {
 		return err
 	}
 	return nil
+}
+
+// resolveRedirectURL reads the provider's redirect URL from the current root URL setting.
+func (a *Auth) resolveRedirectURL(providerID int) (string, error) {
+	fn, ok := a.redirectURLs[providerID]
+	if !ok || fn == nil {
+		return "", fmt.Errorf("no redirect URL resolver for provider: %d", providerID)
+	}
+	return fn()
 }
 
 // generateCSRFToken creates a random base64 encoded str.

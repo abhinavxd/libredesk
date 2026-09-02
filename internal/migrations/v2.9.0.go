@@ -116,6 +116,16 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	if err := createIndexConcurrently(db, "index_conversation_messages_on_source_id", `CREATE INDEX CONCURRENTLY IF NOT EXISTS index_conversation_messages_on_source_id ON conversation_messages (source_id)`); err != nil {
 		return err
 	}
+
+	_, err = db.Exec(`
+		UPDATE roles
+		SET permissions = array_append(permissions, 'messages:write_private')
+		WHERE 'messages:write' = ANY(permissions)
+		AND NOT ('messages:write_private' = ANY(permissions));
+	`)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

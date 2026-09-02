@@ -118,16 +118,26 @@ export class WebSocketClient {
           } else {
             this.convStore.refreshConversationList()
           }
+          this.convStore.refreshSidebarCounts()
         },
         // Property updates for conversation and message.
         [WS_EVENT.MESSAGE_UPDATE]: () => this.convStore.mergeMessageUpdate(data.data),
-        [WS_EVENT.CONVERSATION_UPDATE]: () => this.convStore.mergeConversationUpdate(data.data),
+        [WS_EVENT.CONVERSATION_UPDATE]: () => {
+          this.convStore.mergeConversationUpdate(data.data)
+          if (data.data?.status) {
+            this.convStore.refreshSidebarCounts()
+          }
+        },
         [WS_EVENT.CONTACT_UPDATE]: () => this.convStore.mergeContactUpdate(data.data),
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)
         },
         // New notification.
-        [WS_EVENT.NEW_NOTIFICATION]: () => this.notificationStore.addNotification(data.data),
+        [WS_EVENT.NEW_NOTIFICATION]: () => {
+          this.notificationStore.addNotification(data.data)
+          // Mentions and assignments arrive as notifications without a conversation_update.
+          this.convStore.refreshSidebarCounts()
+        },
         [WS_EVENT.AGENT_AVAILABILITY_UPDATE]: () =>
           this.usersStore.setAvailability(data.data.agent_id, data.data.availability_status),
       }

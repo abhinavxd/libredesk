@@ -61,8 +61,8 @@ import {
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
 import { Button } from '@shared-ui/components/ui/button'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useRouter } from 'vue-router'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api/index.js'
@@ -82,7 +82,7 @@ const props = defineProps({
 const handleDelete = async () => {
   await api.deleteMacro(props.macro.id)
 
-  await macroStore.loadMacros(true)
+  macroStore.clearCache()
 
   isDeleteOpen.value = false
   emit.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'macros' })

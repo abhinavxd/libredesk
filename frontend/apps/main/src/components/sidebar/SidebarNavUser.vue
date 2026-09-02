@@ -95,7 +95,7 @@
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuItem @click="showShortcuts = true">
+        <DropdownMenuItem @click="shortcutsDialog.show">
           <Keyboard size="18" class="mr-2" />
           {{ t('navigation.keyboardShortcuts') }}
         </DropdownMenuItem>
@@ -108,7 +108,6 @@
     </DropdownMenuContent>
   </DropdownMenu>
 
-  <KeyboardShortcutsDialog v-model:open="showShortcuts" />
 </template>
 
 <script setup>
@@ -130,17 +129,16 @@ import { ChevronsUpDown, CircleUserRound, Keyboard, LogOut } from 'lucide-vue-ne
 import { useUserStore } from '@main/stores/user'
 import { useIsMobile } from '@shared-ui/composables'
 import { useRouter } from 'vue-router'
-import KeyboardShortcutsDialog from '@main/components/KeyboardShortcutsDialog.vue'
+import { useKeyboardShortcutsDialog } from '@main/composables/useKeyboardShortcutsDialog'
 
 import { useColorMode } from '@vueuse/core'
-import { ref } from 'vue'
 
 const isMobile = useIsMobile()
 const mode = useColorMode()
 const userStore = useUserStore()
 const router = useRouter()
 const { t } = useI18n()
-const showShortcuts = ref(false)
+const shortcutsDialog = useKeyboardShortcutsDialog()
 
 const logout = () => {
   window.location.href = '/logout'

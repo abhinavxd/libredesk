@@ -9,12 +9,21 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// handleGetTags returns all tags from the database.
+// handleGetTags returns tags from the database, all of them without page params.
 func handleGetTags(r *fastglue.Request) error {
 	var (
-		app = r.Context.(*App)
+		app   = r.Context.(*App)
+		query = string(r.RequestCtx.QueryArgs().Peek("q"))
 	)
-	t, err := app.tag.GetAll()
+	if ids := getIDsParam(r, "ids"); len(ids) > 0 {
+		t, err := app.tag.GetByIDs(ids)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		return r.SendEnvelope(t)
+	}
+	page, pageSize := getOptionalPagination(r)
+	t, err := app.tag.GetAll(query, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

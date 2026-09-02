@@ -6,6 +6,7 @@
     :items="items"
     :placeholder="placeholder"
     :align="align"
+    :search="search"
   >
     <!-- Custom trigger passthrough -->
     <template v-if="$slots.trigger" #trigger="slotProps">
@@ -91,6 +92,10 @@ const props = defineProps({
   align: {
     type: String,
     default: 'center'
+  },
+  search: {
+    type: Function,
+    default: null
   }
 })
 

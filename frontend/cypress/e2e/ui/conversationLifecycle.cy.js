@@ -34,6 +34,14 @@ describe('Conversation lifecycle', () => {
     })
   }
 
+  // Pickers list one server page, so a fresh row is only reachable through the search input.
+  const searchInPicker = (text) =>
+    cy
+      .get('[data-radix-popper-content-wrapper]:visible input')
+      .last()
+      .invoke('val', text)
+      .trigger('input')
+
   // The list column also renders a status dropdown; this one is the header badge.
   const statusBadge = () => cy.get('div.bg-primary.rounded-md')
 
@@ -124,13 +132,32 @@ describe('Conversation lifecycle', () => {
     statusBadge().should('contain.text', 'Open')
   })
 
+  it('focuses the date button when the custom snooze picker opens', () => {
+    openConversation()
+    cy.get('body').trigger('keydown', { key: 'z', code: 'KeyZ', altKey: true })
+    cy.get('[cmdk-input-wrapper] input').type('pick{enter}')
+    cy.contains('button', 'Pick a date').should('be.focused')
+  })
+
+  it('suggests tags from the command palette for an open conversation', () => {
+    cy.intercept('POST', '**/api/v1/ai/suggest-tags', { body: { data: [] } }).as('suggestTags')
+
+    openConversation()
+    cy.get('body').trigger('keydown', { key: 'k', code: 'KeyK', ctrlKey: true })
+    cy.get('[cmdk-input-wrapper] input').type('suggest tags')
+    cy.contains('[role="option"]', 'Suggest tags').click()
+
+    cy.wait('@suggestTags').its('request.body.conversation_uuid').should('eq', conversationUuid)
+  })
+
   it('assigns the conversation to an agent', () => {
     cy.intercept('PUT', `**/conversations/${conversationUuid}/assignee/user`).as('assignAgent')
 
     openConversation()
     openActionsSection()
     cy.contains('button[role="combobox"]', 'Select agent').click()
-    cy.get('[role="option"]').contains(agentName).click()
+    searchInPicker(agentLastName)
+    cy.contains('[role="option"]', agentName).click()
 
     cy.wait('@assignAgent').its('response.statusCode').should('eq', 200)
     cy.contains('button[role="combobox"]', agentName).should('exist')
@@ -142,7 +169,8 @@ describe('Conversation lifecycle', () => {
     openConversation()
     openActionsSection()
     cy.contains('button[role="combobox"]', 'Select team').click()
-    cy.get('[role="option"]').contains(teamName).click()
+    searchInPicker(teamName)
+    cy.contains('[role="option"]', teamName).click()
 
     cy.wait('@assignTeam').its('response.statusCode').should('eq', 200)
     cy.contains('button[role="combobox"]', teamName).should('exist')
@@ -169,8 +197,8 @@ describe('Conversation lifecycle', () => {
 
     openConversation()
     openActionsSection()
-    cy.get('input[placeholder="Select tags"]').click()
-    cy.get('[role="option"]').contains(tagName).click()
+    cy.get('input[placeholder="Select tags"]').click().type(tagName)
+    cy.contains('[role="option"]', tagName).click()
 
     cy.wait('@setTags').its('response.statusCode').should('eq', 200)
     cy.api('GET', `/api/v1/conversations/${conversationUuid}`)
@@ -189,12 +217,18 @@ describe('Conversation lifecycle', () => {
 
     openConversation()
     cy.contains('button', 'Private note').click()
-    cy.get('.tiptap.ProseMirror').first().click().type(noteBody)
+    cy.get('.tiptap.ProseMirror').first().click()
+    cy.get('.tiptap.ProseMirror').first().type(noteBody)
     cy.contains('button', /^Send$/).click()
 
-    cy.wait('@sendNote').its('response.statusCode').should('eq', 200)
-    // Scoped to the thread: the list column shows the same text as the preview.
-    cy.get('[data-message-uuid]').contains(noteBody).closest('.bg-private').should('exist')
+    cy.wait('@sendNote').then(({ request, response }) => {
+      expect(request.body.private).to.eq(true)
+      expect(response.statusCode).to.eq(200)
+      expect(response.body.data.private).to.eq(true)
+      cy.get(`[data-message-uuid="${response.body.data.uuid}"]`)
+        .find('.message-bubble')
+        .should('have.class', 'bg-private')
+    })
   })
 
   it('sends a reply that appears in the thread', () => {
@@ -205,7 +239,8 @@ describe('Conversation lifecycle', () => {
     cy.get('input[placeholder="Email addresses separated by comma"]')
       .first()
       .should('not.have.value', '')
-    cy.get('.tiptap.ProseMirror').first().click().type(replyBody)
+    cy.get('.tiptap.ProseMirror').first().click()
+    cy.get('.tiptap.ProseMirror').first().type(replyBody)
     cy.contains('button', /^Send$/).click() // exact: the split button next to it is "send and set status"
 
     cy.wait('@sendReply').its('response.statusCode').should('eq', 200)

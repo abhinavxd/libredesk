@@ -4,6 +4,22 @@ FROM users
 -- email != 'System' also drops NULL-email users (anonymous visitors); AI assistants have no email and must still be listed.
 WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND type = ANY($1)
 
+-- name: get-agents-compact
+SELECT users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+FROM users
+WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND users.type = ANY($1)
+    AND ($2 = '' OR CONCAT(users.first_name, ' ', COALESCE(users.last_name, '')) ILIKE '%' || $2 || '%' OR users.email ILIKE '%' || $2 || '%')
+    AND ($3 = '' OR users.type::text = $3)
+    AND (NOT $4 OR users.enabled)
+ORDER BY users.first_name, users.last_name, users.id
+LIMIT NULLIF($5, 0) OFFSET $6;
+
+-- name: get-agents-compact-by-ids
+SELECT users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+FROM users
+WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND users.type = ANY($1) AND users.id = ANY($2)
+ORDER BY users.first_name, users.last_name, users.id;
+
 -- name: soft-delete-agent
 WITH soft_delete AS (
     UPDATE users

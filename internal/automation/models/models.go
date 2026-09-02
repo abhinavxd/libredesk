@@ -88,7 +88,7 @@ var ActionPermissions = map[string]string{
 	ActionAssignUser:      authzModels.PermConversationsUpdateUserAssignee,
 	ActionSetStatus:       authzModels.PermConversationsUpdateStatus,
 	ActionSetPriority:     authzModels.PermConversationsUpdatePriority,
-	ActionSendPrivateNote: authzModels.PermMessagesWrite,
+	ActionSendPrivateNote: authzModels.PermMessagesWritePrivate,
 	ActionReply:           authzModels.PermMessagesWrite,
 	ActionAddTags:         authzModels.PermConversationsUpdateTags,
 	ActionSetTags:         authzModels.PermConversationsUpdateTags,

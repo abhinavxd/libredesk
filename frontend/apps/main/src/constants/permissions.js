@@ -13,6 +13,7 @@ export const permissions = {
   CONVERSATIONS_UPDATE_TAGS: 'conversations:update_tags',
   MESSAGES_READ: 'messages:read',
   MESSAGES_WRITE: 'messages:write',
+  MESSAGES_WRITE_PRIVATE: 'messages:write_private',
   MESSAGES_WRITE_AS_CONTACT: 'messages:write_as_contact',
   VIEW_MANAGE: 'view:manage',
   SHARED_VIEWS_MANAGE: 'shared_views:manage',

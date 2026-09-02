@@ -14,7 +14,10 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-const maxPageSize = 500
+const (
+	maxPageSize = 500
+	maxIDsParam = 200
+)
 
 // initHandlers initializes the HTTP routes and handlers for the application.
 func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
@@ -53,8 +56,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/conversations/unassigned", perm(handleGetUnassignedConversations, "conversations:read_unassigned"))
 	g.GET("/api/v1/conversations/assigned", perm(handleGetAssignedConversations, "conversations:read_assigned"))
 	g.GET("/api/v1/conversations/mentioned", perm(handleGetMentionedConversations, "conversations:read"))
+	g.GET("/api/v1/conversations/sidebar-counts", perm(handleGetSidebarCounts, "conversations:read"))
 	g.GET("/api/v1/teams/{id}/conversations/unassigned", perm(handleGetTeamUnassignedConversations, "conversations:read_team_inbox"))
 	g.GET("/api/v1/views/{id}/conversations", perm(handleGetViewConversations, "conversations:read"))
+	g.GET("/api/v1/views/{id}/count", perm(handleGetViewCount, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}", perm(handleGetConversation, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}/participants", perm(handleGetConversationParticipants, "conversations:read"))
 	g.PUT("/api/v1/conversations/{uuid}/assignee/user", perm(handleUpdateUserAssignee, "conversations:update_user_assignee"))
@@ -70,9 +75,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleGetMessage, "messages:read"))
 	g.GET("/api/v1/conversations/{uuid}/messages", perm(handleGetMessages, "messages:read"))
 	g.GET("/api/v1/conversations/{uuid}/transcript", perm(handleDownloadConversationTranscript, "messages:read"))
-	g.POST("/api/v1/conversations/{cuuid}/messages", perm(handleSendMessage, "messages:write"))
+	g.POST("/api/v1/conversations/{cuuid}/messages", auth(handleSendMessage))
 	g.PUT("/api/v1/conversations/{cuuid}/messages/{uuid}/retry", perm(handleRetryMessage, "messages:write"))
-	g.DELETE("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleDeleteMessage, "messages:write"))
+	g.DELETE("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleDeleteMessage, "messages:write_private"))
 	g.POST("/api/v1/conversations", perm(handleCreateConversation, "conversations:write"))
 	g.PUT("/api/v1/conversations/{uuid}/custom-attributes", auth(handleUpdateConversationCustomAttributes))
 	g.PUT("/api/v1/conversations/{uuid}/contacts/custom-attributes", auth(handleUpdateContactCustomAttributes))
@@ -117,7 +122,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Macros.
 	g.GET("/api/v1/macros", auth(handleGetMacros))
-	g.GET("/api/v1/macros/{id}", perm(handleGetMacro, "macros:manage"))
+	g.GET("/api/v1/macros/compact", perm(handleGetMacrosCompact, "macros:manage"))
+	g.GET("/api/v1/macros/search", auth(handleSearchMacros))
+	g.GET("/api/v1/macros/{id}", auth(handleGetMacro))
 	g.POST("/api/v1/macros", perm(handleCreateMacro, "macros:manage"))
 	g.PUT("/api/v1/macros/{id}", perm(handleUpdateMacro, "macros:manage"))
 	g.DELETE("/api/v1/macros/{id}", perm(handleDeleteMacro, "macros:manage"))
@@ -267,7 +274,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// AI assistant: reply drafting + copilot chat.
 	g.POST("/api/v1/ai/generate-reply", auth(handleAIGenerateReply))
-	g.POST("/api/v1/ai/summarize", perm(handleAISummarizeConversation, "messages:write"))
+	g.POST("/api/v1/ai/summarize", perm(handleAISummarizeConversation, "messages:write_private"))
 	g.POST("/api/v1/ai/suggest-tags", auth(handleAISuggestTags))
 	g.POST("/api/v1/ai/copilot", auth(handleAICopilot))
 	g.GET("/api/v1/ai/copilot/messages", auth(handleGetCopilotMessages))
@@ -556,6 +563,26 @@ func serveWidgetJS(r *fastglue.Request) error {
 	return nil
 }
 
+// getIDsParam parses a comma separated list of positive IDs from a query param.
+func getIDsParam(r *fastglue.Request, name string) []int {
+	raw := strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek(name)))
+	if raw == "" {
+		return nil
+	}
+	var ids []int
+	for part := range strings.SplitSeq(raw, ",") {
+		id, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || id <= 0 {
+			continue
+		}
+		ids = append(ids, id)
+		if len(ids) == maxIDsParam {
+			break
+		}
+	}
+	return ids
+}
+
 // getPagination extracts page and page_size from query params with defaults.
 func getPagination(r *fastglue.Request) (page, pageSize int) {
 	page, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page")))
@@ -565,6 +592,22 @@ func getPagination(r *fastglue.Request) (page, pageSize int) {
 	}
 	if pageSize < 1 {
 		pageSize = 30
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+	return page, pageSize
+}
+
+// getOptionalPagination reads page/page_size, returning pageSize 0 (fetch everything) when absent.
+func getOptionalPagination(r *fastglue.Request) (page, pageSize int) {
+	page, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page")))
+	pageSize, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page_size")))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 0 {
+		pageSize = 0
 	}
 	if pageSize > maxPageSize {
 		pageSize = maxPageSize

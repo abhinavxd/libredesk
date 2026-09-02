@@ -13,6 +13,14 @@
     </template>
     <template #help>
       <p>{{ $t('admin.helpCenter.help') }}</p>
+      <a
+        href="https://docs.libredesk.io/configuration/help-center"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="link-style"
+      >
+        {{ $t('globals.terms.learnMore') }}
+      </a>
     </template>
   </AdminSplitLayout>
 

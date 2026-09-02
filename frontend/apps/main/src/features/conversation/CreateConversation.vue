@@ -15,13 +15,17 @@
             <TabsTrigger value="whatsapp">{{ $t('globals.terms.whatsapp') }}</TabsTrigger>
           </TabsList>
           <div class="flex flex-col flex-1 overflow-hidden mt-4">
-            <EmailConversationForm v-if="channel === 'email'" @close="dialogOpen = false" />
+            <EmailConversationForm
+              v-if="channel === 'email'"
+              :initial-contact="props.initialContact"
+              @close="dialogOpen = false"
+            />
             <WhatsAppConversationForm v-else @close="dialogOpen = false" />
           </div>
         </Tabs>
 
         <div v-else class="flex flex-col flex-1 overflow-hidden">
-          <EmailConversationForm @close="dialogOpen = false" />
+          <EmailConversationForm :initial-contact="props.initialContact" @close="dialogOpen = false" />
         </div>
       </DialogContent>
     </Dialog>
@@ -45,6 +49,9 @@ import WhatsAppConversationForm from './WhatsAppConversationForm.vue'
 const dialogOpen = defineModel({
   required: false,
   default: () => false
+})
+const props = defineProps({
+  initialContact: { type: Object, default: null }
 })
 
 const inboxStore = useInboxStore()

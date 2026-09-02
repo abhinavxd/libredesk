@@ -120,15 +120,7 @@
                 ({{ $t('globals.terms.optional') }})
               </FormLabel>
               <FormControl>
-                <SelectComboBox
-                  v-bind="componentField"
-                  :items="[
-                    { value: 'none', label: t('globals.terms.none') },
-                    ...teamStore.options
-                  ]"
-                  :placeholder="t('placeholders.selectTeam')"
-                  type="team"
-                />
+                <SelectTeamCombobox v-bind="componentField" include-none />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -141,15 +133,7 @@
                 ({{ $t('globals.terms.optional') }})
               </FormLabel>
               <FormControl>
-                <SelectComboBox
-                  v-bind="componentField"
-                  :items="[
-                    { value: 'none', label: t('globals.terms.none') },
-                    ...uStore.options
-                  ]"
-                  :placeholder="t('placeholders.selectAgent')"
-                  type="user"
-                />
+                <SelectAgentCombobox v-bind="componentField" include-none />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -240,9 +224,7 @@ import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useInboxStore } from '@main/stores/inbox'
-import { useUsersStore } from '@main/stores/users'
 import { useUserStore } from '@main/stores/user'
-import { useTeamStore } from '@main/stores/team'
 import {
   Select,
   SelectContent,
@@ -255,7 +237,8 @@ import { useI18n } from 'vue-i18n'
 import { useFileUpload } from '@/composables/useFileUpload'
 import Editor from '@/components/editor/ConversationEditor.vue'
 import { useMacroStore } from '@/stores/macro'
-import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
+import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
 import { UserTypeAgent } from '@/constants/user'
 import { IdCard } from 'lucide-vue-next'
 import api from '@/api'
@@ -263,15 +246,18 @@ import { useContactSearch } from '@/features/conversation/useContactSearch.js'
 import ContactSearchResults from '@/features/conversation/ContactSearchResults.vue'
 import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
+import { useCommandPalette } from '@main/features/command/useCommandPalette'
 
 const emit = defineEmits(['close'])
+const props = defineProps({
+  initialContact: { type: Object, default: null }
+})
+const palette = useCommandPalette()
 
 const inboxStore = useInboxStore()
 const { t } = useI18n()
 const isCramped = useIsComposerCramped()
-const uStore = useUsersStore()
 const userStore = useUserStore()
-const teamStore = useTeamStore()
 const emitter = useEmitter()
 const loading = ref(false)
 const emailQuery = ref('')
@@ -324,23 +310,25 @@ onUnmounted(() => {
   clearMediaFiles()
   conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
   macroStore.setCurrentView(previousMacroView)
-  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
-    command: null,
-    open: false
-  })
+  palette.setMacroContext(MACRO_CONTEXT.REPLY)
 })
 
 onMounted(() => {
   previousMacroView = macroStore.currentView
   macroStore.setCurrentView('starting_conversation')
-  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
-    command: 'apply-macro-to-new-conversation',
-    open: false
-  })
+  palette.setMacroContext(MACRO_CONTEXT.NEW_CONVERSATION)
+  if (props.initialContact?.email) selectContact(props.initialContact)
   nextTick(() => {
     emailInputRef.value?.$el?.focus()
   })
 })
+
+watch(
+  () => props.initialContact,
+  (contact) => {
+    if (contact?.email) selectContact(contact)
+  }
+)
 
 const form = useForm({
   validationSchema: toTypedSchema(formSchema),

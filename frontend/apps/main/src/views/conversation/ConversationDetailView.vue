@@ -13,7 +13,7 @@
       @layout="onLayoutChange"
     >
       <!-- Conversation Content Panel -->
-      <ResizablePanel :default-size="sidebarOpen ? panelSizes[0] : 100" :min-size="40">
+      <ResizablePanel :default-size="sidebarOpen ? panelSizes[0] : 100" :min-size="30">
         <Conversation />
       </ResizablePanel>
 
@@ -25,7 +25,7 @@
         ref="sidebarPanelRef"
         :default-size="panelSizes[1]"
         :min-size="15"
-        :max-size="40"
+        :max-size="60"
         :collapsible="true"
         :collapsed-size="0"
         @collapse="onSidebarCollapse"

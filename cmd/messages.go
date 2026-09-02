@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
@@ -22,6 +23,7 @@ type messageReq struct {
 	SenderType  string                 `json:"sender_type"`
 	Mentions    []cmodels.MentionInput `json:"mentions"`
 	EchoID      string                 `json:"echo_id"`
+	SourceID    string                 `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact sender only.
 
 	// WhatsApp-only. Set TemplateID to send an approved template; omit for free-form.
 	WhatsAppTemplateID     int               `json:"whatsapp_template_id,omitempty"`
@@ -203,6 +205,10 @@ func handleSendMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
+	if !canCreateConversationMessage(user, req) {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+	}
+
 	// Make sure the inbox is enabled.
 	inbox, err := app.inbox.GetDBRecord(conv.InboxID)
 	if err != nil {
@@ -248,7 +254,7 @@ func handleSendMessage(r *fastglue.Request) error {
 
 	// Create contact message.
 	if req.SenderType == umodels.UserTypeContact {
-		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false)
+		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false, req.SourceID)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -313,4 +319,13 @@ func resolveQuotedCIDs(app *App, msg *cmodels.Message) {
 		url := app.media.GetURL(ref.UUID, ref.ContentType, ref.Filename)
 		msg.Content = strings.ReplaceAll(msg.Content, "cid:"+ref.ContentID, url)
 	}
+}
+
+// canCreateConversationMessage returns whether the user may create a message of the requested visibility.
+func canCreateConversationMessage(user umodels.User, req messageReq) bool {
+	requiredPermission := authzModels.PermMessagesWrite
+	if req.Private {
+		requiredPermission = authzModels.PermMessagesWritePrivate
+	}
+	return slices.Contains(user.Permissions, requiredPermission)
 }

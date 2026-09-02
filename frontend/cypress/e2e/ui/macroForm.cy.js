@@ -8,10 +8,25 @@ const messageBody = `Canned reply from the macro form spec ${stamp}`
 const newPath = '/admin/conversations/macros/new'
 const listPath = '/admin/conversations/macros'
 
-const filterList = (text) => cy.get('input[placeholder="Search"]').clear().type(text)
+// The success toast sits over the search input until it expires, so wait it out first.
+const filterList = (text) => {
+  cy.get('[data-sonner-toast]', { timeout: 10000 }).should('not.exist')
+  return cy.get('input[placeholder="Search"]').clear().type(text)
+}
+
+// Pickers list one server page, so a fresh row is only reachable through the search input.
+const searchInPicker = (text) =>
+  cy
+    .get('[data-radix-popper-content-wrapper]:visible input')
+    .last()
+    .invoke('val', text)
+    .trigger('input')
 
 describe('Macro form', () => {
   let macroId
+
+  // radix-vue focuses a trigger it just unmounted, and Cypress fails the test on uncaught errors.
+  Cypress.on('uncaught:exception', (err) => !err.message.includes("reading 'focus'"))
 
   before(() => {
     cy.login()
@@ -67,7 +82,8 @@ describe('Macro form', () => {
     cy.get('select[name="visibility"]').siblings('button[role="combobox"]').click()
     cy.get('[role="option"]').contains('Team').click()
     cy.contains('label', 'Team').parent().find('button[role="combobox"]').click()
-    cy.get('[role="option"]').contains(teamName).click()
+    searchInPicker(teamName)
+    cy.contains('[role="option"]', teamName).click()
 
     cy.get('button[type="submit"]').click()
     cy.wait('@updateMacro').its('response.statusCode').should('eq', 200)

@@ -16,22 +16,19 @@
           <!-- Agent, team, priority, and tags assignment -->
           <AccordionContent class="accordion-content--actions">
             <div>
-              <SelectComboBox
+              <SelectAgentCombobox
                 v-model="conversationStore.current.assigned_user_id"
-                :items="agentOptions"
-                :placeholder="t('placeholders.selectAgent')"
+                include-none
+                current-user-first
                 @select="selectAgent"
-                type="user"
               />
             </div>
 
             <div>
-              <SelectComboBox
-                v-model="conversationStore.current.assigned_team_id"
-                :items="[{ value: 'none', label: t('globals.terms.none') }, ...teamsStore.options]"
-                :placeholder="t('placeholders.selectTeam')"
+              <SelectTeamCombobox
+                :model-value="conversationStore.current.assigned_team_id"
+                include-none
                 @select="selectTeam"
-                type="team"
               />
             </div>
 
@@ -46,11 +43,10 @@
             </div>
 
             <div v-if="conversationStore.current">
-              <SelectTag
+              <SelectTagCombobox
+                multiple
                 :model-value="conversationStore.current.tags || []"
                 @update:modelValue="onTagsChange"
-                :items="tags.map((tag) => ({ label: tag, value: tag }))"
-                :placeholder="t('placeholders.selectTags')"
               />
               <div class="mt-2 flex flex-wrap items-center gap-1">
                 <Button
@@ -156,13 +152,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Sparkles, Loader2, Plus } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { useConversationStore } from '@/stores/conversation'
-import { useUsersStore } from '@/stores/users'
-import { useTeamStore } from '@/stores/team'
-import { useTagStore } from '@/stores/tag'
 import { useUserStore } from '@/stores/user'
 import { COPILOT_NAME } from '@/constants/copilot'
 import {
@@ -175,9 +168,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/
 import ConversationInfo from './ConversationInfo.vue'
 import ConversationSideBarContact from '@/features/conversation/sidebar/ConversationSideBarContact.vue'
 import CopilotPanel from '@/features/conversation/sidebar/CopilotPanel.vue'
-import { SelectTag } from '@shared-ui/components/ui/select'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import { useStorage } from '@vueuse/core'
@@ -187,25 +179,20 @@ import ContactNotes from '@/features/contact/ContactNotes.vue'
 import PreviousConversations from '@/features/conversation/sidebar/PreviousConversations.vue'
 import ConversationSideBarPageVisits from '@/features/conversation/sidebar/ConversationSideBarPageVisits.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
+import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
+import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
+import SelectTagCombobox from '@main/components/combobox/SelectTagCombobox.vue'
 import { TAG_ACTION } from '@/constants/conversation'
 import api from '@/api'
 
 const customAttributeStore = useCustomAttributeStore()
 const emitter = useEmitter()
 const conversationStore = useConversationStore()
-const usersStore = useUsersStore()
-const teamsStore = useTeamStore()
-const tagStore = useTagStore()
 const userStore = useUserStore()
-const tags = ref([])
 const accordionState = useStorage('conversation-sidebar-accordion', [])
 const activeTab = useStorage('conversation-sidebar-tab', 'details')
 const { t } = useI18n()
 customAttributeStore.fetchCustomAttributes()
-
-onMounted(async () => {
-  await fetchTags()
-})
 
 const onTagsChange = (newTags) => {
   const conv = conversationStore.current
@@ -254,6 +241,13 @@ const suggestTags = async () => {
   }
 }
 
+const onPaletteAction = (action) => {
+  if (action === CONVERSATION_ACTIONS.SUGGEST_TAGS) suggestTags()
+}
+
+onMounted(() => emitter.on(EMITTER_EVENTS.CONVERSATION_ACTION, onPaletteAction))
+onUnmounted(() => emitter.off(EMITTER_EVENTS.CONVERSATION_ACTION, onPaletteAction))
+
 const applySuggestedTag = (tag) => {
   const conv = conversationStore.current
   if (!conv) return
@@ -263,19 +257,6 @@ const applySuggestedTag = (tag) => {
 }
 
 const priorityOptions = computed(() => conversationStore.priorityOptions)
-
-const agentOptions = computed(() => {
-  const none = { value: 'none', label: t('globals.terms.none') }
-  const isMe = (option) => String(option.value) === String(userStore.userID)
-  const me = usersStore.options.find(isMe)
-  if (!me) return [none, ...usersStore.options]
-  return [none, me, ...usersStore.options.filter((option) => !isMe(option))]
-})
-
-const fetchTags = async () => {
-  await tagStore.fetchTags()
-  tags.value = tagStore.tags.map((item) => item.name)
-}
 
 const handleAssignedUserChange = (id) => {
   conversationStore.updateAssignee('user', {

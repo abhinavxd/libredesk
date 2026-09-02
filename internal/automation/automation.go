@@ -36,6 +36,8 @@ const (
 	NewConversation    TaskType = "new"
 	UpdateConversation TaskType = "update"
 	TimeTrigger        TaskType = "time-trigger"
+
+	timeTriggerBatchSize = 1000
 )
 
 // ConversationTask represents a unit of work for processing conversations.
@@ -72,7 +74,7 @@ type Opts struct {
 type conversationStore interface {
 	ApplyAction(action models.RuleAction, conversation cmodels.Conversation, user umodels.User) error
 	GetConversation(teamID int, uuid, refNum string) (cmodels.Conversation, error)
-	GetConversationsCreatedAfter(time.Time) ([]cmodels.Conversation, error)
+	GetConversationsCreatedAfter(after time.Time, afterID, limit int) ([]cmodels.ConversationRef, error)
 }
 
 type queries struct {
@@ -364,28 +366,43 @@ func (e *Engine) handleUpdateConversation(conversation cmodels.Conversation, eve
 
 // handleTimeTrigger handles time trigger events.
 func (e *Engine) handleTimeTrigger() {
-	e.lo.Info("running time trigger evaluation for automation rules")
-	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
-	conversations, err := e.conversationStore.GetConversationsCreatedAfter(thirtyDaysAgo)
-	if err != nil {
-		e.lo.Error("error fetching conversations for time trigger", "error", err)
-		return
-	}
 	rules := e.filterRulesByType(models.RuleTypeTimeTrigger, "")
 	if len(rules) == 0 {
 		e.lo.Info("no rules to evaluate for time trigger")
 		return
 	}
-	e.lo.Info("fetched conversations for evaluating time triggers", "conversations_count", len(conversations), "rules_count", len(rules))
-	for _, c := range conversations {
-		// Fetch entire conversation.
-		conversation, err := e.conversationStore.GetConversation(0, c.UUID, "")
+	var (
+		thirtyDaysAgo = time.Now().Add(-30 * 24 * time.Hour)
+		afterID       = 0
+		total         = 0
+		batch         = 0
+	)
+	for {
+		refs, err := e.conversationStore.GetConversationsCreatedAfter(thirtyDaysAgo, afterID, timeTriggerBatchSize)
 		if err != nil {
-			e.lo.Error("error fetching conversation for time trigger", "uuid", c.UUID, "error", err)
-			continue
+			e.lo.Error("error fetching conversations for time trigger", "after_id", afterID, "batch", batch, "error", err)
+			return
 		}
-		e.evalConversationRules(rules, conversation, nil)
+		batch++
+		e.lo.Info("fetched conversation batch for time trigger", "batch", batch, "after_id", afterID, "count", len(refs))
+		if len(refs) == 0 {
+			break
+		}
+		for _, ref := range refs {
+			conversation, err := e.conversationStore.GetConversation(0, ref.UUID, "")
+			if err != nil {
+				e.lo.Error("error fetching conversation for time trigger", "uuid", ref.UUID, "error", err)
+				continue
+			}
+			e.evalConversationRules(rules, conversation, nil)
+		}
+		afterID = refs[len(refs)-1].ID
+		total += len(refs)
+		if len(refs) < timeTriggerBatchSize {
+			break
+		}
 	}
+	e.lo.Info("evaluated conversations for time triggers", "conversations_count", total, "batches", batch, "rules_count", len(rules))
 }
 
 // suppress marks a conversation as having automation actions in flight.

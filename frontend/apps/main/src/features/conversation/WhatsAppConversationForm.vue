@@ -102,23 +102,13 @@
           <label class="text-sm font-medium">
             {{ $t('actions.assignTeam') }} ({{ $t('globals.terms.optional') }})
           </label>
-          <SelectComboBox
-            v-model="teamId"
-            :items="[{ value: 'none', label: t('globals.terms.none') }, ...teamStore.options]"
-            :placeholder="t('placeholders.selectTeam')"
-            type="team"
-          />
+          <SelectTeamCombobox v-model="teamId" include-none />
         </div>
         <div class="space-y-2">
           <label class="text-sm font-medium">
             {{ $t('actions.assignAgent') }} ({{ $t('globals.terms.optional') }})
           </label>
-          <SelectComboBox
-            v-model="agentId"
-            :items="[{ value: 'none', label: t('globals.terms.none') }, ...uStore.options]"
-            :placeholder="t('placeholders.selectAgent')"
-            type="user"
-          />
+          <SelectAgentCombobox v-model="agentId" include-none />
         </div>
       </div>
     </div>
@@ -171,14 +161,13 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
-import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
+import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useInboxStore } from '@main/stores/inbox'
-import { useUsersStore } from '@main/stores/users'
 import { useUserStore } from '@main/stores/user'
-import { useTeamStore } from '@main/stores/team'
 import { countryCallingOptions as allCountries } from '@shared-ui/constants/countries.js'
 import { useWhatsAppTemplatePicker } from './useWhatsAppTemplatePicker.js'
 import WhatsAppTemplatePicker from './WhatsAppTemplatePicker.vue'
@@ -191,9 +180,7 @@ const emit = defineEmits(['close'])
 const { t } = useI18n()
 const emitter = useEmitter()
 const inboxStore = useInboxStore()
-const uStore = useUsersStore()
 const userStore = useUserStore()
-const teamStore = useTeamStore()
 
 const {
   selectedTemplate,

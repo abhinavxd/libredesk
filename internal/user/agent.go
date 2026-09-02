@@ -79,11 +79,21 @@ func (u *Manager) InvalidateAllAgentCache() {
 	u.agentCache = make(map[int]cachedAgent)
 }
 
-// GetAgentsCompact returns a compact list of agents and AI assistants (both assignable identities).
-func (u *Manager) GetAgentsCompact() ([]models.UserCompact, error) {
+// GetAgentsCompact returns agents and AI assistants matching search, all of them when pageSize is 0.
+func (u *Manager) GetAgentsCompact(search, userType string, enabledOnly bool, page, pageSize int) ([]models.UserCompact, error) {
 	var users = make([]models.UserCompact, 0)
-	if err := u.db.Select(&users, u.q.GetUsersCompact, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant})); err != nil {
+	if err := u.q.GetAgentsCompact.Select(&users, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant}), search, userType, enabledOnly, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
 		u.lo.Error("error fetching users from db", "error", err)
+		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return users, nil
+}
+
+// GetAgentsCompactByIDs returns the agents and AI assistants with the given IDs.
+func (u *Manager) GetAgentsCompactByIDs(ids []int) ([]models.UserCompact, error) {
+	var users = make([]models.UserCompact, 0)
+	if err := u.q.GetAgentsCompactByIDs.Select(&users, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant}), pq.Array(ids)); err != nil {
+		u.lo.Error("error fetching users by ids from db", "error", err)
 		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return users, nil

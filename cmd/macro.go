@@ -21,17 +21,58 @@ func handleGetMacros(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	for i, m := range macros {
-		var actions []autoModels.RuleAction
-		if err := json.Unmarshal(m.Actions, &actions); err != nil {
-			app.lo.Error("error unmarshalling macro actions", "macro_id", m.ID, "error", err)
+		if macros[i].Actions, err = decorateMacroActions(app, m.Actions); err != nil {
+			app.lo.Error("error decorating macro actions", "macro_id", m.ID, "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
-		// Set display values for actions as the value field can contain DB IDs
-		if err := setDisplayValues(app, actions); err != nil {
-			app.lo.Warn("error setting display values", "error", err)
+	}
+	return r.SendEnvelope(macros)
+}
+
+// handleGetMacrosCompact returns macros without message content, all of them without page params.
+func handleGetMacrosCompact(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		query = string(r.RequestCtx.QueryArgs().Peek("q"))
+	)
+	page, pageSize := getOptionalPagination(r)
+	macros, err := app.macro.GetAllCompact(query, page, pageSize)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	for i, m := range macros {
+		if macros[i].Actions, err = decorateMacroActions(app, m.Actions); err != nil {
+			app.lo.Error("error decorating macro actions", "macro_id", m.ID, "error", err)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
-		if macros[i].Actions, err = json.Marshal(actions); err != nil {
-			app.lo.Error("error marshalling macro actions", "macro_id", m.ID, "error", err)
+	}
+	return r.SendEnvelope(macros)
+}
+
+// handleSearchMacros returns the top macros without message content visible to the requesting agent.
+func handleSearchMacros(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		query = string(r.RequestCtx.QueryArgs().Peek("q"))
+		view  = string(r.RequestCtx.QueryArgs().Peek("view"))
+	)
+	switch view {
+	case "", models.VisibleWhenReplying, models.VisibleWhenStartingConversation, models.VisibleWhenAddingPrivateNote:
+	default:
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	macros, err := app.macro.SearchCompact(query, view, user.ID, user.Teams.IDs())
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	for i, m := range macros {
+		if macros[i].Actions, err = decorateMacroActions(app, m.Actions); err != nil {
+			app.lo.Error("error decorating macro actions", "macro_id", m.ID, "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
 	}
@@ -53,17 +94,8 @@ func handleGetMacro(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	var actions []autoModels.RuleAction
-	if err := json.Unmarshal(macro.Actions, &actions); err != nil {
-		app.lo.Error("error unmarshalling macro actions", "macro_id", id, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
-	}
-	// Set display values for actions as the value field can contain DB IDs
-	if err := setDisplayValues(app, actions); err != nil {
-		app.lo.Warn("error setting display values", "error", err)
-	}
-	if macro.Actions, err = json.Marshal(actions); err != nil {
-		app.lo.Error("error marshalling macro actions", "macro_id", id, "error", err)
+	if macro.Actions, err = decorateMacroActions(app, macro.Actions); err != nil {
+		app.lo.Error("error decorating macro actions", "macro_id", id, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
@@ -226,6 +258,18 @@ func hasActionPermission(action string, userPerms []string) bool {
 	return slices.Contains(userPerms, requiredPerm)
 }
 
+// decorateMacroActions resolves display values for action IDs and re-marshals the actions.
+func decorateMacroActions(app *App, raw json.RawMessage) (json.RawMessage, error) {
+	var actions []autoModels.RuleAction
+	if err := json.Unmarshal(raw, &actions); err != nil {
+		return nil, err
+	}
+	if err := setDisplayValues(app, actions); err != nil {
+		app.lo.Warn("error setting display values", "error", err)
+	}
+	return json.Marshal(actions)
+}
+
 // setDisplayValues sets display values for actions.
 func setDisplayValues(app *App, actions []autoModels.RuleAction) error {
 	getters := map[string]func(int) (string, error){
@@ -238,7 +282,7 @@ func setDisplayValues(app *App, actions []autoModels.RuleAction) error {
 			return t.Name, nil
 		},
 		autoModels.ActionAssignUser: func(id int) (string, error) {
-			u, err := app.user.GetAgent(id, "")
+			u, err := app.user.GetAgentCachedOrLoad(id)
 			if err != nil {
 				app.lo.Warn("user not found for macro action", "user_id", id)
 				return "", err

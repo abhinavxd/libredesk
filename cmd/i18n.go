@@ -22,6 +22,10 @@ const (
 var (
 	localeI18nMu    sync.Mutex
 	localeI18nCache = map[string]*i18n.I18n{}
+
+	// Keyed by resolved language code
+	i18nJSONMu    sync.Mutex
+	i18nJSONCache = map[string][]byte{}
 )
 
 // handleGetI18nLang returns the JSON language pack for the given language code.
@@ -30,11 +34,14 @@ func handleGetI18nLang(r *fastglue.Request) error {
 		app  = r.Context.(*App)
 		lang = r.RequestCtx.UserValue("lang").(string)
 	)
-	i, err := loadI18nLang(lang, app.fs)
+	b, err := i18nLangJSON(app, lang)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendBytes(http.StatusOK, "application/json", i.JSON())
+	r.RequestCtx.Response.Header.SetContentType("application/json")
+	r.RequestCtx.Response.SetStatusCode(http.StatusOK)
+	r.RequestCtx.Response.SetBodyRaw(b)
+	return nil
 }
 
 // handleGetAvailableLanguages returns the list of available languages
@@ -94,6 +101,23 @@ func localeI18n(app *App, locale string) *i18n.I18n {
 	}
 	localeI18nCache[loc] = i
 	return i
+}
+
+// i18nLangJSON returns the marshaled language pack for a language code, cached per resolved code.
+func i18nLangJSON(app *App, lang string) ([]byte, error) {
+	code := matchLangFile(app.fs, strings.ToLower(strings.TrimSpace(lang)))
+	i18nJSONMu.Lock()
+	defer i18nJSONMu.Unlock()
+	if b, ok := i18nJSONCache[code]; ok {
+		return b, nil
+	}
+	i, err := loadI18nLang(code, app.fs)
+	if err != nil {
+		return nil, err
+	}
+	b := i.JSON()
+	i18nJSONCache[code] = b
+	return b, nil
 }
 
 // matchLangFile finds the language pack code for a locale: exact match first, then language prefix.

@@ -1,22 +1,16 @@
 import { computed } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useInboxStore } from '@/stores/inbox'
-import { useUsersStore } from '@/stores/users'
-import { useTeamStore } from '@/stores/team'
 import { useSlaStore } from '@/stores/sla'
 import { useCustomAttributeStore } from '@/stores/customAttributes'
-import { useTagStore } from '@/stores/tag'
 import { FIELD_TYPE, FIELD_OPERATORS } from '@/constants/filterConfig'
 import { useI18n } from 'vue-i18n'
 
 export function useConversationFilters () {
     const cStore = useConversationStore()
     const iStore = useInboxStore()
-    const uStore = useUsersStore()
-    const tStore = useTeamStore()
     const slaStore = useSlaStore()
     const customAttributeStore = useCustomAttributeStore()
-    const tagStore = useTagStore()
     const { t } = useI18n()
 
     const customAttributeDataTypeToFieldType = {
@@ -54,13 +48,13 @@ export function useConversationFilters () {
             label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: tStore.options
+            entity: 'team'
         },
         assigned_user_id: {
             label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: uStore.options
+            entity: 'agent'
         },
         inbox_id: {
             label: t('globals.terms.inbox'),
@@ -72,7 +66,7 @@ export function useConversationFilters () {
             label: t('globals.terms.tag', 2),
             type: FIELD_TYPE.MULTI_SELECT,
             operators: FIELD_OPERATORS.MULTI_SELECT,
-            options: tagStore.tagOptions
+            entity: 'tag'
         },
         created_at: {
             label: t('globals.terms.createdAt'),
@@ -192,13 +186,13 @@ export function useConversationFilters () {
             label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: tStore.options
+            entity: 'team'
         },
         assigned_user: {
             label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: uStore.options
+            entity: 'agent'
         },
         inbox: {
             label: t('globals.terms.inbox'),
@@ -225,13 +219,13 @@ export function useConversationFilters () {
             label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: tStore.options
+            entity: 'team'
         },
         assigned_user: {
             label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: uStore.options
+            entity: 'agent'
         },
         hours_since_created: {
             label: t('globals.messages.hoursSinceCreated'),
@@ -275,13 +269,13 @@ export function useConversationFilters () {
             label: t('admin.automation.previousAssignedUser'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: uStore.options
+            entity: 'agent'
         },
         previous_assigned_team: {
             label: t('admin.automation.previousAssignedTeam'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: tStore.options
+            entity: 'team'
         }
     }))
 
@@ -289,12 +283,12 @@ export function useConversationFilters () {
         assign_team: {
             label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
-            options: tStore.options
+            entity: 'team'
         },
         assign_user: {
             label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
-            options: uStore.options
+            entity: 'agent'
         },
         set_status: {
             label: t('actions.setStatus'),
@@ -352,12 +346,12 @@ export function useConversationFilters () {
         assign_team: {
             label: t('actions.assignTeam'),
             type: FIELD_TYPE.SELECT,
-            options: tStore.options
+            entity: 'team'
         },
         assign_user: {
             label: t('actions.assignAgent'),
             type: FIELD_TYPE.SELECT,
-            options: uStore.options
+            entity: 'agent'
         },
         set_status: {
             label: t('actions.setStatus'),

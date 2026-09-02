@@ -29,6 +29,7 @@ describe('Role form', () => {
     cy.get('input[name="name"]').type(roleName)
     cy.get('input[name="description"]').type(roleDescription)
     togglePermission('View all conversations')
+    togglePermission('Send private notes in conversations')
     togglePermission('Manage tags')
     togglePermission('Manage conversation statuses')
 
@@ -37,6 +38,7 @@ describe('Role form', () => {
       expect(response.statusCode).to.eq(200)
       expect(response.body.data.permissions).to.include.members([
         'conversations:read_all',
+        'messages:write_private',
         'tags:manage',
         'status:manage'
       ])
@@ -56,6 +58,7 @@ describe('Role form', () => {
     cy.get('input[name="name"]').should('have.value', roleName)
     cy.get('input[name="description"]').should('have.value', roleDescription)
     permission('View all conversations').should('have.attr', 'data-state', 'checked')
+    permission('Send private notes in conversations').should('have.attr', 'data-state', 'checked')
     permission('Manage tags').should('have.attr', 'data-state', 'checked')
     permission('Manage conversation statuses').should('have.attr', 'data-state', 'checked')
     permission('Manage webhooks').should('have.attr', 'data-state', 'unchecked')

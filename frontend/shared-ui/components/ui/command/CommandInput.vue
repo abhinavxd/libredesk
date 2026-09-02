@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { MagnifyingGlassIcon } from '@radix-icons/vue'
 import { ComboboxInput, useForwardProps } from 'radix-vue'
 import { cn } from '../../../lib/utils'
+import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
 
 defineOptions({
   inheritAttrs: false
@@ -14,11 +15,12 @@ const props = defineProps({
   autoFocus: { type: Boolean, required: false },
   asChild: { type: Boolean, required: false },
   as: { type: null, required: false },
-  class: { type: null, required: false }
+  class: { type: null, required: false },
+  loading: { type: Boolean, required: false, default: false }
 })
 
 const delegatedProps = computed(() => {
-  const { class: _, ...delegated } = props
+  const { class: _, loading: __, ...delegated } = props
 
   return delegated
 })
@@ -28,7 +30,14 @@ const forwardedProps = useForwardProps(delegatedProps)
 
 <template>
   <div class="flex items-center border-b px-3" cmdk-input-wrapper>
-    <MagnifyingGlassIcon class="mr-2 h-4 w-4 shrink-0 opacity-50" />
+    <Spinner
+      v-if="loading"
+      size="xs"
+      variant="muted"
+      :absolute="false"
+      class="mr-2 h-4 w-4 shrink-0"
+    />
+    <MagnifyingGlassIcon v-else class="mr-2 h-4 w-4 shrink-0 opacity-50" />
     <ComboboxInput
       v-bind="{ ...forwardedProps, ...$attrs }"
       auto-focus
