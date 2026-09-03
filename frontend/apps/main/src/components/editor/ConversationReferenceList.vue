@@ -1,12 +1,12 @@
 <template>
   <div
     v-if="items.length > 0"
-    class="ticket-reference-list bg-background border rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto"
+    class="conversation-reference-list bg-background border rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto"
   >
     <button
       v-for="(item, index) in items"
       :key="item.id"
-      class="ticket-reference-item w-full text-left px-3 py-2 hover:bg-muted"
+      class="conversation-reference-item w-full text-left px-3 py-2 hover:bg-muted"
       :class="{ 'bg-muted': index === selectedIndex }"
       @click="selectItem(index)"
     >
@@ -19,7 +19,7 @@
       </div>
     </button>
   </div>
-  <div v-else class="ticket-reference-list bg-background border rounded-lg shadow-lg p-3">
+  <div v-else class="conversation-reference-list bg-background border rounded-lg shadow-lg p-3">
     <span v-if="query.length < MIN_REFERENCE_QUERY_LENGTH" class="text-sm text-muted-foreground">
       {{
         $t('search.minQueryLength', {
@@ -35,7 +35,7 @@
 
 <script setup>
 import { ref, watch, nextTick } from 'vue'
-import { MIN_REFERENCE_QUERY_LENGTH } from './ticketReference'
+import { MIN_REFERENCE_QUERY_LENGTH } from './conversationReference'
 
 const props = defineProps({
   items: { type: Array, default: () => [] },
@@ -52,7 +52,7 @@ watch(
 )
 watch(selectedIndex, () =>
   nextTick(() =>
-    document.querySelector('.ticket-reference-item.bg-muted')?.scrollIntoView({ block: 'nearest' })
+    document.querySelector('.conversation-reference-item.bg-muted')?.scrollIntoView({ block: 'nearest' })
   )
 )
 defineExpose({
@@ -70,7 +70,7 @@ defineExpose({
 </script>
 
 <style scoped>
-.ticket-reference-list {
+.conversation-reference-list {
   min-width: 240px;
   max-width: 360px;
 }

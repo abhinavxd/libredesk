@@ -3,7 +3,7 @@ import api from '@main/api'
 export const MIN_REFERENCE_QUERY_LENGTH = 3
 const SUGGESTION_LIMIT = 10
 
-export const getTicketSuggestions = async (query, search = api.searchConversations) => {
+export const getConversationSuggestions = async (query, search = api.searchConversations) => {
   const reference = query.trim()
   if (reference.length < MIN_REFERENCE_QUERY_LENGTH) return []
 

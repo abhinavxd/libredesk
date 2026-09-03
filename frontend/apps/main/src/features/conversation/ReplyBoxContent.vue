@@ -96,10 +96,10 @@
         :autoFocus="true"
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
-        :enableTicketReferences="messageType === 'private_note'"
+        :enableConversationReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
-        :getTicketSuggestions="getTicketSuggestions"
+        :getConversationSuggestions="getConversationSuggestions"
         @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
@@ -168,7 +168,7 @@ import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api'
-import { getTicketSuggestions as fetchTicketSuggestions } from '@main/components/editor/ticketReference'
+import { getConversationSuggestions as fetchConversationSuggestions } from '@main/components/editor/conversationReference'
 
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
@@ -217,12 +217,12 @@ const getSuggestions = async (query) => {
   return (await debouncedFetchSuggestions(query)) || []
 }
 
-const debouncedFetchTicketSuggestions = useDebounceFn(fetchTicketSuggestions, MENTION_DEBOUNCE_MS)
+const debouncedFetchConversationSuggestions = useDebounceFn(fetchConversationSuggestions, MENTION_DEBOUNCE_MS)
 
-const getTicketSuggestions = async (query) => {
+const getConversationSuggestions = async (query) => {
   if (messageType.value !== 'private_note') return []
   const messageTypeAtRequest = messageType.value
-  const suggestions = (await debouncedFetchTicketSuggestions(query)) || []
+  const suggestions = (await debouncedFetchConversationSuggestions(query)) || []
   return messageType.value === messageTypeAtRequest ? suggestions : []
 }
 

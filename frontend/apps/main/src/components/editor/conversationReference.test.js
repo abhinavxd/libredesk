@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { getTicketSuggestions } from './ticketReference'
+import { getConversationSuggestions } from './conversationReference'
 
-describe('ticket reference suggestions', () => {
+describe('conversation reference suggestions', () => {
   it('does not search until three characters are entered', async () => {
     const search = vi.fn()
-    await expect(getTicketSuggestions('10', search)).resolves.toEqual([])
+    await expect(getConversationSuggestions('10', search)).resolves.toEqual([])
     expect(search).not.toHaveBeenCalled()
   })
 
@@ -21,7 +21,7 @@ describe('ticket reference suggestions', () => {
         ]
       }
     })
-    await expect(getTicketSuggestions('108', search)).resolves.toEqual([
+    await expect(getConversationSuggestions('108', search)).resolves.toEqual([
       { id: 'conversation-uuid', label: '108', subject: 'Payment failed', status: 'Open' }
     ])
   })
@@ -29,6 +29,6 @@ describe('ticket reference suggestions', () => {
   it('caps the suggestion list', async () => {
     const rows = Array.from({ length: 30 }, (_, i) => ({ uuid: `u${i}`, reference_number: `${i}` }))
     const search = vi.fn().mockResolvedValue({ data: { data: rows } })
-    await expect(getTicketSuggestions('108', search)).resolves.toHaveLength(10)
+    await expect(getConversationSuggestions('108', search)).resolves.toHaveLength(10)
   })
 })
