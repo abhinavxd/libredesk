@@ -38,6 +38,7 @@
               :placeholder="t('conversation.whatsapp.numberPlaceholder')"
               @input="handleSearchContacts"
               @keydown="handleSearchKeydown"
+              @blur="clearSearchResults"
               autocomplete="off"
             />
           </div>
@@ -207,7 +208,7 @@ const lastName = ref('')
 const phoneCountryCode = ref('')
 const phoneNumber = ref('')
 
-const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydown, selectContact } =
+const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydown, selectContact, clearSearchResults } =
   useContactSearch({
     getQuery: () => phoneNumber.value,
     filterResults: (c) => c.phone_number,

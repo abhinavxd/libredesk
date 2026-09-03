@@ -13,6 +13,7 @@
                 v-model="emailQuery"
                 @input="handleSearchContacts"
                 @keydown="handleSearchKeydown"
+                @blur="clearSearchResults"
                 autocomplete="off"
               />
             </FormControl>
@@ -353,7 +354,7 @@ watch(emailQuery, (newVal) => {
   }
 })
 
-const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydown, selectContact } =
+const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydown, selectContact, clearSearchResults } =
   useContactSearch({
     getQuery: () => emailQuery.value,
     filterResults: (c) => c.email,

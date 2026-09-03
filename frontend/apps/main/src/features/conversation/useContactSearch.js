@@ -9,11 +9,20 @@ export function useContactSearch({ getQuery, filterResults, onSelect }) {
   const searchResults = ref([])
   const highlightedIndex = ref(-1)
   let timeoutId = null
+  let searchSequence = 0
 
-  onUnmounted(() => clearTimeout(timeoutId))
+  const clearSearchResults = () => {
+    clearTimeout(timeoutId)
+    searchSequence++
+    searchResults.value.splice(0)
+    highlightedIndex.value = -1
+  }
+
+  onUnmounted(clearSearchResults)
 
   const handleSearchContacts = () => {
     clearTimeout(timeoutId)
+    const sequence = ++searchSequence
     timeoutId = setTimeout(async () => {
       const query = getQuery().trim()
       if (query.length < 3) {
@@ -22,10 +31,12 @@ export function useContactSearch({ getQuery, filterResults, onSelect }) {
       }
       try {
         const resp = await api.searchContacts({ query })
+        if (sequence !== searchSequence) return
         const results = resp.data.data
         searchResults.value = filterResults ? results.filter(filterResults) : [...results]
         highlightedIndex.value = -1
       } catch (error) {
+        if (sequence !== searchSequence) return
         emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
           variant: 'destructive',
           description: handleHTTPError(error).message
@@ -47,16 +58,22 @@ export function useContactSearch({ getQuery, filterResults, onSelect }) {
       e.preventDefault()
       selectContact(searchResults.value[highlightedIndex.value])
     } else if (e.key === 'Escape') {
-      searchResults.value.splice(0)
-      highlightedIndex.value = -1
+      e.stopPropagation()
+      clearSearchResults()
     }
   }
 
   const selectContact = (contact) => {
     onSelect(contact)
-    searchResults.value.splice(0)
-    highlightedIndex.value = -1
+    clearSearchResults()
   }
 
-  return { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydown, selectContact }
+  return {
+    searchResults,
+    highlightedIndex,
+    handleSearchContacts,
+    handleSearchKeydown,
+    selectContact,
+    clearSearchResults
+  }
 }

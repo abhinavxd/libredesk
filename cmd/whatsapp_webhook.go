@@ -31,6 +31,10 @@ const (
 	whatsAppDefaultContactName = "Contact"
 	// Retry window for a status whose message row is missing; older events reference a wamid that will never exist locally.
 	whatsAppStatusNotFoundGrace = 10 * time.Minute
+
+	whatsAppMediaAttemptTimeout = 3 * time.Minute
+	whatsAppMediaMaxAttempts    = 3
+	whatsAppMediaRetryDelay     = 2 * time.Second
 )
 
 var (
@@ -199,8 +203,8 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 	app.lo.Debug("ingesting whatsapp message", "wa_message_id", m.ID, "type", m.Type, "media_id", m.MediaID, "mime", m.MediaMimeType, "context_id", m.ContextID)
 
 	// Skip the media download up front when the message is already ingested (retries, Meta redeliveries).
-	if exists, err := app.conversation.MessageExists(m.ID); err != nil {
-		return fmt.Errorf("checking duplicate: %w", err)
+	if exists, err := app.conversation.AdvanceWhatsAppWindowForMessage(m.ID, m.Timestamp); err != nil {
+		return fmt.Errorf("repairing duplicate: %w", err)
 	} else if exists {
 		return nil
 	}
@@ -220,8 +224,8 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		defer unlock()
 	}
 
-	if exists, err := app.conversation.MessageExists(m.ID); err != nil {
-		return fmt.Errorf("checking duplicate: %w", err)
+	if exists, err := app.conversation.AdvanceWhatsAppWindowForMessage(m.ID, m.Timestamp); err != nil {
+		return fmt.Errorf("repairing duplicate: %w", err)
 	} else if exists {
 		return nil
 	}
@@ -325,8 +329,6 @@ func buildInboundMeta(app *App, m whatsapp.ParsedMessage) json.RawMessage {
 	return raw
 }
 
-const whatsAppMediaAttemptTimeout = 3 * time.Minute
-
 // fetchWhatsAppAttachments returns (nil, nil) on a permanent (4xx) failure so a placeholder is stored; any other error propagates for a queue retry.
 func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel.Config, m whatsapp.ParsedMessage) (attachment.Attachments, error) {
 	if m.MediaID == "" || app.whatsappClient == nil {
@@ -364,7 +366,7 @@ func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel
 		if ctx.Err() != nil {
 			return nil, nil
 		}
-		if attempt >= 3 {
+		if attempt >= whatsAppMediaMaxAttempts {
 			if isPermanentMediaError(err) {
 				app.lo.Warn("whatsapp media permanently unavailable, inserting placeholder", "media_id", m.MediaID, "attempts", attempt, "error", err)
 				return nil, nil
@@ -376,7 +378,7 @@ func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel
 		select {
 		case <-ctx.Done():
 			return nil, nil
-		case <-time.After(2 * time.Second):
+		case <-time.After(whatsAppMediaRetryDelay):
 		}
 	}
 

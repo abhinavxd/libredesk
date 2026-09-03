@@ -1128,12 +1128,15 @@ func (m *Manager) ProcessIncomingWhatsAppMessage(msg models.Message, isNewConver
 		return models.Message{}, err
 	}
 
-	if err := m.UpdateConversationLastInboundAt(msg.ConversationID, inboundAt); err != nil {
-		m.lo.Error("error updating last_inbound_at", "conversation_id", msg.ConversationID, "error", err)
-	}
+	// Hooks run even if the window update fails: the message is stored, so the queue retry only repairs the window.
+	windowErr := m.UpdateConversationLastInboundAt(msg.ConversationID, inboundAt)
 
 	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
+	}
+
+	if windowErr != nil {
+		return models.Message{}, windowErr
 	}
 
 	return msg, nil
@@ -1148,6 +1151,20 @@ func (m *Manager) MessageExists(messageID string) (bool, error) {
 		}
 		m.lo.Error("error fetching message from db", "error", err)
 		return false, err
+	}
+	return true, nil
+}
+
+func (m *Manager) AdvanceWhatsAppWindowForMessage(messageID string, inboundAt time.Time) (bool, error) {
+	conversationID, err := m.messageExistsBySourceID([]string{messageID})
+	if errors.Is(err, errConversationNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if err := m.UpdateConversationLastInboundAt(conversationID, inboundAt); err != nil {
+		return true, err
 	}
 	return true, nil
 }
@@ -1300,7 +1317,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
-			true,          /** private **/
+			true,         /** private **/
 		)
 		if err != nil {
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)

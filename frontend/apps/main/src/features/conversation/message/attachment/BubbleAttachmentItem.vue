@@ -97,12 +97,6 @@ watch(
 
 const shortName = (name) => (name || '').substring(0, 40)
 
-const fallbackToOriginal = (event, originalUrl) => {
-  if (event.target.dataset.originalFallback) return
-  event.target.dataset.originalFallback = 'true'
-  event.target.src = originalUrl
-}
-
 const isImage = computed(() => (props.attachment.content_type || '').startsWith('image/'))
 
 const isAudio = computed(() => (props.attachment.content_type || '').startsWith('audio/'))

@@ -18,7 +18,7 @@ const (
 	whatsAppConsumer    = "ingester"
 
 	// Must exceed the worst-case media-download budget so the reclaimer never re-runs a still-in-flight delivery.
-	whatsAppReclaimMinIdle = 5 * time.Minute
+	whatsAppReclaimMinIdle = 10 * time.Minute
 
 	whatsAppEnqueueTimeout = 5 * time.Second
 )

@@ -15,6 +15,14 @@ import (
 	"github.com/zerodha/logf"
 )
 
+func TestWhatsAppReclaimWaitsForMediaRetries(t *testing.T) {
+	worstCase := whatsAppMediaAttemptTimeout*time.Duration(whatsAppMediaMaxAttempts) +
+		whatsAppMediaRetryDelay*time.Duration(whatsAppMediaMaxAttempts-1)
+	if whatsAppReclaimMinIdle <= worstCase {
+		t.Fatalf("reclaim idle %s must exceed media retry budget %s", whatsAppReclaimMinIdle, worstCase)
+	}
+}
+
 func TestEnqueueAndConsume(t *testing.T) {
 	app, mr := testIngesterApp(t)
 	ing, err := newWhatsAppIngester(app)

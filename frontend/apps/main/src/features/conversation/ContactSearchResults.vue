@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="results.length"
+    @mousedown.prevent
     class="absolute w-full z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
   >
     <ul class="max-h-60 overflow-y-auto" role="listbox">

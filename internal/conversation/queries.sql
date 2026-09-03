@@ -968,7 +968,10 @@ ORDER BY cm.created_at DESC
 LIMIT 1;
 
 -- name: update-conversation-last-inbound-at
-UPDATE conversations SET last_inbound_at = GREATEST(last_inbound_at, $2), updated_at = NOW() WHERE id = $1
+UPDATE conversations
+SET last_inbound_at = GREATEST(last_inbound_at, $2),
+    updated_at = CASE WHEN last_inbound_at IS NULL OR last_inbound_at < $2 THEN NOW() ELSE updated_at END
+WHERE id = $1
 RETURNING contact_id, inbox_id;
 
 -- name: get-contact-window-inbound-at
