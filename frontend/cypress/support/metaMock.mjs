@@ -9,6 +9,7 @@ const state = {
   requests: [],
   templates: new Map(),
   media: new Map(),
+  phoneNumbers: new Set(),
   failSend: 0,
   failValidate: false,
   counter: 0
@@ -63,11 +64,7 @@ const handle = async (req, res) => {
   if (path.startsWith('/__ctl/')) {
     const action = path.replace('/__ctl/', '')
     if (action === 'reset') {
-      state.requests = []
-      state.templates.clear()
-      state.media.clear()
-      state.failSend = 0
-      state.failValidate = false
+      control.reset()
       return json(res, 200, { ok: true })
     }
     if (action === 'requests') {
@@ -127,7 +124,11 @@ const handle = async (req, res) => {
 
   if (parts.length === 2 && parts[1] === 'phone_numbers') {
     if (state.failValidate) return metaError(res, 400, 'Object with ID does not exist', 803)
-    return json(res, 200, { data: [{ id: 'PHONE1', display_phone_number: '+1 555 000 1111' }] })
+    const numbers = [...state.phoneNumbers].map((id) => ({
+      id,
+      display_phone_number: '+1 555 000 1111'
+    }))
+    return json(res, 200, { data: numbers })
   }
 
   if (parts.length === 2 && parts[1] === 'subscribed_apps' && req.method === 'POST') {
@@ -171,6 +172,8 @@ const handle = async (req, res) => {
       })
     }
     if (state.failValidate) return metaError(res, 400, 'Object with ID does not exist', 803)
+    // Every phone number handed out here belongs to the WABA the credential check asks about next.
+    state.phoneNumbers.add(id)
     return json(res, 200, { id, display_phone_number: '+1 555 000 1111', verified_name: 'Mock Co' })
   }
 
@@ -194,6 +197,7 @@ export const control = {
     state.requests = []
     state.templates.clear()
     state.media.clear()
+    state.phoneNumbers.clear()
     state.failSend = 0
     state.failValidate = false
     return null
