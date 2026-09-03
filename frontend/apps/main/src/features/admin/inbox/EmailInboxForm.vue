@@ -11,6 +11,65 @@
       </FormItem>
     </FormField>
 
+    <div v-if="showFormFields" class="space-y-3">
+      <div>
+        <label class="text-sm font-medium">{{ $t('admin.inbox.aliases') }}</label>
+        <p class="text-sm text-muted-foreground">{{ $t('admin.inbox.aliases.description') }}</p>
+      </div>
+      <div v-for="(field, index) in aliasFields" :key="field.key" class="flex items-start gap-2">
+        <FormField v-slot="{ componentField }" :name="`aliases[${index}].email`" class="flex-1">
+          <FormItem class="flex-1">
+            <FormControl>
+              <Input type="email" placeholder="billing@example.com" v-bind="componentField" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+        <div class="flex shrink-0 items-center gap-1">
+          <div v-if="verifyAlias" class="w-28">
+            <Button
+              v-if="field.value?.verification_status === 'verified'"
+              type="button"
+              variant="outline"
+              size="sm"
+              class="w-full justify-center border-success text-success hover:bg-success/10 hover:text-success"
+              @click="handleVerifyAlias(field.value)"
+            >
+              <CheckCircle2 class="mr-1 size-4" />
+              {{ $t('admin.inbox.aliases.reverifySending') }}
+            </Button>
+            <Button
+              v-else-if="field.value?.verification_status === 'pending'"
+              type="button"
+              variant="outline"
+              size="sm"
+              class="w-full justify-center"
+              @click="handleVerifyAlias(field.value)"
+            >
+              {{ $t('admin.inbox.aliases.pending') }}
+            </Button>
+            <Button
+              v-else
+              type="button"
+              variant="outline"
+              size="sm"
+              class="w-full justify-center"
+              @click="handleVerifyAlias(field.value)"
+            >
+              {{ $t('admin.inbox.aliases.verify') }}
+            </Button>
+          </div>
+          <Button type="button" variant="ghost" size="icon" @click="removeAlias(index)">
+            <Trash2 class="size-4" />
+          </Button>
+        </div>
+      </div>
+      <Button type="button" variant="outline" size="sm" @click="addAlias({ email: '' })">
+        <Plus class="size-4 mr-1" />{{ $t('admin.inbox.aliases.add') }}
+      </Button>
+      <p class="text-xs text-muted-foreground">{{ $t('admin.inbox.aliases.smtpWarning') }}</p>
+    </div>
+
     <FormField v-if="showFormFields" v-slot="{ componentField }" name="from">
       <FormItem>
         <FormLabel>{{ $t('globals.terms.fromEmailAddress') }}</FormLabel>
@@ -672,6 +731,23 @@
     </Button>
   </form>
 
+  <AlertDialog :open="showRetryVerificationDialog" @update:open="showRetryVerificationDialog = $event">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ $t('admin.inbox.aliases.retrySendingVerificationTitle') }}</AlertDialogTitle>
+        <AlertDialogDescription>
+          {{ $t('admin.inbox.aliases.retrySendingVerificationDescription', { email: aliasToRetry }) }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click="retryVerification">
+          {{ $t('admin.inbox.aliases.retrySending') }}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
   <!-- OAuth Credentials Modal -->
   <Dialog v-model:open="showOAuthModal">
     <DialogContent>
@@ -781,7 +857,7 @@
 
 <script setup>
 import { watch, computed, ref } from 'vue'
-import { useForm } from 'vee-validate'
+import { useFieldArray, useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './formSchema.js'
 import {
@@ -810,7 +886,17 @@ import {
   DialogHeader,
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
-import { CheckCircle2, RefreshCw, Mail, Lightbulb } from 'lucide-vue-next'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import { CheckCircle2, RefreshCw, Mail, Lightbulb, Plus, Trash2 } from 'lucide-vue-next'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
@@ -845,6 +931,14 @@ const props = defineProps({
   isLoading: {
     type: Boolean,
     default: false
+  },
+  verifyAlias: {
+    type: Function,
+    default: null
+  },
+  aliasVerificationState: {
+    type: Object,
+    default: () => ({})
   }
 })
 
@@ -868,6 +962,8 @@ const oauthCredentials = ref({
   tenant_id: ''
 })
 const isSubmittingOAuth = ref(false)
+const showRetryVerificationDialog = ref(false)
+const aliasToRetry = ref('')
 
 // Computed callback URL for OAuth
 const callbackUrl = computed(() => {
@@ -888,6 +984,7 @@ const form = useForm({
   initialValues: {
     name: '',
     from: '',
+    aliases: [],
     from_name_template: '',
     reply_to: '',
     enabled: true,
@@ -922,6 +1019,38 @@ const form = useForm({
     }
   }
 })
+
+const { fields: aliasFields, push: addAlias, remove: removeAlias } = useFieldArray('aliases')
+
+const handleVerifyAlias = (alias) => {
+  if (!alias?.email || !props.verifyAlias) return
+  if (alias.verification_status === 'pending') {
+    aliasToRetry.value = alias.email
+    showRetryVerificationDialog.value = true
+    return
+  }
+  props.verifyAlias(alias.email)
+}
+
+const retryVerification = async () => {
+  const email = aliasToRetry.value
+  showRetryVerificationDialog.value = false
+  aliasToRetry.value = ''
+  if (email && props.verifyAlias) await props.verifyAlias(email)
+}
+
+watch(
+  () => props.aliasVerificationState,
+  (states) => {
+    for (const [index, alias] of (form.values.aliases || []).entries()) {
+      const state = states[alias.email]
+      if (!state) continue
+      form.setFieldValue(`aliases[${index}].verification_status`, state.verification_status, false)
+      form.setFieldValue(`aliases[${index}].verified_at`, state.verified_at, false)
+    }
+  },
+  { deep: true, immediate: true }
+)
 
 // OAuth computed properties
 const oauthProvider = computed(() => {

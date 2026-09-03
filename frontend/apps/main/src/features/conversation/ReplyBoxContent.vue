@@ -39,8 +39,19 @@
         :class="['space-y-3', isFullscreen ? 'border-b border-border p-4' : 'mb-3']"
         v-if="messageType === 'reply'"
       >
-        <div class="flex items-center gap-2">
-          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">TO:</label>
+        <div v-if="conversationStore.currentFromOptions.length > 1" class="flex items-center space-x-2">
+          <label class="w-12 text-sm font-medium text-muted-foreground">{{ $t('replyBox.from') }}:</label>
+          <Select v-model="sendFrom">
+            <SelectTrigger class="flex-grow"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="address in conversationStore.currentFromOptions" :key="address" :value="address">
+                {{ address }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div class="flex items-center space-x-2">
+          <label class="w-12 text-sm font-medium text-muted-foreground">TO:</label>
           <Input
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
@@ -159,6 +170,7 @@ import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared-ui/components/ui/select'
 import { useEmitter } from '@main/composables/useEmitter'
 import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
@@ -175,6 +187,7 @@ const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
 const cc = defineModel('cc', { default: '' })
 const bcc = defineModel('bcc', { default: '' })
+const sendFrom = defineModel('sendFrom', { default: '' })
 const showBcc = defineModel('showBcc', { default: false })
 const emailErrors = defineModel('emailErrors', { default: () => [] })
 const htmlContent = defineModel('htmlContent', { default: '' })
@@ -389,7 +402,7 @@ const handleAiPromptSelected = (key) => {
 // Watch and update macro view based on message type this filters our macros.
 watch(
   messageType,
-  (newType, oldType) => {
+  (newType) => {
     if (newType === 'reply') {
       macroStore.setCurrentView('replying')
     } else if (newType === 'private_note') {

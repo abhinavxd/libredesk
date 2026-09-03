@@ -5,6 +5,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { TYPING_RECEIVE_TIMEOUT } from '@shared-ui/composables/useTypingIndicator.js'
 import { deepMerge } from '@shared-ui/utils/object.js'
 import { computeRecipientsFromMessage } from '@main/utils/email-recipients'
+import { resolveEmailSender } from '@main/utils/email-sender'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { subscribeToConversation, sendTypingIndicator, subscribeListReplace } from '@main/websocket'
@@ -26,6 +27,8 @@ export const useConversationStore = defineStore('conversation', () => {
   const currentTo = ref([])
   const currentBCC = ref([])
   const currentCC = ref([])
+  const currentFrom = ref('')
+  const currentFromOptions = ref([])
   const macros = ref({})
   const drafts = ref(new Map())
   // In-memory, resets on reload.
@@ -445,10 +448,24 @@ export const useConversationStore = defineStore('conversation', () => {
       currentTo.value = []
       currentCC.value = []
       currentBCC.value = []
+      currentFrom.value = ''
+      currentFromOptions.value = []
       return
     }
 
-    if (!conv || !msgData || !inboxEmail) return
+    if (!conv || !msgData || !inboxEmail) {
+      currentFrom.value = ''
+      currentFromOptions.value = []
+      return
+    }
+
+    const aliases = Array.isArray(conv.inbox_aliases) ? conv.inbox_aliases : []
+    const receivingAddresses = [inboxEmail, ...aliases.map(alias => alias.email)].filter(Boolean)
+    const sendableAddresses = [
+      inboxEmail,
+      ...aliases.filter(alias => alias.verification_status === 'verified').map(alias => alias.email)
+    ].filter(Boolean)
+    currentFromOptions.value = sendableAddresses
 
     // Skip automated messages (auto-replies, CSAT) so the prefill reflects the last human-driven recipients.
     const latestMessage = msgData.getLatestMessage(conv.uuid, ['incoming', 'outgoing'], true, true)
@@ -456,14 +473,15 @@ export const useConversationStore = defineStore('conversation', () => {
       currentTo.value = []
       currentCC.value = []
       currentBCC.value = []
+      currentFrom.value = sendableAddresses[0] || ''
       return
     }
 
+    currentFrom.value = resolveEmailSender(latestMessage, sendableAddresses)
     const { to, cc, bcc } = computeRecipientsFromMessage(
       latestMessage,
       conv.contact?.email || '',
-      inboxEmail,
-      conv?.inbox_reply_to || ''
+      [...receivingAddresses, conv?.inbox_reply_to].filter(Boolean)
     )
     currentTo.value = to
     currentCC.value = cc
@@ -1250,6 +1268,8 @@ export const useConversationStore = defineStore('conversation', () => {
     currentTo,
     currentBCC,
     currentCC,
+    currentFrom,
+    currentFromOptions,
     isConversationInList,
     addPendingNotification,
     mergeConversationUpdate,
