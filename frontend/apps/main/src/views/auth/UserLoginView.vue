@@ -32,7 +32,7 @@
             {{ oidcProvider.name }}
           </Button>
 
-          <div class="relative">
+          <div v-if="localLoginEnabled" class="relative">
             <div class="absolute inset-0 flex items-center">
               <span class="w-full border-t border-border"></span>
             </div>
@@ -42,7 +42,7 @@
           </div>
         </div>
 
-        <form @submit.prevent="loginAction" class="space-y-3">
+        <form v-if="localLoginEnabled" @submit.prevent="loginAction" class="space-y-3">
           <div class="space-y-2">
             <Label for="email" class="text-muted-foreground">{{ t('globals.terms.email') }}</Label>
             <Input
@@ -258,6 +258,10 @@ const loginAction = () => {
 const enabledOIDCProviders = computed(() => {
   return oidcProviders.value.filter((provider) => !provider.disabled)
 })
+
+const localLoginEnabled = computed(
+  () => appSettingsStore.public_config?.['app.local_login_enabled'] !== false
+)
 
 const emailHasError = computed(() => {
   if (!submitted.value) return false

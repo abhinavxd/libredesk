@@ -4,8 +4,27 @@ import (
 	"encoding/json"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	oidcmodels "github.com/abhinavxd/libredesk/internal/oidc/models"
 	"github.com/zerodha/fastglue"
 )
+
+const localLoginEnabledKey = "auth.local_login_enabled"
+
+// isLocalLoginEnabled keeps local login available by default and whenever no
+// OIDC provider is enabled, preventing an administrator from locking everyone out.
+func isLocalLoginEnabled(providers []oidcmodels.OIDC) bool {
+	if !ko.Exists(localLoginEnabledKey) || ko.Bool(localLoginEnabledKey) {
+		return true
+	}
+
+	for _, provider := range providers {
+		if provider.Enabled {
+			return false
+		}
+	}
+
+	return true
+}
 
 // handleGetConfig returns the public configuration needed for app initialization, this includes minimal app settings and enabled SSO providers (without secrets).
 func handleGetConfig(r *fastglue.Request) error {
@@ -58,6 +77,7 @@ func handleGetConfig(r *fastglue.Request) error {
 
 	// Add SSO providers to the response
 	publicSettings["app.sso_providers"] = enabledProviders
+	publicSettings["app.local_login_enabled"] = isLocalLoginEnabled(oidcProviders)
 
 	return r.SendEnvelope(publicSettings)
 }
