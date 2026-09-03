@@ -96,8 +96,10 @@
         :autoFocus="true"
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
+        :enableConversationReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
+        :getConversationSuggestions="getConversationSuggestions"
         @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
@@ -167,6 +169,7 @@ import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api'
+import { getConversationSuggestions as fetchConversationSuggestions } from '@main/components/editor/conversationReference'
 
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
@@ -213,6 +216,15 @@ const debouncedFetchSuggestions = useDebounceFn(fetchSuggestions, MENTION_DEBOUN
 const getSuggestions = async (query) => {
   if (messageType.value !== 'private_note') return []
   return (await debouncedFetchSuggestions(query)) || []
+}
+
+const debouncedFetchConversationSuggestions = useDebounceFn(fetchConversationSuggestions, MENTION_DEBOUNCE_MS)
+
+const getConversationSuggestions = async (query) => {
+  if (messageType.value !== 'private_note') return []
+  const messageTypeAtRequest = messageType.value
+  const suggestions = (await debouncedFetchConversationSuggestions(query)) || []
+  return messageType.value === messageTypeAtRequest ? suggestions : []
 }
 
 // Handle mentions changed from editor
@@ -389,7 +401,7 @@ const handleAiPromptSelected = (key) => {
 // Watch and update macro view based on message type this filters our macros.
 watch(
   messageType,
-  (newType, oldType) => {
+  (newType) => {
     if (newType === 'reply') {
       macroStore.setCurrentView('replying')
     } else if (newType === 'private_note') {

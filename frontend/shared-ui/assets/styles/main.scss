@@ -121,7 +121,9 @@
 
     // Mention styling — vue-letter scopes classes as msg_XXX_ld-mention
     [class$="_ld-mention"],
-    .ld-mention {
+    [class$="_ld-conversation-reference"],
+    .ld-mention,
+    .ld-conversation-reference {
       background-color: hsl(var(--primary) / 0.1);
       border-radius: 0.25rem;
       padding: 0 0.25rem;

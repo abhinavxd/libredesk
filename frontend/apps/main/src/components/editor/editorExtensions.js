@@ -17,6 +17,8 @@ import { Callout } from './extensions/Callout'
 import { Details, DetailsSummary, DetailsContent } from './extensions/Collapsible'
 import { TrailingNode } from './extensions/TrailingNode'
 import mentionSuggestion from './mentionSuggestion'
+import conversationReferenceSuggestion from './conversationReferenceSuggestion'
+import { ConversationReference } from './conversationReferenceExtension'
 
 const lowlight = createLowlight(codeGrammars)
 
@@ -142,6 +144,7 @@ export function buildConversationExtensions({ getPlaceholder }) {
       HTMLAttributes: { class: 'ld-mention' },
       suggestion: mentionSuggestion
     }),
+    ConversationReference.configure({ suggestion: conversationReferenceSuggestion }),
     CustomTable.configure({ resizable: false }),
     TableRow,
     CustomTableCell,
