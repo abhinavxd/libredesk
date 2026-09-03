@@ -505,6 +505,18 @@
           />
         </FormItem>
       </FormField>
+
+      <FormField v-slot="{ componentField, handleChange }" name="imap.expunge_inbox">
+        <FormItem>
+          <SwitchField
+            :title="$t('admin.inbox.expungeInbox')"
+            :description="$t('admin.inbox.expungeInbox.description')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
+
     </div>
 
     <!-- SMTP Section -->
