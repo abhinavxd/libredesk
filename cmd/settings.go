@@ -148,18 +148,24 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 		req.Password = cur.Password
 	}
 
+	// Build the provider from the request BEFORE anything is persisted, so a
+	// config the SMTP pool rejects is refused with nothing changed, rather
+	// than saved and then failing to apply.
+	provider, err := buildEmailNotifier(req)
+	if err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, err.Error(), nil, envelope.InputError)
+	}
+
 	if err := app.setting.Update(req); err != nil {
+		provider.Close()
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Load the saved values into koanf (the dispatcher reads the enabled flag
-	// from there on every send) and rebuild the SMTP provider from them.
-	if err := reloadSettings(app); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
-	}
-	if err := reloadNotifier(app); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
-	}
+	// Publish the complete state to the running process: the provider first,
+	// then the flag that lets sends reach it. Neither reads koanf, which is
+	// why no reloadSettings is needed here; boot reads the database too.
+	app.notifier.SetProvider(provider)
+	app.notifDispatcher.SetEmailEnabled(req.Enabled)
 
 	return r.SendEnvelope(true)
 }

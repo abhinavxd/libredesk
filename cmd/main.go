@@ -125,6 +125,7 @@ type App struct {
 	search           *search.Manager
 	activityLog      *activitylog.Manager
 	notifier         *notifier.Service
+	notifDispatcher  *notifier.Dispatcher
 	userNotification *notifier.UserNotificationManager
 	customAttribute  *customAttribute.Manager
 	report           *report.Manager
@@ -245,9 +246,9 @@ func main() {
 		webhook                     = initWebhook(db, i18n, ssrfControl)
 		user                        = initUser(i18n, db)
 		wsHub                       = initWS(user)
-		notifier                    = initNotifier()
+		notifier                    = initNotifier(settings)
 		userNotification            = initUserNotification(db, i18n)
-		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub)
+		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub, ko.Bool("notification.email.enabled"))
 		automation                  = initAutomationEngine(db, i18n)
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
@@ -304,6 +305,7 @@ func main() {
 		priority:         priority,
 		tmpl:             template,
 		notifier:         notifier,
+		notifDispatcher:  notifDispatcher,
 		consts:           atomic.Value{},
 		conversation:     conversation,
 		automation:       automation,

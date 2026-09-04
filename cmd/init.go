@@ -46,6 +46,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/setting"
+	smodels "github.com/abhinavxd/libredesk/internal/setting/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/tag"
@@ -671,28 +672,57 @@ func initAutoAssigner(teamManager *team.Manager, userManager *user.Manager, conv
 	return e
 }
 
-// buildEmailNotifier builds the email notification provider from the
-// `notification.email.*` settings currently loaded in koanf. It is used at boot
-// and again by reloadNotifier whenever those settings are saved.
-func buildEmailNotifier() (*emailnotifier.Email, error) {
-	smtpCfg := imodels.SMTPConfig{}
-	if err := ko.UnmarshalWithConf("notification.email", &smtpCfg, koanf.UnmarshalConf{Tag: "json"}); err != nil {
-		return nil, fmt.Errorf("unmarshalling email notification provider config: %w", err)
+// loadEmailNotificationSettings reads the `notification.email.*` settings
+// from the database. The notifier is built from this struct, both at boot and
+// when the settings are saved, so it never reads koanf on the live path (koanf
+// is reloaded under the App lock and is not safe to read concurrently).
+func loadEmailNotificationSettings(settings *setting.Manager) (smodels.EmailNotification, error) {
+	var cfg smodels.EmailNotification
+	out, err := settings.GetByPrefix("notification.email")
+	if err != nil {
+		return cfg, err
 	}
-	// The setting is stored as `wait_timeout` but the pool option's JSON tag is
-	// `pool_wait_timeout`, so the unmarshal above never fills it and the pool
-	// silently ran on its default. Map it by hand.
-	smtpCfg.PoolWaitTimeout = ko.String("notification.email.wait_timeout")
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		return cfg, fmt.Errorf("unmarshalling email notification settings: %w", err)
+	}
+	return cfg, nil
+}
 
+// buildEmailNotifier builds the email notification provider from the given
+// settings. Building does not connect, so a config the pool rejects (an
+// unknown auth protocol, say) fails here and nothing is left half-applied.
+func buildEmailNotifier(cfg smodels.EmailNotification) (*emailnotifier.Email, error) {
+	smtpCfg := imodels.SMTPConfig{
+		Username:          cfg.Username,
+		Password:          cfg.Password,
+		AuthProtocol:      cfg.AuthProtocol,
+		TLSType:           cfg.TLSType,
+		TLSSkipVerify:     cfg.TLSSkipVerify,
+		Host:              cfg.Host,
+		Port:              cfg.Port,
+		HelloHostname:     cfg.HelloHostname,
+		MaxConns:          cfg.MaxConns,
+		MaxMessageRetries: cfg.MaxMsgRetries,
+		IdleTimeout:       cfg.IdleTimeout,
+		// Mapped by name on purpose: the setting is `wait_timeout` while the
+		// pool option's JSON tag is `pool_wait_timeout`, so the koanf
+		// unmarshal this replaced never filled it and the pool always ran on
+		// the library default.
+		PoolWaitTimeout: cfg.WaitTimeout,
+	}
 	return emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
 		Lo:        initLogger("email-notifier"),
-		FromEmail: ko.String("notification.email.email_address"),
+		FromEmail: cfg.EmailAddress,
 	})
 }
 
 // initNotifier initializes the notifier service with available providers.
-func initNotifier() *notifier.Service {
-	emailNotifier, err := buildEmailNotifier()
+func initNotifier(settings *setting.Manager) *notifier.Service {
+	cfg, err := loadEmailNotificationSettings(settings)
+	if err != nil {
+		log.Fatalf("error loading email notification settings: %v", err)
+	}
+	emailNotifier, err := buildEmailNotifier(cfg)
 	if err != nil {
 		log.Fatalf("error initializing email notifier: %v", err)
 	}
@@ -702,21 +732,6 @@ func initNotifier() *notifier.Service {
 	}
 
 	return notifier.NewService(notifierProviders, ko.MustInt("notification.concurrency"), ko.MustInt("notification.queue_size"), initLogger("notifier"))
-}
-
-// reloadNotifier rebuilds the email provider from the current settings and
-// swaps it into the running notifier service, so SMTP changes apply to the
-// next notification instead of waiting for a restart. The previous provider's
-// idle connections are dropped by its own sweeper.
-func reloadNotifier(app *App) error {
-	app.lo.Info("reloading email notifier")
-	emailNotifier, err := buildEmailNotifier()
-	if err != nil {
-		app.lo.Error("error reloading email notifier", "error", err)
-		return err
-	}
-	app.notifier.SetProvider(emailNotifier)
-	return nil
 }
 
 // initEmailInbox loads inbox config from DB and initializes the email inbox.
@@ -1198,14 +1213,12 @@ func initImporter(i18n *i18n.I18n) *importer.Importer {
 }
 
 // initNotifDispatcher initializes the notification dispatcher.
-func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub) *notifier.Dispatcher {
+func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
-		InApp:    userNotification,
-		Outbound: outbound,
-		WSHub:    wsHub,
-		// Read live, like the media store's root URL, so the toggle in
-		// settings applies without a restart.
-		EmailEnabled: func() bool { return ko.Bool("notification.email.enabled") },
+		InApp:        userNotification,
+		Outbound:     outbound,
+		WSHub:        wsHub,
+		EmailEnabled: emailEnabled,
 		Lo:           initLogger("notification-dispatcher"),
 	})
 }

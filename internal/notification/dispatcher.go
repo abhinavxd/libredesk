@@ -2,6 +2,7 @@ package notifier
 
 import (
 	"encoding/json"
+	"sync/atomic"
 
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
@@ -47,7 +48,7 @@ type Dispatcher struct {
 	inApp        *UserNotificationManager
 	outbound     *Service
 	wsHub        WSHub
-	emailEnabled func() bool
+	emailEnabled atomic.Bool
 	lo           *logf.Logger
 }
 
@@ -56,26 +57,28 @@ type DispatcherOpts struct {
 	InApp    *UserNotificationManager
 	Outbound *Service
 	WSHub    WSHub
-	// EmailEnabled is consulted on every send rather than captured once, so
-	// toggling email notifications in settings takes effect without a restart.
-	// nil means email is never sent.
-	EmailEnabled func() bool
+	// EmailEnabled is the initial value; SetEmailEnabled changes it on a
+	// running dispatcher when the setting is saved.
+	EmailEnabled bool
 	Lo           *logf.Logger
 }
 
 // NewDispatcher creates a new notification Dispatcher.
 func NewDispatcher(opts DispatcherOpts) *Dispatcher {
-	enabled := opts.EmailEnabled
-	if enabled == nil {
-		enabled = func() bool { return false }
+	d := &Dispatcher{
+		inApp:    opts.InApp,
+		outbound: opts.Outbound,
+		wsHub:    opts.WSHub,
+		lo:       opts.Lo,
 	}
-	return &Dispatcher{
-		inApp:        opts.InApp,
-		outbound:     opts.Outbound,
-		wsHub:        opts.WSHub,
-		emailEnabled: enabled,
-		lo:           opts.Lo,
-	}
+	d.emailEnabled.Store(opts.EmailEnabled)
+	return d
+}
+
+// SetEmailEnabled turns the email channel on or off for every send after this call, so the
+// setting takes effect without a restart.
+func (d *Dispatcher) SetEmailEnabled(enabled bool) {
+	d.emailEnabled.Store(enabled)
 }
 
 // Send sends a notification through all configured channels.
@@ -85,7 +88,7 @@ func (d *Dispatcher) Send(n Notification) {
 	for i, recipientID := range n.RecipientIDs {
 		d.sendToRecipient(recipientID, n)
 
-		if d.outbound != nil && n.Email != nil && d.emailEnabled() {
+		if d.outbound != nil && n.Email != nil && d.emailEnabled.Load() {
 			var email string
 			if i < len(n.Email.Recipients) {
 				email = n.Email.Recipients[i]
@@ -105,7 +108,7 @@ func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) 
 	for i, recipientID := range n.RecipientIDs {
 		d.sendToRecipient(recipientID, n)
 
-		if d.outbound != nil && i < len(emails) && len(emails[i].Recipients) > 0 && d.emailEnabled() {
+		if d.outbound != nil && i < len(emails) && len(emails[i].Recipients) > 0 && d.emailEnabled.Load() {
 			e := emails[i]
 			d.sendEmail(recipientID, e.Recipients[0], e.Subject, e.Content, n.Type)
 		}
