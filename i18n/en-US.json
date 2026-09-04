@@ -1016,6 +1016,7 @@
   "globals.terms.firstReplyAt": "First reply at",
   "globals.terms.footer": "Footer",
   "globals.terms.fromEmailAddress": "From email address | From email addresses",
+  "globals.terms.toEmailAddress": "To email address | To email addresses",
   "globals.terms.general": "General",
   "globals.terms.appearance": "Appearance",
   "globals.terms.desktop": "Desktop",
