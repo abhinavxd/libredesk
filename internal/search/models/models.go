@@ -6,6 +6,18 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// ReadScope carries an agent's conversation read permissions for filtering search results.
+type ReadScope struct {
+	UserID         int
+	TeamIDs        []int
+	Read           bool
+	ReadAll        bool
+	ReadAssigned   bool
+	ReadTeamAll    bool
+	ReadTeamInbox  bool
+	ReadUnassigned bool
+}
+
 type ConversationResult struct {
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
 	UUID            string    `db:"uuid" json:"uuid"`

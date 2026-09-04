@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"slices"
 
@@ -20,6 +24,15 @@ import (
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
 )
+
+// immutable suppresses revalidation, so this is how long a revoked file stays reachable from a client cache.
+const mediaCacheTTL = 24 * time.Hour
+
+type preparedImageUpload struct {
+	thumbnail    *bytes.Reader
+	meta         []byte
+	thumbnailErr error
+}
 
 // handleMediaUpload handles media uploads.
 func handleMediaUpload(r *fastglue.Request) error {
@@ -59,6 +72,22 @@ func handleMediaUpload(r *fastglue.Request) error {
 	model, ok := form.Value["linked_model"]
 	if ok && len(model) > 0 {
 		linkedModel = model[0]
+	}
+
+	// Only agents who manage the help center may upload publicly served media.
+	if mmodels.IsPublicModel(linkedModel) {
+		auser := r.RequestCtx.UserValue("user").(amodels.User)
+		agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		allowed, err := app.authz.Enforce(agent, "help_center", "manage")
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		if !allowed {
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+		}
 	}
 
 	// Sanitize filename.
@@ -102,29 +131,24 @@ func handleMediaUpload(r *fastglue.Request) error {
 	// Generate and upload thumbnail and store image dimensions in the media meta.
 	var meta = []byte("{}")
 	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
-		file.Seek(0, 0)
-		thumbFile, err := image.CreateThumb(image.DefThumbSize, file)
-		if err != nil {
-			app.lo.Error("error creating thumb image", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
-		}
-		thumbName, _, err = app.media.Upload(thumbName, srcContentType, thumbFile)
-		if err != nil {
-			return sendErrorEnvelope(r, err)
-		}
-
-		// Store image dimensions in media meta, storing dimensions for image previews in future.
-		file.Seek(0, 0)
-		width, height, err := image.GetDimensions(file)
+		prepared, err := prepareImageUpload(file)
 		if err != nil {
 			cleanUp = true
 			app.lo.Error("error getting image dimensions", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
 		}
-		meta, _ = json.Marshal(map[string]interface{}{
-			"width":  width,
-			"height": height,
-		})
+		if prepared.thumbnailErr != nil {
+			app.lo.Error("error creating thumb image", "error", prepared.thumbnailErr)
+		} else {
+			// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
+			uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
+			if err != nil {
+				cleanUp = true
+				return sendErrorEnvelope(r, err)
+			}
+			thumbName = uploadedThumb
+		}
+		meta = prepared.meta
 	}
 
 	// Reset ptr.
@@ -139,7 +163,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta)
+	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel))
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error inserting metadata into database", "error", err)
@@ -149,7 +173,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 }
 
 // handleServeMedia serves uploaded media.
-// Supports both authenticated access (with permission checks) and signed URL access (no permission checks).
+// Supports public media (no checks), authenticated access (with permission checks) and signed URL access (no permission checks).
 func handleServeMedia(r *fastglue.Request) error {
 	var (
 		app        = r.Context.(*App)
@@ -157,21 +181,33 @@ func handleServeMedia(r *fastglue.Request) error {
 		authMethod = r.RequestCtx.UserValue("auth_method")
 	)
 
-	// If accessed via signed URL, skip permission checks and serve file directly.
-	if authMethod == "signed_url" {
-		return serveMediaFile(r, app, uuid, nil)
-	}
-
-	// Session/API key authenticated - perform full permission check.
-	auser := r.RequestCtx.UserValue("user").(amodels.User)
-
-	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	media, err := getMediaByUUID(app, uuid)
 	if err != nil {
+		// Anonymous probes must not distinguish missing media from existing private media.
+		if authMethod == authMethodPublic {
+			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.UnauthorizedError)
+		}
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Fetch media from DB.
-	media, err := getMediaByUUID(app, uuid)
+	// Public serve as is.
+	if !media.Private {
+		return serveMediaFile(r, app, uuid, &media)
+	}
+
+	// If accessed via signed URL, skip permission checks and serve file directly.
+	if authMethod == authMethodSignedURL {
+		return serveMediaFile(r, app, uuid, &media)
+	}
+
+	// Unauthenticated and not a signed URL - private media requires auth.
+	auser, ok := r.RequestCtx.UserValue("user").(amodels.User)
+	if !ok {
+		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.UnauthorizedError)
+	}
+
+	// Session/API key authenticated - perform full permission check.
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -231,8 +267,13 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		}
 
 		r.RequestCtx.Response.Header.Set("Content-Type", media.ContentType)
-		r.RequestCtx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`%s; filename="%s"`, disposition, media.Filename))
+		r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": media.Filename}))
 		r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+		// Sandbox SVGs.
+		if media.ContentType == "image/svg+xml" {
+			r.RequestCtx.Response.Header.Set("Content-Security-Policy", "sandbox")
+		}
+		r.RequestCtx.Response.Header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, immutable", cacheVisibility(media.Private), int(mediaCacheTTL.Seconds())))
 
 		fasthttp.ServeFile(r.RequestCtx, filepath.Join(ko.String("upload.fs.upload_path"), uuid))
 	case "s3":
@@ -240,6 +281,7 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		if forceDownload {
 			url = app.media.GetURLForDownload(uuid, media.Filename)
 		}
+		r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
 		r.RequestCtx.Redirect(url, http.StatusFound)
 	}
 	return nil
@@ -268,6 +310,40 @@ func getUnassociatedMedia(app *App, ids []int) ([]mmodels.Media, error) {
 }
 
 // getMediaByUUID fetches media metadata from DB, handling thumbnail prefix.
-func getMediaByUUID(app *App, uuid string) (mmodels.Media, error) {
-	return app.media.Get(0, strings.TrimPrefix(uuid, image.ThumbPrefix))
+func getMediaByUUID(app *App, mediaUUID string) (mmodels.Media, error) {
+	mediaUUID = strings.TrimPrefix(mediaUUID, image.ThumbPrefix)
+	if _, err := uuid.Parse(mediaUUID); err != nil {
+		return mmodels.Media{}, envelope.NewError(envelope.NotFoundError, app.i18n.T("globals.messages.notFound"), nil)
+	}
+	return app.media.Get(0, mediaUUID)
+}
+
+func cacheVisibility(private bool) string {
+	if private {
+		return "private"
+	}
+	return "public"
+}
+
+func prepareImageUpload(file io.ReadSeeker) (preparedImageUpload, error) {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return preparedImageUpload{}, err
+	}
+	thumbnail, thumbnailErr := image.CreateThumb(image.DefThumbSize, file)
+
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return preparedImageUpload{}, err
+	}
+	width, height, err := image.GetDimensions(file)
+	if err != nil {
+		return preparedImageUpload{}, err
+	}
+	meta, err := json.Marshal(map[string]any{
+		"width":  width,
+		"height": height,
+	})
+	if err != nil {
+		return preparedImageUpload{}, err
+	}
+	return preparedImageUpload{thumbnail: thumbnail, meta: meta, thumbnailErr: thumbnailErr}, nil
 }

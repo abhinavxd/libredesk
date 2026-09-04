@@ -3,7 +3,7 @@ package stringutil
 import (
 	"strings"
 
-	"github.com/jaytaylor/html2text"
+	"github.com/inbucket/html2text"
 	"golang.org/x/net/html"
 )
 

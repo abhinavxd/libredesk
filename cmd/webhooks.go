@@ -11,6 +11,18 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+// handleGetWebhooksCompact returns all webhooks in a compact format.
+func handleGetWebhooksCompact(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+	)
+	webhooks, err := app.webhook.GetAllCompact()
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(webhooks)
+}
+
 // handleGetWebhooks returns all webhooks from the database.
 func handleGetWebhooks(r *fastglue.Request) error {
 	var (
@@ -64,7 +76,7 @@ func handleCreateWebhook(r *fastglue.Request) error {
 
 	// Validate webhook fields
 	if err := validateWebhook(app, webhook); err != nil {
-		return r.SendEnvelope(err)
+		return sendErrorEnvelope(r, err)
 	}
 
 	webhook, err := app.webhook.Create(webhook)
@@ -96,7 +108,7 @@ func handleUpdateWebhook(r *fastglue.Request) error {
 
 	// Validate webhook fields
 	if err := validateWebhook(app, webhook); err != nil {
-		return r.SendEnvelope(err)
+		return sendErrorEnvelope(r, err)
 	}
 
 	updatedWebhook, err := app.webhook.Update(id, webhook)

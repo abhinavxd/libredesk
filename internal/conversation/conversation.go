@@ -59,6 +59,12 @@ var (
 
 const (
 	conversationsListMaxPageSize = 500
+
+	automationNotifyEmailContent = `<p style="white-space: pre-line;">{{ .Message }}</p>
+
+<p>
+<a href="{{ RootURL }}/inboxes/all/conversation/{{ .Conversation.UUID }}">#{{ .Conversation.ReferenceNumber }}</a>
+</p>`
 )
 
 var conversationFilterRenderers = dbutil.FieldRenderers{
@@ -138,6 +144,7 @@ type slaStore interface {
 	ApplySLA(startTime time.Time, conversationID, assignedTeamID, slaID int) (slaModels.SLAPolicy, error)
 	CreateNextResponseSLAEvent(conversationID, appliedSLAID, slaPolicyID, assignedTeamID int) (time.Time, error)
 	SetLatestSLAEventMetAt(appliedSLAID int, metric string) (time.Time, error)
+	EvaluateConversationSLA(conversationID int) error
 }
 
 type statusStore interface {
@@ -159,7 +166,7 @@ type userStore interface {
 	GetAgent(int, string) (umodels.User, error)
 	GetAgentCachedOrLoad(int) (umodels.User, error)
 	GetSystemUser() (umodels.User, error)
-	CreateContact(user *umodels.User) error
+	ResolveContact(user *umodels.User, policy umodels.ContactPolicy) error
 	UpgradeVisitorToContact(visitorID int) error
 }
 
@@ -175,7 +182,7 @@ type mediaStore interface {
 	GetDraftInlineMedia(uuid string, conversationID int) (mmodels.Media, error)
 	ContentIDExists(contentID, conversationUUID string) (bool, string, error)
 	Upload(fileName, contentType string, content io.ReadSeeker) (string, string, error)
-	UploadAndInsert(fileName, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte) (mmodels.Media, error)
+	UploadAndInsert(fileName, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (mmodels.Media, error)
 }
 
 type inboxStore interface {
@@ -198,6 +205,7 @@ type csatStore interface {
 
 type webhookStore interface {
 	TriggerEvent(event wmodels.WebhookEvent, data any)
+	TriggerWebhook(webhookID int, event wmodels.WebhookEvent, data any)
 }
 
 // ContinuityConfig holds configuration for conversation continuity emails
@@ -304,7 +312,9 @@ type queries struct {
 	GetConversationParticipantAgents    *sqlx.Stmt `query:"get-conversation-participant-agents"`
 	GetAgentsWithoutUnseenReplies       *sqlx.Stmt `query:"get-agents-without-unseen-replies"`
 	GetUserActiveConversationsCount     *sqlx.Stmt `query:"get-user-active-conversations-count"`
-	UpdateConversationWaitingSince      *sqlx.Stmt `query:"update-conversation-waiting-since"`
+	GetSidebarStandardCounts            *sqlx.Stmt `query:"get-sidebar-standard-counts"`
+	GetConversationsCountBase           string     `query:"get-conversations-count-base"`
+	StartConversationWaitingSince       *sqlx.Stmt `query:"start-conversation-waiting-since"`
 	UpdateConversationReplyTimestamps   *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
 	UpdateConversationContactLastSeen   *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
 	UpsertUserLastSeen                  *sqlx.Stmt `query:"upsert-user-last-seen"`
@@ -517,14 +527,14 @@ func (c *Manager) SignAvatarURL(avatarURL *null.String) {
 	}
 }
 
-// GetConversationsCreatedAfter retrieves conversations created after the specified time.
-func (c *Manager) GetConversationsCreatedAfter(time time.Time) ([]models.Conversation, error) {
-	var conversations = make([]models.Conversation, 0)
-	if err := c.q.GetConversationsCreatedAfter.Select(&conversations, time); err != nil {
-		c.lo.Error("error fetching conversation", "error", err)
-		return conversations, err
+// GetConversationsCreatedAfter retrieves a batch of conversation refs created after the given time, keyset-paged by id.
+func (c *Manager) GetConversationsCreatedAfter(after time.Time, afterID, limit int) ([]models.ConversationRef, error) {
+	var refs = make([]models.ConversationRef, 0, limit)
+	if err := c.q.GetConversationsCreatedAfter.Select(&refs, after, afterID, limit); err != nil {
+		c.lo.Error("error fetching conversation refs", "error", err)
+		return refs, err
 	}
-	return conversations, nil
+	return refs, nil
 }
 
 // UpdateUserLastSeen updates the last seen timestamp for a specific user on a conversation.
@@ -547,13 +557,17 @@ func (c *Manager) MarkAsUnread(uuid string, userID int) error {
 
 // UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.
 func (c *Manager) UpdateConversationContactLastSeen(uuid string) error {
-	if _, err := c.q.UpdateConversationContactLastSeen.Exec(uuid); err != nil {
+	var lastSeenAt time.Time
+	if err := c.q.UpdateConversationContactLastSeen.Get(&lastSeenAt, uuid); err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
 		c.lo.Error("error updating contact last seen timestamp", "conversation_id", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Broadcast the property update to all subscribers.
-	c.BroadcastConversationUpdate(uuid, map[string]any{"contact_last_seen_at": time.Now().Format(time.RFC3339)})
+	c.BroadcastConversationUpdate(uuid, map[string]any{"contact_last_seen_at": lastSeenAt.Format(time.RFC3339Nano)})
 	return nil
 }
 
@@ -672,22 +686,24 @@ func (c *Manager) GetConversations(viewingUserID, userID int, teamIDs []int, lis
 
 // ReOpenConversation reopens a conversation if it's snoozed, resolved or closed.
 func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User) error {
-	rows, err := c.q.ReOpenConversation.Exec(conversationUUID)
-	if err != nil {
+	var conversationID int
+	if err := c.q.ReOpenConversation.QueryRow(conversationUUID).Scan(&conversationID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
 		c.lo.Error("error reopening conversation", "uuid", conversationUUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Record the status change as an activity if the conversation was reopened.
-	count, _ := rows.RowsAffected()
-	if count > 0 {
-		// Broadcast update using WS
-		c.BroadcastConversationUpdate(conversationUUID, map[string]any{"status": models.StatusOpen})
+	// Reopening revives any first response or resolution deadline the resolved status had nulled.
+	if err := c.slaStore.EvaluateConversationSLA(conversationID); err != nil {
+		c.lo.Error("error evaluating SLA after reopen", "uuid", conversationUUID, "error", err)
+	}
 
-		// Record the status change as an activity.
-		if err := c.RecordStatusChange(models.StatusOpen, conversationUUID, actor); err != nil {
-			return err
-		}
+	c.BroadcastConversationUpdate(conversationUUID, map[string]any{"status": models.StatusOpen})
+
+	if err := c.RecordStatusChange(models.StatusOpen, conversationUUID, actor); err != nil {
+		return err
 	}
 	return nil
 }
@@ -712,35 +728,45 @@ func (c *Manager) UpdateConversationLastMessage(conversation int, conversationUU
 	return nil
 }
 
-// UpdateConversationWaitingSince updates the waiting since timestamp for a conversation.
-func (c *Manager) UpdateConversationWaitingSince(conversationUUID string, at *time.Time) error {
-	res, err := c.q.UpdateConversationWaitingSince.Exec(conversationUUID, at)
+// StartConversationWaitingSince stamps the waiting since timestamp only if the conversation isn't already waiting.
+func (c *Manager) StartConversationWaitingSince(conversationUUID string, at time.Time) error {
+	res, err := c.q.StartConversationWaitingSince.Exec(conversationUUID, at)
 	if err != nil {
 		c.lo.Error("error updating conversation waiting since", "error", err)
 		return err
 	}
 
-	rows, _ := res.RowsAffected()
-	if rows > 0 {
-		if at != nil {
-			c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": at.Format(time.RFC3339)})
-		} else {
-			c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": nil})
-		}
+	if rows, _ := res.RowsAffected(); rows > 0 {
+		c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": at.Format(time.RFC3339)})
 	}
 	return nil
 }
 
 // UpdateConversationUserAssignee sets the assignee of a conversation to a specifc user.
 func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, actor umodels.User) error {
+	previousConversation, err := c.GetConversation(0, uuid, "")
+	if err != nil {
+		return err
+	}
+
+	// Return early on a no-op write, else automation rules acting on the user assigned event re-trigger themselves.
+	if previousConversation.AssignedUserID.Valid && previousConversation.AssignedUserID.Int == assigneeID {
+		c.lo.Debug("no assignee update: conversation assignee unchanged", "uuid", uuid, "assignee_id", assigneeID)
+		return nil
+	}
+
 	if err := c.updateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	return c.afterUserAssignedHooks(uuid, assigneeID, actor)
+	return c.afterUserAssignedHooks(uuid, assigneeID, actor, amodels.PreviousValues(previousConversation))
 }
 
 // ClaimUnassignedConversation atomically assigns a conversation only if still unassigned and still in expectedTeamID, else returns ErrConversationAlreadyAssigned.
 func (c *Manager) ClaimUnassignedConversation(uuid string, assigneeID, expectedTeamID int, actor umodels.User) error {
+	previousConversation, err := c.GetConversation(0, uuid, "")
+	if err != nil {
+		return err
+	}
 	prev, prevErr := c.GetConversationListItem(uuid)
 
 	res, err := c.q.ClaimUnassignedConversation.Exec(uuid, assigneeID, expectedTeamID)
@@ -758,11 +784,11 @@ func (c *Manager) ClaimUnassignedConversation(uuid string, assigneeID, expectedT
 	}
 
 	c.broadcastReassignment(uuid, prev, prevErr)
-	return c.afterUserAssignedHooks(uuid, assigneeID, actor)
+	return c.afterUserAssignedHooks(uuid, assigneeID, actor, amodels.PreviousValues(previousConversation))
 }
 
 // afterUserAssignedHooks runs the side-effects shared by every user-assignment path.
-func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umodels.User) error {
+func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umodels.User, previousValues map[string]string) error {
 	conversation, err := c.GetConversation(0, uuid, "")
 	if err != nil {
 		return err
@@ -775,7 +801,7 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 		"conversation":      conversation,
 	})
 
-	c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationUserAssigned)
+	c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationUserAssigned, previousValues, actor)
 
 	if assigneeID != actor.ID {
 		if err := c.NotifyAssignment([]int{assigneeID}, conversation); err != nil {
@@ -816,49 +842,36 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 
 // UpdateConversationTeamAssignee sets the assignee of a conversation to a specific team and sets the assigned user id to NULL.
 func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor umodels.User) error {
-	// Store previously assigned team ID to apply SLA policy if team has changed.
 	conversation, err := c.GetConversation(0, uuid, "")
 	if err != nil {
 		return err
 	}
 	previousAssignedTeamID := conversation.AssignedTeamID.Int
+	previousValues := amodels.PreviousValues(conversation)
 
 	if err := c.updateAssignee(uuid, teamID, models.AssigneeTypeTeam); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Assignment successful, any errors now are non-critical and can be ignored by returning nil.
+	// Assignment succeeded, errors after this point are non-critical and must not skip the remaining side effects.
 	if err := c.RecordAssigneeTeamChange(uuid, teamID, actor); err != nil {
-		return nil
+		c.lo.Error("error recording team assignee change", "uuid", uuid, "error", err)
 	}
 
 	// Team changed?
 	if previousAssignedTeamID != teamID {
 		// Remove assigned user if team has changed.
-		c.RemoveConversationAssignee(uuid, models.AssigneeTypeUser, actor)
-
-		// Apply SLA policy if this new team has a SLA policy.
-		team, err := c.teamStore.Get(teamID)
-		if err != nil {
-			return nil
-		}
-		// Fetch the conversation again to get the updated details.
-		conversation, err := c.GetConversation(0, uuid, "")
-		if err != nil {
-			return nil
-		}
-		if team.SLAPolicyID.Int > 0 {
-			systemUser, err := c.userStore.GetSystemUser()
-			if err != nil {
-				return nil
-			}
-			if err := c.ApplySLA(conversation, team.SLAPolicyID.Int, systemUser); err != nil {
-				return nil
-			}
+		if err := c.RemoveConversationAssignee(uuid, models.AssigneeTypeUser, actor); err != nil {
+			c.lo.Error("error removing conversation assignee after team change", "uuid", uuid, "error", err)
 		}
 
-		// Evaluate automation rules for conversation team assignment.
-		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationTeamAssigned)
+		updatedConversation, err := c.GetConversation(0, uuid, "")
+		if err != nil {
+			c.lo.Error("error fetching conversation after team assignment", "uuid", uuid, "error", err)
+		} else {
+			c.applyTeamSLA(updatedConversation, teamID)
+			c.automation.EvaluateConversationUpdateRules(updatedConversation, amodels.EventConversationTeamAssigned, previousValues, actor)
+		}
 	}
 
 	// Broadcast conversation update to widget clients.
@@ -867,6 +880,26 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 	})
 
 	return nil
+}
+
+// applyTeamSLA applies the team's SLA policy to the conversation if the team has one, logging failures.
+func (c *Manager) applyTeamSLA(conversation models.Conversation, teamID int) {
+	team, err := c.teamStore.Get(teamID)
+	if err != nil {
+		c.lo.Error("error fetching team for SLA policy", "team_id", teamID, "error", err)
+		return
+	}
+	if team.SLAPolicyID.Int <= 0 {
+		return
+	}
+	systemUser, err := c.userStore.GetSystemUser()
+	if err != nil {
+		c.lo.Error("error fetching system user to apply team SLA policy", "error", err)
+		return
+	}
+	if err := c.ApplySLA(conversation, team.SLAPolicyID.Int, systemUser); err != nil {
+		c.lo.Error("error applying team SLA policy", "uuid", conversation.UUID, "sla_policy_id", team.SLAPolicyID.Int, "error", err)
+	}
 }
 
 // broadcastReassignment broadcasts a reassignment to agents, given the conversation's prior list item.
@@ -885,7 +918,11 @@ func (c *Manager) broadcastReassignment(uuid string, prev models.ConversationLis
 
 // UpdateConversationPriority updates the priority of a conversation.
 func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priority string, actor umodels.User) error {
-	// Fetch the priority name if priority ID is provided.
+	previousConversation, err := c.GetConversation(0, uuid, "")
+	if err != nil {
+		return err
+	}
+
 	if priorityID > 0 {
 		p, err := c.priorityStore.Get(priorityID)
 		if err != nil {
@@ -893,15 +930,21 @@ func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priori
 		}
 		priority = p.Name
 	}
+
+	// Return early on a no-op write, else automation rules acting on the priority change event re-trigger themselves.
+	if previousConversation.Priority.String == priority {
+		c.lo.Debug("no priority update: conversation priority unchanged", "uuid", uuid, "priority", priority)
+		return nil
+	}
+
 	if _, err := c.q.UpdateConversationPriority.Exec(uuid, priority); err != nil {
 		c.lo.Error("error updating conversation priority", "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Evaluate automation rules for conversation priority change.
 	conversation, err := c.GetConversation(0, uuid, "")
 	if err == nil {
-		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationPriorityChange)
+		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationPriorityChange, amodels.PreviousValues(previousConversation), actor)
 	}
 
 	// Record activity.
@@ -931,8 +974,8 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	snoozeUntil := time.Time{}
 	if status == models.StatusSnoozed {
 		duration, err := time.ParseDuration(snoozeDur)
-		if err != nil {
-			c.lo.Error("error parsing snooze duration", "error", err)
+		if err != nil || duration <= 0 {
+			c.lo.Error("error parsing snooze duration", "duration", snoozeDur, "error", err)
 			return envelope.NewError(envelope.InputError, c.i18n.T("validation.invalidSnoozeDuration"), nil)
 		}
 		snoozeUntil = time.Now().Add(duration)
@@ -955,6 +998,11 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	if _, err := c.q.UpdateConversationStatus.Exec(uuid, status, snoozeUntil); err != nil {
 		c.lo.Error("error updating conversation status", "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	// Stamps a just-resolved resolution SLA immediately and recomputes the cached deadline.
+	if err := c.slaStore.EvaluateConversationSLA(conversationBeforeChange.ID); err != nil {
+		c.lo.Error("error evaluating SLA after status change", "uuid", uuid, "error", err)
 	}
 
 	// Fetch conversation for webhook and automation rules.
@@ -1017,9 +1065,8 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	}
 	c.BroadcastConversationUpdate(uuid, agentData)
 
-	// Evaluate automation rules.
 	if conversation.ID != 0 {
-		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationStatusChange)
+		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationStatusChange, amodels.PreviousValues(conversationBeforeChange), actor)
 	}
 
 	// Broadcast conversation update to widget clients.
@@ -1356,47 +1403,46 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	// Don't notify the person who made the mention.
 	delete(recipientIDMap, mentionedByUserID)
 
-	// Build recipient list and personalized emails.
-	var recipientIDs []int
-	var emails []notifier.EmailNotification
-
+	userIDs := make([]int, 0, len(recipientIDMap))
 	for userID := range recipientIDMap {
-		recipient, err := m.userStore.GetAgent(userID, "")
-		if err != nil {
-			m.lo.Error("error fetching recipient for mention notification", "user_id", userID, "error", err)
-			continue
-		}
-
-		recipientIDs = append(recipientIDs, userID)
-
-		// Render personalized email for this recipient.
-		var email notifier.EmailNotification
-		if recipient.Email.String != "" {
-			// Mentions have no automated author, the mentioning agent is exposed as MentionedBy.
-			data := notificationTemplateData(conversation, recipient, umodels.User{})
-			data["Message"] = map[string]any{
-				"UUID":    message.UUID,
-				"Content": message.Content,
-			}
-			data["MentionedBy"] = map[string]any{
-				"FirstName": author.FirstName,
-				"LastName":  author.LastName,
-				"FullName":  author.FullName(),
-				"Email":     author.Email.String,
-			}
-			content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned, data)
-			if err != nil {
-				m.lo.Error("error rendering mention notification template", "conversation_uuid", conversationUUID, "error", err)
-			} else {
-				email = notifier.EmailNotification{
-					Recipients: []string{recipient.Email.String},
-					Subject:    subject,
-					Content:    content,
-				}
-			}
-		}
-		emails = append(emails, email)
+		userIDs = append(userIDs, userID)
 	}
+
+	recipientIDs, emails := m.buildRecipientEmails(userIDs, func(recipient umodels.User) (string, string, error) {
+		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned,
+			map[string]any{
+				"Conversation": map[string]any{
+					"ReferenceNumber": conversation.ReferenceNumber,
+					"Subject":         conversation.Subject.String,
+					"Priority":        conversation.Priority.String,
+					"UUID":            conversation.UUID,
+				},
+				"Recipient": map[string]any{
+					"FirstName": recipient.FirstName,
+					"LastName":  recipient.LastName,
+					"FullName":  recipient.FullName(),
+					"Email":     recipient.Email.String,
+				},
+				"Message": map[string]any{
+					"UUID":    message.UUID,
+					"Content": message.Content,
+				},
+				"MentionedBy": map[string]any{
+					"FirstName": author.FirstName,
+					"LastName":  author.LastName,
+					"FullName":  author.FullName(),
+					"Email":     author.Email.String,
+				},
+				// Automated messages do not have an author.
+				"Author": map[string]any{
+					"FirstName": "",
+					"LastName":  "",
+					"FullName":  "",
+					"Email":     "",
+				},
+			})
+		return subject, content, err
+	})
 
 	if len(recipientIDs) == 0 {
 		return
@@ -1438,9 +1484,13 @@ func (m *Manager) ApplySLA(conversation models.Conversation, policyID int, actor
 	if updated, ferr := m.GetConversation(0, conversation.UUID, ""); ferr == nil {
 		m.BroadcastConversationUpdate(conversation.UUID, map[string]any{
 			"sla_policy_id":              updated.SLAPolicyID.Int,
+			"sla_policy_name":            updated.SlaPolicyName.String,
 			"applied_sla_id":             updated.AppliedSLAID.Int,
 			"first_response_deadline_at": nullTimeOrNil(updated.FirstResponseDueAt),
 			"resolution_deadline_at":     nullTimeOrNil(updated.ResolutionDueAt),
+			"next_response_deadline_at":  nullTimeOrNil(updated.NextResponseDueAt),
+			"next_response_met_at":       nullTimeOrNil(updated.NextResponseMetAt),
+			"next_sla_deadline_at":       nullTimeOrNil(updated.NextSLADeadlineAt),
 		})
 	}
 
@@ -1450,8 +1500,9 @@ func (m *Manager) ApplySLA(conversation models.Conversation, policyID int, actor
 // ApplyAction applies an action to a conversation, this can be called from multiple packages across the app to perform actions on conversations.
 // all actions are executed on behalf of the provided user if the user is not provided, system user is used.
 func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversation, user umodels.User) error {
-	// CSAT action does not require a value.
-	if len(action.Value) == 0 && action.Type != amodels.ActionSendCSAT {
+	// CSAT has no value; notify carries its data in dedicated fields.
+	if len(action.Value) == 0 && action.Type != amodels.ActionSendCSAT && action.Type != amodels.ActionNotify {
+		m.lo.Warn("empty value for action", "type", action.Type, "conversation_uuid", conv.UUID)
 		return fmt.Errorf("empty value for action %s", action.Type)
 	}
 
@@ -1531,8 +1582,207 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 		return m.SetConversationTags(conv.UUID, action.Type, action.Value, user)
 	case amodels.ActionSendCSAT:
 		return m.SendCSATReply(user.ID, conv)
+	case amodels.ActionSnooze:
+		if len(action.Value) == 0 || strings.TrimSpace(action.Value[0]) == "" {
+			return fmt.Errorf("snooze action requires a duration")
+		}
+		return m.UpdateConversationStatus(conv.UUID, 0, models.StatusSnoozed, strings.TrimSpace(action.Value[0]), user)
+	case amodels.ActionTriggerWebhook:
+		if len(action.Value) < 2 {
+			return fmt.Errorf("trigger webhook action requires a webhook and an event name")
+		}
+		webhookID, err := strconv.Atoi(action.Value[0])
+		if err != nil {
+			return fmt.Errorf("invalid webhook ID %q: %w", action.Value[0], err)
+		}
+		if webhookID <= 0 {
+			return fmt.Errorf("invalid webhook ID %q", action.Value[0])
+		}
+		eventName := strings.TrimSpace(action.Value[1])
+		if eventName == "" {
+			return fmt.Errorf("trigger webhook action requires an event name")
+		}
+		m.webhookStore.TriggerWebhook(webhookID, wmodels.WebhookEvent(eventName), map[string]any{
+			"conversation": conv,
+			"actor_id":     user.ID,
+		})
+		return nil
+	case amodels.ActionNotify:
+		subject := strings.TrimSpace(action.Subject)
+		message := strings.TrimSpace(action.Message)
+		if subject == "" || message == "" || len(action.Recipients) == 0 {
+			return fmt.Errorf("notify action requires a subject, a message and at least one recipient")
+		}
+		return m.notifyAutomation(subject, message, action.Recipients, conv)
 	default:
 		return fmt.Errorf("unknown action: %s", action.Type)
+	}
+	return nil
+}
+
+func (m *Manager) notifyAutomation(subject, message string, entries []string, conv models.Conversation) error {
+	userIDs := m.resolveNotifyRecipients(entries, conv)
+	if len(userIDs) == 0 {
+		m.lo.Debug("notify action: no recipients resolved", "conversation_uuid", conv.UUID)
+		return nil
+	}
+	if len(userIDs) > amodels.MaxNotifyRecipients {
+		m.lo.Warn("notify action: recipient cap reached, truncating", "original", len(userIDs), "cap", amodels.MaxNotifyRecipients, "conversation_uuid", conv.UUID)
+		userIDs = userIDs[:amodels.MaxNotifyRecipients]
+	}
+
+	recipientIDs, emails := m.buildRecipientEmails(userIDs, func(recipient umodels.User) (string, string, error) {
+		content, err := m.template.RenderEmailWithTemplate(
+			map[string]any{
+				"Conversation": map[string]any{
+					"ReferenceNumber": conv.ReferenceNumber,
+					"Subject":         conv.Subject.String,
+					"Priority":        conv.Priority.String,
+					"UUID":            conv.UUID,
+				},
+				"Recipient": map[string]any{
+					"FirstName": recipient.FirstName,
+					"LastName":  recipient.LastName,
+					"FullName":  recipient.FullName(),
+					"Email":     recipient.Email.String,
+				},
+				"Contact": map[string]any{
+					"FirstName": conv.Contact.FirstName,
+					"LastName":  conv.Contact.LastName,
+					"FullName":  conv.Contact.FullName(),
+					"Email":     conv.Contact.Email.String,
+				},
+				// Automated messages do not have an author.
+				"Author": map[string]any{
+					"FirstName": "",
+					"LastName":  "",
+					"FullName":  "",
+					"Email":     "",
+				},
+				"Message": message,
+			},
+			automationNotifyEmailContent)
+		return subject, content, err
+	})
+
+	m.dispatcher.SendWithEmails(notifier.Notification{
+		Type:             nmodels.NotificationTypeMention,
+		RecipientIDs:     recipientIDs,
+		Title:            subject,
+		Body:             null.StringFrom(message),
+		ConversationID:   null.IntFrom(conv.ID),
+		ConversationUUID: conv.UUID,
+	}, emails)
+	return nil
+}
+
+// buildRecipientEmails fetches each recipient and renders their email, returning emails index-aligned with recipient IDs; on fetch or render failure the in-app notification still goes out with a zero-value email.
+func (m *Manager) buildRecipientEmails(userIDs []int, render func(recipient umodels.User) (subject, content string, err error)) ([]int, []notifier.EmailNotification) {
+	var (
+		recipientIDs []int
+		emails       []notifier.EmailNotification
+	)
+	for _, id := range userIDs {
+		recipientIDs = append(recipientIDs, id)
+
+		recipient, err := m.userStore.GetAgentCachedOrLoad(id)
+		if err != nil {
+			m.lo.Error("error fetching agent for email notification", "user_id", id, "error", err)
+			emails = append(emails, notifier.EmailNotification{})
+			continue
+		}
+
+		var email notifier.EmailNotification
+		if recipient.Email.String != "" {
+			subject, content, err := render(recipient)
+			if err != nil {
+				m.lo.Error("error rendering email notification", "user_id", id, "error", err)
+			} else {
+				email = notifier.EmailNotification{
+					Recipients: []string{recipient.Email.String},
+					Subject:    subject,
+					Content:    content,
+				}
+			}
+		}
+		emails = append(emails, email)
+	}
+	return recipientIDs, emails
+}
+
+func (m *Manager) resolveNotifyRecipients(entries []string, conv models.Conversation) []int {
+	seen := make(map[int]bool)
+	ids := make([]int, 0, len(entries))
+	addUser := func(id int) {
+		if id <= 0 || seen[id] {
+			return
+		}
+		seen[id] = true
+		agent, err := m.userStore.GetAgentCachedOrLoad(id)
+		if err != nil {
+			m.lo.Error("notify: error fetching agent", "user_id", id, "error", err)
+			return
+		}
+		if !agent.Enabled {
+			m.lo.Debug("notify: agent disabled, skipping", "user_id", id)
+			return
+		}
+		ids = append(ids, id)
+	}
+	addTeam := func(teamID int) {
+		members, err := m.teamStore.GetMembers(teamID)
+		if err != nil {
+			m.lo.Error("notify: failed to get team members", "team_id", teamID, "error", err)
+			return
+		}
+		for _, mm := range members {
+			addUser(mm.ID)
+		}
+	}
+	for _, e := range entries {
+		kind, id := parseNotifyRecipient(e)
+		switch kind {
+		case amodels.NotifyRecipientAssignee:
+			if conv.AssignedUserID.Valid {
+				addUser(conv.AssignedUserID.Int)
+			} else {
+				m.lo.Debug("notify: assignee unset, skipping", "uuid", conv.UUID)
+			}
+		case amodels.NotifyRecipientAssignedTeam:
+			if conv.AssignedTeamID.Valid {
+				addTeam(conv.AssignedTeamID.Int)
+			} else {
+				m.lo.Debug("notify: assigned team unset, skipping", "uuid", conv.UUID)
+			}
+		case amodels.NotifyRecipientTeam:
+			if id > 0 {
+				addTeam(id)
+			}
+		case amodels.NotifyRecipientUser:
+			addUser(id)
+		default:
+			m.lo.Warn("notify: unknown recipient kind", "entry", e, "uuid", conv.UUID)
+		}
+	}
+	return ids
+}
+
+// UnassignConversationUser removes the assigned user and records the removal activity.
+func (m *Manager) UnassignConversationUser(uuid string, actor umodels.User) error {
+	conversation, err := m.GetConversation(0, uuid, "")
+	if err != nil {
+		return err
+	}
+	previousAssigneeID := conversation.AssignedUserID.Int
+
+	if err := m.RemoveConversationAssignee(uuid, models.AssigneeTypeUser, actor); err != nil {
+		return err
+	}
+
+	if previousAssigneeID > 0 {
+		if err := m.RecordAssigneeUserRemoval(uuid, previousAssigneeID, actor); err != nil {
+			m.lo.Error("error recording assignee removal", "uuid", uuid, "assignee_id", previousAssigneeID, "error", err)
+		}
 	}
 	return nil
 }
@@ -1657,13 +1907,13 @@ func (c *Manager) UpdateConversationCustomAttributes(uuid string, customAttribut
 
 // addConversationParticipant adds a user as participant to a conversation.
 func (c *Manager) addConversationParticipant(userID int, conversationUUID string) error {
-	_, err := c.q.InsertConversationParticipant.Exec(userID, conversationUUID)
+	res, err := c.q.InsertConversationParticipant.Exec(userID, conversationUUID)
 	if err != nil {
-		if dbutil.IsUniqueViolationError(err) {
-			return nil // Already a participant.
-		}
 		c.lo.Error("error adding conversation participant", "user_id", userID, "conversation_uuid", conversationUUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if rows, err := res.RowsAffected(); err == nil && rows == 0 {
+		return nil
 	}
 
 	// New participant added - log activity only for contacts with a different email than the conversation contact.
@@ -1727,55 +1977,13 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 	}
 
 	// Prepare the conditions based on the list types.
-	conditions := []string{}
-	for _, lt := range listTypes {
-		switch lt {
-		case models.AssignedConversations:
-			conditions = append(conditions, fmt.Sprintf("conversations.assigned_user_id = $%d", len(qArgs)+1))
-			qArgs = append(qArgs, userID)
-		case models.UnassignedConversations:
-			conditions = append(conditions, "conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL")
-		case models.TeamUnassignedConversations:
-			placeholders := make([]string, len(teamIDs))
-			for i := range teamIDs {
-				placeholders[i] = fmt.Sprintf("$%d", len(qArgs)+i+1)
-			}
-			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s) AND conversations.assigned_user_id IS NULL)", strings.Join(placeholders, ",")))
-			for _, id := range teamIDs {
-				qArgs = append(qArgs, id)
-			}
-		case models.TeamAllConversations:
-			placeholders := make([]string, len(teamIDs))
-			for i := range teamIDs {
-				placeholders[i] = fmt.Sprintf("$%d", len(qArgs)+i+1)
-			}
-			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s))", strings.Join(placeholders, ",")))
-			for _, id := range teamIDs {
-				qArgs = append(qArgs, id)
-			}
-		case models.AllConversations:
-			// No conditions needed for all conversations.
-		case models.MentionedConversations:
-			// Filter to only conversations where user is mentioned (directly or via team)
-			conditions = append(conditions, `conversations.id IN (
-				SELECT cm.conversation_id
-				FROM conversation_mentions cm
-				WHERE cm.mentioned_user_id = $1
-				   OR EXISTS(
-					   SELECT 1 FROM team_members tm
-					   WHERE tm.team_id = cm.mentioned_team_id AND tm.user_id = $1
-				   )
-			)`)
-		default:
-			return "", nil, fmt.Errorf("unknown conversation type: %s", lt)
-		}
+	conditions, err := appendListTypeConditions(listTypes, viewingUserID, userID, teamIDs, &qArgs)
+	if err != nil {
+		return "", nil, err
 	}
 
 	// Build the base query with list type conditions
-	var whereClause string
-	if len(conditions) > 0 {
-		whereClause = "AND (" + strings.Join(conditions, " OR ") + ")"
-	}
+	whereClause := listTypeWhereClause(conditions)
 
 	baseQuery = fmt.Sprintf(baseQuery, whereClause)
 
@@ -2092,6 +2300,16 @@ func (c *Manager) filterLocation() string {
 	return tz
 }
 
+func parseNotifyRecipient(entry string) (string, int) {
+	parts := strings.SplitN(strings.TrimSpace(entry), ":", 2)
+	kind := strings.ToLower(strings.TrimSpace(parts[0]))
+	if len(parts) == 1 {
+		return kind, 0
+	}
+	id, _ := strconv.Atoi(strings.TrimSpace(parts[1]))
+	return kind, id
+}
+
 func nullTimeOrNil(t null.Time) any {
 	if !t.Valid || t.Time.IsZero() {
 		return nil
@@ -2151,4 +2369,60 @@ func notificationTemplateData(conversation models.Conversation, recipient, autho
 			"Email":     author.Email.String,
 		},
 	}
+}
+
+// appendListTypeConditions returns the SQL conditions for the list types, appending their bind parameters to args.
+func appendListTypeConditions(listTypes []string, viewingUserID, userID int, teamIDs []int, args *[]any) ([]string, error) {
+	conditions := make([]string, 0, len(listTypes))
+	for _, lt := range listTypes {
+		switch lt {
+		case models.AssignedConversations:
+			*args = append(*args, userID)
+			conditions = append(conditions, fmt.Sprintf("conversations.assigned_user_id = $%d", len(*args)))
+		case models.UnassignedConversations:
+			conditions = append(conditions, "conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL")
+		case models.TeamUnassignedConversations:
+			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s) AND conversations.assigned_user_id IS NULL)", appendTeamIDArgs(teamIDs, args)))
+		case models.TeamAllConversations:
+			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s))", appendTeamIDArgs(teamIDs, args)))
+		case models.AllConversations:
+			// No conditions needed for all conversations.
+		case models.MentionedConversations:
+			// Filter to only conversations where user is mentioned (directly or via team)
+			*args = append(*args, viewingUserID)
+			conditions = append(conditions, fmt.Sprintf(`conversations.id IN (
+				SELECT cm.conversation_id
+				FROM conversation_mentions cm
+				WHERE cm.mentioned_user_id = $%d
+				   OR EXISTS(
+					   SELECT 1 FROM team_members tm
+					   WHERE tm.team_id = cm.mentioned_team_id AND tm.user_id = $%d
+				   )
+			)`, len(*args), len(*args)))
+		default:
+			return nil, fmt.Errorf("unknown conversation type: %s", lt)
+		}
+	}
+	return conditions, nil
+}
+
+// appendTeamIDArgs appends team IDs to args and returns their placeholders, or NULL when there are none.
+func appendTeamIDArgs(teamIDs []int, args *[]any) string {
+	if len(teamIDs) == 0 {
+		return "NULL"
+	}
+	placeholders := make([]string, len(teamIDs))
+	for i, id := range teamIDs {
+		*args = append(*args, id)
+		placeholders[i] = fmt.Sprintf("$%d", len(*args))
+	}
+	return strings.Join(placeholders, ",")
+}
+
+// listTypeWhereClause ORs the conditions into an AND (...) clause for the base query.
+func listTypeWhereClause(conditions []string) string {
+	if len(conditions) == 0 {
+		return ""
+	}
+	return "AND (" + strings.Join(conditions, " OR ") + ")"
 }

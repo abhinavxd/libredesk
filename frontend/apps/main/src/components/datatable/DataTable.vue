@@ -126,7 +126,7 @@ const { t } = useI18n()
 
 // Hidden until row-hover on pointer devices; always shown on touch, focus, and while the menu is open.
 const actionCellClass =
-  'transition-opacity duration-150 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100 focus-within:!opacity-100 [&:has([data-state=open])]:!opacity-100'
+  'transition-opacity duration-150 can-hover:opacity-0 can-hover:group-hover/row:opacity-100 focus-within:!opacity-100 [&:has([data-state=open])]:!opacity-100 max-md:[&_button]:size-11'
 
 const props = defineProps({
   columns: Array,

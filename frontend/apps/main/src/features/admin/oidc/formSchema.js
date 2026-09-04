@@ -27,5 +27,5 @@ export const createFormSchema = (t) => z.object({
     })
     .min(1, { message: t('globals.messages.required') }),
   redirect_uri: z.string().readonly().optional(),
-  enabled: z.boolean().default(true).optional(),
+  enabled: z.boolean().optional().default(true),
 })

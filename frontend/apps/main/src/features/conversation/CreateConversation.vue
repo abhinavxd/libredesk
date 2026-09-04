@@ -1,7 +1,7 @@
 <template>
   <div>
     <Dialog v-model:open="dialogOpen">
-      <DialogContent class="max-w-5xl w-full h-[90vh] flex flex-col" >
+      <DialogContent class="max-w-5xl h-[90vh] flex flex-col" >
         <DialogHeader>
           <DialogTitle>
             {{ $t('conversation.newConversation') }}
@@ -148,15 +148,7 @@
                       ({{ $t('globals.terms.optional') }})
                     </FormLabel>
                     <FormControl>
-                      <SelectComboBox
-                        v-bind="componentField"
-                        :items="[
-                          { value: 'none', label: t('globals.terms.none') },
-                          ...teamStore.options
-                        ]"
-                        :placeholder="t('placeholders.selectTeam')"
-                        type="team"
-                      />
+                      <SelectTeamCombobox v-bind="componentField" include-none />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -170,15 +162,7 @@
                       ({{ $t('globals.terms.optional') }})
                     </FormLabel>
                     <FormControl>
-                      <SelectComboBox
-                        v-bind="componentField"
-                        :items="[
-                          { value: 'none', label: t('globals.terms.none') },
-                          ...uStore.options
-                        ]"
-                        :placeholder="t('placeholders.selectAgent')"
-                        type="user"
-                      />
+                      <SelectAgentCombobox v-bind="componentField" include-none />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -197,7 +181,7 @@
                     <Editor
                       v-model:htmlContent="componentField.modelValue"
                       @update:htmlContent="(value) => componentField.onChange(value)"
-                      :placeholder="t('editor.hint.newLineCtrlK')"
+                      :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')"
                       :insertContent="insertContent"
                       :autoFocus="false"
                       :enableInlineImages="true"
@@ -243,6 +227,7 @@
               :handleFileUpload="handleFileUpload"
               @emojiSelect="handleEmojiSelect"
               :showSendButton="false"
+              :showGenerateReply="false"
             />
             <Button type="submit" :disabled="isDisabled" :isLoading="loading">
               {{ $t('globals.messages.submit') }}
@@ -285,8 +270,6 @@ import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useInboxStore } from '@main/stores/inbox'
-import { useUsersStore } from '@main/stores/users'
-import { useTeamStore } from '@main/stores/team'
 import {
   Select,
   SelectContent,
@@ -297,24 +280,30 @@ import {
 } from '@shared-ui/components/ui/select'
 import { useI18n } from 'vue-i18n'
 import { useFileUpload } from '@/composables/useFileUpload'
-import Editor from '@/components/editor/TextEditor.vue'
+import Editor from '@/components/editor/ConversationEditor.vue'
 import { useMacroStore } from '@/stores/macro'
-import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
+import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
 import { UserTypeAgent } from '@/constants/user'
 import { IdCard } from 'lucide-vue-next'
 import api from '@/api'
 import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
+import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
+import { useCommandPalette } from '@/features/command/useCommandPalette'
 
 const dialogOpen = defineModel({
   required: false,
   default: () => false
 })
+const props = defineProps({
+  initialContact: { type: Object, default: null }
+})
+const palette = useCommandPalette()
 
 const inboxStore = useInboxStore()
 const { t } = useI18n()
-const uStore = useUsersStore()
-const teamStore = useTeamStore()
 const emitter = useEmitter()
+const isCramped = useIsComposerCramped()
 const loading = ref(false)
 const searchResults = ref([])
 const emailQuery = ref('')
@@ -369,23 +358,25 @@ onUnmounted(() => {
   clearMediaFiles()
   conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
   macroStore.setCurrentView(previousMacroView)
-  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
-    command: null,
-    open: false
-  })
+  palette.setMacroContext(MACRO_CONTEXT.REPLY)
 })
 
 onMounted(() => {
   previousMacroView = macroStore.currentView
   macroStore.setCurrentView('starting_conversation')
-  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
-    command: 'apply-macro-to-new-conversation',
-    open: false
-  })
+  palette.setMacroContext(MACRO_CONTEXT.NEW_CONVERSATION)
+  if (props.initialContact?.email) selectContact(props.initialContact)
   nextTick(() => {
     emailInputRef.value?.$el?.focus()
   })
 })
+
+watch(
+  () => props.initialContact,
+  (contact) => {
+    if (contact?.email) selectContact(contact)
+  }
+)
 
 const form = useForm({
   validationSchema: toTypedSchema(formSchema),
@@ -471,6 +462,11 @@ const createConversation = form.handleSubmit(async (values) => {
     values.agent_id = values.agent_id ? Number(values.agent_id) : null
     // Array of attachment ids.
     values.attachments = mediaFiles.value.map((file) => file.id)
+    if (selectedContact.value?.external_user_id) {
+      values.external_user_id = selectedContact.value.external_user_id
+    }
+    // Form data is a snapshot from search; never let it overwrite the stored contact.
+    values.reuse_contact = true
     // Initiator of this conversation is always agent
     values.initiator = UserTypeAgent
     const conversation = await api.createConversation(values)
@@ -478,7 +474,7 @@ const createConversation = form.handleSubmit(async (values) => {
 
     // Get macro from context, and set if any actions are available.
     const macro = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)
-    if (conversationUUID !== '' && macro?.id && macro?.actions?.length > 0) {
+    if (conversationUUID !== '' && macro?.id) {
       try {
         await api.applyMacro(conversationUUID, macro.id, macro.actions)
       } catch (error) {
@@ -506,10 +502,8 @@ const createConversation = form.handleSubmit(async (values) => {
 watch(
   () => conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).id,
   () => {
-    form.setFieldValue(
-      'content',
-      conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
-    )
+    const content = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
+    if (content) form.setFieldValue('content', content)
   },
   { deep: true }
 )

@@ -149,6 +149,7 @@ const permissions = ref([
       { name: perms.CONVERSATIONS_UPDATE_TAGS, label: t('admin.role.conversations.updateTags') },
       { name: perms.MESSAGES_READ, label: t('admin.role.messages.read') },
       { name: perms.MESSAGES_WRITE, label: t('admin.role.messages.write') },
+      { name: perms.MESSAGES_WRITE_PRIVATE, label: t('admin.role.messages.writePrivate') },
       { name: perms.MESSAGES_WRITE_AS_CONTACT, label: t('admin.role.messages.writeAsContact') },
       { name: perms.VIEW_MANAGE, label: t('admin.role.view.manage') }
     ]
@@ -175,6 +176,7 @@ const permissions = ref([
       { name: perms.BUSINESS_HOURS_MANAGE, label: t('admin.role.businessHours.manage') },
       { name: perms.SLA_MANAGE, label: t('admin.role.sla.manage') },
       { name: perms.AI_MANAGE, label: t('admin.role.ai.manage') },
+      { name: perms.HELP_CENTER_MANAGE, label: t('admin.role.helpCenter.manage') },
       { name: perms.CUSTOM_ATTRIBUTES_MANAGE, label: t('admin.role.customAttributes.manage') },
       { name: perms.ACTIVITY_LOGS_MANAGE, label: t('admin.role.activityLog.manage') },
       { name: perms.WEBHOOKS_MANAGE, label: t('admin.role.webhooks.manage') },
@@ -189,6 +191,8 @@ const permissions = ref([
       { name: perms.CONTACTS_READ, label: t('admin.role.contacts.read') },
       { name: perms.CONTACTS_WRITE, label: t('admin.role.contacts.write') },
       { name: perms.CONTACTS_BLOCK, label: t('admin.role.contacts.block') },
+      { name: perms.CONTACTS_DELETE, label: t('admin.role.contacts.delete') },
+      { name: perms.CONTACTS_EXPORT, label: t('admin.role.contacts.export') },
       { name: perms.CONTACT_NOTES_READ, label: t('admin.role.contactNotes.read') },
       { name: perms.CONTACT_NOTES_WRITE, label: t('admin.role.contactNotes.write') },
       { name: perms.CONTACT_NOTES_DELETE, label: t('admin.role.contactNotes.delete') }
@@ -229,7 +233,8 @@ watch(
   () => props.initialValues,
   (newValues) => {
     form.setValues(newValues, false)
-    selectedPermissions.value = newValues.permissions || []
+    // Copy: mutating the shared array retriggers the watcher and resets the form.
+    selectedPermissions.value = [...(newValues.permissions || [])]
   },
   { deep: true, immediate: true }
 )

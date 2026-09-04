@@ -206,6 +206,32 @@ const routes = [
             redirect: { name: 'ai-providers' }
           },
           {
+            path: 'help-center',
+            component: () => import('@main/views/admin/help-center/HelpCenter.vue'),
+            meta: { titleKey: 'globals.terms.helpCenter' },
+            children: [
+              {
+                path: '',
+                name: 'help-center-list',
+                component: () => import('@main/views/admin/help-center/HelpCenterList.vue')
+              },
+              {
+                path: ':id/customize',
+                name: 'help-center-customize',
+                props: true,
+                component: () => import('@main/views/admin/help-center/HelpCenterCustomize.vue'),
+                meta: { titleKey: 'globals.terms.helpCenter' }
+              },
+              {
+                path: ':id/tree/:locale?',
+                name: 'help-center-tree',
+                props: true,
+                component: () => import('@main/views/admin/help-center/HelpCenterTree.vue'),
+                meta: { titleKey: 'globals.terms.helpCenter' }
+              }
+            ]
+          },
+          {
             path: 'ai/providers',
             name: 'ai-providers',
             component: () => import('@main/views/admin/ai/AIProviders.vue'),
@@ -215,7 +241,7 @@ const routes = [
             path: 'ai/snippets',
             name: 'ai-snippets',
             component: () => import('@main/views/admin/ai/AISnippets.vue'),
-            meta: { titleKey: 'admin.ai.snippets' }
+            meta: { titleKey: 'admin.ai.snippets', titleCount: 2 }
           },
           {
             path: 'ai/suggestions',

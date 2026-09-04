@@ -1,17 +1,15 @@
 import { computed } from 'vue'
-import { useUsersStore } from '../stores/users'
 import { FIELD_TYPE, FIELD_OPERATORS } from '../constants/filterConfig'
 import { useI18n } from 'vue-i18n'
 
 export function useActivityLogFilters () {
-    const uStore = useUsersStore()
     const { t } = useI18n()
     const activityLogListFilters = computed(() => ({
         actor_id: {
             label: t('globals.terms.actor'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
-            options: uStore.options
+            entity: 'agent'
         },
         activity_type: {
             label: t('activityLog.entryType'),
@@ -38,6 +36,12 @@ export function useActivityLogFilters () {
             }, {
                 label: t('activityLog.entryType.agentRolePermissionsChanged'),
                 value: 'agent_role_permissions_changed'
+            }, {
+                label: t('activityLog.entryType.contactDeleted'),
+                value: 'contact_deleted'
+            }, {
+                label: t('activityLog.entryType.contactDataExported'),
+                value: 'contact_data_exported'
             }]
         },
     }))

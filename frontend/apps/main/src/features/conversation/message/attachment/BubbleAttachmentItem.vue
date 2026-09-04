@@ -19,7 +19,7 @@
               @error="fallbackToOriginal($event, attachment.url)"
             />
             <div
-              class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+              class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent transition-opacity pointer-events-none can-hover:opacity-0 can-hover:group-hover:opacity-100"
             >
               <div class="min-w-0 flex-1 text-white image-meta">
                 <p class="font-medium text-xs truncate">{{ shortName(attachment.name) }}</p>
@@ -47,7 +47,7 @@
           <DownloadLink
             v-if="!isImage"
             :url="attachment.url"
-            class="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            class="absolute top-1.5 right-1.5 transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100"
           />
         </div>
       </PopoverTrigger>

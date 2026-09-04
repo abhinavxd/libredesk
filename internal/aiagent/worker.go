@@ -303,7 +303,8 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	// verified: the 30-min window can expire mid-run and a blocked tool then points the model at
 	// them. set_contact_email is visitor-only, so a self-claimed email can be corrected in chat; a
 	// known contact's email is never swappable this way.
-	if conv.InboxChannel == channelEmail || conv.Contact.Type != umodels.UserTypeContact {
+	needsVerification := m.assistantHasVerifiedTool(assistant)
+	if needsVerification && (conv.InboxChannel == channelEmail || conv.Contact.Type != umodels.UserTypeContact) {
 		offerSetEmail := conv.Contact.Type == umodels.UserTypeVisitor
 		tools = append(tools, &sendEmailVerificationTool{m: m, conv: &conv})
 		tools = append(tools, &checkEmailVerificationTool{m: m, conv: &conv})
@@ -312,7 +313,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		}
 		m.lo.Debug("ai agent offering verification tools", "conversation_uuid", conv.UUID, "set_contact_email_offered", offerSetEmail)
 	}
-	if !runVerified {
+	if needsVerification && !runVerified {
 		systemPrompt += "\n\n" + verificationNote
 	}
 
@@ -495,23 +496,43 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 	return main, m.previewSources(hits), nil
 }
 
-// previewSources dedupes search hits by knowledge base item, keeping each item's best score.
+// previewSources dedupes search hits by source, keeping each one's best score. Snippets and help
+// articles number their rows independently, so the type is part of a hit's identity.
 func (m *Manager) previewSources(hits []aimodels.SearchResult) []models.PreviewSource {
+	type sourceKey struct {
+		sourceType string
+		id         int
+	}
 	sources := []models.PreviewSource{}
-	best := map[int]int{}
+	best := map[sourceKey]int{}
 	for _, h := range hits {
-		if idx, ok := best[h.SourceID]; ok {
+		key := sourceKey{h.SourceType, h.SourceID}
+		if idx, ok := best[key]; ok {
 			sources[idx].Score = max(sources[idx].Score, h.Score)
 			continue
 		}
-		item, err := m.ai.GetKnowledgeBaseItem(h.SourceID)
+		title, err := m.sourceTitle(h.SourceType, h.SourceID)
 		if err != nil {
 			continue
 		}
-		best[h.SourceID] = len(sources)
-		sources = append(sources, models.PreviewSource{ID: item.ID, Title: item.Title, Score: h.Score})
+		best[key] = len(sources)
+		sources = append(sources, models.PreviewSource{ID: h.SourceID, Type: h.SourceType, Title: title, Score: h.Score})
 	}
 	return sources
+}
+
+func (m *Manager) sourceTitle(sourceType string, id int) (string, error) {
+	switch sourceType {
+	case aimodels.SourceHelpArticle:
+		return m.ai.GetHelpArticleTitle(id)
+	case aimodels.SourceSnippet:
+		item, err := m.ai.GetKnowledgeBaseItem(id)
+		if err != nil {
+			return "", err
+		}
+		return item.Title, nil
+	}
+	return "", fmt.Errorf("unknown embedding source type %q", sourceType)
 }
 
 func lastIsInboundContact(msgs []cmodels.Message) bool {
@@ -630,6 +651,25 @@ func (m *Manager) recentContactConversations(conv cmodels.Conversation, verified
 		return nil
 	}
 	return recent
+}
+
+// assistantHasVerifiedTool reports whether any tool attached to the assistant is verification-gated;
+// it fails open so a lookup error keeps the verification flow available.
+func (m *Manager) assistantHasVerifiedTool(a models.Assistant) bool {
+	if len(a.ToolIDs) == 0 {
+		return false
+	}
+	tools, err := m.ai.GetEnabledToolsByIDs(a.ToolIDs)
+	if err != nil {
+		m.lo.Error("error fetching assistant tools for verification check", "assistant_id", a.ID, "error", err)
+		return true
+	}
+	for _, t := range tools {
+		if t.RequiresVerification {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Manager) encodeAttachmentImage(att attachment.Attachment) (aimodels.ChatImage, bool) {

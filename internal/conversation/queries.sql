@@ -186,6 +186,7 @@ SELECT
    c.updated_at,
    c.closed_at,
    c.resolved_at,
+   c.contact_last_seen_at,
    c.inbox_id,
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
@@ -207,6 +208,7 @@ SELECT
    c.subject,
    c.contact_id,
    c.sla_policy_id,
+   c.next_sla_deadline_at,
    c.meta,
    sla.name as sla_policy_name,
    c.last_message_at,
@@ -290,7 +292,9 @@ SELECT
     c.id,
     c.uuid
 FROM conversations c
-WHERE c.created_at > $1;
+WHERE c.created_at > $1 AND c.id > $2
+ORDER BY c.id
+LIMIT $3;
 
 -- name: get-contact-previous-conversations
 SELECT
@@ -442,7 +446,8 @@ WHERE uuid = $1 AND assigned_user_id IS NULL AND assigned_team_id = $3;
 UPDATE conversations
 SET contact_last_seen_at = NOW(),
 updated_at = NOW()
-WHERE uuid = $1;
+WHERE uuid = $1
+RETURNING contact_last_seen_at;
 
 -- name: update-conversation-assigned-team
 UPDATE conversations
@@ -465,6 +470,32 @@ WHERE uuid = $1;
 
 -- name: get-user-active-conversations-count
 SELECT COUNT(*) FROM conversations WHERE status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open') AND assigned_user_id = $1;
+
+-- name: get-sidebar-standard-counts
+SELECT
+    COUNT(*) FILTER (WHERE conversations.assigned_user_id = $1) AS assigned,
+    COUNT(*) FILTER (WHERE conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL) AS unassigned,
+    COUNT(*) FILTER (WHERE EXISTS (
+        SELECT 1 FROM conversation_mentions cm
+        WHERE cm.conversation_id = conversations.id
+          AND (cm.mentioned_user_id = $1 OR EXISTS (
+              SELECT 1 FROM team_members tm
+              WHERE tm.team_id = cm.mentioned_team_id AND tm.user_id = $1
+          ))
+    )) AS mentioned,
+    COUNT(*) AS "all"
+FROM conversations
+WHERE conversations.status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open');
+
+-- name: get-conversations-count-base
+-- The list-type WHERE clause is appended at %s; view filters are added by BuildFilterQuery.
+SELECT 1
+FROM conversations
+JOIN users ON contact_id = users.id
+JOIN inboxes ON inbox_id = inboxes.id
+LEFT JOIN conversation_statuses ON status_id = conversation_statuses.id
+WHERE TRUE
+%s
 
 -- name: update-conversation-priority
 UPDATE conversations 
@@ -533,7 +564,8 @@ WHERE c.uuid = $1
 -- name: insert-conversation-participant
 INSERT INTO conversation_participants
 (user_id, conversation_id)
-VALUES($1, (SELECT id FROM conversations WHERE uuid = $2));
+VALUES($1, (SELECT id FROM conversations WHERE uuid = $2))
+ON CONFLICT (conversation_id, user_id) DO NOTHING;
 
 -- name: get-unassigned-conversations
 SELECT
@@ -607,11 +639,11 @@ SET custom_attributes = $2,
     updated_at = NOW()
 WHERE uuid = $1;
 
--- name: update-conversation-waiting-since
+-- name: start-conversation-waiting-since
 UPDATE conversations
 SET waiting_since = $2,
     updated_at = NOW()
-WHERE uuid = $1;
+WHERE uuid = $1 AND waiting_since IS NULL;
 
 -- name: update-conversation-reply-timestamps
 WITH old AS (
@@ -653,6 +685,7 @@ WHERE
   AND status_id IN (
     SELECT id FROM conversation_statuses WHERE name NOT IN ('Open')
   )
+RETURNING id;
 
 -- name: get-conversation-by-message-id
 SELECT
@@ -675,7 +708,7 @@ DELETE FROM conversation_messages WHERE CASE
 END;
 
 -- name: delete-private-message
--- $1 = message uuid, $2 = conversation uuid, $3 = deleted placeholder text.
+-- $1 = message uuid, $2 = conversation uuid, $3 = deleted placeholder text, $4 = sender id, 0 to skip the sender check.
 WITH deleted AS (
     UPDATE conversation_messages
     SET content = $3, text_content = $3, updated_at = NOW(),
@@ -683,6 +716,7 @@ WITH deleted AS (
     WHERE uuid = $1
       AND private = true
       AND meta->>'deleted_at' IS NULL
+      AND ($4 = 0 OR sender_id = $4)
       AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
     RETURNING id, conversation_id, created_at
 ),

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
+	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -16,7 +18,8 @@ import (
 const (
 	oidcErrLoginFailed     = "oidc_login_failed"
 	oidcErrSessionExpired  = "oidc_session_expired"
-	oidcErrProvider        = "oidc_provider_error"
+	oidcErrInvalidClient   = "oidc_invalid_client"
+	oidcErrAccessDenied    = "oidc_access_denied"
 	oidcErrNoAccount       = "oidc_no_account"
 	oidcErrAccountDisabled = "oidc_account_disabled"
 )
@@ -71,7 +74,7 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		app             = r.Context.(*App)
 		code            = string(r.RequestCtx.QueryArgs().Peek("code"))
 		state           = string(r.RequestCtx.QueryArgs().Peek("state"))
-		providerID, err = strconv.Atoi(string(r.RequestCtx.UserValue("id").(string)))
+		providerID, err = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 		ip              = realip.FromRequest(r.RequestCtx)
 	)
 	next, _ := app.auth.GetSessionValue(r, oidcNextSessKey)
@@ -83,6 +86,17 @@ func handleOIDCCallback(r *fastglue.Request) error {
 	}
 
 	app.lo.Debug("oidc callback received", "provider_id", providerID, "has_code", code != "")
+
+	// Providers redirect back with an error param instead of a code when the handshake fails on their side (RFC 6749 4.1.2.1).
+	if oauthErr := string(r.RequestCtx.QueryArgs().Peek("error")); oauthErr != "" {
+		desc := string(r.RequestCtx.QueryArgs().Peek("error_description"))
+		if oauthErr == "access_denied" {
+			app.lo.Warn("oidc sign-in cancelled or denied at provider", "provider_id", providerID, "description", desc)
+			return redirectLoginError(r, oidcErrAccessDenied, nextStr)
+		}
+		app.lo.Error("oidc provider returned an error on callback", "provider_id", providerID, "oauth_error", oauthErr, "description", desc)
+		return redirectLoginError(r, oidcErrLoginFailed, nextStr)
+	}
 
 	// Compare the state from the session with the state from the query.
 	sessionState, err := app.auth.GetSessionValue(r, oidcStateSessKey)
@@ -97,29 +111,31 @@ func handleOIDCCallback(r *fastglue.Request) error {
 
 	_, claims, err := app.auth.ExchangeOIDCToken(r.RequestCtx, providerID, code)
 	if err != nil {
-		app.lo.Error("error exchanging oidc token", "provider_id", providerID, "error", err)
-		return redirectLoginError(r, oidcErrProvider, nextStr)
+		if errors.Is(err, auth_.ErrOIDCInvalidClient) {
+			return redirectLoginError(r, oidcErrInvalidClient, nextStr)
+		}
+		return redirectLoginError(r, oidcErrLoginFailed, nextStr)
 	}
 
-	// Agent emails are stored lower-cased, providers may return the claim with the original casing.
 	email := strings.ToLower(strings.TrimSpace(claims.Email))
 
 	user, err := app.user.GetAgent(0, email)
 	if err != nil {
-		app.lo.Error("error fetching agent for oidc login", "email", email, "error", err)
 		if e, ok := err.(envelope.Error); ok && e.ErrorType == envelope.NotFoundError {
+			app.lo.Warn("no agent account matching oidc email", "provider_id", providerID, "email", email)
 			return redirectLoginError(r, oidcErrNoAccount, nextStr)
 		}
 		return redirectLoginError(r, oidcErrLoginFailed, nextStr)
 	}
 
 	if !user.Enabled {
-		app.lo.Error("oidc login rejected for disabled account", "provider_id", providerID, "user_id", user.ID)
+		app.lo.Warn("oidc login rejected for disabled account", "provider_id", providerID, "user_id", user.ID)
 		return redirectLoginError(r, oidcErrAccountDisabled, nextStr)
 	}
 	// Only agents can log in; GetAgent also resolves ai_assistant identity users.
 	if user.Type != models.UserTypeAgent {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.PermissionError)
+		app.lo.Warn("oidc login rejected for non-agent user", "provider_id", providerID, "user_id", user.ID)
+		return redirectLoginError(r, oidcErrNoAccount, nextStr)
 	}
 
 	if err := app.auth.SaveSession(amodels.User{
@@ -153,7 +169,6 @@ func handleOIDCCallback(r *fastglue.Request) error {
 	return r.RedirectURI(redirectURL, fasthttp.StatusFound, nil, "")
 }
 
-// redirectLoginError redirects to the login page with an error code and the original next path.
 func redirectLoginError(r *fastglue.Request, code, next string) error {
 	args := map[string]any{"error": code}
 	if next != "" {

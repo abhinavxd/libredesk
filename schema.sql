@@ -20,7 +20,7 @@ DROP TYPE IF EXISTS "applied_sla_status" CASCADE; CREATE TYPE "applied_sla_statu
 DROP TYPE IF EXISTS "sla_event_status" CASCADE; CREATE TYPE "sla_event_status" AS ENUM ('pending', 'breached', 'met');
 DROP TYPE IF EXISTS "sla_metric" CASCADE; CREATE TYPE "sla_metric" AS ENUM ('first_response', 'resolution', 'next_response');
 DROP TYPE IF EXISTS "sla_notification_type" CASCADE; CREATE TYPE "sla_notification_type" AS ENUM ('warning', 'breach');
-DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online', 'agent_password_set', 'agent_role_permissions_changed');
+DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online', 'agent_password_set', 'agent_role_permissions_changed', 'contact_deleted', 'contact_data_exported');
 DROP TYPE IF EXISTS "macro_visible_when" CASCADE; CREATE TYPE "macro_visible_when" AS ENUM ('replying', 'starting_conversation', 'adding_private_note');
 DROP TYPE IF EXISTS "user_notification_type" CASCADE; CREATE TYPE "user_notification_type" AS ENUM ('mention', 'assignment', 'sla_warning', 'sla_breach', 'new_reply', 'new_reply_participating', 'sla_first_response_warning', 'sla_first_response_breach', 'sla_next_response_warning', 'sla_next_response_breach', 'sla_resolution_warning', 'sla_resolution_breach');
 DROP TYPE IF EXISTS "notification_channel" CASCADE; CREATE TYPE "notification_channel" AS ENUM ('in_app', 'email');
@@ -46,6 +46,36 @@ BEGIN
     RETURN prefix || nextval('conversation_reference_number_sequence');
 END;
 $$ LANGUAGE plpgsql;
+
+-- Function to pick the text search configuration for a help article locale.
+CREATE OR REPLACE FUNCTION help_article_search_config(locale TEXT)
+RETURNS regconfig AS $$
+    SELECT CASE split_part(locale, '-', 1)
+        WHEN 'ar' THEN 'arabic'
+        WHEN 'da' THEN 'danish'
+        WHEN 'nl' THEN 'dutch'
+        WHEN 'en' THEN 'english'
+        WHEN 'fi' THEN 'finnish'
+        WHEN 'fr' THEN 'french'
+        WHEN 'de' THEN 'german'
+        WHEN 'el' THEN 'greek'
+        WHEN 'hu' THEN 'hungarian'
+        WHEN 'id' THEN 'indonesian'
+        WHEN 'ga' THEN 'irish'
+        WHEN 'it' THEN 'italian'
+        WHEN 'lt' THEN 'lithuanian'
+        WHEN 'ne' THEN 'nepali'
+        WHEN 'no' THEN 'norwegian'
+        WHEN 'pt' THEN 'portuguese'
+        WHEN 'ro' THEN 'romanian'
+        WHEN 'ru' THEN 'russian'
+        WHEN 'es' THEN 'spanish'
+        WHEN 'sv' THEN 'swedish'
+        WHEN 'ta' THEN 'tamil'
+        WHEN 'tr' THEN 'turkish'
+        ELSE 'simple'
+    END::regconfig;
+$$ LANGUAGE sql IMMUTABLE;
 
 DROP TABLE IF EXISTS sla_policies CASCADE;
 CREATE TABLE sla_policies (
@@ -165,6 +195,7 @@ CREATE TABLE users (
 );
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
+CREATE INDEX index_users_on_availability_status_when_agent ON users(availability_status) WHERE type = 'agent' AND deleted_at IS NULL;
 CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
 	ON users(email)
 	WHERE type = 'agent' AND deleted_at IS NULL;
@@ -261,6 +292,7 @@ CREATE INDEX index_conversations_on_inbox_id ON conversations (inbox_id);
 CREATE INDEX index_conversations_on_status_id ON conversations (status_id);
 CREATE INDEX index_conversations_on_priority_id ON conversations (priority_id);
 CREATE INDEX index_conversations_on_created_at ON conversations (created_at);
+CREATE INDEX index_conversations_on_resolved_at ON conversations (resolved_at);
 CREATE INDEX index_conversations_on_last_message_at ON conversations (last_message_at);
 CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_interaction_at);
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
@@ -398,6 +430,7 @@ CREATE TABLE media (
 	disposition media_disposition NULL,
 	"size" INT NULL,
 	meta jsonb DEFAULT '{}'::jsonb NOT NULL,
+	private BOOLEAN NOT NULL DEFAULT true,
 	CONSTRAINT constraint_media_on_filename CHECK (length(filename) <= 1000),
 	CONSTRAINT constraint_media_on_content_id CHECK (length(content_id) <= 300)
 );
@@ -498,6 +531,7 @@ CREATE TABLE csat_responses (
 );
 CREATE INDEX index_csat_responses_on_uuid ON csat_responses(uuid);
 CREATE INDEX index_csat_responses_on_conversation_id ON csat_responses(conversation_id);
+CREATE INDEX index_csat_responses_on_created_at ON csat_responses(created_at);
 
 DROP TABLE IF EXISTS views CASCADE;
 CREATE TABLE views (
@@ -539,6 +573,7 @@ CREATE TABLE applied_slas (
 );
 CREATE INDEX index_applied_slas_on_conversation_id ON applied_slas(conversation_id);
 CREATE INDEX index_applied_slas_on_status ON applied_slas(status);
+CREATE INDEX index_applied_slas_on_created_at ON applied_slas(created_at);
 CREATE UNIQUE INDEX index_applied_slas_unique_pending_per_conv ON applied_slas(conversation_id) WHERE status = 'pending';
 
 DROP TABLE IF EXISTS sla_events CASCADE;
@@ -556,6 +591,7 @@ CREATE TABLE sla_events (
 );
 CREATE INDEX index_sla_events_on_applied_sla_id ON sla_events(applied_sla_id);
 CREATE INDEX index_sla_events_on_status ON sla_events(status);
+CREATE INDEX index_sla_events_on_created_at ON sla_events(created_at);
 
 DROP TABLE IF EXISTS scheduled_sla_notifications CASCADE;
 CREATE TABLE scheduled_sla_notifications (
@@ -631,6 +667,100 @@ CREATE TABLE embeddings (
 	meta JSONB NOT NULL DEFAULT '{}'
 );
 CREATE INDEX index_embeddings_on_source_type_source_id ON embeddings(source_type, source_id);
+
+DROP TABLE IF EXISTS help_centers CASCADE;
+CREATE TABLE help_centers (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	name TEXT NOT NULL,
+	slug TEXT NOT NULL UNIQUE,
+	page_title TEXT NOT NULL DEFAULT '',
+	meta_description TEXT NOT NULL DEFAULT '',
+	custom_css TEXT NOT NULL DEFAULT '',
+	custom_js TEXT NOT NULL DEFAULT '',
+	default_locale TEXT NOT NULL DEFAULT 'en',
+	allowed_locales JSONB NOT NULL DEFAULT '["en"]',
+	is_active BOOLEAN NOT NULL DEFAULT true,
+	theme JSONB NOT NULL DEFAULT '{}',
+	custom_domain TEXT NOT NULL DEFAULT '',
+	template TEXT NOT NULL DEFAULT 'classic',
+	CONSTRAINT constraint_help_centers_on_template CHECK (template IN ('docs', 'classic'))
+);
+
+DROP TABLE IF EXISTS article_collections CASCADE;
+CREATE TABLE article_collections (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	help_center_id INTEGER NOT NULL REFERENCES help_centers(id) ON DELETE CASCADE,
+	slug TEXT NOT NULL,
+	parent_id INTEGER NULL REFERENCES article_collections(id) ON DELETE CASCADE,
+	locale TEXT NOT NULL DEFAULT 'en',
+	name TEXT NOT NULL,
+	description TEXT NOT NULL DEFAULT '',
+	icon TEXT NOT NULL DEFAULT '',
+	sort_order INTEGER NOT NULL DEFAULT 0,
+	is_published BOOLEAN NOT NULL DEFAULT false
+);
+CREATE UNIQUE INDEX index_unique_article_collections_on_help_center_slug_locale ON article_collections(help_center_id, slug, locale);
+CREATE INDEX index_article_collections_on_help_center_id ON article_collections(help_center_id);
+CREATE INDEX index_article_collections_on_parent_id ON article_collections(parent_id);
+
+DROP TABLE IF EXISTS help_articles CASCADE;
+CREATE TABLE help_articles (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	collection_id INTEGER NOT NULL REFERENCES article_collections(id) ON DELETE CASCADE,
+	author_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	created_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	slug TEXT NOT NULL,
+	locale TEXT NOT NULL DEFAULT 'en',
+	title TEXT NOT NULL,
+	content TEXT NOT NULL DEFAULT '',
+	excerpt TEXT NOT NULL DEFAULT '',
+	meta_title TEXT NOT NULL DEFAULT '',
+	meta_description TEXT NOT NULL DEFAULT '',
+	meta_image_url TEXT NOT NULL DEFAULT '',
+	sort_order INTEGER NOT NULL DEFAULT 0,
+	status TEXT NOT NULL DEFAULT 'draft',
+	view_count INTEGER NOT NULL DEFAULT 0,
+	ai_enabled BOOLEAN NOT NULL DEFAULT false,
+	embedded_fingerprint TEXT NOT NULL DEFAULT '',
+	-- left() caps the indexed body below the 1MB tsvector limit so oversized articles still save.
+	search_tsv TSVECTOR GENERATED ALWAYS AS (
+		setweight(to_tsvector(help_article_search_config(locale), title), 'A') ||
+		setweight(to_tsvector(help_article_search_config(locale), excerpt), 'B') ||
+		setweight(to_tsvector(help_article_search_config(locale), left(content, 100000)), 'C')
+	) STORED,
+	CONSTRAINT constraint_help_articles_on_status CHECK (status IN ('draft', 'published'))
+);
+CREATE UNIQUE INDEX index_unique_help_articles_on_collection_slug_locale ON help_articles(collection_id, slug, locale);
+CREATE INDEX index_help_articles_on_collection_id ON help_articles(collection_id);
+CREATE INDEX index_help_articles_on_author_id ON help_articles(author_id);
+CREATE INDEX index_help_articles_on_title_trgm ON help_articles USING gin (title gin_trgm_ops);
+CREATE INDEX index_help_articles_on_content_trgm ON help_articles USING gin (content gin_trgm_ops);
+CREATE INDEX index_help_articles_on_search_tsv ON help_articles USING gin (search_tsv);
+
+DROP TABLE IF EXISTS help_article_feedback CASCADE;
+CREATE TABLE help_article_feedback (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	article_id INTEGER NOT NULL REFERENCES help_articles(id) ON DELETE CASCADE,
+	is_helpful BOOLEAN NOT NULL
+);
+CREATE INDEX index_help_article_feedback_on_article_id ON help_article_feedback(article_id);
+
+DROP TABLE IF EXISTS help_search_queries CASCADE;
+CREATE TABLE help_search_queries (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	help_center_id INTEGER NOT NULL REFERENCES help_centers(id) ON DELETE CASCADE,
+	query TEXT NOT NULL,
+	results_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX index_help_search_queries_on_help_center_id ON help_search_queries(help_center_id);
 
 DROP TABLE IF EXISTS ai_tools CASCADE;
 CREATE TABLE ai_tools (
@@ -857,7 +987,7 @@ INSERT INTO settings ("key", value)
 VALUES
     ('app.lang', '"en-US"'::jsonb),
     ('app.root_url', '"http://localhost:9000"'::jsonb),
-    ('app.logo_url', '"http://localhost:9000/logo.png"'::jsonb),
+    ('app.logo_url', '""'::jsonb),
     ('app.site_name', '"libredesk"'::jsonb),
     ('app.favicon_url', '"http://localhost:9000/favicon.ico"'::jsonb),
     ('app.max_file_upload_size', '20'::jsonb),
@@ -901,7 +1031,7 @@ VALUES
 	(
 		'Agent',
 		'Role for all agents with limited access to conversations.',
-		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage}'
+		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,messages:write_private,view:manage}'
 	);
 
 INSERT INTO
@@ -910,7 +1040,7 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
+		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contacts:delete,contacts:export,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,help_center:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,messages:write_private,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage}'
 	);
 
 

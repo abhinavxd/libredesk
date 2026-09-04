@@ -5,7 +5,7 @@ import {
   accountNavItems,
   contactNavItems
 } from '../../constants/navigation'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
 import { Badge } from '@shared-ui/components/ui/badge'
 import {
@@ -32,66 +32,8 @@ import {
   CircleDashed,
   List,
   AtSign,
-  Settings,
-  Clock,
-  Timer,
-  Inbox as InboxIcon,
-  CircleDot,
-  Tag,
-  SlidersHorizontal,
-  Eye,
-  Zap,
-  Workflow,
-  UserRound,
-  UsersRound,
-  Shield,
-  ScrollText,
-  Mail,
-  FileText,
-  KeyRound,
-  Webhook,
-  Link,
-  BarChart3,
-  CircleUser,
-  Bell,
-  Contact,
-  Sparkles,
-  NotebookText,
-  Wrench,
-  Bot,
-  Lightbulb
 } from 'lucide-vue-next'
 
-const navIconMap = {
-  Settings,
-  Clock,
-  Timer,
-  Inbox: InboxIcon,
-  CircleDot,
-  Tag,
-  SlidersHorizontal,
-  Eye,
-  Zap,
-  Workflow,
-  UserRound,
-  UsersRound,
-  Shield,
-  ScrollText,
-  Mail,
-  FileText,
-  KeyRound,
-  Webhook,
-  Link,
-  BarChart3,
-  CircleUser,
-  Bell,
-  Contact,
-  Sparkles,
-  NotebookText,
-  Wrench,
-  Bot,
-  Lightbulb
-}
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,13 +50,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
+import MobileDrawerNav from './MobileDrawerNav.vue'
+import MobileDrawerFooter from './MobileDrawerFooter.vue'
+import SidebarCountBadge from './SidebarCountBadge.vue'
 import { filterNavItems } from '@main/utils/nav-permissions'
 import { permissions } from '@main/constants/permissions'
 import { useStorage } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
+import { navIconMap } from '@main/constants/navIcons'
+import { useInboxNavigation } from '@main/composables/useInboxNavigation'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
@@ -125,7 +72,6 @@ const userStore = useUserStore()
 const conversationStore = useConversationStore()
 const settingsStore = useAppSettingsStore()
 const route = useRoute()
-const router = useRouter()
 const { t } = useI18n()
 const emit = defineEmits(['createView', 'editView', 'deleteView', 'createConversation'])
 
@@ -158,57 +104,7 @@ const handleDeleteView = () => {
   }
 }
 
-// Navigation methods with conversation retention
-const navigateToInbox = (type) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
-    router.push({
-      name: 'inbox-conversation',
-      params: {
-        type,
-        uuid: conversationStore.conversation.data.uuid
-      }
-    })
-  } else {
-    router.push({
-      name: 'inbox',
-      params: { type }
-    })
-  }
-}
-
-const navigateToTeamInbox = (teamID) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
-    router.push({
-      name: 'team-inbox-conversation',
-      params: {
-        teamID,
-        uuid: conversationStore.conversation.data.uuid
-      }
-    })
-  } else {
-    router.push({
-      name: 'team-inbox',
-      params: { teamID }
-    })
-  }
-}
-
-const navigateToViewInbox = (viewID) => {
-  if (conversationStore.isConversationOpen && conversationStore.conversation.data?.uuid) {
-    router.push({
-      name: 'view-inbox-conversation',
-      params: {
-        viewID,
-        uuid: conversationStore.conversation.data.uuid
-      }
-    })
-  } else {
-    router.push({
-      name: 'view-inbox',
-      params: { viewID }
-    })
-  }
-}
+const { navigateToInbox, navigateToTeamInbox, navigateToViewInbox } = useInboxNavigation()
 
 const filteredAdminNavItems = computed(() => filterNavItems(adminNavItems, userStore.can))
 const filteredReportsNavItems = computed(() => filterNavItems(reportsNavItems, userStore.can))
@@ -240,12 +136,17 @@ const teamInboxOpen = useStorage('teamInboxOpen', true)
 const viewInboxOpen = useStorage('viewInboxOpen', true)
 const sharedViewInboxOpen = useStorage('sharedViewInboxOpen', true)
 
-// Track which view is being hovered for ellipsis menu visibility
-const hoveredViewId = ref(null)
-
 // Track delete confirmation dialog state
 const isDeleteOpen = ref(false)
 const viewToDelete = ref(null)
+
+const viewSidebarCount = (viewID) => {
+  return conversationStore.sidebarCounts.views?.[viewID] ?? 0
+}
+
+onMounted(() => {
+  conversationStore.fetchSidebarCounts({ force: true })
+})
 </script>
 
 <template>
@@ -271,6 +172,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredContactsNavItems" :key="item.titleKey">
@@ -284,6 +186,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 
@@ -307,6 +210,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredReportsNavItems" :key="item.titleKey">
@@ -320,6 +224,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 
@@ -342,6 +247,7 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in filteredAdminNavItems" :key="item.titleKey">
@@ -393,6 +299,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 
@@ -411,13 +318,14 @@ const viewToDelete = ref(null)
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in accountNavItems" :key="item.titleKey">
                 <SidebarMenuButton :isActive="isActiveParent(item.href)" asChild>
                   <router-link :to="item.href">
                     <component :is="navIconMap[item.icon]" v-if="item.icon" />
-                    <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
+                    <span>{{ t(item.titleKey) }}</span>
                   </router-link>
                 </SidebarMenuButton>
                 <SidebarMenuAction>
@@ -427,6 +335,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 
@@ -451,6 +360,7 @@ const viewToDelete = ref(null)
         </SidebarHeader>
 
         <SidebarContent>
+          <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -462,34 +372,50 @@ const viewToDelete = ref(null)
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/assigned')" @click="navigateToInbox('assigned')">
                     <User />
-                    <span>{{ t('globals.terms.myInbox') }}</span>
+                    <span class="flex-1 truncate">{{ t('globals.terms.myInbox') }}</span>
+                    <SidebarCountBadge
+                      :count="conversationStore.sidebarCounts.assigned"
+                      :ariaLabel="t('conversation.sidebarCounts.assigned', conversationStore.sidebarCounts.assigned)"
+                    />
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/mentioned')" @click="navigateToInbox('mentioned')">
                     <AtSign />
-                    <span>
+                    <span class="flex-1 truncate">
                       {{ t('globals.terms.mention', 2) }}
                     </span>
+                    <SidebarCountBadge
+                      :count="conversationStore.sidebarCounts.mentioned"
+                      :ariaLabel="t('conversation.sidebarCounts.mentioned', conversationStore.sidebarCounts.mentioned)"
+                    />
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/unassigned')" @click="navigateToInbox('unassigned')">
                     <CircleDashed />
-                    <span>
+                    <span class="flex-1 truncate">
                       {{ t('globals.terms.unassigned') }}
                     </span>
+                    <SidebarCountBadge
+                      :count="conversationStore.sidebarCounts.unassigned"
+                      :ariaLabel="t('conversation.sidebarCounts.unassigned', conversationStore.sidebarCounts.unassigned)"
+                    />
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/all')" @click="navigateToInbox('all')">
                     <List />
-                    <span>
+                    <span class="flex-1 truncate">
                       {{ t('globals.messages.all') }}
                     </span>
+                    <SidebarCountBadge
+                      :count="conversationStore.sidebarCounts.all"
+                      :ariaLabel="t('conversation.sidebarCounts.all', conversationStore.sidebarCounts.all)"
+                    />
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -519,7 +445,7 @@ const viewToDelete = ref(null)
                           :is-active="route.params.teamID == team.id"
                           @click="navigateToTeamInbox(team.id)"
                         >
-                          {{ team.emoji }}<span>{{ team.name }}</span>
+                          {{ team.emoji }}<span class="flex-1 truncate" :title="team.name">{{ team.name }}</span>
                         </SidebarMenuButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
@@ -539,7 +465,7 @@ const viewToDelete = ref(null)
                           <Plus
                             size="18"
                             @click.stop="openCreateViewDialog"
-                            class="rounded-md cursor-pointer opacity-0 transition-colors duration-200 group-hover/item:opacity-100 hover:bg-sidebar-accent/50 text-muted-foreground hover:text-sidebar-accent-foreground p-1"
+                            class="rounded-md cursor-pointer transition-colors duration-200 can-hover:opacity-0 can-hover:group-hover/item:opacity-100 hover:bg-sidebar-accent/50 text-muted-foreground hover:text-sidebar-accent-foreground p-1"
                           />
                         </div>
                         <ChevronRight
@@ -553,38 +479,38 @@ const viewToDelete = ref(null)
                     <SidebarMenuSub>
                       <SidebarMenuSubItem
                         v-for="view in userViews" :key="view.id"
-                        @mouseenter="hoveredViewId = view.id"
-                        @mouseleave="hoveredViewId = null"
+                        class="group/view-item"
                       >
                         <SidebarMenuButton
                           size="sm"
+                          class="group-has-[[data-sidebar=menu-action]]/menu-item:pr-7"
                           :isActive="route.params.viewID == view.id"
                           @click="navigateToViewInbox(view.id)"
                         >
                           <span class="flex-1 truncate" :title="view.name">{{ view.name }}</span>
+                          <SidebarCountBadge
+                            :count="viewSidebarCount(view.id)"
+                            :ariaLabel="t('conversation.sidebarCounts.view', viewSidebarCount(view.id))"
+                          />
                         </SidebarMenuButton>
-                        <SidebarMenuAction
-                          :class="[
-                            'mr-3',
-                            'md:opacity-0',
-                            'data-[state=open]:opacity-100',
-                            { 'md:opacity-100': hoveredViewId === view.id }
-                          ]"
-                        >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild @click.prevent>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger as-child>
+                            <SidebarMenuAction
+                              class="mr-1 can-hover:opacity-0 can-hover:group-hover/view-item:opacity-100 data-[state=open]:opacity-100"
+                              @click.prevent
+                            >
                               <EllipsisVertical />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem @click="() => editView(view)">
-                                <span>{{ t('globals.messages.edit') }}</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem @click="() => openDeleteConfirmation(view)">
-                                <span>{{ t('globals.messages.delete') }}</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </SidebarMenuAction>
+                            </SidebarMenuAction>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem @click="() => editView(view)">
+                              <span>{{ t('globals.messages.edit') }}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="() => openDeleteConfirmation(view)">
+                              <span>{{ t('globals.messages.delete') }}</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
                   </CollapsibleContent>
@@ -621,6 +547,10 @@ const viewToDelete = ref(null)
                           <span class="flex-1 truncate" :title="view.name">{{
                             view.name
                           }}</span>
+                          <SidebarCountBadge
+                            :count="viewSidebarCount(view.id)"
+                            :ariaLabel="t('conversation.sidebarCounts.view', viewSidebarCount(view.id))"
+                          />
                         </SidebarMenuButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
@@ -630,6 +560,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+        <MobileDrawerFooter />
       </Sidebar>
     </template>
 

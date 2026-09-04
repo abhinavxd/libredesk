@@ -5,6 +5,11 @@ export default {
   char: '@',
   allowSpaces: true,
 
+  allow: ({ editor }) => {
+    const enableMentions = editor.options.editorProps?.enableMentions
+    return enableMentions ? enableMentions() : false
+  },
+
   items: async ({ query, editor }) => {
     // Get the suggestion handler from editor options
     const getSuggestions = editor.options.editorProps?.getSuggestions

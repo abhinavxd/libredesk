@@ -1,0 +1,167 @@
+{{ define "hc-shared-behavior" }}
+    <script>
+    (function () {
+        var announcement = document.querySelector('[data-hc-announcement]');
+        if (announcement) {
+            announcement.querySelector('[data-hc-announcement-close]').addEventListener('click', function () {
+                try { localStorage.setItem('hc-announcement-' + announcement.dataset.hcAnnouncement, '1'); } catch (e) {}
+                announcement.remove();
+            });
+        }
+        var lang = document.querySelector('[data-hc-lang]');
+        if (!lang) return;
+        var btn = lang.querySelector('.hc-lang-btn');
+        var close = function () { lang.removeAttribute('data-open'); btn.setAttribute('aria-expanded', 'false'); };
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var open = lang.hasAttribute('data-open');
+            if (open) { close(); } else { lang.setAttribute('data-open', ''); btn.setAttribute('aria-expanded', 'true'); }
+        });
+        document.addEventListener('click', function (e) { if (!lang.contains(e.target)) close(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    })();
+    </script>
+{{ end }}
+
+{{ define "hc-article-behavior" }}
+<script>
+(function () {
+    // The server can only render one fixed English format, so the reader's locale is applied here.
+    var lang = document.documentElement.lang || undefined;
+    document.querySelectorAll('time.hc-date[datetime]').forEach(function (el) {
+        var d = new Date(el.getAttribute('datetime'));
+        if (isNaN(d)) return;
+        try {
+            el.textContent = d.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (e) {}
+    });
+
+    var prose = document.getElementById('hc-prose');
+    var toc = document.getElementById('hc-toc');
+    if (prose && toc) {
+        var headings = prose.querySelectorAll('h2, h3, h4');
+        var list = toc.querySelector('ul');
+        var links = [];
+        var tracked = [];
+        headings.forEach(function (h, i) {
+            var text = h.textContent.trim();
+            if (!text) return;
+            if (!h.id) h.id = 'sec-' + i + '-' + text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            var li = document.createElement('li');
+            if (h.tagName === 'H3') li.className = 'hc-toc-h3';
+            if (h.tagName === 'H4') li.className = 'hc-toc-h4';
+            var a = document.createElement('a');
+            a.href = '#' + h.id;
+            a.textContent = text;
+            li.appendChild(a);
+            list.appendChild(li);
+            links.push(a);
+            tracked.push(h);
+        });
+        if (links.length >= 2) toc.hidden = false;
+
+        var toggle = document.getElementById('hc-toc-toggle');
+        if (toggle) {
+            // The rail is permanently open at desktop width, so it stops being a disclosure there.
+            var wide = window.matchMedia('(min-width: 1100px)');
+            var syncState = function () {
+                if (wide.matches) {
+                    toggle.setAttribute('aria-expanded', 'true');
+                    toggle.disabled = true;
+                } else {
+                    toggle.disabled = false;
+                    toggle.setAttribute('aria-expanded', toc.classList.contains('hc-toc-open') ? 'true' : 'false');
+                }
+            };
+            syncState();
+            wide.addEventListener('change', syncState);
+            toggle.addEventListener('click', function () {
+                toc.classList.toggle('hc-toc-open');
+                syncState();
+            });
+            list.addEventListener('click', function () {
+                toc.classList.remove('hc-toc-open');
+                syncState();
+            });
+        }
+
+        if (tracked.length && 'IntersectionObserver' in window) {
+            var visible = new Set();
+            var markActive = function () {
+                var current = null;
+                for (var i = 0; i < tracked.length; i++) {
+                    if (visible.has(tracked[i])) { current = links[i]; break; }
+                }
+                links.forEach(function (a) { a.classList.toggle('hc-toc-active', a === current); });
+            };
+            var observer = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) {
+                    if (e.isIntersecting) visible.add(e.target); else visible.delete(e.target);
+                });
+                markActive();
+            }, { rootMargin: '0px 0px -70% 0px' });
+            tracked.forEach(function (h) { observer.observe(h); });
+        }
+    }
+
+    if (prose && navigator.clipboard) {
+        var copyIcon = '{{ LucideIcon "copy" }}';
+        var copiedIcon = '{{ LucideIcon "check" }}';
+        var copyLabel = '{{ .L.T "globals.terms.copy" }}';
+        var copiedLabel = '{{ .L.T "globals.messages.copied" }}';
+        prose.querySelectorAll('pre').forEach(function (pre) {
+            var code = pre.querySelector('code');
+            if (!code) return;
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'hc-copy';
+            btn.innerHTML = copyIcon;
+            btn.setAttribute('aria-label', copyLabel);
+            btn.title = copyLabel;
+            var reset;
+            btn.addEventListener('click', function () {
+                navigator.clipboard.writeText(code.innerText).then(function () {
+                    btn.innerHTML = copiedIcon;
+                    btn.setAttribute('data-copied', '');
+                    btn.setAttribute('aria-label', copiedLabel);
+                    btn.title = copiedLabel;
+                    clearTimeout(reset);
+                    reset = setTimeout(function () {
+                        btn.innerHTML = copyIcon;
+                        btn.removeAttribute('data-copied');
+                        btn.setAttribute('aria-label', copyLabel);
+                        btn.title = copyLabel;
+                    }, 1500);
+                }).catch(function () {});
+            });
+            pre.appendChild(btn);
+        });
+    }
+
+    var box = document.getElementById('hc-helpful');
+    if (box) {
+        var key = 'hc-feedback:' + box.dataset.endpoint;
+        var done = function () {
+            box.querySelectorAll('button').forEach(function (b) { b.hidden = true; });
+            box.querySelector('.hc-helpful-q').hidden = true;
+            box.querySelector('.hc-helpful-thanks').hidden = false;
+        };
+        try { if (localStorage.getItem(key)) done(); } catch (e) {}
+        box.querySelectorAll('button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                done();
+                fetch(box.dataset.endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ helpful: b.dataset.helpful === 'true' })
+                }).then(function (res) {
+                    // Only a stored vote suppresses the form on reload, so a failed one can be retried.
+                    if (!res.ok) return;
+                    try { localStorage.setItem(key, b.dataset.helpful); } catch (e) {}
+                }).catch(function () {});
+            });
+        });
+    }
+})();
+</script>
+{{ end }}

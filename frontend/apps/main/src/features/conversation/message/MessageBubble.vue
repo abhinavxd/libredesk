@@ -4,7 +4,7 @@
     <div
       v-if="!groupWithPrev"
       class="mb-1 flex items-center gap-1"
-      :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'"
+      :class="isOutgoing ? 'pr-2 md:pr-[47px]' : 'pl-10 md:pl-[47px]'"
     >
       <router-link
         v-if="!isOutgoing"
@@ -51,16 +51,15 @@
         <div v-else class="w-8 flex-shrink-0" />
       </template>
 
-      <!-- Bubble Wrapper with max 80% width -->
       <div
-        class="w-4/5"
+        class="w-full md:w-4/5"
         :class="{ 'flex justify-end items-center gap-2': isOutgoing }"
         style="contain: inline-size"
       >
         <!-- Delete note menu (private notes, appears on hover, left of bubble) -->
         <div
-          v-if="isPrivateMessage && !isDeleted"
-          class="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200"
+          v-if="canDeleteNote"
+          class="flex-shrink-0 transition-opacity duration-200 can-hover:opacity-0 can-hover:group-hover:opacity-100 focus-within:!opacity-100"
         >
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
@@ -165,7 +164,22 @@
             <!-- Status Icons (outgoing only) -->
             <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
               <Lock :size="12" v-if="isPrivateMessage" class="text-muted-foreground" />
-              <Check :size="14" v-if="showCheckCheck" class="text-success" />
+              <Tooltip v-if="isReadByContact">
+                <TooltipTrigger>
+                  <CheckCheck :size="14" class="text-success" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{{ t('globals.terms.read') }}</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip v-else-if="isDelivered">
+                <TooltipTrigger>
+                  <Check :size="14" class="text-success" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{{ t('globals.terms.sent') }}</p>
+                </TooltipContent>
+              </Tooltip>
               <Tooltip v-if="message.meta?.continuity_emailed">
                 <TooltipTrigger>
                   <Mail :size="12" class="text-muted-foreground" />
@@ -257,7 +271,7 @@ import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, Maximize2, Trash2, MoreHorizontal } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, CheckCheck, Maximize2, Trash2, MoreHorizontal } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -394,9 +408,22 @@ const bubbleClasses = computed(() => ({
 
 const isPrivateMessage = computed(() => isOutgoing.value && props.message.private)
 const isDeleted = computed(() => !!props.message.meta?.deleted_at)
-const showCheckCheck = computed(
+const canDeleteNote = computed(
+  () =>
+    isPrivateMessage.value &&
+    !isDeleted.value &&
+    (props.message.sender_id === userStore.userID || userStore.hasAdminRole)
+)
+const isDelivered = computed(
   () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
 )
+const isReadByContact = computed(() => {
+  const conversation = convStore.current
+  const lastSeenAt = conversation?.contact_last_seen_at
+  const isLiveChat = conversation?.inbox_channel === 'livechat'
+  if (!isDelivered.value || !lastSeenAt || !isLiveChat) return false
+  return new Date(props.message.created_at) <= new Date(lastSeenAt)
+})
 const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
 
 const retryMessage = (msg) => {

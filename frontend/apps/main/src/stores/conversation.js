@@ -4,19 +4,19 @@ import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { TYPING_RECEIVE_TIMEOUT } from '@shared-ui/composables/useTypingIndicator.js'
 import { deepMerge } from '@shared-ui/utils/object.js'
-import { computeRecipientsFromMessage } from '../utils/email-recipients'
-import { useEmitter } from '../composables/useEmitter'
-import { EMITTER_EVENTS } from '../constants/emitterEvents'
+import { computeRecipientsFromMessage } from '@main/utils/email-recipients'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { subscribeToConversation, sendTypingIndicator, subscribeListReplace } from '@main/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
-import MessageCache from '../utils/conversation-message-cache'
-import { getI18n } from '../i18n'
+import MessageCache from '@main/utils/conversation-message-cache'
+import { getI18n } from '@main/i18n'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@/constants/conversation'
-import { useThrottleFn } from '@vueuse/core'
+import { useThrottleFn, useStorage } from '@vueuse/core'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
 import { delayedLoading } from '@/utils/delayed-loading'
-import api from '../api'
+import api from '@main/api'
 
 export const useConversationStore = defineStore('conversation', () => {
   const CONV_LIST_PAGE_SIZE = 25
@@ -38,6 +38,70 @@ export const useConversationStore = defineStore('conversation', () => {
   const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
 
   const selectedUUIDs = ref(new Set())
+
+  const sidebarCounts = reactive({
+    assigned: 0,
+    mentioned: 0,
+    unassigned: 0,
+    all: 0,
+    views: {}
+  })
+
+  // Route changes reuse a count younger than the TTL; mutations and WS events pass force.
+  const SIDEBAR_COUNTS_TTL = 45_000
+  let sidebarCountsRequest = null
+  let sidebarCountsFetchedAt = 0
+  let sidebarCountsForceQueued = false
+
+  async function fetchSidebarCounts ({ force = false } = {}) {
+    if (sidebarCountsRequest) {
+      // A request already in flight may have read the DB before this caller's mutation committed.
+      if (force) sidebarCountsForceQueued = true
+      return sidebarCountsRequest
+    }
+    if (!force && Date.now() - sidebarCountsFetchedAt < SIDEBAR_COUNTS_TTL) return
+
+    sidebarCountsRequest = (async () => {
+      try {
+        const resp = await api.getSidebarCounts()
+        const data = resp?.data?.data
+        if (!data) return
+        sidebarCounts.assigned = data.assigned || 0
+        sidebarCounts.mentioned = data.mentioned || 0
+        sidebarCounts.unassigned = data.unassigned || 0
+        sidebarCounts.all = data.all || 0
+        sidebarCounts.views = data.views || {}
+        sidebarCountsFetchedAt = Date.now()
+      } catch {
+        // The sidebar works without counts.
+      } finally {
+        sidebarCountsRequest = null
+        if (sidebarCountsForceQueued) {
+          sidebarCountsForceQueued = false
+          fetchSidebarCounts({ force: true })
+        }
+      }
+    })()
+
+    return sidebarCountsRequest
+  }
+
+  async function fetchViewCount (viewID) {
+    try {
+      const resp = await api.getViewCount(viewID)
+      sidebarCounts.views[viewID] = resp?.data?.data?.count || 0
+    } catch {
+      // The sidebar works without counts.
+    }
+  }
+
+  // WS events burst one per conversation; leading + trailing keeps it to two requests per burst.
+  const SIDEBAR_COUNTS_EVENT_THROTTLE = 45_000
+  const refreshSidebarCounts = useThrottleFn(
+    () => fetchSidebarCounts({ force: true }),
+    SIDEBAR_COUNTS_EVENT_THROTTLE,
+    true
+  )
 
   const priorityOptions = computed(() => {
     return priorities.value.map(p => ({ label: p.name, value: p.id }))
@@ -145,6 +209,12 @@ export const useConversationStore = defineStore('conversation', () => {
     priority_first: 'conversation.sort.priorityFirst'
   }
 
+  const persistedListStatus = useStorage('conversationListStatus', CONVERSATION_DEFAULT_STATUSES.OPEN)
+  const persistedListSortField = useStorage('conversationListSortField', 'newest')
+  if (!sortFieldMap[persistedListSortField.value]) {
+    persistedListSortField.value = 'newest'
+  }
+
   let typingTimeout = null
   const typingByUUID = reactive({})
   const typingTimeoutsByUUID = new Map()
@@ -152,8 +222,8 @@ export const useConversationStore = defineStore('conversation', () => {
   const conversations = reactive({
     data: [],
     listType: null,
-    status: 'Open',
-    sortField: 'newest',
+    status: persistedListStatus.value,
+    sortField: persistedListSortField.value,
     listFilters: [],
     viewID: 0,
     teamID: 0,
@@ -205,6 +275,10 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function setListStatus (status, fetch = true) {
     conversations.status = status
+    // Views clear the status, so only a real selection updates the remembered one.
+    if (status) {
+      persistedListStatus.value = status
+    }
     if (fetch) {
       resetConversations()
       reFetchConversationsList()
@@ -218,6 +292,7 @@ export const useConversationStore = defineStore('conversation', () => {
   function setListSortField (field) {
     if (conversations.sortField === field) return
     conversations.sortField = field
+    persistedListSortField.value = field
     resetConversations()
     reFetchConversationsList()
   }
@@ -237,6 +312,10 @@ export const useConversationStore = defineStore('conversation', () => {
         ...status,
         id: status.id.toString()
       }))
+      // A remembered status can point at one that has since been deleted.
+      if (conversations.status && !statuses.value.some(s => s.name === conversations.status)) {
+        setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN)
+      }
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -708,6 +787,7 @@ export const useConversationStore = defineStore('conversation', () => {
     try {
       await api.updateConversationStatus(conversation.data.uuid, { status: v })
       notificationStore.markAssignmentAsReadForConversation(conversation.data.uuid)
+      fetchSidebarCounts({ force: true })
     } catch (error) {
       if (conversation.data) conversation.data.status = previous
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -720,6 +800,7 @@ export const useConversationStore = defineStore('conversation', () => {
   async function snoozeConversation (snoozeDuration) {
     try {
       await api.updateConversationStatus(conversation.data.uuid, { status: CONVERSATION_DEFAULT_STATUSES.SNOOZED, snoozed_until: snoozeDuration })
+      fetchSidebarCounts({ force: true })
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -768,8 +849,13 @@ export const useConversationStore = defineStore('conversation', () => {
 
   async function updateAssignee (type, v) {
     try {
+      const teamChanged =
+        type === 'team' && Number(conversation.data.assigned_team_id) !== Number(v.assignee_id)
       await api.updateAssignee(conversation.data.uuid, type, v)
       conversation.data[`assigned_${type}_id`] = v.assignee_id
+      // Backend clears the user assignee when the team changes.
+      if (teamChanged) conversation.data.assigned_user_id = null
+      fetchSidebarCounts({ force: true })
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -782,6 +868,7 @@ export const useConversationStore = defineStore('conversation', () => {
     try {
       await api.removeAssignee(conversation.data.uuid, type)
       conversation.data[`assigned_${type}_id`] = null
+      fetchSidebarCounts({ force: true })
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -1200,6 +1287,7 @@ export const useConversationStore = defineStore('conversation', () => {
     setMacroActions,
     removeAssignee,
     getListSortField,
+    sortFieldI18nKeys,
     getListStatus,
     statuses,
     priorities,
@@ -1231,6 +1319,10 @@ export const useConversationStore = defineStore('conversation', () => {
     toggleSelect,
     selectAll,
     clearSelection,
-    isSelected
+    isSelected,
+    sidebarCounts,
+    fetchSidebarCounts,
+    fetchViewCount,
+    refreshSidebarCounts
   }
 })

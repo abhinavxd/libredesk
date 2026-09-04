@@ -53,6 +53,7 @@ const verificationNote = `This customer is not verified yet. Some tools need a v
 - Call send_email_verification to email them a one-time code, then tell them you have sent a code and ask them to reply with it. Never ask for or accept the code by any other means, and never state the code yourself.
 - If the customer gives a different email from the one the code went to (for example after their account could not be located), call set_contact_email with the new email, then send_email_verification again.
 - When they reply with the code, call check_email_verification with it. Once it succeeds, retry the tool you needed.
+- Call check_email_verification for every code the customer sends, including after an earlier code was rejected. Never tell them a code is wrong unless that tool just said so.
 Do not claim the customer is verified until check_email_verification has succeeded.`
 
 var toneClauses = map[string]string{

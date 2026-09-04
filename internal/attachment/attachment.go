@@ -3,6 +3,7 @@ package attachment
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/textproto"
 )
 
@@ -64,10 +65,16 @@ func MakeHeader(contentType, contentID, fileName, encoding, disposition string) 
 		h.Set("Content-Disposition", "inline")
 		h.Set("Content-ID", "<"+contentID+">")
 	} else {
-		h.Set("Content-Disposition", fmt.Sprintf("%s; filename=\"%s\"", disposition, fileName))
+		h.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": fileName}))
 	}
 
-	h.Set("Content-Type", fmt.Sprintf("%s; name=\"%s\"", contentType, fileName))
+	// Round-trip through ParseMediaType so existing params (e.g. charset) survive alongside name.
+	if mt, params, err := mime.ParseMediaType(contentType); err == nil {
+		params["name"] = fileName
+		h.Set("Content-Type", mime.FormatMediaType(mt, params))
+	} else {
+		h.Set("Content-Type", contentType)
+	}
 	h.Set("Content-Transfer-Encoding", encoding)
 
 	return h

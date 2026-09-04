@@ -48,6 +48,7 @@
             <Input
               id="email"
               type="text"
+              autofocus
               autocomplete="username"
               v-model.trim="loginForm.email"
               :class="{ 'border-destructive': emailHasError }"
@@ -155,7 +156,8 @@ const demoCredentials = {
 }
 
 const oidcErrorKeys = {
-  oidc_provider_error: 'auth.oidcProviderError',
+  oidc_invalid_client: 'auth.oidcInvalidClient',
+  oidc_access_denied: 'auth.oidcAccessDenied',
   oidc_session_expired: 'auth.oidcSessionExpired',
   oidc_no_account: 'auth.oidcNoAccount',
   oidc_account_disabled: 'user.accountDisabled',
@@ -175,8 +177,8 @@ onMounted(async () => {
 const showOIDCError = () => {
   const { error, ...query } = router.currentRoute.value.query
   if (!error) return
-  errorMessage.value = t(oidcErrorKeys[error] ?? 'auth.oidcLoginFailed')
-  useTemporaryClass('login-container', 'animate-shake')
+  errorMessage.value = t(Object.hasOwn(oidcErrorKeys, error) ? oidcErrorKeys[error] : 'auth.oidcLoginFailed')
+  applyTemporaryClass('login-container', 'animate-shake')
   router.replace({ query })
 }
 

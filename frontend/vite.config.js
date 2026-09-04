@@ -13,6 +13,11 @@ export default defineConfig(({ mode, command }) => {
   const isWidget = mode === 'widget'
   const appPath = isWidget ? 'apps/widget' : 'apps/main'
 
+  const apiTarget = process.env.LD_API_TARGET || 'http://127.0.0.1:9000'
+  const wsTarget = process.env.LD_WS_TARGET || 'ws://127.0.0.1:9000'
+  const mainPort = process.env.LD_DEV_PORT ? Number(process.env.LD_DEV_PORT) : 8000
+  const widgetPort = process.env.LD_WIDGET_DEV_PORT ? Number(process.env.LD_WIDGET_DEV_PORT) : 8001
+
   // Load shared tailwind config but scope content to current app only,
   // so each app's CSS bundle doesn't include unused classes from the other.
   const tailwindConfig = require('./tailwind.config.cjs')
@@ -39,39 +44,40 @@ export default defineConfig(({ mode, command }) => {
     cacheDir: path.resolve(__dirname, `node_modules/.vite-${isWidget ? 'widget' : 'main'}`),
     server: {
       cors: { origin: "*" },
-      // Allow access to parent dir so shared-ui imports work in dev.
+      // Allow access to parent dir so shared-ui imports work in dev, plus the
+      // public stylesheet the article editor shares with the rendered page.
       fs: {
-        allow: [path.resolve(__dirname)],
+        allow: [path.resolve(__dirname), path.resolve(__dirname, '../static/public/static')],
       },
-      port: isWidget ? 8001 : 8000,
+      port: isWidget ? widgetPort : mainPort,
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/widget.js': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/static': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/logout': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/uploads': {
-          target: 'http://127.0.0.1:9000',
+          target: apiTarget,
           changeOrigin: true,
         },
         '/ws': {
-          target: 'ws://127.0.0.1:9000',
+          target: wsTarget,
           ws: true,
           changeOrigin: true,
         },
         '/widget/ws': {
-          target: 'ws://127.0.0.1:9000',
+          target: wsTarget,
           ws: true,
           changeOrigin: true,
         }
@@ -114,12 +120,17 @@ export default defineConfig(({ mode, command }) => {
       },
     },
     plugins: [vue()],
+    // `root` is the app dir, which would hide the tests living in the other app and in shared-ui.
+    test: {
+      dir: path.resolve(__dirname),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, `${appPath}/src`),
         '@main': path.resolve(__dirname, 'apps/main/src'),
         '@widget': path.resolve(__dirname, 'apps/widget/src'),
         '@shared-ui': path.resolve(__dirname, 'shared-ui'),
+        '@public-static': path.resolve(__dirname, '../static/public/static'),
       },
     },
   }

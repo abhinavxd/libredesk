@@ -55,3 +55,31 @@ func TestTranscriptMaxMessages(t *testing.T) {
 		t.Errorf("expected last two messages kept, got %q", got)
 	}
 }
+
+func TestShouldEvaluateAutomation(t *testing.T) {
+	const systemUserID = 99
+
+	tests := []struct {
+		name     string
+		senderID int
+		meta     string
+		want     bool
+	}{
+		{"agent reply", 7, `{}`, true},
+		{"agent reply, empty meta", 7, ``, true},
+		{"system sender (automation reply, continuity)", systemUserID, `{}`, false},
+		{"agent sender but automated (CSAT on agent resolve)", 7, `{"is_automated":true}`, false},
+		{"system sender and automated", systemUserID, `{"is_automated":true}`, false},
+		{"is_automated explicitly false", 7, `{"is_automated":false}`, true},
+		{"malformed meta treated as not automated", 7, `not-json`, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := Message{SenderID: tt.senderID, Meta: []byte(tt.meta)}
+			if got := m.ShouldEvaluateAutomation(systemUserID); got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

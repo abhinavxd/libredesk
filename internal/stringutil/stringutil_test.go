@@ -271,6 +271,40 @@ func TestSanitizeUTF8(t *testing.T) {
 	}
 }
 
+func TestSanitizeFilename(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"plain ascii", "report.pdf", "report.pdf"},
+		{"case preserved", "Report.PDF", "Report.PDF"},
+		{"cyrillic preserved", "Документ_Иванов.pdf", "Документ_Иванов.pdf"},
+		{"chinese with space", "报告 2024.xlsx", "报告-2024.xlsx"},
+		{"spaces collapse to hyphen", "my  file name.txt", "my-file-name.txt"},
+		{"path traversal", "../../etc/passwd", "passwd"},
+		{"windows path stripped to base name", `dir\sub\file.txt`, "file.txt"},
+		{"control chars stripped", "a\r\nb\x00c.pdf", "a-bc.pdf"},
+		{"empty", "", "attachment"},
+		{"whitespace only", "   ", "attachment"},
+		{"dot only", ".", "attachment"},
+		{"dot dot", "..", "attachment"},
+		{"slash only", "/", "attachment"},
+		{"slashes only", "///", "attachment"},
+		{"backslash only", `\`, "attachment"},
+		{"c1 control stripped", "a\u0085b.pdf", "ab.pdf"},
+		{"invalid utf8 replaced", "rapport\xe9.pdf", "rapport�.pdf"},
+		{"emoji preserved", "photo😀.jpg", "photo😀.jpg"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SanitizeFilename(tt.input); got != tt.expected {
+				t.Errorf("SanitizeFilename(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestSplitName(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -292,6 +326,63 @@ func TestSplitName(t *testing.T) {
 			first, last := SplitName(tt.input)
 			if first != tt.wantFirst || last != tt.wantLast {
 				t.Errorf("SplitName(%q) = (%q, %q), want (%q, %q)", tt.input, first, last, tt.wantFirst, tt.wantLast)
+			}
+		})
+	}
+}
+func TestGenerateSlug(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple title",
+			input:    "Hello World",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with special characters",
+			input:    "Hello, World! How are you?",
+			expected: "hello-world-how-are-you",
+		},
+		{
+			name:     "title with numbers",
+			input:    "Article 123: How to Code",
+			expected: "article-123-how-to-code",
+		},
+		{
+			name:     "title with underscores",
+			input:    "test_article_name",
+			expected: "test_article_name",
+		},
+		{
+			name:     "title with multiple spaces",
+			input:    "Hello     World",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with leading/trailing spaces",
+			input:    "  Hello World  ",
+			expected: "hello-world",
+		},
+		{
+			name:     "title with multiple hyphens",
+			input:    "Hello---World",
+			expected: "hello-world",
+		},
+		{
+			name:     "unicode characters",
+			input:    "Hello World",
+			expected: "hello-world",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GenerateSlug(tt.input)
+			if result != tt.expected {
+				t.Errorf("GenerateSlug(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -334,6 +425,41 @@ func TestHTML2TextMarkdownLinks(t *testing.T) {
 			want: "[See](<https://example.com/a(b)>)",
 		},
 		{
+			name: "mailto link becomes markdown",
+			html: `<p>Mail <a href="mailto:billing@example.com">billing</a>.</p>`,
+			want: "Mail [billing](mailto:billing@example.com).",
+		},
+		{
+			name: "linked image becomes bare url",
+			html: `<a href="https://x.io"><img src="cid:1" alt="Banner"></a>`,
+			want: "https://x.io",
+		},
+		{
+			name: "bold kept as markdown",
+			html: `<div>Abra&ccedil;os,<br><b>Jo&atilde;o</b></div>`,
+			want: "Abraços,\n*João*",
+		},
+		{
+			name: "lists keep bullets",
+			html: `<ul><li>First</li><li>Second</li></ul>`,
+			want: "* First\n* Second",
+		},
+		{
+			name: "blockquote kept",
+			html: `<blockquote>quoted line</blockquote>after quote`,
+			want: "> \n> quoted line\n\nafter quote",
+		},
+		{
+			name: "multilingual",
+			html: `<div>visible 您好 مرحبا שלום Grüße</div>`,
+			want: "visible 您好 مرحبا שלום Grüße",
+		},
+		{
+			name: "empty input",
+			html: ``,
+			want: "",
+		},
+		{
 			name: "anchor without href keeps its text",
 			html: `<p><a name="top">Top</a> of page.</p>`,
 			want: "Top of page.",
@@ -343,6 +469,27 @@ func TestHTML2TextMarkdownLinks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := HTML2TextMarkdownLinks(tt.html); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeMessageID(t *testing.T) {
+	for _, tc := range []struct {
+		name, in, want string
+	}{
+		{"bracketed", "<abc@example.com>", "abc@example.com"},
+		{"already bare", "abc@example.com", "abc@example.com"},
+		{"surrounding whitespace", "  <abc@example.com>  ", "abc@example.com"},
+		{"empty stays empty", "", ""},
+		{"brackets only", "<>", ""},
+		{"line feed is rejected", "a\nb@example.com", ""},
+		{"carriage return is rejected", "a\rb@example.com", ""},
+		{"crlf inside brackets is rejected", "<a\r\nb@host>", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NormalizeMessageID(tc.in); got != tc.want {
+				t.Errorf("NormalizeMessageID(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
 	}

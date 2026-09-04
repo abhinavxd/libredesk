@@ -3,28 +3,32 @@
   <div class="flex flex-col h-full" :class="{ 'max-h-[600px]': !isFullscreen }">
     <!-- Message type toggle -->
     <div
-      class="flex justify-between items-center"
+      class="flex items-center justify-between"
       :class="{ 'mb-4': !isFullscreen, 'border-b border-border pb-4': isFullscreen }"
     >
-      <Tabs v-model="messageType" class="rounded-md border">
-        <TabsList class="bg-muted p-1 rounded-md">
+      <Tabs v-model="messageType" class="rounded-lg">
+        <TabsList class="rounded-lg border bg-muted/50 p-0.5">
           <TabsTrigger
+            v-if="canSendReply"
             value="reply"
-            class="px-3 py-1 rounded-md transition-colors duration-200"
-            :class="{ 'bg-background text-foreground': messageType === 'reply' }"
+            :class="TAB_TRIGGER_CLASS"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
           <TabsTrigger
+            v-if="canSendPrivateNote"
             value="private_note"
-            class="px-3 py-1 rounded-md transition-colors duration-200"
-            :class="{ 'bg-background text-foreground': messageType === 'private_note' }"
+            :class="TAB_TRIGGER_CLASS"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <Button class="text-muted-foreground" variant="ghost" @click="toggleFullscreen">
+      <Button
+        class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0"
+        variant="ghost"
+        @click="toggleFullscreen"
+      >
         <component :is="isFullscreen ? Minimize2 : Maximize2" />
       </Button>
     </div>
@@ -32,43 +36,39 @@
     <!-- To, CC, and BCC fields -->
     <div v-if="conversationStore.current.inbox_channel === 'email'">
       <div
-        :class="['space-y-3', isFullscreen ? 'p-4 border-b border-border' : 'mb-4']"
+        :class="['space-y-3', isFullscreen ? 'border-b border-border p-4' : 'mb-3']"
         v-if="messageType === 'reply'"
       >
-        <div class="flex items-center space-x-2">
-          <label class="w-12 text-sm font-medium text-muted-foreground">TO:</label>
+        <div class="flex items-center gap-2">
+          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">TO:</label>
           <Input
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="to"
-            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
+            :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
         </div>
-        <div class="flex items-center space-x-2">
-          <label class="w-12 text-sm font-medium text-muted-foreground">CC:</label>
+        <div class="flex items-center gap-2">
+          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">CC:</label>
           <Input
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="cc"
-            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
+            :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
-          <Button
-            size="sm"
-            @click="toggleBcc"
-            class="text-sm bg-secondary text-secondary-foreground hover:bg-secondary/80"
-          >
+          <Button size="sm" @click="toggleBcc" variant="secondary">
             {{ showBcc ? $t('replyBox.removeBCC') : $t('replyBox.bcc') }}
           </Button>
         </div>
-        <div v-if="showBcc" class="flex items-center space-x-2">
-          <label class="w-12 text-sm font-medium text-muted-foreground">BCC:</label>
+        <div v-if="showBcc" class="flex items-center gap-2">
+          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">BCC:</label>
           <Input
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="bcc"
-            class="flex-grow px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-ring"
+            :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
         </div>
@@ -77,7 +77,7 @@
       <!-- email errors -->
       <div
         v-if="emailErrors.length > 0"
-        class="mb-4 px-2 py-1 bg-destructive/10 border border-destructive text-destructive rounded-md"
+        class="mb-3 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-destructive"
       >
         <p v-for="error in emailErrors" :key="error" class="text-sm">{{ error }}</p>
       </div>
@@ -90,7 +90,7 @@
         v-model:htmlContent="htmlContent"
         v-model:textContent="textContent"
         :message-type="messageType"
-        :placeholder="t('editor.hint.full')"
+        :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
         :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
@@ -102,6 +102,7 @@
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
         @filesDropped="handleFilesDropped"
+        @toggleMessageType="toggleMessageType"
       />
     </div>
 
@@ -124,7 +125,7 @@
 
     <!-- Editor menu bar with send button -->
     <ReplyBoxMenuBar
-      class="mt-1 shrink-0"
+      class="mt-2"
       :isFullscreen="isFullscreen"
       :handleFileUpload="handleFileUpload"
       :isSending="isSending"
@@ -140,13 +141,21 @@
 </template>
 
 <script setup>
+const RECIPIENT_INPUT_CLASS =
+  'flex-grow border-input bg-card px-3 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-ring'
+
+const TAB_TRIGGER_CLASS =
+  'rounded-md px-3 py-1 text-sm transition-colors duration-150 max-md:py-2.5 data-[state=active]:bg-card data-[state=active]:shadow-sm'
+
 import { ref, computed, nextTick, watch } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { Maximize2, Minimize2 } from 'lucide-vue-next'
-import Editor from '@main/components/editor/TextEditor.vue'
+import Editor from '@main/components/editor/ConversationEditor.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
+import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
@@ -157,8 +166,10 @@ import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
-import { useUsersStore } from '@main/stores/users'
-import { useTeamStore } from '@main/stores/team'
+import api from '@main/api'
+
+const MENTION_LIMIT = 10
+const MENTION_DEBOUNCE_MS = 250
 
 const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
@@ -170,23 +181,16 @@ const htmlContent = defineModel('htmlContent', { default: '' })
 const textContent = defineModel('textContent', { default: '' })
 const mentions = defineModel('mentions', { default: () => [] })
 const macroStore = useMacroStore()
-const usersStore = useUsersStore()
-const teamStore = useTeamStore()
 
 // Get suggestions for the mention dropdown
-const getSuggestions = async (query) => {
-  // Only show suggestions in private note mode
-  if (messageType.value !== 'private_note') {
-    return []
-  }
+const fetchSuggestions = async (query) => {
+  // Mentions run their own query so typing here never disturbs the shared agent and team pickers.
+  const [agentsResponse, teamsResponse] = await Promise.all([
+    api.getUsersCompact({ q: query, page_size: MENTION_LIMIT, type: 'agent', enabled: true }),
+    api.getTeamsCompact({ q: query, page_size: MENTION_LIMIT })
+  ])
 
-  await Promise.all([usersStore.fetchUsers(), teamStore.fetchTeams()])
-
-  const q = query.toLowerCase()
-
-  const users = usersStore.users
-    .filter((u) => u.enabled && u.type !== 'ai_assistant')
-    .filter((u) => `${u.first_name} ${u.last_name}`.toLowerCase().includes(q))
+  const users = (agentsResponse?.data?.data || [])
     .map((u) => ({
       id: u.id,
       type: 'agent',
@@ -194,21 +198,31 @@ const getSuggestions = async (query) => {
       avatar_url: u.avatar_url
     }))
 
-  const teams = teamStore.teams
-    .filter((t) => t.name.toLowerCase().includes(q))
-    .map((t) => ({
-      id: t.id,
-      type: 'team',
-      label: t.name,
-      emoji: t.emoji
-    }))
+  const teams = (teamsResponse?.data?.data || []).map((t) => ({
+    id: t.id,
+    type: 'team',
+    label: t.name,
+    emoji: t.emoji
+  }))
 
-  return [...users, ...teams].slice(0, 25)
+  return [...users, ...teams].slice(0, MENTION_LIMIT)
+}
+
+const debouncedFetchSuggestions = useDebounceFn(fetchSuggestions, MENTION_DEBOUNCE_MS)
+
+const getSuggestions = async (query) => {
+  if (messageType.value !== 'private_note') return []
+  return (await debouncedFetchSuggestions(query)) || []
 }
 
 // Handle mentions changed from editor
 const handleMentionsChanged = (newMentions) => {
   mentions.value = newMentions
+}
+
+const toggleMessageType = () => {
+  if (props.isGenerating || !props.canSendReply || !props.canSendPrivateNote) return
+  messageType.value = messageType.value === 'private_note' ? 'reply' : 'private_note'
 }
 
 const props = defineProps({
@@ -241,6 +255,14 @@ const props = defineProps({
   isGenerating: {
     type: Boolean,
     default: false
+  },
+  canSendReply: {
+    type: Boolean,
+    required: true
+  },
+  canSendPrivateNote: {
+    type: Boolean,
+    required: true
   }
 })
 
@@ -257,6 +279,7 @@ const emit = defineEmits([
 ])
 
 const conversationStore = useConversationStore()
+const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)
@@ -286,7 +309,8 @@ const enableSend = computed(() => {
       conversationStore.getMacro('reply')?.actions?.length > 0 ||
       props.uploadedFiles.length > 0) &&
     emailErrors.value.length === 0 &&
-    !props.uploadingFiles.length && !props.isDraftLoading
+    !props.uploadingFiles.length &&
+    !props.isDraftLoading
   )
 })
 

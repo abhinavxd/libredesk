@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/knadh/go-i18n"
@@ -18,17 +19,29 @@ const (
 	defLang = "en-US"
 )
 
+var (
+	localeI18nMu    sync.Mutex
+	localeI18nCache = map[string]*i18n.I18n{}
+
+	// Keyed by resolved language code
+	i18nJSONMu    sync.Mutex
+	i18nJSONCache = map[string][]byte{}
+)
+
 // handleGetI18nLang returns the JSON language pack for the given language code.
 func handleGetI18nLang(r *fastglue.Request) error {
 	var (
 		app  = r.Context.(*App)
 		lang = r.RequestCtx.UserValue("lang").(string)
 	)
-	i, err := loadI18nLang(lang, app.fs)
+	b, err := i18nLangJSON(app, lang)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendBytes(http.StatusOK, "application/json", i.JSON())
+	r.RequestCtx.Response.Header.SetContentType("application/json")
+	r.RequestCtx.Response.SetStatusCode(http.StatusOK)
+	r.RequestCtx.Response.SetBodyRaw(b)
+	return nil
 }
 
 // handleGetAvailableLanguages returns the list of available languages
@@ -71,6 +84,64 @@ func handleGetAvailableLanguages(r *fastglue.Request) error {
 	})
 
 	return r.SendEnvelope(langs)
+}
+
+// localeI18n returns an i18n instance for the given locale code, matching available
+// language packs by exact code or language prefix, falling back to the app's i18n.
+func localeI18n(app *App, locale string) *i18n.I18n {
+	loc := strings.ToLower(strings.TrimSpace(locale))
+	localeI18nMu.Lock()
+	defer localeI18nMu.Unlock()
+	if i, ok := localeI18nCache[loc]; ok {
+		return i
+	}
+	i, err := loadI18nLang(matchLangFile(app.fs, loc), app.fs)
+	if err != nil || i == nil {
+		i = app.i18n
+	}
+	localeI18nCache[loc] = i
+	return i
+}
+
+// i18nLangJSON returns the marshaled language pack for a language code, cached per resolved code.
+func i18nLangJSON(app *App, lang string) ([]byte, error) {
+	code := matchLangFile(app.fs, strings.ToLower(strings.TrimSpace(lang)))
+	i18nJSONMu.Lock()
+	defer i18nJSONMu.Unlock()
+	if b, ok := i18nJSONCache[code]; ok {
+		return b, nil
+	}
+	i, err := loadI18nLang(code, app.fs)
+	if err != nil {
+		return nil, err
+	}
+	b := i.JSON()
+	i18nJSONCache[code] = b
+	return b, nil
+}
+
+// matchLangFile finds the language pack code for a locale: exact match first, then language prefix.
+func matchLangFile(fs stuffbin.FileSystem, loc string) string {
+	files, err := fs.Glob("/i18n/*.json")
+	if err != nil {
+		return defLang
+	}
+	lang := strings.SplitN(loc, "-", 2)[0]
+	prefixMatch := ""
+	for _, f := range files {
+		code := strings.TrimSuffix(filepath.Base(f), ".json")
+		lc := strings.ToLower(code)
+		if lc == loc {
+			return code
+		}
+		if prefixMatch == "" && (lc == lang || strings.HasPrefix(lc, lang+"-")) {
+			prefixMatch = code
+		}
+	}
+	if prefixMatch != "" {
+		return prefixMatch
+	}
+	return defLang
 }
 
 // loadI18nLang loads the i18n language pack for the given language code.

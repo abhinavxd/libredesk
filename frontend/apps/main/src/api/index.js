@@ -6,6 +6,9 @@ const http = axios.create({
   responseType: 'json'
 })
 
+// LLM calls can take 30-40s+, well past the default request timeout.
+const AI_TIMEOUT = 120000
+
 function getCSRFToken () {
   const name = 'csrf_token='
   const cookies = document.cookie.split(';')
@@ -212,6 +215,8 @@ const blockContact = (id, data) => http.put(`/api/v1/contacts/${id}/block`, data
     'Content-Type': 'application/json'
   }
 })
+const deleteContact = (id) => http.delete(`/api/v1/contacts/${id}`)
+const exportContact = (id) => http.get(`/api/v1/contacts/${id}/export`, { responseType: 'blob' })
 const getTeam = (id) => http.get(`/api/v1/teams/${id}`)
 const getTeams = () => http.get('/api/v1/teams')
 const updateTeam = (id, data) => http.put(`/api/v1/teams/${id}`, data, {
@@ -224,7 +229,7 @@ const createTeam = (data) => http.post('/api/v1/teams', data, {
     'Content-Type': 'application/json'
   }
 })
-const getTeamsCompact = () => http.get('/api/v1/teams/compact')
+const getTeamsCompact = (params) => http.get('/api/v1/teams/compact', { params })
 const deleteTeam = (id) => http.delete(`/api/v1/teams/${id}`)
 const updateUser = (id, data) =>
   http.put(`/api/v1/agents/${id}`, data, {
@@ -233,7 +238,7 @@ const updateUser = (id, data) =>
     }
   })
 const getUsers = () => http.get('/api/v1/agents')
-const getUsersCompact = () => http.get('/api/v1/agents/compact')
+const getUsersCompact = (params) => http.get('/api/v1/agents/compact', { params })
 const updateCurrentUser = (data) =>
   http.put('/api/v1/agents/me', data, {
     headers: {
@@ -273,7 +278,7 @@ const createUser = (data) =>
       'Content-Type': 'application/json'
     }
   })
-const getTags = () => http.get('/api/v1/tags')
+const getTags = (params) => http.get('/api/v1/tags', { params })
 const importTags = (data) =>
   http.post('/api/v1/tags/import', data, {
     headers: {
@@ -344,7 +349,8 @@ const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { ab
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
-const getAllMacros = () => http.get('/api/v1/macros')
+const getMacrosCompact = (params) => http.get('/api/v1/macros/compact', { params })
+const searchMacros = (params) => http.get('/api/v1/macros/search', { params })
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
 const createMacro = (data) =>
   http.post('/api/v1/macros', data, {
@@ -375,6 +381,8 @@ const getAllConversations = (params) =>
   http.get('/api/v1/conversations/all', { params, abortOnRoute: true })
 const getMentionedConversations = (params) =>
   http.get('/api/v1/conversations/mentioned', { params, abortOnRoute: true })
+const getSidebarCounts = () => http.get('/api/v1/conversations/sidebar-counts')
+const getViewCount = (id) => http.get(`/api/v1/views/${id}/count`)
 const getViewConversations = (id, params) =>
   http.get(`/api/v1/views/${id}/conversations`, { params, abortOnRoute: true })
 const uploadMedia = (data) =>
@@ -452,13 +460,15 @@ const deleteSharedView = (id) => http.delete(`/api/v1/shared-views/${id}`)
 
 const getAiPrompts = () => http.get('/api/v1/ai/prompts')
 const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
+  timeout: AI_TIMEOUT,
   headers: {
     'Content-Type': 'application/json'
   }
 })
 const getAIConfig = (type) => http.get(`/api/v1/ai/config/${type}`)
 const updateAIConfig = (type, data) => http.put(`/api/v1/ai/config/${type}`, data)
-const testAIConfig = (type, data) => http.post(`/api/v1/ai/config/${type}/test`, data)
+const testAIConfig = (type, data) =>
+  http.post(`/api/v1/ai/config/${type}/test`, data, { timeout: AI_TIMEOUT })
 const getAITools = () => http.get('/api/v1/ai/tools')
 const getAITool = (id) => http.get(`/api/v1/ai/tools/${id}`)
 const createAITool = (data) => http.post('/api/v1/ai/tools', data)
@@ -476,12 +486,14 @@ const updateAIAssistant = (id, data) =>
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 const deleteAIAssistant = (id) => http.delete(`/api/v1/ai/assistants/${id}`)
-const previewAIAssistant = (id, data) => http.post(`/api/v1/ai/assistants/${id}/preview`, data)
+const previewAIAssistant = (id, data) =>
+  http.post(`/api/v1/ai/assistants/${id}/preview`, data, { timeout: AI_TIMEOUT })
 const getAIAssistantStats = (id, range) =>
   http.get(`/api/v1/ai/assistants/${id}/stats`, { params: range ? { range } : {} })
 const getAISnippets = () => http.get('/api/v1/ai/snippets')
 const createAISnippet = (data) => http.post('/api/v1/ai/snippets', data)
-const importAISnippetFromURL = (data) => http.post('/api/v1/ai/snippets/import-url', data)
+const importAISnippetFromURL = (data) =>
+  http.post('/api/v1/ai/snippets/import-url', data, { timeout: AI_TIMEOUT })
 const updateAISnippet = (id, data) => http.put(`/api/v1/ai/snippets/${id}`, data)
 const deleteAISnippet = (id) => http.delete(`/api/v1/ai/snippets/${id}`)
 const getAIFaqSuggestions = (status) =>
@@ -491,14 +503,50 @@ const approveAIFaqSuggestion = (id, data) =>
 const rejectAIFaqSuggestion = (id) => http.post(`/api/v1/ai/faq-suggestions/${id}/reject`)
 const getAIFaqLearning = () => http.get('/api/v1/ai/faq-learning')
 const updateAIFaqLearning = (data) => http.put('/api/v1/ai/faq-learning', data)
-const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data)
-const aiSummarizeConversation = (data) => http.post('/api/v1/ai/summarize', data)
-const aiSuggestTags = (data) => http.post('/api/v1/ai/suggest-tags', data)
-const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data)
+const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data, { timeout: AI_TIMEOUT })
+const aiSummarizeConversation = (data) => http.post('/api/v1/ai/summarize', data, { timeout: AI_TIMEOUT })
+const aiSuggestTags = (data) => http.post('/api/v1/ai/suggest-tags', data, { timeout: AI_TIMEOUT })
+const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data, { timeout: AI_TIMEOUT })
 const getCopilotMessages = (conversationUUID) =>
   http.get('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
 const clearCopilotMessages = (conversationUUID) =>
   http.delete('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
+const getHelpCenters = () => http.get('/api/v1/help-centers')
+const getHelpCenterLocales = () => http.get('/api/v1/help-centers/locales')
+const getHelpCenter = (id) => http.get(`/api/v1/help-centers/${id}`)
+const createHelpCenter = (data) => http.post('/api/v1/help-centers', data)
+const updateHelpCenter = (id, data) => http.put(`/api/v1/help-centers/${id}`, data)
+const deleteHelpCenter = (id) => http.delete(`/api/v1/help-centers/${id}`)
+const toggleHelpCenter = (id) => http.put(`/api/v1/help-centers/${id}/toggle`)
+const previewHelpCenter = (id, data, page) =>
+  http.post(`/api/v1/help-centers/${id}/preview`, data, {
+    responseType: 'text',
+    params: page ? { page } : {}
+  })
+const getHelpCenterTree = (id, locale) =>
+  http.get(`/api/v1/help-centers/${id}/tree`, { params: locale ? { locale } : {} })
+const getCollections = (helpCenterId) => http.get(`/api/v1/help-centers/${helpCenterId}/collections`)
+const createCollection = (helpCenterId, data) =>
+  http.post(`/api/v1/help-centers/${helpCenterId}/collections`, data)
+const updateCollection = (helpCenterId, id, data) =>
+  http.put(`/api/v1/help-centers/${helpCenterId}/collections/${id}`, data)
+const deleteCollection = (helpCenterId, id) =>
+  http.delete(`/api/v1/help-centers/${helpCenterId}/collections/${id}`)
+const toggleCollection = (id) => http.put(`/api/v1/collections/${id}/toggle`)
+const updateCollectionSortOrders = (helpCenterId, data) =>
+  http.put(`/api/v1/help-centers/${helpCenterId}/collection-sort-order`, data)
+const moveArticleToCollection = (id, data) => http.put(`/api/v1/articles/${id}/collection`, data)
+const updateArticleSortOrders = (collectionId, data) =>
+  http.put(`/api/v1/collections/${collectionId}/article-sort-order`, data)
+const getArticle = (collectionId, id) =>
+  http.get(`/api/v1/collections/${collectionId}/articles/${id}`)
+const createArticle = (collectionId, data) =>
+  http.post(`/api/v1/collections/${collectionId}/articles`, data)
+const updateArticle = (id, data) => http.put(`/api/v1/articles/${id}`, data)
+const deleteArticle = (collectionId, id) =>
+  http.delete(`/api/v1/collections/${collectionId}/articles/${id}`)
+const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data)
+const getHelpCenterInsights = (id) => http.get(`/api/v1/help-centers/${id}/insights`)
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
   headers: {
@@ -507,6 +555,7 @@ const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`
 })
 const deleteContactNote = (id, noteId) => http.delete(`/api/v1/contacts/${id}/notes/${noteId}`)
 const getActivityLogs = (params) => http.get('/api/v1/activity-logs', { params })
+const getWebhooksCompact = () => http.get('/api/v1/webhooks/compact')
 const getWebhooks = () => http.get('/api/v1/webhooks')
 const getWebhook = (id) => http.get(`/api/v1/webhooks/${id}`)
 const createWebhook = (data) =>
@@ -608,6 +657,8 @@ export default {
   getUnassignedConversations,
   getAllConversations,
   getMentionedConversations,
+  getSidebarCounts,
+  getViewCount,
   getTeamUnassignedConversations,
   getViewConversations,
   getOverviewCharts,
@@ -621,7 +672,8 @@ export default {
   getConversationTranscript,
   getCurrentUser,
   getCurrentUserTeams,
-  getAllMacros,
+  getMacrosCompact,
+  searchMacros,
   getMacro,
   createMacro,
   updateMacro,
@@ -718,6 +770,29 @@ export default {
   importAISnippetFromURL,
   updateAISnippet,
   deleteAISnippet,
+  getHelpCenters,
+  getHelpCenterLocales,
+  getHelpCenter,
+  createHelpCenter,
+  updateHelpCenter,
+  deleteHelpCenter,
+  toggleHelpCenter,
+  previewHelpCenter,
+  getHelpCenterTree,
+  getCollections,
+  createCollection,
+  updateCollection,
+  deleteCollection,
+  toggleCollection,
+  updateCollectionSortOrders,
+  updateArticleSortOrders,
+  moveArticleToCollection,
+  getArticle,
+  createArticle,
+  updateArticle,
+  deleteArticle,
+  updateArticleStatus,
+  getHelpCenterInsights,
   getAIFaqSuggestions,
   approveAIFaqSuggestion,
   rejectAIFaqSuggestion,
@@ -737,6 +812,8 @@ export default {
   getContact,
   updateContact,
   blockContact,
+  deleteContact,
+  exportContact,
   getCustomAttributes,
   createCustomAttribute,
   updateCustomAttribute,
@@ -746,6 +823,7 @@ export default {
   createContactNote,
   deleteContactNote,
   getActivityLogs,
+  getWebhooksCompact,
   getWebhooks,
   getWebhook,
   createWebhook,

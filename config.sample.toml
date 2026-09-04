@@ -24,7 +24,7 @@ disable_secure_cookies = false
 # Session lifetime duration.
 session_lifetime = "9h"
 # Request read and write timeouts.
-read_timeout = "8s"
+read_timeout = "60s"
 write_timeout = "60s"
 # Maximum request body size in bytes (100MB)
 # If you are using proxy, you may need to configure them to allow larger request bodies.
@@ -160,3 +160,26 @@ continuity_scan_interval = "5m"
 [sla]
 # How often to evaluate SLA compliance for conversations
 evaluation_interval = "5m"
+
+# Per-IP rate limits (requests per minute) for unauthenticated endpoints.
+# Setting enabled = false disables that rule entirely.
+
+# Livechat widget APIs.
+[rate_limit.widget]
+enabled = true
+requests_per_minute = 100
+
+# Login, password reset and other auth endpoints.
+[rate_limit.auth]
+enabled = true
+requests_per_minute = 30
+
+# Public pages and APIs: help center, CSAT, robots.txt/sitemaps.
+[rate_limit.public]
+enabled = true
+requests_per_minute = 100
+
+# Public media downloads (uploaded files, avatars).
+[rate_limit.media]
+enabled = true
+requests_per_minute = 300
