@@ -129,6 +129,12 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	req.IdleTimeout = strings.TrimSpace(req.IdleTimeout)
 	req.WaitTimeout = strings.TrimSpace(req.WaitTimeout)
 
+	// One save at a time from here on: the current-password read, the
+	// persist and the publish below must not interleave with another save,
+	// or the database and the running notifier end up on different configs.
+	app.emailSettingsMu.Lock()
+	defer app.emailSettingsMu.Unlock()
+
 	out, err := app.setting.GetByPrefix("notification.email")
 	if err != nil {
 		return sendErrorEnvelope(r, err)

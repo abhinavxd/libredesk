@@ -94,38 +94,42 @@ const (
 
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
-	ctx              context.Context
-	fs               stuffbin.FileSystem
-	consts           atomic.Value
-	auth             *auth_.Auth
-	authz            *authz.Enforcer
-	i18n             *i18n.I18n
-	lo               *logf.Logger
-	oidc             *oidc.Manager
-	media            *media.Manager
-	setting          *setting.Manager
-	role             *role.Manager
-	user             *user.Manager
-	team             *team.Manager
-	status           *status.Manager
-	priority         *priority.Manager
-	tag              *tag.Manager
-	inbox            *inbox.Manager
-	tmpl             *template.Manager
-	macro            *macro.Manager
-	conversation     *conversation.Manager
-	automation       *automation.Engine
-	businessHours    *businesshours.Manager
-	sla              *sla.Manager
-	csat             *csat.Manager
-	view             *view.Manager
-	ai               *ai.Manager
-	aiAgent          *aiagent.Manager
-	helpcenter       *helpcenter.Manager
-	search           *search.Manager
-	activityLog      *activitylog.Manager
-	notifier         *notifier.Service
-	notifDispatcher  *notifier.Dispatcher
+	ctx             context.Context
+	fs              stuffbin.FileSystem
+	consts          atomic.Value
+	auth            *auth_.Auth
+	authz           *authz.Enforcer
+	i18n            *i18n.I18n
+	lo              *logf.Logger
+	oidc            *oidc.Manager
+	media           *media.Manager
+	setting         *setting.Manager
+	role            *role.Manager
+	user            *user.Manager
+	team            *team.Manager
+	status          *status.Manager
+	priority        *priority.Manager
+	tag             *tag.Manager
+	inbox           *inbox.Manager
+	tmpl            *template.Manager
+	macro           *macro.Manager
+	conversation    *conversation.Manager
+	automation      *automation.Engine
+	businessHours   *businesshours.Manager
+	sla             *sla.Manager
+	csat            *csat.Manager
+	view            *view.Manager
+	ai              *ai.Manager
+	aiAgent         *aiagent.Manager
+	helpcenter      *helpcenter.Manager
+	search          *search.Manager
+	activityLog     *activitylog.Manager
+	notifier        *notifier.Service
+	notifDispatcher *notifier.Dispatcher
+	// Serializes email notification settings updates end to end (read current,
+	// build, persist, publish), so two concurrent saves cannot leave the
+	// database holding one config while the running notifier uses the other.
+	emailSettingsMu  sync.Mutex
 	userNotification *notifier.UserNotificationManager
 	customAttribute  *customAttribute.Manager
 	report           *report.Manager

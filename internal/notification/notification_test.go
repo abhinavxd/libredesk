@@ -9,10 +9,14 @@ type fakeProvider struct {
 	name    string
 	got     []Message
 	closed  bool
+	started chan struct{} // when set, closed once Send has been entered
 	release chan struct{} // when set, Send blocks until it is closed
 }
 
 func (f *fakeProvider) Send(m Message) error {
+	if f.started != nil {
+		close(f.started)
+	}
 	if f.release != nil {
 		<-f.release
 	}
@@ -53,7 +57,7 @@ func TestSetProviderRoutesSubsequentSendsAndClosesOld(t *testing.T) {
 
 // A swap must not close a provider while one of its sends is still running.
 func TestSetProviderWaitsForInFlightSend(t *testing.T) {
-	old := &fakeProvider{name: ProviderEmail, release: make(chan struct{})}
+	old := &fakeProvider{name: ProviderEmail, started: make(chan struct{}), release: make(chan struct{})}
 	s := NewService(map[string]Notifier{ProviderEmail: old}, 1, 1, nil)
 
 	sendDone := make(chan struct{})
@@ -61,8 +65,8 @@ func TestSetProviderWaitsForInFlightSend(t *testing.T) {
 		_ = s.SendSync(Message{Provider: ProviderEmail})
 		close(sendDone)
 	}()
-	// Let the send reach the provider and block there.
-	time.Sleep(20 * time.Millisecond)
+	// Wait until the send is inside the provider and blocked there.
+	<-old.started
 
 	swapDone := make(chan struct{})
 	go func() {
