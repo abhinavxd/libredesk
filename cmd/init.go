@@ -671,17 +671,28 @@ func initAutoAssigner(teamManager *team.Manager, userManager *user.Manager, conv
 	return e
 }
 
-// initNotifier initializes the notifier service with available providers.
-func initNotifier() *notifier.Service {
+// buildEmailNotifier builds the email notification provider from the
+// `notification.email.*` settings currently loaded in koanf. It is used at boot
+// and again by reloadNotifier whenever those settings are saved.
+func buildEmailNotifier() (*emailnotifier.Email, error) {
 	smtpCfg := imodels.SMTPConfig{}
 	if err := ko.UnmarshalWithConf("notification.email", &smtpCfg, koanf.UnmarshalConf{Tag: "json"}); err != nil {
-		log.Fatalf("error unmarshalling email notification provider config: %v", err)
+		return nil, fmt.Errorf("unmarshalling email notification provider config: %w", err)
 	}
+	// The setting is stored as `wait_timeout` but the pool option's JSON tag is
+	// `pool_wait_timeout`, so the unmarshal above never fills it and the pool
+	// silently ran on its default. Map it by hand.
+	smtpCfg.PoolWaitTimeout = ko.String("notification.email.wait_timeout")
 
-	emailNotifier, err := emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
+	return emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
 		Lo:        initLogger("email-notifier"),
 		FromEmail: ko.String("notification.email.email_address"),
 	})
+}
+
+// initNotifier initializes the notifier service with available providers.
+func initNotifier() *notifier.Service {
+	emailNotifier, err := buildEmailNotifier()
 	if err != nil {
 		log.Fatalf("error initializing email notifier: %v", err)
 	}
@@ -691,6 +702,21 @@ func initNotifier() *notifier.Service {
 	}
 
 	return notifier.NewService(notifierProviders, ko.MustInt("notification.concurrency"), ko.MustInt("notification.queue_size"), initLogger("notifier"))
+}
+
+// reloadNotifier rebuilds the email provider from the current settings and
+// swaps it into the running notifier service, so SMTP changes apply to the
+// next notification instead of waiting for a restart. The previous provider's
+// idle connections are dropped by its own sweeper.
+func reloadNotifier(app *App) error {
+	app.lo.Info("reloading email notifier")
+	emailNotifier, err := buildEmailNotifier()
+	if err != nil {
+		app.lo.Error("error reloading email notifier", "error", err)
+		return err
+	}
+	app.notifier.SetProvider(emailNotifier)
+	return nil
 }
 
 // initEmailInbox loads inbox config from DB and initializes the email inbox.
@@ -1172,12 +1198,14 @@ func initImporter(i18n *i18n.I18n) *importer.Importer {
 }
 
 // initNotifDispatcher initializes the notification dispatcher.
-func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub) *notifier.Dispatcher {
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
-		InApp:        userNotification,
-		Outbound:     outbound,
-		WSHub:        wsHub,
-		EmailEnabled: emailEnabled,
+		InApp:    userNotification,
+		Outbound: outbound,
+		WSHub:    wsHub,
+		// Read live, like the media store's root URL, so the toggle in
+		// settings applies without a restart.
+		EmailEnabled: func() bool { return ko.Bool("notification.email.enabled") },
 		Lo:           initLogger("notification-dispatcher"),
 	})
 }

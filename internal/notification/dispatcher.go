@@ -47,26 +47,33 @@ type Dispatcher struct {
 	inApp        *UserNotificationManager
 	outbound     *Service
 	wsHub        WSHub
-	emailEnabled bool
+	emailEnabled func() bool
 	lo           *logf.Logger
 }
 
 // DispatcherOpts contains options for creating a new Dispatcher.
 type DispatcherOpts struct {
-	InApp        *UserNotificationManager
-	Outbound     *Service
-	WSHub        WSHub
-	EmailEnabled bool
+	InApp    *UserNotificationManager
+	Outbound *Service
+	WSHub    WSHub
+	// EmailEnabled is consulted on every send rather than captured once, so
+	// toggling email notifications in settings takes effect without a restart.
+	// nil means email is never sent.
+	EmailEnabled func() bool
 	Lo           *logf.Logger
 }
 
 // NewDispatcher creates a new notification Dispatcher.
 func NewDispatcher(opts DispatcherOpts) *Dispatcher {
+	enabled := opts.EmailEnabled
+	if enabled == nil {
+		enabled = func() bool { return false }
+	}
 	return &Dispatcher{
 		inApp:        opts.InApp,
 		outbound:     opts.Outbound,
 		wsHub:        opts.WSHub,
-		emailEnabled: opts.EmailEnabled,
+		emailEnabled: enabled,
 		lo:           opts.Lo,
 	}
 }
@@ -78,7 +85,7 @@ func (d *Dispatcher) Send(n Notification) {
 	for i, recipientID := range n.RecipientIDs {
 		d.sendToRecipient(recipientID, n)
 
-		if d.outbound != nil && n.Email != nil && d.emailEnabled {
+		if d.outbound != nil && n.Email != nil && d.emailEnabled() {
 			var email string
 			if i < len(n.Email.Recipients) {
 				email = n.Email.Recipients[i]
@@ -98,7 +105,7 @@ func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) 
 	for i, recipientID := range n.RecipientIDs {
 		d.sendToRecipient(recipientID, n)
 
-		if d.outbound != nil && i < len(emails) && len(emails[i].Recipients) > 0 && d.emailEnabled {
+		if d.outbound != nil && i < len(emails) && len(emails[i].Recipients) > 0 && d.emailEnabled() {
 			e := emails[i]
 			d.sendEmail(recipientID, e.Recipients[0], e.Subject, e.Content, n.Type)
 		}

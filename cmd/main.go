@@ -138,8 +138,6 @@ type App struct {
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
-	// Flag to indicate if app restart is required for settings to take effect.
-	restartRequired bool
 	sync.Mutex
 }
 
@@ -249,7 +247,7 @@ func main() {
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
 		userNotification            = initUserNotification(db, i18n)
-		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub, ko.Bool("notification.email.enabled"))
+		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub)
 		automation                  = initAutomationEngine(db, i18n)
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)

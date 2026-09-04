@@ -31,8 +31,6 @@ func handleGetGeneralSettings(r *fastglue.Request) error {
 	settings["app.update"] = app.update
 	// Set app version.
 	settings["app.version"] = versionString
-	// Set restart required flag.
-	settings["app.restart_required"] = app.restartRequired
 	return r.SendEnvelope(settings)
 }
 
@@ -154,10 +152,14 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Email notification settings require app restart to take effect.
-	app.Lock()
-	app.restartRequired = true
-	app.Unlock()
+	// Load the saved values into koanf (the dispatcher reads the enabled flag
+	// from there on every send) and rebuild the SMTP provider from them.
+	if err := reloadSettings(app); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
+	if err := reloadNotifier(app); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
 
 	return r.SendEnvelope(true)
 }

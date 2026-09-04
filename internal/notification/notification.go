@@ -43,7 +43,11 @@ type Notifier interface {
 
 // Service manages message providers and a worker pool.
 type Service struct {
+	// providersMu guards providers on its own: Close holds mu while waiting for
+	// the workers, and a worker mid-SendSync must still be able to look its
+	// provider up, so the two must never share a lock.
 	providers      map[string]Notifier
+	providersMu    sync.RWMutex
 	messageChannel chan Message
 	concurrency    int
 	lo             *logf.Logger
@@ -79,13 +83,28 @@ func (s *Service) Send(message Message) error {
 	}
 }
 
-// SendSync sends on the caller's goroutine so delivery failures reach the caller; it holds no lock, so a slow relay cannot stall Send or Close.
+// SendSync sends on the caller's goroutine so delivery failures reach the caller; the provider
+// lookup is the only locked section, so a slow relay cannot stall Send, Close or SetProvider.
 func (s *Service) SendSync(message Message) error {
+	s.providersMu.RLock()
 	provider, exists := s.providers[message.Provider]
+	s.providersMu.RUnlock()
 	if !exists {
 		return fmt.Errorf("unsupported provider: %s", message.Provider)
 	}
 	return provider.Send(message)
+}
+
+// SetProvider replaces the provider registered under p.Name(), or adds it. Messages already
+// in flight finish on the provider they resolved; everything after the swap uses the new one.
+// This is how a settings change reaches a running service without a restart.
+func (s *Service) SetProvider(p Notifier) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+	if s.providers == nil {
+		s.providers = map[string]Notifier{}
+	}
+	s.providers[p.Name()] = p
 }
 
 // Run starts the worker pool to process messages.
