@@ -57,6 +57,12 @@ var metricLabels = map[string]string{
 	MetricNextResponse:  "Next response",
 }
 
+var metricNotificationTypes = map[string]struct{ warning, breach nmodels.NotificationType }{
+	MetricFirstResponse: {nmodels.NotificationTypeSLAFirstResponseWarn, nmodels.NotificationTypeSLAFirstResponseBreach},
+	MetricNextResponse:  {nmodels.NotificationTypeSLANextResponseWarn, nmodels.NotificationTypeSLANextResponseBreach},
+	MetricResolution:    {nmodels.NotificationTypeSLAResolutionWarn, nmodels.NotificationTypeSLAResolutionBreach},
+}
+
 type Manager struct {
 	q                queries
 	lo               *logf.Logger
@@ -757,12 +763,9 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			continue
 		}
 
-		// Determine notification type for in-app notification.
-		var notifType nmodels.NotificationType
+		notifType := metricNotificationTypes[scheduledNotification.Metric].warning
 		if scheduledNotification.NotificationType == NotificationTypeBreach {
-			notifType = nmodels.NotificationTypeSLABreach
-		} else {
-			notifType = nmodels.NotificationTypeSLAWarning
+			notifType = metricNotificationTypes[scheduledNotification.Metric].breach
 		}
 
 		notificationTitle := m.i18n.Ts("notification.slaAlert",

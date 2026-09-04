@@ -1163,6 +1163,19 @@ func initUserNotification(db *sqlx.DB, i18n *i18n.I18n) *notifier.UserNotificati
 	return m
 }
 
+// initNotificationPreference inits the notification preference manager.
+func initNotificationPreference(db *sqlx.DB, i18n *i18n.I18n) *notifier.PreferenceManager {
+	m, err := notifier.NewPreferenceManager(notifier.PreferenceManagerOpts{
+		DB:   db,
+		Lo:   initLogger("notification-preference"),
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing notification preference manager: %v", err)
+	}
+	return m
+}
+
 // initImporter inits the importer manager.
 func initImporter(i18n *i18n.I18n) *importer.Importer {
 	return importer.New(importer.Opts{
@@ -1171,12 +1184,42 @@ func initImporter(i18n *i18n.I18n) *importer.Importer {
 	})
 }
 
+func initNotificationEmailQueue(db *sqlx.DB, outbound *notifier.Service) *notifier.EmailQueue {
+	q, err := notifier.NewEmailQueue(notifier.EmailQueueOpts{
+		DB:       db,
+		Outbound: outbound,
+		Lo:       initLogger("notification-email-queue"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing notification email queue: %v", err)
+	}
+	return q
+}
+
+func initPushNotification(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *notifier.PushManager {
+	m, err := notifier.NewPushManager(notifier.PushManagerOpts{
+		DB:          db,
+		Settings:    settings,
+		Lo:          initLogger("push-notification"),
+		I18n:        i18n,
+		RootURL:     ko.String("app.root_url"),
+		Concurrency: ko.MustInt("notification.concurrency"),
+		QueueSize:   ko.MustInt("notification.queue_size"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing push notification manager: %v", err)
+	}
+	return m
+}
+
 // initNotifDispatcher initializes the notification dispatcher.
-func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+func initNotifDispatcher(userNotification *notifier.UserNotificationManager, prefs *notifier.PreferenceManager, push *notifier.PushManager, emailQueue *notifier.EmailQueue, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
 		InApp:        userNotification,
-		Outbound:     outbound,
+		EmailQueue:   emailQueue,
 		WSHub:        wsHub,
+		Prefs:        prefs,
+		Push:         push,
 		EmailEnabled: emailEnabled,
 		Lo:           initLogger("notification-dispatcher"),
 	})

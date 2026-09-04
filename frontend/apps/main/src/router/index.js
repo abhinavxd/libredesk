@@ -173,6 +173,13 @@ const routes = [
             name: 'profile',
             component: () => import('@main/views/account/profile/ProfileEditView.vue'),
             meta: { titleKey: 'account.editProfile' }
+          },
+          {
+            path: 'notifications',
+            name: 'account-notifications',
+            component: () =>
+              import('@main/views/account/notifications/NotificationPreferences.vue'),
+            meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
           }
         ]
       },

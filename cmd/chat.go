@@ -283,7 +283,7 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 
 	// Process post-message hooks for the new conversation and initial message.
-	if err := app.conversation.ProcessIncomingMessageHooks(conversationUUID, true); err != nil {
+	if err := app.conversation.ProcessIncomingMessageHooks(message, true); err != nil {
 		app.lo.Error("error processing incoming message hooks for initial message", "conversation_uuid", conversationUUID, "error", err)
 	}
 

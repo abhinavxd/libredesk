@@ -613,6 +613,10 @@ const markNotificationAsRead = (id) => http.put(`/api/v1/notifications/${id}/rea
 const markAllNotificationsAsRead = () => http.put('/api/v1/notifications/read-all')
 const deleteNotification = (id) => http.delete(`/api/v1/notifications/${id}`)
 const deleteAllNotifications = () => http.delete('/api/v1/notifications')
+const getNotificationPreferences = () => http.get('/api/v1/notifications/preferences')
+const updateNotificationPreferences = (data) => http.put('/api/v1/notifications/preferences', data)
+const createPushSubscription = (data) => http.post('/api/v1/notifications/push-subscriptions', data)
+const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/push-subscriptions', { data: { endpoint } })
 
 export default {
   login,
@@ -846,5 +850,9 @@ export default {
   markAllNotificationsAsRead,
   deleteNotification,
   deleteAllNotifications,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  createPushSubscription,
+  deletePushSubscription,
   getContactPageVisits
 }
