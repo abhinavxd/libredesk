@@ -1377,7 +1377,10 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		conversation, err := m.GetConversation(0, conversationUUID, "")
 		if err == nil {
 			conversation.IncomingTo = incomingTo
-			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, conversation)
+			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, struct {
+				models.Conversation
+				To []string `json:"to"`
+			}{Conversation: conversation, To: conversation.IncomingTo})
 			m.automation.EvaluateNewConversationRules(conversation)
 		}
 		return nil
