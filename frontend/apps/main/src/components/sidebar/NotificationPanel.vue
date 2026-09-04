@@ -135,6 +135,7 @@ import {
   AtSign,
   UserPlus,
   MessageSquare,
+  RotateCcw,
   AlertTriangle,
   AlertCircle
 } from 'lucide-vue-next'
@@ -154,7 +155,8 @@ const notificationStyles = {
   mention: { icon: AtSign, class: 'text-primary' },
   assignment: { icon: UserPlus, class: 'text-accent-foreground' },
   new_reply: { icon: MessageSquare, class: 'text-primary' },
-  new_reply_participating: { icon: MessageSquare, class: 'text-primary' }
+  new_reply_participating: { icon: MessageSquare, class: 'text-primary' },
+  conversation_reopened: { icon: RotateCcw, class: 'text-accent-foreground' }
 }
 
 const getNotificationStyle = (type) => {

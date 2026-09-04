@@ -10,6 +10,19 @@
         {{ $t('notification.emailChannelDisabled') }}
       </p>
 
+      <div class="flex items-center justify-between gap-4 border border-border rounded-md px-4 py-3">
+        <div class="space-y-1">
+          <p class="text-sm text-foreground">{{ $t('notification.browserPush.title') }}</p>
+          <p class="text-xs text-muted-foreground">{{ browserPushDescription }}</p>
+        </div>
+        <Switch
+          :checked="pushNotifications.enabled.value"
+          :disabled="!pushNotifications.supported.value || pushNotifications.permission.value === 'denied'"
+          :aria-label="$t('notification.browserPush.title')"
+          @update:checked="updateBrowserPush"
+        />
+      </div>
+
       <div class="border border-border rounded-md divide-y divide-border">
         <div class="flex items-center px-4 py-2 text-xs font-medium text-muted-foreground">
           <div class="flex-grow" />
@@ -42,27 +55,32 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Switch } from '@shared-ui/components/ui/switch'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import api from '@/api'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 
 const { t } = useI18n()
 const emitter = useEmitter()
 const rows = ref([])
 const emailEnabled = ref(true)
+const vapidPublicKey = ref('')
+const pushNotifications = usePushNotifications()
 
 const channels = [
   { key: 'in_app', labelKey: 'notification.channel.inApp' },
-  { key: 'email', labelKey: 'globals.terms.email' }
+  { key: 'email', labelKey: 'globals.terms.email' },
+  { key: 'push', labelKey: 'notification.channel.push' }
 ]
 
 const typeLabels = {
   assignment: 'notification.type.assignment',
   mention: 'notification.type.mention',
+  conversation_reopened: 'notification.type.conversationReopened',
   new_reply: 'notification.type.newReply',
   new_reply_participating: 'notification.type.newReplyParticipating',
   sla_first_response_warning: 'notification.type.slaFirstResponseWarning',
@@ -79,12 +97,35 @@ const fetchPreferences = async () => {
   try {
     const { data } = await api.getNotificationPreferences()
     emailEnabled.value = data.data.email_enabled
+    vapidPublicKey.value = data.data.vapid_public_key
+    await pushNotifications.refresh(vapidPublicKey.value)
     const byType = {}
     for (const pref of data.data.preferences) {
       byType[pref.notification_type] ??= { type: pref.notification_type }
       byType[pref.notification_type][pref.channel] = pref.enabled
     }
     rows.value = Object.values(byType)
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  }
+}
+
+const browserPushDescription = computed(() => {
+  if (!pushNotifications.supported.value) return t('notification.browserPush.unsupported')
+  if (pushNotifications.permission.value === 'denied') return t('notification.browserPush.blocked')
+  return t('notification.browserPush.description')
+})
+
+const updateBrowserPush = async (value) => {
+  try {
+    if (value) {
+      await pushNotifications.enable(vapidPublicKey.value)
+    } else {
+      await pushNotifications.disable()
+    }
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

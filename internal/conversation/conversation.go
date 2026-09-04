@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"slices"
 	"strconv"
@@ -65,6 +66,7 @@ const (
 <p>
 <a href="{{ RootURL }}/inboxes/all/conversation/{{ .Conversation.UUID }}">#{{ .Conversation.ReferenceNumber }}</a>
 </p>`
+	newReplyEmailDelay = 2 * time.Minute
 )
 
 var conversationFilterRenderers = dbutil.FieldRenderers{
@@ -685,14 +687,14 @@ func (c *Manager) GetConversations(viewingUserID, userID int, teamIDs []int, lis
 }
 
 // ReOpenConversation reopens a conversation if it's snoozed, resolved or closed.
-func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User) error {
+func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User) (bool, error) {
 	var conversationID int
 	if err := c.q.ReOpenConversation.QueryRow(conversationUUID).Scan(&conversationID); err != nil {
 		if err == sql.ErrNoRows {
-			return nil
+			return false, nil
 		}
 		c.lo.Error("error reopening conversation", "uuid", conversationUUID, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return false, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Reopening revives any first response or resolution deadline the resolved status had nulled.
@@ -703,9 +705,9 @@ func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User
 	c.BroadcastConversationUpdate(conversationUUID, map[string]any{"status": models.StatusOpen})
 
 	if err := c.RecordStatusChange(models.StatusOpen, conversationUUID, actor); err != nil {
-		return err
+		return true, err
 	}
-	return nil
+	return true, nil
 }
 
 // ActiveUserConversationsCount returns the count of active conversations for a user. i.e. conversations not closed or resolved status.
@@ -1246,7 +1248,7 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 }
 
 // NotifyNewReply notifies the assigned agent and the other participating agents of an incoming reply.
-func (m *Manager) NotifyNewReply(conversation models.Conversation, message models.Message) {
+func (m *Manager) NotifyNewReply(conversation models.Conversation, message models.Message, reopened bool) {
 	var participants []umodels.User
 	if err := m.q.GetConversationParticipantAgents.Select(&participants, conversation.UUID); err != nil {
 		m.lo.Error("error fetching participants for new reply notification", "conversation_uuid", conversation.UUID, "error", err)
@@ -1261,9 +1263,16 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 		participating = append(participating, p)
 	}
 
+	assigneeType, assigneeTmpl := nmodels.NotificationTypeNewReply, template.TmplNewReply
+	assigneeTitle := m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber)
+	if reopened {
+		assigneeType, assigneeTmpl = nmodels.NotificationTypeConversationReopened, template.TmplConversationReopened
+		assigneeTitle = m.i18n.Ts("notification.conversationReopened", "referenceNumber", conversation.ReferenceNumber)
+	}
+
 	var assigneeChannels, participatingChannels map[int][]nmodels.NotificationChannel
 	if assigneeID != 0 && assigneeID != message.SenderID {
-		assigneeChannels = m.dispatcher.EnabledChannels([]int{assigneeID}, nmodels.NotificationTypeNewReply)
+		assigneeChannels = m.dispatcher.EnabledChannels([]int{assigneeID}, assigneeType)
 	}
 	if len(participating) > 0 {
 		ids := make([]int, 0, len(participating))
@@ -1288,7 +1297,7 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 	notifiable := m.agentsWithoutUnseenReplies(conversation.UUID, candidateIDs, message.ID)
 
 	var assignees []umodels.User
-	if len(assigneeChannels) > 0 && slices.Contains(notifiable, assigneeID) {
+	if len(assigneeChannels) > 0 && (reopened || slices.Contains(notifiable, assigneeID)) {
 		if agent, err := m.userStore.GetAgent(assigneeID, ""); err != nil {
 			m.lo.Error("error fetching agent for new reply notification", "user_id", assigneeID, "error", err)
 		} else {
@@ -1308,11 +1317,12 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 		return
 	}
 
-	m.notifyNewReplyRecipients(conversation, nmodels.NotificationTypeNewReply, template.TmplNewReply, assignees, assigneeChannels, sender)
-	m.notifyNewReplyRecipients(conversation, nmodels.NotificationTypeNewReplyParticipating, template.TmplNewReplyParticipating, participating, participatingChannels, sender)
+	m.notifyNewReplyRecipients(conversation, message, assigneeType, assigneeTmpl, assigneeTitle, assignees, assigneeChannels, sender)
+	m.notifyNewReplyRecipients(conversation, message, nmodels.NotificationTypeNewReplyParticipating, template.TmplNewReplyParticipating,
+		m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber), participating, participatingChannels, sender)
 }
 
-func (m *Manager) notifyNewReplyRecipients(conversation models.Conversation, nType nmodels.NotificationType, tmplName string, recipients []umodels.User, channels map[int][]nmodels.NotificationChannel, author umodels.User) {
+func (m *Manager) notifyNewReplyRecipients(conversation models.Conversation, message models.Message, nType nmodels.NotificationType, tmplName, title string, recipients []umodels.User, channels map[int][]nmodels.NotificationChannel, author umodels.User) {
 	if len(recipients) == 0 {
 		return
 	}
@@ -1323,18 +1333,20 @@ func (m *Manager) notifyNewReplyRecipients(conversation models.Conversation, nTy
 		if !slices.Contains(channels[recipient.ID], nmodels.NotificationChannelEmail) {
 			continue
 		}
-		if rendered := m.renderNotificationEmail(tmplName, conversation, recipient, author); rendered != nil {
+		if rendered := m.renderNotificationEmail(tmplName, conversation, message, recipient, author); rendered != nil {
 			emails[i] = *rendered
 		}
 	}
-	m.dispatcher.SendWithEmails(notifier.Notification{
+	m.dispatcher.SendWithEmailsAfter(notifier.Notification{
 		Type:             nType,
 		RecipientIDs:     recipientIDs,
-		Title:            m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber),
+		Title:            title,
 		Body:             conversation.Subject,
 		ConversationID:   null.IntFrom(conversation.ID),
+		MessageID:        null.IntFrom(message.ID),
 		ConversationUUID: conversation.UUID,
-	}, emails)
+		MessageUUID:      message.UUID,
+	}, emails, newReplyEmailDelay)
 }
 
 // agentsWithoutUnseenReplies returns the given agents that have seen every incoming message older than the given one.
@@ -1348,11 +1360,16 @@ func (m *Manager) agentsWithoutUnseenReplies(conversationUUID string, userIDs []
 }
 
 // renderNotificationEmail returns nil when the recipient has no email or the template fails to render.
-func (m *Manager) renderNotificationEmail(tmplName string, conversation models.Conversation, recipient, author umodels.User) *notifier.EmailNotification {
+func (m *Manager) renderNotificationEmail(tmplName string, conversation models.Conversation, message models.Message, recipient, author umodels.User) *notifier.EmailNotification {
 	if recipient.Email.String == "" {
 		return nil
 	}
-	content, subject, err := m.template.RenderStoredEmailTemplate(tmplName, notificationTemplateData(conversation, recipient, author))
+	data := notificationTemplateData(conversation, recipient, author)
+	data["Message"] = map[string]any{
+		"UUID":    message.UUID,
+		"Content": strings.ReplaceAll(html.EscapeString(message.TextContent), "\n", "<br>"),
+	}
+	content, subject, err := m.template.RenderStoredEmailTemplate(tmplName, data)
 	if err != nil {
 		m.lo.Error("error rendering template", "template", tmplName, "conversation_uuid", conversation.UUID, "error", err)
 		return nil
@@ -1458,6 +1475,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 		MessageID:        null.IntFrom(message.ID),
 		ActorID:          null.IntFrom(mentionedByUserID),
 		ConversationUUID: conversation.UUID,
+		MessageUUID:      message.UUID,
 		ActorFirstName:   author.FirstName,
 		ActorLastName:    author.LastName,
 	}, emails)

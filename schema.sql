@@ -22,8 +22,8 @@ DROP TYPE IF EXISTS "sla_metric" CASCADE; CREATE TYPE "sla_metric" AS ENUM ('fir
 DROP TYPE IF EXISTS "sla_notification_type" CASCADE; CREATE TYPE "sla_notification_type" AS ENUM ('warning', 'breach');
 DROP TYPE IF EXISTS "activity_log_type" CASCADE; CREATE TYPE "activity_log_type" AS ENUM ('agent_login', 'agent_logout', 'agent_away', 'agent_away_reassigned', 'agent_online', 'agent_password_set', 'agent_role_permissions_changed', 'contact_deleted', 'contact_data_exported');
 DROP TYPE IF EXISTS "macro_visible_when" CASCADE; CREATE TYPE "macro_visible_when" AS ENUM ('replying', 'starting_conversation', 'adding_private_note');
-DROP TYPE IF EXISTS "user_notification_type" CASCADE; CREATE TYPE "user_notification_type" AS ENUM ('mention', 'assignment', 'sla_warning', 'sla_breach', 'new_reply', 'new_reply_participating', 'sla_first_response_warning', 'sla_first_response_breach', 'sla_next_response_warning', 'sla_next_response_breach', 'sla_resolution_warning', 'sla_resolution_breach');
-DROP TYPE IF EXISTS "notification_channel" CASCADE; CREATE TYPE "notification_channel" AS ENUM ('in_app', 'email');
+DROP TYPE IF EXISTS "user_notification_type" CASCADE; CREATE TYPE "user_notification_type" AS ENUM ('mention', 'assignment', 'sla_warning', 'sla_breach', 'new_reply', 'new_reply_participating', 'sla_first_response_warning', 'sla_first_response_breach', 'sla_next_response_warning', 'sla_next_response_breach', 'sla_resolution_warning', 'sla_resolution_breach', 'conversation_reopened');
+DROP TYPE IF EXISTS "notification_channel" CASCADE; CREATE TYPE "notification_channel" AS ENUM ('in_app', 'email', 'push');
 DROP TYPE IF EXISTS "conversation_status_category" CASCADE; CREATE TYPE "conversation_status_category" AS ENUM ('open', 'waiting', 'resolved');
 DROP TYPE IF EXISTS "ai_knowledge_type" CASCADE; CREATE TYPE "ai_knowledge_type" AS ENUM ('snippet');
 DROP TYPE IF EXISTS "webhook_event" CASCADE; CREATE TYPE webhook_event AS ENUM (
@@ -966,6 +966,36 @@ CREATE TABLE user_notification_preferences (
 	CONSTRAINT constraint_uniq_user_notification_preferences UNIQUE (user_id, notification_type, channel)
 );
 
+DROP TABLE IF EXISTS notification_push_subscriptions CASCADE;
+CREATE TABLE notification_push_subscriptions (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	endpoint TEXT NOT NULL UNIQUE,
+	p256dh TEXT NOT NULL,
+	auth TEXT NOT NULL
+);
+CREATE INDEX index_notification_push_subscriptions_on_user_id ON notification_push_subscriptions(user_id);
+
+DROP TABLE IF EXISTS notification_email_queue CASCADE;
+CREATE TABLE notification_email_queue (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	notification_id BIGINT REFERENCES user_notifications(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	notification_type user_notification_type NOT NULL,
+	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	recipient_email TEXT NOT NULL,
+	subject TEXT NOT NULL,
+	content TEXT NOT NULL,
+	queued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	send_at TIMESTAMPTZ NOT NULL,
+	CONSTRAINT constraint_uniq_notification_email_queue UNIQUE (user_id, notification_type, conversation_id)
+);
+CREATE INDEX index_notification_email_queue_on_send_at ON notification_email_queue(send_at);
+
 INSERT INTO ai_providers
 ("name", provider, type, config, is_default)
 VALUES
@@ -1009,7 +1039,9 @@ VALUES
 	('notification.email.hello_hostname', '""'::jsonb),
     ('notification.email.email_address', '"admin@yourcompany.com"'::jsonb),
     ('notification.email.max_msg_retries', '3'::jsonb),
-    ('notification.email.enabled', 'false'::jsonb);
+    ('notification.email.enabled', 'false'::jsonb),
+    ('notification.push.vapid_public_key', '""'::jsonb),
+    ('notification.push.vapid_private_key', '""'::jsonb);
 
 -- Default conversation priorities
 INSERT INTO conversation_priorities (name) VALUES
@@ -1076,6 +1108,8 @@ VALUES('email_notification'::template_type, '
     Subject: {{ .Conversation.Subject }}
 </div>
 
+<blockquote>{{ .Message.Content }}</blockquote>
+
 <p>
     <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
 </p>
@@ -1097,6 +1131,8 @@ VALUES('email_notification'::template_type, '
     Subject: {{ .Conversation.Subject }}
 </div>
 
+<blockquote>{{ .Message.Content }}</blockquote>
+
 <p>
     <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
 </p>
@@ -1107,6 +1143,29 @@ VALUES('email_notification'::template_type, '
 </div>
 
 ', false, 'New reply on participating conversation', 'New reply on conversation #{{ .Conversation.ReferenceNumber }}', true);
+
+INSERT INTO templates
+("type", body, is_default, "name", subject, is_builtin)
+VALUES('email_notification'::template_type, '
+<p>{{ .Author.FullName }} replied and reopened a conversation assigned to you:</p>
+
+<div>
+    Reference number: {{ .Conversation.ReferenceNumber }} <br>
+    Subject: {{ .Conversation.Subject }}
+</div>
+
+<blockquote>{{ .Message.Content }}</blockquote>
+
+<p>
+    <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
+</p>
+
+<div>
+    Best regards,<br>
+    Libredesk
+</div>
+
+', false, 'Conversation reopened', 'Conversation #{{ .Conversation.ReferenceNumber }} reopened', true);
 
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)

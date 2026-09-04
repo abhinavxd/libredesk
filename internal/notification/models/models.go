@@ -19,6 +19,7 @@ const (
 	NotificationTypeAssignment             NotificationType = "assignment"
 	NotificationTypeNewReply               NotificationType = "new_reply"
 	NotificationTypeNewReplyParticipating  NotificationType = "new_reply_participating"
+	NotificationTypeConversationReopened   NotificationType = "conversation_reopened"
 	NotificationTypeSLAFirstResponseWarn   NotificationType = "sla_first_response_warning"
 	NotificationTypeSLAFirstResponseBreach NotificationType = "sla_first_response_breach"
 	NotificationTypeSLANextResponseWarn    NotificationType = "sla_next_response_warning"
@@ -32,12 +33,14 @@ const (
 
 	NotificationChannelInApp NotificationChannel = "in_app"
 	NotificationChannelEmail NotificationChannel = "email"
+	NotificationChannelPush  NotificationChannel = "push"
 )
 
 // AgentNotificationTypes are the notification types agents can set preferences for.
 var AgentNotificationTypes = []NotificationType{
 	NotificationTypeAssignment,
 	NotificationTypeMention,
+	NotificationTypeConversationReopened,
 	NotificationTypeNewReply,
 	NotificationTypeNewReplyParticipating,
 	NotificationTypeSLAFirstResponseWarn,
@@ -52,6 +55,7 @@ var AgentNotificationTypes = []NotificationType{
 var NotificationChannels = []NotificationChannel{
 	NotificationChannelInApp,
 	NotificationChannelEmail,
+	NotificationChannelPush,
 }
 
 // defaultDisabledTypes are off until an agent opts in. Every other type defaults to on.
@@ -68,7 +72,11 @@ type NotificationPreference struct {
 }
 
 // DefaultEnabled reports the preference for a type when the agent has no stored row for it.
-func DefaultEnabled(nType NotificationType) bool {
+
+func DefaultEnabled(nType NotificationType, channel NotificationChannel) bool {
+	if channel == NotificationChannelPush {
+		return false
+	}
 	return !slices.Contains(defaultDisabledTypes, nType)
 }
 

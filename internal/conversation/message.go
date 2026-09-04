@@ -1409,11 +1409,13 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 	}
 
 	// Reopen conversation if it's not Open.
+	var reopened bool
 	systemUser, err := m.userStore.GetSystemUser()
 	if err != nil {
 		m.lo.Error("error fetching system user", "error", err)
 	} else {
-		if err := m.ReOpenConversation(conversationUUID, systemUser); err != nil {
+		var err error
+		if reopened, err = m.ReOpenConversation(conversationUUID, systemUser); err != nil {
 			m.lo.Error("error reopening conversation", "error", err)
 		}
 	}
@@ -1427,7 +1429,7 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming, previousValues, umodels.User{ID: conversation.ContactID})
 
-		go m.NotifyNewReply(conversation, message)
+		go m.NotifyNewReply(conversation, message, reopened)
 
 		// If assigned to an AI assistant, let it respond to this inbound customer message.
 		if m.aiAgent != nil && conversation.AssignedUserID.Valid {

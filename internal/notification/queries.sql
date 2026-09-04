@@ -62,3 +62,49 @@ INSERT INTO user_notification_preferences (user_id, notification_type, channel, 
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (user_id, notification_type, channel)
 DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now();
+
+-- name: get-push-subscriptions
+SELECT id, endpoint, p256dh, auth
+FROM notification_push_subscriptions
+WHERE user_id = $1;
+
+-- name: upsert-push-subscription
+INSERT INTO notification_push_subscriptions (user_id, endpoint, p256dh, auth)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (endpoint) DO UPDATE SET
+    user_id = EXCLUDED.user_id,
+    p256dh = EXCLUDED.p256dh,
+    auth = EXCLUDED.auth,
+    updated_at = now();
+
+-- name: delete-push-subscription
+DELETE FROM notification_push_subscriptions WHERE user_id = $1 AND endpoint = $2;
+
+-- name: delete-push-subscription-by-id
+DELETE FROM notification_push_subscriptions WHERE id = $1;
+
+-- name: is-notification-seen
+SELECT COALESCE((SELECT is_read FROM user_notifications WHERE id = $2 AND user_id = $1), false)
+    OR EXISTS (
+        SELECT 1 FROM conversation_last_seen
+        WHERE conversation_id = $3 AND user_id = $1 AND last_seen_at > $4
+    );
+
+-- name: enqueue-notification-email
+INSERT INTO notification_email_queue
+    (user_id, notification_id, notification_type, conversation_id, recipient_email, subject, content, send_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (user_id, notification_type, conversation_id) DO UPDATE SET
+    notification_id = EXCLUDED.notification_id,
+    recipient_email = EXCLUDED.recipient_email,
+    subject = EXCLUDED.subject,
+    content = EXCLUDED.content,
+    queued_at = now(),
+    updated_at = now();
+
+-- name: dequeue-due-notification-emails
+DELETE FROM notification_email_queue
+WHERE id IN (
+    SELECT id FROM notification_email_queue WHERE send_at <= now() ORDER BY send_at LIMIT $1
+)
+RETURNING user_id, notification_id, notification_type, conversation_id, recipient_email, subject, content, queued_at;
