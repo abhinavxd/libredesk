@@ -37,6 +37,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/template"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
@@ -51,6 +52,7 @@ var (
 	efs                             embed.FS
 	errConversationNotFound         = errors.New("conversation not found")
 	ErrConversationAlreadyAssigned  = errors.New("conversation already assigned")
+	ErrMessageNotFound              = errors.New("message not found")
 	conversationsAllowedFields      = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since", "next_sla_deadline_at", "snoozed_until", "sla_policy_id"}
 	conversationStatusAllowedFields = []string{"id", "name"}
 	usersAllowedFields              = []string{"email", "external_user_id"}
@@ -100,6 +102,7 @@ type Manager struct {
 	automation                 *automation.Engine
 	wsHub                      *ws.Hub
 	template                   *template.Manager
+	whatsappTemplate           WhatsAppTemplateStore
 	incomingMessageQueue       chan models.IncomingMessage
 	outgoingMessageQueue       chan models.Message
 	outgoingProcessingMessages sync.Map
@@ -168,6 +171,8 @@ type userStore interface {
 	GetSystemUser() (umodels.User, error)
 	ResolveContact(user *umodels.User, policy umodels.ContactPolicy) error
 	UpgradeVisitorToContact(visitorID int) error
+	GetChannelIdentity(contactID int, channel string) (string, error)
+	LinkChannelIdentity(contactID int, channel, identifier string) (int, error)
 }
 
 type mediaStore interface {
@@ -206,6 +211,13 @@ type csatStore interface {
 type webhookStore interface {
 	TriggerEvent(event wmodels.WebhookEvent, data any)
 	TriggerWebhook(webhookID int, event wmodels.WebhookEvent, data any)
+}
+
+// WhatsAppTemplateStore is an interface over internal/whatsapp_template to avoid a circular import.
+type WhatsAppTemplateStore interface {
+	GetByID(id int) (wtmodels.Template, error)
+	GetByName(inboxID int, name string) (wtmodels.Template, error)
+	GetApproved(inboxID int, name, language string) (wtmodels.Template, error)
 }
 
 // ContinuityConfig holds configuration for conversation continuity emails
@@ -295,9 +307,15 @@ func New(
 	return c, nil
 }
 
+// SetWhatsAppTemplateStore wires the WhatsApp template store after construction; nil disables template sends.
+func (m *Manager) SetWhatsAppTemplateStore(s WhatsAppTemplateStore) {
+	m.whatsappTemplate = s
+}
+
 type queries struct {
 	// Conversation queries.
 	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
+	GetConversationInboxContact         *sqlx.Stmt `query:"get-conversation-inbox-contact"`
 	GetConversation                     *sqlx.Stmt `query:"get-conversation"`
 	GetConversationListItem             *sqlx.Stmt `query:"get-conversation-list-item"`
 	GetConversationsCreatedAfter        *sqlx.Stmt `query:"get-conversations-created-after"`
@@ -352,7 +370,16 @@ type queries struct {
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
 	InsertMessage                      *sqlx.Stmt `query:"insert-message"`
 	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
+	MarkMessagePendingForRetry         *sqlx.Stmt `query:"mark-message-pending-for-retry"`
 	UpdateMessageSourceID              *sqlx.Stmt `query:"update-message-source-id"`
+	UpdateMessageSourceIDByUUID        *sqlx.Stmt `query:"update-message-source-id-by-uuid"`
+	ApplyWhatsAppMessageStatus         *sqlx.Stmt `query:"apply-whatsapp-message-status"`
+	MergeMessageMetaByUUID             *sqlx.Stmt `query:"merge-message-meta-by-uuid"`
+	GetWhatsAppReadReceiptTarget       *sqlx.Stmt `query:"get-whatsapp-read-receipt-target"`
+	UpdateConversationLastInboundAt    *sqlx.Stmt `query:"update-conversation-last-inbound-at"`
+	GetContactWindowInboundAt          *sqlx.Stmt `query:"get-contact-window-inbound-at"`
+	GetLatestOpenConversationByContact *sqlx.Stmt `query:"get-latest-open-conversation-by-contact-inbox"`
+	GetReopenableConversationByContact *sqlx.Stmt `query:"get-latest-reopenable-conversation-by-contact-inbox"`
 	DeleteMessage                      *sqlx.Stmt `query:"delete-message"`
 	DeletePrivateMessage               *sqlx.Stmt `query:"delete-private-message"`
 
@@ -369,8 +396,9 @@ type queries struct {
 	GetActiveLivechatConversationsByAgent *sqlx.Stmt `query:"get-active-livechat-conversations-by-agent"`
 
 	// WS list-subscribe authz.
-	FilterAuthorizedListUUIDs     *sqlx.Stmt `query:"filter-authorized-list-uuids"`
-	GetConversationUUIDsByContact *sqlx.Stmt `query:"get-conversation-uuids-by-contact"`
+	FilterAuthorizedListUUIDs          *sqlx.Stmt `query:"filter-authorized-list-uuids"`
+	GetConversationUUIDsByContact      *sqlx.Stmt `query:"get-conversation-uuids-by-contact"`
+	GetConversationUUIDsByContactInbox *sqlx.Stmt `query:"get-conversation-uuids-by-contact-inbox"`
 }
 
 // CreateConversation creates a new conversation. If maxConversations > 0, the insert is
@@ -437,8 +465,8 @@ func (c *Manager) GetConversation(id int, uuid, refNum string) (models.Conversat
 		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Strip name and extract plain email from "Name <email>"
-	if conversation.InboxMail != "" {
+	// Only email inboxes carry an address here; other channels store a display name in inbox_mail.
+	if conversation.InboxChannel == inbox.ChannelEmail && conversation.InboxMail != "" {
 		var err error
 		conversation.InboxMail, err = stringutil.ExtractEmail(conversation.InboxMail)
 		if err != nil {
@@ -1459,8 +1487,12 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 	case amodels.ActionReply:
 		// Automated replies always go to the contact only. CCs from the
 		// conversation history are deliberately not carried forward.
-		if conv.Contact.Email.String == "" {
+		if conv.InboxChannel == inbox.ChannelEmail && conv.Contact.Email.String == "" {
 			return fmt.Errorf("auto-reply skipped: contact has no email for conversation: %s", conv.UUID)
+		}
+		var to []string
+		if conv.Contact.Email.String != "" {
+			to = []string{conv.Contact.Email.String}
 		}
 		_, err := m.QueueReply(
 			[]mmodels.Media{},
@@ -1469,7 +1501,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			conv.ContactID,
 			conv.UUID,
 			action.Value[0],
-			[]string{conv.Contact.Email.String},
+			to,
 			nil,
 			nil,
 			map[string]any{"is_automated": true},
@@ -1734,10 +1766,10 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 	return nil
 }
 
-// SendCSATReply sends a CSAT reply message to a conversation. No-op if one was already sent or contact has no email.
+// SendCSATReply is a no-op if one was already sent or an email contact has no email.
 func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversation) error {
-	if conversation.Contact.Email.String == "" {
-		m.lo.Info("CSAT reply skipped: contact has no email for conversation: %s", "conversation_uuid", conversation.UUID)
+	if conversation.InboxChannel == inbox.ChannelEmail && conversation.Contact.Email.String == "" {
+		m.lo.Info("CSAT reply skipped: contact has no email", "conversation_uuid", conversation.UUID)
 		return nil
 	}
 	csatResp, err := m.csatStore.Create(conversation.ID)
@@ -1752,6 +1784,10 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	csatPublicURL := m.csatStore.MakePublicURL(appRootURL, csatResp.UUID)
+
+	if conversation.InboxChannel == inbox.ChannelWhatsApp {
+		return m.sendWhatsAppCSAT(actorUserID, conversation, csatResp.UUID, csatPublicURL)
+	}
 
 	// Render CSAT email template.
 	data, err := m.BuildTemplateData(conversation.UUID, actorUserID)
@@ -1774,7 +1810,11 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 	}
 
 	// Only send CSAT to contact.
-	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, []string{conversation.Contact.Email.String}, nil, nil, meta)
+	var to []string
+	if conversation.Contact.Email.String != "" {
+		to = []string{conversation.Contact.Email.String}
+	}
+	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, nil, nil, meta)
 	if err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

@@ -11,7 +11,6 @@
         }"
       >
         <div class="flex items-start gap-2">
-          <!-- Avatar with channel indicator (checkbox overlays on hover / when selecting) -->
           <div class="relative flex-shrink-0 w-10 h-10">
             <div
               class="transition-opacity"
@@ -63,7 +62,7 @@
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <component
-                        :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
+                        :is="channelIcon"
                         class="w-3 h-3 text-muted-foreground"
                         role="img"
                         :aria-label="conversation.inbox_name"
@@ -168,6 +167,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { Mail, MessageSquare, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,
@@ -203,6 +203,13 @@ const props = defineProps({
 const handleMarkAsUnread = () => {
   conversationStore.markAsUnread(props.conversation.uuid)
 }
+
+const CHANNEL_ICONS = {
+  livechat: MessageSquare,
+  whatsapp: WhatsAppIcon
+}
+
+const channelIcon = computed(() => CHANNEL_ICONS[props.conversation.inbox_channel] || Mail)
 
 const conversationRoute = computed(() => {
   const baseRoute = route.params.teamID

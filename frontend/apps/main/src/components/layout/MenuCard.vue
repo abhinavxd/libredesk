@@ -19,7 +19,7 @@ import { Card } from '@shared-ui/components/ui/card'
 const props = defineProps({
   title: String,
   subTitle: String,
-  icon: [Function, String],
+  icon: [Function, String, Object],
   onClick: Function,
   badge: String
 })

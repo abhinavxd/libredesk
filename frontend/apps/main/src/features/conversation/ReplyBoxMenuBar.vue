@@ -12,7 +12,14 @@
     />
     <div class="flex items-center gap-1">
       <!-- File inputs -->
-      <input type="file" class="hidden" ref="attachmentInput" multiple @change="handleFileUpload" />
+      <input
+        type="file"
+        class="hidden"
+        ref="attachmentInput"
+        multiple
+        :accept="attachmentAccept"
+        @change="handleFileUpload"
+      />
       <!-- <input
         type="file"
         class="hidden"
@@ -48,6 +55,20 @@
           </Toggle>
         </TooltipTrigger>
         <TooltipContent>{{ $t('globals.messages.addEmoji') }}</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="isWhatsApp">
+        <TooltipTrigger as-child>
+          <Toggle
+            :class="ICON_BUTTON_CLASS"
+            variant="outline"
+            :aria-label="$t('globals.messages.sendTemplate')"
+            @click="openTemplatePicker"
+            :pressed="false"
+          >
+            <WhatsAppIcon class="h-4 w-4" />
+          </Toggle>
+        </TooltipTrigger>
+        <TooltipContent>{{ $t('globals.messages.sendTemplate') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="showGenerateReply">
         <TooltipTrigger as-child>
@@ -104,7 +125,7 @@
 const ICON_BUTTON_CLASS =
   'border-border/70 bg-background px-2 py-2 text-muted-foreground shadow-none max-md:min-h-11 max-md:min-w-11'
 
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
@@ -117,8 +138,11 @@ import {
   DropdownMenuContent,
   DropdownMenuLabel
 } from '@shared-ui/components/ui/dropdown-menu'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { useConversationStore } from '@main/stores/conversation'
-const conversationStore = useConversationStore()
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { WHATSAPP_MEDIA_ACCEPT } from '@main/features/conversation/whatsappMedia'
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([import('vue3-emoji-picker'), import('vue3-emoji-picker/css')])
@@ -132,8 +156,9 @@ const emojiPickerRef = ref(null)
 const emit = defineEmits(['emojiSelect', 'generateReply'])
 
 // Using defineProps for props that don't need two-way binding
-defineProps({
+const props = defineProps({
   isFullscreen: Boolean,
+  isWhatsApp: Boolean,
   isSending: Boolean,
   isGenerating: Boolean,
   enableSend: Boolean,
@@ -165,6 +190,15 @@ const triggerFileUpload = () => {
 
 const toggleEmojiPicker = () => {
   isEmojiPickerVisible.value = !isEmojiPickerVisible.value
+}
+
+const conversationStore = useConversationStore()
+const emitter = useEmitter()
+
+const attachmentAccept = computed(() => (props.isWhatsApp ? WHATSAPP_MEDIA_ACCEPT : undefined))
+
+const openTemplatePicker = () => {
+  emitter.emit(EMITTER_EVENTS.WHATSAPP_TEMPLATE_PICKER_OPEN)
 }
 
 function onSelectEmoji(emoji) {

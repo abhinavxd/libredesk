@@ -38,6 +38,18 @@ var (
 	)
 )
 
+// NormalizeWhatsAppPhone strips formatting to the bare digit string Meta uses as the wa_id.
+func NormalizeWhatsAppPhone(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.
 func SanitizeUTF8(s string) string {
 	if s == "" {

@@ -94,18 +94,29 @@
 
             <!-- Message Content -->
             <div
+              v-if="message.meta?.wa_unsupported"
+              class="mb-1 text-muted-foreground italic text-sm"
+            >
+              {{ t('conversation.whatsapp.unsupportedMessage') }}
+            </div>
+            <div
+              v-else
               ref="contentWrapperEl"
               class="relative"
               :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
             >
               <div
-                v-if="message.content_type === 'text'"
+                v-if="message.content_type === 'text' && sanitizedContent"
                 class="mb-1 native-html whitespace-pre-wrap"
                 :class="{ 'mb-3': message.attachments.length > 0 }"
               >
                 {{ sanitizedContent }}
               </div>
-              <div v-else ref="messageContentEl" @click="onMessageContentClick">
+              <div
+                v-else-if="message.content_type !== 'text' && sanitizedContent"
+                ref="messageContentEl"
+                @click="onMessageContentClick"
+              >
                 <Letter
                   :html="sanitizedContent"
                   :allowedSchemas="['cid', 'https', 'http', 'mailto']"
@@ -186,6 +197,14 @@
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{{ t('conversation.sentViaEmail') }}</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip v-if="sendFailureReason">
+                <TooltipTrigger>
+                  <CircleAlert :size="12" class="text-destructive" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p class="max-w-xs break-words">{{ sendFailureReason }}</p>
                 </TooltipContent>
               </Tooltip>
               <RotateCcw
@@ -271,7 +290,17 @@ import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, CheckCheck, Maximize2, Trash2, MoreHorizontal } from 'lucide-vue-next'
+import {
+  Lock,
+  Mail,
+  RotateCcw,
+  Check,
+  CheckCheck,
+  CircleAlert,
+  Maximize2,
+  Trash2,
+  MoreHorizontal
+} from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -425,6 +454,10 @@ const isReadByContact = computed(() => {
   return new Date(props.message.created_at) <= new Date(lastSeenAt)
 })
 const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
+
+const sendFailureReason = computed(() =>
+  props.message.status === 'failed' ? props.message.meta?.provider_failure_reason : null
+)
 
 const retryMessage = (msg) => {
   api.retryMessage(convStore.current.uuid, msg.uuid)
