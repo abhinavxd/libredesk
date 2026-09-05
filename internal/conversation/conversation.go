@@ -1313,6 +1313,12 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 		userIDs = append(userIDs, userID)
 	}
 
+	rootURL, err := m.settingsStore.GetAppRootURL()
+	if err != nil {
+		m.lo.Error("error fetching root URL for mention notification", "error", err)
+	}
+	messageContent := absolutizeConversationReferenceLinks(message.Content, rootURL)
+
 	recipientIDs, emails := m.buildRecipientEmails(userIDs, func(recipient umodels.User) (string, string, error) {
 		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned,
 			map[string]any{
@@ -1330,7 +1336,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 				},
 				"Message": map[string]any{
 					"UUID":    message.UUID,
-					"Content": message.Content,
+					"Content": messageContent,
 				},
 				"MentionedBy": map[string]any{
 					"FirstName": author.FirstName,
