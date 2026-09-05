@@ -147,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IdCard } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
@@ -177,6 +177,9 @@ import ContactSearchResults from './ContactSearchResults.vue'
 import api from '@/api'
 
 const emit = defineEmits(['close'])
+const props = defineProps({
+  initialContact: { type: Object, default: null }
+})
 
 const { t } = useI18n()
 const emitter = useEmitter()
@@ -220,6 +223,17 @@ const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydo
       lastName.value = contact.last_name || ''
     }
   })
+
+onMounted(() => {
+  if (props.initialContact?.phone_number) selectContact(props.initialContact)
+})
+
+watch(
+  () => props.initialContact,
+  (contact) => {
+    if (contact?.phone_number) selectContact(contact)
+  }
+)
 
 watch(inboxId, (id) => fetchTemplates(id))
 

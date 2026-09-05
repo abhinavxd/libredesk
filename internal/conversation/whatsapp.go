@@ -30,6 +30,8 @@ const WhatsAppWindowDuration = 24 * time.Hour
 // whatsAppMaxTextLength is Meta's cap on a text message body.
 const whatsAppMaxTextLength = 4096
 
+const whatsAppMaxCaptionLength = 1024
+
 // WhatsAppStatus values mirror Meta's delivery lifecycle, kept in message.meta.
 const (
 	WhatsAppStatusSent      = "sent"
@@ -306,11 +308,8 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		if !m.whatsAppWindowOpen(conv.ContactID, conv.InboxID) {
 			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.windowClosed"), nil)
 		}
-		if strings.TrimSpace(content) == "" && !hasAttachments {
-			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contentRequired"), nil)
-		}
-		if utf8.RuneCountInString(stringutil.HTML2Text(content)) > whatsAppMaxTextLength {
-			return content, envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.tooLong", "limit", strconv.Itoa(whatsAppMaxTextLength)), nil)
+		if err := m.validateWhatsAppContent(content, hasAttachments); err != nil {
+			return content, err
 		}
 	}
 
@@ -321,6 +320,20 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 
 	metaMap["whatsapp"] = json.RawMessage(encoded)
 	return rendered, nil
+}
+
+func (m *Manager) validateWhatsAppContent(content string, hasAttachments bool) error {
+	if strings.TrimSpace(content) == "" && !hasAttachments {
+		return envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contentRequired"), nil)
+	}
+	limit := whatsAppMaxTextLength
+	if hasAttachments {
+		limit = whatsAppMaxCaptionLength
+	}
+	if utf8.RuneCountInString(stringutil.HTML2Text(content)) > limit {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.tooLong", "limit", strconv.Itoa(limit)), nil)
+	}
+	return nil
 }
 
 // validateTemplateParams rejects unfilled body and text-header placeholders locally, ahead of Meta's opaque parameter-mismatch error.

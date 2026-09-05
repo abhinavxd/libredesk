@@ -152,6 +152,42 @@ func TestValidateTemplateParams(t *testing.T) {
 	}
 }
 
+func TestValidateWhatsAppContent(t *testing.T) {
+	tests := []struct {
+		name           string
+		content        string
+		hasAttachments bool
+		wantMatch      string
+	}{
+		{name: "attachment without caption", hasAttachments: true},
+		{name: "caption at limit", content: strings.Repeat("a", 1024), hasAttachments: true},
+		{name: "caption over limit", content: strings.Repeat("a", 1025), hasAttachments: true, wantMatch: "1024"},
+		{name: "unicode caption counts runes", content: strings.Repeat("श", 1024), hasAttachments: true},
+		{name: "text at limit", content: strings.Repeat("a", 4096)},
+		{name: "text over limit", content: strings.Repeat("a", 4097), wantMatch: "4096"},
+		{name: "empty text without attachment", wantMatch: "attach a file"},
+	}
+
+	manager := testManager(t)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := manager.validateWhatsAppContent(tc.content, tc.hasAttachments)
+			if tc.wantMatch == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected an error mentioning %q", tc.wantMatch)
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), tc.wantMatch) {
+				t.Fatalf("expected the error to mention %q, got %q", tc.wantMatch, err.Error())
+			}
+		})
+	}
+}
+
 func TestExtractInt(t *testing.T) {
 	tests := []struct {
 		name string

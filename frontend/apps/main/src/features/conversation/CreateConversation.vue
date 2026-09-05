@@ -20,7 +20,11 @@
               :initial-contact="props.initialContact"
               @close="dialogOpen = false"
             />
-            <WhatsAppConversationForm v-else @close="dialogOpen = false" />
+            <WhatsAppConversationForm
+              v-else
+              :initial-contact="props.initialContact"
+              @close="dialogOpen = false"
+            />
           </div>
         </Tabs>
 

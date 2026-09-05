@@ -346,10 +346,10 @@ func main() {
 	app.consts.Store(constants)
 	helpCenterCacheOpts.Logger = log.New(helpCenterCacheLogWriter{lo: app.lo}, "", 0)
 
+	waClient.SetAuthErrorHook(makeWhatsAppAuthErrorHook(app))
 	if err := ensureWhatsAppIngester(app); err != nil {
 		app.lo.Error("error starting whatsapp ingester, inbound whatsapp messages will not be processed", "error", err)
 	}
-	waClient.SetAuthErrorHook(makeWhatsAppAuthErrorHook(app))
 
 	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, conversation, makeInboxAuthStatusHook(app))
 
