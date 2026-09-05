@@ -168,7 +168,10 @@ import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api'
-import { getConversationSuggestions as fetchConversationSuggestions } from '@main/components/editor/conversationReference'
+import {
+  createLatestConversationSuggestionFetcher,
+  getConversationSuggestions as fetchConversationSuggestions
+} from '@main/components/editor/conversationReference'
 
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
@@ -218,11 +221,14 @@ const getSuggestions = async (query) => {
 }
 
 const debouncedFetchConversationSuggestions = useDebounceFn(fetchConversationSuggestions, MENTION_DEBOUNCE_MS)
+const fetchLatestConversationSuggestions = createLatestConversationSuggestionFetcher(
+  debouncedFetchConversationSuggestions
+)
 
 const getConversationSuggestions = async (query) => {
   if (messageType.value !== 'private_note') return []
   const messageTypeAtRequest = messageType.value
-  const suggestions = (await debouncedFetchConversationSuggestions(query)) || []
+  const suggestions = (await fetchLatestConversationSuggestions(query)) || []
   return messageType.value === messageTypeAtRequest ? suggestions : []
 }
 

@@ -3,6 +3,16 @@ import api from '@main/api'
 export const MIN_REFERENCE_QUERY_LENGTH = 3
 const SUGGESTION_LIMIT = 10
 
+export const createLatestConversationSuggestionFetcher = (fetchSuggestions) => {
+  let latestRequestID = 0
+
+  return async (query) => {
+    const requestID = ++latestRequestID
+    const suggestions = await fetchSuggestions(query)
+    return requestID === latestRequestID ? suggestions : []
+  }
+}
+
 export const getConversationSuggestions = async (query, search = api.searchConversations) => {
   const reference = query.trim()
   if (reference.length < MIN_REFERENCE_QUERY_LENGTH) return []
