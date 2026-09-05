@@ -158,9 +158,10 @@ func (e *Engine) populateTeamBalancer() error {
 		balancer := e.roundRobinBalancer[team.ID]
 		existingUsers := make(map[string]struct{})
 		for _, user := range users {
-			// Skip user if availability status is `away_manual` or `away_and_reassigning`
-			if user.AvailabilityStatus == umodels.AwayManual || user.AvailabilityStatus == umodels.AwayAndReassigning {
-				e.lo.Debug("user is away, skipping autoasssignment ", "team_id", team.ID, "user_id", user.ID, "availability_status", user.AvailabilityStatus)
+			// Only online users are eligible for auto-assignment, this also excludes
+			// `away`, `away_manual`, `away_and_reassigning` and `offline` users.
+			if user.AvailabilityStatus != umodels.Online {
+				e.lo.Debug("user is not online, skipping autoassignment", "team_id", team.ID, "user_id", user.ID, "availability_status", user.AvailabilityStatus)
 				continue
 			}
 
