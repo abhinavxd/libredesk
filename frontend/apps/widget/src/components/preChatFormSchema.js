@@ -87,7 +87,17 @@ export const createPreChatFormSchema = (t, fields = []) => {
           })
         }
       }
-      
+
+      if (field.pattern) {
+        try {
+          fieldSchema = fieldSchema.regex(new RegExp(field.pattern), {
+            message: field.pattern_message || t('validation.invalid')
+          })
+        } catch {
+          // Ignore an invalid regex from the inbox config, field keeps its existing validation.
+        }
+      }
+
       if (field.required && field.type !== 'checkbox') {
         fieldSchema = fieldSchema.min(1, {
           message: t('globals.messages.required')
