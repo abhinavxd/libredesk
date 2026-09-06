@@ -281,6 +281,25 @@ const routes = [
             meta: { titleKey: 'admin.ai.assistant.edit' }
           },
           {
+            path: 'guided-forms',
+            name: 'guided-forms',
+            component: () => import('@main/views/admin/guidedForms/GuidedForms.vue'),
+            meta: { titleKey: 'admin.guidedForms.title' }
+          },
+          {
+            path: 'guided-forms/new',
+            name: 'new-guided-form',
+            component: () => import('@main/views/admin/guidedForms/CreateOrEditGuidedForm.vue'),
+            meta: { titleKey: 'admin.guidedForms.new' }
+          },
+          {
+            path: 'guided-forms/:id/edit',
+            name: 'edit-guided-form',
+            props: true,
+            component: () => import('@main/views/admin/guidedForms/CreateOrEditGuidedForm.vue'),
+            meta: { titleKey: 'admin.guidedForms.edit' }
+          },
+          {
             path: 'business-hours',
             component: () => import('@main/views/admin/business-hours/BusinessHours.vue'),
             meta: { titleKey: 'globals.terms.businessHour', titleCount: 2 },

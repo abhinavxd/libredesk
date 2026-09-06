@@ -87,6 +87,13 @@ export const adminNavItems = [
         permission: 'ai:manage',
         isTitleKeyPlural: true,
         icon: 'Bot'
+      },
+      {
+        titleKey: 'admin.guidedForms.title',
+        href: '/admin/guided-forms',
+        createRouteName: 'new-guided-form',
+        permission: 'inboxes:manage',
+        icon: 'ListTree'
       }
     ]
   },
