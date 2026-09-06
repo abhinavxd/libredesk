@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"regexp"
+	"slices"
 	"strings"
 
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -90,14 +91,22 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 
 	// Only a fresh inbound message from the conversation's own contact advances the flow -
 	// never the bot's own question, and never a CC'd/other participant's message.
+	// GetConversationMessages returns newest-first, so reverse to chronological order before
+	// scanning for "the latest one" - mirrors internal/aiagent/worker.go.
 	private := false
 	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, 20, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
 	if err != nil {
 		m.lo.Error("error fetching messages for guided form", "conversation_uuid", conv.UUID, "error", err)
 		return
 	}
+	slices.Reverse(msgs)
 	inbound := latestInboundContact(msgs)
 	if inbound == nil || inbound.SenderID != conv.ContactID {
+		return
+	}
+	// Guards against reprocessing the same answer twice if this handler is invoked more than
+	// once for the same message (e.g. an assignment event and a message event landing together).
+	if inbound.ID <= progress.LastMessageID {
 		return
 	}
 
@@ -114,6 +123,7 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 		saveKey = step.ID
 	}
 	progress.Answers[saveKey] = answer
+	progress.LastMessageID = inbound.ID
 	// Mutates attrs in place for a conversation-scoped answer; a contact-scoped one is saved
 	// separately on the contact's own row, so it never touches this conversation's attributes.
 	m.applyAnswer(attrs, conv.ContactID, step, answer)

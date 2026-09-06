@@ -101,4 +101,7 @@ type Progress struct {
 	FormID  int            `json:"form_id"`
 	StepID  string         `json:"step_id"`
 	Answers map[string]any `json:"answers"`
+	// LastMessageID is the id of the inbound message last used to advance the flow, so a
+	// duplicate trigger for the same message doesn't advance it twice.
+	LastMessageID int `json:"last_message_id"`
 }
