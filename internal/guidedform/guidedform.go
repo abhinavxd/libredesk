@@ -25,19 +25,19 @@ import (
 var efs embed.FS
 
 type queries struct {
-	GetForms                *sqlx.Stmt `query:"get-forms"`
-	GetForm                 *sqlx.Stmt `query:"get-form"`
-	GetFormByUserID         *sqlx.Stmt `query:"get-form-by-user-id"`
-	GetFormByInboxID        *sqlx.Stmt `query:"get-form-by-inbox-id"`
-	GetFormBotUserIDs       *sqlx.Stmt `query:"get-form-bot-user-ids"`
-	InsertFormUser          *sqlx.Stmt `query:"insert-form-user"`
-	UpdateFormUser          *sqlx.Stmt `query:"update-form-user"`
-	SoftDeleteFormUser      *sqlx.Stmt `query:"soft-delete-form-user"`
-	InsertForm              *sqlx.Stmt `query:"insert-form"`
-	UpdateForm              *sqlx.Stmt `query:"update-form"`
-	DeleteForm              *sqlx.Stmt `query:"delete-form"`
-	UnassignFormBotConvos   *sqlx.Stmt `query:"unassign-form-bot-conversations"`
-	InsertGuidedFormEvent   *sqlx.Stmt `query:"insert-guided-form-event"`
+	GetForms              *sqlx.Stmt `query:"get-forms"`
+	GetForm               *sqlx.Stmt `query:"get-form"`
+	GetFormByUserID       *sqlx.Stmt `query:"get-form-by-user-id"`
+	GetFormByInboxID      *sqlx.Stmt `query:"get-form-by-inbox-id"`
+	GetFormBotUserIDs     *sqlx.Stmt `query:"get-form-bot-user-ids"`
+	InsertFormUser        *sqlx.Stmt `query:"insert-form-user"`
+	UpdateFormUser        *sqlx.Stmt `query:"update-form-user"`
+	SoftDeleteFormUser    *sqlx.Stmt `query:"soft-delete-form-user"`
+	InsertForm            *sqlx.Stmt `query:"insert-form"`
+	UpdateForm            *sqlx.Stmt `query:"update-form"`
+	DeleteForm            *sqlx.Stmt `query:"delete-form"`
+	UnassignFormBotConvos *sqlx.Stmt `query:"unassign-form-bot-conversations"`
+	InsertGuidedFormEvent *sqlx.Stmt `query:"insert-guided-form-event"`
 }
 
 // Manager owns guided form configuration and runs the question/answer flow for conversations
