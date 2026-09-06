@@ -287,6 +287,17 @@ func handleChatInit(r *fastglue.Request) error {
 		app.lo.Error("error processing incoming message hooks for initial message", "conversation_uuid", conversationUUID, "error", err)
 	}
 
+	// If this inbox has an enabled guided pre-chat form, hand the new conversation to its bot
+	// identity so it asks the first question instead of waiting in the unassigned queue.
+	if form, ferr := app.guidedForm.GetFormByInboxID(inbox.ID); ferr == nil && form.Enabled {
+		systemUser, sErr := app.user.GetSystemUser()
+		if sErr != nil {
+			app.lo.Error("error fetching system user for guided form handoff", "error", sErr)
+		} else if err := app.conversation.UpdateConversationUserAssignee(conversationUUID, form.UserID, systemUser); err != nil {
+			app.lo.Error("error assigning conversation to guided form bot", "conversation_uuid", conversationUUID, "error", err)
+		}
+	}
+
 	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching created conversation", "conversation_uuid", conversationUUID, "error", err)

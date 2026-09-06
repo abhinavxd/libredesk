@@ -1,0 +1,311 @@
+package guidedform
+
+import (
+	"database/sql"
+	"encoding/json"
+	"regexp"
+	"strings"
+
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	statusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
+	gmodels "github.com/abhinavxd/libredesk/internal/guidedform/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+)
+
+// progressAttrKey is the reserved conversation custom-attribute key guidedform uses to persist
+// where a conversation is within its form's flow. It is never surfaced in the UI because it does
+// not correspond to any defined custom attribute.
+const progressAttrKey = "_guided_form_progress"
+
+// nonActionableCategories mirrors aiagent: a conversation that's snoozed/waiting or already
+// resolved should not have the bot post into it.
+var nonActionableCategories = map[string]bool{
+	statusmodels.CategoryWaiting:  true,
+	statusmodels.CategoryResolved: true,
+}
+
+// HandleConversationEvent is notified whenever a conversation assigned to a user may need
+// attention - a fresh inbound message, or a brand new assignment to that user. If the assignee
+// is a guided-form bot, it advances (or starts) that conversation's flow. It recovers from
+// panics so a bad form config can never take other channels down with it.
+func (m *Manager) HandleConversationEvent(conversationID, assigneeUserID int) {
+	if conversationID == 0 || assigneeUserID == 0 || !m.isFormBotUser(assigneeUserID) {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			m.lo.Error("recovered from panic in guided form handler", "conversation_id", conversationID, "panic", r)
+		}
+	}()
+	m.handle(conversationID, assigneeUserID)
+}
+
+func (m *Manager) handle(conversationID, assigneeUserID int) {
+	conv, err := m.convo.GetConversation(conversationID, "", "")
+	if err != nil {
+		m.lo.Error("error fetching conversation for guided form", "conversation_id", conversationID, "error", err)
+		return
+	}
+	if !conv.AssignedUserID.Valid || int(conv.AssignedUserID.Int) != assigneeUserID {
+		return
+	}
+	form, err := m.GetFormByUserID(assigneeUserID)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			m.lo.Error("error fetching guided form", "conversation_id", conversationID, "user_id", assigneeUserID, "error", err)
+		}
+		return
+	}
+	if !form.Enabled || nonActionableCategories[conv.StatusCategory.String] {
+		return
+	}
+
+	attrs := decodeAttrs(conv.CustomAttributes)
+	progress, hasProgress := decodeProgress(attrs)
+
+	// Brand new to the flow: ask the first question and stop, there is nothing to match yet.
+	if !hasProgress {
+		step, ok := form.StepByID(form.StartStepID)
+		if !ok {
+			m.lo.Error("guided form has no valid start step", "form_id", form.ID)
+			return
+		}
+		m.askStep(conv, form, step)
+		m.saveProgress(conv, attrs, gmodels.Progress{FormID: form.ID, StepID: step.ID, Answers: map[string]any{}})
+		return
+	}
+
+	// Progress belongs to a different (e.g. since-replaced) form; nothing sane to do but stop.
+	if progress.FormID != form.ID {
+		return
+	}
+
+	step, ok := form.StepByID(progress.StepID)
+	if !ok {
+		m.lo.Error("guided form progress points at unknown step, handing off", "form_id", form.ID, "step_id", progress.StepID)
+		m.handoff(conv, form, attrs, m.i18n.T("globals.messages.somethingWentWrong"))
+		return
+	}
+
+	// Only a fresh inbound message from the conversation's own contact advances the flow -
+	// never the bot's own question, and never a CC'd/other participant's message.
+	private := false
+	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, 20, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	if err != nil {
+		m.lo.Error("error fetching messages for guided form", "conversation_uuid", conv.UUID, "error", err)
+		return
+	}
+	inbound := latestInboundContact(msgs)
+	if inbound == nil || inbound.SenderID != conv.ContactID {
+		return
+	}
+
+	answer := strings.TrimSpace(messageText(inbound))
+	if answer == "" {
+		return
+	}
+
+	if progress.Answers == nil {
+		progress.Answers = map[string]any{}
+	}
+	saveKey := step.SaveAs
+	if saveKey == "" {
+		saveKey = step.ID
+	}
+	progress.Answers[saveKey] = answer
+	// Mutates attrs in place for a conversation-scoped answer; a contact-scoped one is saved
+	// separately on the contact's own row, so it never touches this conversation's attributes.
+	m.applyAnswer(attrs, conv.ContactID, step, answer)
+
+	nextStepID := matchBranch(step, answer)
+	if nextStepID == "" {
+		m.complete(conv, form, attrs)
+		return
+	}
+	nextStep, ok := form.StepByID(nextStepID)
+	if !ok {
+		m.lo.Error("guided form branch points at unknown step", "form_id", form.ID, "next_step_id", nextStepID)
+		m.handoff(conv, form, attrs, m.i18n.T("globals.messages.somethingWentWrong"))
+		return
+	}
+
+	m.askStep(conv, form, nextStep)
+	progress.StepID = nextStep.ID
+	m.saveProgress(conv, attrs, progress)
+}
+
+// matchBranch returns the id of the next step for the given answer: the first branch whose
+// pattern matches (case-insensitively), or the step's default, or "" if the step is terminal.
+func matchBranch(step gmodels.Step, answer string) string {
+	for _, b := range step.Branches {
+		re, err := compileBranchPattern(b.Pattern)
+		if err != nil {
+			continue
+		}
+		if re.MatchString(answer) {
+			return b.NextStepID
+		}
+	}
+	return step.DefaultNextStepID
+}
+
+func compileBranchPattern(pattern string) (*regexp.Regexp, error) {
+	return regexp.Compile("(?i)" + pattern)
+}
+
+// askStep posts a step's question as an ordinary outgoing chat message from the bot identity.
+func (m *Manager) askStep(conv cmodels.Conversation, form gmodels.Form, step gmodels.Step) {
+	question := step.Question
+	if len(step.Options) > 0 {
+		question += "\n\n" + strings.Join(step.Options, " / ")
+	}
+	meta := map[string]any{"is_guided_form": true}
+	if _, err := m.convo.QueueReply(nil, conv.InboxID, form.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(question), nil, nil, nil, meta); err != nil {
+		m.lo.Error("error posting guided form question", "conversation_uuid", conv.UUID, "step_id", step.ID, "error", err)
+	}
+}
+
+// applyAnswer records a step's answer onto the custom attribute it was configured against, so it
+// shows up wherever the equivalent pre-chat form field would (sidebar custom attributes). A
+// conversation-scoped answer is written into attrs in place (the caller persists it once,
+// alongside the progress state, to avoid two independent read-modify-writes racing on the same
+// JSONB column); a contact-scoped answer is saved directly since it lives on a different row.
+func (m *Manager) applyAnswer(attrs map[string]any, contactID int, step gmodels.Step, answer string) {
+	if step.CustomAttributeID == 0 {
+		return
+	}
+	attr, err := m.customAttribute.Get(step.CustomAttributeID)
+	if err != nil {
+		m.lo.Warn("guided form custom attribute not found", "custom_attribute_id", step.CustomAttributeID, "error", err)
+		return
+	}
+	if attr.AppliesTo == gmodels.AppliesToConversation {
+		attrs[attr.Key] = answer
+		return
+	}
+	if err := m.user.SaveCustomAttributes(contactID, map[string]any{attr.Key: answer}, false); err != nil {
+		m.lo.Error("error saving guided form answer to contact attributes", "contact_id", contactID, "error", err)
+	}
+}
+
+// complete runs when the flow reaches a terminal step: it clears the progress marker (merging
+// any conversation-scoped answer the caller already applied to attrs into the same write), posts
+// the optional completion message, hands off per the form's configured action, and records the event.
+func (m *Manager) complete(conv cmodels.Conversation, form gmodels.Form, attrs map[string]any) {
+	delete(attrs, progressAttrKey)
+	if err := m.convo.UpdateConversationCustomAttributes(conv.UUID, attrs); err != nil {
+		m.lo.Error("error clearing guided form progress on completion", "conversation_uuid", conv.UUID, "error", err)
+	}
+	if form.CompletionMessage != "" {
+		meta := map[string]any{"is_guided_form": true}
+		if _, err := m.convo.QueueReply(nil, conv.InboxID, form.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(form.CompletionMessage), nil, nil, nil, meta); err != nil {
+			m.lo.Error("error posting guided form completion message", "conversation_uuid", conv.UUID, "error", err)
+		}
+	}
+
+	actor := umodels.User{ID: form.UserID, FirstName: form.Name, Type: umodels.UserTypeGuidedFormBot}
+	switch form.OnCompleteAction {
+	case gmodels.CompleteActionAssistant:
+		var assistantUserID int
+		if err := m.db.Get(&assistantUserID, `SELECT user_id FROM ai_assistants WHERE id = $1`, form.OnCompleteAssistantID.Int); err != nil {
+			m.lo.Error("error resolving ai assistant for guided form handoff", "form_id", form.ID, "error", err)
+			m.recordEvent(form.ID, conv.ID, "completed")
+			return
+		}
+		if err := m.convo.UpdateConversationUserAssignee(conv.UUID, assistantUserID, actor); err != nil {
+			m.lo.Error("error assigning conversation to ai assistant after guided form", "conversation_uuid", conv.UUID, "error", err)
+		}
+	case gmodels.CompleteActionTeam:
+		if err := m.convo.UpdateConversationTeamAssignee(conv.UUID, int(form.OnCompleteTeamID.Int), actor); err != nil {
+			m.lo.Error("error assigning conversation to team after guided form", "conversation_uuid", conv.UUID, "error", err)
+		}
+		if err := m.convo.RemoveConversationAssignee(conv.UUID, cmodels.AssigneeTypeUser, actor); err != nil {
+			m.lo.Error("error unassigning guided form bot after handoff", "conversation_uuid", conv.UUID, "error", err)
+		}
+	case gmodels.CompleteActionUnassign:
+		if err := m.convo.RemoveConversationAssignee(conv.UUID, cmodels.AssigneeTypeUser, actor); err != nil {
+			m.lo.Error("error unassigning guided form bot on completion", "conversation_uuid", conv.UUID, "error", err)
+		}
+	}
+	m.recordEvent(form.ID, conv.ID, "completed")
+}
+
+// handoff is used for error paths mid-flow (e.g. a misconfigured form): fall back to the form's
+// team if set, else drop the assignment so a human picks it up from the unassigned queue.
+func (m *Manager) handoff(conv cmodels.Conversation, form gmodels.Form, attrs map[string]any, reason string) {
+	delete(attrs, progressAttrKey)
+	if err := m.convo.UpdateConversationCustomAttributes(conv.UUID, attrs); err != nil {
+		m.lo.Error("error clearing guided form progress on handoff", "conversation_uuid", conv.UUID, "error", err)
+	}
+	actor := umodels.User{ID: form.UserID, FirstName: form.Name, Type: umodels.UserTypeGuidedFormBot}
+	if _, err := m.convo.SendPrivateNote(nil, form.UserID, conv.UUID, reason, nil); err != nil {
+		m.lo.Error("error posting guided form handoff note", "conversation_uuid", conv.UUID, "error", err)
+	}
+	if form.OnCompleteTeamID.Valid {
+		if err := m.convo.UpdateConversationTeamAssignee(conv.UUID, int(form.OnCompleteTeamID.Int), actor); err != nil {
+			m.lo.Error("error assigning fallback team on guided form error", "conversation_uuid", conv.UUID, "error", err)
+		}
+	}
+	if err := m.convo.RemoveConversationAssignee(conv.UUID, cmodels.AssigneeTypeUser, actor); err != nil {
+		m.lo.Error("error unassigning guided form bot on error", "conversation_uuid", conv.UUID, "error", err)
+	}
+	m.recordEvent(form.ID, conv.ID, "handoff")
+}
+
+func (m *Manager) saveProgress(conv cmodels.Conversation, attrs map[string]any, progress gmodels.Progress) {
+	attrs[progressAttrKey] = progress
+	if err := m.convo.UpdateConversationCustomAttributes(conv.UUID, attrs); err != nil {
+		m.lo.Error("error saving guided form progress", "conversation_uuid", conv.UUID, "error", err)
+	}
+}
+
+func decodeAttrs(raw json.RawMessage) map[string]any {
+	attrs := map[string]any{}
+	if len(raw) == 0 {
+		return attrs
+	}
+	if err := json.Unmarshal(raw, &attrs); err != nil {
+		return map[string]any{}
+	}
+	return attrs
+}
+
+func decodeProgress(attrs map[string]any) (gmodels.Progress, bool) {
+	raw, ok := attrs[progressAttrKey]
+	if !ok {
+		return gmodels.Progress{}, false
+	}
+	b, err := json.Marshal(raw)
+	if err != nil {
+		return gmodels.Progress{}, false
+	}
+	var p gmodels.Progress
+	if err := json.Unmarshal(b, &p); err != nil {
+		return gmodels.Progress{}, false
+	}
+	return p, true
+}
+
+func latestInboundContact(msgs []cmodels.Message) *cmodels.Message {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Type == cmodels.MessageIncoming && msgs[i].SenderType == cmodels.SenderTypeContact {
+			return &msgs[i]
+		}
+	}
+	return nil
+}
+
+// messageText returns a message's plain-text content, stripping quoted reply chains.
+func messageText(msg *cmodels.Message) string {
+	if msg.ContentType == cmodels.ContentTypeHTML {
+		if t := stringutil.HTML2TextNoQuotes(msg.Content); t != "" {
+			return t
+		}
+		return stringutil.HTML2TextMarkdownLinks(msg.Content)
+	}
+	if t := stringutil.TrimPlainTextQuotes(msg.TextContent); t != "" {
+		return t
+	}
+	return msg.TextContent
+}

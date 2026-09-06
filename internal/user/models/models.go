@@ -21,6 +21,7 @@ const (
 	UserTypeContact     = "contact"
 	UserTypeVisitor     = "visitor"
 	UserTypeAIAssistant = "ai_assistant"
+	UserTypeGuidedFormBot = "guided_form_bot"
 
 	// User availability statuses
 	Online  = "online"

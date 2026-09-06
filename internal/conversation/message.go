@@ -1430,6 +1430,11 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 			m.aiAgent.HandleConversationEvent(conversation.ID, conversation.AssignedUserID.Int)
 		}
 
+		// If assigned to a guided-form bot, let it process the answer and ask the next question.
+		if m.guidedForm != nil && conversation.AssignedUserID.Valid {
+			m.guidedForm.HandleConversationEvent(conversation.ID, conversation.AssignedUserID.Int)
+		}
+
 		if conversation.SLAPolicyID.Int == 0 {
 			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
 			return nil
