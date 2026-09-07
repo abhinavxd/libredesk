@@ -172,6 +172,8 @@
   "admin.guidedForms.invalidAnswer": "Sorry, I didn't understand that. Please try again.",
   "admin.guidedForms.skippedByVisitor": "The visitor asked to speak with a human instead of continuing the guided form.",
   "admin.guidedForms.enabledHint": "Enabling this form automatically disables any other guided form on the same inbox.",
+  "admin.guidedForms.allowSkipToHuman": "Let visitors skip to a human",
+  "admin.guidedForms.allowSkipToHumanHint": "Shows a \"talk to a human instead\" link in the widget while this form is in progress.",
   "admin.guidedForms.testForm": "Test this form",
   "admin.guidedForms.testFormHint": "Try answering as a visitor would, using the questions and branches as currently drafted (unsaved changes included).",
   "admin.guidedForms.testReset": "Restart test",

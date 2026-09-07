@@ -341,6 +341,17 @@
           <FormMessage />
         </FormItem>
       </FormField>
+
+      <FormField v-slot="{ componentField, handleChange }" name="allow_skip_to_human">
+        <FormItem>
+          <SwitchField
+            :title="t('admin.guidedForms.allowSkipToHuman')"
+            :description="t('admin.guidedForms.allowSkipToHumanHint')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
     </div>
 
     <div class="flex justify-end mt-10">
@@ -487,7 +498,8 @@ const form = useForm({
       on_complete_team_id: z.string().optional(),
       on_complete_assistant_id: z.string().optional(),
       completion_message: z.string().optional(),
-      enabled: z.boolean().optional()
+      enabled: z.boolean().optional(),
+      allow_skip_to_human: z.boolean().optional()
     })
   ),
   initialValues: {
@@ -497,7 +509,8 @@ const form = useForm({
     on_complete_team_id: '',
     on_complete_assistant_id: '',
     completion_message: '',
-    enabled: true
+    enabled: true,
+    allow_skip_to_human: true
   }
 })
 
@@ -514,7 +527,8 @@ watch(
           ? String(values.on_complete_assistant_id)
           : '',
         completion_message: values.completion_message || '',
-        enabled: values.enabled ?? true
+        enabled: values.enabled ?? true,
+        allow_skip_to_human: values.allow_skip_to_human ?? true
       },
       false
     )
@@ -602,7 +616,8 @@ const onSubmit = form.handleSubmit(async (values) => {
         values.on_complete_action === 'ai_assistant' && values.on_complete_assistant_id
           ? Number(values.on_complete_assistant_id)
           : null,
-      completion_message: values.completion_message || ''
+      completion_message: values.completion_message || '',
+      allow_skip_to_human: !!values.allow_skip_to_human
     }
     await props.submitForm(payload)
   } finally {

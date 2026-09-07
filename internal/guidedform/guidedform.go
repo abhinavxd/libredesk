@@ -157,7 +157,7 @@ func (m *Manager) CreateForm(f gmodels.Form) (gmodels.Form, error) {
 	}
 
 	var id int
-	if err := tx.Stmtx(m.q.InsertForm).QueryRow(userID, f.Name, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage).Scan(&id); err != nil {
+	if err := tx.Stmtx(m.q.InsertForm).QueryRow(userID, f.Name, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage, f.AllowSkipToHuman).Scan(&id); err != nil {
 		m.lo.Error("error creating guided form", "error", err)
 		return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -196,7 +196,7 @@ func (m *Manager) UpdateForm(id int, f gmodels.Form) (gmodels.Form, error) {
 		}
 	}
 
-	if _, err := tx.Stmtx(m.q.UpdateForm).Exec(id, f.Name, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage); err != nil {
+	if _, err := tx.Stmtx(m.q.UpdateForm).Exec(id, f.Name, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage, f.AllowSkipToHuman); err != nil {
 		m.lo.Error("error updating guided form", "error", err)
 		return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -399,6 +399,17 @@ func (m *Manager) refreshBotUserIDs() error {
 	m.botUserIDs = set
 	m.mu.Unlock()
 	return nil
+}
+
+// AllowsSkipToHuman reports whether the guided form whose bot identity is userID offers the
+// "talk to a human" escape hatch. Used to decide whether to expose the option to a widget
+// client; fails closed (false) so an unresolvable form never shows the button.
+func (m *Manager) AllowsSkipToHuman(userID int) bool {
+	form, err := m.GetFormByUserID(userID)
+	if err != nil {
+		return false
+	}
+	return form.AllowSkipToHuman
 }
 
 func (m *Manager) isFormBotUser(userID int) bool {

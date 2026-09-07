@@ -77,7 +77,11 @@ const handleQuickReply = (text) => {
 
 // Lets a visitor bail out of an in-progress guided form and reach a human directly, instead of
 // being stuck answering questions until something matches a branch.
-const isInGuidedForm = computed(() => chatStore.currentConversation?.assignee?.type === 'guided_form_bot')
+const isInGuidedForm = computed(
+  () =>
+    chatStore.currentConversation?.assignee?.type === 'guided_form_bot' &&
+    !!chatStore.currentConversation?.guided_form_allow_skip
+)
 
 const skipGuidedForm = async () => {
   if (!chatStore.currentConversation?.uuid) return

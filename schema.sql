@@ -865,6 +865,7 @@ CREATE TABLE guided_forms (
 	on_complete_assistant_id INTEGER NULL REFERENCES ai_assistants(id) ON DELETE SET NULL,
 	on_complete_team_id INTEGER NULL REFERENCES teams(id) ON DELETE SET NULL,
 	completion_message TEXT NOT NULL DEFAULT '',
+	allow_skip_to_human BOOLEAN NOT NULL DEFAULT true,
 	CONSTRAINT constraint_guided_forms_on_complete_action CHECK (on_complete_action IN ('team', 'ai_assistant', 'unassigned'))
 );
 CREATE INDEX index_guided_forms_on_user_id ON guided_forms(user_id);

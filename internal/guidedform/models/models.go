@@ -75,6 +75,9 @@ type Form struct {
 	OnCompleteAssistantID null.Int        `json:"on_complete_assistant_id" db:"on_complete_assistant_id"`
 	OnCompleteTeamID      null.Int        `json:"on_complete_team_id" db:"on_complete_team_id"`
 	CompletionMessage     string          `json:"completion_message" db:"completion_message"`
+	// AllowSkipToHuman controls whether a visitor sees a "talk to a human" escape hatch out of
+	// this form's flow (widget) and whether it's honored server-side if they use it anyway.
+	AllowSkipToHuman bool `json:"allow_skip_to_human" db:"allow_skip_to_human"`
 }
 
 // UnmarshalSteps decodes StepsRaw (as loaded from the DB) into Steps.

@@ -62,6 +62,11 @@ func (m *Manager) SkipToHuman(conversationID int) error {
 		m.lo.Error("error fetching guided form for skip", "conversation_id", conversationID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	if !form.AllowSkipToHuman {
+		// This form doesn't offer the escape hatch; the widget shouldn't show the button, but
+		// enforce it server-side too rather than trusting the client.
+		return nil
+	}
 	attrs := decodeAttrs(conv.CustomAttributes)
 	m.handoff(conv, form, attrs, m.i18n.T("admin.guidedForms.skippedByVisitor"))
 	return nil

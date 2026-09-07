@@ -72,6 +72,10 @@ type Claims struct {
 type conversationResp struct {
 	Conversation cmodels.ChatConversation `json:"conversation"`
 	Messages     []cmodels.ChatMessage    `json:"messages"`
+	// GuidedFormAllowSkip tells the widget whether to show a "talk to a human" escape hatch out
+	// of the guided form currently assigned to this conversation. Always false when the
+	// conversation isn't assigned to a guided-form bot.
+	GuidedFormAllowSkip bool `json:"guided_form_allow_skip"`
 }
 
 type customAttributeWidget struct {
@@ -315,6 +319,7 @@ func handleChatInit(r *fastglue.Request) error {
 		"messages":                 resp.Messages,
 		"business_hours_id":        resp.BusinessHoursID,
 		"working_hours_utc_offset": resp.WorkingHoursUTCOffset,
+		"guided_form_allow_skip":   resp.GuidedFormAllowSkip,
 	}
 
 	// Add session token and user metadata when a new visitor is created.
@@ -906,14 +911,24 @@ func buildConversationResponseWithBusinessHours(app *App, conversation cmodels.C
 
 	resp := conversationResponseWithBusinessHours{
 		conversationResp: conversationResp{
-			Conversation: widgetResp.Conversation,
-			Messages:     widgetResp.Messages,
+			Conversation:        widgetResp.Conversation,
+			Messages:            widgetResp.Messages,
+			GuidedFormAllowSkip: guidedFormAllowSkip(app, widgetResp.Conversation),
 		},
 		BusinessHoursID:       widgetResp.BusinessHoursID,
 		WorkingHoursUTCOffset: widgetResp.WorkingHoursUTCOffset,
 	}
 
 	return resp, nil
+}
+
+// guidedFormAllowSkip reports whether the widget should offer a "talk to a human" escape hatch
+// for this conversation's current assignee.
+func guidedFormAllowSkip(app *App, conversation cmodels.ChatConversation) bool {
+	if conversation.Assignee == nil || conversation.Assignee.Type != umodels.UserTypeGuidedFormBot {
+		return false
+	}
+	return app.guidedForm.AllowsSkipToHuman(conversation.Assignee.ID)
 }
 
 // resolveUserFromClaims resolves the actual user from JWT claims,
