@@ -130,6 +130,11 @@ const setupParentMessageListeners = () => {
       userStore.clearSessionToken()
     } else if (event.data.type === 'PAGE_VISIT') {
       sendPageVisit(event.data.url, event.data.title)
+    } else if (event.data.type === 'LD_PREVIEW_CONFIG') {
+      // Admin form-builder live preview: an in-progress (possibly unsaved) config pushed from
+      // the parent admin page overrides the config fetched from the server, so the preview
+      // reflects edits instantly while the real chat/API calls still hit the real backend.
+      widgetStore.updateConfig(event.data.config)
     }
   })
 }

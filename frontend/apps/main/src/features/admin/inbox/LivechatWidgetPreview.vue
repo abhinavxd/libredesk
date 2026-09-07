@@ -1,5 +1,20 @@
 <template>
-  <div class="relative w-full h-[750px] rounded-xl border border-border bg-muted overflow-hidden">
+  <!-- Once the inbox is saved, preview the real widget app in an iframe against the real
+       backend, fed this form's live (possibly unsaved) config over postMessage. Real chat,
+       real guided forms - not a mock. -->
+  <div v-if="inboxUuid" class="relative w-full h-[750px] rounded-xl border border-border bg-muted overflow-hidden">
+    <iframe
+      ref="iframeEl"
+      :src="iframeSrc"
+      class="w-full h-full border-0"
+      :title="$t('admin.inbox.livechat.preview')"
+      @load="onIframeLoad"
+    />
+  </div>
+
+  <!-- No saved inbox yet (still being created) - the widget has nothing real to load against,
+       so fall back to a static mock of the configured look. -->
+  <div v-else class="relative w-full h-[750px] rounded-xl border border-border bg-muted overflow-hidden">
     <!-- Widget window, themed independently of the admin app. -->
     <transition name="ld-preview-window">
       <div
@@ -347,8 +362,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDebounceFn } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardContent } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'
@@ -382,11 +398,62 @@ const props = defineProps({
   config: {
     type: Object,
     default: () => ({})
+  },
+  // The inbox's real UUID once saved - switches the preview from a static mock to the real
+  // widget app running against the real backend, with this form's live config pushed into it.
+  inboxUuid: {
+    type: String,
+    default: ''
   }
 })
 
 const { t } = useI18n()
 
+// --- Real widget preview (iframe) ---
+const iframeEl = ref(null)
+const iframeReady = ref(false)
+
+const iframeSrc = computed(() => `/widget?inbox_id=${encodeURIComponent(props.inboxUuid)}`)
+
+const pushLivePreviewConfig = () => {
+  const win = iframeEl.value?.contentWindow
+  if (!win || !iframeReady.value) return
+  // props.config is a Vue-reactive object (sourced from vee-validate form state) and can carry
+  // values the structured clone algorithm postMessage uses can't clone; round-tripping through
+  // JSON strips reactivity and anything non-plain, leaving a safe plain object to send.
+  let plainConfig
+  try {
+    plainConfig = JSON.parse(JSON.stringify(props.config))
+  } catch {
+    return
+  }
+  win.postMessage({ type: 'LD_PREVIEW_CONFIG', config: plainConfig }, window.location.origin)
+}
+const pushLivePreviewConfigDebounced = useDebounceFn(pushLivePreviewConfig, 250)
+
+const onPreviewMessage = (event) => {
+  if (event.source !== iframeEl.value?.contentWindow) return
+  if (event.data?.type === 'VUE_APP_READY') {
+    iframeReady.value = true
+    pushLivePreviewConfig()
+  }
+}
+window.addEventListener('message', onPreviewMessage)
+onBeforeUnmount(() => window.removeEventListener('message', onPreviewMessage))
+
+const onIframeLoad = () => {
+  // A fresh navigation (including src changes) means the previous ready signal no longer
+  // applies until the new page announces itself again.
+  iframeReady.value = false
+}
+
+watch(
+  () => props.config,
+  () => pushLivePreviewConfigDebounced(),
+  { deep: true }
+)
+
+// --- Static mock fallback (no saved inbox yet) ---
 const open = ref(true)
 const view = ref('home')
 // The preview can't send/receive, so a sample conversation stands in for a real one.
