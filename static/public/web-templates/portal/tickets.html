@@ -11,33 +11,24 @@
         <a href="/portal?status=resolved"{{ if eq .Data.StatusFilter "resolved" }} aria-current="page"{{ end }}>{{ .L.T "globals.terms.resolved" }}</a>
     </nav>
     {{ if .Data.Tickets }}
-    <div class="pt-table-wrap">
-        <table class="pt-table" aria-label="{{ .L.T "portal.myTickets" }}">
-            <thead>
-                <tr>
-                    <th scope="col">{{ .L.T "globals.terms.number" }}</th>
-                    <th scope="col">{{ .L.Tc "globals.terms.subject" 1 }}</th>
-                    <th scope="col">{{ .L.Tc "globals.terms.status" 1 }}</th>
-                    <th scope="col" class="pt-created">{{ .L.T "globals.terms.createdAt" }}</th>
-                    <th scope="col">{{ .L.T "portal.lastActivity" }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ range .Data.Tickets }}
-                <tr>
-                    <td class="pt-ref" data-label="{{ $.L.T "globals.terms.number" }}"><a href="/portal/tickets/{{ .ReferenceNumber }}">#{{ .ReferenceNumber }}</a></td>
-                    <td class="pt-subject" data-label="{{ $.L.Tc "globals.terms.subject" 1 }}"><a href="/portal/tickets/{{ .ReferenceNumber }}">{{ .Subject }}</a></td>
-                    <td class="pt-state" data-label="{{ $.L.Tc "globals.terms.status" 1 }}">
-                        {{ template "portal-status-badge" . }}
-                        <span class="pt-replies">{{ .ReplyLabel }}</span>
-                    </td>
-                    <td class="pt-created" data-label="{{ $.L.T "globals.terms.createdAt" }}"><time datetime="{{ .CreatedAtISO }}">{{ .CreatedAt }}</time></td>
-                    <td class="pt-activity" data-label="{{ $.L.T "portal.lastActivity" }}"><time datetime="{{ .LastActivityAtISO }}">{{ .LastActivityAt }}</time></td>
-                </tr>
-                {{ end }}
-            </tbody>
-        </table>
-    </div>
+    <ul class="pt-ticket-list">
+        {{ range .Data.Tickets }}
+        <li>
+            <a class="pt-ticket-link" href="/portal/tickets/{{ .ReferenceNumber }}">
+                <span class="pt-row-main">
+                    <span class="pt-row-subject">{{ .Subject }}</span>
+                    <span class="pt-row-meta"><span class="pt-ref">#{{ .ReferenceNumber }}</span><span class="pt-replies">{{ .ReplyLabel }}</span></span>
+                </span>
+                {{ template "portal-status-badge" . }}
+                <span class="pt-row-updated">
+                    <span>{{ $.L.T "portal.lastActivity" }}</span>
+                    <time datetime="{{ .LastActivityAtISO }}">{{ .LastActivityAt }}</time>
+                </span>
+                {{ template "hc-arrow-icon" }}
+            </a>
+        </li>
+        {{ end }}
+    </ul>
     {{ if gt .Data.TotalPages 1 }}
     <nav class="pt-pager" aria-label="{{ .L.T "globals.terms.pagination" }}">
         {{ if gt .Data.Page 1 }}<a href="/portal?status={{ .Data.StatusFilter }}&amp;page={{ .Data.PrevPage }}">{{ .L.T "globals.terms.previous" }}</a>{{ end }}

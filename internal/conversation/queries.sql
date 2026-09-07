@@ -431,9 +431,9 @@ SELECT
     c.uuid,
     c.reference_number,
     c.subject,
-    c.last_message,
-    c.last_message_at,
-    c.last_message_sender,
+    c.last_interaction,
+    c.last_interaction_at,
+    c.last_interaction_sender,
     cs.name AS status,
     COALESCE(cs.category::TEXT, '') AS status_category,
     (
@@ -447,7 +447,7 @@ FROM conversations c
 LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 WHERE c.contact_id = $1
     AND ($2 = '' OR ($2 = 'resolved' AND cs.category = 'resolved') OR ($2 = 'open' AND COALESCE(cs.category::TEXT, '') != 'resolved'))
-ORDER BY COALESCE(c.last_message_at, c.created_at) DESC, c.id DESC
+ORDER BY COALESCE(c.last_interaction_at, c.created_at) DESC, c.id DESC
 LIMIT $3 OFFSET $4;
 
 -- name: get-conversation-uuid

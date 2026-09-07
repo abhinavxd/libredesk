@@ -1,6 +1,6 @@
 {{ define "portal-verify" }}
 {{ template "portal-header" . }}
-<div class="pt-auth-card">
+<div class="pt-auth-card pt-auth-verify">
     <h1>{{ .L.T "portal.enterCode" }}</h1>
     <p class="pt-muted">{{ .L.Ts "portal.codeSentTo" "email" .Data.Email }}</p>
     {{ if .Data.Error }}<p class="pt-error" role="alert">{{ .Data.Error }}</p>{{ end }}

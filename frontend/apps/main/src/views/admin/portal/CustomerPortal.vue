@@ -20,7 +20,7 @@
           </LoadingOverlay>
         </TabsContent>
         <TabsContent value="forms">
-          <PortalForms />
+          <PortalForms :forms="ticketForms" :loading="formsLoading" @refresh="fetchTicketForms" />
         </TabsContent>
       </Tabs>
     </template>
@@ -47,6 +47,7 @@ const inboxes = ref([])
 const livechatInboxes = ref([])
 const helpCenters = ref([])
 const ticketForms = ref([])
+const formsLoading = ref(false)
 const isLoading = ref(false)
 const emitter = useEmitter()
 
@@ -82,6 +83,21 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
+
+const fetchTicketForms = async () => {
+  try {
+    formsLoading.value = true
+    const resp = await api.getPortalForms()
+    ticketForms.value = resp.data.data || []
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    formsLoading.value = false
+  }
+}
 
 const submitForm = async (values) => {
   await api.updateSettings('portal', {

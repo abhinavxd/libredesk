@@ -36,15 +36,15 @@ func TestGetContactPortalConversations(t *testing.T) {
 	}
 
 	now := time.Now()
-	insert := func(contact, status int, subject string, lastMessageAt time.Time, lastSender string) {
+	insert := func(contact, status int, subject string, lastInteractionAt time.Time, lastSender string) {
 		var sender any
 		if lastSender != "" {
 			sender = lastSender
 		}
 		if _, err := m.db.Exec(`
-			INSERT INTO conversations (contact_id, inbox_id, status_id, subject, last_message, last_message_at, last_message_sender)
+			INSERT INTO conversations (contact_id, inbox_id, status_id, subject, last_interaction, last_interaction_at, last_interaction_sender)
 			VALUES ($1, $2, $3, $4, 'hi', $5, $6)`,
-			contact, inboxID, status, subject, lastMessageAt, sender); err != nil {
+			contact, inboxID, status, subject, lastInteractionAt, sender); err != nil {
 			t.Fatalf("inserting conversation: %v", err)
 		}
 	}
@@ -54,6 +54,8 @@ func TestGetContactPortalConversations(t *testing.T) {
 	insert(contactID, statusID("Resolved"), "resolved ticket", now.Add(-3*time.Hour), "agent")
 	insert(contactID, statusID("Closed"), "closed ticket", now.Add(-4*time.Hour), "agent")
 	insert(otherContactID, statusID("Open"), "other contact ticket", now, "contact")
+
+	m.db.MustExec(`UPDATE conversations SET last_message = 'private note', last_message_sender = 'agent', last_message_at = $1 WHERE contact_id = $2`, now, contactID)
 
 	// All conversations of the contact, newest activity first, never another contact's.
 	all, total, err := m.GetContactPortalConversations(contactID, "", 1, 10)
@@ -66,6 +68,10 @@ func TestGetContactPortalConversations(t *testing.T) {
 	if all[0].Subject.String != "open ticket" || all[3].Subject.String != "closed ticket" {
 		t.Errorf("wrong order: first=%q last=%q", all[0].Subject.String, all[3].Subject.String)
 	}
+	if all[0].LastInteractionSender.String != "contact" || all[0].LastInteractionAt.Time.Sub(now.Add(-time.Hour)).Abs() > time.Microsecond {
+		t.Errorf("private note changed the public interaction: %+v", all[0])
+	}
+
 	for _, c := range all {
 		if c.Subject.String == "other contact ticket" {
 			t.Fatal("leaked another contact's conversation")

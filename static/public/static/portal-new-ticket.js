@@ -8,7 +8,9 @@
     var locale = form.getAttribute('data-pt-locale');
     var articleBase = form.getAttribute('data-pt-article-base');
     var suggestTitle = form.getAttribute('data-pt-suggest-title');
-    var draftKey = 'pt-draft-' + (form.getAttribute('data-pt-article') || 'default');
+    var draftKey = 'pt-contact-draft-' + form.getAttribute('data-pt-contact-id') + '-' +
+        (form.getAttribute('data-pt-article-locale') || '') + '-' +
+        (form.getAttribute('data-pt-article') || 'default');
     var pendingKey = draftKey + '-pending';
 
     var DEBOUNCE = 300;
@@ -53,6 +55,10 @@
         clearTimeout(saveTimer);
         saveTimer = setTimeout(saveDraft, 400);
     }
+    var logout = document.querySelector('form[action="/portal/logout"]');
+    if (logout) logout.addEventListener('submit', function () {
+        clearTimeout(saveTimer);
+    });
     if (subject) subject.addEventListener('input', queueSave);
     if (message) message.addEventListener('input', queueSave);
     form.addEventListener('submit', function () {

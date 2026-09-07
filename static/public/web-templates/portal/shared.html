@@ -70,6 +70,24 @@
     <script>
     (function () {
         var buttons = [];
+        var draftPrefix = 'pt-contact-draft-' + {{ .Data.ContactID }} + '-';
+        function clearDrafts(storage, prefix) {
+            for (var i = storage.length - 1; i >= 0; i--) {
+                var key = storage.key(i);
+                if (key.indexOf(prefix) === 0) storage.removeItem(key);
+            }
+        }
+        try {
+            clearDrafts(localStorage, 'pt-draft-');
+            clearDrafts(sessionStorage, 'pt-draft-');
+        } catch (e) {}
+        var logout = document.querySelector('form[action="/portal/logout"]');
+        if (logout) logout.addEventListener('submit', function () {
+            try {
+                clearDrafts(localStorage, draftPrefix);
+                clearDrafts(sessionStorage, draftPrefix);
+            } catch (e) {}
+        });
         document.querySelectorAll('form[method="POST"]').forEach(function (form) {
             form.addEventListener('submit', function () {
                 var button = form.querySelector('button[type="submit"]');

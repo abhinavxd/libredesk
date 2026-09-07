@@ -1,5 +1,5 @@
 <template>
-  <LoadingOverlay :loading="isLoading" reserve-height>
+  <LoadingOverlay :loading="loading" reserve-height>
     <div class="flex justify-end mb-4">
       <Dialog v-model:open="dialogOpen">
         <DialogTrigger as-child @click="newForm">
@@ -21,7 +21,7 @@
         </DialogContent>
       </Dialog>
     </div>
-    <DataTable :columns="createColumns(t, { onEdit: editForm })" :data="forms" :loading="isLoading" />
+    <DataTable :columns="createColumns(t, { onEdit: editForm })" :data="forms" :loading="loading" />
   </LoadingOverlay>
 </template>
 
@@ -49,8 +49,11 @@ import api from '@main/api'
 
 const { t } = useI18n()
 const emitter = useEmitter()
-const forms = ref([])
-const isLoading = ref(false)
+defineProps({
+  forms: { type: Array, default: () => [] },
+  loading: { type: Boolean, default: false }
+})
+const emit = defineEmits(['refresh'])
 const isSaving = ref(false)
 const dialogOpen = ref(false)
 const current = ref({ id: 0, name: '', ask_subject: true, fields: [] })
@@ -58,14 +61,13 @@ const current = ref({ id: 0, name: '', ask_subject: true, fields: [] })
 const blank = () => ({ id: 0, name: '', ask_subject: true, fields: [] })
 
 const refreshHandler = (data) => {
-  if (data?.model === 'portal-forms') fetchAll()
+  if (data?.model === 'portal-forms') emit('refresh')
 }
 const editHandler = (data) => {
   if (data?.model === 'portal-forms') editForm(data.data)
 }
 
 onMounted(() => {
-  fetchAll()
   emitter.on(EMITTER_EVENTS.REFRESH_LIST, refreshHandler)
   emitter.on(EMITTER_EVENTS.EDIT_MODEL, editHandler)
 })
@@ -85,21 +87,6 @@ const editForm = (form) => {
   dialogOpen.value = true
 }
 
-const fetchAll = async () => {
-  try {
-    isLoading.value = true
-    const resp = await api.getPortalForms()
-    forms.value = resp.data.data || []
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    isLoading.value = false
-  }
-}
-
 const save = async () => {
   try {
     isSaving.value = true
@@ -117,7 +104,7 @@ const save = async () => {
       description: t('globals.messages.savedSuccessfully')
     })
     dialogOpen.value = false
-    fetchAll()
+    emit('refresh')
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

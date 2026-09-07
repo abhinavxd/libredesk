@@ -98,18 +98,19 @@
       <div v-if="availableAttributes.length > 0" class="space-y-3">
         <h5 class="font-medium text-sm">{{ $t('admin.portalForm.availableAttributes') }}</h5>
         <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-          <div
+          <button
             v-for="attr in availableAttributes"
+            type="button"
             :key="attr.id"
-            class="flex items-center space-x-2 p-2 border rounded-md cursor-pointer hover:bg-accent"
+            class="flex items-center space-x-2 p-2 border rounded-md text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             @click="addAttributeField(attr)"
           >
-            <div class="flex-1">
-              <div class="font-medium text-sm">{{ attr.name }}</div>
-              <div class="text-xs text-muted-foreground">{{ attr.data_type }}</div>
-            </div>
-            <Plus class="w-4 h-4 text-muted-foreground" />
-          </div>
+            <span class="flex-1">
+              <span class="block font-medium text-sm">{{ attr.name }}</span>
+              <span class="block text-xs text-muted-foreground">{{ attr.data_type }}</span>
+            </span>
+            <Plus class="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          </button>
         </div>
       </div>
     </div>

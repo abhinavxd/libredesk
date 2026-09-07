@@ -468,7 +468,7 @@
                 return Promise.resolve(cookieToken);
             }
             var self = this;
-            return fetch(this.config.baseURL + this.config.sessionPath, { credentials: 'same-origin' })
+            return fetch(new URL(this.config.sessionPath, window.location.origin).href, { credentials: 'same-origin' })
                 .then(function (resp) { return resp.ok ? resp.json() : null; })
                 .then(function (body) {
                     var token = body && body.data && body.data.session_token;

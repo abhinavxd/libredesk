@@ -271,10 +271,10 @@ func handlePortalTickets(r *fastglue.Request) error {
 	rows := make([]portalTicketRow, 0, len(conversations))
 	for _, c := range conversations {
 		lastActivity := c.CreatedAt
-		if c.LastMessageAt.Valid {
-			lastActivity = c.LastMessageAt.Time
+		if c.LastInteractionAt.Valid {
+			lastActivity = c.LastInteractionAt.Time
 		}
-		label, class := portalStatusLabel(lcl, c.StatusCategory, c.LastMessageSender.String)
+		label, class := portalStatusLabel(lcl, c.StatusCategory, c.LastInteractionSender.String)
 		rows = append(rows, portalTicketRow{
 			ReferenceNumber:   c.ReferenceNumber,
 			Subject:           portalSubject(lcl, c.Subject.String),
@@ -301,14 +301,16 @@ func handlePortalTickets(r *fastglue.Request) error {
 }
 
 func handlePortalTicketView(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-		lcl = portalI18n(app, r)
-	)
 	conversation, err := getPortalConversation(r)
 	if err != nil {
 		return renderPortalError(r, fasthttp.StatusNotFound)
 	}
+	return renderPortalTicket(r, conversation, "", string(r.RequestCtx.QueryArgs().Peek("error")))
+}
+
+func renderPortalTicket(r *fastglue.Request, conversation cmodels.Conversation, reply, errMsg string) error {
+	app := r.Context.(*App)
+	lcl := portalI18n(app, r)
 
 	private := false
 	messages, _, err := app.conversation.GetConversationMessages(conversation.UUID, 1, portalMessagesPageSize, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
@@ -331,6 +333,8 @@ func handlePortalTicketView(r *fastglue.Request) error {
 			Attachments:   msg.Attachments,
 		}
 		if msg.ContentType == cmodels.ContentTypeHTML {
+			resolveQuotedCIDs(app, &msg)
+			resolveAttachmentCIDs(&msg, app.consts.Load().(*constants).AppBaseURL)
 			view.HTML = template.HTML(portalHTMLPolicy.Sanitize(msg.Content))
 			view.HasQuoted = portalContainsQuoteMarkers(msg.Content)
 		} else {
@@ -339,7 +343,7 @@ func handlePortalTicketView(r *fastglue.Request) error {
 		views = append(views, view)
 	}
 
-	label, class := portalStatusLabel(lcl, conversation.StatusCategory.String, conversation.LastMessageSender.String)
+	label, class := portalStatusLabel(lcl, conversation.StatusCategory.String, conversation.LastInteractionSender.String)
 	subject := portalSubject(lcl, conversation.Subject.String)
 	return renderPortalPage(r, "portal-ticket", subject, map[string]interface{}{
 		"ReferenceNumber": conversation.ReferenceNumber,
@@ -350,7 +354,8 @@ func handlePortalTicketView(r *fastglue.Request) error {
 		"CreatedAtISO":    conversation.CreatedAt.In(loc).Format(time.RFC3339),
 		"CSATWidgetURL":   portalCSATWidgetURL(app, conversation.ID),
 		"Messages":        views,
-		"Error":           string(r.RequestCtx.QueryArgs().Peek("error")),
+		"Error":           errMsg,
+		"Message":         reply,
 	})
 }
 
@@ -374,7 +379,7 @@ func handlePortalTicketReply(r *fastglue.Request) error {
 		errKey = "portal.messageTooLong"
 	}
 	if errKey != "" {
-		return r.RedirectURI("/portal/tickets/"+conversation.ReferenceNumber, fasthttp.StatusSeeOther, map[string]any{"error": lcl.T(errKey)}, "")
+		return renderPortalTicket(r, conversation, message, lcl.T(errKey))
 	}
 
 	msg := cmodels.Message{
@@ -400,52 +405,61 @@ func handlePortalTicketReply(r *fastglue.Request) error {
 // handlePortalNewTicket renders the new-ticket form, seeding the subject from the article the contact came from.
 func handlePortalNewTicket(r *fastglue.Request) error {
 	var (
-		app         = r.Context.(*App)
-		lcl         = portalI18n(app, r)
-		articleSlug = string(r.RequestCtx.QueryArgs().Peek("article"))
+		app           = r.Context.(*App)
+		lcl           = portalI18n(app, r)
+		articleSlug   = strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("article")))
+		articleLocale = strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("article_locale")))
+		article       = portalArticle(app, articleSlug, articleLocale)
 	)
 	if portalInboxID(r) <= 0 {
 		return renderPortalError(r, fasthttp.StatusNotFound)
 	}
-	subject := portalArticleSubject(app, articleSlug)
-	if app.consts.Load().(*constants).PortalTicketsFromArticleOnly && subject == "" {
+	subject := article.Title
+	if app.consts.Load().(*constants).PortalTicketsFromArticleOnly && article.ID == 0 {
 		return renderPortalError(r, fasthttp.StatusNotFound)
 	}
-	form := portalTicketForm(app, articleSlug)
+	form := portalTicketForm(app, article)
 	return renderPortalPage(r, "portal-new-ticket", lcl.T("portal.newTicket"), map[string]interface{}{
-		"Subject":    subject,
-		"Article":    articleSlug,
-		"AskSubject": form.AskSubject,
-		"FormFields": portalFieldViews(r, form, false),
-		"FormName":   form.Name,
+		"Subject":       subject,
+		"Article":       articleSlug,
+		"ArticleLocale": article.Locale,
+		"AskSubject":    form.AskSubject,
+		"FormFields":    portalFieldViews(r, form, false),
+		"FormName":      form.Name,
 	})
 }
 
 func handlePortalCreateTicket(r *fastglue.Request) error {
 	var (
-		app         = r.Context.(*App)
-		contactID   = r.RequestCtx.UserValue(ctxPortalContactID).(int)
-		lcl         = portalI18n(app, r)
-		subject     = strings.TrimSpace(string(r.RequestCtx.FormValue("subject")))
-		message     = strings.TrimSpace(string(r.RequestCtx.FormValue("message")))
-		articleSlug = strings.TrimSpace(string(r.RequestCtx.FormValue("article")))
-		form        = portalTicketForm(app, articleSlug)
+		app           = r.Context.(*App)
+		contactID     = r.RequestCtx.UserValue(ctxPortalContactID).(int)
+		lcl           = portalI18n(app, r)
+		subject       = strings.TrimSpace(string(r.RequestCtx.FormValue("subject")))
+		message       = strings.TrimSpace(string(r.RequestCtx.FormValue("message")))
+		articleSlug   = strings.TrimSpace(string(r.RequestCtx.FormValue("article")))
+		articleLocale = strings.TrimSpace(string(r.RequestCtx.FormValue("article_locale")))
+		article       = portalArticle(app, articleSlug, articleLocale)
+		form          = portalTicketForm(app, article)
 	)
+	if app.consts.Load().(*constants).PortalTicketsFromArticleOnly && article.ID == 0 {
+		return renderPortalError(r, fasthttp.StatusNotFound)
+	}
 	if !form.AskSubject {
-		subject = portalArticleSubject(app, articleSlug)
+		subject = article.Title
 		if subject == "" {
 			subject = form.Name
 		}
 	}
 	retry := func(errMsg string) error {
 		return renderPortalPage(r, "portal-new-ticket", lcl.T("portal.newTicket"), map[string]interface{}{
-			"Error":      errMsg,
-			"Subject":    subject,
-			"Message":    message,
-			"Article":    articleSlug,
-			"AskSubject": form.AskSubject,
-			"FormFields": portalFieldViews(r, form, true),
-			"FormName":   form.Name,
+			"Error":         errMsg,
+			"Subject":       subject,
+			"Message":       message,
+			"Article":       articleSlug,
+			"ArticleLocale": article.Locale,
+			"AskSubject":    form.AskSubject,
+			"FormFields":    portalFieldViews(r, form, true),
+			"FormName":      form.Name,
 		})
 	}
 
@@ -479,7 +493,7 @@ func handlePortalCreateTicket(r *fastglue.Request) error {
 	if errKey != "" {
 		return retry(lcl.Ts(errKey, "name", fieldLabel))
 	}
-	if articleTitle := portalArticleSubject(app, articleSlug); articleTitle != "" {
+	if articleTitle := article.Title; articleTitle != "" {
 		headerLines = append(headerLines, [2]string{lcl.Tc("globals.terms.article", 1), articleTitle})
 	}
 	if via := portalSessionVia(app, r, lcl); via != "" {
@@ -694,6 +708,17 @@ func handlePortalOIDCLogin(r *fastglue.Request) error {
 		return redirectPortalLoginError(r, "oidc")
 	}
 
+	callback, err := url.Parse(provider.RedirectURI)
+	if err != nil || callback.Host == "" || (callback.Scheme != "http" && callback.Scheme != "https") {
+		return redirectPortalLoginError(r, "oidc")
+	}
+	if !strings.EqualFold(string(r.RequestCtx.Host()), callback.Host) {
+		target := callback.Scheme + "://" + callback.Host + "/portal/oidc/" + strconv.Itoa(providerID) + "/login"
+		return r.Redirect(target, fasthttp.StatusSeeOther, map[string]any{
+			"return": portalReturnPath(r, string(r.RequestCtx.QueryArgs().Peek("return"))),
+		}, "")
+	}
+
 	nonce, err := stringutil.RandomAlphanumeric(32)
 	if err != nil {
 		app.lo.Error("error generating portal oidc state", "error", err)
@@ -773,6 +798,11 @@ func handlePortalOIDCCallback(r *fastglue.Request) error {
 	_, claims, err := app.auth.ExchangeOIDCToken(r.RequestCtx, providerID, code, flow["code_verifier"], flow["nonce"])
 	if err != nil {
 		app.lo.Error("error exchanging portal oidc token", "provider_id", providerID, "error", err)
+		return redirectPortalLoginError(r, "oidc")
+	}
+
+	if !claims.EmailVerified {
+		app.lo.Warn("portal oidc email is not verified", "provider_id", providerID)
 		return redirectPortalLoginError(r, "oidc")
 	}
 
@@ -935,7 +965,8 @@ func renderPortalPage(r *fastglue.Request, page, title string, data map[string]i
 	data["LocaleLinks"] = portalLocaleLinks(app, r)
 	data["Dir"] = localeDir(locale)
 	data["CSRF"], _ = r.RequestCtx.UserValue(ctxPortalCSRF).(string)
-	_, loggedIn := r.RequestCtx.UserValue(ctxPortalContactID).(int)
+	contactID, loggedIn := r.RequestCtx.UserValue(ctxPortalContactID).(int)
+	data["ContactID"] = contactID
 	data["LoggedIn"] = loggedIn
 	data["Brand"] = portalBrand(app)
 	data["MaxMessageLength"] = maxChatMessageLength
@@ -1190,28 +1221,24 @@ func portalTimezone(app *App) *time.Location {
 }
 
 // portalStatusLabel maps internal status categories onto the three customer-facing labels and a CSS class.
-func portalStatusLabel(lcl *i18n.I18n, category, lastMessageSender string) (string, string) {
+func portalStatusLabel(lcl *i18n.I18n, category, lastInteractionSender string) (string, string) {
 	if category == smodels.CategoryResolved {
 		return lcl.T("globals.terms.resolved"), "resolved"
 	}
-	if lastMessageSender == cmodels.SenderTypeAgent {
+	if lastInteractionSender == cmodels.SenderTypeAgent {
 		return lcl.T("portal.statusAwaitingYourReply"), "waiting"
 	}
 	return lcl.T("portal.statusInProgress"), "open"
 }
 
 // portalTicketForm resolves the article's form override, else the portal default, else an empty subject-asking form.
-func portalTicketForm(app *App, articleSlug string) pfmodels.Form {
+func portalTicketForm(app *App, article hcmodels.Article) pfmodels.Form {
 	fallback := pfmodels.Form{AskSubject: true}
 	consts := app.consts.Load().(*constants)
 
 	formID := consts.PortalFormID
-	if articleSlug != "" && consts.PortalHelpCenterID > 0 {
-		if hc, err := app.helpcenter.GetHelpCenterByID(consts.PortalHelpCenterID); err == nil {
-			if article, err := app.helpcenter.GetPublishedArticle(hc.Slug, articleSlug, hc.DefaultLocale); err == nil && article.PortalFormID.Valid {
-				formID = article.PortalFormID.Int
-			}
-		}
+	if article.PortalFormID.Valid {
+		formID = article.PortalFormID.Int
 	}
 	if formID <= 0 {
 		return fallback
@@ -1266,7 +1293,7 @@ func portalFormAnswers(r *fastglue.Request, form pfmodels.Form) (map[string]any,
 			}
 			continue
 		}
-		if utf8.RuneCountInString(raw) > portalMaxFieldLength || len(f.Options) > 0 && !slices.Contains(f.Options, raw) {
+		if utf8.RuneCountInString(raw) > portalMaxFieldLength || f.Type == pfmodels.FieldTypeSelect && !slices.Contains(f.Options, raw) {
 			return nil, nil, "portal.invalidField", f.Label
 		}
 		if f.Target != pfmodels.TargetAttribute {
@@ -1305,21 +1332,26 @@ func portalSessionVia(app *App, r *fastglue.Request, lcl *i18n.I18n) string {
 	return ""
 }
 
-// portalArticleSubject is empty when the slug names no published article.
-func portalArticleSubject(app *App, articleSlug string) string {
+func portalArticle(app *App, articleSlug, locale string) hcmodels.Article {
 	consts := app.consts.Load().(*constants)
 	if articleSlug == "" || consts.PortalHelpCenterID <= 0 {
-		return ""
+		return hcmodels.Article{}
 	}
 	hc, err := app.helpcenter.GetHelpCenterByID(consts.PortalHelpCenterID)
 	if err != nil || !hc.IsActive {
-		return ""
+		return hcmodels.Article{}
 	}
-	article, err := app.helpcenter.GetPublishedArticle(hc.Slug, articleSlug, hc.DefaultLocale)
+	if locale == "" {
+		locale = hc.DefaultLocale
+	}
+	if !slices.Contains(helpCenterLocales(hc), locale) {
+		return hcmodels.Article{}
+	}
+	article, err := app.helpcenter.GetPublishedArticle(hc.Slug, articleSlug, locale)
 	if err != nil {
-		return ""
+		return hcmodels.Article{}
 	}
-	return article.Title
+	return article
 }
 
 // portalCSATWidgetURL is empty when no survey was sent for the conversation.

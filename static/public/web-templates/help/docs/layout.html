@@ -35,6 +35,12 @@
     <div class="hcd-shell">
         <div class="hcd-sidebar-backdrop" data-hcd-sidebar-close></div>
         <aside class="hcd-sidebar" id="hcd-sidebar">
+            {{ if or .Data.HelpCenter.NavLinks .Data.HelpCenter.PortalPath }}
+            <nav class="hcd-sidebar-links" aria-label="{{ .L.T "globals.terms.main" }}">
+                {{ range .Data.HelpCenter.NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
+                {{ if .Data.HelpCenter.PortalPath }}<a href="{{ .Data.HelpCenter.PortalPath }}">{{ .L.T "portal.myTickets" }}</a>{{ end }}
+            </nav>
+            {{ end }}
             {{ if .Data.Tree }}
             <nav class="hcd-nav" aria-label="{{ .L.Tc "globals.terms.collection" 2 }}">
                 {{ range .Data.Tree }}

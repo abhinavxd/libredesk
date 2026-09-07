@@ -60,7 +60,7 @@
         <p class="hc-still-stuck-title">{{ .L.T "helpCenter.stillNeedHelp" }}</p>
         <p class="hc-still-stuck-sub">{{ .L.T "helpCenter.stillNeedHelp.description" }}</p>
     </div>
-    <a class="hc-still-stuck-cta" href="{{ .Data.HelpCenter.NewTicketPath }}?article={{ .Data.Article.Slug }}">{{ .L.T "helpCenter.contactSupport" }}</a>
+    <a class="hc-still-stuck-cta" href="{{ .Data.HelpCenter.NewTicketPath }}?article={{ .Data.Article.Slug }}&article_locale={{ .Data.Article.Locale }}">{{ .L.T "helpCenter.contactSupport" }}</a>
 </aside>
 {{ end }}
 {{ end }}

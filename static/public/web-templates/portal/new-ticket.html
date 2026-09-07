@@ -2,17 +2,20 @@
 {{ template "portal-header" . }}
 <div class="pt-wrap pt-form-page">
     <p class="pt-back"><a href="/portal">← {{ .L.T "portal.backToTickets" }}</a></p>
-    <h1>{{ .L.T "portal.newTicket" }}</h1>
+    <div class="pt-page-head"><h1>{{ .L.T "portal.newTicket" }}</h1></div>
     {{ if .Data.Error }}<p class="pt-error" role="alert">{{ .Data.Error }}</p>{{ end }}
     <form class="pt-new-ticket" action="/portal/tickets" method="POST" enctype="multipart/form-data"
         data-pt-hc-slug="{{ .Data.Brand.HelpCenterSlug }}"
         data-pt-article-base="{{ .Data.Brand.ArticleBasePath }}"
+        data-pt-contact-id="{{ .Data.ContactID }}"
+        data-pt-article-locale="{{ .Data.ArticleLocale }}"
         data-pt-article="{{ .Data.Article }}"
         data-pt-locale="{{ .Data.Brand.ArticleLocale }}"
         data-pt-suggest-title="{{ .L.T "portal.suggestedArticles" }}"
         data-pt-has-error="{{ if .Data.Error }}true{{ else }}false{{ end }}">
         <input type="hidden" name="csrf" value="{{ .Data.CSRF }}" />
         {{ if .Data.Article }}<input type="hidden" name="article" value="{{ .Data.Article }}" />{{ end }}
+        <input type="hidden" name="article_locale" value="{{ .Data.ArticleLocale }}" />
         {{ if .Data.AskSubject }}
         <label for="pt-subject">{{ .L.Tc "globals.terms.subject" 1 }} <span class="pt-req" aria-hidden="true">*</span></label>
         <input id="pt-subject" type="text" name="subject" required maxlength="255" value="{{ .Data.Subject }}" placeholder="{{ .L.T "portal.subjectPlaceholder" }}" />
@@ -36,9 +39,13 @@
         {{ end }}
         <label for="pt-message">{{ .L.Tc "globals.terms.message" 1 }} <span class="pt-req" aria-hidden="true">*</span></label>
         <textarea id="pt-message" name="message" rows="8" required maxlength="{{ .Data.MaxMessageLength }}" placeholder="{{ .L.T "portal.messagePlaceholder" }}">{{ .Data.Message }}</textarea>
-        <label class="pt-file-label" for="pt-files">{{ .L.Tc "globals.terms.attachment" 2 }}</label>
-        <input id="pt-files" type="file" name="files" multiple{{ if .Data.AcceptAttachments }} accept="{{ .Data.AcceptAttachments }}"{{ end }} />
-        <button type="submit">{{ .L.T "portal.submitTicket" }}</button>
+        <div class="pt-form-footer">
+            <div class="pt-file-field">
+                <label class="pt-file-label" for="pt-files">{{ .L.Tc "globals.terms.attachment" 2 }}</label>
+                <input id="pt-files" type="file" name="files" multiple{{ if .Data.AcceptAttachments }} accept="{{ .Data.AcceptAttachments }}"{{ end }} />
+            </div>
+            <button type="submit">{{ .L.T "portal.submitTicket" }}</button>
+        </div>
     </form>
 </div>
 <script defer src="/static/public/static/portal-new-ticket.js?v={{ AssetVer }}"></script>
