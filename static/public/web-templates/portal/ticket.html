@@ -22,6 +22,13 @@
         <iframe src="{{ .Data.CSATWidgetURL }}" title="{{ .L.T "csat.rateYourInteraction" }}" loading="lazy"></iframe>
     </section>
     {{ end }}
+    {{ if gt .Data.TotalPages 1 }}
+    <nav class="pt-pager" aria-label="{{ .L.T "globals.terms.pagination" }}">
+        {{ if lt .Data.Page .Data.TotalPages }}<a href="/portal/tickets/{{ .Data.ReferenceNumber }}?page={{ .Data.NextPage }}">{{ .L.T "globals.messages.olderMessages" }}</a>{{ end }}
+        <span>{{ .Data.Page }} / {{ .Data.TotalPages }}</span>
+        {{ if gt .Data.Page 1 }}<a href="/portal/tickets/{{ .Data.ReferenceNumber }}?page={{ .Data.PrevPage }}">{{ .L.T "globals.messages.newerMessages" }}</a>{{ end }}
+    </nav>
+    {{ end }}
     <ol class="pt-messages">
         {{ range .Data.Messages }}
         <li class="pt-message{{ if .IsAgent }} pt-message-agent{{ end }}{{ if .GroupWithPrev }} pt-message-grouped{{ end }}">

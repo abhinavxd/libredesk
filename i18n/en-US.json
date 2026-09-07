@@ -1007,6 +1007,8 @@
   "globals.terms.createdAt": "Created at",
   "globals.terms.next": "Next",
   "globals.terms.number": "Number",
+  "globals.messages.olderMessages": "Older messages",
+  "globals.messages.newerMessages": "Newer messages",
   "globals.terms.pagination": "Pagination",
   "globals.terms.previous": "Previous",
   "globals.terms.question": "Question",

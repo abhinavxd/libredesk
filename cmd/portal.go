@@ -312,12 +312,23 @@ func renderPortalTicket(r *fastglue.Request, conversation cmodels.Conversation, 
 	app := r.Context.(*App)
 	lcl := portalI18n(app, r)
 
+	page, err := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("page")))
+	if err != nil || page < 1 {
+		page = 1
+	}
 	private := false
-	messages, _, err := app.conversation.GetConversationMessages(conversation.UUID, 1, portalMessagesPageSize, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	messages, _, err := app.conversation.GetConversationMessages(conversation.UUID, page, portalMessagesPageSize, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
 	if err != nil {
 		return renderPortalError(r, fasthttp.StatusInternalServerError)
 	}
-	sort.Slice(messages, func(i, j int) bool { return messages[i].CreatedAt.Before(messages[j].CreatedAt) })
+	if page > 1 && len(messages) == 0 {
+		return renderPortalError(r, fasthttp.StatusNotFound)
+	}
+	totalPages := 1
+	if len(messages) > 0 {
+		totalPages = (messages[0].Total + portalMessagesPageSize - 1) / portalMessagesPageSize
+	}
+	slices.SortFunc(messages, func(a, b cmodels.Message) int { return a.CreatedAt.Compare(b.CreatedAt) })
 
 	loc := portalTimezone(app)
 	views := make([]portalMessageView, 0, len(messages))
@@ -354,6 +365,10 @@ func renderPortalTicket(r *fastglue.Request, conversation cmodels.Conversation, 
 		"CreatedAtISO":    conversation.CreatedAt.In(loc).Format(time.RFC3339),
 		"CSATWidgetURL":   portalCSATWidgetURL(app, conversation.ID),
 		"Messages":        views,
+		"Page":            page,
+		"TotalPages":      totalPages,
+		"PrevPage":        page - 1,
+		"NextPage":        page + 1,
 		"Error":           errMsg,
 		"Message":         reply,
 	})
@@ -1056,7 +1071,7 @@ func portalBrand(app *App) map[string]interface{} {
 	brand["CustomJS"] = template.JS(hc.CustomJS)
 	brand["HelpCenterURL"] = helpCenterBaseURL(app, hc) + helpCenterHomePath(hc, hc.DefaultLocale)
 	brand["HelpCenterSlug"] = hc.Slug
-	brand["ArticleBasePath"] = helpCenterHomePath(hc, hc.DefaultLocale) + "/articles/"
+	brand["ArticleBasePath"] = helpCenterBaseURL(app, hc) + helpCenterHomePath(hc, hc.DefaultLocale) + "/articles/"
 	brand["ArticleLocale"] = hc.DefaultLocale
 	brand["AnnouncementHTML"] = template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text))
 	brand["AnnouncementKey"] = announcementKey(hc.Slug, theme.Announcement)

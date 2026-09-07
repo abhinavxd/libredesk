@@ -33,7 +33,7 @@
             {{ $selected := .Value }}{{ range .Options }}<option value="{{ . }}"{{ if eq . $selected }} selected{{ end }}>{{ . }}</option>{{ end }}
         </select>
         {{ else }}
-        <input id="pt-field-{{ .Key }}" type="{{ if eq .Type "link" }}url{{ else }}{{ .Type }}{{ end }}" name="field_{{ .Key }}" {{ if .Required }}required{{ end }} maxlength="500" value="{{ .Value }}" placeholder="{{ .Placeholder }}" />
+        <input id="pt-field-{{ .Key }}" type="{{ if eq .Type "link" }}url{{ else }}{{ .Type }}{{ end }}" name="field_{{ .Key }}"{{ if eq .Type "number" }} step="any"{{ end }} {{ if .Required }}required{{ end }} maxlength="500" value="{{ .Value }}" placeholder="{{ .Placeholder }}" />
         {{ end }}
         {{ end }}
         {{ end }}
