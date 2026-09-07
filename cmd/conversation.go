@@ -922,6 +922,9 @@ func handleCreateConversation(r *fastglue.Request) error {
 		defer lockWhatsAppConversation(contactID, req.InboxID)()
 		// WhatsApp is one thread per contact; reuse the open conversation instead of creating a parallel one.
 		if id, uuid, lookupErr := app.conversation.GetLatestOpenConversationForContact(contactID, req.InboxID); lookupErr == nil {
+			if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+				return sendErrorEnvelope(r, err)
+			}
 			conversationID, conversationUUID, createdNew = id, uuid, false
 		} else if !errors.Is(lookupErr, sql.ErrNoRows) {
 			app.lo.Error("error finding open whatsapp conversation", "error", lookupErr)
