@@ -204,6 +204,12 @@ const updateRole = (id, data) =>
 const deleteRole = (id) => http.delete(`/api/v1/roles/${id}`)
 const getContacts = (params) => http.get('/api/v1/contacts', { params })
 const getContact = (id) => http.get(`/api/v1/contacts/${id}`)
+const createContact = (data) =>
+  http.post('/api/v1/contacts', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
 const updateContact = (id, data) =>
   http.put(`/api/v1/contacts/${id}`, data, {
     headers: {
@@ -808,6 +814,7 @@ export default {
   removeAssignee,
   getContacts,
   getContact,
+  createContact,
   updateContact,
   blockContact,
   deleteContact,

@@ -79,7 +79,7 @@
 
     <div v-if="userStore.can('contacts:write')">
       <Button type="submit" :isLoading="formLoading" :disabled="formLoading">
-        {{ t('contact.updateContact') }}
+        {{ submitLabel || t('contact.updateContact') }}
       </Button>
     </div>
   </form>
@@ -99,9 +99,9 @@ import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import PhoneNumberInput from '@shared-ui/components/PhoneNumberInput.vue'
 import { countryOptions } from '@shared-ui/constants/countries.js'
 import { useI18n } from 'vue-i18n'
-import { useUserStore } from '../../stores/user'
+import { useUserStore } from '@main/stores/user'
 
-defineProps(['formLoading', 'onSubmit'])
+defineProps(['formLoading', 'onSubmit', 'submitLabel'])
 
 const { t } = useI18n()
 const userStore = useUserStore()

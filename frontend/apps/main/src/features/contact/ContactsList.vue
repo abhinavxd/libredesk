@@ -25,7 +25,9 @@
                 <SelectValue :placeholder="orderByField" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="'users.created_at'">{{ $t('globals.terms.createdAt') }}</SelectItem>
+                <SelectItem :value="'users.created_at'">{{
+                  $t('globals.terms.createdAt')
+                }}</SelectItem>
                 <SelectItem :value="'users.email'">{{ $t('globals.terms.email') }}</SelectItem>
               </SelectContent>
             </Select>
@@ -42,6 +44,16 @@
             </Select>
           </PopoverContent>
         </Popover>
+
+        <Button
+          v-if="userStore.can('contacts:write')"
+          size="sm"
+          class="flex items-center h-8 gap-1"
+          @click="showCreateDialog = true"
+        >
+          <UserPlus size="16" />
+          {{ $t('contact.new') }}
+        </Button>
       </div>
 
       <!-- Loading State -->
@@ -79,13 +91,20 @@
                   {{ contact.first_name }} {{ contact.last_name }}
                 </h4>
                 <Badge v-if="contact.type" variant="secondary" class="text-xs px-1.5 py-0">
-                  {{ contact.type === 'visitor' ? $t('contact.type.visitor') : $t('contact.type.contact') }}
+                  {{
+                    contact.type === 'visitor'
+                      ? $t('contact.type.visitor')
+                      : $t('contact.type.contact')
+                  }}
                 </Badge>
               </div>
               <p class="text-xs text-muted-foreground truncate">
                 {{ contact.email }}
               </p>
-              <div v-if="contact.external_user_id" class="flex items-center gap-1 text-xs text-muted-foreground">
+              <div
+                v-if="contact.external_user_id"
+                class="flex items-center gap-1 text-xs text-muted-foreground"
+              >
                 <IdCardIcon size="12" class="flex-shrink-0" />
                 <span class="truncate">{{ contact.external_user_id }}</span>
               </div>
@@ -98,16 +117,15 @@
       </template>
     </div>
 
-    <PaginationBar
-      v-model:page="page"
-      v-model:per-page="perPage"
-      :total-pages="totalPages"
-    />
+    <PaginationBar v-model:page="page" v-model:per-page="perPage" :total-pages="totalPages" />
   </div>
+
+  <CreateContactDialog v-model:open="showCreateDialog" @created="onContactCreated" />
 </template>
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Card } from '@shared-ui/components/ui/card'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { Avatar, AvatarImage, AvatarFallback } from '@shared-ui/components/ui/avatar'
@@ -121,13 +139,15 @@ import {
 } from '@shared-ui/components/ui/select'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
-import { ArrowDownWideNarrow, IdCardIcon } from 'lucide-vue-next'
+import { ArrowDownWideNarrow, IdCardIcon, UserPlus } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import PaginationBar from '@main/components/pagination/PaginationBar.vue'
+import CreateContactDialog from './CreateContactDialog.vue'
+import { useUserStore } from '@main/stores/user'
 import api from '@main/api'
 
 const contacts = ref([])
@@ -139,7 +159,10 @@ const searchTerm = ref('')
 const orderByField = ref('users.created_at')
 const orderByDirection = ref('desc')
 const total = ref(0)
+const showCreateDialog = ref(false)
 const emitter = useEmitter()
+const router = useRouter()
+const userStore = useUserStore()
 let fetchRequestId = 0
 
 const fetchContactsDebounced = useDebounceFn(() => {
@@ -189,6 +212,10 @@ const fetchContacts = async () => {
 
 const getInitials = (firstName, lastName) => {
   return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase()
+}
+
+const onContactCreated = (contact) => {
+  router.push({ name: 'contact-detail', params: { id: contact.id } })
 }
 
 watch([page, perPage], fetchContacts)
