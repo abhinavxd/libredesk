@@ -4,9 +4,9 @@ import OuterApp from '@main/OuterApp.vue'
 import InboxLayout from '@main/layouts/inbox/InboxLayout.vue'
 import AccountLayout from '@main/layouts/account/AccountLayout.vue'
 import AdminLayout from '@main/layouts/admin/AdminLayout.vue'
-import { useAppSettingsStore } from '../stores/appSettings'
-import { getI18n } from '../i18n'
-import { abortRouteScope } from '../api'
+import { useAppSettingsStore } from '@main/stores/appSettings'
+import { getI18n } from '@main/i18n'
+import { abortRouteScope } from '@main/api'
 
 const routes = [
   {
@@ -358,6 +358,23 @@ const routes = [
             ]
           },
           {
+            path: 'whatsapp/templates',
+            meta: { titleKey: 'admin.whatsappTemplates.title' },
+            children: [
+              {
+                path: '',
+                name: 'whatsapp-templates',
+                component: () => import('@main/views/admin/whatsapp/WhatsAppTemplateList.vue')
+              },
+              {
+                path: 'new',
+                name: 'whatsapp-template-new',
+                component: () => import('@main/views/admin/whatsapp/NewWhatsAppTemplate.vue'),
+                meta: { titleKey: 'globals.messages.newTemplate' }
+              }
+            ]
+          },
+          {
             path: 'notification',
             component: () => import('@main/features/admin/notification/NotificationSetting.vue'),
             meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
@@ -497,7 +514,7 @@ const routes = [
                 name: 'new-template',
                 props: true,
                 component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { titleKey: 'template.new' }
+                meta: { titleKey: 'globals.messages.newTemplate' }
               }
             ]
           },

@@ -1,5 +1,13 @@
 <template>
   <form @submit="onSubmit" novalidate class="space-y-6 w-full">
+    <div
+      v-if="initialValues?.token_invalid"
+      class="box border-destructive/40 bg-destructive/5 p-3 text-sm flex items-start gap-2"
+    >
+      <TriangleAlert class="size-4 mt-0.5 text-destructive shrink-0" />
+      <span>{{ $t('admin.inbox.email.authenticationFailed') }}</span>
+    </div>
+
     <!-- Basic Fields -->
     <FormField v-if="showFormFields" v-slot="{ componentField }" name="name">
       <FormItem>
@@ -810,7 +818,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
-import { CheckCircle2, RefreshCw, Mail, Lightbulb } from 'lucide-vue-next'
+import { CheckCircle2, RefreshCw, Mail, Lightbulb, TriangleAlert } from 'lucide-vue-next'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'

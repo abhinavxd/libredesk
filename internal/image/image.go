@@ -11,6 +11,9 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/gabriel-vasile/mimetype"
+
+	// Registers the WebP decoder with image.Decode, which imaging.Decode uses.
+	_ "golang.org/x/image/webp"
 )
 
 const (
@@ -25,7 +28,7 @@ const (
 )
 
 var (
-	Exts         = []string{"gif", "png", "jpg", "jpeg"}
+	Exts         = []string{"gif", "png", "jpg", "jpeg", "webp"}
 	DefThumbSize = 150
 	ThumbPrefix  = "thumb_"
 )
@@ -44,7 +47,7 @@ func IsImageByContent(r io.ReadSeeker) bool {
 		return false
 	}
 	switch mtype.String() {
-	case "image/png", "image/jpeg", "image/gif":
+	case "image/png", "image/jpeg", "image/gif", "image/webp":
 		return true
 	}
 	return false

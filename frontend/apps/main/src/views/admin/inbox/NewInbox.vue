@@ -39,6 +39,14 @@
           :available-languages="availableLanguages"
         />
       </div>
+      <div v-else-if="selectedChannel === 'whatsapp'">
+        <WhatsAppInboxForm
+          :initial-values="{}"
+          :submitForm="submitWhatsAppForm"
+          :isLoading="isLoading"
+          :isNewForm="true"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -49,12 +57,14 @@ import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import { Mail, MessageCircle } from 'lucide-vue-next'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
-import api from '../../../api'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
+import WhatsAppInboxForm from '@/features/admin/inbox/WhatsAppInboxForm.vue'
+import api from '@/api'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 
@@ -83,6 +93,10 @@ const selectLiveChatChannel = () => {
   selectChannel('livechat')
 }
 
+const selectWhatsAppChannel = () => {
+  selectChannel('whatsapp')
+}
+
 const channels = [
   {
     title: t('globals.terms.email'),
@@ -94,7 +108,15 @@ const channels = [
     title: t('globals.terms.liveChat'),
     subTitle: t('admin.inbox.createLiveChatInbox'),
     onClick: selectLiveChatChannel,
-    icon: MessageCircle
+    icon: MessageCircle,
+    badge: t('globals.terms.beta')
+  },
+  {
+    title: t('globals.terms.whatsapp'),
+    subTitle: t('admin.inbox.createWhatsAppInbox'),
+    onClick: selectWhatsAppChannel,
+    icon: WhatsAppIcon,
+    badge: t('globals.terms.beta')
   }
 ]
 
@@ -141,6 +163,20 @@ const submitLiveChatForm = (values) => {
     prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
     secret: values.secret ?? '',
     linked_email_inbox_id: values.linked_email_inbox_id ?? null,
+    config: values.config
+  }
+  createInbox(payload)
+}
+
+const submitWhatsAppForm = (values) => {
+  const payload = {
+    name: values.name,
+    from: values.from,
+    channel: 'whatsapp',
+    enabled: values.enabled ?? true,
+    csat_enabled: values.csat_enabled ?? false,
+    prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
+    reopen_window_hours: values.reopen_window_hours ?? 0,
     config: values.config
   }
   createInbox(payload)

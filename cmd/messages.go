@@ -24,6 +24,10 @@ type messageReq struct {
 	Mentions    []cmodels.MentionInput `json:"mentions"`
 	EchoID      string                 `json:"echo_id"`
 	SourceID    string                 `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact sender only.
+
+	// WhatsApp-only. Set TemplateID to send an approved template; omit for free-form.
+	WhatsAppTemplateID     int               `json:"whatsapp_template_id,omitempty"`
+	WhatsAppTemplateParams map[string]string `json:"whatsapp_template_params,omitempty"`
 }
 
 // handleGetMessages returns messages for a conversation.
@@ -165,6 +169,7 @@ func handleRetryMessage(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+
 	if msg.SenderType != cmodels.SenderTypeAgent || msg.Status != cmodels.MessageStatusFailed || msg.SenderID != user.ID || msg.ConversationUUID != cuuid {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
@@ -272,6 +277,12 @@ func handleSendMessage(r *fastglue.Request) error {
 	meta := map[string]any{}
 	if req.EchoID != "" {
 		meta["echo_id"] = req.EchoID
+	}
+	if req.WhatsAppTemplateID > 0 {
+		meta["whatsapp_template_id"] = req.WhatsAppTemplateID
+	}
+	if len(req.WhatsAppTemplateParams) > 0 {
+		meta["whatsapp_template_params"] = req.WhatsAppTemplateParams
 	}
 	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, meta)
 	if err != nil {

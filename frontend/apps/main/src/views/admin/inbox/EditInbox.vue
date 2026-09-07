@@ -25,14 +25,21 @@
       :available-languages="availableLanguages"
       v-else-if="inbox.channel === 'livechat'"
     />
+    <WhatsAppInboxForm
+      :initialValues="inbox"
+      :submitForm="submitForm"
+      :isLoading="isLoading"
+      v-else-if="inbox.channel === 'whatsapp'"
+    />
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import api from '../../../api'
+import api from '@/api'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
+import WhatsAppInboxForm from '@/features/admin/inbox/WhatsAppInboxForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import CopyButton from '@/components/button/CopyButton.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
@@ -101,6 +108,24 @@ const submitForm = (values) => {
       ...values,
       channel: inbox.value.channel,
       config: values.config
+    }
+  } else if (inbox.value.channel === 'whatsapp') {
+    payload = {
+      name: values.name,
+      from: values.from,
+      channel: inbox.value.channel,
+      enabled: values.enabled,
+      csat_enabled: values.csat_enabled,
+      prompt_tags_on_reply: values.prompt_tags_on_reply,
+      reopen_window_hours: values.reopen_window_hours,
+      config: { ...values.config }
+    }
+    // Emptying a masked secret makes the backend keep the existing encrypted value.
+    if (payload.config.access_token?.includes('•')) {
+      payload.config.access_token = ''
+    }
+    if (payload.config.app_secret?.includes('•')) {
+      payload.config.app_secret = ''
     }
   }
 

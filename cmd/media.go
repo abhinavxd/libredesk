@@ -133,22 +133,21 @@ func handleMediaUpload(r *fastglue.Request) error {
 	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
 		prepared, err := prepareImageUpload(file)
 		if err != nil {
-			cleanUp = true
-			app.lo.Error("error getting image dimensions", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
-		}
-		if prepared.thumbnailErr != nil {
-			app.lo.Error("error creating thumb image", "error", prepared.thumbnailErr)
+			app.lo.Warn("skipping thumbnail and dimensions, unsupported image format", "error", err)
 		} else {
-			// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
-			uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
-			if err != nil {
-				cleanUp = true
-				return sendErrorEnvelope(r, err)
+			if prepared.thumbnailErr != nil {
+				app.lo.Warn("skipping thumbnail, unsupported image format", "error", prepared.thumbnailErr)
+			} else {
+				// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
+				uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
+				if err != nil {
+					cleanUp = true
+					return sendErrorEnvelope(r, err)
+				}
+				thumbName = uploadedThumb
 			}
-			thumbName = uploadedThumb
+			meta = prepared.meta
 		}
-		meta = prepared.meta
 	}
 
 	// Reset ptr.

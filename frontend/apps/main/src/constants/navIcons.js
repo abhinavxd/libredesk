@@ -28,6 +28,7 @@ import {
   Wrench,
   Zap
 } from 'lucide-vue-next'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 
 // Icon names referenced by string in navigation.js.
 export const navIconMap = {
@@ -58,5 +59,6 @@ export const navIconMap = {
   Webhook,
   Workflow,
   Wrench,
-  Zap
+  Zap,
+  WhatsApp: WhatsAppIcon
 }
