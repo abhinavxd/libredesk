@@ -95,6 +95,23 @@
             <MessageAttachment class="mt-1" :attachments="message.attachments" />
           </div>
 
+          <!-- Guided-form quick-reply buttons: only on the latest message, so they disappear
+               once the visitor answers (a normal message send makes this no longer "latest"). -->
+          <div
+            v-if="quickReplyOptions(message)"
+            class="flex flex-wrap gap-2 mt-2 max-w-[85%]"
+          >
+            <button
+              v-for="option in quickReplyOptions(message)"
+              :key="option"
+              type="button"
+              @click="$emit('quick-reply', option)"
+              class="px-3 py-1.5 text-sm rounded-full border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer"
+            >
+              {{ option }}
+            </button>
+          </div>
+
           <!-- Message metadata -->
           <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
             <!-- Agent name and time for agent messages -->
@@ -179,6 +196,8 @@ const props = defineProps({
   }
 })
 
+defineEmits(['quick-reply'])
+
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const messagesContainer = ref(null)
@@ -198,6 +217,17 @@ const isLoadingConversation = computed(() => chatStore.isLoadingConversation)
 
 const getMessageTime = (timestamp) => {
   return useRelativeTime(new Date(timestamp)).value
+}
+
+// quickReplyOptions returns the guided-form choice buttons to show for a message, or null.
+// Only the conversation's latest message ever shows buttons, so they vanish as soon as the
+// visitor answers (sending any message makes an older bot question no longer "latest").
+const quickReplyOptions = (message) => {
+  const options = message.meta?.guided_form_options
+  if (!Array.isArray(options) || options.length === 0) return null
+  const messages = chatStore.getCurrentConversationMessages
+  if (messages[messages.length - 1]?.uuid !== message.uuid) return null
+  return options
 }
 
 const isQuotedTextVisible = (messageUuid) => {

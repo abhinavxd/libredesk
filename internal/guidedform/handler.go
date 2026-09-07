@@ -129,6 +129,14 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 	m.applyAnswer(attrs, conv.ContactID, step, answer)
 
 	nextStepID := matchBranch(step, answer)
+	// No branch matched and no explicit default: fall through to the next step in order
+	// (a plain linear form needs no branch config at all), unless the step explicitly ends
+	// the form here, or there is no next step to fall through to.
+	if nextStepID == "" && !step.EndsForm {
+		if next, ok := form.NextStepInOrder(step.ID); ok {
+			nextStepID = next.ID
+		}
+	}
 	if nextStepID == "" {
 		m.complete(conv, form, attrs)
 		return
@@ -165,12 +173,16 @@ func compileBranchPattern(pattern string) (*regexp.Regexp, error) {
 }
 
 // askStep posts a step's question as an ordinary outgoing chat message from the bot identity.
+// For a choice step, the options travel in meta so the widget can render them as quick-reply
+// buttons (see guided_form_options); the question text also lists them inline as a fallback for
+// any client that doesn't render the buttons.
 func (m *Manager) askStep(conv cmodels.Conversation, form gmodels.Form, step gmodels.Step) {
 	question := step.Question
-	if len(step.Options) > 0 {
-		question += "\n\n" + strings.Join(step.Options, " / ")
-	}
 	meta := map[string]any{"is_guided_form": true}
+	if step.Type == gmodels.StepTypeChoice && len(step.Options) > 0 {
+		question += "\n\n" + strings.Join(step.Options, " / ")
+		meta["guided_form_options"] = step.Options
+	}
 	if _, err := m.convo.QueueReply(nil, conv.InboxID, form.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(question), nil, nil, nil, meta); err != nil {
 		m.lo.Error("error posting guided form question", "conversation_uuid", conv.UUID, "step_id", step.ID, "error", err)
 	}

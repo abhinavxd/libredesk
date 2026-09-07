@@ -21,6 +21,15 @@ const (
 	AppliesToConversation = "conversation"
 )
 
+// Step answer types.
+const (
+	StepTypeText   = "text"
+	StepTypeChoice = "choice"
+	StepTypeEmail  = "email"
+	StepTypePhone  = "phone"
+	StepTypeNumber = "number"
+)
+
 // Branch matches an answer against a pattern and, if it matches, sends the flow to NextStepID.
 // Pattern is a case-insensitive regular expression matched against the trimmed answer text.
 // The first matching branch (in slice order) wins.
@@ -29,8 +38,12 @@ type Branch struct {
 	NextStepID string `json:"next_step_id"`
 }
 
-// Step is one question in a guided form. When the visitor's answer doesn't match any Branch,
-// the flow moves to DefaultNextStepID; a step with no branches and no default is terminal.
+// Step is one question in a guided form. When the visitor's answer doesn't match any Branch:
+//   - if DefaultNextStepID is set, the flow jumps there;
+//   - else if EndsForm is true, the flow ends here;
+//   - else the flow falls through to the next step in the form's Steps order (so a plain
+//     linear form needs no branch/default configuration at all), ending only if this is the
+//     last step.
 type Step struct {
 	ID                string   `json:"id"`
 	Question          string   `json:"question"`
@@ -41,11 +54,9 @@ type Step struct {
 	Required          bool     `json:"required"`
 	Branches          []Branch `json:"branches,omitempty"`
 	DefaultNextStepID string   `json:"default_next_step_id,omitempty"`
-}
-
-// IsTerminal reports whether this step ends the flow when nothing else matches.
-func (s Step) IsTerminal() bool {
-	return len(s.Branches) == 0 && s.DefaultNextStepID == ""
+	// EndsForm explicitly ends the flow here when no branch matches, instead of falling
+	// through to the next step in order. Ignored when DefaultNextStepID is set.
+	EndsForm bool `json:"ends_form,omitempty"`
 }
 
 // Form is a guided, branching pre-chat question flow configured for a live chat inbox.
@@ -90,6 +101,17 @@ func (f Form) StepByID(id string) (Step, bool) {
 	for _, s := range f.Steps {
 		if s.ID == id {
 			return s, true
+		}
+	}
+	return Step{}, false
+}
+
+// NextStepInOrder returns the step immediately following the one with the given id in the
+// form's Steps slice, or ok=false if id is the last step (or not found).
+func (f Form) NextStepInOrder(id string) (Step, bool) {
+	for i, s := range f.Steps {
+		if s.ID == id && i+1 < len(f.Steps) {
+			return f.Steps[i+1], true
 		}
 	}
 	return Step{}, false

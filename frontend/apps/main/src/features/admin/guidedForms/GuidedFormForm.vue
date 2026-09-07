@@ -110,6 +110,7 @@
             </TagsInputItem>
             <TagsInputInput :placeholder="t('admin.guidedForms.optionsPlaceholder')" />
           </TagsInput>
+          <p class="text-xs text-muted-foreground">{{ t('admin.guidedForms.optionsHint') }}</p>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
@@ -149,7 +150,8 @@
           </div>
         </div>
 
-        <div class="space-y-2 border-t pt-3">
+        <!-- Branching, nested visually under the question it belongs to. -->
+        <div class="border-t pt-3">
           <div class="flex items-center justify-between">
             <label class="text-sm font-medium leading-none">{{ t('admin.guidedForms.branches') }}</label>
             <Button type="button" variant="outline" size="sm" @click="addBranch(step)">
@@ -157,59 +159,83 @@
               {{ t('admin.guidedForms.addBranch') }}
             </Button>
           </div>
-          <p class="text-xs text-muted-foreground">{{ t('admin.guidedForms.branchesHint') }}</p>
-          <div
-            v-for="(branch, bIndex) in step.branches"
-            :key="bIndex"
-            class="flex items-center gap-2"
-          >
-            <Input
-              v-model="branch.pattern"
-              class="flex-1"
-              :placeholder="t('admin.guidedForms.branchPatternPlaceholder')"
-            />
-            <span class="text-xs text-muted-foreground shrink-0">{{ t('admin.guidedForms.goesTo') }}</span>
-            <Select v-model="branch.next_step_id">
-              <SelectTrigger class="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="s in otherSteps(step)" :key="s.id" :value="s.id">
-                    {{ s.id || t('admin.guidedForms.untitledStep') }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 shrink-0"
-              @click="step.branches.splice(bIndex, 1)"
-            >
-              <X class="h-4 w-4" />
-            </Button>
-          </div>
+          <p class="text-xs text-muted-foreground mt-1">{{ t('admin.guidedForms.branchesHint') }}</p>
 
-          <div class="flex items-center gap-2 pt-1">
-            <span class="text-xs text-muted-foreground shrink-0">{{ t('admin.guidedForms.otherwiseGoesTo') }}</span>
-            <Select
-              :modelValue="step.default_next_step_id || 'none'"
-              @update:modelValue="(v) => (step.default_next_step_id = v === 'none' ? '' : v)"
+          <div class="mt-3 ml-2 pl-4 border-l-2 border-muted space-y-3">
+            <!-- Quick-add a branch per choice option, prefilled to match that option exactly. -->
+            <div v-if="step.type === 'choice' && step.options.length" class="flex flex-wrap items-center gap-2">
+              <span class="text-xs text-muted-foreground">{{ t('admin.guidedForms.quickAddBranch') }}</span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                class="h-6 px-2 text-xs"
+                v-for="option in step.options"
+                :key="option"
+                @click="addBranchFromOption(step, option)"
+              >
+                <Plus class="mr-1 h-3 w-3" />
+                {{ option }}
+              </Button>
+            </div>
+
+            <div
+              v-for="(branch, bIndex) in step.branches"
+              :key="bIndex"
+              class="flex items-center gap-2"
             >
-              <SelectTrigger class="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="none">{{ t('admin.guidedForms.endFlow') }}</SelectItem>
-                  <SelectItem v-for="s in otherSteps(step)" :key="s.id" :value="s.id">
-                    {{ s.id || t('admin.guidedForms.untitledStep') }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+              <Input
+                v-model="branch.pattern"
+                class="flex-1"
+                :placeholder="t('admin.guidedForms.branchPatternPlaceholder')"
+              />
+              <span class="text-xs text-muted-foreground shrink-0">{{ t('admin.guidedForms.goesTo') }}</span>
+              <Select v-model="branch.next_step_id">
+                <SelectTrigger class="w-40">
+                  <SelectValue :placeholder="t('admin.guidedForms.pickStep')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem v-for="s in otherSteps(step)" :key="s.id" :value="s.id">
+                      {{ s.id || t('admin.guidedForms.untitledStep') }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 shrink-0"
+                @click="step.branches.splice(bIndex, 1)"
+              >
+                <X class="h-4 w-4" />
+              </Button>
+            </div>
+            <p v-if="!step.branches.length" class="text-xs text-muted-foreground italic">
+              {{ t('admin.guidedForms.noBranches') }}
+            </p>
+
+            <div class="flex items-center gap-2 pt-1">
+              <span class="text-xs text-muted-foreground shrink-0">{{ t('admin.guidedForms.otherwiseGoesTo') }}</span>
+              <Select
+                :modelValue="otherwiseValue(step)"
+                @update:modelValue="(v) => setOtherwiseValue(step, v)"
+              >
+                <SelectTrigger class="w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="auto">{{ t('admin.guidedForms.continueToNext') }}</SelectItem>
+                    <SelectItem value="end">{{ t('admin.guidedForms.endFlow') }}</SelectItem>
+                    <SelectItem v-for="s in otherSteps(step)" :key="s.id" :value="s.id">
+                      {{ t('admin.guidedForms.jumpTo') }} {{ s.id || t('admin.guidedForms.untitledStep') }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
@@ -384,7 +410,8 @@ const newStep = () => ({
   custom_attribute_id: 0,
   required: false,
   branches: [],
-  default_next_step_id: ''
+  default_next_step_id: '',
+  ends_form: false
 })
 
 const addStep = () => {
@@ -399,7 +426,39 @@ const addBranch = (step) => {
   step.branches.push({ pattern: '', next_step_id: '' })
 }
 
+// escapeRegex lets an admin type/click a plain option label without knowing regex syntax -
+// branch patterns are matched as case-insensitive regex on the backend.
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// addBranchFromOption adds a branch pre-filled to match a choice option exactly, so wiring up
+// branching for a choice step is a couple of clicks instead of hand-writing regex.
+const addBranchFromOption = (step, option) => {
+  if (step.branches.some((b) => b.pattern === `^${escapeRegex(option)}$`)) return
+  step.branches.push({ pattern: `^${escapeRegex(option)}$`, next_step_id: '' })
+}
+
 const otherSteps = (current) => steps.value.filter((s) => s !== current)
+
+// otherwiseValue/setOtherwiseValue collapse ends_form + default_next_step_id into a single
+// three-way choice for the "otherwise" select: continue automatically (the default), end the
+// form here, or jump to a specific step.
+const otherwiseValue = (step) => {
+  if (step.ends_form) return 'end'
+  return step.default_next_step_id || 'auto'
+}
+
+const setOtherwiseValue = (step, value) => {
+  if (value === 'auto') {
+    step.ends_form = false
+    step.default_next_step_id = ''
+  } else if (value === 'end') {
+    step.ends_form = true
+    step.default_next_step_id = ''
+  } else {
+    step.ends_form = false
+    step.default_next_step_id = value
+  }
+}
 
 const form = useForm({
   validationSchema: toTypedSchema(
@@ -454,7 +513,8 @@ watch(
       custom_attribute_id: s.custom_attribute_id || 0,
       required: !!s.required,
       branches: (s.branches || []).map((b) => ({ pattern: b.pattern || '', next_step_id: b.next_step_id || '' })),
-      default_next_step_id: s.default_next_step_id || ''
+      default_next_step_id: s.default_next_step_id || '',
+      ends_form: !!s.ends_form
     }))
     if (steps.value.length === 0) {
       steps.value.push(newStep())
@@ -516,7 +576,8 @@ const onSubmit = form.handleSubmit(async (values) => {
         custom_attribute_id: s.custom_attribute_id || 0,
         required: !!s.required,
         branches: s.branches.filter((b) => b.pattern.trim() && b.next_step_id),
-        default_next_step_id: s.default_next_step_id || ''
+        default_next_step_id: s.default_next_step_id || '',
+        ends_form: !!s.ends_form
       })),
       on_complete_action: values.on_complete_action,
       on_complete_team_id:

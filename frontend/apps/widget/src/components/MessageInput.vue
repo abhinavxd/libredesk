@@ -171,6 +171,16 @@ const sendMessage = async () => {
   }
 }
 
+// sendQuickReply lets a caller (e.g. a guided-form choice button) send a message through the
+// exact same path as typing it and hitting send.
+const sendQuickReply = (text) => {
+  if (!text || isSending.value) return
+  newMessage.value = text
+  sendMessage()
+}
+
+defineExpose({ sendQuickReply })
+
 // Handle typing events
 const handleTyping = () => {
   startTyping()

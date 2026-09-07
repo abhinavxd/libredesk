@@ -13,13 +13,22 @@
     />
 
     <!-- Messages container (when no pre-chat form) -->
-    <ChatMessages v-else ref="chatMessages" :showPreChatForm="showPreChatForm" />
+    <ChatMessages
+      v-else
+      ref="chatMessages"
+      :showPreChatForm="showPreChatForm"
+      @quick-reply="handleQuickReply"
+    />
 
     <!-- Error display -->
     <WidgetError :errorMessage="errorMessage" />
 
     <!-- Message input (only when pre-chat form is not shown) -->
-    <MessageInput v-if="!showPreChatForm && !isConversationClosed" @error="handleError" />
+    <MessageInput
+      v-if="!showPreChatForm && !isConversationClosed"
+      ref="messageInput"
+      @error="handleError"
+    />
 
     <!-- Closed conversation notice -->
     <div v-if="isConversationClosed" class="border-t p-4 text-center text-sm text-muted-foreground">
@@ -48,6 +57,12 @@ const errorMessage = ref('')
 const preChatFormSubmitted = ref(false)
 const isInitializing = ref(false)
 const config = computed(() => widgetStore.config)
+const messageInput = ref(null)
+
+// Forwards a guided-form choice button click to the same send path as typed messages.
+const handleQuickReply = (text) => {
+  messageInput.value?.sendQuickReply(text)
+}
 
 // Determine if pre-chat form should be shown
 const showPreChatForm = computed(() => {
