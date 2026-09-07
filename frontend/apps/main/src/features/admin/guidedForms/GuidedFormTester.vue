@@ -101,8 +101,7 @@ const reset = () => {
   draft.value = ''
   const first = props.steps[0]
   if (!first) return
-  currentStepId.value = first.id
-  transcript.value.push({ role: 'bot', text: questionText(first) })
+  enterStep(first)
 }
 
 // Reset whenever the draft steps change shape meaningfully, so the test never runs against a
@@ -114,13 +113,7 @@ watch(
   }
 )
 
-const questionText = (step) => {
-  let text = step.question || ''
-  if (step.type === 'choice' && step.options?.length) {
-    text += '\n\n' + step.options.join(' / ')
-  }
-  return text
-}
+const questionText = (step) => step.question || ''
 
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -175,6 +168,33 @@ const nextStepID = (step, answer) => {
   return ''
 }
 
+// enterStep mirrors internal/guidedform/handler.go's enterStep: post the question, and if it's
+// a statement ("info") step with no answer expected, immediately cascade into whatever comes
+// next (default/natural order) instead of waiting for a reply.
+const enterStep = (step) => {
+  transcript.value.push({ role: 'bot', text: questionText(step) })
+  currentStepId.value = step.id
+  if (step.type !== 'info') return
+
+  const nextID = step.default_next_step_id || (!step.ends_form && nextInOrder(step)) || ''
+  if (!nextID) {
+    ended.value = true
+    return
+  }
+  const nextStep = findStep(nextID)
+  if (!nextStep) {
+    transcript.value.push({ role: 'bot', text: t('globals.messages.somethingWentWrong') })
+    ended.value = true
+    return
+  }
+  enterStep(nextStep)
+}
+
+const nextInOrder = (step) => {
+  const index = props.steps.findIndex((s) => s.id === step.id)
+  return props.steps[index + 1]?.id || ''
+}
+
 const submitAnswer = (text) => {
   const answer = (text || '').trim()
   if (!answer || ended.value) return
@@ -200,7 +220,6 @@ const submitAnswer = (text) => {
     ended.value = true
     return
   }
-  currentStepId.value = nextStep.id
-  transcript.value.push({ role: 'bot', text: questionText(nextStep) })
+  enterStep(nextStep)
 }
 </script>

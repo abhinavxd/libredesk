@@ -266,6 +266,11 @@ func (m *Manager) validate(f *gmodels.Form) error {
 		if s.ID == "" || s.Question == "" {
 			return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
+		switch s.ContactField {
+		case "", gmodels.ContactFieldName, gmodels.ContactFieldEmail:
+		default:
+			return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
 		ids[s.ID] = true
 	}
 	if f.StartStepID == "" {

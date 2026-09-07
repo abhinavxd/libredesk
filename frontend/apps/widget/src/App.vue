@@ -134,7 +134,10 @@ const setupParentMessageListeners = () => {
       // Admin form-builder live preview: an in-progress (possibly unsaved) config pushed from
       // the parent admin page overrides the config fetched from the server, so the preview
       // reflects edits instantly while the real chat/API calls still hit the real backend.
-      widgetStore.updateConfig(event.data.config)
+      // Merged, not replaced: the pushed object is just the inbox's livechat.Config (what the
+      // admin form edits) and doesn't carry server-computed-only fields like has_guided_form,
+      // business_hours, or custom_attributes - replacing wholesale would silently drop those.
+      widgetStore.updateConfig({ ...widgetStore.config, ...event.data.config })
     }
   })
 }

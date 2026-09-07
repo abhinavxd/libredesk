@@ -34,6 +34,7 @@ import { useWidgetStore } from '../store/widget.js'
 import { useUserStore } from '@widget/store/user.js'
 import ConversationsList from '../components/ConversationsList.vue'
 import WidgetHeader from '../layouts/WidgetHeader.vue'
+import { initConversation } from '@widget/composables/useChatInit.js'
 
 const { t } = useI18n()
 const chatStore = useChatStore()
@@ -52,12 +53,26 @@ const canStartNewConversation = computed(() => {
   return userConfig?.prevent_multiple_conversations !== true || !chatStore.hasConversations
 })
 
-const startNewConversation = () => {
+const hasEnabledPrechatFields = computed(() => {
+  const cfg = widgetStore.config
+  return Boolean(cfg?.prechat_form?.enabled && cfg.prechat_form.fields?.some((f) => f.enabled))
+})
+
+const startNewConversation = async () => {
   // Clear current conversation
   chatStore.setCurrentConversation(null)
   chatStore.clearMessages()
 
   // Navigate directly to chat view
   widgetStore.navigateToChat()
+
+  // A guided form should greet/ask right away rather than waiting for a typed message.
+  if (widgetStore.config?.has_guided_form && !hasEnabledPrechatFields.value) {
+    try {
+      await initConversation({})
+    } catch {
+      // Fall through to the normal empty compose box; MessageInput surfaces a real send error.
+    }
+  }
 }
 </script>

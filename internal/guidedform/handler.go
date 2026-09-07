@@ -102,8 +102,7 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 			m.lo.Error("guided form has no valid start step", "form_id", form.ID)
 			return
 		}
-		m.askStep(conv, form, step)
-		m.saveProgress(conv, attrs, gmodels.Progress{FormID: form.ID, StepID: step.ID, Answers: map[string]any{}})
+		m.enterStep(conv, form, attrs, gmodels.Progress{FormID: form.ID, Answers: map[string]any{}}, step)
 		return
 	}
 
@@ -165,7 +164,7 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 	progress.LastMessageID = inbound.ID
 	// Mutates attrs in place for a conversation-scoped answer; a contact-scoped one is saved
 	// separately on the contact's own row, so it never touches this conversation's attributes.
-	m.applyAnswer(attrs, conv.ContactID, step, answer)
+	m.applyAnswer(attrs, conv, step, answer)
 
 	nextStepID := matchBranch(step, answer)
 	// No branch matched and no explicit default: fall through to the next step in order
@@ -187,9 +186,38 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 		return
 	}
 
-	m.askStep(conv, form, nextStep)
-	progress.StepID = nextStep.ID
-	m.saveProgress(conv, attrs, progress)
+	m.enterStep(conv, form, attrs, progress, nextStep)
+}
+
+// enterStep asks a step's question and, if it's an "info" step (a statement with no answer
+// expected), immediately cascades into whatever comes next instead of waiting for a reply -
+// following its default/natural-order target the same way a matched branch would, and ending
+// the form if it has nowhere to go. Recurses through any run of consecutive info steps.
+func (m *Manager) enterStep(conv cmodels.Conversation, form gmodels.Form, attrs map[string]any, progress gmodels.Progress, step gmodels.Step) {
+	m.askStep(conv, form, step)
+	if step.Type != gmodels.StepTypeInfo {
+		progress.StepID = step.ID
+		m.saveProgress(conv, attrs, progress)
+		return
+	}
+
+	nextStepID := step.DefaultNextStepID
+	if nextStepID == "" && !step.EndsForm {
+		if next, ok := form.NextStepInOrder(step.ID); ok {
+			nextStepID = next.ID
+		}
+	}
+	if nextStepID == "" {
+		m.complete(conv, form, attrs)
+		return
+	}
+	nextStep, ok := form.StepByID(nextStepID)
+	if !ok {
+		m.lo.Error("guided form info step points at unknown step", "form_id", form.ID, "next_step_id", nextStepID)
+		m.handoff(conv, form, attrs, m.i18n.T("globals.messages.somethingWentWrong"))
+		return
+	}
+	m.enterStep(conv, form, attrs, progress, nextStep)
 }
 
 // matchBranch returns the id of the next step for the given answer: the first branch whose
@@ -212,9 +240,8 @@ func compileBranchPattern(pattern string) (*regexp.Regexp, error) {
 }
 
 // askStep posts a step's question as an ordinary outgoing chat message from the bot identity.
-// For a choice step, the options travel in meta so the widget can render them as quick-reply
-// buttons (see guided_form_options); the question text also lists them inline as a fallback for
-// any client that doesn't render the buttons.
+// For a choice step, the options travel in meta only (guided_form_options) so a client that
+// renders them as quick-reply buttons doesn't also show them as a redundant inline list.
 func (m *Manager) askStep(conv cmodels.Conversation, form gmodels.Form, step gmodels.Step) {
 	m.postQuestion(conv, form, step, "")
 }
@@ -228,7 +255,6 @@ func (m *Manager) postQuestion(conv cmodels.Conversation, form gmodels.Form, ste
 	}
 	meta := map[string]any{"is_guided_form": true}
 	if step.Type == gmodels.StepTypeChoice && len(step.Options) > 0 {
-		question += "\n\n" + strings.Join(step.Options, " / ")
 		meta["guided_form_options"] = step.Options
 	}
 	if _, err := m.convo.QueueReply(nil, conv.InboxID, form.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(question), nil, nil, nil, meta); err != nil {
@@ -278,7 +304,11 @@ func (m *Manager) askInvalidAnswer(conv cmodels.Conversation, form gmodels.Form,
 // conversation-scoped answer is written into attrs in place (the caller persists it once,
 // alongside the progress state, to avoid two independent read-modify-writes racing on the same
 // JSONB column); a contact-scoped answer is saved directly since it lives on a different row.
-func (m *Manager) applyAnswer(attrs map[string]any, contactID int, step gmodels.Step, answer string) {
+func (m *Manager) applyAnswer(attrs map[string]any, conv cmodels.Conversation, step gmodels.Step, answer string) {
+	if step.ContactField != "" {
+		m.applyContactField(conv, step.ContactField, answer)
+		return
+	}
 	if step.CustomAttributeID == 0 {
 		return
 	}
@@ -291,9 +321,43 @@ func (m *Manager) applyAnswer(attrs map[string]any, contactID int, step gmodels.
 		attrs[attr.Key] = answer
 		return
 	}
-	if err := m.user.SaveCustomAttributes(contactID, map[string]any{attr.Key: answer}, false); err != nil {
-		m.lo.Error("error saving guided form answer to contact attributes", "contact_id", contactID, "error", err)
+	if err := m.user.SaveCustomAttributes(conv.ContactID, map[string]any{attr.Key: answer}, false); err != nil {
+		m.lo.Error("error saving guided form answer to contact attributes", "contact_id", conv.ContactID, "error", err)
 	}
+}
+
+// applyContactField saves an answer directly to a core contact field (name or email) rather
+// than a custom attribute, so a guided form can identify the visitor the same way the static
+// pre-chat form's default fields do. Preserves every other field on the contact - the update
+// query replaces the whole row, so it starts from what's already loaded on the conversation.
+func (m *Manager) applyContactField(conv cmodels.Conversation, field, answer string) {
+	c := conv.Contact
+	firstName, lastName := c.FirstName, c.LastName
+	email := c.Email.String
+	switch field {
+	case gmodels.ContactFieldName:
+		firstName, lastName = splitName(answer)
+	case gmodels.ContactFieldEmail:
+		if !stringutil.ValidEmail(answer) {
+			return
+		}
+		email = answer
+	default:
+		return
+	}
+	if err := m.user.UpdateContactBasicInfo(conv.ContactID, firstName, lastName, email, c.PhoneNumber.String, c.PhoneNumberCountryCode.String); err != nil {
+		m.lo.Error("error saving guided form answer to contact field", "contact_id", conv.ContactID, "field", field, "error", err)
+	}
+}
+
+// splitName splits a free-text name answer into first/last on the first space, so "Alex Smith"
+// becomes ("Alex", "Smith") while a single-word answer keeps the whole thing as the first name.
+func splitName(answer string) (string, string) {
+	parts := strings.SplitN(answer, " ", 2)
+	if len(parts) == 2 {
+		return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+	}
+	return answer, ""
 }
 
 // complete runs when the flow reaches a terminal step: it clears the progress marker (merging

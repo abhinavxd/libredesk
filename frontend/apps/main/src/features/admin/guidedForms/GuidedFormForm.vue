@@ -105,8 +105,13 @@
         </div>
 
         <div class="space-y-2">
-          <label class="text-sm font-medium leading-none">{{ t('admin.guidedForms.question') }}</label>
+          <label class="text-sm font-medium leading-none">
+            {{ step.type === 'info' ? t('admin.guidedForms.statementText') : t('admin.guidedForms.question') }}
+          </label>
           <Textarea v-model="step.question" rows="2" />
+          <p v-if="step.type === 'info'" class="text-xs text-muted-foreground">
+            {{ t('admin.guidedForms.statementHint') }}
+          </p>
         </div>
 
         <div v-if="step.type === 'choice'" class="space-y-2">
@@ -121,12 +126,12 @@
           <p class="text-xs text-muted-foreground">{{ t('admin.guidedForms.optionsHint') }}</p>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-2">
+        <div v-if="step.type !== 'info'" class="grid gap-4 md:grid-cols-2">
           <div class="space-y-2">
             <label class="text-sm font-medium leading-none">{{ t('admin.guidedForms.saveAsAttribute') }}</label>
             <Select
-              :modelValue="step.custom_attribute_id ? String(step.custom_attribute_id) : 'none'"
-              @update:modelValue="(v) => (step.custom_attribute_id = v === 'none' ? 0 : Number(v))"
+              :modelValue="saveTargetValue(step)"
+              @update:modelValue="(v) => setSaveTargetValue(step, v)"
             >
               <SelectTrigger>
                 <SelectValue />
@@ -134,10 +139,12 @@
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value="none">{{ t('globals.terms.none') }}</SelectItem>
+                  <SelectItem value="contact_name">{{ t('admin.guidedForms.saveTargetName') }}</SelectItem>
+                  <SelectItem value="contact_email">{{ t('admin.guidedForms.saveTargetEmail') }}</SelectItem>
                   <SelectItem
                     v-for="attr in customAttributes"
                     :key="attr.id"
-                    :value="String(attr.id)"
+                    :value="`attr_${attr.id}`"
                   >
                     {{ attr.name }}
                   </SelectItem>
@@ -158,74 +165,81 @@
           </div>
         </div>
 
-        <!-- Branching, nested visually under the question it belongs to. -->
+        <!-- Branching, nested visually under the question it belongs to. Not shown for a
+             statement step, which has no answer to branch on. -->
         <div class="border-t pt-3">
-          <div class="flex items-center justify-between">
+          <div v-if="step.type !== 'info'" class="flex items-center justify-between">
             <label class="text-sm font-medium leading-none">{{ t('admin.guidedForms.branches') }}</label>
             <Button type="button" variant="outline" size="sm" @click="addBranch(step)">
               <Plus class="mr-1 h-3 w-3" />
               {{ t('admin.guidedForms.addBranch') }}
             </Button>
           </div>
-          <p class="text-xs text-muted-foreground mt-1">{{ t('admin.guidedForms.branchesHint') }}</p>
+          <p v-if="step.type !== 'info'" class="text-xs text-muted-foreground mt-1">
+            {{ t('admin.guidedForms.branchesHint') }}
+          </p>
 
           <div class="mt-3 ml-2 pl-4 border-l-2 border-muted space-y-3">
-            <!-- Quick-add a branch per choice option, prefilled to match that option exactly. -->
-            <div v-if="step.type === 'choice' && step.options.length" class="flex flex-wrap items-center gap-2">
-              <span class="text-xs text-muted-foreground">{{ t('admin.guidedForms.quickAddBranch') }}</span>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                class="h-6 px-2 text-xs"
-                v-for="option in step.options"
-                :key="option"
-                @click="addBranchFromOption(step, option)"
-              >
-                <Plus class="mr-1 h-3 w-3" />
-                {{ option }}
-              </Button>
-            </div>
+            <template v-if="step.type !== 'info'">
+              <!-- Quick-add a branch per choice option, prefilled to match that option exactly. -->
+              <div v-if="step.type === 'choice' && step.options.length" class="flex flex-wrap items-center gap-2">
+                <span class="text-xs text-muted-foreground">{{ t('admin.guidedForms.quickAddBranch') }}</span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="h-6 px-2 text-xs"
+                  v-for="option in step.options"
+                  :key="option"
+                  @click="addBranchFromOption(step, option)"
+                >
+                  <Plus class="mr-1 h-3 w-3" />
+                  {{ option }}
+                </Button>
+              </div>
 
-            <div
-              v-for="(branch, bIndex) in step.branches"
-              :key="bIndex"
-              class="flex items-center gap-2"
-            >
-              <Input
-                v-model="branch.pattern"
-                class="flex-1"
-                :placeholder="t('admin.guidedForms.branchPatternPlaceholder')"
-              />
-              <span class="text-xs text-muted-foreground shrink-0">{{ t('admin.guidedForms.goesTo') }}</span>
-              <Select v-model="branch.next_step_id">
-                <SelectTrigger class="w-40">
-                  <SelectValue :placeholder="t('admin.guidedForms.pickStep')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem v-for="s in otherSteps(step)" :key="s.id" :value="s.id">
-                      {{ s.id || t('admin.guidedForms.untitledStep') }}
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8 shrink-0"
-                @click="step.branches.splice(bIndex, 1)"
+              <div
+                v-for="(branch, bIndex) in step.branches"
+                :key="bIndex"
+                class="flex items-center gap-2"
               >
-                <X class="h-4 w-4" />
-              </Button>
-            </div>
-            <p v-if="!step.branches.length" class="text-xs text-muted-foreground italic">
-              {{ t('admin.guidedForms.noBranches') }}
-            </p>
+                <Input
+                  v-model="branch.pattern"
+                  class="flex-1"
+                  :placeholder="t('admin.guidedForms.branchPatternPlaceholder')"
+                />
+                <span class="text-xs text-muted-foreground shrink-0">{{ t('admin.guidedForms.goesTo') }}</span>
+                <Select v-model="branch.next_step_id">
+                  <SelectTrigger class="w-40">
+                    <SelectValue :placeholder="t('admin.guidedForms.pickStep')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem v-for="s in otherSteps(step)" :key="s.id" :value="s.id">
+                        {{ s.id || t('admin.guidedForms.untitledStep') }}
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8 shrink-0"
+                  @click="step.branches.splice(bIndex, 1)"
+                >
+                  <X class="h-4 w-4" />
+                </Button>
+              </div>
+              <p v-if="!step.branches.length" class="text-xs text-muted-foreground italic">
+                {{ t('admin.guidedForms.noBranches') }}
+              </p>
+            </template>
 
             <div class="flex items-center gap-2 pt-1">
-              <span class="text-xs text-muted-foreground shrink-0">{{ t('admin.guidedForms.otherwiseGoesTo') }}</span>
+              <span class="text-xs text-muted-foreground shrink-0">
+                {{ step.type === 'info' ? t('admin.guidedForms.thenGoesTo') : t('admin.guidedForms.otherwiseGoesTo') }}
+              </span>
               <Select
                 :modelValue="otherwiseValue(step)"
                 @update:modelValue="(v) => setOtherwiseValue(step, v)"
@@ -406,7 +420,7 @@ import { useAIAssistantStore } from '@/stores/aiAssistant'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 
-const stepTypes = ['text', 'choice', 'email', 'phone', 'number']
+const stepTypes = ['text', 'choice', 'email', 'phone', 'number', 'info']
 
 const props = defineProps({
   initialValues: { type: Object, default: () => ({}) },
@@ -433,6 +447,7 @@ const newStep = () => ({
   type: 'text',
   options: [],
   custom_attribute_id: 0,
+  contact_field: '',
   required: false,
   branches: [],
   default_next_step_id: '',
@@ -482,6 +497,27 @@ const setOtherwiseValue = (step, value) => {
   } else {
     step.ends_form = false
     step.default_next_step_id = value
+  }
+}
+
+// saveTargetValue/setSaveTargetValue collapse contact_field + custom_attribute_id into the
+// single "save answer to" select: none, a core contact field, or a custom attribute.
+const saveTargetValue = (step) => {
+  if (step.contact_field === 'name') return 'contact_name'
+  if (step.contact_field === 'email') return 'contact_email'
+  if (step.custom_attribute_id) return `attr_${step.custom_attribute_id}`
+  return 'none'
+}
+
+const setSaveTargetValue = (step, value) => {
+  step.contact_field = ''
+  step.custom_attribute_id = 0
+  if (value === 'contact_name') {
+    step.contact_field = 'name'
+  } else if (value === 'contact_email') {
+    step.contact_field = 'email'
+  } else if (value.startsWith('attr_')) {
+    step.custom_attribute_id = Number(value.slice(5))
   }
 }
 
@@ -539,6 +575,7 @@ watch(
       type: s.type || 'text',
       options: [...(s.options || [])],
       custom_attribute_id: s.custom_attribute_id || 0,
+      contact_field: s.contact_field || '',
       required: !!s.required,
       branches: (s.branches || []).map((b) => ({ pattern: b.pattern || '', next_step_id: b.next_step_id || '' })),
       default_next_step_id: s.default_next_step_id || '',
@@ -602,6 +639,7 @@ const onSubmit = form.handleSubmit(async (values) => {
         options: s.type === 'choice' ? s.options : [],
         save_as: s.id.trim(),
         custom_attribute_id: s.custom_attribute_id || 0,
+        contact_field: s.contact_field || '',
         required: !!s.required,
         branches: s.branches.filter((b) => b.pattern.trim() && b.next_step_id),
         default_next_step_id: s.default_next_step_id || '',

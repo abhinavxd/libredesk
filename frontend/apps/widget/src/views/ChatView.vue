@@ -54,7 +54,8 @@ import { useWidgetStore } from '../store/widget.js'
 import { useUserStore } from '../store/user.js'
 import { useChatStore } from '../store/chat.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api, { saveSession } from '@widget/api/index.js'
+import api from '@widget/api/index.js'
+import { initConversation } from '@widget/composables/useChatInit.js'
 import WidgetError from '@widget/components/WidgetError.vue'
 import ChatHeader from '@widget/components/ChatHeader.vue'
 import ChatMessages from '@widget/components/ChatMessages.vue'
@@ -134,10 +135,11 @@ const handleError = (message) => {
   }
 }
 
-// Handle pre-chat form submission - init chat with form data and message
+// Handle pre-chat form submission - init chat with form data and message.
 const handlePreChatFormSubmit = async ({ formData, message }) => {
-  // Auto-submit with no message (e.g., all fields excluded) - just skip to chat
-  if (!message) {
+  // No message and nothing to proactively start a conversation with (no guided form) - just
+  // skip to an empty chat and wait for the visitor to type.
+  if (!message && !config.value?.has_guided_form) {
     preChatFormSubmitted.value = true
     return
   }
@@ -146,27 +148,13 @@ const handlePreChatFormSubmit = async ({ formData, message }) => {
   errorMessage.value = ''
 
   try {
-    const payload = {
-      message: message
-    }
-
+    const payload = {}
+    if (message) payload.message = message
     if (Object.keys(formData).length > 0) {
       payload.form_data = formData
     }
 
-    const resp = await api.initChatConversation(payload)
-    const { conversation, session_token, user, messages, business_hours_id, working_hours_utc_offset } = resp.data.data
-    conversation.business_hours_id = business_hours_id
-    conversation.working_hours_utc_offset = working_hours_utc_offset
-
-    if (!userStore.userSessionToken && session_token) {
-      saveSession(session_token, user, userStore, true)
-    }
-
-    chatStore.addConversationToList(conversation)
-    chatStore.setCurrentConversation(conversation)
-    chatStore.replaceMessages(messages)
-
+    await initConversation(payload)
     preChatFormSubmitted.value = true
   } catch (error) {
     errorMessage.value = handleHTTPError(error).message

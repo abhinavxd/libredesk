@@ -101,6 +101,9 @@ type chatSettingsResponse struct {
 	DefaultBusinessHoursID int                           `json:"default_business_hours_id,omitempty"`
 	WorkingHoursUTCOffset  *int                          `json:"working_hours_utc_offset,omitempty"`
 	CustomAttributes       map[int]customAttributeWidget `json:"custom_attributes,omitempty"`
+	// HasGuidedForm tells the widget it can start a conversation proactively (no message
+	// required) so the guided form's bot can ask its first question immediately.
+	HasGuidedForm bool `json:"has_guided_form"`
 }
 
 // conversationResponseWithBusinessHours includes business hours info for the widget
@@ -135,6 +138,12 @@ func handleGetChatSettings(r *fastglue.Request) error {
 
 	response := chatSettingsResponse{
 		Config: config,
+	}
+
+	if inbox, ierr := getWidgetInbox(r); ierr == nil {
+		if form, ferr := app.guidedForm.GetFormByInboxID(inbox.ID); ferr == nil && form.Enabled {
+			response.HasGuidedForm = true
+		}
 	}
 
 	// Get business hours data if office hours feature is enabled.
@@ -198,9 +207,9 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
-	if req.Message == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
-	}
+	// An empty message is allowed: the widget uses it to start a conversation proactively (e.g.
+	// so a guided form's bot can ask its first question immediately) without the visitor having
+	// typed anything yet.
 	if len(req.Message) > maxChatMessageLength {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
 	}
@@ -266,27 +275,32 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 	}
 
-	message := cmodels.Message{
-		ConversationUUID: conversationUUID,
-		SenderID:         contactID,
-		Type:             cmodels.MessageIncoming,
-		SenderType:       cmodels.SenderTypeContact,
-		Status:           cmodels.MessageStatusReceived,
-		Content:          req.Message,
-		ContentType:      cmodels.ContentTypeText,
-		Private:          false,
-	}
-	if err := app.conversation.InsertMessage(&message); err != nil {
-		// Clean up conversation if message insert fails.
-		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
-			app.lo.Error("error deleting conversation after message insert failure", "conversation_uuid", conversationUUID, "error", err)
+	// No message yet (proactive start, e.g. into a guided form) - nothing to insert, but the
+	// conversation-created hooks below and the guided-form handoff still run regardless.
+	if req.Message != "" {
+		message := cmodels.Message{
+			ConversationUUID: conversationUUID,
+			SenderID:         contactID,
+			Type:             cmodels.MessageIncoming,
+			SenderType:       cmodels.SenderTypeContact,
+			Status:           cmodels.MessageStatusReceived,
+			Content:          req.Message,
+			ContentType:      cmodels.ContentTypeText,
+			Private:          false,
+		}
+		if err := app.conversation.InsertMessage(&message); err != nil {
+			// Clean up conversation if message insert fails.
+			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
+				app.lo.Error("error deleting conversation after message insert failure", "conversation_uuid", conversationUUID, "error", err)
+				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+			}
+			app.lo.Error("error inserting initial message", "conversation_uuid", conversationUUID, "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 		}
-		app.lo.Error("error inserting initial message", "conversation_uuid", conversationUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 	}
 
-	// Process post-message hooks for the new conversation and initial message.
+	// Process post-message/conversation-created hooks (webhooks, automation rules) regardless
+	// of whether there was an initial message.
 	if err := app.conversation.ProcessIncomingMessageHooks(conversationUUID, true); err != nil {
 		app.lo.Error("error processing incoming message hooks for initial message", "conversation_uuid", conversationUUID, "error", err)
 	}

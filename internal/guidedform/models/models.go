@@ -28,6 +28,15 @@ const (
 	StepTypeEmail  = "email"
 	StepTypePhone  = "phone"
 	StepTypeNumber = "number"
+	StepTypeInfo   = "info"
+)
+
+// ContactField values a step's answer can be linked to directly, instead of (or in addition to
+// being unavailable alongside) a custom attribute. These are the same core fields the static
+// pre-chat form's default fields set.
+const (
+	ContactFieldName  = "name"
+	ContactFieldEmail = "email"
 )
 
 // Branch matches an answer against a pattern and, if it matches, sends the flow to NextStepID.
@@ -51,7 +60,11 @@ type Step struct {
 	Options           []string `json:"options,omitempty"`
 	SaveAs            string   `json:"save_as,omitempty"`
 	CustomAttributeID int      `json:"custom_attribute_id,omitempty"`
-	Required          bool     `json:"required"`
+	// ContactField, when set, saves the answer directly to that core contact field (see the
+	// ContactField* constants) instead of a custom attribute. Takes precedence over
+	// CustomAttributeID when both are somehow set.
+	ContactField string `json:"contact_field,omitempty"`
+	Required     bool   `json:"required"`
 	Branches          []Branch `json:"branches,omitempty"`
 	DefaultNextStepID string   `json:"default_next_step_id,omitempty"`
 	// EndsForm explicitly ends the flow here when no branch matches, instead of falling

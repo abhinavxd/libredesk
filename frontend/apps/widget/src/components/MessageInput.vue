@@ -59,7 +59,8 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { sendWidgetTyping } from '../websocket.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageInputActions from './MessageInputActions.vue'
-import api, { saveSession } from '@widget/api/index.js'
+import api from '@widget/api/index.js'
+import { initConversation } from '@widget/composables/useChatInit.js'
 
 const emit = defineEmits(['error'])
 const widgetStore = useWidgetStore()
@@ -90,21 +91,7 @@ const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
 })
 
 const initChatConversation = async (messageText) => {
-  const resp = await api.initChatConversation({ message: messageText })
-  const { conversation, session_token, user, messages, business_hours_id, working_hours_utc_offset } = resp.data.data
-  conversation.business_hours_id = business_hours_id
-  conversation.working_hours_utc_offset = working_hours_utc_offset
-
-  if (!userStore.userSessionToken && session_token) {
-    saveSession(session_token, user, userStore, true)
-  }
-
-  // Add the new conversation to the list
-  chatStore.addConversationToList(conversation)
-
-  // Update chat store with new conversation and messages.
-  chatStore.setCurrentConversation(conversation)
-  chatStore.replaceMessages(messages)
+  await initConversation({ message: messageText })
 }
 
 const sendMessageToConversation = async (messageText, tempMessageID) => {

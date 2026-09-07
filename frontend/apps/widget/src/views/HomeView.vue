@@ -42,6 +42,7 @@ import HomeHeader from '@widget/components/HomeHeader.vue'
 import HomeExternalLink from '@widget/components/HomeExternalLink.vue'
 import AnnouncementCard from '@widget/components/AnnouncementCard.vue'
 import RecentConversationCard from '@widget/components/RecentConversationCard.vue'
+import { initConversation } from '@widget/composables/useChatInit.js'
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
@@ -70,8 +71,22 @@ const startButtonText = computed(() => {
     : config.value.users?.start_conversation_button_text || t('globals.messages.sendUsMessage')
 })
 
-const startConversation = () => {
+// A guided form's whole point is to greet/ask right away, so when one is configured and there's
+// no pre-chat form in the way, start the conversation immediately instead of waiting for the
+// visitor to type first.
+const hasEnabledPrechatFields = computed(() =>
+  Boolean(config.value?.prechat_form?.enabled && config.value.prechat_form.fields?.some((f) => f.enabled))
+)
+
+const startConversation = async () => {
   chatStore.setCurrentConversation(null)
   widgetStore.navigateToChat()
+  if (config.value?.has_guided_form && !hasEnabledPrechatFields.value) {
+    try {
+      await initConversation({})
+    } catch {
+      // Fall through to the normal empty compose box; MessageInput surfaces a real send error.
+    }
+  }
 }
 </script>
