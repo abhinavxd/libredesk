@@ -138,6 +138,7 @@ import { nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { handleHTTPError } from '@shared-ui/utils/http'
+import { downloadBlobResponse } from '@shared-ui/utils/file'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
@@ -192,15 +193,20 @@ const submit = async () => {
     error.value = t('validation.passwordCannotBeEmpty')
     return
   }
-  if (
-    (stage.value === 'scan' || (action.value !== 'setup' && status.value.verification_required)) &&
-    !code.value.trim()
-  ) {
-    error.value = t('twoFactor.enterCode')
-    return
-  }
   busy.value = true
   try {
+    if (action.value !== 'setup') {
+      status.value = (await api.getTwoFactor()).data.data
+    }
+    if (
+      (stage.value === 'scan' || (action.value !== 'setup' && status.value.verification_required)) &&
+      !code.value.trim()
+    ) {
+      error.value = t('twoFactor.enterCode')
+      await nextTick()
+      document.getElementById('security-code')?.focus()
+      return
+    }
     const data = { password: password.value, code: code.value.trim() }
     if (action.value === 'setup' && stage.value === 'password') {
       setup.value = (await api.setupTwoFactor(data)).data.data
@@ -211,7 +217,11 @@ const submit = async () => {
     }
     if (action.value === 'disable') {
       await api.disableTwoFactor(data)
-      status.value = { enabled: false, recovery_codes_remaining: 0 }
+      status.value = {
+        enabled: false,
+        recovery_codes_remaining: 0,
+        verification_required: status.value.verification_required
+      }
       reset()
       return
     }
@@ -248,11 +258,6 @@ const submit = async () => {
 
 const downloadCodes = () => {
   const blob = new Blob([recoveryCodes.value.join('\n') + '\n'], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'libredesk-recovery-codes.txt'
-  link.click()
-  URL.revokeObjectURL(url)
+  downloadBlobResponse({ data: blob }, 'libredesk-recovery-codes.txt')
 }
 </script>
