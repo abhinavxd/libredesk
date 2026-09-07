@@ -869,6 +869,7 @@ CREATE TABLE guided_forms (
 );
 CREATE INDEX index_guided_forms_on_user_id ON guided_forms(user_id);
 CREATE INDEX index_guided_forms_on_inbox_id ON guided_forms(inbox_id);
+CREATE UNIQUE INDEX index_unique_guided_forms_on_inbox_when_enabled ON guided_forms(inbox_id) WHERE enabled = true;
 
 DROP TABLE IF EXISTS guided_form_events CASCADE;
 CREATE TABLE guided_form_events (

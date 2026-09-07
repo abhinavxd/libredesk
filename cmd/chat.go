@@ -577,6 +577,25 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	return sendChatMessageResponse(app, r, message.UUID)
 }
 
+// handleSkipGuidedForm lets a visitor bail out of an in-progress guided form and reach a human
+// directly, instead of being stuck answering questions until something matches.
+func handleSkipGuidedForm(r *fastglue.Request) error {
+	var (
+		app              = r.Context.(*App)
+		conversationUUID = r.RequestCtx.UserValue("uuid").(string)
+	)
+
+	_, conversation, err := getContactConversation(r, conversationUUID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if err := app.guidedForm.SkipToHuman(conversation.ID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
 // handleWidgetMediaUpload handles media uploads for the widget.
 func handleWidgetMediaUpload(r *fastglue.Request) error {
 	app := r.Context.(*App)

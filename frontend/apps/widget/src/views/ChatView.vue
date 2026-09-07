@@ -23,6 +23,17 @@
     <!-- Error display -->
     <WidgetError :errorMessage="errorMessage" />
 
+    <!-- Escape hatch out of an in-progress guided form -->
+    <div v-if="isInGuidedForm" class="px-4 py-1.5 border-t">
+      <button
+        type="button"
+        class="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+        @click="skipGuidedForm"
+      >
+        {{ $t('widget.talkToHuman') }}
+      </button>
+    </div>
+
     <!-- Message input (only when pre-chat form is not shown) -->
     <MessageInput
       v-if="!showPreChatForm && !isConversationClosed"
@@ -62,6 +73,19 @@ const messageInput = ref(null)
 // Forwards a guided-form choice button click to the same send path as typed messages.
 const handleQuickReply = (text) => {
   messageInput.value?.sendQuickReply(text)
+}
+
+// Lets a visitor bail out of an in-progress guided form and reach a human directly, instead of
+// being stuck answering questions until something matches a branch.
+const isInGuidedForm = computed(() => chatStore.currentConversation?.assignee?.type === 'guided_form_bot')
+
+const skipGuidedForm = async () => {
+  if (!chatStore.currentConversation?.uuid) return
+  try {
+    await api.skipGuidedForm(chatStore.currentConversation.uuid)
+  } catch (error) {
+    errorMessage.value = handleHTTPError(error).message
+  }
 }
 
 // Determine if pre-chat form should be shown

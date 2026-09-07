@@ -36,6 +36,7 @@ type queries struct {
 	InsertForm            *sqlx.Stmt `query:"insert-form"`
 	UpdateForm            *sqlx.Stmt `query:"update-form"`
 	DeleteForm            *sqlx.Stmt `query:"delete-form"`
+	DisableOtherFormsOnInbox *sqlx.Stmt `query:"disable-other-forms-on-inbox"`
 	UnassignFormBotConvos *sqlx.Stmt `query:"unassign-form-bot-conversations"`
 	InsertGuidedFormEvent *sqlx.Stmt `query:"insert-guided-form-event"`
 }
@@ -142,6 +143,13 @@ func (m *Manager) CreateForm(f gmodels.Form) (gmodels.Form, error) {
 	}
 	defer tx.Rollback()
 
+	if f.Enabled {
+		if _, err := tx.Stmtx(m.q.DisableOtherFormsOnInbox).Exec(f.InboxID, 0); err != nil {
+			m.lo.Error("error disabling other guided forms on inbox", "inbox_id", f.InboxID, "error", err)
+			return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+	}
+
 	var userID int
 	if err := tx.Stmtx(m.q.InsertFormUser).QueryRow(f.Name).Scan(&userID); err != nil {
 		m.lo.Error("error creating guided form bot user", "error", err)
@@ -180,6 +188,13 @@ func (m *Manager) UpdateForm(id int, f gmodels.Form) (gmodels.Form, error) {
 		return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	defer tx.Rollback()
+
+	if f.Enabled {
+		if _, err := tx.Stmtx(m.q.DisableOtherFormsOnInbox).Exec(f.InboxID, id); err != nil {
+			m.lo.Error("error disabling other guided forms on inbox", "inbox_id", f.InboxID, "error", err)
+			return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+	}
 
 	if _, err := tx.Stmtx(m.q.UpdateForm).Exec(id, f.Name, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage); err != nil {
 		m.lo.Error("error updating guided form", "error", err)
@@ -272,6 +287,9 @@ func (m *Manager) validate(f *gmodels.Form) error {
 			}
 		}
 	}
+	if err := m.validateGraph(*f); err != nil {
+		return err
+	}
 	switch f.OnCompleteAction {
 	case gmodels.CompleteActionTeam:
 		if !f.OnCompleteTeamID.Valid {
@@ -288,6 +306,81 @@ func (m *Manager) validate(f *gmodels.Form) error {
 	}
 	if err := f.MarshalSteps(); err != nil {
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
+// validateGraph checks the step transition graph (branches, explicit defaults, and the
+// natural fall-through-to-next-in-order edge) for two mistakes that are easy to make by hand
+// and otherwise only surface as a broken conversation later: a step that can never be reached
+// from the start step, and a cycle that would loop forever without ever completing the form.
+func (m *Manager) validateGraph(f gmodels.Form) error {
+	edges := make(map[string][]string, len(f.Steps))
+	for i, s := range f.Steps {
+		var targets []string
+		for _, b := range s.Branches {
+			targets = append(targets, b.NextStepID)
+		}
+		if s.DefaultNextStepID != "" {
+			targets = append(targets, s.DefaultNextStepID)
+		} else if !s.EndsForm && i+1 < len(f.Steps) {
+			targets = append(targets, f.Steps[i+1].ID)
+		}
+		edges[s.ID] = targets
+	}
+
+	// Reachability: BFS from the start step over every edge.
+	reachable := map[string]bool{f.StartStepID: true}
+	queue := []string{f.StartStepID}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		for _, next := range edges[id] {
+			if !reachable[next] {
+				reachable[next] = true
+				queue = append(queue, next)
+			}
+		}
+	}
+	for _, s := range f.Steps {
+		if !reachable[s.ID] {
+			return envelope.NewError(envelope.InputError, m.i18n.Ts("admin.guidedForms.errors.unreachableStep", "step", s.ID), nil)
+		}
+	}
+
+	// Cycle detection: DFS with a recursion-stack marker, following the same edges.
+	const (
+		unvisited = 0
+		visiting  = 1
+		done      = 2
+	)
+	state := make(map[string]int, len(f.Steps))
+	var stack []string
+	var dfs func(id string) error
+	dfs = func(id string) error {
+		state[id] = visiting
+		stack = append(stack, id)
+		for _, next := range edges[id] {
+			switch state[next] {
+			case visiting:
+				loop := append(append([]string{}, stack...), next)
+				return envelope.NewError(envelope.InputError, m.i18n.Ts("admin.guidedForms.errors.cycle", "path", strings.Join(loop, " -> ")), nil)
+			case unvisited:
+				if err := dfs(next); err != nil {
+					return err
+				}
+			}
+		}
+		stack = stack[:len(stack)-1]
+		state[id] = done
+		return nil
+	}
+	for _, s := range f.Steps {
+		if state[s.ID] == unvisited {
+			if err := dfs(s.ID); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

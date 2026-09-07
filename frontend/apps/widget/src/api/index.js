@@ -137,6 +137,7 @@ const getChatConversations = () => http.get('/api/v1/widget/chat/conversations')
 const getChatConversation = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}`)
 const sendChatMessage = (uuid, data) => http.post(`/api/v1/widget/chat/conversations/${uuid}/message`, data)
 const closeChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/close`)
+const skipGuidedForm = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/guided-form/skip`)
 const uploadMedia = (conversationUUID, files) => {
     const formData = new FormData()
     formData.append('conversation_uuid', conversationUUID)
@@ -166,6 +167,7 @@ export default {
     getChatConversation,
     sendChatMessage,
     closeChatConversation,
+    skipGuidedForm,
     uploadMedia,
     updateConversationLastSeen,
     submitCSATResponse

@@ -4,6 +4,7 @@
       <FormItem>
         <SwitchField
           :title="t('globals.terms.enabled')"
+          :description="t('admin.guidedForms.enabledHint')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />
@@ -58,9 +59,16 @@
         </Button>
       </div>
 
-      <div v-for="(step, index) in steps" :key="step._key" class="border rounded-lg p-4 space-y-4">
+      <Draggable v-model="steps" item-key="_key" :animation="200" handle=".step-drag-handle" class="space-y-3">
+        <template #item="{ element: step, index }">
+      <div class="border rounded-lg p-4 space-y-4">
         <div class="flex items-center justify-between">
-          <span class="text-sm font-medium">{{ t('admin.guidedForms.step') }} {{ index + 1 }}</span>
+          <div class="flex items-center gap-2">
+            <div class="step-drag-handle cursor-move text-muted-foreground">
+              <GripVertical class="w-4 h-4" />
+            </div>
+            <span class="text-sm font-medium">{{ t('admin.guidedForms.step') }} {{ index + 1 }}</span>
+          </div>
           <Button
             type="button"
             variant="ghost"
@@ -239,6 +247,10 @@
           </div>
         </div>
       </div>
+        </template>
+      </Draggable>
+
+      <GuidedFormTester :steps="steps" />
     </div>
 
     <div class="space-y-4 border-t pt-4">
@@ -344,7 +356,9 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
-import { Plus, X } from 'lucide-vue-next'
+import { Plus, X, GripVertical } from 'lucide-vue-next'
+import Draggable from 'vuedraggable'
+import GuidedFormTester from './GuidedFormTester.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import { Textarea } from '@shared-ui/components/ui/textarea/index.js'

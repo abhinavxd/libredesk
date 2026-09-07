@@ -375,6 +375,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", rateLimit(widgetAuth(handleChatUpdateLastSeen), "widget"))
 	g.GET("/api/v1/widget/chat/conversations/{uuid}", rateLimit(widgetAuth(handleChatGetConversation), "widget"))
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", rateLimit(widgetAuth(handleChatSendMessage), "widget"))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/guided-form/skip", rateLimit(widgetAuth(handleSkipGuidedForm), "widget"))
 	g.POST("/api/v1/widget/media/upload", rateLimit(widgetAuth(handleWidgetMediaUpload), "widget"))
 
 	// getAndHead registers both methods: uptime checkers and link validators probe with HEAD.

@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	statusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
+	"github.com/abhinavxd/libredesk/internal/envelope"
 	gmodels "github.com/abhinavxd/libredesk/internal/guidedform/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -40,6 +42,29 @@ func (m *Manager) HandleConversationEvent(conversationID, assigneeUserID int) {
 		}
 	}()
 	m.handle(conversationID, assigneeUserID)
+}
+
+// SkipToHuman lets a visitor bail out of an in-progress guided form and reach a human directly,
+// instead of being stuck typing until something matches a branch. It reuses the same handoff
+// path as an error mid-flow: fall back to the form's team if set, else the unassigned queue.
+func (m *Manager) SkipToHuman(conversationID int) error {
+	conv, err := m.convo.GetConversation(conversationID, "", "")
+	if err != nil {
+		m.lo.Error("error fetching conversation for guided form skip", "conversation_id", conversationID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if !conv.AssignedUserID.Valid || !m.isFormBotUser(int(conv.AssignedUserID.Int)) {
+		// Nothing to skip - already past the guided form (or never in one). Not an error.
+		return nil
+	}
+	form, err := m.GetFormByUserID(int(conv.AssignedUserID.Int))
+	if err != nil {
+		m.lo.Error("error fetching guided form for skip", "conversation_id", conversationID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	attrs := decodeAttrs(conv.CustomAttributes)
+	m.handoff(conv, form, attrs, m.i18n.T("admin.guidedForms.skippedByVisitor"))
+	return nil
 }
 
 func (m *Manager) handle(conversationID, assigneeUserID int) {
@@ -115,6 +140,15 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 		return
 	}
 
+	// A required step must satisfy its type's format before the flow advances; an optional one
+	// accepts whatever was sent. Marks the message processed either way so it's never re-evaluated.
+	if step.Required && !validAnswerFormat(step.Type, answer) {
+		progress.LastMessageID = inbound.ID
+		m.saveProgress(conv, attrs, progress)
+		m.askInvalidAnswer(conv, form, step)
+		return
+	}
+
 	if progress.Answers == nil {
 		progress.Answers = map[string]any{}
 	}
@@ -177,7 +211,16 @@ func compileBranchPattern(pattern string) (*regexp.Regexp, error) {
 // buttons (see guided_form_options); the question text also lists them inline as a fallback for
 // any client that doesn't render the buttons.
 func (m *Manager) askStep(conv cmodels.Conversation, form gmodels.Form, step gmodels.Step) {
+	m.postQuestion(conv, form, step, "")
+}
+
+// postQuestion sends a step's question, optionally prefixed with a validation hint (used to
+// re-prompt on an invalid required answer instead of advancing).
+func (m *Manager) postQuestion(conv cmodels.Conversation, form gmodels.Form, step gmodels.Step, hint string) {
 	question := step.Question
+	if hint != "" {
+		question = hint + "\n\n" + question
+	}
 	meta := map[string]any{"is_guided_form": true}
 	if step.Type == gmodels.StepTypeChoice && len(step.Options) > 0 {
 		question += "\n\n" + strings.Join(step.Options, " / ")
@@ -186,6 +229,43 @@ func (m *Manager) askStep(conv cmodels.Conversation, form gmodels.Form, step gmo
 	if _, err := m.convo.QueueReply(nil, conv.InboxID, form.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(question), nil, nil, nil, meta); err != nil {
 		m.lo.Error("error posting guided form question", "conversation_uuid", conv.UUID, "step_id", step.ID, "error", err)
 	}
+}
+
+var phonePattern = regexp.MustCompile(`^[0-9+()\-\s]{6,20}$`)
+
+// validAnswerFormat reports whether answer satisfies step type's format. text and choice accept
+// anything non-empty (already guaranteed by the caller); email/phone/number are format-checked.
+func validAnswerFormat(stepType, answer string) bool {
+	switch stepType {
+	case gmodels.StepTypeEmail:
+		return stringutil.ValidEmail(answer)
+	case gmodels.StepTypePhone:
+		return phonePattern.MatchString(answer) && strings.ContainsAny(answer, "0123456789")
+	case gmodels.StepTypeNumber:
+		_, err := strconv.ParseFloat(strings.TrimSpace(answer), 64)
+		return err == nil
+	default:
+		return true
+	}
+}
+
+// invalidAnswerHintKey maps a step type to the i18n key for its re-prompt hint.
+func invalidAnswerHintKey(stepType string) string {
+	switch stepType {
+	case gmodels.StepTypeEmail:
+		return "admin.guidedForms.invalidEmail"
+	case gmodels.StepTypePhone:
+		return "admin.guidedForms.invalidPhone"
+	case gmodels.StepTypeNumber:
+		return "admin.guidedForms.invalidNumber"
+	default:
+		return "admin.guidedForms.invalidAnswer"
+	}
+}
+
+// askInvalidAnswer re-prompts the same step with a short validation hint instead of advancing.
+func (m *Manager) askInvalidAnswer(conv cmodels.Conversation, form gmodels.Form, step gmodels.Step) {
+	m.postQuestion(conv, form, step, m.i18n.T(invalidAnswerHintKey(step.Type)))
 }
 
 // applyAnswer records a step's answer onto the custom attribute it was configured against, so it

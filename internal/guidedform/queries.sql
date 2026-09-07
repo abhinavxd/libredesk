@@ -51,6 +51,12 @@ WHERE id = $1;
 -- name: delete-form
 DELETE FROM guided_forms WHERE id = $1;
 
+-- name: disable-other-forms-on-inbox
+-- Enforces one active form per inbox: run before enabling $2 on inbox $1 so the partial unique
+-- index on (inbox_id) WHERE enabled never conflicts.
+UPDATE guided_forms SET enabled = false, updated_at = now()
+WHERE inbox_id = $1 AND enabled = true AND id != $2;
+
 -- name: unassign-form-bot-conversations
 UPDATE conversations
 SET assigned_user_id = NULL, assigned_team_id = COALESCE($2, assigned_team_id), updated_at = now()
