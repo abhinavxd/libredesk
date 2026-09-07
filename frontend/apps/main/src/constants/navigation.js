@@ -258,6 +258,11 @@ export const accountNavItems = [
     titleKey: 'globals.terms.profile',
     href: '/account/profile',
     icon: 'CircleUser'
+  },
+  {
+    titleKey: 'globals.terms.security',
+    href: '/account/security',
+    icon: 'Shield'
   }
 ]
 
