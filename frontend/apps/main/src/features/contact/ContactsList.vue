@@ -2,10 +2,11 @@
   <div class="min-h-screen flex flex-col">
     <!-- Main Content Area -->
     <div class="flex flex-wrap gap-4 pb-4">
-      <div class="flex items-center gap-4 mb-4">
+      <div class="flex items-center gap-4 mb-4 w-full">
         <!-- Search Input -->
         <Input
           type="text"
+          class="max-w-sm"
           v-model="searchTerm"
           :placeholder="$t('contact.searchByEmail')"
           @input="fetchContactsDebounced"
@@ -48,7 +49,7 @@
         <Button
           v-if="userStore.can('contacts:write')"
           size="sm"
-          class="flex items-center h-8 gap-1"
+          class="flex items-center h-8 gap-1 ml-auto"
           @click="showCreateDialog = true"
         >
           <UserPlus size="16" />
