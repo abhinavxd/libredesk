@@ -429,20 +429,7 @@ func extractStringMap(m map[string]any, key string) map[string]string {
 }
 
 func stripCSATUUID(meta json.RawMessage) json.RawMessage {
-	if len(meta) == 0 {
-		return meta
-	}
-	var m map[string]any
-	if err := json.Unmarshal(meta, &m); err != nil {
-		return meta
-	}
-	if _, ok := m["csat_uuid"]; !ok {
-		return meta
-	}
-	delete(m, "csat_uuid")
-	stripped, err := json.Marshal(m)
-	if err != nil {
-		return meta
-	}
-	return stripped
+	message := models.Message{Meta: meta}
+	message.StripCSATUUID()
+	return message.Meta
 }

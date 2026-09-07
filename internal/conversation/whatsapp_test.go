@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
 	"github.com/knadh/go-i18n"
 	"github.com/volatiletech/null/v9"
@@ -237,6 +239,49 @@ func TestExtractStringMap(t *testing.T) {
 			t.Fatalf("expected nil for a missing key, got %+v", got)
 		}
 	})
+}
+
+func TestCSATTokensHiddenFromAgentResponses(t *testing.T) {
+	tests := []struct {
+		name string
+		meta string
+		want string
+	}{
+		{"all copies", `{"is_csat":true,"csat_uuid":"secret","whatsapp_template_params":{"button_url_0":"secret","body:name":"Alex"},"whatsapp":{"template_params":{"button_url_0":"secret"},"template_name":"survey"}}`, `{"is_csat":true,"whatsapp_template_params":{"body:name":"Alex"},"whatsapp":{"template_params":{},"template_name":"survey"}}`},
+		{"nested copies only", `{"is_csat":true,"whatsapp_template_params":{"button_url_0":"secret"},"whatsapp":{"template_params":{"button_url_0":"secret"}}}`, `{"is_csat":true,"whatsapp_template_params":{},"whatsapp":{"template_params":{}}}`},
+		{"token without flag", `{"csat_uuid":"secret","whatsapp_template_params":{"button_url_0":"secret"}}`, `{"whatsapp_template_params":{}}`},
+		{"ordinary template", `{"is_csat":false,"whatsapp_template_params":{"button_url_0":"order-123"},"whatsapp":{"template_params":{"button_url_0":"order-123"}}}`, `{"is_csat":false,"whatsapp_template_params":{"button_url_0":"order-123"},"whatsapp":{"template_params":{"button_url_0":"order-123"}}}`},
+		{"null maps", `{"is_csat":true,"csat_uuid":"secret","whatsapp_template_params":null,"whatsapp":{"template_params":null}}`, `{"is_csat":true,"whatsapp_template_params":null,"whatsapp":{"template_params":null}}`},
+	}
+	for _, tt := range tests {
+		for name, redact := range map[string]func(json.RawMessage) json.RawMessage{
+			"HTTP": func(meta json.RawMessage) json.RawMessage {
+				msg := models.Message{Meta: meta}
+				msg.StripCSATUUID()
+				return msg.Meta
+			},
+			"WebSocket": stripCSATUUID,
+		} {
+			t.Run(tt.name+"/"+name, func(t *testing.T) {
+				original := json.RawMessage(tt.meta)
+				got := redact(original)
+				var want any
+				if err := json.Unmarshal([]byte(tt.want), &want); err != nil {
+					t.Fatal(err)
+				}
+				var result any
+				if err := json.Unmarshal(got, &result); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(result, want) {
+					t.Fatalf("got %s, want %s", got, tt.want)
+				}
+				if string(original) != tt.meta {
+					t.Fatal("redaction mutated the stored metadata")
+				}
+			})
+		}
+	}
 }
 
 func TestStripCSATUUID(t *testing.T) {

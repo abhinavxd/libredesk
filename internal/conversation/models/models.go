@@ -433,14 +433,25 @@ func (m *Message) CensorCSATContentWithStatus(csatSubmitted bool, csatUUID strin
 	}
 }
 
-// StripCSATUUID removes the csat_uuid from the message meta.
-// Used to hide CSAT links from agent sessions while keeping them for API key callers.
 func (m *Message) StripCSATUUID() {
 	var meta map[string]any
-	if err := json.Unmarshal([]byte(m.Meta), &meta); err != nil {
+	if err := json.Unmarshal(m.Meta, &meta); err != nil {
+		return
+	}
+	isCSAT, _ := meta["is_csat"].(bool)
+	_, hasUUID := meta["csat_uuid"]
+	if !isCSAT && !hasUUID {
 		return
 	}
 	delete(meta, "csat_uuid")
+	if params, ok := meta["whatsapp_template_params"].(map[string]any); ok {
+		delete(params, "button_url_0")
+	}
+	if whatsapp, ok := meta["whatsapp"].(map[string]any); ok {
+		if params, ok := whatsapp["template_params"].(map[string]any); ok {
+			delete(params, "button_url_0")
+		}
+	}
 	if updatedMeta, err := json.Marshal(meta); err == nil {
 		m.Meta = json.RawMessage(updatedMeta)
 	}

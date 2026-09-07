@@ -953,6 +953,16 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	// Team assignment clears the assigned agent.
+	if createdNew {
+		if req.AssignedTeamID > 0 {
+			app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
+		}
+		if req.AssignedAgentID > 0 {
+			app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
+		}
+	}
+
 	// WhatsApp is always an agent-initiated template; email follows the initiator.
 	agentInitiated := true
 	var sendErr error
@@ -984,16 +994,6 @@ func handleCreateConversation(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, sendErr)
 		}
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
-	}
-
-	// Don't reassign a reused conversation; team first as it clears the agent.
-	if createdNew {
-		if req.AssignedTeamID > 0 {
-			app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
-		}
-		if req.AssignedAgentID > 0 {
-			app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
-		}
 	}
 
 	// Contact-initiated conversations get this event from the incoming message hooks.
