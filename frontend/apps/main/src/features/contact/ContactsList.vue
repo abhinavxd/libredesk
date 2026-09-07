@@ -45,7 +45,6 @@
           </PopoverContent>
         </Popover>
 
-        <!-- Create Contact Button -->
         <Button
           v-if="userStore.can('contacts:write')"
           size="sm"
@@ -53,7 +52,7 @@
           @click="showCreateDialog = true"
         >
           <UserPlus size="16" />
-          {{ $t('contact.newContact') }}
+          {{ $t('contact.new') }}
         </Button>
       </div>
 

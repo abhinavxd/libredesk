@@ -2,12 +2,12 @@
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
     <DialogContent class="sm:max-w-2xl">
       <DialogHeader>
-        <DialogTitle>{{ t('contact.newContact') }}</DialogTitle>
+        <DialogTitle>{{ t('contact.new') }}</DialogTitle>
       </DialogHeader>
       <ContactForm
         :formLoading="loading"
         :onSubmit="onSubmit"
-        :submitLabel="t('contact.createContact')"
+        :submitLabel="t('globals.messages.create')"
       />
     </DialogContent>
   </Dialog>
@@ -54,7 +54,7 @@ const onSubmit = form.handleSubmit(async (values) => {
   loading.value = true
   try {
     const { data } = await api.createContact(values)
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('contact.createdSuccessfully') })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('globals.messages.savedSuccessfully') })
     emit('update:open', false)
     emit('created', data.data)
   } catch (err) {

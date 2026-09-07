@@ -25,7 +25,6 @@ type blockContactReq struct {
 	Enabled bool `json:"enabled"`
 }
 
-// handleCreateContact creates a new contact.
 func handleCreateContact(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 
@@ -316,7 +315,6 @@ func handleBlockContact(r *fastglue.Request) error {
 	return r.SendEnvelope(contact)
 }
 
-// contactFromForm parses and validates the multipart contact form shared by create and update.
 func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) {
 	var app = r.Context.(*App)
 
@@ -331,7 +329,7 @@ func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) 
 		if vals := form.Value[key]; len(vals) > 0 {
 			v = strings.TrimSpace(vals[0])
 		}
-		// Browsers serialise a null field as the string "null".
+		// The edit page sends cleared fields as the string "null".
 		if v == "null" {
 			return ""
 		}
