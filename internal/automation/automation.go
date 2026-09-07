@@ -36,13 +36,16 @@ const (
 	NewConversation    TaskType = "new"
 	UpdateConversation TaskType = "update"
 	TimeTrigger        TaskType = "time-trigger"
+
+	timeTriggerBatchSize = 1000
 )
 
 // ConversationTask represents a unit of work for processing conversations.
 type ConversationTask struct {
-	taskType     TaskType
-	eventType    string
-	conversation cmodels.Conversation
+	taskType       TaskType
+	eventType      string
+	conversation   cmodels.Conversation
+	previousValues map[string]string
 }
 
 type Engine struct {
@@ -52,10 +55,14 @@ type Engine struct {
 	lo                *logf.Logger
 	i18n              *i18n.I18n
 	conversationStore conversationStore
+	systemUserID      int
 	taskQueue         chan ConversationTask
 	closed            bool
 	closedMu          sync.RWMutex
 	wg                sync.WaitGroup
+
+	suppressed   map[string]int
+	suppressedMu sync.Mutex
 }
 
 type Opts struct {
@@ -67,7 +74,7 @@ type Opts struct {
 type conversationStore interface {
 	ApplyAction(action models.RuleAction, conversation cmodels.Conversation, user umodels.User) error
 	GetConversation(teamID int, uuid, refNum string) (cmodels.Conversation, error)
-	GetConversationsCreatedAfter(time.Time) ([]cmodels.Conversation, error)
+	GetConversationsCreatedAfter(after time.Time, afterID, limit int) ([]cmodels.ConversationRef, error)
 }
 
 type queries struct {
@@ -103,6 +110,11 @@ func New(opt Opts) (*Engine, error) {
 // SetConversationStore sets conversations store.
 func (e *Engine) SetConversationStore(store conversationStore) {
 	e.conversationStore = store
+}
+
+// SetSystemUserID sets the system user ID used to identify events raised by automation actions.
+func (e *Engine) SetSystemUserID(id int) {
+	e.systemUserID = id
 }
 
 // ReloadRules reloads automation rules from DB.
@@ -153,7 +165,7 @@ func (e *Engine) worker(ctx context.Context) {
 			case NewConversation:
 				e.handleNewConversation(task.conversation)
 			case UpdateConversation:
-				e.handleUpdateConversation(task.conversation, task.eventType)
+				e.handleUpdateConversation(task.conversation, task.eventType, task.previousValues)
 			case TimeTrigger:
 				e.handleTimeTrigger()
 			}
@@ -292,10 +304,15 @@ func (e *Engine) EvaluateNewConversationRules(conversation cmodels.Conversation)
 	}
 }
 
-// EvaluateConversationUpdateRules enqueues a conversation for rule evaluation, this function exists along with EvaluateConversationUpdateRulesByID to reduce DB queries for fetching conversations.
-func (e *Engine) EvaluateConversationUpdateRules(conversation cmodels.Conversation, eventType string) {
+// EvaluateConversationUpdateRules enqueues a conversation for rule evaluation. previousValues carries pre-change field values for filters like previous_status.
+func (e *Engine) EvaluateConversationUpdateRules(conversation cmodels.Conversation, eventType string, previousValues map[string]string, actor umodels.User) {
 	if eventType == "" {
 		e.lo.Error("error evaluating conversation update rules: eventType is empty")
+		return
+	}
+	// Drop only the engine's own in-flight events; a concurrent agent update on a suppressed conversation must still evaluate.
+	if actor.ID == e.systemUserID && e.isSuppressed(conversation.UUID) {
+		e.lo.Debug("automation suppressed for conversation, skipping update rule evaluation", "uuid", conversation.UUID, "event_type", eventType)
 		return
 	}
 	e.closedMu.RLock()
@@ -305,25 +322,24 @@ func (e *Engine) EvaluateConversationUpdateRules(conversation cmodels.Conversati
 	}
 	select {
 	case e.taskQueue <- ConversationTask{
-		taskType:     UpdateConversation,
-		eventType:    eventType,
-		conversation: conversation,
+		taskType:       UpdateConversation,
+		eventType:      eventType,
+		conversation:   conversation,
+		previousValues: previousValues,
 	}:
 	default:
-		// Queue is full.
 		e.lo.Warn("EvaluateConversationUpdateRules: updateConversationQ is full, unable to enqueue conversation")
 	}
 }
 
-// EvaluateConversationUpdateRulesByID fetches conversation by ID and enqueues for rule evaluation,
-// This function is useful when callers want to fresh fetch the conversation from the database instead of passing it directly as they might have a stale copy.
-func (e *Engine) EvaluateConversationUpdateRulesByID(conversationID int, conversationUUID, eventType string) {
+// EvaluateConversationUpdateRulesByID fetches conversation by ID and enqueues for rule evaluation; it has no pre-change snapshot, so previous_* filters never match.
+func (e *Engine) EvaluateConversationUpdateRulesByID(conversationID int, conversationUUID, eventType string, actor umodels.User) {
 	conversation, err := e.conversationStore.GetConversation(conversationID, conversationUUID, "")
 	if err != nil {
 		e.lo.Error("error fetching conversation", "conversation_id", conversationID, "error", err)
 		return
 	}
-	e.EvaluateConversationUpdateRules(conversation, eventType)
+	e.EvaluateConversationUpdateRules(conversation, eventType, nil, actor)
 }
 
 // handleNewConversation handles new conversation events.
@@ -334,44 +350,86 @@ func (e *Engine) handleNewConversation(conversation cmodels.Conversation) {
 		e.lo.Info("no rules to evaluate for new conversation rule evaluation", "uuid", conversation.UUID)
 		return
 	}
-	e.evalConversationRules(rules, conversation)
+	e.evalConversationRules(rules, conversation, nil)
 }
 
 // handleUpdateConversation handles update conversation events with specific eventType.
-func (e *Engine) handleUpdateConversation(conversation cmodels.Conversation, eventType string) {
+func (e *Engine) handleUpdateConversation(conversation cmodels.Conversation, eventType string, previousValues map[string]string) {
 	e.lo.Debug("handling update conversation for automation rule evaluation", "uuid", conversation.UUID, "event_type", eventType)
 	rules := e.filterRulesByType(models.RuleTypeConversationUpdate, eventType)
 	if len(rules) == 0 {
 		e.lo.Info("no rules to evaluate for conversation update", "uuid", conversation.UUID, "event_type", eventType)
 		return
 	}
-	e.evalConversationRules(rules, conversation)
+	e.evalConversationRules(rules, conversation, previousValues)
 }
 
 // handleTimeTrigger handles time trigger events.
 func (e *Engine) handleTimeTrigger() {
-	e.lo.Info("running time trigger evaluation for automation rules")
-	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
-	conversations, err := e.conversationStore.GetConversationsCreatedAfter(thirtyDaysAgo)
-	if err != nil {
-		e.lo.Error("error fetching conversations for time trigger", "error", err)
-		return
-	}
 	rules := e.filterRulesByType(models.RuleTypeTimeTrigger, "")
 	if len(rules) == 0 {
 		e.lo.Info("no rules to evaluate for time trigger")
 		return
 	}
-	e.lo.Info("fetched conversations for evaluating time triggers", "conversations_count", len(conversations), "rules_count", len(rules))
-	for _, c := range conversations {
-		// Fetch entire conversation.
-		conversation, err := e.conversationStore.GetConversation(0, c.UUID, "")
+	var (
+		thirtyDaysAgo = time.Now().Add(-30 * 24 * time.Hour)
+		afterID       = 0
+		total         = 0
+		batch         = 0
+	)
+	for {
+		refs, err := e.conversationStore.GetConversationsCreatedAfter(thirtyDaysAgo, afterID, timeTriggerBatchSize)
 		if err != nil {
-			e.lo.Error("error fetching conversation for time trigger", "uuid", c.UUID, "error", err)
-			continue
+			e.lo.Error("error fetching conversations for time trigger", "after_id", afterID, "batch", batch, "error", err)
+			return
 		}
-		e.evalConversationRules(rules, conversation)
+		batch++
+		e.lo.Info("fetched conversation batch for time trigger", "batch", batch, "after_id", afterID, "count", len(refs))
+		if len(refs) == 0 {
+			break
+		}
+		for _, ref := range refs {
+			conversation, err := e.conversationStore.GetConversation(0, ref.UUID, "")
+			if err != nil {
+				e.lo.Error("error fetching conversation for time trigger", "uuid", ref.UUID, "error", err)
+				continue
+			}
+			e.evalConversationRules(rules, conversation, nil)
+		}
+		afterID = refs[len(refs)-1].ID
+		total += len(refs)
+		if len(refs) < timeTriggerBatchSize {
+			break
+		}
 	}
+	e.lo.Info("evaluated conversations for time triggers", "conversations_count", total, "batches", batch, "rules_count", len(rules))
+}
+
+// suppress marks a conversation as having automation actions in flight.
+func (e *Engine) suppress(conversationUUID string) {
+	e.suppressedMu.Lock()
+	defer e.suppressedMu.Unlock()
+	if e.suppressed == nil {
+		e.suppressed = map[string]int{}
+	}
+	e.suppressed[conversationUUID]++
+}
+
+// unsuppress releases one in-flight claim on a conversation.
+func (e *Engine) unsuppress(conversationUUID string) {
+	e.suppressedMu.Lock()
+	defer e.suppressedMu.Unlock()
+	if e.suppressed[conversationUUID] <= 1 {
+		delete(e.suppressed, conversationUUID)
+		return
+	}
+	e.suppressed[conversationUUID]--
+}
+
+func (e *Engine) isSuppressed(conversationUUID string) bool {
+	e.suppressedMu.Lock()
+	defer e.suppressedMu.Unlock()
+	return e.suppressed[conversationUUID] > 0
 }
 
 // queryRules fetches automation rules from the database.

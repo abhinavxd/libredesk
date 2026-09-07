@@ -97,10 +97,10 @@
           <div class="flex items-center justify-between mb-5">
             <div class="flex items-center gap-3">
               <span
-                class="flex items-center justify-center w-8 h-8 rounded"
+                class="flex items-center justify-center w-8 h-8 rounded-md"
                 :class="{
-                  'bg-red-100/80 text-red-600': notification.type === 'breach',
-                  'bg-amber-100/80 text-amber-600': notification.type === 'warning'
+                  'bg-destructive/10 text-destructive': notification.type === 'breach',
+                  'bg-warning/10 text-warning-600': notification.type === 'warning'
                 }"
               >
                 <CircleAlert size="18" v-if="notification.type === 'warning'" />
@@ -119,6 +119,7 @@
               </div>
             </div>
             <Button
+              type="button"
               variant="ghost"
               size="xs"
               @click.prevent="removeNotification(index)"
@@ -201,13 +202,12 @@
                     {{ t('admin.sla.alertRecipients') }}
                   </FormLabel>
                   <FormControl>
-                    <SelectTag
-                      :items="
-                        usersStore.options.concat({
-                          label: t('admin.sla.assignedUser'),
-                          value: 'assigned_user'
-                        })
-                      "
+                    <SelectAgentCombobox
+                      multiple
+                      exclude-ai-assistants
+                      :prepend-items="[
+                        { label: t('admin.sla.assignedUser'), value: 'assigned_user' }
+                      ]"
                       :placeholder="t('globals.messages.startTypingToSearch')"
                       v-model="componentField.modelValue"
                       @update:modelValue="handleChange"
@@ -261,7 +261,7 @@
       <!-- Empty State -->
       <div
         v-else
-        class="flex flex-col items-center justify-center p-8 space-y-3 rounded bg-muted/30 border border-dashed"
+        class="flex flex-col items-center justify-center p-8 space-y-3 rounded-md bg-muted/30 border border-dashed"
       >
         <Bell class="w-8 h-8 text-muted-foreground" />
         <p class="text-sm text-muted-foreground">{{ t('admin.sla.noAlertsConfigured') }}</p>
@@ -291,7 +291,6 @@ import {
   Bell,
   SlidersHorizontal
 } from 'lucide-vue-next'
-import { useUsersStore } from '../../../stores/users'
 import {
   FormControl,
   FormField,
@@ -309,7 +308,7 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { useI18n } from 'vue-i18n'
-import { SelectTag } from '@shared-ui/components/ui/select'
+import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import { Input } from '@shared-ui/components/ui/input'
 
 const props = defineProps({
@@ -331,7 +330,6 @@ const props = defineProps({
   }
 })
 
-const usersStore = useUsersStore()
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
@@ -398,7 +396,8 @@ watch(
     form.setValues({
       ...newValues,
       notifications: transformedNotifications
-    })
+    }, false)
+
   },
   { immediate: true, deep: true }
 )

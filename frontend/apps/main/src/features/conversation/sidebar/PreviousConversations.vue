@@ -1,8 +1,8 @@
 <template>
   <div
     v-if="
-      conversationStore.current?.previous_conversations?.length === 0 ||
-      conversationStore.conversation?.loading
+      !conversationStore.conversation?.loading &&
+      conversationStore.current?.previous_conversations?.length === 0
     "
     class="text-center text-sm text-muted-foreground py-4"
   >
@@ -10,7 +10,7 @@
   </div>
   <div v-else class="space-y-1">
     <router-link
-      v-for="conversation in conversationStore.current.previous_conversations"
+      v-for="conversation in conversationStore.current?.previous_conversations || []"
       :key="conversation.uuid"
       :to="{
         name: 'inbox-conversation',
@@ -19,7 +19,7 @@
           type: 'assigned'
         }
       }"
-      class="block p-2 rounded hover:bg-muted"
+      class="block p-2 rounded-md hover:bg-muted"
     >
       <div class="flex flex-wrap items-start justify-between gap-1">
         <div class="flex flex-col flex-1 min-w-[120px]">

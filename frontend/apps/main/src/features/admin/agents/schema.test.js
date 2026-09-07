@@ -12,7 +12,6 @@ const validForm = {
 }
 
 describe('Form Schema', () => {
-    // Valid cases
     test('valid complete form', () => {
         expect(() => schema.parse(validForm)).not.toThrow()
     })
@@ -25,7 +24,6 @@ describe('Form Schema', () => {
         })).not.toThrow()
     })
 
-    // First name tests
     test('first_name too short', () => {
         expect(() => schema.parse({ ...validForm, first_name: 'J' })).toThrow()
     })
@@ -47,7 +45,6 @@ describe('Form Schema', () => {
         expect(() => schema.parse({ ...validForm, first_name: null })).toThrow()
     })
 
-    // Email tests
     test('invalid email format', () => {
         expect(() => schema.parse({ ...validForm, email: 'invalid' })).toThrow()
     })
@@ -69,7 +66,6 @@ describe('Form Schema', () => {
         expect(() => schema.parse(form)).toThrow()
     })
 
-    // Roles tests
     test('roles empty array', () => {
         expect(() => schema.parse({ ...validForm, roles: [] })).toThrow()
     })
@@ -83,7 +79,6 @@ describe('Form Schema', () => {
         expect(() => schema.parse({ ...validForm, roles: ['admin', 'user', 'moderator'] })).not.toThrow()
     })
 
-    // Password tests
     test('password too short', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'Pass1!' })).toThrow()
     })
@@ -128,7 +123,6 @@ describe('Form Schema', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'P'.repeat(69) + 'a1!' })).not.toThrow()
     })
 
-    // Optional fields
     test('last_name optional', () => {
         expect(() => schema.parse(validForm)).not.toThrow()
         expect(() => schema.parse({ ...validForm, last_name: 'Doe' })).not.toThrow()
@@ -159,7 +153,6 @@ describe('Form Schema', () => {
         expect(() => schema.parse({ ...validForm, teams: ['team1', 'team2'] })).not.toThrow()
     })
 
-    // Edge cases
     test('undefined values', () => {
         expect(() => schema.parse({
             first_name: undefined,
@@ -203,7 +196,6 @@ describe('Form Schema', () => {
 
 // Password regex validation tests
 describe('Password Regex Validation', () => {
-    // Lowercase tests
     test('lowercase - single letter', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'PASSWORD123!a' })).not.toThrow()
     })
@@ -220,7 +212,6 @@ describe('Password Regex Validation', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'PASSWORD123!' })).toThrow()
     })
 
-    // Uppercase tests
     test('uppercase - single letter', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'passwordA123!' })).not.toThrow()
     })
@@ -237,7 +228,6 @@ describe('Password Regex Validation', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'password123!' })).toThrow()
     })
 
-    // Digit tests
     test('digit - single number', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'Password1!' })).not.toThrow()
     })
@@ -254,7 +244,6 @@ describe('Password Regex Validation', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'Password!' })).toThrow()
     })
 
-    // Special character tests
     test('special - common symbols', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'Password123!' })).not.toThrow()
         expect(() => schema.parse({ ...validForm, new_password: 'Password123@' })).not.toThrow()
@@ -311,7 +300,6 @@ describe('Password Regex Validation', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'Password123' })).toThrow()
     })
 
-    // Combination edge cases
     test('only uppercase and special', () => {
         expect(() => schema.parse({ ...validForm, new_password: 'PASSWORD!@#$%^&*()' })).toThrow()
     })

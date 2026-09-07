@@ -94,13 +94,14 @@ type AppliedSLA struct {
 }
 
 type SLAEvent struct {
-	ID           int       `db:"id"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
-	AppliedSLAID int       `db:"applied_sla_id"`
-	SlaPolicyID  int       `db:"sla_policy_id"`
-	Type         string    `db:"type"`
-	DeadlineAt   time.Time `db:"deadline_at"`
-	MetAt        null.Time `db:"met_at"`
-	BreachedAt   null.Time `db:"breached_at"`
+	ID             int       `db:"id"`
+	CreatedAt      time.Time `db:"created_at"`
+	UpdatedAt      time.Time `db:"updated_at"`
+	AppliedSLAID   int       `db:"applied_sla_id"`
+	ConversationID int       `db:"conversation_id"`
+	SlaPolicyID    int       `db:"sla_policy_id"`
+	Type           string    `db:"type"`
+	DeadlineAt     time.Time `db:"deadline_at"`
+	MetAt          null.Time `db:"met_at"`
+	BreachedAt     null.Time `db:"breached_at"`
 }

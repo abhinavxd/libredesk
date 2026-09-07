@@ -1,0 +1,48 @@
+{{ define "docs-help-collection" }}
+{{ template "docs-header" . }}
+
+{{ template "docs-breadcrumb" (map "L" .L "Data" .Data "Current" .Data.Collection.Name) }}
+
+<header class="hcd-collection-head">
+    <div class="hc-collection-icon{{ if .Data.HelpCenter.Theme.Cards.ShowIconTile }} hc-icon-tile{{ end }}">{{ with LucideIcon .Data.Collection.Icon }}{{ . }}{{ else }}{{ LucideIcon "folder" }}{{ end }}</div>
+    <div class="hcd-collection-headings">
+        <h1>{{ .Data.Collection.Name }}</h1>
+        {{ if .Data.Collection.Description }}<p class="hcd-lead">{{ .Data.Collection.Description }}</p>{{ end }}
+    </div>
+</header>
+
+{{ if .Data.Collection.Articles }}
+{{ template "docs-article-rows" (map "Articles" .Data.Collection.Articles "Base" .Data.HelpCenter.BasePath) }}
+{{ end }}
+
+{{ range .Data.Collection.Children }}
+<section class="hcd-collection-block" aria-labelledby="hcd-col-{{ .Slug }}">
+    <h2 id="hcd-col-{{ .Slug }}"><a href="{{ $.Data.HelpCenter.BasePath }}/collections/{{ .Slug }}"><span class="hcd-block-icon">{{ with LucideIcon .Icon }}{{ . }}{{ else }}{{ LucideIcon "folder" }}{{ end }}</span>{{ .Name }}</a></h2>
+    {{ if .Description }}<p class="hcd-block-desc">{{ .Description }}</p>{{ end }}
+    {{ if .Articles }}{{ template "docs-article-rows" (map "Articles" .Articles "Base" $.Data.HelpCenter.BasePath) }}{{ end }}
+    {{ if .Children }}
+    <ul class="hcd-folder-rows">
+        {{ range .Children }}
+        <li>
+            <a href="{{ $.Data.HelpCenter.BasePath }}/collections/{{ .Slug }}">
+                <span class="hcd-folder-icon">{{ with LucideIcon .Icon }}{{ . }}{{ else }}{{ LucideIcon "folder" }}{{ end }}</span>
+                <span class="hcd-row-body">
+                    <span class="hcd-row-title">{{ .Name }}</span>
+                    {{ if .Description }}<span class="hcd-row-excerpt">{{ .Description }}</span>{{ end }}
+                </span>
+                <span class="hcd-row-count">{{ len .Articles }} {{ $.L.Tc "globals.terms.article" (len .Articles) }}</span>
+                {{ template "hc-arrow-icon" }}
+            </a>
+        </li>
+        {{ end }}
+    </ul>
+    {{ end }}
+</section>
+{{ end }}
+
+{{ if and (not .Data.Collection.Articles) (not .Data.Collection.Children) }}
+<p class="hcd-empty">{{ .L.T "helpCenter.noArticles" }}</p>
+{{ end }}
+
+{{ template "docs-footer" . }}
+{{ end }}

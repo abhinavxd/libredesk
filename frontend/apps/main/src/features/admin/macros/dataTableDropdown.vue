@@ -3,12 +3,20 @@
     <DropdownMenuTrigger as-child>
       <Button variant="ghost" class="w-8 h-8 p-0">
         <span class="sr-only"></span>
-        <MoreHorizontal class="w-4 h-4" />
+        <MoreVertical class="w-4 h-4" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>
-      <DropdownMenuItem @click="editMacro">{{ $t('globals.messages.edit') }}</DropdownMenuItem>
-      <DropdownMenuItem @click="() => (isDeleteOpen = true)">
+      <DropdownMenuItem @click="editMacro">
+        <Pencil class="mr-2 h-4 w-4" />
+        {{ $t('globals.messages.edit') }}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        @click="() => (isDeleteOpen = true)"
+        class="text-destructive focus:text-destructive"
+      >
+        <Trash class="mr-2 h-4 w-4" />
         {{ $t('globals.messages.delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
@@ -24,7 +32,7 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="handleDelete">{{
+        <AlertDialogAction variant="destructive" @click="handleDelete">{{
           $t('globals.messages.delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
@@ -34,11 +42,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreHorizontal } from 'lucide-vue-next'
+import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
@@ -52,8 +61,8 @@ import {
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
 import { Button } from '@shared-ui/components/ui/button'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useRouter } from 'vue-router'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api/index.js'
@@ -72,9 +81,9 @@ const props = defineProps({
 
 const handleDelete = async () => {
   await api.deleteMacro(props.macro.id)
-  
-  await macroStore.loadMacros(true)
-  
+
+  macroStore.clearCache()
+
   isDeleteOpen.value = false
   emit.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'macros' })
 }

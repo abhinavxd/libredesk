@@ -1,5 +1,6 @@
 <template>
   <Button
+    type="button"
     variant="ghost"
     @click.stop="onClose"
     size="xs"

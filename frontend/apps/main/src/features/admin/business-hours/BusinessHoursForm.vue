@@ -73,7 +73,7 @@
                     :disabled="!selectedDays[day]"
                   />
                 </div>
-                <span class="text-gray-500">to</span>
+                <span class="text-muted-foreground">to</span>
                 <div class="flex flex-col items-start">
                   <Input
                     type="time"
@@ -95,7 +95,7 @@
         <div class="flex justify-between items-center mb-4">
           <div></div>
           <DialogTrigger as-child>
-            <Button @click="openHolidayForm = true">
+            <Button type="button" @click="openHolidayForm = true">
               {{
                 t('businessHour.newHoliday')
               }}
@@ -307,7 +307,10 @@ const initializeFromValues = (values) => {
 
   // Set hours and selected days
   if (values.hours && typeof values.hours === 'object') {
-    hours.value = { ...values.hours }
+    // Copy each day: mutating a shared day object retriggers the watcher and resets the form.
+    hours.value = Object.fromEntries(
+      Object.entries(values.hours).map(([day, hour]) => [day, { ...hour }])
+    )
     selectedDays.value = Object.keys(values.hours).reduce((acc, day) => {
       acc[day] = true
       return acc
@@ -316,11 +319,11 @@ const initializeFromValues = (values) => {
 
   // Set holidays
   if (values.holidays) {
-    holidays.push(...values.holidays)
+    holidays.push(...values.holidays.map((holiday) => ({ ...holiday })))
   }
 
   // Update form
-  form.setValues(values)
+  form.setValues(values, false)
   syncHoursToForm()
 }
 

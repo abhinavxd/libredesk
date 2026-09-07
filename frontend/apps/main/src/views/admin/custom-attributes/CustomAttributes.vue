@@ -109,7 +109,7 @@ const refreshHandler = (data) => {
 }
 const editHandler = (data) => {
   if (data?.model === 'custom-attributes') {
-    form.setValues(data.data)
+    form.setValues(data.data, false)
     form.setErrors({})
     isEditing.value = true
     dialogOpen.value = true
@@ -128,7 +128,7 @@ onUnmounted(() => {
 })
 
 const editCustomAttribute = (item) => {
-  form.setValues(item)
+  form.setValues(item, false)
   form.setErrors({})
   isEditing.value = true
   dialogOpen.value = true

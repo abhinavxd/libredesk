@@ -2,16 +2,19 @@
 package ws
 
 import (
-	"log"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
+	"github.com/zerodha/logf"
 )
 
 // Hub maintains the set of registered websockets clients.
 type Hub struct {
+	lo *logf.Logger
+
 	clients      map[int][]*Client
 	clientsMutex sync.RWMutex
 
@@ -35,8 +38,9 @@ type conversationStore interface {
 }
 
 // NewHub creates a new websocket hub.
-func NewHub(userStore userStore) *Hub {
+func NewHub(lo *logf.Logger, userStore userStore) *Hub {
 	return &Hub{
+		lo:                lo,
 		clients:           make(map[int][]*Client, 64),
 		clientsMutex:      sync.RWMutex{},
 		convSubsList:      make(map[string]map[*Client]struct{}, 1024),
@@ -52,12 +56,23 @@ func (h *Hub) KickUser(userID int) {
 	h.clientsMutex.RLock()
 	clients := append([]*Client(nil), h.clients[userID]...)
 	h.clientsMutex.RUnlock()
-	log.Printf("ws: kicking user %d (%d connections)", userID, len(clients))
-	closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "kicked")
-	for _, c := range clients {
-		_ = c.Conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
-		_ = c.Conn.Close()
+	if len(clients) == 0 {
+		return
 	}
+	h.lo.Debug("kicking user ws connections", "user_id", userID, "connections", len(clients))
+	closeClients(clients, websocket.CloseNormalClosure, "kicked")
+}
+
+// CloseAll sends a close frame to every connected client and returns the number closed.
+func (h *Hub) CloseAll() int {
+	h.clientsMutex.RLock()
+	clients := make([]*Client, 0, len(h.clients))
+	for _, userClients := range h.clients {
+		clients = append(clients, userClients...)
+	}
+	h.clientsMutex.RUnlock()
+	closeClients(clients, websocket.CloseGoingAway, "server shutting down")
+	return len(clients)
 }
 
 // SubscribeListReplace replaces list-source subs; open-source subs are untouched so deep links survive list refreshes.
@@ -158,14 +173,28 @@ func (h *Hub) RemoveClient(client *Client) {
 	defer h.clientsMutex.Unlock()
 
 	if clients, ok := h.clients[client.ID]; ok {
-		for i, c := range clients {
-			if c == client {
-				h.clients[client.ID] = append(clients[:i], clients[i+1:]...)
-				break
-			}
+		if i := slices.Index(clients, client); i >= 0 {
+			clients = slices.Delete(clients, i, i+1)
+		}
+		if len(clients) == 0 {
+			delete(h.clients, client.ID)
+		} else {
+			h.clients[client.ID] = clients
 		}
 	}
 	h.ClearClientSubs(client)
+}
+
+func (h *Hub) ConnectedUserIDs() []int {
+	h.clientsMutex.RLock()
+	defer h.clientsMutex.RUnlock()
+	out := make([]int, 0, len(h.clients))
+	for id, clients := range h.clients {
+		if len(clients) > 0 {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // PushToClients sends a raw payload directly to the given client connections.
@@ -208,5 +237,17 @@ func (h *Hub) BroadcastTypingToConversation(conversationUUID string, typingMsg m
 func (h *Hub) BroadcastTypingToAllConversationClients(conversationUUID string, data []byte) {
 	for _, c := range h.ListSubscribers(conversationUUID) {
 		c.SendMessage(data, websocket.TextMessage)
+	}
+}
+
+func closeClients(clients []*Client, closeCode int, reason string) {
+	closeMsg := websocket.FormatCloseMessage(closeCode, reason)
+	deadline := time.Now().Add(closeFrameWait)
+	for _, c := range clients {
+		_ = c.Conn.WriteControl(websocket.CloseMessage, closeMsg, deadline)
+		_ = c.Conn.SetReadDeadline(time.Now())
+		_ = c.Conn.Close()
+		c.Hub.RemoveClient(c)
+		c.close()
 	}
 }

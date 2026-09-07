@@ -9,6 +9,7 @@
         return;
     }
     window.__libredeskWidgetLoaded = true;
+    const DEFAULT_LAUNCHER_LOGO_PATH = '/static/public/launcher-logo.png';
 
     class Libredesk {
         constructor(config = {}) {
@@ -20,7 +21,7 @@
             }
 
             this.IFRAME_BORDER_RADIUS = '16px';
-            this.IFRAME_BOX_SHADOW = '0 12px 48px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.25)';
+            this.IFRAME_BOX_SHADOW = '0 1px 6px rgba(9, 14, 21, 0.5), 0 4px 32px rgba(9, 14, 21, 0.65)';
             this.IFRAME_WIDTH = '400px';
             this.IFRAME_HEIGHT = '700px';
             this.EXPANDED_WIDTH = '750px';
@@ -157,9 +158,18 @@
         contrastColor (hex) {
             try {
                 hex = hex.replace(/^#/, '');
-                var r = parseInt(hex.substring(0, 2), 16) / 255;
-                var g = parseInt(hex.substring(2, 4), 16) / 255;
-                var b = parseInt(hex.substring(4, 6), 16) / 255;
+                if (hex.length === 3) {
+                    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+                }
+                var toLinear = function (channel) {
+                    var c = parseInt(channel, 16) / 255;
+                    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+                };
+                var r = toLinear(hex.substring(0, 2));
+                var g = toLinear(hex.substring(2, 4));
+                var b = toLinear(hex.substring(4, 6));
+                // Relative luminance per WCAG, gamma-corrected so the 0.179 threshold
+                // reflects perceived brightness instead of raw sRGB values.
                 var L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
                 return L > 0.179 ? '#000000' : '#ffffff';
             } catch (e) {
@@ -183,7 +193,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);
+                box-shadow: 0 1px 4px rgba(9, 14, 21, 0.45), 0 3px 18px rgba(9, 14, 21, 0.55);
                 transition: transform 0.3s ease;
             `;
 
@@ -197,17 +207,15 @@
                 transition: transform 0.3s ease;
             `;
 
-            if (launcher.logo_url) {
-                this.defaultIcon = document.createElement('img');
-                this.defaultIcon.src = launcher.logo_url;
-                this.defaultIcon.style.cssText = `
-                    width: 100%;
-                    height: 100%;
-                    border-radius: 50%;
-                    object-fit: cover;
-                `;
-                this.iconContainer.appendChild(this.defaultIcon);
-            }
+            this.defaultIcon = document.createElement('img');
+            this.defaultIcon.src = launcher.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
+            this.defaultIcon.style.cssText = `
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                object-fit: cover;
+            `;
+            this.iconContainer.appendChild(this.defaultIcon);
 
             this.arrowIcon = document.createElement('div');
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

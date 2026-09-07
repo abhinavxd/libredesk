@@ -39,7 +39,7 @@ const createMacro = async (values) => {
     formLoading.value = true
     await api.createMacro(values)
     
-    await macroStore.loadMacros(true)
+    macroStore.clearCache()
     
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')

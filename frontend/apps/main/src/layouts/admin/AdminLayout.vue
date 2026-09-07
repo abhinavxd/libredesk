@@ -7,7 +7,9 @@
       >
         <div>{{ $t('admin.empty') }}</div>
       </div>
-      <router-view class="flex-grow" />
+      <div class="flex-grow flex flex-col">
+        <router-view />
+      </div>
     </div>
   </div>
 </template>

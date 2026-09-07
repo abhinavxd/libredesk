@@ -17,9 +17,10 @@ const (
 	SystemUserEmail = "System"
 
 	// User types
-	UserTypeAgent   = "agent"
-	UserTypeContact = "contact"
-	UserTypeVisitor = "visitor"
+	UserTypeAgent       = "agent"
+	UserTypeContact     = "contact"
+	UserTypeVisitor     = "visitor"
+	UserTypeAIAssistant = "ai_assistant"
 
 	// User availability statuses
 	Online  = "online"
@@ -31,17 +32,28 @@ const (
 	AwayAndReassigning = "away_and_reassigning"
 )
 
+// ContactPolicy controls whether contact resolution may modify a matched contact.
+type ContactPolicy int
+
+const (
+	// ContactReuse resolves to the existing contact without modifying it.
+	ContactReuse ContactPolicy = iota
+	// ContactSync also updates name/email and enriches external_user_id on a match.
+	ContactSync
+)
+
 type UserCompact struct {
-	ID             int         `db:"id" json:"id"`
-	Type           string      `db:"type" json:"type"`
-	FirstName      string      `db:"first_name" json:"first_name"`
-	LastName       string      `db:"last_name" json:"last_name"`
-	Email          null.String `db:"email" json:"email"`
-	Enabled        bool        `db:"enabled" json:"enabled"`
-	AvatarURL      null.String `db:"avatar_url" json:"avatar_url"`
-	ExternalUserID null.String `db:"external_user_id" json:"external_user_id"`
-	CreatedAt      time.Time   `db:"created_at" json:"created_at"`
-	UpdatedAt      time.Time   `db:"updated_at" json:"updated_at"`
+	ID                 int         `db:"id" json:"id"`
+	Type               string      `db:"type" json:"type"`
+	FirstName          string      `db:"first_name" json:"first_name"`
+	LastName           string      `db:"last_name" json:"last_name"`
+	Email              null.String `db:"email" json:"email"`
+	Enabled            bool        `db:"enabled" json:"enabled"`
+	AvatarURL          null.String `db:"avatar_url" json:"avatar_url"`
+	ExternalUserID     null.String `db:"external_user_id" json:"external_user_id"`
+	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
+	CreatedAt          time.Time   `db:"created_at" json:"created_at"`
+	UpdatedAt          time.Time   `db:"updated_at" json:"updated_at"`
 
 	Total int `db:"total" json:"-"`
 }
@@ -91,6 +103,7 @@ type ChatUser struct {
 	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
 	Type               string      `db:"type" json:"type"`
 	ActiveAt           null.Time   `db:"active_at" json:"active_at"`
+	Expectation        string      `db:"expectation" json:"expectation,omitempty"`
 }
 
 type Note struct {

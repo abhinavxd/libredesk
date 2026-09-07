@@ -28,7 +28,7 @@ builds:
     goarm:
       - 6
       - 7
-    binary: 'libredesk{{ if eq .Os "windows" }}.exe{{ end }}'
+    binary: libredesk
     ldflags:
       - -s -w -X "main.buildString={{ .Tag }} ({{ .ShortCommit }} {{ .Date }}, {{ .Os }}/{{ .Arch }})" -X "main.versionString={{ .Tag }}"
     hooks:

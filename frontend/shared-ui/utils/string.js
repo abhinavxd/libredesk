@@ -66,3 +66,12 @@ export function renderTemplate(text, data) {
     data[Object.keys(data).find(k => k.toLowerCase() === key.toLowerCase())] || fallback?.trim() || ''
   )
 }
+
+export function isValidTemplate (text, allowedVars = []) {
+  if (!text) return true
+  // Strip valid variable tokens; any leftover brace means bad syntax or an unknown variable.
+  const leftover = text.replace(/\{\{\s*(.*?)\s*\}\}/g, (m, v) =>
+    allowedVars.includes(v.trim()) ? '' : m
+  )
+  return !leftover.includes('{') && !leftover.includes('}')
+}

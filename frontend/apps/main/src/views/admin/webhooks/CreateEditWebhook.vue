@@ -133,7 +133,7 @@ onMounted(async () => {
     try {
       isLoading.value = true
       const resp = await api.getWebhook(props.id)
-      form.setValues(resp.data.data)
+      form.setValues(resp.data.data, false)
       // The secret is already masked by the backend, no need to modify it here
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

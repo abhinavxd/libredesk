@@ -14,7 +14,7 @@ export const createColumns = (t) => [
                 h(RouterLink,
                     {
                         to: { name: 'edit-business-hours', params: { id: row.original.id } },
-                        class: 'text-primary hover:underline'
+                        class: 'text-foreground font-medium hover:underline'
                     },
                     () => row.getValue('name')
                 )

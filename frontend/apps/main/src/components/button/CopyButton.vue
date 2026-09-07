@@ -3,10 +3,10 @@
     type="button"
     variant="ghost"
     size="icon"
-    class="h-7 w-7 text-zinc-400 hover:text-white hover:bg-zinc-700"
+    class="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent"
     @click="copy"
   >
-    <Check v-if="copied" class="h-4 w-4 text-green-500" />
+    <Check v-if="copied" class="h-4 w-4 text-success" />
     <Copy v-else class="h-4 w-4" />
   </Button>
 </template>

@@ -1,5 +1,5 @@
 <template>
-  <form @submit="onSubmit" class="space-y-6">
+  <form @submit="onSubmit" novalidate class="space-y-6">
     <div class="grid gap-6 md:grid-cols-2">
     <FormField name="emoji" v-slot="{ componentField }">
       <FormItem ref="emojiPickerContainer" class="relative">
@@ -242,7 +242,7 @@ watch(
   () => props.initialValues,
   (newValues) => {
     if (Object.keys(newValues).length === 0) return
-    form.setValues(newValues)
+    form.setValues(newValues, false)
   },
   { immediate: true }
 )

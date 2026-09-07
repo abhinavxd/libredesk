@@ -53,7 +53,7 @@ func handleCreateContextLink(r *fastglue.Request) error {
 	if err := r.Decode(&contextLink, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
-	if err := validateContextLink(app, contextLink); err != nil {
+	if err := validateContextLink(app, &contextLink); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -77,7 +77,7 @@ func handleUpdateContextLink(r *fastglue.Request) error {
 	if err := r.Decode(&contextLink, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
-	if err := validateContextLink(app, contextLink); err != nil {
+	if err := validateContextLink(app, &contextLink); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -163,7 +163,7 @@ func handleGetContextLinkURL(r *fastglue.Request) error {
 	return r.SendEnvelope(url)
 }
 
-func validateContextLink(app *App, contextLink models.ContextLink) error {
+func validateContextLink(app *App, contextLink *models.ContextLink) error {
 	if contextLink.Name == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
 	}

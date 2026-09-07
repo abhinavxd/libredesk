@@ -26,17 +26,24 @@ export const useCustomAttributeStore = defineStore('customAttributes', () => {
                 ...att,
             }))
     })
-    const fetchCustomAttributes = async () => {
-        if (attributes.value.length) return
-        try {
-            const response = await api.getCustomAttributes()
-            attributes.value = response?.data?.data || []
-        } catch (error) {
-            emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-                variant: 'destructive',
-                description: handleHTTPError(error).message
+    let inflight = null
+    let hasFetched = false
+    const fetchCustomAttributes = () => {
+        if (hasFetched) return Promise.resolve()
+        if (inflight) return inflight
+        inflight = api.getCustomAttributes()
+            .then(response => {
+                attributes.value = response?.data?.data || []
+                hasFetched = true
             })
-        }
+            .catch(error => {
+                emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+                    variant: 'destructive',
+                    description: handleHTTPError(error).message
+                })
+            })
+            .finally(() => { inflight = null })
+        return inflight
     }
     return {
         attributes,

@@ -76,6 +76,26 @@ export const useNotificationStore = defineStore('notification', () => {
     }
   }
 
+  const markAssignmentAsReadForConversation = (conversationUUID) => {
+    if (!conversationUUID) return
+
+    let markedCount = 0
+    notifications.value.forEach(n => {
+      if (
+        !n.is_read &&
+        n.notification_type === 'assignment' &&
+        n.conversation_uuid === conversationUUID
+      ) {
+        n.is_read = true
+        markedCount++
+      }
+    })
+
+    if (markedCount > 0) {
+      unreadCount.value = Math.max(0, unreadCount.value - markedCount)
+    }
+  }
+
   // Mark all notifications as read
   const markAllAsRead = async () => {
     try {
@@ -153,6 +173,7 @@ export const useNotificationStore = defineStore('notification', () => {
     fetchNotifications,
     fetchStats,
     markAsRead,
+    markAssignmentAsReadForConversation,
     markAllAsRead,
     deleteNotification,
     deleteAll,

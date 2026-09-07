@@ -23,8 +23,8 @@ const (
 	ChannelLiveChat       = "livechat"
 	MaxConnectionsPerUser = 10
 
-	HomeAppAnnouncement  = "announcement"
-	HomeAppExternalLink  = "external_link"
+	HomeAppAnnouncement = "announcement"
+	HomeAppExternalLink = "external_link"
 )
 
 type PreChatFormField struct {
@@ -126,10 +126,15 @@ type Config struct {
 
 // Client represents a connected chat client
 type Client struct {
-	ID        string
-	Channel   chan []byte
-	closed    atomic.Bool
-	closeOnce sync.Once
+	ID         string
+	Channel    chan []byte
+	disconnect func()
+	closed     atomic.Bool
+	closeOnce  sync.Once
+}
+
+func (c *Client) IsClosed() bool {
+	return c.closed.Load()
 }
 
 // CloseChannel closes the client's channel exactly once. Safe to call multiple times.
@@ -143,6 +148,7 @@ func (c *Client) CloseChannel() {
 // LiveChat represents the live chat inbox.
 type LiveChat struct {
 	id            int
+	name          string
 	config        Config
 	from          string
 	lo            *logf.Logger
@@ -156,6 +162,7 @@ type LiveChat struct {
 // Opts holds the options required for the live chat inbox.
 type Opts struct {
 	ID            int
+	Name          string
 	Config        Config
 	From          string
 	Lo            *logf.Logger
@@ -166,6 +173,7 @@ type Opts struct {
 func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*LiveChat, error) {
 	lc := &LiveChat{
 		id:            opts.ID,
+		name:          opts.Name,
 		config:        opts.Config,
 		from:          opts.From,
 		lo:            opts.Lo,
@@ -260,13 +268,15 @@ func (lc *LiveChat) Send(message models.OutboundMessage) error {
 	return nil
 }
 
-// Close closes all connected client channels and clears the client map.
 func (lc *LiveChat) Close() error {
 	lc.clientsMutex.Lock()
 	defer lc.clientsMutex.Unlock()
 	for _, clients := range lc.clients {
 		for _, c := range clients {
 			c.CloseChannel()
+			if c.disconnect != nil {
+				c.disconnect()
+			}
 		}
 	}
 	lc.clients = make(map[string][]*Client)
@@ -283,13 +293,23 @@ func (lc *LiveChat) ReplyToAddress() string {
 	return ""
 }
 
+// Name returns the inbox name.
+func (lc *LiveChat) Name() string {
+	return lc.name
+}
+
+// FromNameTemplate is not applicable to livechat and always returns empty.
+func (lc *LiveChat) FromNameTemplate() string {
+	return ""
+}
+
 // Channel returns the channel name for this inbox.
 func (lc *LiveChat) Channel() string {
 	return ChannelLiveChat
 }
 
 // AddClient adds a new client to the live chat session.
-func (lc *LiveChat) AddClient(userID string) (*Client, error) {
+func (lc *LiveChat) AddClient(userID string, disconnect func()) (*Client, error) {
 	lc.clientsMutex.Lock()
 	defer lc.clientsMutex.Unlock()
 
@@ -300,8 +320,9 @@ func (lc *LiveChat) AddClient(userID string) (*Client, error) {
 	}
 
 	client := &Client{
-		ID:      userID,
-		Channel: make(chan []byte, 128),
+		ID:         userID,
+		disconnect: disconnect,
+		Channel:    make(chan []byte, 128),
 	}
 
 	// Add the client to the clients map.

@@ -3,7 +3,7 @@
     <Card class="hover:bg-accent transition-colors cursor-pointer rounded-md">
       <CardContent class="p-4">
         <div class="flex justify-between items-center">
-          <span class="text-sm text-primary font-medium">
+          <span class="text-sm text-foreground font-medium">
             {{ link.text }}
           </span>
           <ExternalLink size="18" class="text-muted-foreground" />

@@ -89,6 +89,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useStorage } from '@vueuse/core'
 import SimpleTable from '@main/components/table/SimpleTable.vue'
 import {
   Select,
@@ -116,7 +117,7 @@ const orderByField = ref('activity_logs.created_at')
 const orderByDirection = ref('desc')
 const totalCount = ref(0)
 const totalPages = ref(0)
-const filters = ref([])
+const filters = useStorage('activity-log-filters', [])
 const filtersOpen = ref(false)
 const { activityLogListFilters } = useActivityLogFilters()
 
@@ -127,7 +128,8 @@ const filterFields = computed(() =>
     field,
     type: value.type,
     operators: value.operators,
-    options: value.options ?? []
+    options: value.options ?? [],
+    entity: value.entity
   }))
 )
 

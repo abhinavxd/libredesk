@@ -221,6 +221,19 @@ func (m *Manager) GetAppRootURL() (string, error) {
 	return strings.Trim(string(rootURL), "\""), nil
 }
 
+// GetAppTimezone returns the configured app timezone, empty if unset or unreadable.
+func (m *Manager) GetAppTimezone() string {
+	b, err := m.Get("app.timezone")
+	if err != nil {
+		return ""
+	}
+	var tz string
+	if err := json.Unmarshal(b, &tz); err != nil {
+		return ""
+	}
+	return tz
+}
+
 // encryptSettings encrypts sensitive fields in the settings JSON.
 func (m *Manager) encryptSettings(data []byte) ([]byte, error) {
 	var settings map[string]interface{}

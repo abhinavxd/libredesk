@@ -1,10 +1,19 @@
 import * as z from 'zod'
-import { isGoDuration, validateEmail } from '@shared-ui/utils/string'
+import { isGoDuration, validateEmail, isValidTemplate } from '@shared-ui/utils/string'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@main/constants/auth.js'
+
+const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
 
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, t('globals.messages.required')),
   from: z.string().min(1, t('globals.messages.required')),
+  from_name_template: z
+    .string()
+    .optional()
+    .default('')
+    .refine((val) => isValidTemplate(val, FROM_NAME_TEMPLATE_VARS), {
+      message: t('admin.inbox.fromNameTemplate.invalidTemplate')
+    }),
   reply_to: z
     .string()
     .optional()

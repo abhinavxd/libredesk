@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
@@ -44,15 +45,17 @@ var (
 	MessageStatusFailed   = "failed"
 	MessageStatusReceived = "received"
 
-	ActivityStatusChange       = "status_change"
-	ActivityPriorityChange     = "priority_change"
-	ActivityAssignedUserChange = "assigned_user_change"
-	ActivityAssignedTeamChange = "assigned_team_change"
-	ActivitySelfAssign         = "self_assign"
-	ActivityTagAdded           = "tag_added"
-	ActivityTagRemoved         = "tag_removed"
-	ActivitySLASet             = "sla_set"
-	ActivityParticipantAdded   = "participant_added"
+	ActivityStatusChange        = "status_change"
+	ActivityPriorityChange      = "priority_change"
+	ActivityAssignedUserChange  = "assigned_user_change"
+	ActivityAssignedTeamChange  = "assigned_team_change"
+	ActivityAssigneeUserRemoved = "assignee_user_removed"
+	ActivitySelfAssign          = "self_assign"
+	ActivitySelfUnassign        = "self_unassign"
+	ActivityTagAdded            = "tag_added"
+	ActivityTagRemoved          = "tag_removed"
+	ActivitySLASet              = "sla_set"
+	ActivityParticipantAdded    = "participant_added"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"
@@ -156,6 +159,12 @@ type ConversationListContact struct {
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
 }
 
+// ConversationRef is a lightweight (id, uuid) reference to a conversation.
+type ConversationRef struct {
+	ID   int    `db:"id" json:"id"`
+	UUID string `db:"uuid" json:"uuid"`
+}
+
 type Conversation struct {
 	ID                        int                    `db:"id" json:"id"`
 	CreatedAt                 time.Time              `db:"created_at" json:"created_at"`
@@ -165,16 +174,19 @@ type Conversation struct {
 	InboxID                   int                    `db:"inbox_id" json:"inbox_id"`
 	ClosedAt                  null.Time              `db:"closed_at" json:"closed_at"`
 	ResolvedAt                null.Time              `db:"resolved_at" json:"resolved_at"`
+	ContactLastSeenAt         null.Time              `db:"contact_last_seen_at" json:"contact_last_seen_at"`
 	ReferenceNumber           string                 `db:"reference_number" json:"reference_number"`
 	Priority                  null.String            `db:"priority" json:"priority"`
 	PriorityID                null.Int               `db:"priority_id" json:"priority_id"`
 	Status                    null.String            `db:"status" json:"status"`
+	StatusCategory            null.String            `db:"status_category" json:"status_category"`
 	StatusID                  null.Int               `db:"status_id" json:"status_id"`
 	FirstReplyAt              null.Time              `db:"first_reply_at" json:"first_reply_at"`
 	LastReplyAt               null.Time              `db:"last_reply_at" json:"last_reply_at"`
 	AssignedUserID            null.Int               `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID            null.Int               `db:"assigned_team_id" json:"assigned_team_id"`
 	WaitingSince              null.Time              `db:"waiting_since" json:"waiting_since"`
+	SnoozedUntil              null.Time              `db:"snoozed_until" json:"snoozed_until"`
 	Subject                   null.String            `db:"subject" json:"subject"`
 	InboxMail                 string                 `db:"inbox_mail" json:"inbox_mail"`
 	InboxReplyTo              string                 `db:"inbox_reply_to" json:"inbox_reply_to"`
@@ -193,11 +205,15 @@ type Conversation struct {
 	SLAPolicyID               null.Int               `db:"sla_policy_id" json:"sla_policy_id"`
 	SlaPolicyName             null.String            `db:"sla_policy_name" json:"sla_policy_name"`
 	AppliedSLAID              null.Int               `db:"applied_sla_id" json:"applied_sla_id"`
+	NextSLADeadlineAt         null.Time              `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	FirstResponseDueAt        null.Time              `db:"first_response_deadline_at" json:"first_response_deadline_at"`
 	ResolutionDueAt           null.Time              `db:"resolution_deadline_at" json:"resolution_deadline_at"`
 	NextResponseDueAt         null.Time              `db:"next_response_deadline_at" json:"next_response_deadline_at"`
 	NextResponseMetAt         null.Time              `db:"next_response_met_at" json:"next_response_met_at"`
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
+	CSATRating                null.Int               `db:"csat_rating" json:"csat_rating"`
+	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
+	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
 }
 
@@ -245,6 +261,20 @@ type PreviousConversationContact struct {
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
 }
 
+// AIConversationSummary is a bounded conversation row for agent-facing AI tools. AssignedUserID and
+// AssignedTeamID carry the fields EnforceConversationAccess reads so per-row access filtering runs in Go.
+type AIConversationSummary struct {
+	ID              int         `db:"id"`
+	ReferenceNumber string      `db:"reference_number"`
+	Subject         string      `db:"subject"`
+	Status          null.String `db:"status"`
+	CreatedAt       time.Time   `db:"created_at"`
+	LastMessageAt   null.Time   `db:"last_message_at"`
+	AssignedUserID  null.Int    `db:"assigned_user_id"`
+	AssignedTeamID  null.Int    `db:"assigned_team_id"`
+	ContactName     string      `db:"contact_name"`
+}
+
 type ConversationParticipant struct {
 	ID        int         `db:"id" json:"id"`
 	FirstName string      `db:"first_name" json:"first_name"`
@@ -261,6 +291,13 @@ type MessageAuthor struct {
 	AvailabilityStatus string      `db:"availability_status" json:"availability_status"`
 	Type               string      `db:"type" json:"type"`
 	LastActiveAt       null.Time   `db:"last_active_at" json:"last_active_at"`
+}
+
+func (a *MessageAuthor) FullName() string {
+	if a.LastName == "" {
+		return a.FirstName
+	}
+	return a.FirstName + " " + a.LastName
 }
 
 type ConversationCounts struct {
@@ -315,6 +352,21 @@ func (m *Message) IsContinuityMessage() bool {
 	}
 	isContinuity, _ := meta["continuity_email"].(bool)
 	return isContinuity
+}
+
+// ShouldEvaluateAutomation reports whether this outgoing message may trigger automation rules; machine-generated messages must not, else they loop.
+func (m *Message) ShouldEvaluateAutomation(systemUserID int) bool {
+	return m.SenderID != systemUserID && !m.IsAutomated()
+}
+
+// IsAutomated returns true if the message was produced by an automation rule action.
+func (m *Message) IsAutomated() bool {
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(m.Meta), &meta); err != nil {
+		return false
+	}
+	isAutomated, _ := meta["is_automated"].(bool)
+	return isAutomated
 }
 
 // csatMeta unmarshals the message meta and returns the map and whether is_csat is true.
@@ -515,6 +567,7 @@ type ConversationDraft struct {
 	ConversationID   int64           `db:"conversation_id" json:"conversation_id"`
 	ConversationUUID string          `db:"conversation_uuid" json:"conversation_uuid"`
 	UserID           int64           `db:"user_id" json:"user_id"`
+	Type             string          `db:"type" json:"type"`
 	Content          string          `db:"content" json:"content"`
 	CreatedAt        time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt        time.Time       `db:"updated_at" json:"updated_at"`
@@ -525,4 +578,32 @@ type ConversationDraft struct {
 type MentionInput struct {
 	Type string `json:"type"` // "agent" or "team"
 	ID   int    `json:"id"`
+}
+
+// Transcript renders the last max messages as a plaintext "Customer:/Agent:" transcript for AI context.
+func Transcript(msgs []Message, max int) string {
+	if len(msgs) > max {
+		msgs = msgs[len(msgs)-max:]
+	}
+	var b strings.Builder
+	for _, msg := range msgs {
+		role := "Agent"
+		if msg.SenderType == SenderTypeContact {
+			role = "Customer"
+		}
+		text := strings.TrimSpace(msg.TextContent)
+		if msg.ContentType == ContentTypeHTML {
+			if t := stringutil.HTML2TextMarkdownLinks(msg.Content); t != "" {
+				text = t
+			}
+		}
+		if text == "" {
+			continue
+		}
+		b.WriteString(role)
+		b.WriteString(": ")
+		b.WriteString(text)
+		b.WriteString("\n")
+	}
+	return b.String()
 }

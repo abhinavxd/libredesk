@@ -120,6 +120,65 @@ SELECT
     ) nxt_resp_event ON true
 WHERE 1=1 %s
 
+-- name: get-conversation-list-item
+SELECT
+    conversations.id,
+    conversations.created_at,
+    conversations.updated_at,
+    conversations.uuid,
+    conversations.reference_number,
+    conversations.waiting_since,
+    users.created_at as "contact.created_at",
+    users.updated_at as "contact.updated_at",
+    users.first_name as "contact.first_name",
+    users.last_name as "contact.last_name",
+    users.email as "contact.email",
+    users.avatar_url as "contact.avatar_url",
+    inboxes.channel as inbox_channel,
+    inboxes.name as inbox_name,
+    conversations.sla_policy_id,
+    conversations.first_reply_at,
+    conversations.last_reply_at,
+    conversations.resolved_at,
+    conversations.subject,
+    conversations.last_message,
+    conversations.last_message_at,
+    conversations.last_message_sender,
+    conversations.last_interaction,
+    conversations.last_interaction_at,
+    conversations.last_interaction_sender,
+    conversations.next_sla_deadline_at,
+    conversations.priority_id,
+    conversations.assigned_user_id,
+    conversations.assigned_team_id,
+    conversation_statuses.name as status,
+    conversation_priorities.name as priority,
+    as_latest.first_response_deadline_at,
+    as_latest.resolution_deadline_at,
+    as_latest.id as applied_sla_id,
+    nxt_resp_event.deadline_at AS next_response_deadline_at,
+    nxt_resp_event.met_at as next_response_met_at
+FROM conversations
+JOIN users ON contact_id = users.id
+JOIN inboxes ON inbox_id = inboxes.id
+LEFT JOIN conversation_statuses ON status_id = conversation_statuses.id
+LEFT JOIN conversation_priorities ON priority_id = conversation_priorities.id
+LEFT JOIN LATERAL (
+    SELECT id, first_response_deadline_at, resolution_deadline_at
+    FROM applied_slas
+    WHERE conversation_id = conversations.id
+    ORDER BY created_at DESC LIMIT 1
+) as_latest ON true
+LEFT JOIN LATERAL (
+    SELECT se.deadline_at, se.met_at
+    FROM sla_events se
+    WHERE se.applied_sla_id = as_latest.id
+    AND se.type = 'next_response'
+    ORDER BY se.created_at DESC
+    LIMIT 1
+) nxt_resp_event ON true
+WHERE conversations.uuid = $1::uuid;
+
 -- name: get-conversation
 SELECT
    c.id,
@@ -127,6 +186,7 @@ SELECT
    c.updated_at,
    c.closed_at,
    c.resolved_at,
+   c.contact_last_seen_at,
    c.inbox_id,
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
@@ -136,16 +196,19 @@ SELECT
    c.priority_id,
    p.name as priority,
    s.name as status,
+   s.category as status_category,
    c.uuid,
    c.reference_number,
    c.first_reply_at,
    c.last_reply_at,
    c.waiting_since,
+   c.snoozed_until,
    c.assigned_user_id,
    c.assigned_team_id,
    c.subject,
    c.contact_id,
    c.sla_policy_id,
+   c.next_sla_deadline_at,
    c.meta,
    sla.name as sla_policy_name,
    c.last_message_at,
@@ -184,10 +247,20 @@ SELECT
    as_latest.id as applied_sla_id,
    nxt_resp_event.deadline_at AS next_response_deadline_at,
    nxt_resp_event.met_at as next_response_met_at,
-   c.last_continuity_email_sent_at
+   c.last_continuity_email_sent_at,
+   csat.rating as csat_rating,
+   csat.feedback as csat_feedback,
+   csat.response_timestamp as csat_responded_at
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
+LEFT JOIN LATERAL (
+    SELECT rating, feedback, response_timestamp
+    FROM csat_responses
+    WHERE conversation_id = c.id
+    ORDER BY response_timestamp DESC NULLS LAST, created_at DESC
+    LIMIT 1
+) csat ON true
 LEFT JOIN sla_policies sla ON c.sla_policy_id = sla.id
 LEFT JOIN teams at ON at.id = c.assigned_team_id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id
@@ -219,7 +292,9 @@ SELECT
     c.id,
     c.uuid
 FROM conversations c
-WHERE c.created_at > $1;
+WHERE c.created_at > $1 AND c.id > $2
+ORDER BY c.id
+LIMIT $3;
 
 -- name: get-contact-previous-conversations
 SELECT
@@ -238,6 +313,43 @@ JOIN conversations c ON c.contact_id = u.id
 WHERE c.contact_id = $1
 ORDER BY c.created_at DESC
 LIMIT $2;
+
+-- name: get-contact-conversations-for-ai
+SELECT
+    c.id,
+    c.reference_number,
+    c.subject,
+    cs.name AS status,
+    c.created_at,
+    c.last_message_at,
+    c.assigned_user_id,
+    c.assigned_team_id
+FROM conversations c
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE c.contact_id = $1
+  AND c.id != $2
+ORDER BY c.created_at DESC
+LIMIT 50;
+
+-- name: get-conversations-by-contact-email-for-ai
+SELECT
+    c.id,
+    c.reference_number,
+    c.subject,
+    cs.name AS status,
+    c.created_at,
+    c.last_message_at,
+    c.assigned_user_id,
+    c.assigned_team_id,
+    TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) AS contact_name
+FROM conversations c
+JOIN users u ON c.contact_id = u.id
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE LOWER(u.email) = LOWER($1)
+  AND u.type = 'contact'
+  AND u.deleted_at IS NULL
+ORDER BY c.created_at DESC
+LIMIT 50;
 
 -- name: get-chat-conversation
 SELECT
@@ -265,11 +377,13 @@ SELECT
     COALESCE(au.first_name, '') as "assignee.first_name",
     COALESCE(au.id, 0) as "assignee.id",
     COALESCE(au.last_name, '') as "assignee.last_name",
-    COALESCE(au.type::TEXT, '') as "assignee.type"
+    COALESCE(au.type::TEXT, '') as "assignee.type",
+    COALESCE(aa.expectation, '') as "assignee.expectation"
 FROM conversations c
 INNER JOIN inboxes inb on c.inbox_id = inb.id
 LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
 LEFT JOIN users au ON c.assigned_user_id = au.id
+LEFT JOIN ai_assistants aa ON aa.user_id = au.id
 LEFT JOIN users lis ON c.last_interaction_sender_id = lis.id
 WHERE c.uuid = $1
   AND inb.deleted_at IS NULL;
@@ -322,11 +436,18 @@ SET assigned_user_id = $2,
 updated_at = NOW()
 WHERE uuid = $1;
 
+-- name: claim-unassigned-conversation
+UPDATE conversations
+SET assigned_user_id = $2,
+updated_at = NOW()
+WHERE uuid = $1 AND assigned_user_id IS NULL AND assigned_team_id = $3;
+
 -- name: update-conversation-contact-last-seen
 UPDATE conversations
 SET contact_last_seen_at = NOW(),
 updated_at = NOW()
-WHERE uuid = $1;
+WHERE uuid = $1
+RETURNING contact_last_seen_at;
 
 -- name: update-conversation-assigned-team
 UPDATE conversations
@@ -349,6 +470,32 @@ WHERE uuid = $1;
 
 -- name: get-user-active-conversations-count
 SELECT COUNT(*) FROM conversations WHERE status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open') AND assigned_user_id = $1;
+
+-- name: get-sidebar-standard-counts
+SELECT
+    COUNT(*) FILTER (WHERE conversations.assigned_user_id = $1) AS assigned,
+    COUNT(*) FILTER (WHERE conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL) AS unassigned,
+    COUNT(*) FILTER (WHERE EXISTS (
+        SELECT 1 FROM conversation_mentions cm
+        WHERE cm.conversation_id = conversations.id
+          AND (cm.mentioned_user_id = $1 OR EXISTS (
+              SELECT 1 FROM team_members tm
+              WHERE tm.team_id = cm.mentioned_team_id AND tm.user_id = $1
+          ))
+    )) AS mentioned,
+    COUNT(*) AS "all"
+FROM conversations
+WHERE conversations.status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open');
+
+-- name: get-conversations-count-base
+-- The list-type WHERE clause is appended at %s; view filters are added by BuildFilterQuery.
+SELECT 1
+FROM conversations
+JOIN users ON contact_id = users.id
+JOIN inboxes ON inbox_id = inboxes.id
+LEFT JOIN conversation_statuses ON status_id = conversation_statuses.id
+WHERE TRUE
+%s
 
 -- name: update-conversation-priority
 UPDATE conversations 
@@ -391,7 +538,8 @@ WHERE conversation_id =
 -- name: insert-conversation-participant
 INSERT INTO conversation_participants
 (user_id, conversation_id)
-VALUES($1, (SELECT id FROM conversations WHERE uuid = $2));
+VALUES($1, (SELECT id FROM conversations WHERE uuid = $2))
+ON CONFLICT (conversation_id, user_id) DO NOTHING;
 
 -- name: get-unassigned-conversations
 SELECT
@@ -465,11 +613,11 @@ SET custom_attributes = $2,
     updated_at = NOW()
 WHERE uuid = $1;
 
--- name: update-conversation-waiting-since
+-- name: start-conversation-waiting-since
 UPDATE conversations
 SET waiting_since = $2,
     updated_at = NOW()
-WHERE uuid = $1;
+WHERE uuid = $1 AND waiting_since IS NULL;
 
 -- name: update-conversation-reply-timestamps
 WITH old AS (
@@ -511,6 +659,7 @@ WHERE
   AND status_id IN (
     SELECT id FROM conversation_statuses WHERE name NOT IN ('Open')
   )
+RETURNING id;
 
 -- name: get-conversation-by-message-id
 SELECT
@@ -527,10 +676,43 @@ DELETE FROM conversations WHERE uuid = $1;
 
 -- MESSAGE queries.
 -- name: delete-message
-DELETE FROM conversation_messages WHERE CASE 
-    WHEN $1 > 0 THEN id = $1 
-    ELSE uuid = $2 
+DELETE FROM conversation_messages WHERE CASE
+    WHEN $1 > 0 THEN id = $1
+    ELSE uuid = $2
 END;
+
+-- name: delete-private-message
+-- $1 = message uuid, $2 = conversation uuid, $3 = deleted placeholder text, $4 = sender id, 0 to skip the sender check.
+WITH deleted AS (
+    UPDATE conversation_messages
+    SET content = $3, text_content = $3, updated_at = NOW(),
+        meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('deleted_at', NOW())
+    WHERE uuid = $1
+      AND private = true
+      AND meta->>'deleted_at' IS NULL
+      AND ($4 = 0 OR sender_id = $4)
+      AND conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
+    RETURNING id, conversation_id, created_at
+),
+media_unlink AS (
+    UPDATE media SET model_id = 0
+    FROM deleted d
+    WHERE media.model_type = 'messages' AND media.model_id = d.id
+),
+preview AS (
+    UPDATE conversations c
+    SET last_message = $3, updated_at = NOW()
+    FROM deleted d
+    WHERE c.id = d.conversation_id
+      AND NOT EXISTS (
+          SELECT 1 FROM conversation_messages m2
+          WHERE m2.conversation_id = d.conversation_id
+            AND m2.created_at > d.created_at
+      )
+    RETURNING c.id
+)
+SELECT EXISTS (SELECT 1 FROM preview) AS preview_updated
+FROM deleted d;
 
 -- name: get-message-source-ids
 SELECT 
@@ -784,14 +966,14 @@ SET last_continuity_email_sent_at = NOW(),
 WHERE id = $1;
 
 -- name: upsert-conversation-draft
-INSERT INTO conversation_drafts (conversation_id, user_id, content, meta, updated_at)
-VALUES ($1, $2, $3, $4, NOW())
-ON CONFLICT (conversation_id, user_id)
+INSERT INTO conversation_drafts (conversation_id, user_id, type, content, meta, updated_at)
+VALUES ($1, $2, $3, $4, $5, NOW())
+ON CONFLICT (conversation_id, user_id, type)
 DO UPDATE SET content = EXCLUDED.content, meta = EXCLUDED.meta, updated_at = NOW()
 RETURNING *;
 
 -- name: get-all-user-drafts
-SELECT cd.id, cd.conversation_id, cd.user_id, cd.content, cd.meta, cd.created_at, cd.updated_at, c.uuid as conversation_uuid
+SELECT cd.id, cd.conversation_id, cd.user_id, cd.type, cd.content, cd.meta, cd.created_at, cd.updated_at, c.uuid as conversation_uuid
 FROM conversation_drafts cd
 INNER JOIN conversations c ON cd.conversation_id = c.id
 WHERE cd.user_id = $1
@@ -802,7 +984,8 @@ DELETE FROM conversation_drafts
 WHERE conversation_id IN (
   SELECT id FROM conversations
   WHERE ($1 > 0 AND id = $1) OR (NULLIF($2, '')::uuid IS NOT NULL AND uuid = NULLIF($2, '')::uuid)
-) AND user_id = $3;
+) AND user_id = $3
+AND ($4::text = '' OR type = $4::text);
 
 -- name: delete-stale-drafts
 DELETE FROM conversation_drafts
@@ -813,19 +996,21 @@ INSERT INTO conversation_mentions (conversation_id, message_id, mentioned_user_i
 VALUES ($1, $2, $3, $4, $5);
 
 -- name: mark-conversation-unread
-INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
-VALUES (
-    $1,
-    (SELECT id FROM conversations WHERE uuid = $2),
-    (SELECT created_at - INTERVAL '1 second' FROM conversation_messages
-     WHERE conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
-     ORDER BY created_at DESC LIMIT 1)
+WITH target AS (
+    SELECT id FROM conversations WHERE uuid = $2
+),
+last_msg AS (
+    SELECT created_at - INTERVAL '1 second' AS ts
+    FROM conversation_messages
+    WHERE conversation_id = (SELECT id FROM target)
+      AND (meta IS NULL OR NOT COALESCE((meta->>'continuity_email')::boolean, false))
+    ORDER BY created_at DESC LIMIT 1
 )
+INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
+SELECT $1, (SELECT id FROM target), ts FROM last_msg
 ON CONFLICT (conversation_id, user_id)
 DO UPDATE SET
-    last_seen_at = (SELECT created_at - INTERVAL '1 second' FROM conversation_messages
-                    WHERE conversation_id = (SELECT id FROM conversations WHERE uuid = $2)
-                    ORDER BY created_at DESC LIMIT 1),
+    last_seen_at = EXCLUDED.last_seen_at,
     updated_at = NOW();
 
 -- name: get-active-livechat-conversations-by-agent

@@ -9,6 +9,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/tag/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/lib/pq"
 	"github.com/zerodha/logf"
 )
 
@@ -32,10 +33,11 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	GetAllTags *sqlx.Stmt `query:"get-all-tags"`
-	InsertTag  *sqlx.Stmt `query:"insert-tag"`
-	DeleteTag  *sqlx.Stmt `query:"delete-tag"`
-	UpdateTag  *sqlx.Stmt `query:"update-tag"`
+	GetAllTags   *sqlx.Stmt `query:"get-all-tags"`
+	GetTagsByIDs *sqlx.Stmt `query:"get-tags-by-ids"`
+	InsertTag    *sqlx.Stmt `query:"insert-tag"`
+	DeleteTag    *sqlx.Stmt `query:"delete-tag"`
+	UpdateTag    *sqlx.Stmt `query:"update-tag"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -53,11 +55,21 @@ func New(opts Opts) (*Manager, error) {
 	}, nil
 }
 
-// GetAll retrieves all tags.
-func (t *Manager) GetAll() ([]models.Tag, error) {
+// GetAll retrieves tags matching query, all of them when pageSize is 0.
+func (t *Manager) GetAll(query string, page, pageSize int) ([]models.Tag, error) {
 	var tags = make([]models.Tag, 0)
-	if err := t.q.GetAllTags.Select(&tags); err != nil {
+	if err := t.q.GetAllTags.Select(&tags, query, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
 		t.lo.Error("error fetching tags", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return tags, nil
+}
+
+// GetByIDs retrieves the tags with the given IDs.
+func (t *Manager) GetByIDs(ids []int) ([]models.Tag, error) {
+	var tags = make([]models.Tag, 0)
+	if err := t.q.GetTagsByIDs.Select(&tags, pq.Array(ids)); err != nil {
+		t.lo.Error("error fetching tags by ids", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return tags, nil

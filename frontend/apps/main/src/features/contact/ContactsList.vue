@@ -25,7 +25,9 @@
                 <SelectValue :placeholder="orderByField" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="'users.created_at'">{{ $t('globals.terms.createdAt') }}</SelectItem>
+                <SelectItem :value="'users.created_at'">{{
+                  $t('globals.terms.createdAt')
+                }}</SelectItem>
                 <SelectItem :value="'users.email'">{{ $t('globals.terms.email') }}</SelectItem>
               </SelectContent>
             </Select>
@@ -90,13 +92,20 @@
                   {{ contact.first_name }} {{ contact.last_name }}
                 </h4>
                 <Badge v-if="contact.type" variant="secondary" class="text-xs px-1.5 py-0">
-                  {{ contact.type === 'visitor' ? $t('contact.type.visitor') : $t('contact.type.contact') }}
+                  {{
+                    contact.type === 'visitor'
+                      ? $t('contact.type.visitor')
+                      : $t('contact.type.contact')
+                  }}
                 </Badge>
               </div>
               <p class="text-xs text-muted-foreground truncate">
                 {{ contact.email }}
               </p>
-              <div v-if="contact.external_user_id" class="flex items-center gap-1 text-xs text-muted-foreground">
+              <div
+                v-if="contact.external_user_id"
+                class="flex items-center gap-1 text-xs text-muted-foreground"
+              >
                 <IdCardIcon size="12" class="flex-shrink-0" />
                 <span class="truncate">{{ contact.external_user_id }}</span>
               </div>
@@ -109,17 +118,10 @@
       </template>
     </div>
 
-    <PaginationBar
-      v-model:page="page"
-      v-model:per-page="perPage"
-      :total-pages="totalPages"
-    />
+    <PaginationBar v-model:page="page" v-model:per-page="perPage" :total-pages="totalPages" />
   </div>
 
-  <CreateContactDialog
-    v-model:open="showCreateDialog"
-    @created="onContactCreated"
-  />
+  <CreateContactDialog v-model:open="showCreateDialog" @created="onContactCreated" />
 </template>
 
 <script setup>
@@ -162,15 +164,21 @@ const showCreateDialog = ref(false)
 const emitter = useEmitter()
 const router = useRouter()
 const userStore = useUserStore()
+let fetchRequestId = 0
 
 const fetchContactsDebounced = useDebounceFn(() => {
-  fetchContacts()
+  if (page.value === 1) {
+    fetchContacts()
+  } else {
+    page.value = 1
+  }
 }, 300)
 
 const fetchContacts = async () => {
+  const requestId = ++fetchRequestId
   loading.value = true
   let filterJSON = ''
-  if (searchTerm.value && searchTerm.value.length > 3) {
+  if (searchTerm.value && searchTerm.value.length >= 3) {
     filterJSON = JSON.stringify([
       {
         model: 'users',
@@ -188,16 +196,18 @@ const fetchContacts = async () => {
       order: orderByDirection.value,
       order_by: orderByField.value
     })
+    if (requestId !== fetchRequestId) return
     contacts.value = response.data.data.results
     totalPages.value = response.data.data.total_pages
     total.value = response.data.data.total
   } catch (error) {
+    if (requestId !== fetchRequestId) return
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
   } finally {
-    loading.value = false
+    if (requestId === fetchRequestId) loading.value = false
   }
 }
 

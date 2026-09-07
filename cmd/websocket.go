@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
@@ -13,15 +13,13 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// ErrHandler is a custom error handler.
-func ErrHandler(ctx *fasthttp.RequestCtx, status int, reason error) {
-	fmt.Printf("error status %d: %s", status, reason)
-}
+var wsWriteBufferPool = &sync.Pool{}
 
 // agentUpgrader: same-origin only, with loopback allowed for dev.
 var agentUpgrader = websocket.FastHTTPUpgrader{
 	ReadBufferSize:  8192,
 	WriteBufferSize: 8192,
+	WriteBufferPool: wsWriteBufferPool,
 	CheckOrigin: func(ctx *fasthttp.RequestCtx) bool {
 		origin := string(ctx.Request.Header.Peek("Origin"))
 		if origin == "" {
@@ -47,10 +45,16 @@ var agentUpgrader = websocket.FastHTTPUpgrader{
 var widgetUpgrader = websocket.FastHTTPUpgrader{
 	ReadBufferSize:  8192,
 	WriteBufferSize: 8192,
+	WriteBufferPool: wsWriteBufferPool,
 	CheckOrigin: func(ctx *fasthttp.RequestCtx) bool {
 		return true
 	},
 	Error: ErrHandler,
+}
+
+// ErrHandler writes the handshake failure response.
+func ErrHandler(ctx *fasthttp.RequestCtx, status int, reason error) {
+	ctx.Error(reason.Error(), status)
 }
 
 // handleWS handles the websocket connection.

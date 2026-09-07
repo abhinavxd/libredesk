@@ -47,6 +47,9 @@ func handleCreateUserView(r *fastglue.Request) error {
 	if string(view.Filters) == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`Filters`"), nil, envelope.InputError)
 	}
+	if err := app.conversation.ValidateListFilters(string(view.Filters)); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	createdView, err := app.view.Create(view.Name, view.Filters, user.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -105,6 +108,9 @@ func handleUpdateUserView(r *fastglue.Request) error {
 	}
 	if string(view.Filters) == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`filters`"), nil, envelope.InputError)
+	}
+	if err := app.conversation.ValidateListFilters(string(view.Filters)); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 	v, err := app.view.Get(id)
 	if err != nil {
@@ -263,6 +269,9 @@ func validateSharedView(app *App, view vmodels.View) error {
 	}
 	if string(view.Filters) == "" {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`filters`"), nil)
+	}
+	if err := app.conversation.ValidateListFilters(string(view.Filters)); err != nil {
+		return err
 	}
 	if view.Visibility != vmodels.VisibilityAll && view.Visibility != vmodels.VisibilityTeam {
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)

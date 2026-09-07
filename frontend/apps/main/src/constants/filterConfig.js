@@ -1,3 +1,11 @@
+export const LOGIC = {
+    AND: 'AND',
+    OR: 'OR'
+}
+
+// Mirrors dbutil.MaxFilterGroups on the backend.
+export const MAX_FILTER_GROUPS = 10
+
 export const FIELD_TYPE = {
     SELECT: 'select',
     TAG: 'tag',
@@ -7,6 +15,8 @@ export const FIELD_TYPE = {
     RICHTEXT: 'richtext',
     BOOLEAN: 'boolean',
     DATE: 'date',
+    WEBHOOK: 'webhook',
+    RECIPIENTS: 'recipients',
 }
 
 export const OPERATOR = {
@@ -18,7 +28,19 @@ export const OPERATOR = {
     NOT_CONTAINS: 'not contains',
     GREATER_THAN: 'greater than',
     LESS_THAN: 'less than',
-    BETWEEN: 'between'
+    BETWEEN: 'between',
+    STARTS_WITH: 'starts with'
+}
+
+// operatorLabel returns a clearer display label for operators whose meaning is ambiguous with
+// multiple values (contains = matches ANY of the values). Other operators display as-is.
+const OPERATOR_LABEL_KEYS = {
+    [OPERATOR.CONTAINS]: 'filter.containsAnyOf',
+    [OPERATOR.NOT_CONTAINS]: 'filter.containsNoneOf'
+}
+export const operatorLabel = (op, t) => {
+    const key = OPERATOR_LABEL_KEYS[op]
+    return key ? t(key) : op
 }
 
 export const FIELD_OPERATORS = {
@@ -32,6 +54,18 @@ export const FIELD_OPERATORS = {
         OPERATOR.CONTAINS,
         OPERATOR.NOT_CONTAINS
     ],
+    // "starts with" is only implemented by the automation evaluator, not the SQL filter builder.
+    TEXT_AUTOMATION: [
+        OPERATOR.EQUALS,
+        OPERATOR.NOT_EQUALS,
+        OPERATOR.SET,
+        OPERATOR.NOT_SET,
+        OPERATOR.CONTAINS,
+        OPERATOR.NOT_CONTAINS,
+        OPERATOR.STARTS_WITH
+    ],
+    // For text columns that do not support partial matching, only allow exact match operators.
+    TEXT_EXACT: [OPERATOR.EQUALS, OPERATOR.NOT_EQUALS, OPERATOR.SET, OPERATOR.NOT_SET],
     DATE: [
         OPERATOR.EQUALS,
         OPERATOR.NOT_EQUALS,

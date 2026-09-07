@@ -1,0 +1,50 @@
+name: Go build cache
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - go.mod
+      - go.sum
+      - .github/workflows/go-build-cache.yml
+  workflow_dispatch:
+
+jobs:
+  warm-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.0"
+          cache: false
+
+      - name: Go build cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: release-go-${{ runner.os }}-${{ hashFiles('go.sum') }}
+
+      - name: Compile all release targets
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          for target in \
+            darwin/amd64 darwin/arm64 \
+            linux/amd64 linux/arm64 linux/arm/6 linux/arm/7 \
+            windows/amd64 windows/arm64 windows/arm/6 windows/arm/7 \
+            freebsd/amd64 freebsd/arm64 freebsd/arm/6 freebsd/arm/7 \
+            netbsd/amd64 netbsd/arm64 netbsd/arm/6 netbsd/arm/7 \
+            openbsd/amd64 openbsd/arm64 openbsd/arm/6 openbsd/arm/7; do
+            IFS=/ read -r os arch arm <<< "$target"
+            echo "→ $target"
+            GOOS=$os GOARCH=$arch GOARM=$arm go build -o /dev/null ./cmd
+          done

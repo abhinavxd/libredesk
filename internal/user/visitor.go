@@ -21,7 +21,7 @@ func (u *Manager) CreateVisitor(user *models.User) error {
 		}
 	}
 
-	if err := u.q.InsertVisitor.Get(user, user.Email, user.FirstName, user.LastName, user.CustomAttributes); err != nil {
+	if err := u.q.InsertVisitor.Get(user, user.Email, user.FirstName, user.LastName, user.CustomAttributes, user.PhoneNumber, user.PhoneNumberCountryCode); err != nil {
 		u.lo.Error("error inserting contact", "error", err)
 		return fmt.Errorf("insert contact: %w", err)
 	}

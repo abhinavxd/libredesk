@@ -54,7 +54,7 @@
                 <div class="relative">
                   <CopyButton :text="status.logs.join('\n')" class="absolute top-2 right-2 z-10" />
                   <div
-                    class="bg-black text-white p-4 text-xs font-mono min-h-24 max-h-60 overflow-y-auto space-y-1 logs-scroll-container"
+                    class="bg-muted text-foreground p-4 text-xs font-mono min-h-24 max-h-60 overflow-y-auto space-y-1 logs-scroll-container"
                   >
                     <div v-for="(log, idx) in status.logs.filter((l) => l && l.trim())" :key="idx">
                       {{ log }}

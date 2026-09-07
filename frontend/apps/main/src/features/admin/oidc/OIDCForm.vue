@@ -175,7 +175,7 @@ watch(
     if (newValues && newValues.provider !== 'Custom') {
       newValues.logo_url = ''
     }
-    form.setValues(newValues)
+    form.setValues(newValues, false)
   },
   { deep: true, immediate: true }
 )

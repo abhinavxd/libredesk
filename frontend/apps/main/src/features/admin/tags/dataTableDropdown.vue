@@ -3,14 +3,20 @@
     <DropdownMenuTrigger as-child>
       <Button variant="ghost" class="w-8 h-8 p-0">
         <span class="sr-only"></span>
-        <MoreHorizontal class="w-4 h-4" />
+        <MoreVertical class="w-4 h-4" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>
       <DropdownMenuItem @click="editTag">
+        <Pencil class="mr-2 h-4 w-4" />
         {{ t('globals.messages.edit') }}
       </DropdownMenuItem>
-      <DropdownMenuItem @click="() => (alertOpen = true)">
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        @click="() => (alertOpen = true)"
+        class="text-destructive focus:text-destructive"
+      >
+        <Trash class="mr-2 h-4 w-4" />
         {{ t('globals.messages.delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
@@ -26,7 +32,9 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="deleteTag">{{ t('globals.messages.delete') }}</AlertDialogAction>
+        <AlertDialogAction variant="destructive" @click="deleteTag">{{
+          t('globals.messages.delete')
+        }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
@@ -34,11 +42,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreHorizontal } from 'lucide-vue-next'
+import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu/index.js'
 import { Button } from '@shared-ui/components/ui/button/index.js'

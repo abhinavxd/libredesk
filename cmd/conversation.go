@@ -2,13 +2,15 @@ package main
 
 import (
 	"encoding/json"
-	"slices"
+	"fmt"
+	"mime"
 	"strconv"
+	"strings"
 	"time"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/automation/models"
+	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -50,10 +52,12 @@ type createConversationRequest struct {
 	FirstName        string         `json:"first_name"`
 	LastName         string         `json:"last_name"`
 	ExternalUserID   string         `json:"external_user_id"`
+	ReuseContact     bool           `json:"reuse_contact"`
 	Subject          string         `json:"subject"`
 	Content          string         `json:"content"`
 	Attachments      []int          `json:"attachments"`
 	Initiator        string         `json:"initiator"` // "contact" | "agent"
+	SourceID         string         `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact-initiated only.
 	CustomAttributes map[string]any `json:"custom_attributes"`
 }
 
@@ -199,46 +203,11 @@ func handleGetViewConversations(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	hasAccess := false
-	switch view.Visibility {
-	case vmodels.VisibilityUser:
-		hasAccess = view.UserID != nil && *view.UserID == auser.ID
-	case vmodels.VisibilityAll:
-		hasAccess = true
-	case vmodels.VisibilityTeam:
-		if view.TeamID != nil {
-			hasAccess = slices.Contains(user.Teams.IDs(), *view.TeamID)
-		}
-	}
-
-	if !hasAccess {
+	if !conversation.UserCanAccessView(view, auser.ID, user.Teams.IDs()) {
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("conversation.viewPermissionDenied"), nil, envelope.PermissionError)
 	}
 
-	// Prepare lists user has access to based on user permissions, internally this prepares the SQL query.
-	lists := []string{}
-	hasTeamAll := slices.Contains(user.Permissions, authzModels.PermConversationsReadTeamAll)
-	for _, perm := range user.Permissions {
-		if perm == authzModels.PermConversationsReadAll {
-			// No further lists required as user has access to all conversations.
-			lists = []string{cmodels.AllConversations}
-			break
-		}
-		if perm == authzModels.PermConversationsReadUnassigned {
-			lists = append(lists, cmodels.UnassignedConversations)
-		}
-		if perm == authzModels.PermConversationsReadAssigned {
-			lists = append(lists, cmodels.AssignedConversations)
-		}
-		// Skip TeamUnassignedConversations if user has TeamAllConversations (superset).
-		if perm == authzModels.PermConversationsReadTeamInbox && !hasTeamAll {
-			lists = append(lists, cmodels.TeamUnassignedConversations)
-		}
-		if perm == authzModels.PermConversationsReadTeamAll {
-			lists = append(lists, cmodels.TeamAllConversations)
-		}
-	}
-
+	lists := conversation.ListsForUserPermissions(user.Permissions)
 	// No lists found, user doesn't have access to any conversations.
 	if len(lists) == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
@@ -259,6 +228,73 @@ func handleGetViewConversations(r *fastglue.Request) error {
 		TotalPages: (total + pageSize - 1) / pageSize,
 		Page:       page,
 	})
+}
+
+// handleGetSidebarCounts returns open-conversation counts for inbox sidebar badges.
+func handleGetSidebarCounts(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	personalViews, err := app.view.GetUsersViews(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	sharedViews, err := app.view.GetSharedViewsForUser(user.Teams.IDs())
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	allViews := make([]vmodels.View, 0, len(personalViews)+len(sharedViews))
+	allViews = append(allViews, personalViews...)
+	allViews = append(allViews, sharedViews...)
+
+	counts, err := app.conversation.GetSidebarCounts(user.ID, user.Permissions, user.Teams.IDs(), allViews)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(counts)
+}
+
+// handleGetViewCount returns the sidebar badge count for one view.
+func handleGetViewCount(r *fastglue.Request) error {
+	var (
+		app       = r.Context.(*App)
+		auser     = r.RequestCtx.UserValue("user").(amodels.User)
+		viewID, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	)
+	if viewID < 1 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+
+	view, err := app.view.Get(viewID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if !conversation.UserCanAccessView(view, auser.ID, user.Teams.IDs()) {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("conversation.viewPermissionDenied"), nil, envelope.PermissionError)
+	}
+
+	count, err := app.conversation.GetViewCount(user.ID, user.Permissions, user.Teams.IDs(), view)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(map[string]int{"count": count})
 }
 
 // handleGetTeamUnassignedConversations returns conversations assigned to a team but not to any user.
@@ -326,6 +362,40 @@ func handleGetConversation(r *fastglue.Request) error {
 	prev, _ := app.conversation.GetContactPreviousConversations(conv.ContactID, 10)
 	conv.PreviousConversations = filterCurrentPreviousConv(prev, conv.UUID)
 	return r.SendEnvelope(conv)
+}
+
+// handleDownloadConversationTranscript sends the conversation transcript as a text file download.
+func handleDownloadConversationTranscript(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	conversation, err := enforceConversationAccess(app, uuid, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	private := false
+	messages, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, 0)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	transcript := app.conversation.BuildTranscript(*conversation, messages, time.Now())
+	safeRef := stringutil.SanitizeFilename(conversation.ReferenceNumber)
+	filename := fmt.Sprintf("transcript-%s.txt", safeRef)
+	r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
+	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+	r.RequestCtx.SetContentType("text/plain; charset=utf-8")
+	r.RequestCtx.SetBody(transcript)
+	return nil
 }
 
 // handleGetContactPageVisits returns the recent page visits for the contact of a conversation.
@@ -573,20 +643,7 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 	if err := app.conversation.UpdateConversationStatus(uuid, 0 /**status_id**/, status, snoozedUntil, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-
-	// If status is `Resolved`, send CSAT survey if enabled on inbox.
-	if status == cmodels.StatusResolved {
-		// Check if CSAT is enabled on the inbox and send CSAT survey message.
-		inbox, err := app.inbox.GetDBRecord(conversation.InboxID)
-		if err != nil {
-			return sendErrorEnvelope(r, err)
-		}
-		if inbox.CSATEnabled {
-			if err := app.conversation.SendCSATReply(user.ID, *conversation); err != nil {
-				return sendErrorEnvelope(r, err)
-			}
-		}
-	}
+	markAssignmentNotificationRead(app, conversation, user)
 	return r.SendEnvelope(true)
 }
 
@@ -722,7 +779,7 @@ func handleRemoveUserAssignee(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if err = app.conversation.RemoveConversationAssignee(uuid, "user", user); err != nil {
+	if err = app.conversation.UnassignConversationUser(uuid, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)
@@ -772,27 +829,41 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
-	// Validate the request
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
 	if err := validateCreateConversationRequest(req, app); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	to := []string{req.Email}
+	email := req.Email
+	to := []string{email}
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Find or create contact.
 	contact := umodels.User{
-		Email:            null.StringFrom(req.Email),
+		Email:            null.StringFrom(email),
 		FirstName:        req.FirstName,
 		LastName:         req.LastName,
 		ExternalUserID:   null.NewString(req.ExternalUserID, req.ExternalUserID != ""),
 		CustomAttributes: json.RawMessage(`{}`),
 	}
-	if err := app.user.CreateContact(&contact); err != nil {
+	canWriteContacts, err := app.authz.Enforce(user, "contacts", "write")
+	if err != nil {
+		app.lo.Error("error checking permission", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
+	policy := umodels.ContactReuse
+	if canWriteContacts && !req.ReuseContact {
+		policy = umodels.ContactSync
+	}
+	if err := app.user.ResolveContact(&contact, policy); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
+	// A contact matched by external ID keeps its stored email as the recipient.
+	if policy == umodels.ContactReuse && contact.Email.String != "" {
+		to = []string{contact.Email.String}
 	}
 
 	// Create conversation first.
@@ -818,6 +889,14 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	// Assign team first, it clears any assigned agent.
+	if req.AssignedTeamID > 0 {
+		app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
+	}
+	if req.AssignedAgentID > 0 {
+		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
+	}
+
 	// Send initial message based on the initiator of conversation.
 	switch req.Initiator {
 	case umodels.UserTypeAgent:
@@ -835,7 +914,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		}
 	case umodels.UserTypeContact:
 		// Create contact message.
-		if _, err := app.conversation.CreateContactMessage(media, contact.ID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true); err != nil {
+		if _, err := app.conversation.CreateContactMessage(media, contact.ID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true, req.SourceID); err != nil {
 			// Delete the conversation if message creation fails.
 			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 				app.lo.Error("error deleting conversation", "error", err)
@@ -847,19 +926,10 @@ func handleCreateConversation(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
-	// Assign the conversation to team/agent if provided, always assign team first as it clears assigned agent.
-	if req.AssignedTeamID > 0 {
-		app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
-	}
-	if req.AssignedAgentID > 0 {
-		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
-	}
-
 	conversation, _ := app.conversation.GetConversation(conversationID, "", "")
 	return r.SendEnvelope(conversation)
 }
 
-// validateCreateConversationRequest validates the create conversation request fields.
 func validateCreateConversationRequest(req createConversationRequest, app *App) error {
 	if req.InboxID <= 0 {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`inbox_id`"), nil)

@@ -6,6 +6,24 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      db:
+        image: postgres:17-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: libredesk
+          POSTGRES_PASSWORD: libredesk
+          POSTGRES_DB: libredesk
+        options: >-
+          --health-cmd="pg_isready -U libredesk"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      LIBREDESK_TEST_DB_DSN: "postgres://libredesk:libredesk@127.0.0.1:5432/libredesk?sslmode=disable&connect_timeout=3"
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -13,7 +31,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24.3"
+          go-version: "1.25.0"
 
       - name: Install dependencies
         run: go get -v ./...

@@ -1,0 +1,221 @@
+{{ define "docs-header" }}
+{{ template "hc-head" . }}
+<body class="hcd">
+    <a class="hc-skip-link" href="#hc-main">{{ .L.T "helpCenter.skipToContent" }}</a>
+    {{ template "hc-announcement" . }}
+    <header class="hcd-topbar">
+        <div class="hcd-topbar-inner">
+            <div class="hcd-topbar-start">
+                <button type="button" class="hcd-sidebar-toggle" data-hcd-sidebar-toggle aria-expanded="false" aria-controls="hcd-sidebar" aria-label="{{ .L.T "globals.terms.menu" }}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
+                </button>
+                <a class="hcd-brand" href="{{ .Data.HelpCenter.BasePath }}">
+                    {{ if .Data.HelpCenter.LogoURL }}<img src="{{ .Data.HelpCenter.LogoURL }}" alt="{{ .Data.HelpCenter.Name }}" />{{ else }}<span class="hcd-brand-name">{{ .Data.HelpCenter.Name }}</span>{{ end }}
+                </a>
+            </div>
+            <a class="hcd-search-btn" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open>
+                {{ template "hc-search-icon" }}
+                <span class="hcd-search-btn-label">{{ .L.T "globals.terms.search" }}</span>
+                <span class="hcd-kbd-combo" aria-hidden="true"><kbd class="hcd-kbd hcd-kbd-mod">Ctrl</kbd><kbd class="hcd-kbd">K</kbd></span>
+            </a>
+            <div class="hcd-topbar-end">
+                {{ if .Data.HelpCenter.NavLinks }}
+                <nav class="hcd-topnav" aria-label="{{ .L.T "globals.terms.main" }}">
+                    {{ range .Data.HelpCenter.NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
+                </nav>
+                {{ end }}
+                {{ if gt (len .Data.HelpCenter.AvailableLocales) 1 }}{{ template "hc-lang-switcher" . }}{{ end }}
+            </div>
+        </div>
+    </header>
+
+    <div class="hcd-search-layer" data-hcd-search hidden>
+        <div class="hcd-search-backdrop" data-hcd-search-close></div>
+        <div class="hcd-search-panel" role="dialog" aria-modal="true" aria-label="{{ .L.T "globals.terms.search" }}">
+            <form class="hc-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search" data-hc-base="{{ .Data.HelpCenter.BasePath }}" data-hc-slug="{{ .Data.HelpCenter.Slug }}" data-hc-locale="{{ .Data.HelpCenter.CurrentLocale }}" data-hc-empty="{{ .L.T "helpCenter.noResults" }}" data-hc-results-one="{{ .L.Tc "helpCenter.resultsCount" 1 }}" data-hc-results="{{ .L.Tc "helpCenter.resultsCount" 2 }}">
+                {{ template "hc-search-icon" "hc-search-icon" }}
+                <input type="search" name="q" value="" placeholder="{{ .L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ .L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
+                <button type="submit" class="hc-sr-only">{{ .L.T "globals.terms.search" }}</button>
+            </form>
+            <div class="hcd-search-hints">
+                <span><kbd class="hcd-kbd">↑</kbd><kbd class="hcd-kbd">↓</kbd> {{ .L.T "command.navigate" }}</span>
+                <span><kbd class="hcd-kbd">↵</kbd> {{ .L.T "globals.terms.select" }}</span>
+                <span><kbd class="hcd-kbd">esc</kbd> {{ .L.T "globals.messages.close" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="hcd-shell">
+        <div class="hcd-sidebar-backdrop" data-hcd-sidebar-close></div>
+        <aside class="hcd-sidebar" id="hcd-sidebar">
+            {{ if .Data.Tree }}
+            <nav class="hcd-nav" aria-label="{{ .L.Tc "globals.terms.collection" 2 }}">
+                {{ range .Data.Tree }}
+                {{ template "docs-nav-group" (map "Node" . "Root" true "Base" $.Data.HelpCenter.BasePath "ActiveCollection" $.Data.ActiveCollection "ActiveArticle" $.Data.ActiveArticle) }}
+                {{ end }}
+            </nav>
+            {{ end }}
+        </aside>
+        <main id="hc-main" tabindex="-1">
+{{ end }}
+
+{{ define "docs-nav-group" }}
+<div class="hcd-nav-group{{ if .Root }} hcd-nav-root{{ end }}"{{ if eq .ActiveCollection .Node.Slug }} data-open{{ end }}>
+    <div class="hcd-nav-summary">
+        <a class="hcd-nav-head" {{ if and (eq .ActiveCollection .Node.Slug) (not .ActiveArticle) }}aria-current="page" {{ end }}href="{{ .Base }}/collections/{{ .Node.Slug }}">
+            {{ if .Root }}<span class="hcd-nav-icon">{{ with LucideIcon .Node.Icon }}{{ . }}{{ else }}{{ LucideIcon "folder" }}{{ end }}</span>{{ end }}
+            <span>{{ .Node.Name }}</span>
+        </a>
+        <button type="button" class="hcd-nav-toggle" aria-label="{{ .Node.Name }}" aria-expanded="{{ if eq .ActiveCollection .Node.Slug }}true{{ else }}false{{ end }}">
+            <svg class="hcd-nav-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+    </div>
+    <div class="hcd-nav-body">
+        {{ if .Node.Articles }}
+        <ul class="hcd-nav-list">
+            {{ range .Node.Articles }}
+            <li><a {{ if eq $.ActiveArticle .Slug }}aria-current="page" {{ end }}href="{{ $.Base }}/articles/{{ .Slug }}">{{ .Title }}</a></li>
+            {{ end }}
+        </ul>
+        {{ end }}
+        {{ range .Node.Children }}
+        {{ template "docs-nav-group" (map "Node" . "Root" false "Base" $.Base "ActiveCollection" $.ActiveCollection "ActiveArticle" $.ActiveArticle) }}
+        {{ end }}
+    </div>
+</div>
+{{ end }}
+
+{{ define "docs-footer" }}
+        </main>
+    </div>
+    <footer class="hcd-footer">
+        <div class="hcd-footer-inner">
+            {{ if .Data.HelpCenter.FooterTaglineHTML }}<p class="hcd-footer-tagline">{{ .Data.HelpCenter.FooterTaglineHTML }}</p>{{ end }}
+            {{ if .Data.HelpCenter.Theme.FooterLinks }}
+            <nav class="hcd-footer-links" aria-label="{{ .L.T "globals.terms.footer" }}">
+                {{ range .Data.HelpCenter.Theme.FooterLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
+            </nav>
+            {{ end }}
+            {{ if .Data.HelpCenter.Theme.SocialLinks }}
+            <div class="hcd-footer-social">
+                {{ range .Data.HelpCenter.Theme.SocialLinks }}<a href="{{ .URL }}" target="_blank" rel="noreferrer" aria-label="{{ .Platform }}">{{ template "hc-social-icon" .Platform }}</a>{{ end }}
+            </div>
+            {{ end }}
+            <p class="hcd-footer-powered">{{ .L.T "helpCenter.poweredBy" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
+        </div>
+    </footer>
+    {{ template "hc-shared-behavior" }}
+    <script>
+    (function () {
+        var layer = document.querySelector('[data-hcd-search]');
+        var input = layer && layer.querySelector('input[name="q"]');
+        var lastOpener = null;
+        function openSearch() {
+            lastOpener = document.activeElement;
+            layer.hidden = false;
+            document.body.setAttribute('data-hcd-modal-open', '');
+            if (input) { input.value = ''; input.focus(); }
+        }
+        function closeSearch() {
+            layer.hidden = true;
+            document.body.removeAttribute('data-hcd-modal-open');
+            if (lastOpener && lastOpener.focus) lastOpener.focus();
+        }
+        if (layer) {
+            document.querySelectorAll('[data-hcd-search-open]').forEach(function (el) {
+                el.addEventListener('click', function (e) { e.preventDefault(); openSearch(); });
+            });
+            layer.querySelector('[data-hcd-search-close]').addEventListener('click', closeSearch);
+            layer.addEventListener('keydown', function (e) {
+                if (e.key !== 'Tab') return;
+                var items = layer.querySelectorAll('a[href], button, input');
+                if (!items.length) return;
+                var first = items[0], last = items[items.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            });
+            document.addEventListener('keydown', function (e) {
+                if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    if (layer.hidden) { openSearch(); } else { closeSearch(); }
+                    return;
+                }
+                if (e.key === 'Escape' && !layer.hidden) {
+                    // The typeahead's own Escape handler closes the suggestion panel first.
+                    var panel = layer.querySelector('.hc-typeahead');
+                    if (!panel || panel.hidden) closeSearch();
+                    return;
+                }
+                if (e.key === '/' && layer.hidden) {
+                    var t = e.target;
+                    if (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA' && !t.isContentEditable) { e.preventDefault(); openSearch(); }
+                }
+            });
+            if (/Mac|iPhone|iPad/.test(navigator.platform)) {
+                document.querySelectorAll('.hcd-kbd-mod').forEach(function (k) { k.textContent = '⌘'; });
+            }
+        }
+        var shell = document.querySelector('.hcd-shell');
+        var toggle = document.querySelector('[data-hcd-sidebar-toggle]');
+        if (shell && toggle) {
+            var closeSidebar = function () { shell.removeAttribute('data-sidebar-open'); toggle.setAttribute('aria-expanded', 'false'); };
+            toggle.addEventListener('click', function () {
+                var open = shell.hasAttribute('data-sidebar-open');
+                if (open) { closeSidebar(); } else { shell.setAttribute('data-sidebar-open', ''); toggle.setAttribute('aria-expanded', 'true'); }
+            });
+            var backdrop = shell.querySelector('[data-hcd-sidebar-close]');
+            if (backdrop) backdrop.addEventListener('click', closeSidebar);
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSidebar(); });
+        }
+        var setOpen = function (group, open) {
+            group.toggleAttribute('data-open', open);
+            var btn = group.querySelector(':scope > .hcd-nav-summary > .hcd-nav-toggle');
+            if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+        document.querySelectorAll('.hcd-nav-toggle').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var group = btn.closest('.hcd-nav-group');
+                setOpen(group, !group.hasAttribute('data-open'));
+            });
+        });
+        var current = document.querySelector('.hcd-nav [aria-current="page"]');
+        if (current) {
+            for (var g = current.closest('.hcd-nav-group'); g; g = g.parentElement && g.parentElement.closest('.hcd-nav-group')) setOpen(g, true);
+            if (current.scrollIntoView) current.scrollIntoView({ block: 'center' });
+        }
+    })();
+    </script>
+    <script src="/static/public/static/help-center-search.js?v={{ AssetVer }}" defer></script>
+    {{ if .Data.HelpCenter.CustomJS }}<script>{{ .Data.HelpCenter.CustomJS }}</script>{{ end }}
+</body>
+</html>
+{{ end }}
+
+{{ define "docs-breadcrumb" }}
+<nav class="hcd-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
+    <ol>
+        <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
+        {{ if .Collection }}{{ if .Collection.Name }}
+        <li><a href="{{ .Data.HelpCenter.BasePath }}/collections/{{ .Collection.Slug }}">{{ .Collection.Name }}</a></li>
+        {{ end }}{{ end }}
+        {{ if .Current }}<li><span class="hcd-crumb-current" aria-current="page">{{ .Current }}</span></li>{{ end }}
+    </ol>
+</nav>
+{{ end }}
+
+{{ define "docs-article-rows" }}
+<ul class="hcd-article-rows">
+    {{ range .Articles }}
+    <li>
+        <a href="{{ $.Base }}/articles/{{ .Slug }}">
+            {{ template "hc-doc-icon" }}
+            <span class="hcd-row-body">
+                <span class="hcd-row-title">{{ .Title }}</span>
+                {{ if .Excerpt }}<span class="hcd-row-excerpt">{{ .Excerpt }}</span>{{ end }}
+            </span>
+            {{ template "hc-arrow-icon" }}
+        </a>
+    </li>
+    {{ end }}
+</ul>
+{{ end }}

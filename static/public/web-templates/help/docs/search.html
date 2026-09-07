@@ -1,0 +1,30 @@
+{{ define "docs-help-search" }}
+{{ template "docs-header" . }}
+
+<form class="hcd-page-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search">
+    {{ template "hc-search-icon" "hc-search-icon" }}
+    <input type="search" name="q" value="{{ .Data.Query }}" placeholder="{{ .L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ .L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
+    <button type="submit" class="hc-sr-only">{{ .L.T "globals.terms.search" }}</button>
+</form>
+
+{{ if .Data.Query }}
+<h1 class="hcd-page-title">{{ .L.T "helpCenter.searchResults" }} &ldquo;{{ .Data.Query }}&rdquo;</h1>
+{{ if .Data.Results }}
+<ul class="hcd-results">
+    {{ range .Data.Results }}
+    <li>
+        <a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">{{ .Title }}</a>
+        {{ if .Content }}<p class="hcd-snippet">{{ .Content }}</p>{{ end }}
+    </li>
+    {{ end }}
+</ul>
+{{ else }}
+<p class="hcd-empty">{{ .L.T "helpCenter.noResults" }}</p>
+{{ end }}
+{{ else }}
+<h1 class="hcd-page-title">{{ .L.T "globals.terms.search" }}</h1>
+<p class="hcd-empty">{{ .L.T "globals.messages.startTypingToSearch" }}</p>
+{{ end }}
+
+{{ template "docs-footer" . }}
+{{ end }}

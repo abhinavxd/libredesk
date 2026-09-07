@@ -9,7 +9,7 @@
         variant="outline"
         size="sm"
         @click="startAddingNote"
-        v-if="!isAddingNote && !isLoading && notes.length !== 0 && userStore.can('contact_notes:write')"
+        v-if="!isAddingNote && !isLoading && (notes.length !== 0 || compact) && userStore.can('contact_notes:write')"
         class="transition-all hover:bg-primary/10 hover:border-primary/30"
       >
         <PlusIcon size="18" />
@@ -17,8 +17,12 @@
       </Button>
     </div>
 
-    <div class="h-52" v-if="isLoading">
-      <Spinner />
+    <div
+      v-if="isLoading"
+      class="flex items-center justify-center"
+      :class="compact ? 'py-4' : 'h-52'"
+    >
+      <Spinner :absolute="false" />
     </div>
 
     <!-- Note input -->
@@ -33,8 +37,10 @@
             />
           </div>
           <div class="flex justify-end space-x-3 pt-2">
-            <Button variant="outline" @click="cancelAddNote"> {{ $t('globals.messages.cancel') }} </Button>
-            <Button type="submit" :disabled="!newNote.trim()">
+            <Button type="button" variant="outline" @click="cancelAddNote">
+              {{ $t('globals.messages.cancel') }}
+            </Button>
+            <Button type="submit" :disabled="!newNote.trim() || isSaving" :isLoading="isSaving">
               {{ $t('contact.saveNote') }}
             </Button>
           </div>
@@ -47,7 +53,7 @@
       <Card
         v-for="note in visibleNotes"
         :key="note.id"
-        class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow"
+        class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow-md"
       >
         <!-- Header -->
         <CardHeader :class="compact ? 'p-3 pb-2' : 'bg-background border-b p-2'">
@@ -98,7 +104,7 @@
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-[180px]">
                 <DropdownMenuItem
-                  @click="deleteNote(note.id)"
+                  @click="promptDeleteNote(note.id)"
                   class="text-destructive cursor-pointer"
                 >
                   <TrashIcon class="mr-2" size="15" />
@@ -128,37 +134,55 @@
       </div>
     </div>
 
+    <AlertDialog :open="deleteDialogOpen" @update:open="(v) => (deleteDialogOpen = v)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ $t('contact.deleteNoteConfirmation') }}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" @click="confirmDeleteNote">
+            {{ $t('globals.messages.delete') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <!-- No notes message -->
-    <div
-      v-if="notes.length === 0 && !isAddingNote && !isLoading"
-      class="box border-dashed p-10 text-center bg-muted/50 mt-6"
-    >
-      <div class="flex flex-col items-center">
-        <div class="rounded-full bg-muted p-4 mb-2">
-          <MessageSquareIcon class="text-muted-foreground" size="25" />
-        </div>
-        <h3 class="mt-2 text-base font-medium text-foreground">
-          {{ $t('contact.notes.empty') }}
-        </h3>
-        <p class="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
-          {{ $t('contact.notes.help') }}
-        </p>
-        <Button
-          v-if="userStore.can('contact_notes:write')"
-          variant="outline"
-          class="mt-3"
-          @click="startAddingNote"
-        >
-          <PlusIcon size="15" />
-          {{ $t('contact.addNote') }}
-        </Button>
+    <template v-if="showEmpty">
+      <div v-if="compact" class="text-center text-sm text-muted-foreground py-4">
+        {{ $t('contact.notes.empty') }}
       </div>
-    </div>
+      <div v-else class="box border-dashed p-10 text-center bg-muted/50 mt-6">
+        <div class="flex flex-col items-center">
+          <h3 class="mt-2 text-base font-medium text-foreground">
+            {{ $t('contact.notes.empty') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
+            {{ $t('contact.notes.help') }}
+          </p>
+          <Button
+            v-if="userStore.can('contact_notes:write')"
+            variant="outline"
+            class="mt-3"
+            @click="startAddingNote"
+          >
+            <PlusIcon size="15" />
+            {{ $t('contact.addNote') }}
+          </Button>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
+<script>
+const notesCache = new Map()
+</script>
+
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { format, formatDistanceToNow } from 'date-fns'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardHeader, CardContent } from '@shared-ui/components/ui/card'
@@ -171,16 +195,20 @@ import {
   DropdownMenuItem
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
-  PlusIcon,
-  MoreVerticalIcon,
-  TrashIcon,
-  ClockIcon,
-  MessageSquareIcon
-} from 'lucide-vue-next'
-import Editor from '@main/components/editor/TextEditor.vue'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import { PlusIcon, MoreVerticalIcon, TrashIcon, ClockIcon } from 'lucide-vue-next'
+import Editor from '@main/components/editor/ConversationEditor.vue'
 import { useI18n } from 'vue-i18n'
 import { useEmitter } from '@main/composables/useEmitter'
-import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { EMITTER_EVENTS, CONTACT_ACTIONS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { getInitials } from '@shared-ui/utils/string'
 import { useUserStore } from '@main/stores/user'
@@ -197,18 +225,29 @@ const notes = ref([])
 const isAddingNote = ref(false)
 const newNote = ref('')
 const isLoading = ref(false)
+const isSaving = ref(false)
+const noteToDelete = ref(null)
+const deleteDialogOpen = ref(false)
 const NOTES_LIMIT = 10
 const showAll = ref(false)
 const latestFetchId = ref(0)
 
-
-const fetchNotes = async (contactId = props.contactId) => {
+const fetchNotes = async (contactId = props.contactId, { useCache = true } = {}) => {
+  if (!contactId) return
   const fetchId = ++latestFetchId.value
+
+  if (useCache && notesCache.has(contactId)) {
+    notes.value = notesCache.get(contactId)
+    isLoading.value = false
+    return
+  }
+
   try {
     isLoading.value = true
     const { data } = await api.getContactNotes(contactId)
     if (fetchId !== latestFetchId.value) return
     notes.value = data.data
+    notesCache.set(contactId, data.data)
   } catch (error) {
     if (fetchId !== latestFetchId.value) return
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -229,34 +268,62 @@ const startAddingNote = () => {
   isAddingNote.value = true
 }
 
+const onPaletteAction = (action) => {
+  if (action === CONTACT_ACTIONS.ADD_NOTE && userStore.can('contact_notes:write')) startAddingNote()
+}
+
+onMounted(() => emitter.on(EMITTER_EVENTS.CONTACT_ACTION, onPaletteAction))
+onUnmounted(() => emitter.off(EMITTER_EVENTS.CONTACT_ACTION, onPaletteAction))
+
 const cancelAddNote = () => {
   isAddingNote.value = false
   newNote.value = ''
 }
 
 const addOrUpdateNote = async () => {
+  const targetId = props.contactId
+  if (!targetId || isSaving.value) return
+  isSaving.value = true
   try {
-    await api.createContactNote(props.contactId, { note: newNote.value })
-    await fetchNotes()
+    await api.createContactNote(targetId, { note: newNote.value })
+    notesCache.delete(targetId)
+    await fetchNotes(props.contactId, { useCache: false })
     cancelAddNote()
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  } finally {
+    isSaving.value = false
   }
 }
 
+const promptDeleteNote = (noteId) => {
+  noteToDelete.value = noteId
+  deleteDialogOpen.value = true
+}
+
+const confirmDeleteNote = async () => {
+  const noteId = noteToDelete.value
+  deleteDialogOpen.value = false
+  noteToDelete.value = null
+  if (noteId !== null) await deleteNote(noteId)
+}
+
 const deleteNote = async (noteId) => {
+  const targetId = props.contactId
+  if (!targetId) return
   try {
-    await api.deleteContactNote(props.contactId, noteId)
+    await api.deleteContactNote(targetId, noteId)
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
   } finally {
-    await fetchNotes()
+    notesCache.delete(targetId)
+    await fetchNotes(props.contactId, { useCache: false })
   }
 }
 
@@ -265,16 +332,18 @@ const visibleNotes = computed(() => {
   return notes.value.slice(0, NOTES_LIMIT)
 })
 
+const showEmpty = computed(() => notes.value.length === 0 && !isAddingNote.value && !isLoading.value)
+
 watch(() => props.contactId, (newId) => {
   latestFetchId.value++
   showAll.value = false
   cancelAddNote()
-  notes.value = []
   if (!newId) {
+    notes.value = []
     isLoading.value = false
     return
   }
+  if (!notesCache.has(newId)) notes.value = []
   fetchNotes(newId)
 }, { immediate: true })
-
 </script>

@@ -1,5 +1,7 @@
 import { useConversationStore } from './stores/conversation'
 import { useNotificationStore } from './stores/notification'
+import { useUsersStore } from './stores/users'
+import { useConnectionStore } from './stores/connection'
 import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
 
@@ -17,6 +19,8 @@ export class WebSocketClient {
     this.lastPong = Date.now()
     this.convStore = useConversationStore()
     this.notificationStore = useNotificationStore()
+    this.usersStore = useUsersStore()
+    this.connectionStore = useConnectionStore()
     this.messageQueue = []
     this.maxQueueSize = 50
     this.queueTimeoutMs = 30000
@@ -30,6 +34,8 @@ export class WebSocketClient {
   connect () {
     if (this.isReconnecting || this.manualClose) return
 
+    if (this.socket) this.socket.close()
+
     try {
       this.socket = new WebSocket('/ws')
       this.socket.addEventListener('open', this.handleOpen.bind(this))
@@ -42,21 +48,29 @@ export class WebSocketClient {
     }
   }
 
-  handleOpen () {
+  handleOpen (event) {
+    if (event.target !== this.socket) return
     console.log('WebSocket connected')
     const wasReconnect = this.reconnectAttempts > 0
     this.reconnectInterval = 1000
     this.reconnectAttempts = 0
     this.isReconnecting = false
+    this.connectionStore.setConnecting(false)
+    this.connectionStore.setConnectionFailed(false)
     this.lastPong = Date.now()
     this.setupPing()
     this.flushMessageQueue()
     if (wasReconnect) {
-      this.convStore.refreshConversationList()
+      // RESUB!
+      const uuids = this.convStore.conversations.data?.map(c => c.uuid) || []
+      this.subscribeListReplace(uuids)
+      const openUUID = this.convStore.conversation.data?.uuid
+      if (openUUID) this.subscribeToConversation(openUUID)
     }
   }
 
   handleMessage (event) {
+    if (event.target !== this.socket) return
     try {
       if (!event.data) return
 
@@ -71,8 +85,19 @@ export class WebSocketClient {
           const uuid = data.data.conversation_uuid
           const isOpen = this.convStore.conversation.data?.uuid === uuid
           const isFromContact = data.data.sender_type === 'contact'
+          const convPayload = data.data.conversation
 
-          // Defer the sound if the conversation isn't visible yet so it plays once it joins the list.
+          if (convPayload) {
+            this.convStore.handleConvPush(convPayload)
+          } else {
+            this.convStore.mergeConversationUpdate({
+              uuid,
+              last_message: data.data.preview,
+              last_message_at: data.data.created_at,
+              last_message_sender: data.data.sender_type,
+            })
+          }
+
           if (isFromContact && document.hidden) {
             if (isOpen || this.convStore.isConversationInList(uuid)) {
               playNotificationSound()
@@ -81,29 +106,40 @@ export class WebSocketClient {
             }
           }
 
-          // Not open conversation but in the list, increment unread count.
-          if (isFromContact && !isOpen && this.convStore.isConversationInList(uuid)) {
+          if (!isOpen && this.convStore.isConversationInList(uuid)) {
             this.convStore.incrementUnread(uuid)
           }
 
-          this.convStore.mergeConversationUpdate({
-            uuid,
-            last_message: data.data.preview,
-            last_message_at: data.data.created_at,
-            last_message_sender: data.data.sender_type,
-          })
           this.convStore.updateConversationMessage(data.data)
         },
-        [WS_EVENT.NEW_CONVERSATION]: () => this.convStore.refreshConversationList(),
+        [WS_EVENT.NEW_CONVERSATION]: () => {
+          if (data.data && data.data.uuid) {
+            this.convStore.handleConvPush(data.data)
+          } else {
+            this.convStore.refreshConversationList()
+          }
+          this.convStore.refreshSidebarCounts()
+        },
         // Property updates for conversation and message.
         [WS_EVENT.MESSAGE_UPDATE]: () => this.convStore.mergeMessageUpdate(data.data),
-        [WS_EVENT.CONVERSATION_UPDATE]: () => this.convStore.mergeConversationUpdate(data.data),
+        [WS_EVENT.CONVERSATION_UPDATE]: () => {
+          this.convStore.mergeConversationUpdate(data.data)
+          if (data.data?.status) {
+            this.convStore.refreshSidebarCounts()
+          }
+        },
         [WS_EVENT.CONTACT_UPDATE]: () => this.convStore.mergeContactUpdate(data.data),
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)
         },
         // New notification.
-        [WS_EVENT.NEW_NOTIFICATION]: () => this.notificationStore.addNotification(data.data)
+        [WS_EVENT.NEW_NOTIFICATION]: () => {
+          this.notificationStore.addNotification(data.data)
+          // Mentions and assignments arrive as notifications without a conversation_update.
+          this.convStore.refreshSidebarCounts()
+        },
+        [WS_EVENT.AGENT_AVAILABILITY_UPDATE]: () =>
+          this.usersStore.setAvailability(data.data.agent_id, data.data.availability_status),
       }
 
       const handler = handlers[data.type]
@@ -118,11 +154,13 @@ export class WebSocketClient {
   }
 
   handleError (event) {
+    if (event.target !== this.socket) return
     console.error('WebSocket error:', event)
     this.reconnect()
   }
 
-  handleClose () {
+  handleClose (event) {
+    if (event.target !== this.socket) return
     this.clearPing()
     if (!this.manualClose) {
       this.reconnect()
@@ -130,10 +168,19 @@ export class WebSocketClient {
   }
 
   reconnect () {
-    if (this.isReconnecting || this.reconnectAttempts >= this.maxReconnectAttempts) return
+    if (this.isReconnecting) return
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.connectionStore.setConnecting(false)
+      this.connectionStore.setConnectionFailed(true)
+      return
+    }
 
     this.isReconnecting = true
     this.reconnectAttempts++
+
+    this.connectionStore.setConnecting(true)
+    // The online listener resets the attempt counter, so a retry can follow a give up.
+    this.connectionStore.setConnectionFailed(false)
 
     this.reconnectTimer = setTimeout(() => {
       this.isReconnecting = false
@@ -161,6 +208,8 @@ export class WebSocketClient {
 
     window.addEventListener('focus', () => {
       if (this.socket?.readyState !== WebSocket.OPEN) {
+        this.reconnectAttempts = 0
+        this.reconnectInterval = 1000
         this.reconnect()
       }
     })
@@ -288,6 +337,8 @@ export class WebSocketClient {
   close () {
     this.manualClose = true
     this.clearPing()
+    this.connectionStore.setConnecting(false)
+    this.connectionStore.setConnectionFailed(false)
     if (this.socket) {
       this.socket.close()
     }

@@ -34,7 +34,7 @@
           }}
         </p>
         <div v-else class="mt-16 text-center">
-          <h2 class="text-2xl font-semibold text-primary mb-4">
+          <h2 class="text-xl font-semibold text-primary mb-4">
             {{
               $t('conversation.search')
             }}
@@ -66,6 +66,7 @@ const loading = ref(false)
 const error = ref(null)
 const searchPerformed = ref(false)
 let debounceTimer = null
+let searchRequestId = 0
 
 const totalResults = computed(() => {
   return results.value.conversations.length + results.value.messages.length
@@ -73,8 +74,10 @@ const totalResults = computed(() => {
 
 const handleSearch = async () => {
   if (searchQuery.value.length < MIN_SEARCH_LENGTH) {
+    searchRequestId++
     results.value = { conversations: [], messages: [] }
     searchPerformed.value = false
+    loading.value = false
     return
   }
 
@@ -82,20 +85,23 @@ const handleSearch = async () => {
   error.value = null
   searchPerformed.value = true
 
+  const requestId = ++searchRequestId
   try {
     const [convResults, messagesResults] = await Promise.all([
       api.searchConversations({ query: searchQuery.value }),
       api.searchMessages({ query: searchQuery.value })
     ])
 
+    if (requestId !== searchRequestId) return
     results.value = {
       conversations: convResults.data.data,
       messages: messagesResults.data.data
     }
   } catch (err) {
+    if (requestId !== searchRequestId) return
     error.value = handleHTTPError(err).message
   } finally {
-    loading.value = false
+    if (requestId === searchRequestId) loading.value = false
   }
 }
 
@@ -109,8 +115,10 @@ watch(searchQuery, (newValue) => {
     debouncedSearch()
   } else {
     clearTimeout(debounceTimer)
+    searchRequestId++
     results.value = { conversations: [], messages: [] }
     searchPerformed.value = false
+    loading.value = false
   }
 })
 

@@ -18,16 +18,25 @@
       class="w-full"
     >
       <ComboboxAnchor as-child>
-        <ComboboxInput :placeholder="placeholder" as-child>
-          <TagsInputInput
-            class="w-full px-3"
-            :class="tags.length > 0 ? 'mt-2' : ''"
-            @keydown.enter.prevent
-            @blur="handleBlur"
-            @click="open = true"
-            @input.stop
+        <div class="flex w-full items-center">
+          <ComboboxInput :placeholder="placeholder" as-child>
+            <TagsInputInput
+              class="w-full px-3"
+              :class="tags.length > 0 ? 'mt-2' : ''"
+              @keydown.enter.prevent
+              @blur="handleBlur"
+              @click="open = true"
+              @input.stop
+            />
+          </ComboboxInput>
+          <Spinner
+            v-if="searching"
+            size="xs"
+            variant="muted"
+            :absolute="false"
+            class="mr-3 h-4 w-4 shrink-0"
           />
-        </ComboboxInput>
+        </div>
       </ComboboxAnchor>
       <ComboboxPortal>
         <ComboboxContent>
@@ -35,7 +44,7 @@
             position="popper"
             class="w-[--radix-popper-anchor-width] rounded-md mt-2 border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
           >
-            <CommandEmpty>{{ $t('globals.messages.noResultsFound') }}</CommandEmpty>
+            <CommandEmpty v-if="!searching">{{ $t('globals.messages.noResultsFound') }}</CommandEmpty>
             <CommandGroup>
               <CommandItem
                 v-for="item in visibleOptions"
@@ -54,14 +63,14 @@
 </template>
 
 <script setup>
-import { CommandEmpty, CommandGroup, CommandItem, CommandList } from '../command'
+import { CommandEmpty, CommandGroup, CommandItem, CommandList } from '@shared-ui/components/ui/command'
 import {
   TagsInput,
   TagsInputInput,
   TagsInputItem,
   TagsInputItemDelete,
   TagsInputItemText
-} from '../tags-input'
+} from '@shared-ui/components/ui/tags-input'
 import {
   ComboboxAnchor,
   ComboboxContent,
@@ -69,10 +78,13 @@ import {
   ComboboxPortal,
   ComboboxRoot
 } from 'radix-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { useField } from 'vee-validate'
+import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
+import { useRemoteSearch } from '@shared-ui/composables/useRemoteSearch'
 
 const RENDER_CAP = 200
+const SEARCH_DEBOUNCE_MS = 250
 
 const tags = defineModel({
   required: false,
@@ -93,6 +105,11 @@ const props = defineProps({
     type: Array,
     required: true,
     validator: (value) => value.every((item) => 'label' in item && 'value' in item)
+  },
+  // When set, typing queries the server instead of filtering `items` locally.
+  search: {
+    type: Function,
+    default: null
   }
 })
 
@@ -103,10 +120,33 @@ const { handleBlur } = useField(() => props.name, undefined, {
 const open = ref(false)
 const searchTerm = ref('')
 
-const filteredOptions = computed(() => {
-  const available = props.items.filter((item) => !tags.value.includes(item.value))
+const {
+  results: remoteItems,
+  searching,
+  update: updateSearch,
+  dispose: disposeSearch
+} = useRemoteSearch((term) => props.search(term), SEARCH_DEBOUNCE_MS)
 
-  if (!searchTerm.value) return available
+watch(searchTerm, (term) => {
+  if (props.search) updateSearch(term)
+})
+
+watch(open, (isOpen) => {
+  if (!isOpen && searchTerm.value) searchTerm.value = ''
+})
+
+onUnmounted(() => {
+  disposeSearch()
+})
+
+const displayedItems = computed(() =>
+  props.search && remoteItems.value !== null ? remoteItems.value : props.items
+)
+
+const filteredOptions = computed(() => {
+  const available = displayedItems.value.filter((item) => !tags.value.includes(item.value))
+
+  if (props.search || !searchTerm.value) return available
 
   return available.filter((item) =>
     item.label.toLowerCase().includes(searchTerm.value.toLowerCase())
@@ -115,9 +155,20 @@ const filteredOptions = computed(() => {
 
 const visibleOptions = computed(() => filteredOptions.value.slice(0, RENDER_CAP))
 
+// Reloading the list can drop a chosen row from `items`, which would leave its chip showing a raw id.
+const seenLabels = new Map()
+
+watch(
+  displayedItems,
+  (items) => {
+    for (const item of items) seenLabels.set(item.value, item.label)
+  },
+  { immediate: true, deep: true }
+)
+
 const getLabel = (value) => {
-  const item = props.items.find((item) => item.value === value)
-  return item?.label || value
+  const item = displayedItems.value.find((item) => item.value === value)
+  return item?.label || seenLabels.get(value) || value
 }
 
 const handleSelect = (event) => {
@@ -133,7 +184,8 @@ const handleSelect = (event) => {
 }
 
 const filterFunc = (remainingItemValues, term) => {
-  const remainingItems = props.items.filter((item) => remainingItemValues.includes(item.value))
+  const remainingItems = displayedItems.value.filter((item) => remainingItemValues.includes(item.value))
+  if (props.search) return remainingItems.map((item) => item.value)
   return remainingItems
     .filter((item) => item.label.toLowerCase().includes(term.toLowerCase()))
     .map((item) => item.value)

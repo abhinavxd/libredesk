@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -28,7 +29,7 @@ const (
 
 type conversationStore interface {
 	GetUnassignedConversations() ([]models.Conversation, error)
-	UpdateConversationUserAssignee(conversationUUID string, userID int, user umodels.User) error
+	ClaimUnassignedConversation(conversationUUID string, userID, expectedTeamID int, user umodels.User) error
 	ActiveUserConversationsCount(userID int) (int, error)
 }
 
@@ -204,8 +205,8 @@ func (e *Engine) assignConversations() error {
 		e.lo.Debug("found unassigned conversations", "count", len(unassignedConversations))
 	}
 
-	for _, conversation := range unassignedConversations {
-		teamID := conversation.AssignedTeamID.Int
+	for _, conv := range unassignedConversations {
+		teamID := conv.AssignedTeamID.Int
 		teamMax := e.teamMaxAutoAssignments[teamID]
 		poolSize := e.poolSize(teamID)
 
@@ -215,7 +216,7 @@ func (e *Engine) assignConversations() error {
 			if err != nil {
 				// Log other errors.
 				if err != ErrTeamNotFound && err != ErrNoUsersInPool {
-					e.lo.Error("error fetching user from balancer pool", "conversation_uuid", conversation.UUID, "error", err)
+					e.lo.Error("error fetching user from balancer pool", "conversation_uuid", conv.UUID, "error", err)
 				}
 				break
 			}
@@ -238,8 +239,13 @@ func (e *Engine) assignConversations() error {
 				continue
 			}
 
-			if err := e.conversationStore.UpdateConversationUserAssignee(conversation.UUID, userID, e.systemUser); err != nil {
-				e.lo.Error("error assigning conversation", "conversation_uuid", conversation.UUID, "user_id", userID, "error", err)
+			if err := e.conversationStore.ClaimUnassignedConversation(conv.UUID, userID, teamID, e.systemUser); err != nil {
+				// Already assigned by someone else, stop trying.
+				if errors.Is(err, conversation.ErrConversationAlreadyAssigned) {
+					e.lo.Debug("conversation already assigned, skipping", "conversation_uuid", conv.UUID)
+					break
+				}
+				e.lo.Error("error assigning conversation", "conversation_uuid", conv.UUID, "user_id", userID, "error", err)
 				continue
 			}
 			break

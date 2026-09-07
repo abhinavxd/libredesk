@@ -1,6 +1,14 @@
 <template>
-  <div class="mb-5">
+  <div class="mb-5 flex items-center justify-between gap-4">
     <CustomBreadcrumb :links="breadcrumbLinks" />
+    <div
+      v-if="inbox.channel === 'livechat' && inbox.uuid"
+      class="flex items-center gap-1.5 text-xs text-muted-foreground/70"
+    >
+      <span>UUID:</span>
+      <code class="font-mono">{{ inbox.uuid }}</code>
+      <CopyButton :text="inbox.uuid" />
+    </div>
   </div>
   <Spinner v-if="formLoading"></Spinner>
   <div v-else>
@@ -26,6 +34,7 @@ import api from '../../../api'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
+import CopyButton from '@/components/button/CopyButton.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'

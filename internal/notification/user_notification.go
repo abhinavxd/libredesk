@@ -37,6 +37,7 @@ type queries struct {
 	GetNotificationStats   *sqlx.Stmt `query:"get-notification-stats"`
 	InsertNotification     *sqlx.Stmt `query:"insert-notification"`
 	MarkAsRead             *sqlx.Stmt `query:"mark-as-read"`
+	MarkAssignmentAsRead   *sqlx.Stmt `query:"mark-assignment-as-read"`
 	MarkAllAsRead          *sqlx.Stmt `query:"mark-all-as-read"`
 	DeleteNotification     *sqlx.Stmt `query:"delete-notification"`
 	DeleteAllNotifications *sqlx.Stmt `query:"delete-all-notifications"`
@@ -105,6 +106,15 @@ func (m *UserNotificationManager) MarkAsRead(id, userID int) error {
 	return nil
 }
 
+// MarkAssignmentAsRead marks unread assignment notifications as read for a conversation and user.
+func (m *UserNotificationManager) MarkAssignmentAsRead(conversationID, userID int) error {
+	if _, err := m.q.MarkAssignmentAsRead.Exec(conversationID, userID); err != nil {
+		m.lo.Error("error marking assignment notification as read", "conversation_id", conversationID, "user_id", userID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
 // MarkAllAsRead marks all notifications as read for a user.
 func (m *UserNotificationManager) MarkAllAsRead(userID int) error {
 	if _, err := m.q.MarkAllAsRead.Exec(userID); err != nil {
@@ -139,14 +149,19 @@ func (m *UserNotificationManager) DeleteOldNotifications(ctx context.Context) er
 		m.lo.Error("error deleting old notifications", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	rowsAffected, _ := res.RowsAffected()
-	m.lo.Info("deleted old notifications", "rows_affected", rowsAffected)
+	if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
+		m.lo.Info("deleted old notifications", "rows_affected", rowsAffected)
+	}
 	return nil
 }
 
 // RunNotificationCleaner runs a background job to delete old notifications every 24 hours.
 func (m *UserNotificationManager) RunNotificationCleaner(ctx context.Context) {
-	time.Sleep(10 * time.Second)
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(60 * time.Second):
+	}
 	if err := m.DeleteOldNotifications(ctx); err != nil {
 		m.lo.Error("error cleaning old notifications", "error", err)
 	}

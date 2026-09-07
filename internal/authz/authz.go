@@ -3,10 +3,12 @@ package authz
 import (
 	"slices"
 
+	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/knadh/go-i18n"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -32,28 +34,33 @@ func (e *Enforcer) Enforce(user umodels.User, obj, act string) (bool, error) {
 // 4. User has the "read_unassigned" permission and the conversation is not assigned to any user or team.
 // Returns true if access is granted, false otherwise. In case of an error while checking permissions returns false and the error.
 func (e *Enforcer) EnforceConversationAccess(user umodels.User, conversation cmodels.Conversation) (bool, error) {
-	if !slices.Contains(user.Permissions, "conversations:read") {
-		return false, nil
+	return CanReadAssignment(user, conversation.AssignedUserID, conversation.AssignedTeamID), nil
+}
+
+func CanReadAssignment(user umodels.User, assignedUserID, assignedTeamID null.Int) bool {
+	if !slices.Contains(user.Permissions, authzmodels.PermConversationsRead) {
+		return false
 	}
-	if slices.Contains(user.Permissions, "conversations:read_all") {
-		return true, nil
+	if slices.Contains(user.Permissions, authzmodels.PermConversationsReadAll) {
+		return true
 	}
-	if conversation.AssignedUserID.Int == user.ID && slices.Contains(user.Permissions, "conversations:read_assigned") {
-		return true, nil
+	if assignedUserID.Valid && assignedUserID.Int == user.ID &&
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAssigned) {
+		return true
 	}
-	if conversation.AssignedTeamID.Int > 0 && slices.Contains(user.Teams.IDs(), conversation.AssignedTeamID.Int) {
-		if slices.Contains(user.Permissions, "conversations:read_team_all") {
-			return true, nil
+	if assignedTeamID.Valid && slices.Contains(user.Teams.IDs(), assignedTeamID.Int) {
+		if slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamAll) {
+			return true
 		}
-		if conversation.AssignedUserID.Int == 0 && slices.Contains(user.Permissions, "conversations:read_team_inbox") {
-			return true, nil
+		if !assignedUserID.Valid && slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamInbox) {
+			return true
 		}
 	}
-	if conversation.AssignedUserID.Int == 0 && conversation.AssignedTeamID.Int == 0 &&
-		slices.Contains(user.Permissions, "conversations:read_unassigned") {
-		return true, nil
+	if !assignedUserID.Valid && !assignedTeamID.Valid &&
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadUnassigned) {
+		return true
 	}
-	return false, nil
+	return false
 }
 
 // EnforceMediaAccess checks read access on the model linked to a media item.

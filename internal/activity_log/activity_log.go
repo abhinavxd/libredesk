@@ -57,8 +57,8 @@ func New(opts Opts) (*Manager, error) {
 }
 
 // GetAll retrieves all activity logs.
-func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int) ([]models.ActivityLog, error) {
-	query, qArgs, err := m.makeQuery(page, pageSize, order, orderBy, filtersJSON)
+func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int, location string) ([]models.ActivityLog, error) {
+	query, qArgs, err := m.makeQuery(page, pageSize, order, orderBy, filtersJSON, location)
 	if err != nil {
 		m.lo.Error("error creating activity log list query", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -261,6 +261,40 @@ func (al *Manager) RolePermissionsChanged(actorID int, actorEmail, ip string, ro
 	)
 }
 
+// ContactDeleted records permanent deletion of a contact and their data.
+func (al *Manager) ContactDeleted(actorID int, actorEmail, ip string, contactID int, contactEmail string) error {
+	description := al.i18n.Ts("activityLog.contactDeleted",
+		"actorEmail", actorEmail,
+		"actorId", fmt.Sprintf("#%d", actorID),
+		"contactEmail", contactEmail,
+		"contactId", fmt.Sprintf("#%d", contactID))
+	return al.create(
+		models.ContactDeleted,
+		description,
+		actorID,
+		umodels.UserModel,
+		contactID,
+		ip,
+	)
+}
+
+// ContactDataExported records an export of a contact's stored data.
+func (al *Manager) ContactDataExported(actorID int, actorEmail, ip string, contactID int, contactEmail string) error {
+	description := al.i18n.Ts("activityLog.contactDataExported",
+		"actorEmail", actorEmail,
+		"actorId", fmt.Sprintf("#%d", actorID),
+		"contactEmail", contactEmail,
+		"contactId", fmt.Sprintf("#%d", contactID))
+	return al.create(
+		models.ContactDataExported,
+		description,
+		actorID,
+		umodels.UserModel,
+		contactID,
+		ip,
+	)
+}
+
 // create creates a new activity log in DB.
 func (m *Manager) create(activityType, activityDescription string, actorID int, targetModelType string, targetModelID int, ip string) error {
 	if _, err := m.q.InsertActivity.Exec(activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {
@@ -271,7 +305,7 @@ func (m *Manager) create(activityType, activityDescription string, actorID int, 
 }
 
 // makeQuery constructs the SQL query for fetching activity logs with filters and pagination.
-func (m *Manager) makeQuery(page, pageSize int, order, orderBy, filtersJSON string) (string, []any, error) {
+func (m *Manager) makeQuery(page, pageSize int, order, orderBy, filtersJSON, location string) (string, []any, error) {
 	var (
 		baseQuery = m.q.GetAllActivities
 		qArgs     []any
@@ -281,7 +315,8 @@ func (m *Manager) makeQuery(page, pageSize int, order, orderBy, filtersJSON stri
 		OrderBy:  orderBy,
 		Page:     page,
 		PageSize: pageSize,
+		Location: location,
 	}, filtersJSON, dbutil.AllowedFields{
 		"activity_logs": {"activity_type", "actor_id", "ip", "created_at"},
-	})
+	}, nil)
 }

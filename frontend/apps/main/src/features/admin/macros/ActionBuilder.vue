@@ -5,13 +5,11 @@
       v-if="!model.length"
       class="text-center py-12 px-6 border-2 border-dashed border-muted rounded-lg"
     >
-      <div class="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-3">
-        <Plus class="w-6 h-6 text-muted-foreground" />
-      </div>
       <h3 class="text-sm font-medium text-foreground mb-2">
         {{ $t('actions.noActions') }}
       </h3>
       <Button
+        type="button"
         @click.prevent="add"
         variant="outline"
         size="sm"
@@ -26,7 +24,7 @@
     <div v-else class="space-y-6">
       <div v-for="(action, index) in model" :key="index" class="relative">
         <!-- Action Card -->
-        <div class="border rounded p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="border rounded-md p-6 shadow-sm hover:shadow-md transition-shadow">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1 space-y-4">
               <!-- Action Type Selection -->
@@ -63,28 +61,23 @@
                 >
                   <label class="block text-sm font-medium mb-2">{{ $t('globals.terms.value', 1) }}</label>
 
-                  <SelectComboBox
+                  <SelectAgentCombobox
                     v-if="action.type === 'assign_user'"
                     v-model="action.value[0]"
-                    :items="config.actions[action.type].options"
-                    :placeholder="config.valuePlaceholder"
                     @update:modelValue="(value) => updateValue(value, index)"
-                    type="user"
                   />
 
-                  <SelectComboBox
+                  <SelectTeamCombobox
                     v-else-if="action.type === 'assign_team'"
                     v-model="action.value[0]"
-                    :items="config.actions[action.type].options"
-                    :placeholder="config.valuePlaceholder"
                     @update:modelValue="(value) => updateValue(value, index)"
-                    type="team"
                   />
                   <SelectComboBox
                     v-else
                     v-model="action.value[0]"
                     :items="config.actions[action.type].options"
                     :placeholder="config.valuePlaceholder"
+                    :search="config.actions[action.type].search"
                     @update:modelValue="(value) => updateValue(value, index)"
                   />
                 </div>
@@ -96,11 +89,7 @@
                 class="max-w-md"
               >
                 <label class="block text-sm font-medium mb-2">{{ $t('globals.terms.tag') }}</label>
-                <SelectTag
-                  v-model="action.value"
-                  :items="tagsStore.tagNames.map((tag) => ({ label: tag, value: tag }))"
-                  :placeholder="$t('placeholders.selectTags')"
-                />
+                <SelectTagCombobox multiple v-model="action.value" />
               </div>
             </div>
 
@@ -138,9 +127,10 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import CloseButton from '@main/components/button/CloseButton.vue'
-import { SelectTag } from '@shared-ui/components/ui/select'
-import { useTagStore } from '../../../stores/tag'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
+import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
+import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
+import SelectTagCombobox from '@main/components/combobox/SelectTagCombobox.vue'
 
 const model = defineModel('actions', {
   type: Array,
@@ -155,7 +145,6 @@ defineProps({
   }
 })
 
-const tagsStore = useTagStore()
 
 const updateField = (value, index) => {
   const newModel = [...model.value]

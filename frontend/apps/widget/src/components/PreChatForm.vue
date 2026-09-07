@@ -9,7 +9,7 @@
           {{ formTitle }}
         </div>
 
-        <form ref="formRef" @submit.prevent="submitForm" class="space-y-4">
+        <form ref="formRef" @submit.prevent="submitForm" novalidate class="space-y-4">
           <!-- Dynamic fields -->
           <div v-for="field in sortedFields" :key="field.key" class="space-y-2">
             <!-- Text input -->
@@ -131,12 +131,21 @@
                 <div class="space-y-1 leading-none">
                   <FormLabel class="text-sm font-medium">
                     {{ field.label }}
-                    <span v-if="field.required" class="text-destructive">*</span>
                   </FormLabel>
                   <FormMessage />
                 </div>
               </FormItem>
             </FormField>
+
+            <!-- Phone input -->
+            <PhoneNumberInput
+              v-else-if="field.type === 'phone'"
+              :phone-number-name="field.key"
+              :country-code-name="countryCodeKey(field.key)"
+              :label="field.label"
+              :placeholder="field.placeholder || ''"
+              :required="field.required"
+            />
 
             <!-- List/Select input -->
             <FormField
@@ -221,6 +230,8 @@ import {
   FormLabel,
   FormMessage
 } from '@shared-ui/components/ui/form'
+import PhoneNumberInput from '@shared-ui/components/PhoneNumberInput.vue'
+import { countryCodeKey, defaultCountryCode } from '@shared-ui/utils/phone.js'
 import { useWidgetStore } from '../store/widget.js'
 import { useI18n } from 'vue-i18n'
 import { createPreChatFormSchema } from './preChatFormSchema.js'
@@ -251,9 +262,9 @@ const formFields = computed(() => config.value.fields || [])
 const sortedFields = computed(() => {
   let fields = formFields.value.filter((field) => field.enabled)
 
-  // If user has session token, exclude default name and email fields
+  // If user has session token, exclude default name, email and phone fields
   if (props.excludeDefaultFields) {
-    fields = fields.filter((field) => !['name', 'email'].includes(field.key))
+    fields = fields.filter((field) => !['name', 'email', 'phone'].includes(field.key))
   }
 
   return fields.sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -270,6 +281,9 @@ const initialValues = computed(() => {
   sortedFields.value.forEach((field) => {
     if (field.type === 'checkbox') {
       values[field.key] = false
+    } else if (field.type === 'phone') {
+      values[field.key] = ''
+      values[countryCodeKey(field.key)] = defaultCountryCode()
     } else {
       values[field.key] = ''
     }
@@ -284,11 +298,10 @@ const { handleSubmit, meta, values } = useForm({
 
 const requiredFieldsFilled = computed(() => {
   return sortedFields.value
-    .filter((field) => field.required)
+    .filter((field) => field.required && field.type !== 'checkbox')
     .every((field) => {
       const value = values[field.key]
-      if (field.type === 'checkbox') return true
-      return value && String(value).trim() !== ''
+      return value !== undefined && value !== null && String(value).trim() !== ''
     })
 })
 
@@ -297,8 +310,15 @@ const submitForm = handleSubmit((values) => {
   const filteredValues = {}
   Object.keys(values).forEach((key) => {
     const field = sortedFields.value.find((f) => f.key === key)
-    if (field?.type === 'checkbox' || (values[key] && String(values[key]).trim())) {
-      filteredValues[key] = values[key]
+    const value = values[key]
+    if (
+      (field?.type === 'checkbox' && value === true) ||
+      (field?.type !== 'checkbox' &&
+        value !== undefined &&
+        value !== null &&
+        String(value).trim() !== '')
+    ) {
+      filteredValues[key] = value
     }
   })
 

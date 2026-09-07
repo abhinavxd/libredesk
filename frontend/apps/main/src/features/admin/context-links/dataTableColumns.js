@@ -18,7 +18,7 @@ export const createColumns = (t) => [
           RouterLink,
           {
             to: { name: 'edit-context-link', params: { id: row.original.id } },
-            class: 'text-primary hover:underline'
+            class: 'text-foreground font-medium hover:underline'
           },
           () => row.getValue('name')
         )
@@ -45,7 +45,7 @@ export const createColumns = (t) => [
         h(
           Badge,
           {
-            variant: isActive ? 'default' : 'secondary',
+            variant: isActive ? 'success' : 'secondary',
             class: 'text-xs'
           },
           () => (isActive ? t('globals.terms.active') : t('globals.terms.inactive'))

@@ -1,0 +1,20 @@
+From: Emma Johnson <emma.johnson@example.com>
+To: support@example.org
+Subject: Screenshot attached
+Message-ID: <nameless-inline-test@example.com>
+Date: Wed, 15 Jul 2026 15:15:00 +0200
+MIME-Version: 1.0
+Content-Type: multipart/related; boundary="----=_Outer_NLI"
+X-Mailer: Microsoft Outlook 16.0
+
+------=_Outer_NLI
+Content-Type: text/html; charset="utf-8"
+
+<html><body><p>Here is the screenshot.</p><img src="cid:screenshot@example.com"></body></html>
+------=_Outer_NLI
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-ID: <screenshot@example.com>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+------=_Outer_NLI--

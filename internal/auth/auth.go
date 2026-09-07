@@ -12,6 +12,7 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -27,6 +28,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// ErrOIDCInvalidClient reports the provider rejecting the client credentials, typically an expired or wrong client secret.
+var ErrOIDCInvalidClient = errors.New("oidc provider rejected client credentials")
+
 // OIDCclaim holds OIDC token claims data
 type OIDCclaim struct {
 	Email         string `json:"email"`
@@ -40,7 +44,7 @@ type Provider struct {
 	ID           int
 	Provider     string
 	ProviderURL  string
-	RedirectURL  string
+	RedirectURL  func() (string, error)
 	ClientID     string
 	ClientSecret string
 }
@@ -57,23 +61,28 @@ const defaultSessionLifetime = 9 * time.Hour
 
 // Auth is the auth service it manages OIDC authentication and sessions
 type Auth struct {
-	mu        sync.RWMutex
-	cfg       Config
-	i18n      *i18n.I18n
-	oauthCfgs map[int]oauth2.Config
-	verifiers map[int]*oidc.IDTokenVerifier
-	sess      *simplesessions.Manager
-	logger    *logf.Logger
-	rd        *redis.Client
+	mu           sync.RWMutex
+	cfg          Config
+	i18n         *i18n.I18n
+	oauthCfgs    map[int]oauth2.Config
+	verifiers    map[int]*oidc.IDTokenVerifier
+	redirectURLs map[int]func() (string, error)
+	sess         *simplesessions.Manager
+	logger       *logf.Logger
+	rd           *redis.Client
+	oidcClient   *http.Client
 }
 
-// New creates an Auth service with configured OIDC providers
-func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*Auth, error) {
+// New creates an Auth service with configured OIDC providers.
+func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control) (*Auth, error) {
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
+	redirectURLs := make(map[int]func() (string, error))
+
+	oidcClient := newOIDCClient(dialControl)
 
 	for _, provider := range cfg.Providers {
-		oidcProv, err := oidc.NewProvider(context.Background(), provider.ProviderURL)
+		oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), oidcClient), provider.ProviderURL)
 		if err != nil {
 			logger.Error("error initializing oidc provider", "error", err, "provider", provider.Provider)
 			continue
@@ -83,7 +92,6 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 			ClientID:     provider.ClientID,
 			ClientSecret: provider.ClientSecret,
 			Endpoint:     oidcProv.Endpoint(),
-			RedirectURL:  provider.RedirectURL,
 			Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 		}
 
@@ -91,6 +99,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 
 		oauthCfgs[provider.ID] = oauthCfg
 		verifiers[provider.ID] = verifier
+		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
 	lifetime := cfg.SessionLifetime
@@ -116,19 +125,32 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
 
 	return &Auth{
-		cfg:       cfg,
-		i18n:      i18n,
-		oauthCfgs: oauthCfgs,
-		verifiers: verifiers,
-		sess:      sess,
-		logger:    logger,
-		rd:        rd,
+		cfg:          cfg,
+		i18n:         i18n,
+		oauthCfgs:    oauthCfgs,
+		verifiers:    verifiers,
+		redirectURLs: redirectURLs,
+		sess:         sess,
+		logger:       logger,
+		rd:           rd,
+		oidcClient:   oidcClient,
 	}, nil
+}
+
+// newOIDCClient builds the HTTP client used for OIDC discovery.
+func newOIDCClient(dialControl ssrf.Control) *http.Client {
+	transport := ssrf.NewTransport(dialControl, 3*time.Second)
+	transport.TLSHandshakeTimeout = 5 * time.Second
+	transport.ResponseHeaderTimeout = 5 * time.Second
+	return &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: transport,
+	}
 }
 
 // TestProvider tests the OIDC provider url by doing a discovery on it.
 func (a *Auth) TestProvider(url string) error {
-	_, err := oidc.NewProvider(context.Background(), url)
+	_, err := oidc.NewProvider(oidc.ClientContext(context.Background(), a.oidcClient), url)
 	if err != nil {
 		a.logger.Error("error testing oidc provider", "provider_url", url, "error", err)
 		return envelope.NewError(envelope.GeneralError, err.Error(), nil)
@@ -143,9 +165,10 @@ func (a *Auth) Reload(cfg Config) error {
 
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
+	redirectURLs := make(map[int]func() (string, error))
 
 	for _, provider := range cfg.Providers {
-		oidcProv, err := oidc.NewProvider(context.Background(), provider.ProviderURL)
+		oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), a.oidcClient), provider.ProviderURL)
 		if err != nil {
 			a.logger.Error("error initializing oidc provider", "provider", provider.Provider, "provider_url", provider.ProviderURL, "error", err)
 			return envelope.NewError(envelope.GeneralError, err.Error(), nil)
@@ -155,7 +178,6 @@ func (a *Auth) Reload(cfg Config) error {
 			ClientID:     provider.ClientID,
 			ClientSecret: provider.ClientSecret,
 			Endpoint:     oidcProv.Endpoint(),
-			RedirectURL:  provider.RedirectURL,
 			Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 		}
 
@@ -163,11 +185,13 @@ func (a *Auth) Reload(cfg Config) error {
 
 		oauthCfgs[provider.ID] = oauthCfg
 		verifiers[provider.ID] = verifier
+		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
 	a.cfg = cfg
 	a.oauthCfgs = oauthCfgs
 	a.verifiers = verifiers
+	a.redirectURLs = redirectURLs
 
 	return nil
 }
@@ -180,45 +204,69 @@ func (a *Auth) LoginURL(providerID int, state string) (string, error) {
 	if !ok {
 		return "", envelope.NewError(envelope.InputError, a.i18n.T("validation.notFoundProvider"), nil)
 	}
+	redirectURL, err := a.resolveRedirectURL(providerID)
+	if err != nil {
+		a.logger.Error("error resolving oidc redirect url", "provider_id", providerID, "error", err)
+		return "", envelope.NewError(envelope.GeneralError, a.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	oauthCfg.RedirectURL = redirectURL
 	return oauthCfg.AuthCodeURL(state), nil
 }
-
-// ExchangeOIDCToken takes an OIDC authorization code, validates it, and returns an OIDC token for subsequent auth.
 func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code string) (string, OIDCclaim, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
 	oauthCfg, ok := a.oauthCfgs[providerID]
 	if !ok {
+		a.logger.Error("oidc provider not configured, it may have failed to initialize at startup", "provider_id", providerID)
 		return "", OIDCclaim{}, fmt.Errorf("invalid provider ID: %d", providerID)
 	}
+	redirectURL, err := a.resolveRedirectURL(providerID)
+	if err != nil {
+		a.logger.Error("error resolving oidc redirect url", "provider_id", providerID, "error", err)
+		return "", OIDCclaim{}, err
+	}
+	oauthCfg.RedirectURL = redirectURL
 
 	verifier, ok := a.verifiers[providerID]
 	if !ok {
+		a.logger.Error("oidc verifier not configured, it may have failed to initialize at startup", "provider_id", providerID)
 		return "", OIDCclaim{}, fmt.Errorf("invalid provider ID: %d", providerID)
 	}
 
+	// Otherwise the token exchange and JWKS fetch use http.DefaultClient, which has no SSRF guard and no timeout.
+	ctx = oidc.ClientContext(ctx, a.oidcClient)
+
 	tk, err := oauthCfg.Exchange(ctx, code)
 	if err != nil {
+		a.logger.Error("error exchanging oidc authorization code for token, check the provider client ID / client secret (it may have expired) and redirect URL", "provider_id", providerID, "error", err)
+		var retrieveErr *oauth2.RetrieveError
+		if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_client" {
+			return "", OIDCclaim{}, ErrOIDCInvalidClient
+		}
 		return "", OIDCclaim{}, fmt.Errorf("error exchanging token: %v", err)
 	}
 
 	// Extract the ID Token from OAuth2 token.
 	rawIDTk, ok := tk.Extra("id_token").(string)
 	if !ok {
+		a.logger.Error("oidc token response has no id_token, check that the provider supports OIDC and the openid scope is allowed", "provider_id", providerID)
 		return "", OIDCclaim{}, errors.New("id_token missing")
 	}
 
 	// Parse and verify ID Token payload.
 	idTk, err := verifier.Verify(ctx, rawIDTk)
 	if err != nil {
+		a.logger.Error("error verifying oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, fmt.Errorf("error verifying ID token: %v", err)
 	}
 
 	var claims OIDCclaim
 	if err := idTk.Claims(&claims); err != nil {
+		a.logger.Error("error parsing claims from oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, errors.New("error getting user from OIDC")
 	}
+	a.logger.Debug("oidc token exchange successful", "provider_id", providerID, "email", claims.Email, "email_verified", claims.EmailVerified)
 	return rawIDTk, claims, nil
 }
 
@@ -312,7 +360,9 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 
 	sess, err := a.sess.Acquire(r.RequestCtx, r, r)
 	if err != nil {
-		a.logger.Error("error acquiring session", "error", err)
+		if err != simplesessions.ErrInvalidSession {
+			a.logger.Error("error acquiring session", "error", err)
+		}
 		return models.User{}, err
 	}
 
@@ -352,6 +402,15 @@ func (a *Auth) DestroySession(r *fastglue.Request) error {
 		return err
 	}
 	return nil
+}
+
+// resolveRedirectURL reads the provider's redirect URL from the current root URL setting.
+func (a *Auth) resolveRedirectURL(providerID int) (string, error) {
+	fn, ok := a.redirectURLs[providerID]
+	if !ok || fn == nil {
+		return "", fmt.Errorf("no redirect URL resolver for provider: %d", providerID)
+	}
+	return fn()
 }
 
 // generateCSRFToken creates a random base64 encoded str.

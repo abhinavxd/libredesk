@@ -1,0 +1,24 @@
+{{ define "classic-help-search" }}
+{{ template "classic-header" . }}
+
+{{ if .Data.Query }}
+<h1 class="hc-page-title">{{ $.L.T "helpCenter.searchResults" }} &ldquo;{{ .Data.Query }}&rdquo;</h1>
+{{ if .Data.Results }}
+<ul class="hc-results">
+    {{ range .Data.Results }}
+    <li>
+        <a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">{{ .Title }}</a>
+        {{ if .Content }}<p class="hc-snippet">{{ .Content }}</p>{{ end }}
+    </li>
+    {{ end }}
+</ul>
+{{ else }}
+<p class="hc-empty">{{ $.L.T "helpCenter.noResults" }}</p>
+{{ end }}
+{{ else }}
+<h1 class="hc-page-title">{{ $.L.T "globals.terms.search" }}</h1>
+<p class="hc-empty">{{ $.L.T "globals.messages.startTypingToSearch" }}</p>
+{{ end }}
+
+{{ template "classic-footer" . }}
+{{ end }}

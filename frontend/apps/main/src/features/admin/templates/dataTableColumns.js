@@ -14,7 +14,7 @@ export const createOutgoingEmailTableColumns = (t) => [
         h(RouterLink,
           {
             to: { name: 'edit-template', params: { id: row.original.id } },
-            class: 'text-primary hover:underline'
+            class: 'text-foreground font-medium hover:underline'
           },
           () => row.getValue('name')
         )
@@ -76,7 +76,7 @@ export const createEmailNotificationTableColumns = (t) => [
         h(RouterLink,
           {
             to: { name: 'edit-template', params: { id: row.original.id } },
-            class: 'text-primary hover:underline'
+            class: 'text-foreground font-medium hover:underline'
           },
           () => row.getValue('name')
         )

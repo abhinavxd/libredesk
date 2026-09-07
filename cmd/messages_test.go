@@ -4,8 +4,49 @@ import (
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/lib/pq"
 )
+
+func TestCanCreateConversationMessagePermissionCombinations(t *testing.T) {
+	tests := []struct {
+		name            string
+		permissions     pq.StringArray
+		wantPublic      bool
+		wantPrivateNote bool
+	}{
+		{"both permissions", pq.StringArray{authzmodels.PermMessagesWrite, authzmodels.PermMessagesWritePrivate}, true, true},
+		{"public message only", pq.StringArray{authzmodels.PermMessagesWrite}, true, false},
+		{"private note only", pq.StringArray{authzmodels.PermMessagesWritePrivate}, false, true},
+		{"neither permission", nil, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			user := umodels.User{Permissions: tt.permissions}
+			public := canCreateConversationMessage(user, messageReq{SenderType: umodels.UserTypeAgent})
+			privateNote := canCreateConversationMessage(user, messageReq{SenderType: umodels.UserTypeAgent, Private: true})
+			if public != tt.wantPublic {
+				t.Errorf("public reply allowed = %v, want %v", public, tt.wantPublic)
+			}
+			if privateNote != tt.wantPrivateNote {
+				t.Errorf("private note allowed = %v, want %v", privateNote, tt.wantPrivateNote)
+			}
+		})
+	}
+}
+
+func TestContactMessageStillRequiresPublicMessagePermission(t *testing.T) {
+	req := messageReq{SenderType: umodels.UserTypeContact}
+	if canCreateConversationMessage(umodels.User{Permissions: pq.StringArray{authzmodels.PermMessagesWriteAsContact}}, req) {
+		t.Fatal("write_as_contact alone unexpectedly bypassed messages:write")
+	}
+	if !canCreateConversationMessage(umodels.User{Permissions: pq.StringArray{authzmodels.PermMessagesWrite}}, req) {
+		t.Fatal("messages:write should pass the base contact-message permission check")
+	}
+}
 
 func TestResolveAttachmentCIDs(t *testing.T) {
 	tests := []struct {

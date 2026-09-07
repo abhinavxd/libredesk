@@ -1,6 +1,6 @@
 <script setup>
 import { reactiveOmit } from '@vueuse/core';
-import { DialogTitle } from 'reka-ui';
+import { DialogTitle } from 'radix-vue';
 import { cn } from '../../../lib/utils';
 
 const props = defineProps({

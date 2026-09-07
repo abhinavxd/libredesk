@@ -3,19 +3,24 @@
     <DropdownMenuTrigger as-child>
       <Button variant="ghost" class="w-8 h-8 p-0">
         <span class="sr-only"></span>
-        <MoreHorizontal class="w-4 h-4" />
+        <MoreVertical class="w-4 h-4" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>
-      <DropdownMenuItem @click="editRole(props.role.id)">{{
-        $t('globals.messages.edit')
-      }}</DropdownMenuItem>
-      <DropdownMenuItem
-        @click="() => (alertOpen = true)"
-        v-if="Roles.includes(props.role.name) === false"
-      >
-        {{ $t('globals.messages.delete') }}
+      <DropdownMenuItem @click="editRole(props.role.id)">
+        <Pencil class="mr-2 h-4 w-4" />
+        {{ $t('globals.messages.edit') }}
       </DropdownMenuItem>
+      <template v-if="Roles.includes(props.role.name) === false">
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          @click="() => (alertOpen = true)"
+          class="text-destructive focus:text-destructive"
+        >
+          <Trash class="mr-2 h-4 w-4" />
+          {{ $t('globals.messages.delete') }}
+        </DropdownMenuItem>
+      </template>
     </DropdownMenuContent>
   </DropdownMenu>
 
@@ -24,14 +29,12 @@
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{
-            $t('role.deletionConfirmation')
-          }}
+          {{ $t('role.deletionConfirmation') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="handleDelete">{{
+        <AlertDialogAction variant="destructive" @click="handleDelete">{{
           $t('globals.messages.delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
@@ -41,11 +44,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { MoreHorizontal } from 'lucide-vue-next'
+import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
 import {

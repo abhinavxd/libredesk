@@ -20,6 +20,6 @@ export const createFormSchema = (t) =>
       message: t('globals.messages.required')
     }),
     secret: z.string().optional(),
-    is_active: z.boolean().default(true).optional(),
+    is_active: z.boolean().optional().default(true),
     headers: z.string().optional()
   })

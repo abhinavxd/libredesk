@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col">
+  <div class="h-full flex flex-col">
     <!-- Header -->
     <div class="flex items-center space-x-4 px-2 h-12 border-b shrink-0">
       <SidebarTrigger class="cursor-pointer" />
@@ -73,19 +73,18 @@
     </div>
 
     <!-- Content -->
-    <div class="flex-grow overflow-y-auto">
+    <div class="flex-grow overflow-y-auto overscroll-contain">
       <EmptyList
-        v-if="!hasConversations && !hasErrored && !isLoading"
+        v-if="showEmpty"
         key="empty"
         class="px-4 py-8"
         :title="t('conversation.noConversationsFound')"
         :message="t('conversation.tryAdjustingFilters')"
-        :icon="MessageCircleQuestion"
+        :icon="Inbox"
       />
 
-      <!-- Error State -->
       <EmptyList
-        v-if="conversationStore.conversations.errorMessage"
+        v-if="hasErrored"
         key="error"
         class="px-4 py-8"
         :title="t('conversation.couldNotFetch')"
@@ -93,7 +92,6 @@
         :icon="MessageCircleWarning"
       />
 
-      <!-- Empty State -->
       <TransitionGroup
         enter-active-class="transition-all duration-300 ease-in-out"
         enter-from-class="opacity-0 transform translate-y-4"
@@ -102,9 +100,8 @@
         leave-from-class="opacity-100 transform translate-y-0"
         leave-to-class="opacity-0 transform translate-y-4"
       >
-        <!-- Conversation List -->
         <div
-          v-if="!conversationStore.conversations.errorMessage"
+          v-if="!hasErrored && !conversationStore.conversations.loading"
           key="list"
           class="divide-y divide-border"
           :class="{ 'border-b border-border': hasConversations }"
@@ -119,9 +116,8 @@
           />
         </div>
 
-        <!-- Loading Skeleton -->
-        <div v-if="isLoading" key="loading" class="space-y-4">
-          <ConversationListItemSkeleton v-for="index in 5" :key="index" />
+        <div v-if="conversationStore.conversations.loading" key="loading">
+          <ConversationListItemSkeleton v-for="i in 12" :key="i" :index="i - 1" />
         </div>
       </TransitionGroup>
 
@@ -133,15 +129,15 @@
         <Button
           v-if="conversationStore.conversations.hasMore"
           variant="outline"
-          @click="loadNextPage"
-          :disabled="isLoading"
-          class="transition-all duration-200 ease-in-out transform hover:scale-105"
+          @click="conversationStore.fetchNextConversations"
+          :disabled="conversationStore.conversations.fetching"
+          class="max-md:h-11 transition-all duration-200 ease-in-out transform hover:scale-105"
         >
-          <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
-          {{ isLoading ? t('globals.terms.loading') : t('globals.terms.loadMore') }}
+          <Loader2 v-if="conversationStore.conversations.fetching" class="mr-2 h-4 w-4 animate-spin" />
+          {{ conversationStore.conversations.fetching ? t('globals.terms.loading') : t('globals.terms.loadMore') }}
         </Button>
         <p
-          class="text-sm text-gray-500"
+          class="text-sm text-muted-foreground"
           v-else-if="conversationStore.conversationsList.length > 10"
         >
           {{ $t('conversation.allLoaded') }}
@@ -155,7 +151,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
+import { Inbox, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -196,11 +192,13 @@ const handleSortChange = (order) => {
   conversationStore.setListSortField(order)
 }
 
-const loadNextPage = () => {
-  conversationStore.fetchNextConversations()
-}
-
 const hasConversations = computed(() => conversationStore.conversationsList.length !== 0)
 const hasErrored = computed(() => !!conversationStore.conversations.errorMessage)
-const isLoading = computed(() => conversationStore.conversations.loading)
+const showEmpty = computed(
+  () =>
+    !hasConversations.value &&
+    !hasErrored.value &&
+    !conversationStore.conversations.loading &&
+    conversationStore.conversations.initialized
+)
 </script>

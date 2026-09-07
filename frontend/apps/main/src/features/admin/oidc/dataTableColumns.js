@@ -1,6 +1,7 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
+import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import { format } from 'date-fns'
 
 export const createColumns = (t) => [
@@ -14,7 +15,7 @@ export const createColumns = (t) => [
         h(RouterLink,
           {
             to: { name: 'edit-sso', params: { id: row.original.id } },
-            class: 'text-primary hover:underline'
+            class: 'text-foreground font-medium hover:underline'
           },
           () => row.getValue('name')
         )
@@ -33,10 +34,16 @@ export const createColumns = (t) => [
   {
     accessorKey: 'enabled',
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.enabled')),
+    header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
     cell: ({ row }) => {
       const enabled = row.getValue('enabled')
-      return h('div', { class: 'text-center' }, enabled ? t('globals.messages.yes') : t('globals.messages.no'))
+      return h(
+        'div',
+        { class: 'text-center' },
+        h(Badge, { variant: enabled ? 'success' : 'secondary' }, () =>
+          enabled ? t('globals.terms.enabled') : t('globals.terms.disabled')
+        )
+      )
     }
   },
   {

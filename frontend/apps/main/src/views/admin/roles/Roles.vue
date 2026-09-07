@@ -6,6 +6,14 @@
 
     <template #help>
       <p>{{ $t('admin.role.help') }}</p>
+      <a
+        href="https://docs.libredesk.io/roles/overview"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="link-style"
+      >
+        {{ $t('globals.terms.learnMore') }}
+      </a>
     </template>
   </AdminSplitLayout>
 </template>

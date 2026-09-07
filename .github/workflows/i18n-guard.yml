@@ -1,0 +1,34 @@
+name: i18n guard
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Block edits to translated language files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          OVERRIDE: ${{ contains(github.event.pull_request.labels.*.name, 'allow-i18n-edit') }}
+        run: |
+          if [ "$OVERRIDE" = "true" ]; then
+            echo "allow-i18n-edit label present, skipping."
+            exit 0
+          fi
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+          changed=$(printf '%s\n' "$files" | grep '^i18n/.*\.json$' | grep -v '^i18n/en-US\.json$' || true)
+          if [ -z "$changed" ]; then
+            exit 0
+          fi
+          echo "Translations are managed by Crowdin, edit i18n/en-US.json only."
+          echo "Revert these files:"
+          echo "$changed"
+          exit 1

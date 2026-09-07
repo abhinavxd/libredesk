@@ -18,14 +18,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
-import { createColumns } from '../../../features/admin/macros/dataTableColumns.js'
+import { createColumns } from '@main/features/admin/macros/dataTableColumns.js'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { useI18n } from 'vue-i18n'
-import api from '../../../api'
+import api from '@main/api'
 
 const { t } = useI18n()
 const formLoading = ref(false)
@@ -48,7 +48,7 @@ const refreshList = (data) => {
 const getMacros = async () => {
   try {
     formLoading.value = true
-    const resp = await api.getAllMacros()
+    const resp = await api.getMacrosCompact()
     macros.value = resp.data.data
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {

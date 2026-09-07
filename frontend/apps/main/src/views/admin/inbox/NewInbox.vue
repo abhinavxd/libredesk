@@ -94,8 +94,7 @@ const channels = [
     title: t('globals.terms.liveChat'),
     subTitle: t('admin.inbox.createLiveChatInbox'),
     onClick: selectLiveChatChannel,
-    icon: MessageCircle,
-    badge: t('globals.terms.beta')
+    icon: MessageCircle
   }
 ]
 
@@ -118,6 +117,7 @@ const submitForm = (values) => {
   const payload = {
     name: values.name,
     from: values.from,
+    from_name_template: values.from_name_template || '',
     channel: channelName,
     enabled: values.enabled ?? true,
     csat_enabled: values.csat_enabled ?? false,

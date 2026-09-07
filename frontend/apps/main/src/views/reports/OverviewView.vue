@@ -1,18 +1,62 @@
 <template>
   <div class="overflow-y-auto">
     <div
-      class="p-6 w-[calc(100%-3rem)]"
+      class="p-4 md:p-6 w-full md:w-[calc(100%-3rem)]"
       :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
     >
       <Spinner v-if="isLoading" />
 
       <div class="space-y-6">
-        <div class="text-sm text-gray-500 text-left">
-          {{ $t('globals.terms.lastUpdated') }}: {{ lastUpdateFormatted }}
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-muted-foreground">
+              {{ $t('globals.terms.lastUpdated') }}: {{ lastUpdateFormatted }}
+            </span>
+            <template v-if="autoRefreshPaused">
+              <Separator orientation="vertical" class="h-4" />
+              <span class="text-sm text-muted-foreground">{{ $t('report.autoRefreshPaused') }}</span>
+              <Button size="sm" variant="outline" :disabled="isLoading" @click="manualRefresh">
+                {{ $t('globals.terms.refresh') }}
+              </Button>
+            </template>
+          </div>
+          <div class="flex flex-wrap items-center gap-1">
+            <Button
+              v-for="option in rangeOptions"
+              :key="option"
+              size="sm"
+              :variant="!isCustom && range === option ? 'default' : 'outline'"
+              :disabled="isLoading"
+              @click="selectRange(option)"
+            >
+              {{ $t('globals.messages.nDays', { days: option }) }}
+            </Button>
+            <Separator orientation="vertical" class="h-6 mx-1" />
+            <Button
+              size="sm"
+              :variant="isCustom ? 'default' : 'outline'"
+              :disabled="isLoading"
+              @click="enableCustom"
+            >
+              {{ $t('globals.terms.custom') }}
+            </Button>
+            <Input
+              v-if="isCustom"
+              v-model="customDays"
+              :aria-label="$t('report.customRangeDays')"
+              type="number"
+              min="1"
+              max="365"
+              class="w-20 h-8"
+              :disabled="isLoading"
+              @blur="applyCustom"
+              @keyup.enter="applyCustom"
+            />
+          </div>
         </div>
 
         <!-- Row 1: Open Conversations and Agent Status -->
-        <div class="flex w-full space-x-4">
+        <div class="flex flex-col w-full gap-4 md:flex-row">
           <Card
             class="flex-1"
             :title="$t('report.openConversations')"
@@ -30,14 +74,11 @@
         </div>
 
         <!-- Row 2: CSAT and Message Volume -->
-        <div class="flex w-full space-x-4">
+        <div class="flex flex-col w-full gap-4 md:flex-row">
           <!-- CSAT Card -->
           <div class="flex-1 box p-5">
-            <div class="flex justify-between items-center mb-4">
-              <p class="card-title">{{ $t('report.csat.cardTitle', { days: csatDays }) }}</p>
-              <DateFilter @filter-change="handleCSATFilterChange" :label="''" />
-            </div>
-            <div class="grid grid-cols-3 gap-6">
+            <p class="card-title mb-4">{{ $t('report.csat.cardTitle') }}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{ formatRating(csatData.average_rating) }}</span>
                 <span class="metric-label">{{ $t('report.csat.avgRating') }}</span>
@@ -57,13 +98,8 @@
 
           <!-- Message Volume Card -->
           <div class="flex-1 box p-5">
-            <div class="flex justify-between items-center mb-4">
-              <p class="card-title">
-                {{ $t('report.messages.cardTitle', { days: messageVolumeDays }) }}
-              </p>
-              <DateFilter @filter-change="handleMessageVolumeFilterChange" :label="''" />
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <p class="card-title mb-4">{{ $t('report.messages.cardTitle') }}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{
                   formatCompactNumber(messageVolumeData.total_messages || 0)
@@ -93,41 +129,38 @@
         </div>
 
         <!-- Row 3: SLA Card with Compliance Percentages -->
-        <div class="w-full rounded box p-5">
-          <div class="flex justify-between items-center mb-6">
-            <p class="card-title">{{ slaCardTitle }}</p>
-            <DateFilter @filter-change="handleSlaFilterChange" :label="''" />
-          </div>
+        <div class="w-full box p-5">
+          <p class="card-title mb-4">{{ $t('report.sla.cardTitle') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <!-- First Response -->
             <div class="space-y-4">
               <p class="section-title">{{ $t('report.sla.firstResponse') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-green-600"
+                <span class="metric-value"
                   >{{ slaCounts.first_response_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold text-green-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.first_response_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
                 </div>
                 <div>
-                  <span class="text-2xl font-semibold text-red-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.first_response_breached_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
-                <span class="text-lg font-medium">{{
+                <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_first_response_time_sec
                 }}</span>
-                <p class="text-xs text-muted-foreground">{{ $t('report.sla.avgFirstResp') }}</p>
+                <p class="metric-label">{{ $t('report.sla.avgFirstResp') }}</p>
               </div>
             </div>
 
@@ -135,30 +168,30 @@
             <div class="space-y-4 border-l border-r px-8">
               <p class="section-title">{{ $t('report.sla.nextResponse') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-green-600"
+                <span class="metric-value"
                   >{{ slaCounts.next_response_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold text-green-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.next_response_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
                 </div>
                 <div>
-                  <span class="text-2xl font-semibold text-red-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.next_response_breached_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
-                <span class="text-lg font-medium">{{
+                <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_next_response_time_sec
                 }}</span>
-                <p class="text-xs text-muted-foreground">{{ $t('report.sla.avgNextResp') }}</p>
+                <p class="metric-label">{{ $t('report.sla.avgNextResp') }}</p>
               </div>
             </div>
 
@@ -166,43 +199,38 @@
             <div class="space-y-4">
               <p class="section-title">{{ $t('report.sla.resolution') }}</p>
               <div class="metric-item">
-                <span class="metric-value text-green-600"
+                <span class="metric-value"
                   >{{ slaCounts.resolution_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-center pt-2">
                 <div>
-                  <span class="text-2xl font-semibold text-green-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.resolution_met_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.met') }}</p>
                 </div>
                 <div>
-                  <span class="text-2xl font-semibold text-red-600">{{
+                  <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.resolution_breached_count || 0
                   }}</span>
                   <p class="metric-label">{{ $t('report.sla.breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
-                <span class="text-lg font-medium">{{
+                <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_resolution_time_sec
                 }}</span>
-                <p class="text-xs text-muted-foreground">{{ $t('report.sla.avgResolution') }}</p>
+                <p class="metric-label">{{ $t('report.sla.avgResolution') }}</p>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Row 4: Tag Distribution -->
-        <div class="w-full rounded box p-5">
-          <div class="flex justify-between items-center mb-4">
-            <p class="card-title">
-              {{ $t('report.tags.cardTitle', { days: tagDistributionDays }) }}
-            </p>
-            <DateFilter @filter-change="handleTagDistributionFilterChange" :label="''" />
-          </div>
+        <div class="w-full box p-5">
+          <p class="card-title mb-4">{{ $t('report.tags.cardTitle') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Tagged percentage metric -->
@@ -237,11 +265,8 @@
         </div>
 
         <!-- Row 5: Line Chart -->
-        <div class="rounded box w-full p-5">
-          <div class="flex justify-between items-center mb-4">
-            <p class="card-title">{{ $t('report.chart.title') }}</p>
-            <DateFilter @filter-change="handleChartFilterChange" :label="''" />
-          </div>
+        <div class="box w-full p-5">
+          <p class="card-title mb-4">{{ $t('report.chart.title') }}</p>
           <LineChart :data="processedLineData" />
         </div>
       </div>
@@ -250,7 +275,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useIntervalFn, useDocumentVisibility } from '@vueuse/core'
 import { useEmitter } from '../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -258,7 +284,9 @@ import { formatDuration } from '@shared-ui/utils/datetime.js'
 import Card from '@/features/reports/OverviewCard.vue'
 import LineChart from '@/features/reports/OverviewLineChart.vue'
 import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
-import { DateFilter } from '@shared-ui/components/ui/date-filter'
+import { Button } from '@shared-ui/components/ui/button/index.js'
+import { Input } from '@shared-ui/components/ui/input'
+import { Separator } from '@shared-ui/components/ui/separator'
 import { useI18n } from 'vue-i18n'
 import api from '../../api'
 
@@ -266,9 +294,15 @@ const emitter = useEmitter()
 const { t } = useI18n()
 const isLoading = ref(false)
 const lastUpdate = ref(new Date())
+const rangeOptions = [7, 30, 90]
+const range = ref(7)
+const isCustom = ref(false)
+const customDays = ref('')
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000
+const MAX_POLL_DURATION_MS = 60 * 60 * 1000
+const autoRefreshPaused = ref(false)
 const cardCounts = ref({})
 const chartData = ref({ status_summary: [] })
-let updateInterval = null
 
 const agentStatusCounts = ref({
   agents_online: 0,
@@ -292,7 +326,6 @@ const slaCounts = ref({
   resolution_compliance_percent: 0
 })
 
-// New data refs
 const csatData = ref({
   average_rating: 0,
   response_rate: 0,
@@ -314,14 +347,33 @@ const tagDistributionData = ref({
   tagged_percentage: 0
 })
 
-// Date filter state
-const slaDays = ref(30)
-const chartDays = ref(90)
-const csatDays = ref(30)
-const messageVolumeDays = ref(30)
-const tagDistributionDays = ref(30)
+const sections = {
+  sla: async (days) => {
+    const { data } = await api.getOverviewSLA({ days })
+    slaCounts.value = { ...slaCounts.value, ...data.data }
+  },
+  chart: async (days) => {
+    const { data } = await api.getOverviewCharts({ days })
+    chartData.value = {
+      new_conversations: data.data.new_conversations || [],
+      resolved_conversations: data.data.resolved_conversations || [],
+      messages_sent: data.data.messages_sent || []
+    }
+  },
+  csat: async (days) => {
+    const { data } = await api.getOverviewCSAT({ days })
+    csatData.value = { ...csatData.value, ...data.data }
+  },
+  messageVolume: async (days) => {
+    const { data } = await api.getOverviewMessageVolume({ days })
+    messageVolumeData.value = { ...messageVolumeData.value, ...data.data }
+  },
+  tagDistribution: async (days) => {
+    const { data } = await api.getOverviewTagDistribution({ days })
+    tagDistributionData.value = { ...tagDistributionData.value, ...data.data }
+  }
+}
 
-// Format helpers
 const formatRating = (value) => {
   if (!value) return '0.0'
   return Number(value).toFixed(1)
@@ -346,16 +398,13 @@ const formattedSlaCounts = computed(() => ({
   avg_resolution_time_sec: formatDuration(slaCounts.value.avg_resolution_time_sec, false)
 }))
 
-// Dynamic SLA card title based on selected days
-const slaCardTitle = computed(() => t('report.sla.cardTitle', { days: slaDays.value }))
-
 const lastUpdateFormatted = computed(() => lastUpdate.value.toLocaleTimeString())
 
 const conversationCountLabels = computed(() => ({
   open: t('globals.terms.open'),
   awaiting_response: t('globals.terms.awaitingResponse'),
   unassigned: t('globals.terms.unassigned'),
-  pending: t('globals.terms.pending')
+  pending: t('report.awaitingFirstReply')
 }))
 
 const agentStatusLabels = computed(() => ({
@@ -410,162 +459,113 @@ const fetchCardStats = async () => {
       agents_away: data.data.agents_away || 0,
       agents_reassigning: data.data.agents_reassigning || 0
     }
+    return true
   } catch (error) {
     showError(error)
+    return false
   }
 }
 
-const fetchSLAStats = async (days = slaDays.value) => {
+const runSectionFetch = async (key, days) => {
   try {
-    const { data } = await api.getOverviewSLA({ days })
-    slaCounts.value = { ...slaCounts.value, ...data.data }
+    await sections[key](days)
+    return true
   } catch (error) {
     showError(error)
+    return false
   }
 }
 
-const fetchChartData = async (days = chartDays.value) => {
-  try {
-    const { data } = await api.getOverviewCharts({ days })
-    chartData.value = {
-      new_conversations: data.data.new_conversations || [],
-      resolved_conversations: data.data.resolved_conversations || [],
-      messages_sent: data.data.messages_sent || []
-    }
-  } catch (error) {
-    showError(error)
-  }
-}
-
-const fetchCSATStats = async (days = csatDays.value) => {
-  try {
-    const { data } = await api.getOverviewCSAT({ days })
-    csatData.value = { ...csatData.value, ...data.data }
-  } catch (error) {
-    showError(error)
-  }
-}
-
-const fetchMessageVolumeStats = async (days = messageVolumeDays.value) => {
-  try {
-    const { data } = await api.getOverviewMessageVolume({ days })
-    messageVolumeData.value = { ...messageVolumeData.value, ...data.data }
-  } catch (error) {
-    showError(error)
-  }
-}
-
-const fetchTagDistributionStats = async (days = tagDistributionDays.value) => {
-  try {
-    const { data } = await api.getOverviewTagDistribution({ days })
-    tagDistributionData.value = { ...tagDistributionData.value, ...data.data }
-  } catch (error) {
-    showError(error)
-  }
-}
-
-// Date filter handlers
-const handleSlaFilterChange = async (days) => {
-  slaDays.value = days
+const fetchSections = async () => {
   isLoading.value = true
   try {
-    await fetchSLAStats(days)
+    const results = await Promise.all(
+      Object.keys(sections).map((key) => runSectionFetch(key, range.value))
+    )
+    if (results.every(Boolean)) lastUpdate.value = new Date()
   } finally {
     isLoading.value = false
-    lastUpdate.value = new Date()
   }
 }
 
-const handleChartFilterChange = async (days) => {
-  chartDays.value = days
-  isLoading.value = true
-  try {
-    await fetchChartData(days)
-  } finally {
-    isLoading.value = false
-    lastUpdate.value = new Date()
-  }
+const selectRange = (option) => {
+  isCustom.value = false
+  if (option === range.value) return
+  markActive()
+  range.value = option
+  fetchSections()
 }
 
-const handleCSATFilterChange = async (days) => {
-  csatDays.value = days
-  isLoading.value = true
-  try {
-    await fetchCSATStats(days)
-  } finally {
-    isLoading.value = false
-    lastUpdate.value = new Date()
-  }
+const enableCustom = () => {
+  isCustom.value = true
+  customDays.value = String(range.value)
 }
 
-const handleMessageVolumeFilterChange = async (days) => {
-  messageVolumeDays.value = days
-  isLoading.value = true
-  try {
-    await fetchMessageVolumeStats(days)
-  } finally {
-    isLoading.value = false
-    lastUpdate.value = new Date()
+const applyCustom = () => {
+  let days = parseInt(customDays.value)
+  if (!days || days < 1 || days > 365) {
+    days = 30
+    customDays.value = '30'
   }
-}
-
-const handleTagDistributionFilterChange = async (days) => {
-  tagDistributionDays.value = days
-  isLoading.value = true
-  try {
-    await fetchTagDistributionStats(days)
-  } finally {
-    isLoading.value = false
-    lastUpdate.value = new Date()
-  }
+  if (days === range.value) return
+  markActive()
+  range.value = days
+  fetchSections()
 }
 
 const loadDashboardData = async () => {
   isLoading.value = true
   try {
-    await Promise.allSettled([
+    const results = await Promise.all([
       fetchCardStats(),
-      fetchSLAStats(),
-      fetchChartData(),
-      fetchCSATStats(),
-      fetchMessageVolumeStats(),
-      fetchTagDistributionStats()
+      ...Object.keys(sections).map((key) => runSectionFetch(key, range.value))
     ])
+    if (results.every(Boolean)) lastUpdate.value = new Date()
   } finally {
     isLoading.value = false
-    lastUpdate.value = new Date()
   }
 }
 
-const startRealtimeUpdates = () => {
-  if (updateInterval) clearInterval(updateInterval)
-  updateInterval = setInterval(loadDashboardData, 60000)
-}
+let pollingSince = Date.now()
 
-const stopRealtimeUpdates = () => {
-  if (updateInterval) {
-    clearInterval(updateInterval)
-    updateInterval = null
+const scheduledRefresh = () => {
+  if (Date.now() - pollingSince >= MAX_POLL_DURATION_MS) {
+    pause()
+    autoRefreshPaused.value = true
+    return
   }
-}
-
-onMounted(() => {
   loadDashboardData()
-  startRealtimeUpdates()
+}
+
+const visibility = useDocumentVisibility()
+const { pause, resume } = useIntervalFn(scheduledRefresh, REFRESH_INTERVAL_MS)
+
+const markActive = () => {
+  pollingSince = Date.now()
+  autoRefreshPaused.value = false
+  resume()
+}
+
+const manualRefresh = () => {
+  markActive()
+  loadDashboardData()
+}
+
+watch(visibility, (v) => {
+  if (v === 'visible') {
+    markActive()
+    if (Date.now() - lastUpdate.value.getTime() >= REFRESH_INTERVAL_MS) loadDashboardData()
+  } else {
+    pause()
+  }
 })
 
-onUnmounted(() => {
-  stopRealtimeUpdates()
-})
+onMounted(loadDashboardData)
 </script>
 
 <style scoped>
 .metric-value {
-  @apply text-3xl font-bold tracking-tight;
-}
-
-.metric-value {
-  @apply text-3xl font-bold tracking-tight;
+  @apply text-3xl font-bold tracking-tight tabular-nums;
 }
 
 .metric-label {
@@ -573,7 +573,7 @@ onUnmounted(() => {
 }
 
 .card-title {
-  @apply text-xl font-medium;
+  @apply text-sm font-medium text-muted-foreground;
 }
 
 .metric-item {

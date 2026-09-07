@@ -1,0 +1,16 @@
+From: Grace Sender <grace@example.com>
+To: support@example.org
+Subject: Photo
+Message-ID: <attachment-with-cid-test@example.com>
+Date: Wed, 15 Jul 2026 15:35:00 +0200
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="----=_Mixed_AWC"
+
+------=_Mixed_AWC
+Content-Type: image/png; name="photo.png"
+Content-Disposition: attachment; filename="photo.png"
+Content-Transfer-Encoding: base64
+Content-ID: <photo-cid@example.com>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+------=_Mixed_AWC--

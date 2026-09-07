@@ -56,33 +56,30 @@
         <div class="flex-1">
           <div v-if="modelFilter.field && modelFilter.operator">
             <template v-if="modelFilter.operator !== OPERATOR.SET && modelFilter.operator !== OPERATOR.NOT_SET">
+              <SelectTagCombobox
+                v-if="getFieldEntity(modelFilter) === 'tag'"
+                :multiple="getFieldType(modelFilter) === FIELD_TYPE.MULTI_SELECT"
+                value-field="id"
+                v-model="modelFilter.value"
+              />
+
               <SelectTag
-                v-if="getFieldType(modelFilter) === FIELD_TYPE.MULTI_SELECT"
+                v-else-if="getFieldType(modelFilter) === FIELD_TYPE.MULTI_SELECT"
                 v-model="modelFilter.value"
                 :items="getFieldOptions(modelFilter)"
                 :placeholder="t('placeholders.selectTags')"
               />
 
-              <SelectComboBox
-                v-else-if="
-                  getFieldOptions(modelFilter).length > 0 &&
-                  modelFilter.field === 'assigned_user_id'
-                "
+              <SelectAgentCombobox
+                v-else-if="getFieldEntity(modelFilter) === 'agent'"
                 v-model="modelFilter.value"
-                :items="getFieldOptions(modelFilter)"
                 :placeholder="t('placeholders.selectValue')"
-                type="user"
               />
 
-              <SelectComboBox
-                v-else-if="
-                  getFieldOptions(modelFilter).length > 0 &&
-                  modelFilter.field === 'assigned_team_id'
-                "
+              <SelectTeamCombobox
+                v-else-if="getFieldEntity(modelFilter) === 'team'"
                 v-model="modelFilter.value"
-                :items="getFieldOptions(modelFilter)"
                 :placeholder="t('placeholders.selectValue')"
-                type="team"
               />
 
               <SelectComboBox
@@ -146,6 +143,9 @@ import { useI18n } from 'vue-i18n'
 import { FIELD_TYPE, OPERATOR } from '@/constants/filterConfig'
 import CloseButton from '@/components/button/CloseButton.vue'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
+import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
+import SelectTagCombobox from '@/components/combobox/SelectTagCombobox.vue'
 import SelectTag from '@shared-ui/components/ui/select/SelectTag.vue'
 import DateFilterValue from '@/components/filter/DateFilterValue.vue'
 
@@ -261,6 +261,11 @@ const validFilters = computed(() => {
 const getFieldOptions = (fieldValue) => {
   const field = props.fields.find((f) => f.field === fieldValue.field)
   return field?.options || []
+}
+
+const getFieldEntity = (fieldValue) => {
+  const field = props.fields.find((f) => f.field === fieldValue.field)
+  return field?.entity || ''
 }
 
 const getFieldOperators = (modelFilter) => {
