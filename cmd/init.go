@@ -51,6 +51,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
+	"github.com/abhinavxd/libredesk/internal/twofactor"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/view"
 	"github.com/abhinavxd/libredesk/internal/webhook"
@@ -1307,4 +1308,12 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 	}
 
 	return limiter
+}
+
+func initTwoFactor(db *sqlx.DB, translations *i18n.I18n) *twofactor.Manager {
+	mgr, err := twofactor.New(db, ko.MustString("app.encryption_key"), translations, initLogger("two_factor"))
+	if err != nil {
+		log.Fatalf("error initializing two-factor manager: %v", err)
+	}
+	return mgr
 }

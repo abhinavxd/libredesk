@@ -272,25 +272,11 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 
 // SaveSession creates and sets a session (post successful login/auth).
 func (a *Auth) SaveSession(user amodels.User, r *fastglue.Request) error {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	return a.saveSession(user, r, false)
+}
 
-	sess, err := a.sess.NewSession(r, r)
-	if err != nil {
-		a.logger.Error("error creating login session", "error", err)
-		return err
-	}
-
-	if err := sess.SetMulti(map[string]interface{}{
-		"id":         user.ID,
-		"email":      user.Email,
-		"first_name": user.FirstName,
-		"last_name":  user.LastName,
-	}); err != nil {
-		a.logger.Error("error setting login session", "error", err)
-		return err
-	}
-	return nil
+func (a *Auth) SaveTwoFactorSession(user amodels.User, r *fastglue.Request) error {
+	return a.saveSession(user, r, true)
 }
 
 // SetSessionValues sets passed values in the session.
@@ -399,6 +385,32 @@ func (a *Auth) DestroySession(r *fastglue.Request) error {
 	}
 	if err := sess.Destroy(); err != nil {
 		a.logger.Error("error clearing session", "error", err)
+		return err
+	}
+	return nil
+}
+
+func (a *Auth) saveSession(user amodels.User, r *fastglue.Request, twoFactorVerified bool) error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	sess, err := a.sess.NewSession(r, r)
+	if err != nil {
+		a.logger.Error("error creating login session", "error", err)
+		return err
+	}
+
+	values := map[string]any{
+		"id":         user.ID,
+		"email":      user.Email,
+		"first_name": user.FirstName,
+		"last_name":  user.LastName,
+	}
+	if twoFactorVerified {
+		values["two_factor_verified_at"] = time.Now().UTC().Format(time.RFC3339)
+	}
+	if err := sess.SetMulti(values); err != nil {
+		a.logger.Error("error setting login session", "error", err)
 		return err
 	}
 	return nil

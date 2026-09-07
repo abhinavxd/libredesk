@@ -175,6 +175,12 @@ const routes = [
             meta: { titleKey: 'account.editProfile' }
           },
           {
+            path: 'security',
+            name: 'account-security',
+            component: () => import('@main/views/account/security/SecurityView.vue'),
+            meta: { titleKey: 'globals.terms.security' }
+          },
+          {
             path: 'notifications',
             name: 'account-notifications',
             component: () =>

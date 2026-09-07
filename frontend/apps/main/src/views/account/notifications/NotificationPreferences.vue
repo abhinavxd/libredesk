@@ -72,9 +72,9 @@ const vapidPublicKey = ref('')
 const pushNotifications = usePushNotifications()
 
 const channels = [
-  { key: 'in_app', labelKey: 'notification.channel.inApp' },
+  { key: 'in_app', labelKey: 'globals.terms.inApp' },
   { key: 'email', labelKey: 'globals.terms.email' },
-  { key: 'push', labelKey: 'notification.channel.push' }
+  { key: 'push', labelKey: 'globals.terms.push' }
 ]
 
 const typeLabels = {

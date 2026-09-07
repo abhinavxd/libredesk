@@ -151,6 +151,12 @@ const updateSettings = (key, data) =>
     }
   })
 const getSettings = (key) => http.get(`/api/v1/settings/${key}`)
+const getTwoFactor = () => http.get('/api/v1/users/me/2fa')
+const setupTwoFactor = (data) => http.post('/api/v1/users/me/2fa/setup', data)
+const enableTwoFactor = (data) => http.post('/api/v1/users/me/2fa/enable', data)
+const disableTwoFactor = (data) => http.post('/api/v1/users/me/2fa/disable', data)
+const regenerateTwoFactorCodes = (data) => http.post('/api/v1/users/me/2fa/recovery-codes', data)
+const verifyTwoFactorLogin = (data) => http.post('/api/v1/auth/2fa/verify', data)
 const login = (data) => http.post(`/api/v1/auth/login`, data, {
   headers: {
     'Content-Type': 'application/json'
@@ -620,6 +626,12 @@ const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/
 
 export default {
   login,
+  getTwoFactor,
+  setupTwoFactor,
+  enableTwoFactor,
+  disableTwoFactor,
+  regenerateTwoFactorCodes,
+  verifyTwoFactorLogin,
   deleteUser,
   importAgents,
   getAgentImportStatus,

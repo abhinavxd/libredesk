@@ -1317,3 +1317,14 @@ INSERT INTO business_hours ("name", description, is_always_open, hours, holidays
 -- Default SLA policy
 INSERT INTO sla_policies ("name", description, first_response_time, resolution_time, next_response_time, notifications) VALUES
 ('Default', 'Default SLA policy, first response within 1 hour and resolution within 24 hours.', '1h', '24h', NULL, '[]'::jsonb);
+
+CREATE TABLE user_two_factor (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    secret TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    last_step BIGINT NOT NULL DEFAULT -1,
+    recovery_hashes TEXT[] NOT NULL DEFAULT '{}',
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TIMESTAMPTZ,
+    setup_expires_at TIMESTAMPTZ NOT NULL
+);

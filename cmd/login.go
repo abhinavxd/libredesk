@@ -1,8 +1,10 @@
 package main
 
 import (
+	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -17,7 +19,6 @@ type loginRequest struct {
 func handleLogin(r *fastglue.Request) error {
 	var (
 		app      = r.Context.(*App)
-		ip       = realip.FromRequest(r.RequestCtx)
 		loginReq loginRequest
 	)
 
@@ -41,33 +42,40 @@ func handleLogin(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("user.accountDisabled"), nil))
 	}
 
-	if err := app.auth.SaveSession(amodels.User{
-		ID:        user.ID,
-		Email:     user.Email.String,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-	}, r); err != nil {
-		app.lo.Error("error saving session", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	status, err := app.twoFactor.Status(user.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
 	}
-	// Set CSRF cookie if not already set.
-	if err := app.auth.SetCSRFCookie(r); err != nil {
-		app.lo.Error("error setting csrf cookie", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	if status.Enabled {
+		if err := app.auth.BeginPendingLogin(r, auth_.PendingLogin{UserID: user.ID, CredentialHash: credentialHash(user.Password.String)}); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
+		return r.SendEnvelope(map[string]bool{"two_factor_required": true})
 	}
+	return completeLogin(r, user)
+}
 
-	// Update last login time.
+func completeLogin(r *fastglue.Request, user models.User) error {
+	app := r.Context.(*App)
+	saveSession := app.auth.SaveSession
+	if r.RequestCtx.UserValue("two_factor_verified") == true {
+		saveSession = app.auth.SaveTwoFactorSession
+	}
+	if err := saveSession(amodels.User{ID: user.ID, Email: user.Email.String, FirstName: user.FirstName, LastName: user.LastName}, r); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
+	if err := app.auth.SetCSRFCookie(r); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
 	if err := app.user.UpdateLastLoginAt(user.ID); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-
 	app.user.InvalidateAgentCache(user.ID)
-
-	// Insert activity log.
-	if err := app.activityLog.Login(user.ID, user.Email.String, ip); err != nil {
+	if err := app.activityLog.Login(user.ID, user.Email.String, realip.FromRequest(r.RequestCtx)); err != nil {
 		app.lo.Error("error creating login activity log", "error", err)
 	}
-
+	r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
 	return r.SendEnvelope(user)
 }
 

@@ -14,91 +14,102 @@
           <p class="text-sm text-muted-foreground">{{ t('auth.signIn') }}</p>
         </div>
 
-        <div v-if="enabledOIDCProviders.length" class="space-y-3">
-          <Button
-            v-for="oidcProvider in enabledOIDCProviders"
-            :key="oidcProvider.id"
-            variant="outline"
-            type="button"
-            @click="redirectToOIDC(oidcProvider)"
-            class="w-full"
-          >
-            <img
-              :src="oidcProvider.logo_url"
-              :alt="oidcProvider.name"
-              width="20"
-              v-if="oidcProvider.logo_url"
-            />
-            {{ oidcProvider.name }}
-          </Button>
-
-          <div class="relative">
-            <div class="absolute inset-0 flex items-center">
-              <span class="w-full border-t border-border"></span>
-            </div>
-            <div class="relative flex justify-center text-xs uppercase">
-              <span class="px-2 text-muted-foreground bg-card">{{ t('auth.orContinueWith') }}</span>
-            </div>
-          </div>
-        </div>
-
-        <form @submit.prevent="loginAction" class="space-y-3">
-          <div class="space-y-2">
-            <Label for="email" class="text-muted-foreground">{{ t('globals.terms.email') }}</Label>
-            <Input
-              id="email"
-              type="text"
-              autofocus
-              autocomplete="username"
-              v-model.trim="loginForm.email"
-              :class="{ 'border-destructive': emailHasError }"
-            />
-          </div>
-
-          <div class="space-y-2">
-            <Label for="password" class="text-muted-foreground">
-              {{ t('globals.terms.password') }}
-            </Label>
-            <div class="relative">
-              <Input
-                id="password"
-                :type="showPassword ? 'text' : 'password'"
-                autocomplete="current-password"
-                v-model="loginForm.password"
-                :class="{ 'border-destructive': passwordHasError }"
-                class="pr-10"
-              />
-              <button
-                type="button"
-                :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
-                class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                @click="showPassword = !showPassword"
-              >
-                <Eye v-if="!showPassword" class="w-5 h-5" />
-                <EyeOff v-else class="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <router-link
-              to="/reset-password"
-              class="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        <TwoFactorLoginForm
+          v-if="twoFactorRequired"
+          @success="finishLogin"
+          @cancel="cancelTwoFactor"
+        />
+        <template v-else>
+          <div v-if="enabledOIDCProviders.length" class="space-y-3">
+            <Button
+              v-for="oidcProvider in enabledOIDCProviders"
+              :key="oidcProvider.id"
+              variant="outline"
+              type="button"
+              @click="redirectToOIDC(oidcProvider)"
+              class="w-full"
             >
-              {{ t('auth.forgotPassword') }}
-            </router-link>
+              <img
+                :src="oidcProvider.logo_url"
+                :alt="oidcProvider.name"
+                width="20"
+                v-if="oidcProvider.logo_url"
+              />
+              {{ oidcProvider.name }}
+            </Button>
+
+            <div class="relative">
+              <div class="absolute inset-0 flex items-center">
+                <span class="w-full border-t border-border"></span>
+              </div>
+              <div class="relative flex justify-center text-xs uppercase">
+                <span class="px-2 text-muted-foreground bg-card">{{
+                  t('auth.orContinueWith')
+                }}</span>
+              </div>
+            </div>
           </div>
 
-          <Button class="w-full" :disabled="isLoading" type="submit">
-            <span v-if="isLoading" class="flex items-center justify-center">
-              <div
-                class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"
-              ></div>
-              {{ t('auth.loggingIn') }}
-            </span>
-            <span v-else>{{ t('auth.signInButton') }}</span>
-          </Button>
-        </form>
+          <form @submit.prevent="loginAction" class="space-y-3">
+            <div class="space-y-2">
+              <Label for="email" class="text-muted-foreground">{{
+                t('globals.terms.email')
+              }}</Label>
+              <Input
+                id="email"
+                type="text"
+                autofocus
+                autocomplete="username"
+                v-model.trim="loginForm.email"
+                :class="{ 'border-destructive': emailHasError }"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <Label for="password" class="text-muted-foreground">
+                {{ t('globals.terms.password') }}
+              </Label>
+              <div class="relative">
+                <Input
+                  id="password"
+                  :type="showPassword ? 'text' : 'password'"
+                  autocomplete="current-password"
+                  v-model="loginForm.password"
+                  :class="{ 'border-destructive': passwordHasError }"
+                  class="pr-10"
+                />
+                <button
+                  type="button"
+                  :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
+                  class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                  @click="showPassword = !showPassword"
+                >
+                  <Eye v-if="!showPassword" class="w-5 h-5" />
+                  <EyeOff v-else class="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <router-link
+                to="/reset-password"
+                class="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {{ t('auth.forgotPassword') }}
+              </router-link>
+            </div>
+
+            <Button class="w-full" :disabled="isLoading" type="submit">
+              <span v-if="isLoading" class="flex items-center justify-center">
+                <div
+                  class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"
+                ></div>
+                {{ t('auth.loggingIn') }}
+              </span>
+              <span v-else>{{ t('auth.signInButton') }}</span>
+            </Button>
+          </form>
+        </template>
 
         <Error
           v-if="errorMessage"
@@ -112,10 +123,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api from '../../api'
+import api from '@/api'
+import TwoFactorLoginForm from '@/components/auth/TwoFactorLoginForm.vue'
 import { validateEmail } from '@shared-ui/utils/string'
 import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
@@ -123,16 +135,17 @@ import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
-import { useEmitter } from '../../composables/useEmitter'
-import { useUserStore } from '../../stores/user'
+import { useEmitter } from '@/composables/useEmitter'
+import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useAppSettingsStore } from '../../stores/appSettings'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { useAppSettingsStore } from '@/stores/appSettings'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
 import { Eye, EyeOff } from 'lucide-vue-next'
 
 const emitter = useEmitter()
 const { t } = useI18n()
+const twoFactorRequired = ref(false)
 const errorMessage = ref('')
 const isLoading = ref(false)
 const router = useRouter()
@@ -170,6 +183,7 @@ onMounted(async () => {
     loginForm.value.email = demoCredentials.email
     loginForm.value.password = demoCredentials.password
   }
+  twoFactorRequired.value = router.currentRoute.value.query.two_factor === 'required'
   fetchOIDCProviders()
   showOIDCError()
 })
@@ -177,7 +191,9 @@ onMounted(async () => {
 const showOIDCError = () => {
   const { error, ...query } = router.currentRoute.value.query
   if (!error) return
-  errorMessage.value = t(Object.hasOwn(oidcErrorKeys, error) ? oidcErrorKeys[error] : 'auth.oidcLoginFailed')
+  errorMessage.value = t(
+    Object.hasOwn(oidcErrorKeys, error) ? oidcErrorKeys[error] : 'auth.oidcLoginFailed'
+  )
   applyTemporaryClass('login-container', 'animate-shake')
   router.replace({ query })
 }
@@ -232,19 +248,13 @@ const loginAction = () => {
       password: loginForm.value.password
     })
     .then((resp) => {
-      if (resp?.data?.data) {
-        userStore.setCurrentUser(resp.data.data)
+      if (resp.data.data.two_factor_required) {
+        loginForm.value.password = ''
+        errorMessage.value = ''
+        twoFactorRequired.value = true
+        return
       }
-      // Also fetch general setting as user's logged in.
-      appSettingsStore.fetchSettings('general')
-
-      // Redirect to the 'next' parameter if it exists
-      const nextParam = router.currentRoute.value.query.next
-      if (nextParam) {
-        router.push(nextParam)
-      } else {
-        router.push({ name: 'inboxes' })
-      }
+      finishLogin(resp)
     })
     .catch((error) => {
       errorMessage.value = handleHTTPError(error).message
@@ -253,6 +263,28 @@ const loginAction = () => {
     .finally(() => {
       isLoading.value = false
     })
+}
+
+const finishLogin = (resp) => {
+  userStore.setCurrentUser(resp.data.data)
+  appSettingsStore.fetchSettings('general')
+  const next = resp.headers?.['x-login-next'] || router.currentRoute.value.query.next
+  router.push(
+    typeof next === 'string' && next.startsWith('/') && !next.startsWith('//')
+      ? next
+      : { name: 'inboxes' }
+  )
+}
+
+const cancelTwoFactor = async () => {
+  twoFactorRequired.value = false
+  submitted.value = false
+  errorMessage.value = ''
+  const query = { ...router.currentRoute.value.query }
+  delete query.two_factor
+  await router.replace({ query })
+  await nextTick()
+  document.getElementById('email')?.focus()
 }
 
 const enabledOIDCProviders = computed(() => {
