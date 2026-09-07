@@ -28,7 +28,7 @@
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="t('admin.portal.inbox.placeholder')" />
+                <SelectValue :placeholder="t('placeholders.selectInbox')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -47,11 +47,11 @@
 
       <FormField v-slot="{ componentField }" name="livechat_inbox_id">
         <FormItem>
-          <FormLabel>{{ t('admin.portal.livechatInbox') }}</FormLabel>
+          <FormLabel>{{ t('globals.terms.livechatWidget') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="t('admin.portal.inbox.placeholder')" />
+                <SelectValue :placeholder="t('placeholders.selectInbox')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -74,7 +74,7 @@
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="t('admin.portal.helpCenter.placeholder')" />
+                <SelectValue :placeholder="t('globals.messages.selectHelpCenter')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>

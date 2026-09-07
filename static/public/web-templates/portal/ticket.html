@@ -18,8 +18,8 @@
     {{ if .Data.Error }}<p class="pt-error" role="alert">{{ .Data.Error }}</p>{{ end }}
     {{ if .Data.CSATWidgetURL }}
     <section class="pt-csat">
-        <h2>{{ .L.T "portal.rateExperience" }}</h2>
-        <iframe src="{{ .Data.CSATWidgetURL }}" title="{{ .L.T "portal.rateExperience" }}" loading="lazy"></iframe>
+        <h2>{{ .L.T "csat.rateYourInteraction" }}</h2>
+        <iframe src="{{ .Data.CSATWidgetURL }}" title="{{ .L.T "csat.rateYourInteraction" }}" loading="lazy"></iframe>
     </section>
     {{ end }}
     <ol class="pt-messages">
@@ -46,7 +46,7 @@
     <form class="pt-reply" action="/portal/tickets/{{ .Data.ReferenceNumber }}/reply" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf" value="{{ .Data.CSRF }}" />
         <label for="pt-reply-message">{{ .L.Tc "globals.terms.reply" 1 }}</label>
-        <textarea id="pt-reply-message" name="message" rows="5" maxlength="{{ .Data.MaxMessageLength }}" placeholder="{{ .L.T "portal.replyPlaceholder" }}">{{ .Data.Message }}</textarea>
+        <textarea id="pt-reply-message" name="message" rows="5" maxlength="{{ .Data.MaxMessageLength }}" placeholder="{{ .L.T "globals.messages.writeReply" }}">{{ .Data.Message }}</textarea>
         <div class="pt-form-footer">
             <div class="pt-file-field">
                 <label class="pt-file-label" for="pt-reply-files">{{ .L.Tc "globals.terms.attachment" 2 }}</label>

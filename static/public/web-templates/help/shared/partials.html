@@ -57,10 +57,10 @@
 {{ if .Data.HelpCenter.NewTicketPath }}
 <aside class="hc-still-stuck">
     <div class="hc-still-stuck-copy">
-        <p class="hc-still-stuck-title">{{ .L.T "helpCenter.stillNeedHelp" }}</p>
+        <p class="hc-still-stuck-title">{{ .L.T "globals.messages.stillNeedHelp" }}</p>
         <p class="hc-still-stuck-sub">{{ .L.T "helpCenter.stillNeedHelp.description" }}</p>
     </div>
-    <a class="hc-still-stuck-cta" href="{{ .Data.HelpCenter.NewTicketPath }}?article={{ .Data.Article.Slug }}&article_locale={{ .Data.Article.Locale }}">{{ .L.T "helpCenter.contactSupport" }}</a>
+    <a class="hc-still-stuck-cta" href="{{ .Data.HelpCenter.NewTicketPath }}?article={{ .Data.Article.Slug }}&article_locale={{ .Data.Article.Locale }}">{{ .L.T "globals.messages.contactSupport" }}</a>
 </aside>
 {{ end }}
 {{ end }}
@@ -169,7 +169,7 @@
 {{ define "hc-logout" }}
                 <form class="hc-logout" action="/portal/logout" method="POST">
                     <input type="hidden" name="csrf" value="{{ .CSRF }}" />
-                    <button type="submit">{{ .L.T "globals.messages.signOut" }}</button>
+                    <button type="submit">{{ .L.T "navigation.logout" }}</button>
                 </form>
 {{ end }}
 

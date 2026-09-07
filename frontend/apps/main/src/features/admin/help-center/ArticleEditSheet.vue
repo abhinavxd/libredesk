@@ -200,7 +200,6 @@
                       </SelectContent>
                     </Select>
                   </FormControl>
-                  <FormDescription>{{ t('admin.portalForm.articleForm.description') }}</FormDescription>
                   <FormMessage />
                 </FormItem>
               </FormField>

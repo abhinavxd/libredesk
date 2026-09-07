@@ -13,7 +13,7 @@
     />
 
     <div class="space-y-4">
-      <h4 class="font-medium text-foreground">{{ $t('admin.portalForm.fields') }}</h4>
+      <h4 class="font-medium text-foreground">{{ $t('globals.terms.fields') }}</h4>
 
       <Draggable v-model="draggableFields" item-key="key" :animation="200" class="space-y-3">
         <template #item="{ element: field, index }">
@@ -73,7 +73,7 @@
                   class="mt-1"
                 />
                 <p class="text-xs text-muted-foreground mt-1">
-                  {{ $t('admin.portalForm.optionsHint') }}
+                  {{ $t('globals.messages.oneOptionPerLine') }}
                 </p>
               </div>
             </div>
@@ -87,16 +87,16 @@
       </Draggable>
 
       <div v-if="fields.length === 0" class="text-center py-8 text-muted-foreground">
-        {{ $t('admin.portalForm.noFields') }}
+        {{ $t('globals.messages.noFields') }}
       </div>
 
       <Button type="button" variant="outline" size="sm" @click="addMessageField">
         <Plus class="w-4 h-4 mr-2" />
-        {{ $t('admin.portalForm.addField') }}
+        {{ $t('globals.messages.addField') }}
       </Button>
 
       <div v-if="availableAttributes.length > 0" class="space-y-3">
-        <h5 class="font-medium text-sm">{{ $t('admin.portalForm.availableAttributes') }}</h5>
+        <h5 class="font-medium text-sm">{{ $t('globals.terms.conversationAttributes') }}</h5>
         <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
           <button
             v-for="attr in availableAttributes"

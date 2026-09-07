@@ -9,7 +9,7 @@
         <input type="hidden" name="return" value="{{ .Data.Return }}" />
         <label for="pt-email">{{ .L.Tc "globals.terms.email" 1 }}</label>
         <input id="pt-email" type="email" name="email" required autocomplete="email" autofocus />
-        <button type="submit">{{ .L.T "portal.sendCode" }}</button>
+        <button type="submit">{{ .L.T "globals.messages.sendCode" }}</button>
     </form>
     {{ if .Data.Providers }}
     <div class="pt-auth-divider" aria-hidden="true"><span>{{ .L.T "auth.orContinueWith" }}</span></div>

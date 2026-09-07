@@ -29,7 +29,7 @@ export const createColumns = (t, { onEdit } = {}) => [
     id: 'fields',
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('admin.portalForm.fields'))
+      return h('div', { class: 'text-center' }, t('globals.terms.fields'))
     },
     cell: function ({ row }) {
       return h('div', { class: 'text-center' }, String((row.original.fields || []).length))

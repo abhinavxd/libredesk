@@ -497,7 +497,7 @@ func handlePortalCreateTicket(r *fastglue.Request) error {
 		headerLines = append(headerLines, [2]string{lcl.Tc("globals.terms.article", 1), articleTitle})
 	}
 	if via := portalSessionVia(app, r, lcl); via != "" {
-		headerLines = append(headerLines, [2]string{lcl.T("portal.signedInVia"), via})
+		headerLines = append(headerLines, [2]string{lcl.T("globals.messages.signedInVia"), via})
 	}
 	if block := portalform.RenderHeaderBlock(headerLines); block != "" {
 		message = block + "\n" + message
@@ -606,7 +606,7 @@ func handlePortalSendCode(r *fastglue.Request) error {
 	}
 
 	// The response never reveals whether the address is known.
-	return renderPortalPage(r, "portal-verify", lcl.T("portal.enterCode"), map[string]interface{}{
+	return renderPortalPage(r, "portal-verify", lcl.T("globals.messages.enterCode"), map[string]interface{}{
 		"Email":  email,
 		"Return": returnTo,
 	})
@@ -636,7 +636,7 @@ func handlePortalVerifyCode(r *fastglue.Request) error {
 		return renderPortalError(r, fasthttp.StatusInternalServerError)
 	}
 	if res != 1 {
-		return renderPortalPage(r, "portal-verify", lcl.T("portal.enterCode"), map[string]interface{}{
+		return renderPortalPage(r, "portal-verify", lcl.T("globals.messages.enterCode"), map[string]interface{}{
 			"Email":  email,
 			"Error":  lcl.T("portal.invalidCode"),
 			"Return": returnTo,
@@ -1226,9 +1226,9 @@ func portalStatusLabel(lcl *i18n.I18n, category, lastInteractionSender string) (
 		return lcl.T("globals.terms.resolved"), "resolved"
 	}
 	if lastInteractionSender == cmodels.SenderTypeAgent {
-		return lcl.T("portal.statusAwaitingYourReply"), "waiting"
+		return lcl.T("globals.messages.awaitingYourReply"), "waiting"
 	}
-	return lcl.T("portal.statusInProgress"), "open"
+	return lcl.T("globals.terms.inProgress"), "open"
 }
 
 // portalTicketForm resolves the article's form override, else the portal default, else an empty subject-asking form.
@@ -1325,9 +1325,9 @@ func portalSessionVia(app *App, r *fastglue.Request, lcl *i18n.I18n) string {
 	via, _ := app.redis.HGet(context.Background(), portalSessionPrefix+token, "via").Result()
 	switch via {
 	case portalViaCode:
-		return lcl.T("portal.signedInViaCode")
+		return lcl.T("globals.terms.emailCode")
 	case portalViaOIDC:
-		return lcl.T("portal.signedInViaSSO")
+		return lcl.T("globals.terms.sso")
 	}
 	return ""
 }
@@ -1366,16 +1366,16 @@ func portalCSATWidgetURL(app *App, conversationID int) string {
 // portalReplyLabel counts the replies after the contact's opening message.
 func portalReplyLabel(lcl *i18n.I18n, count int) string {
 	if count <= 0 {
-		return lcl.T("portal.noReplies")
+		return lcl.T("globals.messages.noReplies")
 	}
 	// Tc picks the plural form but does not substitute, Ts substitutes but always picks the singular.
-	return strings.ReplaceAll(lcl.Tc("portal.replyCount", count), "{count}", strconv.Itoa(count))
+	return strings.ReplaceAll(lcl.Tc("globals.messages.replyCount", count), "{count}", strconv.Itoa(count))
 }
 
 // portalSubject falls back to a placeholder for subjectless (livechat) conversations.
 func portalSubject(lcl *i18n.I18n, subject string) string {
 	if strings.TrimSpace(subject) == "" {
-		return lcl.T("portal.noSubject")
+		return lcl.T("globals.messages.noSubject")
 	}
 	return subject
 }
@@ -1404,7 +1404,7 @@ func portalAuthorName(lcl *i18n.I18n, msg cmodels.Message) string {
 	}
 	name := strings.TrimSpace(msg.Author.FirstName + " " + msg.Author.LastName)
 	if name == "" {
-		return lcl.T("portal.supportTeam")
+		return lcl.T("globals.terms.support")
 	}
 	return name
 }

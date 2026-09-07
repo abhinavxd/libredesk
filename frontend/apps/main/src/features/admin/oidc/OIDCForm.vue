@@ -20,7 +20,6 @@
             <Label>{{ $t('admin.sso.enabledForPortal') }}</Label>
           </div>
         </FormControl>
-        <FormDescription>{{ $t('admin.sso.enabledForPortalDescription') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
