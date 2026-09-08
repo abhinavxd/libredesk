@@ -1,82 +1,85 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <div class="h-12 flex-shrink-0 px-2 border-b flex items-center justify-between gap-2">
-      <div class="flex items-center gap-1 min-w-0">
-        <Button
-          v-if="isMobile"
-          variant="ghost"
-          class="w-11 h-11 md:w-8 md:h-8 p-0 shrink-0 -ml-2 md:-ml-1"
-          :aria-label="t('globals.messages.back')"
-          @click="goBackToList"
-        >
-          <ChevronLeft class="w-4 h-4" />
-        </Button>
-        <span class="truncate">{{ conversationStore.currentContactName }}</span>
-        <ConversationSubject />
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <Button
-          v-if="isMobile"
-          variant="ghost"
-          class="w-11 h-11 md:w-8 md:h-8 p-0"
-          :aria-label="t('globals.terms.contact')"
-          @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
-        >
-          <PanelRight class="w-4 h-4" />
-        </Button>
-        <Tooltip v-if="isSnoozed && snoozedUntilLabel">
-          <TooltipTrigger as-child>
-            <span class="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-              <Clock :size="12" />
-              {{ snoozedUntilLabel }}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            {{ t('conversation.snoozedUntil', { time: snoozedUntilLabel }) }}
-          </TooltipContent>
-        </Tooltip>
-        <DropdownMenu>
-          <DropdownMenuTrigger>
-            <div
-              v-if="conversationStore.current?.status"
-              class="flex items-center space-x-1 cursor-pointer bg-primary px-3 py-3 md:px-2 md:py-1 rounded-md text-sm"
-            >
-              <span class="text-primary-foreground font-medium inline-block">
-                {{ conversationStore.current?.status }}
+    <div class="flex-shrink-0 border-b">
+      <div class="h-12 px-2 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-1 min-w-0">
+          <Button
+            v-if="isMobile"
+            variant="ghost"
+            class="w-11 h-11 md:w-8 md:h-8 p-0 shrink-0 -ml-2 md:-ml-1"
+            :aria-label="t('globals.messages.back')"
+            @click="goBackToList"
+          >
+            <ChevronLeft class="w-4 h-4" />
+          </Button>
+          <span class="truncate">{{ conversationStore.currentContactName }}</span>
+          <ConversationSubject variant="inline" />
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <Button
+            v-if="isMobile"
+            variant="ghost"
+            class="w-11 h-11 md:w-8 md:h-8 p-0"
+            :aria-label="t('globals.terms.contact')"
+            @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
+          >
+            <PanelRight class="w-4 h-4" />
+          </Button>
+          <Tooltip v-if="isSnoozed && snoozedUntilLabel">
+            <TooltipTrigger as-child>
+              <span class="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                <Clock :size="12" />
+                {{ snoozedUntilLabel }}
               </span>
-            </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem
-              v-for="status in conversationStore.statusOptions"
-              :key="status.value"
-              @click="handleUpdateStatus(status.label)"
-            >
-              {{ status.label }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button variant="ghost" class="w-11 h-11 md:w-8 md:h-8 p-0">
-              <MoreHorizontal class="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem @click="downloadTranscript">
-              {{ t('conversation.downloadTranscript') }}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              v-if="userStore.can(perms.MESSAGES_WRITE_PRIVATE)"
-              :disabled="isSummarizing"
-              @click="summarize"
-            >
-              {{ t('conversation.summarize') }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </TooltipTrigger>
+            <TooltipContent>
+              {{ t('conversation.snoozedUntil', { time: snoozedUntilLabel }) }}
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <div
+                v-if="conversationStore.current?.status"
+                class="flex items-center space-x-1 cursor-pointer bg-primary px-3 py-3 md:px-2 md:py-1 rounded-md text-sm"
+              >
+                <span class="text-primary-foreground font-medium inline-block">
+                  {{ conversationStore.current?.status }}
+                </span>
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem
+                v-for="status in conversationStore.statusOptions"
+                :key="status.value"
+                @click="handleUpdateStatus(status.label)"
+              >
+                {{ status.label }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" class="w-11 h-11 md:w-8 md:h-8 p-0">
+                <MoreHorizontal class="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem @click="downloadTranscript">
+                {{ t('conversation.downloadTranscript') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                v-if="userStore.can(perms.MESSAGES_WRITE_PRIVATE)"
+                :disabled="isSummarizing"
+                @click="summarize"
+              >
+                {{ t('conversation.summarize') }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+      <ConversationSubject variant="row" />
     </div>
 
     <!-- Messages & reply box -->
