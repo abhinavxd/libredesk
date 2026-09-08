@@ -5,9 +5,9 @@ The open-source customer support platform you actually own. One inbox for email,
 ## Near Term
 - WhatsApp channel - WIP
 - Web / Customer Portal to manage tickets - WIP
+- 2FA for password login - WIP
 - Telegram channel - TODO
 
 ## Mid Term
-- Conversation reports - TODO
+- Extensive conversation reports - TODO
 - Contact merging - TODO
-- 2FA for password login - TODO
