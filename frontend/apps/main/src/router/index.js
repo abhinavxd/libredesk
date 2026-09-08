@@ -237,6 +237,12 @@ const routes = [
             meta: { titleKey: 'admin.ai.snippets', titleCount: 2 }
           },
           {
+            path: 'ai/editor-prompts',
+            name: 'ai-editor-prompts',
+            component: () => import('@main/views/admin/ai/AIEditorPrompts.vue'),
+            meta: { titleKey: 'admin.ai.editorPrompts', titleCount: 2 }
+          },
+          {
             path: 'ai/suggestions',
             name: 'ai-suggestions',
             component: () => import('@main/views/admin/ai/AISuggestions.vue'),
