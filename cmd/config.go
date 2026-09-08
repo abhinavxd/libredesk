@@ -70,7 +70,6 @@ func localLoginDisabledInConfig() bool {
 	return ko.Exists(localLoginEnabledKey) && !ko.Bool(localLoginEnabledKey)
 }
 
-// isLocalLoginEnabled stays true while no OIDC provider is enabled so a misconfigured deployment cannot lock admins out.
 func isLocalLoginEnabled(providers []oidcmodels.OIDC) bool {
 	if !localLoginDisabledInConfig() {
 		return true
