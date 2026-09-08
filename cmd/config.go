@@ -10,22 +10,6 @@ import (
 
 const localLoginEnabledKey = "auth.local_login_enabled"
 
-// isLocalLoginEnabled keeps local login available by default and whenever no
-// OIDC provider is enabled, preventing an administrator from locking everyone out.
-func isLocalLoginEnabled(providers []oidcmodels.OIDC) bool {
-	if !ko.Exists(localLoginEnabledKey) || ko.Bool(localLoginEnabledKey) {
-		return true
-	}
-
-	for _, provider := range providers {
-		if provider.Enabled {
-			return false
-		}
-	}
-
-	return true
-}
-
 // handleGetConfig returns the public configuration needed for app initialization, this includes minimal app settings and enabled SSO providers (without secrets).
 func handleGetConfig(r *fastglue.Request) error {
 	var app = r.Context.(*App)
@@ -77,7 +61,24 @@ func handleGetConfig(r *fastglue.Request) error {
 
 	// Add SSO providers to the response
 	publicSettings["app.sso_providers"] = enabledProviders
-	publicSettings["app.local_login_enabled"] = isLocalLoginEnabled(oidcProviders)
+	publicSettings["auth.local_login_enabled"] = isLocalLoginEnabled(oidcProviders)
 
 	return r.SendEnvelope(publicSettings)
+}
+
+func localLoginDisabledInConfig() bool {
+	return ko.Exists(localLoginEnabledKey) && !ko.Bool(localLoginEnabledKey)
+}
+
+// isLocalLoginEnabled stays true while no OIDC provider is enabled so a misconfigured deployment cannot lock admins out.
+func isLocalLoginEnabled(providers []oidcmodels.OIDC) bool {
+	if !localLoginDisabledInConfig() {
+		return true
+	}
+	for _, provider := range providers {
+		if provider.Enabled {
+			return false
+		}
+	}
+	return true
 }

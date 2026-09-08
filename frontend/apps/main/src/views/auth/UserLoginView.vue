@@ -247,7 +247,7 @@ const enabledOIDCProviders = computed(() => {
 })
 
 const localLoginEnabled = computed(
-  () => appSettingsStore.public_config?.['app.local_login_enabled'] !== false
+  () => appSettingsStore.public_config?.['auth.local_login_enabled'] !== false
 )
 
 const emailHasError = computed(() => {
