@@ -138,6 +138,17 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		return redirectLoginError(r, oidcErrNoAccount, nextStr)
 	}
 
+	status, err := app.twoFactor.Status(user.ID)
+	if err != nil {
+		return redirectLoginError(r, oidcErrLoginFailed, nextStr)
+	}
+	if status.Enabled {
+		if err := app.auth.BeginPendingLogin(r, auth_.PendingLogin{UserID: user.ID, CredentialHash: credentialHash(user.Password.String), Next: nextStr}); err != nil {
+			return redirectLoginError(r, oidcErrLoginFailed, nextStr)
+		}
+		return r.RedirectURI("/?two_factor=required", fasthttp.StatusFound, nil, "")
+	}
+
 	if err := app.auth.SaveSession(amodels.User{
 		ID:        user.ID,
 		Email:     user.Email.String,

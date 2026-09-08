@@ -173,6 +173,12 @@ const routes = [
             name: 'profile',
             component: () => import('@main/views/account/profile/ProfileEditView.vue'),
             meta: { titleKey: 'account.editProfile' }
+          },
+          {
+            path: 'security',
+            name: 'account-security',
+            component: () => import('@main/views/account/security/SecurityView.vue'),
+            meta: { titleKey: 'globals.terms.security' }
           }
         ]
       },
