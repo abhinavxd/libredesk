@@ -26,6 +26,7 @@
                 :message="row.message"
                 :direction="row.message.type"
                 :dark-mode="colorMode === 'dark'"
+                :show-original-email-colors="showOriginalEmailColors"
                 :group-with-prev="row.groupWithPrev"
                 :group-with-next="row.groupWithNext"
               />
@@ -35,6 +36,7 @@
                 :message="row.message"
                 direction="outgoing"
                 :dark-mode="colorMode === 'dark'"
+                :show-original-email-colors="showOriginalEmailColors"
                 :group-with-prev="row.groupWithPrev"
                 :group-with-next="row.groupWithNext"
               />
@@ -106,6 +108,13 @@ const MENTION_SETTLE_FRAMES = 3
 const MENTION_MAX_ANCHOR_FRAMES = 90
 const HIGHLIGHT_MS = 2500
 const OLDER_MESSAGES_SCROLL_DISTANCE = 48
+
+defineProps({
+  showOriginalEmailColors: {
+    type: Boolean,
+    default: false
+  }
+})
 
 const route = useRoute()
 const colorMode = useColorMode()

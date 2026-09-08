@@ -81,7 +81,7 @@
         </div>
 
         <div
-          class="flex flex-col justify-end message-bubble"
+          class="flex flex-col justify-end message-bubble transition-colors duration-150"
           :class="bubbleClasses"
         >
           <div v-if="isDeleted" class="text-sm italic text-muted-foreground">
@@ -119,7 +119,7 @@
                 @click="onMessageContentClick"
               >
                 <Letter
-                  :key="darkMode ? 'dark' : 'light'"
+                  :key="useNormalizedEmailColors ? 'dark' : 'original'"
                   :html="renderedHtmlContent"
                   :allowedSchemas="allowedSchemas"
                   :rewriteExternalLinks="rewriteMessageLink"
@@ -133,7 +133,9 @@
                 v-if="isExpandable && !isExpanded"
                 class="absolute left-0 right-0 bottom-0 h-24 flex items-end justify-center pointer-events-none"
                 :class="
-                  message.private
+                  useOriginalEmailColors
+                    ? 'bg-gradient-to-t from-white via-white/90 to-transparent'
+                    : message.private
                     ? 'bg-gradient-to-t from-private via-private/90 to-transparent'
                     : isOutgoing
                       ? 'bg-gradient-to-t from-secondary via-secondary/90 to-transparent'
@@ -330,9 +332,8 @@ const measureExpandable = () => {
 }
 
 // Email HTML images change height after initial paint - re-measure on load. Also re-run
-// whenever the content DOM is (re)created, since a dark-mode toggle remounts the Letter
-// subtree (see the `props.darkMode` watcher below) and any images it inserts are fresh
-// elements with no listener attached yet.
+// whenever the content DOM is (re)created, since changing its color mode remounts the
+// Letter subtree and any images it inserts are fresh elements with no listener attached.
 const attachImageLoadListeners = () => {
   const imgs = contentWrapperEl.value?.querySelectorAll?.('img') ?? []
   imgs.forEach((img) => {
@@ -361,6 +362,10 @@ const props = defineProps({
     default: false
   },
   darkMode: {
+    type: Boolean,
+    default: false
+  },
+  showOriginalEmailColors: {
     type: Boolean,
     default: false
   }
@@ -440,20 +445,27 @@ const sanitizedContent = computed(() => {
     .replace(STRIKE_OPEN_TAG, '<span style="text-decoration: line-through">')
     .replace(STRIKE_CLOSE_TAG, '</span>')
 })
+const isIncomingEmailHtml = computed(
+  () => !isOutgoing.value && !props.message.private &&
+    convStore.current?.inbox_channel === 'email' && props.message.content_type === 'html'
+)
+const useNormalizedEmailColors = computed(
+  () => props.darkMode && isIncomingEmailHtml.value && !props.showOriginalEmailColors
+)
+const useOriginalEmailColors = computed(
+  () => props.darkMode && isIncomingEmailHtml.value && props.showOriginalEmailColors
+)
 const renderedHtmlContent = computed(() =>
-  normalizeEmailHtml(sanitizedContent.value, props.darkMode)
+  normalizeEmailHtml(sanitizedContent.value, useNormalizedEmailColors.value)
 )
 
 // Letter captures its sanitized HTML during setup and does not react to prop changes.
-// Remount it on theme changes, then reconnect image load measurement to the new DOM.
-watch(
-  () => props.darkMode,
-  async () => {
-    await nextTick()
-    measureExpandable()
-    attachImageLoadListeners()
-  }
-)
+// Remount it when the rendered color mode changes, then reconnect image load measurement.
+watch(useNormalizedEmailColors, async () => {
+  await nextTick()
+  measureExpandable()
+  attachImageLoadListeners()
+})
 
 const nonInlineAttachments = computed(() =>
   props.message.attachments.filter((attachment) => attachment.disposition !== 'inline')
@@ -462,6 +474,8 @@ const nonInlineAttachments = computed(() =>
 const bubbleClasses = computed(() => ({
   'bg-private': isOutgoing.value && props.message.private,
   'bg-secondary border border-border': isOutgoing.value && !props.message.private,
+  'bg-white text-neutral-950 border-neutral-300 [color-scheme:light]':
+    useOriginalEmailColors.value,
   'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
   'border-destructive': isOutgoing.value && props.message.status === 'failed',
   relative: isOutgoing.value,

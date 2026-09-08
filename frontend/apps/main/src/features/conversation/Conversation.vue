@@ -17,6 +17,25 @@
         </span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        <Tooltip v-if="showEmailColorToggle">
+          <TooltipTrigger as-child>
+            <Button
+              type="button"
+              :variant="showOriginalEmailColors ? 'secondary' : 'ghost'"
+              :class="MOBILE_ICON_BUTTON_CLASS"
+              data-cy="conversation-email-color-toggle"
+              :aria-label="emailColorToggleLabel"
+              :aria-pressed="showOriginalEmailColors"
+              @click="showOriginalEmailColors = !showOriginalEmailColors"
+            >
+              <Moon v-if="showOriginalEmailColors" class="w-4 h-4" aria-hidden="true" />
+              <Sun v-else class="w-4 h-4" aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {{ emailColorToggleLabel }}
+          </TooltipContent>
+        </Tooltip>
         <Button
           type="button"
           variant="ghost"
@@ -90,7 +109,10 @@
 
     <!-- Messages & reply box -->
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <MessageList class="min-h-0 flex-1 overflow-y-auto" />
+      <MessageList
+        :show-original-email-colors="showEmailColorToggle && showOriginalEmailColors"
+        class="min-h-0 flex-1 overflow-y-auto"
+      />
       <WhatsAppComposer v-if="isWhatsAppChannel && canCompose" />
       <ReplyBox v-else-if="canCompose" />
     </div>
@@ -100,10 +122,11 @@
 <script setup>
 const MOBILE_ICON_BUTTON_CLASS = 'w-11 h-11 lg:w-8 lg:h-8 p-0'
 
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { useColorMode } from '@vueuse/core'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { Clock, MoreHorizontal, ChevronLeft, PanelRight, PanelRightClose } from 'lucide-vue-next'
+import { Clock, MoreHorizontal, ChevronLeft, PanelRight, PanelRightClose, Sun, Moon } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import { useIsMobile } from '@shared-ui/composables'
 import {
@@ -138,6 +161,20 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const isMobile = useIsMobile()
+const colorMode = useColorMode()
+const showOriginalEmailColors = ref(false)
+const emailColorToggleLabel = computed(() =>
+  t(showOriginalEmailColors.value
+    ? 'conversation.adjustedDarkModeColors'
+    : 'conversation.originalEmailColors')
+)
+const showEmailColorToggle = computed(
+  () => colorMode.value === 'dark' && conversationStore.current?.inbox_channel === 'email'
+)
+watch(
+  [() => conversationStore.current?.uuid, showEmailColorToggle],
+  () => { showOriginalEmailColors.value = false }
+)
 const canCompose = computed(
   () => userStore.can(perms.MESSAGES_WRITE) || userStore.can(perms.MESSAGES_WRITE_PRIVATE)
 )
