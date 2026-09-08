@@ -38,6 +38,7 @@ const (
 	defaultSessionTTL               = 180 * 24 * time.Hour
 	minSessionTTL                   = 1 * time.Hour
 	maxChatMessageLength            = 10000
+	maxChatSubjectLength            = 255
 	maxEmailLength                  = 254
 	maxNameLength                   = 128
 	maxExternalUserIDLength         = 128
@@ -83,6 +84,7 @@ type customAttributeWidget struct {
 
 type chatInitReq struct {
 	Message  string         `json:"message"`
+	Subject  string         `json:"subject"`
 	FormData map[string]any `json:"form_data"`
 }
 
@@ -200,6 +202,12 @@ func handleChatInit(r *fastglue.Request) error {
 	if len(req.Message) > maxChatMessageLength {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
 	}
+	// Optional subject: a single line, whitespace-collapsed, so an app or a pre-chat form can file a titled
+	// conversation the way an email does. Never required — the embedded widget does not send one.
+	req.Subject = strings.Join(strings.Fields(req.Subject), " ")
+	if len(req.Subject) > maxChatSubjectLength {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatSubjectLength)), nil, envelope.InputError)
+	}
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
@@ -247,7 +255,7 @@ func handleChatInit(r *fastglue.Request) error {
 		inbox.ID,
 		"",
 		time.Now(),
-		"",
+		req.Subject,
 		false,
 		meta,
 		conversationAttrs,
