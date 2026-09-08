@@ -355,6 +355,7 @@ LIMIT 50;
 SELECT
     c.created_at,
     c.uuid,
+    COALESCE(c.subject, '') AS subject,
     cs.name as status,
     COALESCE(c.last_interaction, '') as "last_message.content",
     c.last_interaction_at as "last_message.created_at",
@@ -392,6 +393,7 @@ WHERE c.uuid = $1
 SELECT
     c.created_at,
     c.uuid,
+    COALESCE(c.subject, '') AS subject,
     cs.name as status,
     COALESCE(c.last_interaction, '') as "last_message.content",
     c.last_interaction_at as "last_message.created_at",
@@ -500,6 +502,12 @@ WHERE TRUE
 -- name: update-conversation-priority
 UPDATE conversations 
 SET priority_id = (SELECT id FROM conversation_priorities WHERE name = $2),
+    updated_at = NOW()
+WHERE uuid = $1;
+
+-- name: update-conversation-subject
+UPDATE conversations
+SET subject = NULLIF($2::text, ''),
     updated_at = NOW()
 WHERE uuid = $1;
 

@@ -715,6 +715,11 @@ func (m *Manager) RecordPriorityChange(priority, conversationUUID string, actor 
 	return m.InsertConversationActivity(models.ActivityPriorityChange, conversationUUID, priority, actor)
 }
 
+// RecordSubjectChange records an activity for a subject change. An empty subject means it was cleared.
+func (m *Manager) RecordSubjectChange(subject, conversationUUID string, actor umodels.User) error {
+	return m.InsertConversationActivity(models.ActivitySubjectChange, conversationUUID, subject, actor)
+}
+
 // RecordStatusChange records an activity for a status change.
 func (m *Manager) RecordStatusChange(status, conversationUUID string, actor umodels.User) error {
 	return m.InsertConversationActivity(models.ActivityStatusChange, conversationUUID, status, actor)
@@ -793,6 +798,12 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("%s set priority to %s", actorName, newValue)
 	case models.ActivityStatusChange:
 		content = fmt.Sprintf("%s marked the conversation as %s", actorName, newValue)
+	case models.ActivitySubjectChange:
+		if newValue == "" {
+			content = fmt.Sprintf("%s cleared the subject", actorName)
+		} else {
+			content = fmt.Sprintf("%s changed the subject to %s", actorName, newValue)
+		}
 	case models.ActivityTagAdded:
 		content = fmt.Sprintf("%s added tag %s", actorName, newValue)
 	case models.ActivityTagRemoved:

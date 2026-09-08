@@ -797,6 +797,25 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  // Optimistically set the subject; the websocket conversation_update broadcast confirms it and
+  // updates the matching list item.
+  async function updateSubject (v) {
+    if (!conversation.data) return
+    const previous = conversation.data.subject
+    if (previous === v) return
+    conversation.data.subject = v
+    try {
+      await api.updateConversationSubject(conversation.data.uuid, { subject: v })
+    } catch (error) {
+      if (conversation.data) conversation.data.subject = previous
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: handleHTTPError(error).message
+      })
+      throw error
+    }
+  }
+
   async function snoozeConversation (snoozeDuration) {
     try {
       await api.updateConversationStatus(conversation.data.uuid, { status: CONVERSATION_DEFAULT_STATUSES.SNOOZED, snoozed_until: snoozeDuration })
@@ -1265,6 +1284,7 @@ export const useConversationStore = defineStore('conversation', () => {
     incrementUnread,
     updateConversationMessage,
     snoozeConversation,
+    updateSubject,
     fetchConversation,
     fetchConversationsList,
     fetchMessages,

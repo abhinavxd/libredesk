@@ -323,6 +323,7 @@ type queries struct {
 	UpdateConversationCustomAttributes  *sqlx.Stmt `query:"update-conversation-custom-attributes"`
 	UpdateConversationPriority          *sqlx.Stmt `query:"update-conversation-priority"`
 	UpdateConversationStatus            *sqlx.Stmt `query:"update-conversation-status"`
+	UpdateConversationSubject           *sqlx.Stmt `query:"update-conversation-subject"`
 	UpdateConversationLastMessage       *sqlx.Stmt `query:"update-conversation-last-message"`
 	InsertConversationParticipant       *sqlx.Stmt `query:"insert-conversation-participant"`
 	InsertConversation                  *sqlx.Stmt `query:"insert-conversation"`
@@ -950,6 +951,37 @@ func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priori
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	c.BroadcastConversationUpdate(uuid, map[string]any{"priority": priority})
+	return nil
+}
+
+// UpdateConversationSubject updates the subject of a conversation. An empty subject clears it.
+func (c *Manager) UpdateConversationSubject(uuid, subject string, actor umodels.User) error {
+	previousConversation, err := c.GetConversation(0, uuid, "")
+	if err != nil {
+		return err
+	}
+
+	// Return early on a no-op write so the timeline isn't littered with identical activities.
+	if previousConversation.Subject.String == subject {
+		c.lo.Debug("no subject update: conversation subject unchanged", "uuid", uuid)
+		return nil
+	}
+
+	if _, err := c.q.UpdateConversationSubject.Exec(uuid, subject); err != nil {
+		c.lo.Error("error updating conversation subject", "error", err)
+		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	// Record activity.
+	if err := c.RecordSubjectChange(subject, uuid, actor); err != nil {
+		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	c.BroadcastConversationUpdate(uuid, map[string]any{"subject": subject})
+
+	// The widget lists the subject too, so keep an open chat in sync.
+	c.BroadcastConversationToWidget(uuid, previousConversation.ContactID, previousConversation.InboxID, map[string]any{
+		"subject": subject,
+	})
 	return nil
 }
 
