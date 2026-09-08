@@ -45,6 +45,11 @@ type suggestTagsReq struct {
 	ConversationUUID string `json:"conversation_uuid"`
 }
 
+type promptReq struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
 type snippetReq struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
@@ -79,6 +84,52 @@ func handleGetAIPrompts(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(resp)
+}
+
+func handleCreateAIPrompt(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req promptReq
+	)
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	p, err := app.ai.CreatePrompt(req.Title, req.Content)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(p)
+}
+
+func handleUpdateAIPrompt(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req promptReq
+	)
+	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	if err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	p, err := app.ai.UpdatePrompt(id, req.Title, req.Content)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(p)
+}
+
+func handleDeleteAIPrompt(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	if err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	if err := app.ai.DeletePrompt(id); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
 }
 
 // handleGetAIConfig returns the sanitized provider config for a type (completion/embedding).

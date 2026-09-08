@@ -252,6 +252,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// AI completions.
 	g.GET("/api/v1/ai/prompts", auth(handleGetAIPrompts))
+	g.POST("/api/v1/ai/prompts", perm(handleCreateAIPrompt, "ai:manage"))
+	g.PUT("/api/v1/ai/prompts/{id}", perm(handleUpdateAIPrompt, "ai:manage"))
+	g.DELETE("/api/v1/ai/prompts/{id}", perm(handleDeleteAIPrompt, "ai:manage"))
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
 
 	// AI provider config (completion / embedding).
