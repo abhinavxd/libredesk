@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	bhmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
@@ -204,10 +205,11 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 	// Optional subject: a single line, whitespace-collapsed, so an app or a pre-chat form can file a titled
 	// conversation the way an email does. Never required — the embedded widget does not send one.
-	req.Subject = strings.Join(strings.Fields(req.Subject), " ")
-	if len(req.Subject) > maxChatSubjectLength {
+	subject, ok := normalizeChatSubject(req.Subject)
+	if !ok {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatSubjectLength)), nil, envelope.InputError)
 	}
+	req.Subject = subject
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
@@ -956,6 +958,17 @@ func verifyStandardJWT(jwtToken string, inboxSecret string) (Claims, error) {
 	}
 
 	return *claims, nil
+}
+
+// normalizeChatSubject collapses all whitespace in a widget-supplied subject to single spaces and trims it,
+// then enforces maxChatSubjectLength as a count of characters (Unicode code points), not UTF-8 bytes, so a
+// non-ASCII subject is not cut short of the documented limit. Returns false when the subject is too long.
+func normalizeChatSubject(subject string) (string, bool) {
+	subject = strings.Join(strings.Fields(subject), " ")
+	if utf8.RuneCountInString(subject) > maxChatSubjectLength {
+		return "", false
+	}
+	return subject, true
 }
 
 // generateSessionToken creates a random session token and stores it in Redis.
