@@ -120,7 +120,7 @@
   "admin.ai.embedding": "Embedding",
   "admin.ai.snippets": "Snippet | Snippets",
   "admin.ai.editorPrompts": "Editor prompt | Editor prompts",
-  "admin.ai.editorPromptsHelp": "Editor prompts are the AI actions agents can run on their draft from the reply box, such as fixing grammar or changing tone. The prompt is sent as the instruction and the draft as the text to rewrite.",
+  "admin.ai.editorPromptsHelp": "Editor prompts are the AI actions agents can run on their draft from the reply box, such as fixing grammar or changing tone.",
   "admin.ai.editorPrompt.new": "New editor prompt",
   "admin.ai.editorPrompt.edit": "Edit editor prompt",
   "admin.ai.editorPrompt.deleteConfirmation": "This will permanently delete the editor prompt and remove it from the reply box.",

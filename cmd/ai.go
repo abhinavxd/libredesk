@@ -86,6 +86,19 @@ func handleGetAIPrompts(r *fastglue.Request) error {
 	return r.SendEnvelope(resp)
 }
 
+func handleGetAIPrompt(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	if err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	p, err := app.ai.GetPromptByID(id)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(p)
+}
+
 func handleCreateAIPrompt(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)

@@ -98,6 +98,7 @@ type queries struct {
 	UpdateProviderConfig         *sqlx.Stmt `query:"update-provider-config"`
 	GetPrompt                    *sqlx.Stmt `query:"get-prompt"`
 	GetPrompts                   *sqlx.Stmt `query:"get-prompts"`
+	GetPromptByID                *sqlx.Stmt `query:"get-prompt-by-id"`
 	InsertPrompt                 *sqlx.Stmt `query:"insert-prompt"`
 	UpdatePrompt                 *sqlx.Stmt `query:"update-prompt"`
 	DeletePrompt                 *sqlx.Stmt `query:"delete-prompt"`
@@ -243,6 +244,19 @@ func (m *Manager) GetPrompts() ([]models.Prompt, error) {
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return prompts, nil
+}
+
+// GetPromptByID returns a prompt with its content for the admin editor.
+func (m *Manager) GetPromptByID(id int) (models.Prompt, error) {
+	var p models.Prompt
+	if err := m.q.GetPromptByID.Get(&p, id); err != nil {
+		if err == sql.ErrNoRows {
+			return p, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		m.lo.Error("error fetching prompt", "error", err)
+		return p, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return p, nil
 }
 
 // CreatePrompt stores a new editor prompt; the key is derived from the title and never changes.

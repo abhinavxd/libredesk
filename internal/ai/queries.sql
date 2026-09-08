@@ -8,7 +8,10 @@ UPDATE ai_providers SET config = $2, updated_at = now() WHERE type = $1;
 SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE key = $1;
 
 -- name: get-prompts
-SELECT id, created_at, updated_at, key, title, content FROM ai_prompts ORDER BY title;
+SELECT id, created_at, updated_at, key, title FROM ai_prompts ORDER BY title;
+
+-- name: get-prompt-by-id
+SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE id = $1;
 
 -- name: insert-prompt
 INSERT INTO ai_prompts (key, title, content) VALUES ($1, $2, $3)

@@ -105,11 +105,19 @@ const newPrompt = () => {
   initialValues.value = {}
 }
 
-const editPrompt = (item) => {
-  isEditing.value = true
-  editingId.value = item.id
-  initialValues.value = { ...item }
-  dialogOpen.value = true
+const editPrompt = async (item) => {
+  try {
+    const resp = await api.getAIPrompt(item.id)
+    isEditing.value = true
+    editingId.value = item.id
+    initialValues.value = resp.data.data
+    dialogOpen.value = true
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  }
 }
 
 const submitPrompt = async (values) => {

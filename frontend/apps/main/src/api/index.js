@@ -465,6 +465,7 @@ const updateSharedView = (id, data) =>
 const deleteSharedView = (id) => http.delete(`/api/v1/shared-views/${id}`)
 
 const getAiPrompts = () => http.get('/api/v1/ai/prompts')
+const getAIPrompt = (id) => http.get(`/api/v1/ai/prompts/${id}`)
 const createAIPrompt = (data) => http.post('/api/v1/ai/prompts', data)
 const updateAIPrompt = (id, data) => http.put(`/api/v1/ai/prompts/${id}`, data)
 const deleteAIPrompt = (id) => http.delete(`/api/v1/ai/prompts/${id}`)
@@ -755,6 +756,7 @@ export default {
   updateSharedView,
   deleteSharedView,
   getAiPrompts,
+  getAIPrompt,
   createAIPrompt,
   updateAIPrompt,
   deleteAIPrompt,
