@@ -52,3 +52,48 @@ func TestV2_9_0PrivateNotePermissionMigration(t *testing.T) {
 		}
 	}
 }
+
+func TestV2_9_0SubjectPermissionMigration(t *testing.T) {
+	db := testutil.NewDB(t, "migration_v2_9_0_subject")
+
+	roles := []struct {
+		name        string
+		permissions pq.StringArray
+		wantSubject bool
+	}{
+		{"Can change status", pq.StringArray{"conversations:read", "conversations:update_status"}, true},
+		{"Cannot change status", pq.StringArray{"conversations:read", "messages:read"}, false},
+		{"Already migrated", pq.StringArray{"conversations:update_status", "conversations:update_subject"}, true},
+	}
+	for _, role := range roles {
+		if _, err := db.Exec(`INSERT INTO roles (name, description, permissions) VALUES ($1, '', $2)`, role.name, role.permissions); err != nil {
+			t.Fatalf("inserting role %q: %v", role.name, err)
+		}
+	}
+
+	// Running the migration twice verifies that it does not append duplicates.
+	for range 2 {
+		if err := V2_9_0(db, nil, nil); err != nil {
+			t.Fatalf("running migration: %v", err)
+		}
+	}
+
+	for _, role := range roles {
+		var got pq.StringArray
+		if err := db.Get(&got, `SELECT permissions FROM roles WHERE name = $1`, role.name); err != nil {
+			t.Fatalf("reading role %q: %v", role.name, err)
+		}
+		count := 0
+		for _, permission := range got {
+			if permission == "conversations:update_subject" {
+				count++
+			}
+		}
+		if slices.Contains(got, "conversations:update_subject") != role.wantSubject {
+			t.Errorf("role %q permissions = %v, want subject permission = %v", role.name, got, role.wantSubject)
+		}
+		if count > 1 {
+			t.Errorf("role %q has duplicate subject permissions: %v", role.name, got)
+		}
+	}
+}

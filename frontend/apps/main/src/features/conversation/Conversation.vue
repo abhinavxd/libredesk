@@ -13,6 +13,7 @@
           <ChevronLeft class="w-4 h-4" />
         </Button>
         <span class="truncate">{{ conversationStore.currentContactName }}</span>
+        <ConversationSubject />
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <Button
@@ -104,6 +105,7 @@ import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
+import ConversationSubject from './ConversationSubject.vue'
 import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@main/constants/emitterEvents.js'
 import { useCommandPalette } from '@/features/command/useCommandPalette'
 import { SNOOZE_COMMAND } from '@/features/command/providers/useConversationCommands'

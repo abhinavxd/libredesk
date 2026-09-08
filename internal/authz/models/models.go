@@ -12,6 +12,7 @@ const (
 	PermConversationsUpdateTeamAssignee = "conversations:update_team_assignee"
 	PermConversationsUpdatePriority     = "conversations:update_priority"
 	PermConversationsUpdateStatus       = "conversations:update_status"
+	PermConversationsUpdateSubject      = "conversations:update_subject"
 	PermConversationsUpdateTags         = "conversations:update_tags"
 	PermConversationWrite               = "conversations:write"
 	PermMessagesRead                    = "messages:read"
@@ -111,6 +112,7 @@ var validPermissions = map[string]struct{}{
 	PermConversationsUpdateTeamAssignee: {},
 	PermConversationsUpdatePriority:     {},
 	PermConversationsUpdateStatus:       {},
+	PermConversationsUpdateSubject:      {},
 	PermConversationsUpdateTags:         {},
 	PermConversationWrite:               {},
 	PermMessagesRead:                    {},

@@ -16,6 +16,9 @@ export const CONVERSATION_DEFAULT_STATUSES = {
 
 export const CONVERSATION_DEFAULT_STATUSES_LIST = Object.values(CONVERSATION_DEFAULT_STATUSES);
 
+// Keep in sync with maxChatSubjectLength in cmd/chat.go.
+export const SUBJECT_MAX_LENGTH = 255
+
 export const MACRO_CONTEXT = {
   REPLY: 'reply',
   NEW_CONVERSATION: 'new-conversation'

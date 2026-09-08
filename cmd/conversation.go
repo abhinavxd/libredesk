@@ -34,6 +34,10 @@ type priorityUpdateReq struct {
 	Priority string `json:"priority"`
 }
 
+type subjectUpdateReq struct {
+	Subject string `json:"subject"`
+}
+
 type statusUpdateReq struct {
 	Status       string `json:"status"`
 	SnoozedUntil string `json:"snoozed_until,omitempty"`
@@ -644,6 +648,43 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	markAssignmentNotificationRead(app, conversation, user)
+	return r.SendEnvelope(true)
+}
+
+// handleUpdateConversationSubject updates the subject of a conversation. An empty subject clears it.
+func handleUpdateConversationSubject(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   = subjectUpdateReq{}
+	)
+
+	if err := r.Decode(&req, "json"); err != nil {
+		app.lo.Error("error decoding subject update request", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+
+	// Share one subject rule with the widget's conversation init: a single whitespace-collapsed line,
+	// capped in characters rather than bytes. An empty subject is allowed and clears the existing one.
+	subject, ok := normalizeChatSubject(req.Subject)
+	if !ok {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatSubjectLength)), nil, envelope.InputError)
+	}
+
+	// Enforce conversation access.
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if err := app.conversation.UpdateConversationSubject(uuid, subject, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
 	return r.SendEnvelope(true)
 }
 

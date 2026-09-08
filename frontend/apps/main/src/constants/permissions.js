@@ -10,6 +10,7 @@ export const permissions = {
   CONVERSATIONS_UPDATE_TEAM_ASSIGNEE: 'conversations:update_team_assignee',
   CONVERSATIONS_UPDATE_PRIORITY: 'conversations:update_priority',
   CONVERSATIONS_UPDATE_STATUS: 'conversations:update_status',
+  CONVERSATIONS_UPDATE_SUBJECT: 'conversations:update_subject',
   CONVERSATIONS_UPDATE_TAGS: 'conversations:update_tags',
   MESSAGES_READ: 'messages:read',
   MESSAGES_WRITE: 'messages:write',
