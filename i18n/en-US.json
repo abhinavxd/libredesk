@@ -608,6 +608,7 @@
   "auth.invalidOrExpiredSessionClearCookie": "Invalid or expired session. Please clear your cookies and try again.",
   "auth.invalidResetLink": "Invalid reset link. Please request a new password reset link.",
   "auth.loggingIn": "Logging in...",
+  "auth.localLoginDisabled": "Password login is disabled. Sign in with your SSO provider.",
   "auth.newPassword": "New password",
   "auth.oidcAccessDenied": "The sign-in was cancelled or denied at the identity provider. Try signing in again.",
   "auth.oidcInvalidClient": "Sign-in is unavailable due to a configuration problem. Ask your administrator to check the SSO client ID and secret.",
