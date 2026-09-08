@@ -857,6 +857,7 @@ CREATE TABLE guided_forms (
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
 	name TEXT NOT NULL DEFAULT '',
+	display_name TEXT NOT NULL DEFAULT '',
 	inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
 	enabled BOOLEAN NOT NULL DEFAULT true,
 	start_step_id TEXT NOT NULL DEFAULT '',
@@ -866,6 +867,7 @@ CREATE TABLE guided_forms (
 	on_complete_team_id INTEGER NULL REFERENCES teams(id) ON DELETE SET NULL,
 	completion_message TEXT NOT NULL DEFAULT '',
 	allow_skip_to_human BOOLEAN NOT NULL DEFAULT true,
+	abandoned_timeout_minutes INTEGER NOT NULL DEFAULT 0,
 	CONSTRAINT constraint_guided_forms_on_complete_action CHECK (on_complete_action IN ('team', 'ai_assistant', 'unassigned'))
 );
 CREATE INDEX index_guided_forms_on_user_id ON guided_forms(user_id);
@@ -879,7 +881,7 @@ CREATE TABLE guided_form_events (
 	form_id INTEGER NOT NULL REFERENCES guided_forms(id) ON DELETE CASCADE,
 	conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
 	type TEXT NOT NULL,
-	CONSTRAINT constraint_guided_form_events_on_type CHECK (type IN ('completed', 'handoff'))
+	CONSTRAINT constraint_guided_form_events_on_type CHECK (type IN ('completed', 'handoff', 'abandoned'))
 );
 CREATE INDEX index_guided_form_events_on_form_type_created ON guided_form_events(form_id, type, created_at);
 CREATE INDEX index_guided_form_events_on_conversation_id ON guided_form_events(conversation_id);

@@ -1,12 +1,14 @@
 package guidedform
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	statusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
@@ -72,6 +74,48 @@ func (m *Manager) SkipToHuman(conversationID int) error {
 	return nil
 }
 
+// RunAbandonedSweeper periodically auto-resolves conversations whose guided form question has
+// gone unanswered longer than that form's configured timeout, so a visitor who opens chat and
+// never replies doesn't sit in the inbox forever. Forms with the timeout unset (0) are skipped
+// entirely by the query. Safe to run with multiple app instances: resolving is idempotent, and a
+// conversation already resolved (or answered, which changes last_message_sender) simply won't
+// match on the next tick.
+func (m *Manager) RunAbandonedSweeper(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			m.sweepAbandoned()
+		}
+	}
+}
+
+func (m *Manager) sweepAbandoned() {
+	var rows []struct {
+		ConversationID   int    `db:"conversation_id"`
+		ConversationUUID string `db:"conversation_uuid"`
+		FormID           int    `db:"form_id"`
+		BotUserID        int    `db:"bot_user_id"`
+		BotName          string `db:"bot_name"`
+	}
+	if err := m.q.GetAbandonedConversations.Select(&rows); err != nil {
+		m.lo.Error("error fetching abandoned guided form conversations", "error", err)
+		return
+	}
+	for _, row := range rows {
+		actor := umodels.User{ID: row.BotUserID, FirstName: row.BotName, Type: umodels.UserTypeGuidedFormBot}
+		if err := m.convo.UpdateConversationStatus(row.ConversationUUID, 0, cmodels.StatusResolved, "", actor); err != nil {
+			m.lo.Error("error auto-resolving abandoned guided form conversation", "conversation_id", row.ConversationID, "error", err)
+			continue
+		}
+		m.lo.Info("auto-resolved abandoned guided form conversation", "conversation_id", row.ConversationID, "form_id", row.FormID)
+		m.recordEvent(row.FormID, row.ConversationID, "abandoned")
+	}
+}
+
 func (m *Manager) handle(conversationID, assigneeUserID int) {
 	conv, err := m.convo.GetConversation(conversationID, "", "")
 	if err != nil {
@@ -106,8 +150,17 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 		return
 	}
 
-	// Progress belongs to a different (e.g. since-replaced) form; nothing sane to do but stop.
+	// Progress belongs to a different form - either this conversation was just manually
+	// reassigned to a different guided-form bot mid-flow, or a branch/default just routed it
+	// into this form. Either way, stale progress from the old form is meaningless here: start
+	// this form fresh instead of silently doing nothing forever.
 	if progress.FormID != form.ID {
+		step, ok := form.StepByID(form.StartStepID)
+		if !ok {
+			m.lo.Error("guided form has no valid start step", "form_id", form.ID)
+			return
+		}
+		m.enterStep(conv, form, attrs, gmodels.Progress{FormID: form.ID, Answers: map[string]any{}}, step)
 		return
 	}
 
@@ -166,7 +219,19 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 	// separately on the contact's own row, so it never touches this conversation's attributes.
 	m.applyAnswer(attrs, conv, step, answer)
 
-	nextStepID := matchBranch(step, answer)
+	m.route(conv, form, attrs, progress, step, resolveTarget(step, answer))
+}
+
+// route acts on a resolved target: jump to a step within this form, route away to a team/
+// assistant/different form, fall through to the next step in order, or complete the form if
+// there's nowhere left to go.
+func (m *Manager) route(conv cmodels.Conversation, form gmodels.Form, attrs map[string]any, progress gmodels.Progress, step gmodels.Step, target routeTarget) {
+	if target.Action != "" {
+		m.routeAway(conv, form, attrs, target)
+		return
+	}
+
+	nextStepID := target.NextStepID
 	// No branch matched and no explicit default: fall through to the next step in order
 	// (a plain linear form needs no branch config at all), unless the step explicitly ends
 	// the form here, or there is no next step to fall through to.
@@ -191,8 +256,9 @@ func (m *Manager) handle(conversationID, assigneeUserID int) {
 
 // enterStep asks a step's question and, if it's an "info" step (a statement with no answer
 // expected), immediately cascades into whatever comes next instead of waiting for a reply -
-// following its default/natural-order target the same way a matched branch would, and ending
-// the form if it has nowhere to go. Recurses through any run of consecutive info steps.
+// following its default target the same way a matched branch would (including routing away to
+// a team/assistant/different form), and ending the form if it has nowhere to go. Recurses
+// through any run of consecutive info steps.
 func (m *Manager) enterStep(conv cmodels.Conversation, form gmodels.Form, attrs map[string]any, progress gmodels.Progress, step gmodels.Step) {
 	m.askStep(conv, form, step)
 	if step.Type != gmodels.StepTypeInfo {
@@ -200,39 +266,90 @@ func (m *Manager) enterStep(conv cmodels.Conversation, form gmodels.Form, attrs 
 		m.saveProgress(conv, attrs, progress)
 		return
 	}
-
-	nextStepID := step.DefaultNextStepID
-	if nextStepID == "" && !step.EndsForm {
-		if next, ok := form.NextStepInOrder(step.ID); ok {
-			nextStepID = next.ID
-		}
-	}
-	if nextStepID == "" {
-		m.complete(conv, form, attrs)
-		return
-	}
-	nextStep, ok := form.StepByID(nextStepID)
-	if !ok {
-		m.lo.Error("guided form info step points at unknown step", "form_id", form.ID, "next_step_id", nextStepID)
-		m.handoff(conv, form, attrs, m.i18n.T("globals.messages.somethingWentWrong"))
-		return
-	}
-	m.enterStep(conv, form, attrs, progress, nextStep)
+	m.route(conv, form, attrs, progress, step, defaultTarget(step))
 }
 
-// matchBranch returns the id of the next step for the given answer: the first branch whose
-// pattern matches (case-insensitively), or the step's default, or "" if the step is terminal.
-func matchBranch(step gmodels.Step, answer string) string {
+// routeTarget is what a matched branch, or a step's "otherwise" default, resolves to: either
+// NextStepID (continue within this form) or Action (route away from it entirely).
+type routeTarget struct {
+	NextStepID  string
+	Action      string
+	TeamID      int
+	AssistantID int
+	FormID      int
+}
+
+// resolveTarget finds the first branch whose pattern matches the answer and returns its target,
+// or the step's default target if none match.
+func resolveTarget(step gmodels.Step, answer string) routeTarget {
 	for _, b := range step.Branches {
 		re, err := compileBranchPattern(b.Pattern)
 		if err != nil {
 			continue
 		}
 		if re.MatchString(answer) {
-			return b.NextStepID
+			return routeTarget{
+				NextStepID:  b.NextStepID,
+				Action:      b.Action,
+				TeamID:      int(b.TeamID.Int),
+				AssistantID: int(b.AssistantID.Int),
+				FormID:      int(b.FormID.Int),
+			}
 		}
 	}
-	return step.DefaultNextStepID
+	return defaultTarget(step)
+}
+
+// defaultTarget is a step's "otherwise" target, used both when no branch matches and for an
+// info step's unconditional next.
+func defaultTarget(step gmodels.Step) routeTarget {
+	return routeTarget{
+		NextStepID:  step.DefaultNextStepID,
+		Action:      step.DefaultAction,
+		TeamID:      int(step.DefaultTeamID.Int),
+		AssistantID: int(step.DefaultAssistantID.Int),
+		FormID:      int(step.DefaultFormID.Int),
+	}
+}
+
+// routeAway hands the conversation off per an Action target: straight to a team or AI
+// assistant, or into a different guided form's own flow (reassigning to its bot triggers that
+// form's HandleConversationEvent the same way any assignment does, which asks its start step
+// since this clears the old form's progress first).
+func (m *Manager) routeAway(conv cmodels.Conversation, form gmodels.Form, attrs map[string]any, target routeTarget) {
+	delete(attrs, progressAttrKey)
+	if err := m.convo.UpdateConversationCustomAttributes(conv.UUID, attrs); err != nil {
+		m.lo.Error("error clearing guided form progress on branch route", "conversation_uuid", conv.UUID, "error", err)
+	}
+	actor := umodels.User{ID: form.UserID, FirstName: form.Name, Type: umodels.UserTypeGuidedFormBot}
+	switch target.Action {
+	case gmodels.BranchActionTeam:
+		if err := m.convo.UpdateConversationTeamAssignee(conv.UUID, target.TeamID, actor); err != nil {
+			m.lo.Error("error routing conversation to team", "conversation_uuid", conv.UUID, "error", err)
+		}
+		if err := m.convo.RemoveConversationAssignee(conv.UUID, cmodels.AssigneeTypeUser, actor); err != nil {
+			m.lo.Error("error unassigning guided form bot after branch route", "conversation_uuid", conv.UUID, "error", err)
+		}
+	case gmodels.BranchActionAssistant:
+		var assistantUserID int
+		if err := m.db.Get(&assistantUserID, `SELECT user_id FROM ai_assistants WHERE id = $1`, target.AssistantID); err != nil {
+			m.lo.Error("error resolving ai assistant for branch route", "form_id", form.ID, "error", err)
+			break
+		}
+		if err := m.convo.UpdateConversationUserAssignee(conv.UUID, assistantUserID, actor); err != nil {
+			m.lo.Error("error routing conversation to ai assistant", "conversation_uuid", conv.UUID, "error", err)
+		}
+	case gmodels.BranchActionForm:
+		var botUserID int
+		if err := m.db.Get(&botUserID, `SELECT user_id FROM guided_forms WHERE id = $1`, target.FormID); err != nil {
+			m.lo.Error("error resolving guided form for branch route", "form_id", form.ID, "target_form_id", target.FormID, "error", err)
+			break
+		}
+		if err := m.convo.UpdateConversationUserAssignee(conv.UUID, botUserID, actor); err != nil {
+			m.lo.Error("error routing conversation to another guided form", "conversation_uuid", conv.UUID, "error", err)
+		}
+	}
+	m.recordEvent(form.ID, conv.ID, "completed")
 }
 
 func compileBranchPattern(pattern string) (*regexp.Regexp, error) {

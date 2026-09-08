@@ -17,6 +17,18 @@
         <FormControl>
           <Input type="text" v-bind="componentField" />
         </FormControl>
+        <FormDescription>{{ t('admin.guidedForms.nameHint') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ componentField }" name="display_name">
+      <FormItem>
+        <FormLabel>{{ t('admin.guidedForms.displayName') }}</FormLabel>
+        <FormControl>
+          <Input type="text" :placeholder="form.values.name" v-bind="componentField" />
+        </FormControl>
+        <FormDescription>{{ t('admin.guidedForms.displayNameHint') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -209,14 +221,40 @@
                   :placeholder="t('admin.guidedForms.branchPatternPlaceholder')"
                 />
                 <span class="text-xs text-muted-foreground shrink-0">{{ t('admin.guidedForms.goesTo') }}</span>
-                <Select v-model="branch.next_step_id">
-                  <SelectTrigger class="w-40">
+                <Select
+                  :modelValue="targetValue(branch)"
+                  @update:modelValue="(v) => setTargetValue(branch, v)"
+                >
+                  <SelectTrigger class="w-48">
                     <SelectValue :placeholder="t('admin.guidedForms.pickStep')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
                       <SelectItem v-for="s in otherSteps(step)" :key="s.id" :value="s.id">
                         {{ s.id || t('admin.guidedForms.untitledStep') }}
+                      </SelectItem>
+                    </SelectGroup>
+                    <SelectGroup v-if="teams.length">
+                      <SelectItem v-for="team in teams" :key="`team_${team.id}`" :value="`team_${team.id}`">
+                        {{ t('admin.guidedForms.teamPrefix') }} {{ team.name }}
+                      </SelectItem>
+                    </SelectGroup>
+                    <SelectGroup v-if="aiAssistantStore.assistants.length">
+                      <SelectItem
+                        v-for="assistant in aiAssistantStore.assistants"
+                        :key="`assistant_${assistant.id}`"
+                        :value="`assistant_${assistant.id}`"
+                      >
+                        {{ t('admin.guidedForms.assistantPrefix') }} {{ assistant.name }}
+                      </SelectItem>
+                    </SelectGroup>
+                    <SelectGroup v-if="otherFormOptions.length">
+                      <SelectItem
+                        v-for="f in otherFormOptions"
+                        :key="`form_${f.id}`"
+                        :value="`form_${f.id}`"
+                      >
+                        {{ t('admin.guidedForms.formPrefix') }} {{ f.name }}
                       </SelectItem>
                     </SelectGroup>
                   </SelectContent>
@@ -253,6 +291,29 @@
                     <SelectItem value="end">{{ t('admin.guidedForms.endFlow') }}</SelectItem>
                     <SelectItem v-for="s in otherSteps(step)" :key="s.id" :value="s.id">
                       {{ t('admin.guidedForms.jumpTo') }} {{ s.id || t('admin.guidedForms.untitledStep') }}
+                    </SelectItem>
+                  </SelectGroup>
+                  <SelectGroup v-if="teams.length">
+                    <SelectItem v-for="team in teams" :key="`team_${team.id}`" :value="`team_${team.id}`">
+                      {{ t('admin.guidedForms.teamPrefix') }} {{ team.name }}
+                    </SelectItem>
+                  </SelectGroup>
+                  <SelectGroup v-if="aiAssistantStore.assistants.length">
+                    <SelectItem
+                      v-for="assistant in aiAssistantStore.assistants"
+                      :key="`assistant_${assistant.id}`"
+                      :value="`assistant_${assistant.id}`"
+                    >
+                      {{ t('admin.guidedForms.assistantPrefix') }} {{ assistant.name }}
+                    </SelectItem>
+                  </SelectGroup>
+                  <SelectGroup v-if="otherFormOptions.length">
+                    <SelectItem
+                      v-for="f in otherFormOptions"
+                      :key="`form_${f.id}`"
+                      :value="`form_${f.id}`"
+                    >
+                      {{ t('admin.guidedForms.formPrefix') }} {{ f.name }}
                     </SelectItem>
                   </SelectGroup>
                 </SelectContent>
@@ -366,6 +427,17 @@
           />
         </FormItem>
       </FormField>
+
+      <FormField v-slot="{ componentField }" name="abandoned_timeout_minutes">
+        <FormItem>
+          <FormLabel>{{ t('admin.guidedForms.abandonedTimeout') }}</FormLabel>
+          <FormControl>
+            <Input type="number" min="0" step="1" class="max-w-[160px]" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ t('admin.guidedForms.abandonedTimeoutHint') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </div>
 
     <div class="flex justify-end mt-10">
@@ -435,10 +507,24 @@ const aiAssistantStore = useAIAssistantStore()
 const formLoading = ref(false)
 const teams = ref([])
 const customAttributes = ref([])
+const allForms = ref([])
 const steps = ref([])
 let stepKeySeq = 0
 
 const livechatInboxes = computed(() => inboxStore.livechatOptions)
+
+// Every other guided form, selectable as a branch/otherwise "jump to another form" target.
+const otherFormOptions = computed(() =>
+  allForms.value.filter((f) => f.id !== Number(props.initialValues?.id))
+)
+
+const emptyTarget = () => ({
+  next_step_id: '',
+  action: '',
+  team_id: 0,
+  assistant_id: 0,
+  form_id: 0
+})
 
 const newStep = () => ({
   _key: ++stepKeySeq,
@@ -451,7 +537,11 @@ const newStep = () => ({
   required: false,
   branches: [],
   default_next_step_id: '',
-  ends_form: false
+  ends_form: false,
+  default_action: '',
+  default_team_id: 0,
+  default_assistant_id: 0,
+  default_form_id: 0
 })
 
 const addStep = () => {
@@ -463,7 +553,32 @@ const removeStep = (index) => {
 }
 
 const addBranch = (step) => {
-  step.branches.push({ pattern: '', next_step_id: '' })
+  step.branches.push({ pattern: '', ...emptyTarget() })
+}
+
+// targetValue/setTargetValue encode a branch's routing target (continue to a step within this
+// form, or route away to a team/AI assistant/different guided form) as a single select value.
+const targetValue = (branch) => {
+  if (branch.action === 'team') return `team_${branch.team_id}`
+  if (branch.action === 'ai_assistant') return `assistant_${branch.assistant_id}`
+  if (branch.action === 'form') return `form_${branch.form_id}`
+  return branch.next_step_id || ''
+}
+
+const setTargetValue = (branch, value) => {
+  Object.assign(branch, emptyTarget())
+  if (value.startsWith('team_')) {
+    branch.action = 'team'
+    branch.team_id = Number(value.slice(5))
+  } else if (value.startsWith('assistant_')) {
+    branch.action = 'ai_assistant'
+    branch.assistant_id = Number(value.slice(10))
+  } else if (value.startsWith('form_')) {
+    branch.action = 'form'
+    branch.form_id = Number(value.slice(5))
+  } else {
+    branch.next_step_id = value
+  }
 }
 
 // escapeRegex lets an admin type/click a plain option label without knowing regex syntax -
@@ -474,28 +589,43 @@ const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // branching for a choice step is a couple of clicks instead of hand-writing regex.
 const addBranchFromOption = (step, option) => {
   if (step.branches.some((b) => b.pattern === `^${escapeRegex(option)}$`)) return
-  step.branches.push({ pattern: `^${escapeRegex(option)}$`, next_step_id: '' })
+  step.branches.push({ pattern: `^${escapeRegex(option)}$`, ...emptyTarget() })
 }
 
 const otherSteps = (current) => steps.value.filter((s) => s !== current)
 
-// otherwiseValue/setOtherwiseValue collapse ends_form + default_next_step_id into a single
-// three-way choice for the "otherwise" select: continue automatically (the default), end the
-// form here, or jump to a specific step.
+// otherwiseValue/setOtherwiseValue collapse ends_form + default_next_step_id/default_action into
+// a single select: continue automatically (the default), end the form here, jump to a specific
+// step, or route away to a team/AI assistant/different guided form.
 const otherwiseValue = (step) => {
   if (step.ends_form) return 'end'
+  if (step.default_action === 'team') return `team_${step.default_team_id}`
+  if (step.default_action === 'ai_assistant') return `assistant_${step.default_assistant_id}`
+  if (step.default_action === 'form') return `form_${step.default_form_id}`
   return step.default_next_step_id || 'auto'
 }
 
 const setOtherwiseValue = (step, value) => {
+  step.ends_form = false
+  step.default_next_step_id = ''
+  step.default_action = ''
+  step.default_team_id = 0
+  step.default_assistant_id = 0
+  step.default_form_id = 0
   if (value === 'auto') {
-    step.ends_form = false
-    step.default_next_step_id = ''
+    return
   } else if (value === 'end') {
     step.ends_form = true
-    step.default_next_step_id = ''
+  } else if (value.startsWith('team_')) {
+    step.default_action = 'team'
+    step.default_team_id = Number(value.slice(5))
+  } else if (value.startsWith('assistant_')) {
+    step.default_action = 'ai_assistant'
+    step.default_assistant_id = Number(value.slice(10))
+  } else if (value.startsWith('form_')) {
+    step.default_action = 'form'
+    step.default_form_id = Number(value.slice(5))
   } else {
-    step.ends_form = false
     step.default_next_step_id = value
   }
 }
@@ -527,6 +657,7 @@ const form = useForm({
       name: z
         .string({ required_error: t('globals.messages.required') })
         .min(1, { message: t('globals.messages.required') }),
+      display_name: z.string().optional(),
       inbox_id: z.string({ required_error: t('globals.messages.required') }).min(1, {
         message: t('globals.messages.required')
       }),
@@ -535,18 +666,21 @@ const form = useForm({
       on_complete_assistant_id: z.string().optional(),
       completion_message: z.string().optional(),
       enabled: z.boolean().optional(),
-      allow_skip_to_human: z.boolean().optional()
+      allow_skip_to_human: z.boolean().optional(),
+      abandoned_timeout_minutes: z.coerce.number().int().min(0).optional()
     })
   ),
   initialValues: {
     name: '',
+    display_name: '',
     inbox_id: '',
     on_complete_action: 'team',
     on_complete_team_id: '',
     on_complete_assistant_id: '',
     completion_message: '',
     enabled: true,
-    allow_skip_to_human: true
+    allow_skip_to_human: true,
+    abandoned_timeout_minutes: 0
   }
 })
 
@@ -556,6 +690,7 @@ watch(
     form.setValues(
       {
         name: values.name || '',
+        display_name: values.display_name || '',
         inbox_id: values.inbox_id ? String(values.inbox_id) : '',
         on_complete_action: values.on_complete_action || 'team',
         on_complete_team_id: values.on_complete_team_id ? String(values.on_complete_team_id) : '',
@@ -564,7 +699,8 @@ watch(
           : '',
         completion_message: values.completion_message || '',
         enabled: values.enabled ?? true,
-        allow_skip_to_human: values.allow_skip_to_human ?? true
+        allow_skip_to_human: values.allow_skip_to_human ?? true,
+        abandoned_timeout_minutes: values.abandoned_timeout_minutes ?? 0
       },
       false
     )
@@ -577,9 +713,20 @@ watch(
       custom_attribute_id: s.custom_attribute_id || 0,
       contact_field: s.contact_field || '',
       required: !!s.required,
-      branches: (s.branches || []).map((b) => ({ pattern: b.pattern || '', next_step_id: b.next_step_id || '' })),
+      branches: (s.branches || []).map((b) => ({
+        pattern: b.pattern || '',
+        next_step_id: b.next_step_id || '',
+        action: b.action || '',
+        team_id: b.team_id || 0,
+        assistant_id: b.assistant_id || 0,
+        form_id: b.form_id || 0
+      })),
       default_next_step_id: s.default_next_step_id || '',
-      ends_form: !!s.ends_form
+      ends_form: !!s.ends_form,
+      default_action: s.default_action || '',
+      default_team_id: s.default_team_id || 0,
+      default_assistant_id: s.default_assistant_id || 0,
+      default_form_id: s.default_form_id || 0
     }))
     if (steps.value.length === 0) {
       steps.value.push(newStep())
@@ -591,13 +738,15 @@ watch(
 
 onMounted(async () => {
   try {
-    const [teamsResp] = await Promise.all([
+    const [teamsResp, formsResp] = await Promise.all([
       api.getTeamsCompact(),
+      api.getGuidedForms(),
       inboxStore.fetchInboxes(),
       aiAssistantStore.loadAssistants(),
       fetchCustomAttributes()
     ])
     teams.value = teamsResp.data.data || []
+    allForms.value = formsResp.data.data || []
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -629,6 +778,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     formLoading.value = true
     const payload = {
       name: values.name,
+      display_name: values.display_name || '',
       inbox_id: Number(values.inbox_id),
       enabled: !!values.enabled,
       start_step_id: steps.value[0]?.id || '',
@@ -641,9 +791,23 @@ const onSubmit = form.handleSubmit(async (values) => {
         custom_attribute_id: s.custom_attribute_id || 0,
         contact_field: s.contact_field || '',
         required: !!s.required,
-        branches: s.branches.filter((b) => b.pattern.trim() && b.next_step_id),
-        default_next_step_id: s.default_next_step_id || '',
-        ends_form: !!s.ends_form
+        branches: s.branches
+          .filter((b) => b.pattern.trim() && (b.action ? true : b.next_step_id))
+          .map((b) => ({
+            pattern: b.pattern,
+            next_step_id: b.action ? '' : b.next_step_id,
+            action: b.action || '',
+            team_id: b.action === 'team' ? Number(b.team_id) || 0 : 0,
+            assistant_id: b.action === 'ai_assistant' ? Number(b.assistant_id) || 0 : 0,
+            form_id: b.action === 'form' ? Number(b.form_id) || 0 : 0
+          })),
+        default_next_step_id: s.default_action ? '' : s.default_next_step_id || '',
+        ends_form: !!s.ends_form,
+        default_action: s.default_action || '',
+        default_team_id: s.default_action === 'team' ? Number(s.default_team_id) || 0 : 0,
+        default_assistant_id:
+          s.default_action === 'ai_assistant' ? Number(s.default_assistant_id) || 0 : 0,
+        default_form_id: s.default_action === 'form' ? Number(s.default_form_id) || 0 : 0
       })),
       on_complete_action: values.on_complete_action,
       on_complete_team_id:
@@ -655,7 +819,8 @@ const onSubmit = form.handleSubmit(async (values) => {
           ? Number(values.on_complete_assistant_id)
           : null,
       completion_message: values.completion_message || '',
-      allow_skip_to_human: !!values.allow_skip_to_human
+      allow_skip_to_human: !!values.allow_skip_to_human,
+      abandoned_timeout_minutes: Number(values.abandoned_timeout_minutes) || 0
     }
     await props.submitForm(payload)
   } finally {

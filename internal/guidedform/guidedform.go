@@ -18,6 +18,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -39,6 +40,7 @@ type queries struct {
 	DisableOtherFormsOnInbox *sqlx.Stmt `query:"disable-other-forms-on-inbox"`
 	UnassignFormBotConvos *sqlx.Stmt `query:"unassign-form-bot-conversations"`
 	InsertGuidedFormEvent *sqlx.Stmt `query:"insert-guided-form-event"`
+	GetAbandonedConversations *sqlx.Stmt `query:"get-abandoned-guided-form-conversations"`
 }
 
 // Manager owns guided form configuration and runs the question/answer flow for conversations
@@ -151,13 +153,13 @@ func (m *Manager) CreateForm(f gmodels.Form) (gmodels.Form, error) {
 	}
 
 	var userID int
-	if err := tx.Stmtx(m.q.InsertFormUser).QueryRow(f.Name).Scan(&userID); err != nil {
+	if err := tx.Stmtx(m.q.InsertFormUser).QueryRow(f.EffectiveDisplayName()).Scan(&userID); err != nil {
 		m.lo.Error("error creating guided form bot user", "error", err)
 		return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	var id int
-	if err := tx.Stmtx(m.q.InsertForm).QueryRow(userID, f.Name, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage, f.AllowSkipToHuman).Scan(&id); err != nil {
+	if err := tx.Stmtx(m.q.InsertForm).QueryRow(userID, f.Name, f.DisplayName, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage, f.AllowSkipToHuman, f.AbandonedTimeoutMinutes).Scan(&id); err != nil {
 		m.lo.Error("error creating guided form", "error", err)
 		return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -196,11 +198,11 @@ func (m *Manager) UpdateForm(id int, f gmodels.Form) (gmodels.Form, error) {
 		}
 	}
 
-	if _, err := tx.Stmtx(m.q.UpdateForm).Exec(id, f.Name, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage, f.AllowSkipToHuman); err != nil {
+	if _, err := tx.Stmtx(m.q.UpdateForm).Exec(id, f.Name, f.DisplayName, f.InboxID, f.Enabled, f.StartStepID, f.StepsRaw, f.OnCompleteAction, f.OnCompleteAssistantID, f.OnCompleteTeamID, f.CompletionMessage, f.AllowSkipToHuman, f.AbandonedTimeoutMinutes); err != nil {
 		m.lo.Error("error updating guided form", "error", err)
 		return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	if _, err := tx.Stmtx(m.q.UpdateFormUser).Exec(existing.UserID, f.Name); err != nil {
+	if _, err := tx.Stmtx(m.q.UpdateFormUser).Exec(existing.UserID, f.EffectiveDisplayName()); err != nil {
 		m.lo.Error("error updating guided form bot user", "error", err)
 		return gmodels.Form{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -280,15 +282,27 @@ func (m *Manager) validate(f *gmodels.Form) error {
 		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	for _, s := range f.Steps {
-		if s.DefaultNextStepID != "" && !ids[s.DefaultNextStepID] {
+		// A default/otherwise routes either within this form (DefaultNextStepID, checked against
+		// known step ids) or away from it (DefaultAction, checked like a branch's Action below).
+		if s.DefaultAction != "" {
+			if err := m.validateRouteAction(s.DefaultAction, s.DefaultTeamID, s.DefaultAssistantID, s.DefaultFormID); err != nil {
+				return err
+			}
+		} else if s.DefaultNextStepID != "" && !ids[s.DefaultNextStepID] {
 			return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 		for _, b := range s.Branches {
-			if !ids[b.NextStepID] {
-				return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-			}
 			if _, err := compileBranchPattern(b.Pattern); err != nil {
 				return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.invalidFields", "name", "branch pattern"), nil)
+			}
+			if b.Action != "" {
+				if err := m.validateRouteAction(b.Action, b.TeamID, b.AssistantID, b.FormID); err != nil {
+					return err
+				}
+				continue
+			}
+			if !ids[b.NextStepID] {
+				return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 			}
 		}
 	}
@@ -315,6 +329,28 @@ func (m *Manager) validate(f *gmodels.Form) error {
 	return nil
 }
 
+// validateRouteAction checks a branch's or a step's default "route away" target: a valid action
+// naming a set target id.
+func (m *Manager) validateRouteAction(action string, teamID, assistantID, formID null.Int) error {
+	switch action {
+	case gmodels.BranchActionTeam:
+		if !teamID.Valid {
+			return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+	case gmodels.BranchActionAssistant:
+		if !assistantID.Valid {
+			return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+	case gmodels.BranchActionForm:
+		if !formID.Valid {
+			return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+	default:
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
 // validateGraph checks the step transition graph (branches, explicit defaults, and the
 // natural fall-through-to-next-in-order edge) for two mistakes that are easy to make by hand
 // and otherwise only surface as a broken conversation later: a step that can never be reached
@@ -324,9 +360,15 @@ func (m *Manager) validateGraph(f gmodels.Form) error {
 	for i, s := range f.Steps {
 		var targets []string
 		for _, b := range s.Branches {
-			targets = append(targets, b.NextStepID)
+			// A branch that routes away (Action set) exits the graph entirely - no internal
+			// edge, and it can neither strand nor loop anything.
+			if b.Action == "" {
+				targets = append(targets, b.NextStepID)
+			}
 		}
-		if s.DefaultNextStepID != "" {
+		if s.DefaultAction != "" {
+			// Also exits the graph; no edge to add.
+		} else if s.DefaultNextStepID != "" {
 			targets = append(targets, s.DefaultNextStepID)
 		} else if !s.EndsForm && i+1 < len(f.Steps) {
 			targets = append(targets, f.Steps[i+1].ID)

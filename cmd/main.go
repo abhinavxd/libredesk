@@ -292,6 +292,7 @@ func main() {
 	go helpCenter.RunSearchLogCleaner(ctx)
 	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
 	go ai.Run(ctx)
+	go guidedForm.RunAbandonedSweeper(ctx, 5*time.Minute)
 
 	var app = &App{
 		ctx:              ctx,

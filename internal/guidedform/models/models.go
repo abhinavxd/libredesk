@@ -39,12 +39,25 @@ const (
 	ContactFieldEmail = "email"
 )
 
-// Branch matches an answer against a pattern and, if it matches, sends the flow to NextStepID.
+// Branch routing actions: an alternative to continuing within the same form via NextStepID.
+const (
+	BranchActionTeam      = CompleteActionTeam
+	BranchActionAssistant = CompleteActionAssistant
+	BranchActionForm      = "form"
+)
+
+// Branch matches an answer against a pattern and, if it matches, routes the flow onward.
 // Pattern is a case-insensitive regular expression matched against the trimmed answer text.
-// The first matching branch (in slice order) wins.
+// The first matching branch (in slice order) wins. Exactly one of NextStepID or Action should
+// be set: NextStepID continues within this form; Action routes away from it entirely - straight
+// to a team or AI assistant, or into a different guided form's flow from its own start step.
 type Branch struct {
-	Pattern    string `json:"pattern"`
-	NextStepID string `json:"next_step_id"`
+	Pattern     string   `json:"pattern"`
+	NextStepID  string   `json:"next_step_id,omitempty"`
+	Action      string   `json:"action,omitempty"`
+	TeamID      null.Int `json:"team_id,omitempty"`
+	AssistantID null.Int `json:"assistant_id,omitempty"`
+	FormID      null.Int `json:"form_id,omitempty"`
 }
 
 // Step is one question in a guided form. When the visitor's answer doesn't match any Branch:
@@ -68,8 +81,15 @@ type Step struct {
 	Branches          []Branch `json:"branches,omitempty"`
 	DefaultNextStepID string   `json:"default_next_step_id,omitempty"`
 	// EndsForm explicitly ends the flow here when no branch matches, instead of falling
-	// through to the next step in order. Ignored when DefaultNextStepID is set.
+	// through to the next step in order. Ignored when DefaultNextStepID or DefaultAction is set.
 	EndsForm bool `json:"ends_form,omitempty"`
+	// DefaultAction, when set, is the "otherwise" equivalent of a Branch's Action: routes away
+	// from this form entirely when no branch matches, instead of continuing to
+	// DefaultNextStepID. Same values as Branch.Action.
+	DefaultAction      string   `json:"default_action,omitempty"`
+	DefaultTeamID      null.Int `json:"default_team_id,omitempty"`
+	DefaultAssistantID null.Int `json:"default_assistant_id,omitempty"`
+	DefaultFormID      null.Int `json:"default_form_id,omitempty"`
 }
 
 // Form is a guided, branching pre-chat question flow configured for a live chat inbox.
@@ -79,6 +99,9 @@ type Form struct {
 	UpdatedAt             time.Time       `json:"updated_at" db:"updated_at"`
 	UserID                int             `json:"user_id" db:"user_id"`
 	Name                  string          `json:"name" db:"name"`
+	// DisplayName is the name shown to the visitor as the bot's identity (message author,
+	// widget assignee). Falls back to Name when empty, so setting it is optional.
+	DisplayName           string          `json:"display_name" db:"display_name"`
 	InboxID               int             `json:"inbox_id" db:"inbox_id"`
 	Enabled               bool            `json:"enabled" db:"enabled"`
 	StartStepID           string          `json:"start_step_id" db:"start_step_id"`
@@ -91,6 +114,18 @@ type Form struct {
 	// AllowSkipToHuman controls whether a visitor sees a "talk to a human" escape hatch out of
 	// this form's flow (widget) and whether it's honored server-side if they use it anyway.
 	AllowSkipToHuman bool `json:"allow_skip_to_human" db:"allow_skip_to_human"`
+	// AbandonedTimeoutMinutes, when > 0, auto-resolves a conversation still assigned to this
+	// form's bot if its own latest question has gone unanswered for this long - so a visitor
+	// who opens chat and never replies doesn't clutter the inbox forever. 0 disables it.
+	AbandonedTimeoutMinutes int `json:"abandoned_timeout_minutes" db:"abandoned_timeout_minutes"`
+}
+
+// EffectiveDisplayName returns DisplayName, falling back to Name when unset.
+func (f Form) EffectiveDisplayName() string {
+	if f.DisplayName != "" {
+		return f.DisplayName
+	}
+	return f.Name
 }
 
 // UnmarshalSteps decodes StepsRaw (as loaded from the DB) into Steps.
