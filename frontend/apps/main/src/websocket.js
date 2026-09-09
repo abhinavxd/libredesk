@@ -120,6 +120,10 @@ export class WebSocketClient {
           }
           this.convStore.refreshSidebarCounts()
         },
+        [WS_EVENT.CONVERSATION_DELETE]: () => {
+          this.convStore.removeConversation(data.data?.uuid)
+          this.convStore.refreshSidebarCounts()
+        },
         // Property updates for conversation and message.
         [WS_EVENT.MESSAGE_UPDATE]: () => this.convStore.mergeMessageUpdate(data.data),
         [WS_EVENT.CONVERSATION_UPDATE]: () => {

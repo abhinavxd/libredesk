@@ -247,5 +247,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS index_unique_help_articles_on_translation_grou
 `); err != nil {
 		return err
 	}
+
+	// Deleting a conversation is irreversible and can take the originating mails off the
+	// mail server with it, so only the built-in Admin role is granted it on upgrade.
+	if _, err := db.Exec(`
+		UPDATE roles
+		SET permissions = array_append(permissions, 'conversations:delete')
+		WHERE name = 'Admin' AND NOT ('conversations:delete' = ANY(permissions));
+	`); err != nil {
+		return err
+	}
 	return nil
 }

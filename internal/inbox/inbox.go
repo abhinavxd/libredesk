@@ -69,6 +69,13 @@ type Inbox interface {
 	Channel() string
 }
 
+// MailboxPurger is implemented by channels that leave the original messages on a remote server,
+// where they would be re-imported after the desk-side conversation is deleted. It reports the
+// message identifiers it could not remove.
+type MailboxPurger interface {
+	PurgeMessages(ctx context.Context, messageIDs []string) ([]string, error)
+}
+
 // MessageStore defines methods for storing and processing messages.
 type MessageStore interface {
 	MessageExists(string) (bool, error)
