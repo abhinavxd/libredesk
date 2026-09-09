@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"mime"
@@ -13,6 +14,9 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/image"
+	"github.com/abhinavxd/libredesk/internal/inbox"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	vmodels "github.com/abhinavxd/libredesk/internal/view/models"
@@ -21,6 +25,9 @@ import (
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
 )
+
+// mailboxPurgeTimeout caps the IMAP work a single conversation delete may do.
+const mailboxPurgeTimeout = 2 * time.Minute
 
 type assigneeChangeReq struct {
 	AssigneeID int `json:"assignee_id"`
@@ -42,6 +49,45 @@ type statusUpdateReq struct {
 type tagsUpdateReq struct {
 	Tags   []string `json:"tags"`
 	Action string   `json:"action,omitempty"`
+}
+
+// deleteConversationRequest is the optional body of a conversation delete.
+type deleteConversationRequest struct {
+	PurgeMail *bool `json:"purge_mail"`
+}
+
+// deleteConversationResponse reports what the delete left behind: the mails the mailbox purge could
+// not reach, what it did with the rest, and the attachment files still waiting for the media sweep.
+type deleteConversationResponse struct {
+	UnpurgedMessageIDs []string          `json:"unpurged_message_ids"`
+	MailPurge          *mailPurgeSummary `json:"mail_purge,omitempty"`
+	PendingMedia       int               `json:"pending_media"`
+}
+
+// mailPurgeSummary counts the mailbox purge outcomes for the client, which reports them rather than
+// the individual Message-IDs.
+type mailPurgeSummary struct {
+	MovedToTrash int    `json:"moved_to_trash"`
+	Expunged     int    `json:"expunged"`
+	NotFound     int    `json:"not_found"`
+	NotPurged    int    `json:"not_purged"`
+	Failed       int    `json:"failed"`
+	TrashMailbox string `json:"trash_mailbox,omitempty"`
+}
+
+// summarizeMailPurge counts a finished purge, or returns nil when no purge ran.
+func summarizeMailPurge(result imodels.MailPurgeResult) *mailPurgeSummary {
+	if len(result.Mails) == 0 {
+		return nil
+	}
+	return &mailPurgeSummary{
+		MovedToTrash: result.Count(imodels.MailMovedToTrash),
+		Expunged:     result.Count(imodels.MailExpunged),
+		NotFound:     result.Count(imodels.MailNotFound),
+		NotPurged:    result.Count(imodels.MailNotPurged),
+		Failed:       result.Count(imodels.MailPurgeFailed),
+		TrashMailbox: result.TrashMailbox,
+	}
 }
 
 type createConversationRequest struct {
@@ -928,6 +974,151 @@ func handleCreateConversation(r *fastglue.Request) error {
 
 	conversation, _ := app.conversation.GetConversation(conversationID, "", "")
 	return r.SendEnvelope(conversation)
+}
+
+// handleDeleteConversation permanently deletes a conversation and everything attached to it. For an
+// email inbox it also purges the mails the conversation was built from, unless `purge_mail` is false.
+func handleDeleteConversation(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	conversation, err := enforceConversationAccess(app, uuid, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	purgeMail, err := purgeMailOption(app, r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	app.lo.Info("deleting conversation", "conversation_uuid", uuid, "actor_id", auser.ID, "purge_mail", purgeMail)
+
+	deleted, err := app.conversation.DeleteConversationWithData(conversation.ID, uuid)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Attachment files live in the media store, outside the database cascade. They are deleted
+	// eagerly here; a file that cannot be deleted keeps its media row, which the periodic
+	// unlinked-media sweep retries, so the count only tells the client what is still pending.
+	pending := deleteConversationAttachments(app, uuid, deleted.Attachments)
+
+	// The desk side is already gone, so a failed purge is reported rather than raised.
+	var purge imodels.MailPurgeResult
+	if purgeMail {
+		purge = purgeConversationMail(app, conversation, deleted.IncomingSourceID)
+	}
+
+	// Drop the row from every open list.
+	app.conversation.BroadcastConversationDelete(uuid)
+
+	return r.SendEnvelope(deleteConversationResponse{
+		UnpurgedMessageIDs: purge.Unpurged(),
+		MailPurge:          summarizeMailPurge(purge),
+		PendingMedia:       pending,
+	})
+}
+
+// deleteConversationAttachments removes the stored files of a deleted conversation and returns how
+// many of them are still in the media store. The media rows outlive the conversation on purpose:
+// media.Delete drops the row only after the file is gone, so a failed delete leaves the row for the
+// periodic unlinked-media sweep to retry. Thumbnails have no row of their own, which is why an
+// image's thumbnail goes first: a thumbnail that cannot be deleted keeps the main file, and with it
+// the row, so the sweep picks both up.
+func deleteConversationAttachments(app *App, uuid string, attachments []conversation.DeletedAttachment) int {
+	var pending int
+	for _, attachment := range attachments {
+		if strings.HasPrefix(attachment.ContentType, "image/") {
+			thumbUUID := image.ThumbPrefix + attachment.UUID
+			if err := app.media.Delete(thumbUUID); err != nil {
+				pending++
+				app.lo.Error("conversation attachment thumbnail not deleted, left for the unlinked-media sweep", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "thumb_uuid", thumbUUID, "error", err)
+				continue
+			}
+		}
+		if err := app.media.Delete(attachment.UUID); err != nil {
+			pending++
+			app.lo.Error("conversation attachment not deleted, left for the unlinked-media sweep", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "error", err)
+		}
+	}
+	if pending > 0 {
+		app.lo.Warn("conversation delete left attachment files for the unlinked-media sweep", "conversation_uuid", uuid, "pending_media", pending)
+	}
+	return pending
+}
+
+// purgeConversationMail takes the conversation's incoming mails out of the inbox mailbox and reports
+// what happened to each of them. Outgoing mails are handed to SMTP and never appended to the mailbox
+// by the desk, so there is nothing of ours to remove for them.
+func purgeConversationMail(app *App, conversation *cmodels.Conversation, messageIDs []string) imodels.MailPurgeResult {
+	var result imodels.MailPurgeResult
+	if len(messageIDs) == 0 || conversation.InboxChannel != inbox.ChannelEmail {
+		return result
+	}
+
+	inb, err := app.inbox.Get(conversation.InboxID)
+	if err != nil {
+		app.lo.Error("error getting inbox for mailbox purge", "conversation_uuid", conversation.UUID, "inbox_id", conversation.InboxID, "error", err)
+		return failedMailPurge(messageIDs, "the inbox could not be opened")
+	}
+	purger, ok := inb.(inbox.MailboxPurger)
+	if !ok {
+		app.lo.Warn("inbox does not support purging its mailbox", "conversation_uuid", conversation.UUID, "inbox_id", conversation.InboxID, "channel", inb.Channel())
+		return failedMailPurge(messageIDs, "the inbox does not support purging its mailbox")
+	}
+
+	ctx, cancel := context.WithTimeout(app.ctx, mailboxPurgeTimeout)
+	defer cancel()
+
+	result, err = purger.PurgeMessages(ctx, messageIDs)
+	if err != nil {
+		app.lo.Error("error purging conversation mails from the mailbox", "conversation_uuid", conversation.UUID, "inbox_id", conversation.InboxID, "error", err)
+	}
+	if unpurged := result.Unpurged(); len(unpurged) > 0 {
+		app.lo.Warn("conversation mails left on the mail server", "conversation_uuid", conversation.UUID, "inbox_id", conversation.InboxID, "message_ids", unpurged)
+	}
+	return result
+}
+
+// failedMailPurge reports every mail as unreachable, for the cases where the purge never started.
+func failedMailPurge(messageIDs []string, reason string) imodels.MailPurgeResult {
+	var result imodels.MailPurgeResult
+	for _, messageID := range messageIDs {
+		result.Record(messageID, imodels.MailPurgeFailed, reason)
+	}
+	return result
+}
+
+// purgeMailOption reads the `purge_mail` flag from the query string or the request body, defaulting to true.
+func purgeMailOption(app *App, r *fastglue.Request) (bool, error) {
+	if raw := r.RequestCtx.QueryArgs().Peek("purge_mail"); len(raw) > 0 {
+		purge, err := strconv.ParseBool(string(raw))
+		if err != nil {
+			return false, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil)
+		}
+		return purge, nil
+	}
+	body := r.RequestCtx.PostBody()
+	if len(body) == 0 {
+		return true, nil
+	}
+	var req deleteConversationRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return false, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil)
+	}
+	if req.PurgeMail == nil {
+		return true, nil
+	}
+	return *req.PurgeMail, nil
 }
 
 func validateCreateConversationRequest(req createConversationRequest, app *App) error {
