@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -190,6 +191,7 @@ type Conversation struct {
 	Subject                   null.String            `db:"subject" json:"subject"`
 	InboxMail                 string                 `db:"inbox_mail" json:"inbox_mail"`
 	InboxReplyTo              string                 `db:"inbox_reply_to" json:"inbox_reply_to"`
+	InboxAliases              imodels.EmailAliases   `db:"inbox_aliases" json:"inbox_aliases"`
 	InboxName                 string                 `db:"inbox_name" json:"inbox_name"`
 	InboxChannel              string                 `db:"inbox_channel" json:"inbox_channel"`
 	Tags                      null.JSON              `db:"tags" json:"tags"`
@@ -354,6 +356,9 @@ func (m *Message) IsContinuityMessage() bool {
 	return isContinuity
 }
 
+// SendFrom returns the immutable sender address stored for an outgoing message.
+func (m *Message) SendFrom() string { return metaString(m.Meta, "send_from") }
+
 // ShouldEvaluateAutomation reports whether this outgoing message may trigger automation rules; machine-generated messages must not, else they loop.
 func (m *Message) ShouldEvaluateAutomation(systemUserID int) bool {
 	return m.SenderID != systemUserID && !m.IsAutomated()
@@ -464,9 +469,10 @@ type OutboundMessage struct {
 	SourceID string
 
 	// Threading (email)
-	References []string
-	InReplyTo  string
-	ReplyTo    string
+	References             []string
+	InReplyTo              string
+	ReplyTo                string
+	AliasVerificationToken string
 
 	// Attachments
 	Attachments attachment.Attachments
@@ -526,6 +532,18 @@ type IncomingMessage struct {
 	ConversationUUIDFromReplyTo string // UUID extracted from plus-addressed recipient (inbox+conv-{uuid}@domain)
 	InReplyTo                   string
 	References                  []string
+}
+
+// InboxAddress returns the owned address that received an incoming message.
+func (in *IncomingMessage) InboxAddress() string { return metaString(in.Meta, "inbox_address") }
+
+func metaString(meta json.RawMessage, key string) string {
+	var values map[string]any
+	if err := json.Unmarshal(meta, &values); err != nil {
+		return ""
+	}
+	value, _ := values[key].(string)
+	return value
 }
 
 // ToMessage converts IncomingMessage to a Message for DB insertion.

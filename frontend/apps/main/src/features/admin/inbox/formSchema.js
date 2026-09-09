@@ -7,6 +7,11 @@ const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, t('globals.messages.required')),
   from: z.string().min(1, t('globals.messages.required')),
+  aliases: z.array(z.object({
+    email: z.string().refine(validateEmail, { message: t('validation.invalidEmail') }),
+    verification_status: z.string().optional(),
+    verified_at: z.string().optional()
+  })).optional().default([]),
   from_name_template: z
     .string()
     .optional()
@@ -66,4 +71,14 @@ export const createFormSchema = (t) => z.object({
     hello_hostname: z.string().optional(),
     auth_protocol: z.enum(['login', 'cram', 'plain', 'none'])
   })
+}).superRefine((values, ctx) => {
+  const primary = (values.from.match(/<([^>]+)>/)?.[1] || values.from).trim().toLowerCase()
+  const seen = new Set([primary])
+  for (const [index, value] of (values.aliases || []).entries()) {
+    const alias = value.email.trim().toLowerCase()
+    if (seen.has(alias)) {
+      ctx.addIssue({ code: 'custom', path: ['aliases', index, 'email'], message: t('admin.inbox.aliases.duplicate') })
+    }
+    seen.add(alias)
+  }
 })

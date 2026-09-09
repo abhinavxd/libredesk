@@ -55,6 +55,7 @@ type createConversationRequest struct {
 	ReuseContact     bool           `json:"reuse_contact"`
 	Subject          string         `json:"subject"`
 	Content          string         `json:"content"`
+	SendFrom         string         `json:"send_from"`
 	Attachments      []int          `json:"attachments"`
 	Initiator        string         `json:"initiator"` // "contact" | "agent"
 	SourceID         string         `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact-initiated only.
@@ -901,7 +902,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	switch req.Initiator {
 	case umodels.UserTypeAgent:
 		// Queue reply.
-		if _, err := app.conversation.QueueReply(media, req.InboxID, auser.ID /**sender_id**/, contact.ID, conversationUUID, req.Content, to, nil /**cc**/, nil /**bcc**/, map[string]any{} /**meta**/); err != nil {
+		if _, err := app.conversation.QueueReply(media, req.InboxID, auser.ID /**sender_id**/, contact.ID, conversationUUID, req.Content, to, nil /**cc**/, nil /**bcc**/, req.SendFrom, map[string]any{} /**meta**/); err != nil {
 			// Delete the conversation if msg queue fails.
 			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 				app.lo.Error("error deleting conversation", "error", err)

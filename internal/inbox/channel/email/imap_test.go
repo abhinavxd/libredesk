@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	"github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/emersion/go-message/mail"
 	"github.com/jhillyerd/enmime/v2"
 )
@@ -73,6 +74,93 @@ func TestEmail_extractUUIDFromReplyAddress(t *testing.T) {
 				t.Errorf("extractUUIDFromReplyAddress(%q) = %q; expected %q", tc.address, result, tc.expected)
 			}
 		})
+	}
+}
+
+func TestResolveInboxAddress(t *testing.T) {
+	e := &Email{
+		from: "Support <support@example.com>",
+		uuid: "inbox-uuid",
+		receiveAddresses: map[string]struct{}{
+			"support@example.com": {},
+			"billing@example.com": {},
+			"sales@example.com":   {},
+		},
+	}
+	tests := []struct {
+		name    string
+		headers string
+		want    string
+	}{
+		{"owned To beats Cc", "To: customer@example.net, billing@example.com\r\nCc: sales@example.com\r\n", "billing@example.com"},
+		{"first owned To wins", "To: sales@example.com, billing@example.com\r\n", "sales@example.com"},
+		{"Cc when To unowned", "To: customer@example.net\r\nCc: BILLING@example.com\r\n", "billing@example.com"},
+		{"Bcc when available", "To: customer@example.net\r\nBcc: sales@example.com\r\n", "sales@example.com"},
+		{"original before delivered", "X-Original-To: billing@example.com\r\nDelivered-To: sales@example.com\r\n", "billing@example.com"},
+		{"ignore unowned delivery", "X-Original-To: other@example.com\r\nDelivered-To: billing@example.com\r\n", "billing@example.com"},
+		{"fallback primary", "To: customer@example.net\r\n", "support@example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := tt.headers + "From: customer@example.net\r\nSubject: test\r\n\r\nbody"
+			envelope, err := enmime.ReadEnvelope(strings.NewReader(raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := e.resolveInboxAddress(envelope); got != tt.want {
+				t.Fatalf("resolveInboxAddress() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoopMessageIdentity(t *testing.T) {
+	e := &Email{uuid: "550e8400-e29b-41d4-a716-446655440000", receiveAddresses: map[string]struct{}{"support@example.com": {}, "billing@example.com": {}}}
+	for _, identity := range []string{e.uuid, "support@example.com", "BILLING@example.com"} {
+		raw := headerLibredeskLoopPrevention + ": " + identity + "\r\n\r\nbody"
+		envelope, err := enmime.ReadEnvelope(strings.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !e.isLoopMessage(envelope) {
+			t.Fatalf("expected %q to identify loop", identity)
+		}
+	}
+}
+
+func TestEmailAliasCapabilities(t *testing.T) {
+	e := &Email{
+		from: "support@company.com",
+		aliases: models.EmailAliases{
+			{Email: "billing@company.com"},
+			{Email: "support@otherbrand.com", VerificationStatus: models.AliasVerificationVerified},
+		},
+		receiveAddresses: map[string]struct{}{
+			"support@company.com": {}, "billing@company.com": {}, "support@otherbrand.com": {},
+		},
+		sendAddresses: map[string]struct{}{
+			"support@company.com": {}, "support@otherbrand.com": {},
+		},
+	}
+	if !e.OwnsAddress("BILLING@COMPANY.COM") || e.SendsAddress("billing@company.com") {
+		t.Fatal("unverified alias capability was not enforced")
+	}
+	if !e.SendsAddress("SUPPORT@OTHERBRAND.COM") || !e.OwnsAddress("support@otherbrand.com") {
+		t.Fatal("verified alias capability was not enforced")
+	}
+}
+
+func TestSetAliasSendable(t *testing.T) {
+	e := &Email{sendAddresses: map[string]struct{}{}}
+
+	e.SetAliasSendable("Alias@Example.com", true)
+	if !e.SendsAddress("alias@example.com") {
+		t.Fatal("expected alias to become sendable")
+	}
+
+	e.SetAliasSendable("alias@example.com", false)
+	if e.SendsAddress("alias@example.com") {
+		t.Fatal("expected alias to stop being sendable")
 	}
 }
 

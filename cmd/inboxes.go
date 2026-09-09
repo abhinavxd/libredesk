@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"net/mail"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,7 +9,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/httputil"
-	"github.com/abhinavxd/libredesk/internal/inbox"
+	inboxpkg "github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
@@ -66,7 +65,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 
-	if err := validateInbox(app, inbox); err != nil {
+	if err := validateInbox(app, &inbox, 0); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -110,7 +109,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 
-	if err := validateInbox(app, inbox); err != nil {
+	if err := validateInbox(app, &inbox, id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -144,7 +143,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
-	toggledInbox, err := app.inbox.Toggle(id)
+	toggledInbox, err := app.inbox.Toggle(r.RequestCtx, id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -169,7 +168,7 @@ func handleDeleteInbox(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
-	err := app.inbox.SoftDelete(id)
+	err := app.inbox.SoftDelete(r.RequestCtx, id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -180,18 +179,67 @@ func handleDeleteInbox(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
+// handleVerifySendForInboxAlias starts send-as verification for an inbox alias.
+func handleVerifySendForInboxAlias(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	if err != nil || id == 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+	var request struct {
+		Email string `json:"email"`
+	}
+	if err := r.Decode(&request, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+	}
+	if err := app.inbox.StartAliasVerification(r.RequestCtx, id, request.Email); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(map[string]string{"status": imodels.AliasVerificationPending})
+}
+
 // validateInbox validates the inbox
-func validateInbox(app *App, inbox imodels.Inbox) error {
+func validateInbox(app *App, inbox *imodels.Inbox, id int) error {
 	// Validate from address only for email channels.
 	if inbox.Channel == "email" {
-		if _, err := mail.ParseAddress(inbox.From); err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidFromAddress"), nil)
+		primary, aliases, err := inboxpkg.ValidateEmailAddresses(inbox.From, inbox.Aliases)
+		if err != nil {
+			return envelope.NewError(envelope.InputError, err.Error(), nil)
+		}
+		inbox.Aliases = aliases
+		owned := map[string]struct{}{primary: {}}
+		for _, alias := range aliases {
+			owned[alias.Email] = struct{}{}
+		}
+		for address := range owned {
+			ownerID, err := app.inbox.GetEmailAddressOwner(address)
+			if err != nil {
+				return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+			}
+			if ownerID != 0 && ownerID != id {
+				return envelope.NewError(envelope.InputError, app.i18n.T("validation.inboxEmailAddressInUse"), nil)
+			}
 		}
 		var cfg imodels.Config
 		if len(inbox.Config) > 0 {
 			if err := json.Unmarshal(inbox.Config, &cfg); err == nil && cfg.ReplyTo != "" {
-				if _, err := mail.ParseAddress(cfg.ReplyTo); err != nil {
+				replyTo, err := inboxpkg.NormalizeEmailAddress(cfg.ReplyTo)
+				if err != nil {
 					return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+				}
+				if _, ok := owned[replyTo]; !ok {
+					if id != 0 {
+						return envelope.NewError(envelope.InputError, app.i18n.T("validation.replyToMustBeOwned"), nil)
+					}
+					inbox.Aliases = append(inbox.Aliases, imodels.EmailAlias{Email: replyTo})
+					owned[replyTo] = struct{}{}
+					ownerID, err := app.inbox.GetEmailAddressOwner(replyTo)
+					if err != nil {
+						return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+					}
+					if ownerID != 0 && ownerID != id {
+						return envelope.NewError(envelope.InputError, app.i18n.T("validation.inboxEmailAddressInUse"), nil)
+					}
 				}
 			}
 		}
@@ -411,9 +459,12 @@ func trimInboxFields(inb *imodels.Inbox) error {
 	inb.Name = strings.TrimSpace(inb.Name)
 	inb.From = strings.TrimSpace(inb.From)
 	inb.FromNameTemplate = strings.TrimSpace(inb.FromNameTemplate)
+	for i := range inb.Aliases {
+		inb.Aliases[i].Email = strings.TrimSpace(inb.Aliases[i].Email)
+	}
 
 	// Trim email config fields if this is an email channel.
-	if inb.Channel == inbox.ChannelEmail && len(inb.Config) > 0 {
+	if inb.Channel == inboxpkg.ChannelEmail && len(inb.Config) > 0 {
 		var cfg imodels.Config
 		if err := json.Unmarshal(inb.Config, &cfg); err != nil {
 			return err
