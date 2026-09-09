@@ -364,7 +364,7 @@ func (t *setContactEmailTool) Execute(ctx context.Context, args string) (string,
 		t.m.lo.Error("error clearing verification before email change", "conversation_uuid", t.conv.UUID, "error", err)
 		return "", err
 	}
-	if err := t.m.user.UpdateContactBasicInfo(t.conv.ContactID, "", "", email, "", "", nil); err != nil {
+	if err := t.m.user.UpdateContactBasicInfo(t.conv.ContactID, "", "", email, "", ""); err != nil {
 		t.m.lo.Error("error setting contact email for ai agent", "conversation_uuid", t.conv.UUID, "error", err)
 		return "", err
 	}

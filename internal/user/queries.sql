@@ -267,15 +267,38 @@ SET first_name = COALESCE($2, first_name),
 WHERE id = $1 and type in ('contact', 'visitor');
 
 -- name: update-contact-basic-info
--- An empty field is left alone. $7 records the identity an external integration supplied; it is
--- NULL for every other caller, which leaves the existing record untouched.
 UPDATE users
 SET first_name = COALESCE(NULLIF($2, ''), first_name),
     last_name = COALESCE(NULLIF($3, ''), last_name),
     email = COALESCE(NULLIF($4, ''), email),
     phone_number = COALESCE(NULLIF($5, ''), phone_number),
     phone_number_country_code = COALESCE(NULLIF($6, ''), phone_number_country_code),
-    external_sync = COALESCE($7::jsonb, external_sync),
+    updated_at = now()
+WHERE id = $1 AND type IN ('contact', 'visitor');
+
+-- name: lock-contact-external-identity
+-- Read for an identity sync, locking the row so the decision made from these values and the write
+-- that follows cannot be interleaved with an agent's edit or a second sync.
+SELECT first_name,
+       COALESCE(last_name, '') AS last_name,
+       COALESCE(email, '') AS email,
+       COALESCE(phone_number, '') AS phone_number,
+       COALESCE(phone_number_country_code, '') AS phone_number_country_code,
+       external_sync
+FROM users
+WHERE id = $1 AND type IN ('contact', 'visitor')
+FOR UPDATE;
+
+-- name: sync-contact-external-identity
+-- $2-$6 are the identity fields an external integration writes ('' leaves the field alone); $7 records
+-- what it supplied.
+UPDATE users
+SET first_name = COALESCE(NULLIF($2, ''), first_name),
+    last_name = COALESCE(NULLIF($3, ''), last_name),
+    email = COALESCE(NULLIF($4, ''), email),
+    phone_number = COALESCE(NULLIF($5, ''), phone_number),
+    phone_number_country_code = COALESCE(NULLIF($6, ''), phone_number_country_code),
+    external_sync = $7::jsonb,
     updated_at = now()
 WHERE id = $1 AND type IN ('contact', 'visitor');
 

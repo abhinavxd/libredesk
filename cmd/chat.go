@@ -772,27 +772,12 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 		}
 	}
 
-	// Sync the identity from the JWT, leaving any field an agent has corrected by hand alone.
+	// Sync the identity from the JWT, leaving any field an agent has corrected by hand alone. The
+	// manager re-reads the contact under a row lock, so the decision is made from the row as it is
+	// at the moment of the write, not from the copy fetched above.
 	if user.ID > 0 && claims.ExternalUserID != "" {
-		current := map[string]string{
-			umodels.ExternalSyncFirstName:        user.FirstName,
-			umodels.ExternalSyncLastName:         user.LastName,
-			umodels.ExternalSyncEmail:            user.Email.String,
-			umodels.ExternalSyncPhoneNumber:      user.PhoneNumber.String,
-			umodels.ExternalSyncPhoneCountryCode: user.PhoneNumberCountryCode.String,
-		}
-		synced := umodels.UnmarshalExternalSync(user.ExternalSync)
-		apply, next := umodels.ResolveExternalSync(current, synced, claims.externalSyncValues())
-		if len(apply) > 0 || !maps.Equal(next, synced) {
-			record, err := json.Marshal(next)
-			if err != nil {
-				app.lo.Error("error encoding external sync record", "contact_id", user.ID, "error", err)
-				return user.ID, nil
-			}
-			if err := app.user.UpdateContactBasicInfo(user.ID, apply[umodels.ExternalSyncFirstName], apply[umodels.ExternalSyncLastName],
-				apply[umodels.ExternalSyncEmail], apply[umodels.ExternalSyncPhoneNumber], apply[umodels.ExternalSyncPhoneCountryCode], record); err != nil {
-				app.lo.Error("error updating contact basic info", "contact_id", user.ID, "error", err)
-			}
+		if _, err := app.user.SyncContactExternalIdentity(user.ID, claims.externalSyncValues()); err != nil {
+			app.lo.Error("error syncing contact identity", "contact_id", user.ID, "error", err)
 		}
 		return user.ID, nil
 	}

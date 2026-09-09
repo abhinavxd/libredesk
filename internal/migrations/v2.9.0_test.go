@@ -60,12 +60,23 @@ func TestV2_9_0ExternalSyncColumn(t *testing.T) {
 	// schema.sql already ships the column, so drop it to stand in for a database created before it.
 	db.MustExec(`ALTER TABLE users DROP COLUMN external_sync`)
 	db.MustExec(`INSERT INTO users (type, first_name, email) VALUES ('contact', 'Ada', 'ada@example.com')`)
+	db.MustExec(`INSERT INTO users (type, first_name, last_name, email, external_user_id, phone_number) VALUES ('contact', 'Grace', '', 'grace@example.com', 'ext-grace', '5550100')`)
 
 	// Running the migration twice verifies that adding the column is idempotent.
 	for range 2 {
 		if err := V2_9_0(db, nil, nil); err != nil {
 			t.Fatalf("running migration: %v", err)
 		}
+	}
+
+	// A contact an integration created is recorded as holding what the integration supplied, since
+	// that is what the sync wrote before the record existed; empty fields are left out.
+	var seeded string
+	if err := db.Get(&seeded, `SELECT external_sync::text FROM users WHERE external_user_id = 'ext-grace'`); err != nil {
+		t.Fatalf("reading seeded external_sync: %v", err)
+	}
+	if want := `{"email": "grace@example.com", "first_name": "Grace", "phone_number": "5550100"}`; seeded != want {
+		t.Errorf("external contact external_sync = %s, want %s", seeded, want)
 	}
 
 	var column struct {
