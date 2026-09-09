@@ -91,7 +91,6 @@
         v-model:textContent="textContent"
         :message-type="messageType"
         :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
-        :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
         :disabled="isDraftLoading"
@@ -100,7 +99,6 @@
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
         :getConversationSuggestions="getConversationSuggestions"
-        @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
         @filesDropped="handleFilesDropped"
@@ -248,10 +246,6 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  aiPrompts: {
-    type: Array,
-    required: true
-  },
   isSending: {
     type: Boolean,
     required: true
@@ -292,7 +286,6 @@ const emit = defineEmits([
   'inlineImageUpload',
   'fileDelete',
   'filesDropped',
-  'aiPromptSelected',
   'generateReply'
 ])
 
@@ -398,10 +391,6 @@ const handleEmojiSelect = (emoji) => {
   insertContent.value = undefined
   // Force reactivity so the user can select the same emoji multiple times
   nextTick(() => (insertContent.value = emoji))
-}
-
-const handleAiPromptSelected = (key) => {
-  emit('aiPromptSelected', key)
 }
 
 // Watch and update macro view based on message type this filters our macros.

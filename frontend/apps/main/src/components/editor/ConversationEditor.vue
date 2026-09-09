@@ -1,7 +1,7 @@
 <template>
   <div
-    class="editor-wrapper flex flex-col h-full overflow-y-auto"
-    :class="{ 'pointer-events-none': disabled }"
+    class="editor-wrapper relative flex flex-col h-full overflow-y-auto"
+    :class="{ 'pointer-events-none': disabled, 'ai-generating': isGenerating }"
   >
     <BubbleMenu
       v-if="editor"
@@ -14,7 +14,7 @@
         :editor="editor"
         :ai-prompts="aiPrompts"
         @open-link="linkDialog?.open()"
-        @ai-prompt="emitPrompt"
+        @ai-prompt="runAiPrompt"
       />
     </BubbleMenu>
     <EditorContent :editor="editor" class="native-html" />
@@ -32,6 +32,7 @@ import EditorToolbar from './EditorToolbar.vue'
 import EditorLinkDialog from './EditorLinkDialog.vue'
 import { buildConversationExtensions } from './editorExtensions'
 import { useTextEditor } from './useTextEditor'
+import { useAiPrompts } from './useAiPrompts'
 
 const textContent = defineModel('textContent', { default: '' })
 const htmlContent = defineModel('htmlContent', { default: '' })
@@ -41,7 +42,7 @@ const props = defineProps({
   insertContent: String,
   messageType: String,
   autoFocus: { type: Boolean, default: true },
-  aiPrompts: { type: Array, default: () => [] },
+  enableAiPrompts: { type: Boolean, default: true },
   disabled: { type: Boolean, default: false },
   enableMentions: { type: Boolean, default: false },
   getSuggestions: { type: Function, default: null },
@@ -51,17 +52,14 @@ const props = defineProps({
   linkedModel: { type: String, default: 'messages' }
 })
 
-const emit = defineEmits([
-  'send',
-  'aiPromptSelected',
-  'mentionsChanged',
-  'filesDropped',
-  'toggleMessageType'
-])
+const emit = defineEmits(['send', 'mentionsChanged', 'filesDropped', 'toggleMessageType'])
 
 const linkDialog = ref(null)
 
-const emitPrompt = (key) => emit('aiPromptSelected', key)
+const { aiPrompts, isGenerating, runAiPrompt } = useAiPrompts({
+  enabled: props.enableAiPrompts,
+  htmlContent
+})
 
 // Suppress the formatting bubble when an image node is selected so it
 // doesn't fight with the image's own size/remove toolbar.

@@ -1,7 +1,7 @@
 <template>
   <div
     class="editor-wrapper relative flex flex-col h-full min-h-0"
-    :class="{ 'pointer-events-none': disabled }"
+    :class="{ 'pointer-events-none': disabled, 'ai-generating': isGenerating }"
   >
     <Teleport :to="toolbarTarget" :disabled="!toolbarTarget">
       <div
@@ -12,7 +12,9 @@
         <EditorToolbar
           :editor="editor"
           show-article-tools
+          :ai-prompts="aiPrompts"
           :enable-inline-images="enableInlineImages"
+          @ai-prompt="runAiPrompt"
           @open-link="linkDialog?.open()"
           @open-youtube="youtubeDialog?.open()"
           @open-image="imageInput?.click()"
@@ -44,6 +46,7 @@ import EditorLinkDialog from './EditorLinkDialog.vue'
 import EditorYoutubeDialog from './EditorYoutubeDialog.vue'
 import { buildArticleExtensions } from './editorExtensions'
 import { useTextEditor } from './useTextEditor'
+import { useAiPrompts } from './useAiPrompts'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -56,6 +59,7 @@ const props = defineProps({
   insertContent: String,
   autoFocus: { type: Boolean, default: true },
   disabled: { type: Boolean, default: false },
+  enableAiPrompts: { type: Boolean, default: true },
   enableInlineImages: { type: Boolean, default: false },
   linkedModel: { type: String, default: 'messages' },
   toolbarTarget: { type: null, default: null }
@@ -66,6 +70,11 @@ const emit = defineEmits(['send', 'filesDropped'])
 const linkDialog = ref(null)
 const youtubeDialog = ref(null)
 const imageInput = ref(null)
+
+const { aiPrompts, isGenerating, runAiPrompt } = useAiPrompts({
+  enabled: props.enableAiPrompts,
+  htmlContent
+})
 
 const { editor, insertImages, focus } = useTextEditor({
   extensions: buildArticleExtensions({
