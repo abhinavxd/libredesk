@@ -763,7 +763,7 @@ func saveContactAttrsAndCollectConvoAttrs(app *App, contactID int, claims *Claim
 	return formConvoAttrs
 }
 
-// resolveOrCreateExternalContact finds a contact by external_user_id (syncing changed JWT fields) or creates one.
+// resolveOrCreateExternalContact finds a contact by external_user_id (syncing the JWT identity) or creates one.
 func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 	user, err := resolveUserFromClaims(app, claims)
 	if err != nil {
@@ -772,19 +772,23 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 		}
 	}
 
-	// Sync name/email/phone from JWT only if changed.
+	// Sync the identity from the JWT, leaving any field an agent has corrected by hand alone. The
+	// manager re-reads the contact under a row lock, so the decision is made from the row as it is
+	// at the moment of the write, not from the copy fetched above.
 	if user.ID > 0 && claims.ExternalUserID != "" {
-		if user.FirstName != claims.FirstName || user.LastName != claims.LastName || user.Email.String != claims.Email ||
-			user.PhoneNumber.String != claims.PhoneNumber || user.PhoneNumberCountryCode.String != claims.PhoneNumberCountryCode {
-			if err := app.user.UpdateContactBasicInfo(user.ID, claims.FirstName, claims.LastName, claims.Email, claims.PhoneNumber, claims.PhoneNumberCountryCode); err != nil {
-				app.lo.Error("error updating contact basic info", "contact_id", user.ID, "error", err)
-			}
+		if _, err := app.user.SyncContactExternalIdentity(user.ID, claims.externalSyncValues()); err != nil {
+			app.lo.Error("error syncing contact identity", "contact_id", user.ID, "error", err)
 		}
 		return user.ID, nil
 	}
 
 	// Create contact if not found.
 	if claims.ExternalUserID != "" {
+		record, err := json.Marshal(claims.externalSyncValues())
+		if err != nil {
+			app.lo.Error("error encoding external sync record", "external_user_id", claims.ExternalUserID, "error", err)
+			record = []byte("{}")
+		}
 		user := umodels.User{
 			FirstName:              claims.FirstName,
 			LastName:               claims.LastName,
@@ -793,6 +797,7 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 			PhoneNumberCountryCode: null.NewString(claims.PhoneNumberCountryCode, claims.PhoneNumberCountryCode != ""),
 			ExternalUserID:         null.NewString(claims.ExternalUserID, true),
 			CustomAttributes:       marshalCustomAttributes(claims.ContactCustomAttributes, app),
+			ExternalSync:           record,
 		}
 		if err := app.user.ResolveContact(&user, umodels.ContactSync); err != nil {
 			return 0, err
@@ -801,6 +806,25 @@ func resolveOrCreateExternalContact(app *App, claims Claims) (int, error) {
 	}
 
 	return user.ID, nil
+}
+
+// externalSyncValues is the identity these claims supply, in the shape stored in users.external_sync.
+func (c Claims) externalSyncValues() map[string]string {
+	values := map[string]string{
+		umodels.ExternalSyncFirstName: c.FirstName,
+		umodels.ExternalSyncLastName:  c.LastName,
+		// The desk stores a contact's email lowercased and trimmed; record it the same way so the
+		// next exchange compares the record against the value the contact actually holds.
+		umodels.ExternalSyncEmail:            strings.ToLower(strings.TrimSpace(c.Email)),
+		umodels.ExternalSyncPhoneNumber:      c.PhoneNumber,
+		umodels.ExternalSyncPhoneCountryCode: c.PhoneNumberCountryCode,
+	}
+	for field, value := range values {
+		if value == "" {
+			delete(values, field)
+		}
+	}
+	return values
 }
 
 // createVisitorContact creates a new visitor contact from form data.
