@@ -43,7 +43,13 @@ type Notifier interface {
 
 // Service manages message providers and a worker pool.
 type Service struct {
+	// providersMu is held for reading across an entire SendSync and for
+	// writing by SetProvider, so a swap waits for in-flight sends to finish
+	// and can then close the retired provider safely. It is separate from mu
+	// on purpose: Close holds mu while waiting for the workers, and a worker
+	// mid-send must not need it.
 	providers      map[string]Notifier
+	providersMu    sync.RWMutex
 	messageChannel chan Message
 	concurrency    int
 	lo             *logf.Logger
@@ -79,13 +85,38 @@ func (s *Service) Send(message Message) error {
 	}
 }
 
-// SendSync sends on the caller's goroutine so delivery failures reach the caller; it holds no lock, so a slow relay cannot stall Send or Close.
+// SendSync sends on the caller's goroutine so delivery failures reach the caller. It holds
+// the providers read lock for the duration of the send, which never blocks Send or Close (they
+// use mu); it only makes SetProvider wait for sends already in flight.
 func (s *Service) SendSync(message Message) error {
+	s.providersMu.RLock()
+	defer s.providersMu.RUnlock()
 	provider, exists := s.providers[message.Provider]
 	if !exists {
 		return fmt.Errorf("unsupported provider: %s", message.Provider)
 	}
 	return provider.Send(message)
+}
+
+// SetProvider replaces the provider registered under p.Name(), or adds it. It waits for sends
+// in flight on the old provider to finish, then closes the old one if it has a Close method,
+// so a swapped-out SMTP pool does not keep its connections or sweeper goroutine alive. This is
+// how a settings change reaches a running service without a restart.
+func (s *Service) SetProvider(p Notifier) {
+	s.providersMu.Lock()
+	if s.providers == nil {
+		s.providers = map[string]Notifier{}
+	}
+	old := s.providers[p.Name()]
+	s.providers[p.Name()] = p
+	s.providersMu.Unlock()
+
+	if old == nil || old == p {
+		return
+	}
+	if c, ok := old.(interface{ Close() }); ok {
+		c.Close()
+	}
 }
 
 // Run starts the worker pool to process messages.
