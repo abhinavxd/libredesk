@@ -119,16 +119,17 @@ func (e *Email) purgeMailbox(ctx context.Context, client purgeClient, mailbox st
 	if trash != "" && strings.EqualFold(trash, mailbox) {
 		trash = ""
 	}
-	if trash == "" {
-		e.lo.Warn("no Trash folder found, mails will be expunged", "mailbox", mailbox, "inbox_id", e.Identifier())
-	}
-
 	var (
 		canMove = client.HasCap(imap.CapMove)
 		// UID EXPUNGE removes only the mails this purge flagged. A plain EXPUNGE also drops
 		// anything another client left flagged \Deleted in the same mailbox, so it is never used.
 		canUIDExpunge = client.HasCap(imap.CapUIDPlus)
 	)
+	if trash == "" && canUIDExpunge {
+		e.lo.Warn("no Trash folder found, mails will be expunged", "mailbox", mailbox, "inbox_id", e.Identifier())
+	} else if trash == "" {
+		e.lo.Warn("no Trash folder found and no UID EXPUNGE support, mails will be left in the mailbox", "mailbox", mailbox, "inbox_id", e.Identifier())
+	}
 
 	for _, messageID := range sortedKeys(pending) {
 		if err := ctx.Err(); err != nil {

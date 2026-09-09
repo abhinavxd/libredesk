@@ -57,11 +57,11 @@ type deleteConversationRequest struct {
 }
 
 // deleteConversationResponse reports what the delete left behind: the mails the mailbox purge could
-// not reach, what it did with the rest, and the attachment files that outlived their media rows.
+// not reach, what it did with the rest, and the attachment files still waiting for the media sweep.
 type deleteConversationResponse struct {
 	UnpurgedMessageIDs []string          `json:"unpurged_message_ids"`
 	MailPurge          *mailPurgeSummary `json:"mail_purge,omitempty"`
-	OrphanedMedia      int               `json:"orphaned_media"`
+	PendingMedia       int               `json:"pending_media"`
 }
 
 // mailPurgeSummary counts the mailbox purge outcomes for the client, which reports them rather than
@@ -1007,10 +1007,10 @@ func handleDeleteConversation(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Attachment files live in the media store, outside the database cascade. Their rows are
-	// already gone, so a file that cannot be deleted is orphaned with nothing left to retry from:
-	// each one is logged with its media UUID and counted into the response for a manual sweep.
-	orphaned := deleteConversationAttachments(app, uuid, deleted.Attachments)
+	// Attachment files live in the media store, outside the database cascade. They are deleted
+	// eagerly here; a file that cannot be deleted keeps its media row, which the periodic
+	// unlinked-media sweep retries, so the count only tells the client what is still pending.
+	pending := deleteConversationAttachments(app, uuid, deleted.Attachments)
 
 	// The desk side is already gone, so a failed purge is reported rather than raised.
 	var purge imodels.MailPurgeResult
@@ -1024,32 +1024,36 @@ func handleDeleteConversation(r *fastglue.Request) error {
 	return r.SendEnvelope(deleteConversationResponse{
 		UnpurgedMessageIDs: purge.Unpurged(),
 		MailPurge:          summarizeMailPurge(purge),
-		OrphanedMedia:      orphaned,
+		PendingMedia:       pending,
 	})
 }
 
 // deleteConversationAttachments removes the stored files of a deleted conversation and returns how
-// many of them are still in the media store. Media rows are polymorphic and were dropped with the
-// conversation, so a file left behind has no owner to retry from and needs the operator's attention.
+// many of them are still in the media store. The media rows outlive the conversation on purpose:
+// media.Delete drops the row only after the file is gone, so a failed delete leaves the row for the
+// periodic unlinked-media sweep to retry. Thumbnails have no row of their own, which is why an
+// image's thumbnail goes first: a thumbnail that cannot be deleted keeps the main file, and with it
+// the row, so the sweep picks both up.
 func deleteConversationAttachments(app *App, uuid string, attachments []conversation.DeletedAttachment) int {
-	var orphaned int
+	var pending int
 	for _, attachment := range attachments {
-		if err := app.media.Delete(attachment.UUID); err != nil {
-			orphaned++
-			app.lo.Error("orphaned conversation attachment, delete it from the media store by hand", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "error", err)
-		}
 		if strings.HasPrefix(attachment.ContentType, "image/") {
 			thumbUUID := image.ThumbPrefix + attachment.UUID
 			if err := app.media.Delete(thumbUUID); err != nil {
-				orphaned++
-				app.lo.Error("orphaned conversation attachment thumbnail, delete it from the media store by hand", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "thumb_uuid", thumbUUID, "error", err)
+				pending++
+				app.lo.Error("conversation attachment thumbnail not deleted, left for the unlinked-media sweep", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "thumb_uuid", thumbUUID, "error", err)
+				continue
 			}
 		}
+		if err := app.media.Delete(attachment.UUID); err != nil {
+			pending++
+			app.lo.Error("conversation attachment not deleted, left for the unlinked-media sweep", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "error", err)
+		}
 	}
-	if orphaned > 0 {
-		app.lo.Error("conversation delete left files in the media store", "conversation_uuid", uuid, "orphaned_media", orphaned)
+	if pending > 0 {
+		app.lo.Warn("conversation delete left attachment files for the unlinked-media sweep", "conversation_uuid", uuid, "pending_media", pending)
 	}
-	return orphaned
+	return pending
 }
 
 // purgeConversationMail takes the conversation's incoming mails out of the inbox mailbox and reports
