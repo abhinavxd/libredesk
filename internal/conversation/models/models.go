@@ -194,6 +194,7 @@ type Conversation struct {
 	InboxChannel              string                 `db:"inbox_channel" json:"inbox_channel"`
 	Tags                      null.JSON              `db:"tags" json:"tags"`
 	Meta                      json.RawMessage        `db:"meta" json:"meta"`
+	IncomingTo                []string               `db:"-" json:"-"`
 	CustomAttributes          json.RawMessage        `db:"custom_attributes" json:"custom_attributes"`
 	LastMessageAt             null.Time              `db:"last_message_at" json:"last_message_at"`
 	LastMessage               null.String            `db:"last_message" json:"last_message"`
