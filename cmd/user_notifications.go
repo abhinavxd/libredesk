@@ -5,6 +5,8 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -93,6 +95,70 @@ func handleDeleteAllNotifications(r *fastglue.Request) error {
 	)
 
 	if err := app.userNotification.DeleteAll(auser.ID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
+func handleGetNotificationPreferences(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	prefs, err := app.notificationPref.GetMatrix(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(map[string]any{
+		"preferences":      prefs,
+		"email_enabled":    ko.Bool("notification.email.enabled"),
+		"vapid_public_key": app.pushNotification.PublicKey(),
+	})
+}
+
+func handleUpdateNotificationPreferences(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		prefs []nmodels.NotificationPreference
+	)
+	if err := r.Decode(&prefs, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
+			app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	if err := app.notificationPref.Update(auser.ID, prefs); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
+func handleCreatePushSubscription(r *fastglue.Request) error {
+	var (
+		app          = r.Context.(*App)
+		auser        = r.RequestCtx.UserValue("user").(amodels.User)
+		subscription notifier.PushSubscriptionInput
+	)
+	if err := r.Decode(&subscription, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	if err := app.pushNotification.Upsert(auser.ID, subscription); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(true)
+}
+
+func handleDeletePushSubscription(r *fastglue.Request) error {
+	var (
+		app     = r.Context.(*App)
+		auser   = r.RequestCtx.UserValue("user").(amodels.User)
+		request struct {
+			Endpoint string `json:"endpoint"`
+		}
+	)
+	if err := r.Decode(&request, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	if err := app.pushNotification.Delete(auser.ID, request.Endpoint); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)

@@ -496,7 +496,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 	}
 
 	// Process post-message hooks (reopen, waiting since, automation, SLA).
-	if err := m.ProcessIncomingMessageHooks(conversationUUID, isNewConversation); err != nil {
+	if err := m.ProcessIncomingMessageHooks(message, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", conversationUUID, "error", err)
 	}
 
@@ -893,7 +893,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	m.broadcastMessageToWidgetClients(&msg)
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation); err != nil {
+	if err := m.ProcessIncomingMessageHooks(msg, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 		return models.Message{}, fmt.Errorf("processing incoming message hooks: %w", err)
 	}
@@ -1015,7 +1015,7 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
 	// isNewConversation = false since conversation always exists for live chat.
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, false); err != nil {
+	if err := m.ProcessIncomingMessageHooks(msg, false); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 	}
 
@@ -1386,7 +1386,9 @@ func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) e
 // ProcessIncomingMessageHooks handles automation rules, webhooks, SLA events, and other post-processing
 // for incoming messages. This allows other channels to insert messages first and then call this
 // function to trigger the necessary hooks.
-func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConversation bool) error {
+func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConversation bool) error {
+	conversationUUID := message.ConversationUUID
+
 	// Start waiting since clock, cleared when agent replies.
 	m.StartConversationWaitingSince(conversationUUID, time.Now())
 
@@ -1407,11 +1409,13 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	}
 
 	// Reopen conversation if it's not Open.
+	var reopened bool
 	systemUser, err := m.userStore.GetSystemUser()
 	if err != nil {
 		m.lo.Error("error fetching system user", "error", err)
 	} else {
-		if err := m.ReOpenConversation(conversationUUID, systemUser); err != nil {
+		var err error
+		if reopened, err = m.ReOpenConversation(conversationUUID, systemUser); err != nil {
 			m.lo.Error("error reopening conversation", "error", err)
 		}
 	}
@@ -1424,6 +1428,8 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	} else {
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming, previousValues, umodels.User{ID: conversation.ContactID})
+
+		go m.NotifyNewReply(conversation, message, reopened)
 
 		// If assigned to an AI assistant, let it respond to this inbound customer message.
 		if m.aiAgent != nil && conversation.AssignedUserID.Valid {

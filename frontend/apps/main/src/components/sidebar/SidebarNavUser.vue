@@ -130,6 +130,7 @@ import { useUserStore } from '@main/stores/user'
 import { useIsMobile } from '@shared-ui/composables'
 import { useRouter } from 'vue-router'
 import { useKeyboardShortcutsDialog } from '@main/composables/useKeyboardShortcutsDialog'
+import { useLogout } from '@main/composables/useLogout'
 
 import { useColorMode } from '@vueuse/core'
 
@@ -139,8 +140,5 @@ const userStore = useUserStore()
 const router = useRouter()
 const { t } = useI18n()
 const shortcutsDialog = useKeyboardShortcutsDialog()
-
-const logout = () => {
-  window.location.href = '/logout'
-}
+const logout = useLogout()
 </script>
