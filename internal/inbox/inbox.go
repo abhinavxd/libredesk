@@ -70,10 +70,10 @@ type Inbox interface {
 }
 
 // MailboxPurger is implemented by channels that leave the original messages on a remote server,
-// where they would be re-imported after the desk-side conversation is deleted. It reports the
-// message identifiers it could not remove.
+// where they would be re-imported after the desk-side conversation is deleted. It reports what
+// became of every message identifier it was given.
 type MailboxPurger interface {
-	PurgeMessages(ctx context.Context, messageIDs []string) ([]string, error)
+	PurgeMessages(ctx context.Context, messageIDs []string) (imodels.MailPurgeResult, error)
 }
 
 // MessageStore defines methods for storing and processing messages.

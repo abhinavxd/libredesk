@@ -16,6 +16,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	vmodels "github.com/abhinavxd/libredesk/internal/view/models"
@@ -55,9 +56,38 @@ type deleteConversationRequest struct {
 	PurgeMail *bool `json:"purge_mail"`
 }
 
-// deleteConversationResponse reports the mails the mailbox purge could not reach.
+// deleteConversationResponse reports what the delete left behind: the mails the mailbox purge could
+// not reach, what it did with the rest, and the attachment files that outlived their media rows.
 type deleteConversationResponse struct {
-	UnpurgedMessageIDs []string `json:"unpurged_message_ids"`
+	UnpurgedMessageIDs []string          `json:"unpurged_message_ids"`
+	MailPurge          *mailPurgeSummary `json:"mail_purge,omitempty"`
+	OrphanedMedia      int               `json:"orphaned_media"`
+}
+
+// mailPurgeSummary counts the mailbox purge outcomes for the client, which reports them rather than
+// the individual Message-IDs.
+type mailPurgeSummary struct {
+	MovedToTrash int    `json:"moved_to_trash"`
+	Expunged     int    `json:"expunged"`
+	NotFound     int    `json:"not_found"`
+	NotPurged    int    `json:"not_purged"`
+	Failed       int    `json:"failed"`
+	TrashMailbox string `json:"trash_mailbox,omitempty"`
+}
+
+// summarizeMailPurge counts a finished purge, or returns nil when no purge ran.
+func summarizeMailPurge(result imodels.MailPurgeResult) *mailPurgeSummary {
+	if len(result.Mails) == 0 {
+		return nil
+	}
+	return &mailPurgeSummary{
+		MovedToTrash: result.Count(imodels.MailMovedToTrash),
+		Expunged:     result.Count(imodels.MailExpunged),
+		NotFound:     result.Count(imodels.MailNotFound),
+		NotPurged:    result.Count(imodels.MailNotPurged),
+		Failed:       result.Count(imodels.MailPurgeFailed),
+		TrashMailbox: result.TrashMailbox,
+	}
 }
 
 type createConversationRequest struct {
@@ -977,61 +1007,91 @@ func handleDeleteConversation(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Attachment files live in the media store, outside the database cascade.
-	for _, attachment := range deleted.Attachments {
-		if err := app.media.Delete(attachment.UUID); err != nil {
-			app.lo.Error("error deleting conversation attachment", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "error", err)
-		}
-		if strings.HasPrefix(attachment.ContentType, "image/") {
-			thumbUUID := image.ThumbPrefix + attachment.UUID
-			if err := app.media.Delete(thumbUUID); err != nil {
-				app.lo.Error("error deleting conversation attachment thumbnail", "conversation_uuid", uuid, "thumb_uuid", thumbUUID, "error", err)
-			}
-		}
-	}
+	// Attachment files live in the media store, outside the database cascade. Their rows are
+	// already gone, so a file that cannot be deleted is orphaned with nothing left to retry from:
+	// each one is logged with its media UUID and counted into the response for a manual sweep.
+	orphaned := deleteConversationAttachments(app, uuid, deleted.Attachments)
 
 	// The desk side is already gone, so a failed purge is reported rather than raised.
-	var unpurged []string
+	var purge imodels.MailPurgeResult
 	if purgeMail {
-		unpurged = purgeConversationMail(app, conversation, deleted.IncomingSourceID)
+		purge = purgeConversationMail(app, conversation, deleted.IncomingSourceID)
 	}
 
 	// Drop the row from every open list.
 	app.conversation.BroadcastConversationDelete(uuid)
 
-	return r.SendEnvelope(deleteConversationResponse{UnpurgedMessageIDs: unpurged})
+	return r.SendEnvelope(deleteConversationResponse{
+		UnpurgedMessageIDs: purge.Unpurged(),
+		MailPurge:          summarizeMailPurge(purge),
+		OrphanedMedia:      orphaned,
+	})
 }
 
-// purgeConversationMail deletes the conversation's incoming mails from the inbox mailbox and returns
-// the Message-IDs that are still on the server. Outgoing mails are handed to SMTP and never appended
-// to the mailbox by the desk, so there is nothing of ours to remove for them.
-func purgeConversationMail(app *App, conversation *cmodels.Conversation, messageIDs []string) []string {
+// deleteConversationAttachments removes the stored files of a deleted conversation and returns how
+// many of them are still in the media store. Media rows are polymorphic and were dropped with the
+// conversation, so a file left behind has no owner to retry from and needs the operator's attention.
+func deleteConversationAttachments(app *App, uuid string, attachments []conversation.DeletedAttachment) int {
+	var orphaned int
+	for _, attachment := range attachments {
+		if err := app.media.Delete(attachment.UUID); err != nil {
+			orphaned++
+			app.lo.Error("orphaned conversation attachment, delete it from the media store by hand", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "error", err)
+		}
+		if strings.HasPrefix(attachment.ContentType, "image/") {
+			thumbUUID := image.ThumbPrefix + attachment.UUID
+			if err := app.media.Delete(thumbUUID); err != nil {
+				orphaned++
+				app.lo.Error("orphaned conversation attachment thumbnail, delete it from the media store by hand", "conversation_uuid", uuid, "media_uuid", attachment.UUID, "thumb_uuid", thumbUUID, "error", err)
+			}
+		}
+	}
+	if orphaned > 0 {
+		app.lo.Error("conversation delete left files in the media store", "conversation_uuid", uuid, "orphaned_media", orphaned)
+	}
+	return orphaned
+}
+
+// purgeConversationMail takes the conversation's incoming mails out of the inbox mailbox and reports
+// what happened to each of them. Outgoing mails are handed to SMTP and never appended to the mailbox
+// by the desk, so there is nothing of ours to remove for them.
+func purgeConversationMail(app *App, conversation *cmodels.Conversation, messageIDs []string) imodels.MailPurgeResult {
+	var result imodels.MailPurgeResult
 	if len(messageIDs) == 0 || conversation.InboxChannel != inbox.ChannelEmail {
-		return nil
+		return result
 	}
 
 	inb, err := app.inbox.Get(conversation.InboxID)
 	if err != nil {
 		app.lo.Error("error getting inbox for mailbox purge", "conversation_uuid", conversation.UUID, "inbox_id", conversation.InboxID, "error", err)
-		return messageIDs
+		return failedMailPurge(messageIDs, "the inbox could not be opened")
 	}
 	purger, ok := inb.(inbox.MailboxPurger)
 	if !ok {
 		app.lo.Warn("inbox does not support purging its mailbox", "conversation_uuid", conversation.UUID, "inbox_id", conversation.InboxID, "channel", inb.Channel())
-		return messageIDs
+		return failedMailPurge(messageIDs, "the inbox does not support purging its mailbox")
 	}
 
 	ctx, cancel := context.WithTimeout(app.ctx, mailboxPurgeTimeout)
 	defer cancel()
 
-	unpurged, err := purger.PurgeMessages(ctx, messageIDs)
+	result, err = purger.PurgeMessages(ctx, messageIDs)
 	if err != nil {
 		app.lo.Error("error purging conversation mails from the mailbox", "conversation_uuid", conversation.UUID, "inbox_id", conversation.InboxID, "error", err)
 	}
-	if len(unpurged) > 0 {
+	if unpurged := result.Unpurged(); len(unpurged) > 0 {
 		app.lo.Warn("conversation mails left on the mail server", "conversation_uuid", conversation.UUID, "inbox_id", conversation.InboxID, "message_ids", unpurged)
 	}
-	return unpurged
+	return result
+}
+
+// failedMailPurge reports every mail as unreachable, for the cases where the purge never started.
+func failedMailPurge(messageIDs []string, reason string) imodels.MailPurgeResult {
+	var result imodels.MailPurgeResult
+	for _, messageID := range messageIDs {
+		result.Record(messageID, imodels.MailPurgeFailed, reason)
+	}
+	return result
 }
 
 // purgeMailOption reads the `purge_mail` flag from the query string or the request body, defaulting to true.
