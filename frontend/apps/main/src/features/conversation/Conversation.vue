@@ -253,7 +253,7 @@ const confirmDelete = async () => {
     const result = await conversationStore.deleteConversation(conversation.uuid, {
       purgeMail: isEmailConversation.value && purgeMail.value
     })
-    const toast = deletionToast(result?.unpurged_message_ids)
+    const toast = deletionToast(result)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: toast.variant,
       description:

@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"net/smtp"
+	"sort"
 	"strings"
 	"time"
 
@@ -146,4 +147,73 @@ func (m *Inbox) ClearPasswords() error {
 	}
 
 	return nil
+}
+
+// Mailbox purge outcomes, reported per Message-ID by MailboxPurger implementations.
+const (
+	// MailMovedToTrash means the mail now sits in the mailbox's Trash folder and can be
+	// restored from a mail client.
+	MailMovedToTrash = "moved_to_trash"
+	// MailExpunged means the mail was permanently removed because the server has no Trash folder.
+	MailExpunged = "expunged"
+	// MailNotFound means no mail with that Message-ID was in the mailbox.
+	MailNotFound = "not_found"
+	// MailNotPurged means the mail was found but left untouched because the server offers no safe
+	// way to remove it.
+	MailNotPurged = "not_purged"
+	// MailPurgeFailed means the server rejected the search, the move or the delete.
+	MailPurgeFailed = "failed"
+)
+
+// MailPurge is what the mailbox purge did with one Message-ID.
+type MailPurge struct {
+	MessageID string `json:"message_id"`
+	Outcome   string `json:"outcome"`
+	// Reason carries the detail behind a not_purged or failed outcome.
+	Reason string `json:"reason,omitempty"`
+}
+
+// MailPurgeResult reports a finished mailbox purge.
+type MailPurgeResult struct {
+	Mails []MailPurge `json:"mails"`
+	// TrashMailbox names the folder the mails were moved to, empty when none was found.
+	TrashMailbox string `json:"trash_mailbox,omitempty"`
+}
+
+// Record appends an outcome for a Message-ID, replacing an earlier one from another mailbox.
+func (r *MailPurgeResult) Record(messageID, outcome, reason string) {
+	for i, mail := range r.Mails {
+		if mail.MessageID == messageID {
+			r.Mails[i] = MailPurge{MessageID: messageID, Outcome: outcome, Reason: reason}
+			return
+		}
+	}
+	r.Mails = append(r.Mails, MailPurge{MessageID: messageID, Outcome: outcome, Reason: reason})
+}
+
+// Count returns how many mails ended with the given outcome.
+func (r MailPurgeResult) Count(outcome string) int {
+	var n int
+	for _, mail := range r.Mails {
+		if mail.Outcome == outcome {
+			n++
+		}
+	}
+	return n
+}
+
+// Unpurged returns the Message-IDs the purge did not take off the server, in a stable order.
+// A mail that was never found is included: the desk cannot tell an already-deleted mail from one
+// the search could not match, and both leave the caller with nothing to confirm.
+func (r MailPurgeResult) Unpurged() []string {
+	var ids []string
+	for _, mail := range r.Mails {
+		switch mail.Outcome {
+		case MailMovedToTrash, MailExpunged:
+		default:
+			ids = append(ids, mail.MessageID)
+		}
+	}
+	sort.Strings(ids)
+	return ids
 }
