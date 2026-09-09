@@ -104,7 +104,7 @@ const HANDOFF_HEADING_PATTERN = new RegExp(
   'i'
 )
 
-const isWordCharacter = (character) => /[A-Za-z0-9_]/.test(character)
+const isWordCharacter = (character) => /[\p{L}\p{N}_]/u.test(character)
 
 /**
  * A whole-word matcher for an arbitrary term, including terms carrying dots,
@@ -115,9 +115,9 @@ const isWordCharacter = (character) => /[A-Za-z0-9_]/.test(character)
  * captured in group 1.
  */
 const termPattern = (term) => {
-  const prefix = isWordCharacter(term[0]) ? '(?:^|[^A-Za-z0-9_])' : ''
-  const suffix = isWordCharacter(term[term.length - 1]) ? 's?(?![A-Za-z0-9_])' : ''
-  return new RegExp(`${prefix}(${escapeRegExp(term)}${suffix})`, 'gi')
+  const prefix = isWordCharacter(term[0]) ? '(?:^|[^\\p{L}\\p{N}_])' : ''
+  const suffix = isWordCharacter(term[term.length - 1]) ? 's?(?![\\p{L}\\p{N}_])' : ''
+  return new RegExp(`${prefix}(${escapeRegExp(term)}${suffix})`, 'giu')
 }
 
 const truncate = (value) =>
@@ -178,7 +178,7 @@ export const REPLY_GUARD_RULES = [
     test: (text, { mentions = [] } = {}) => {
       const found = collectMatches(
         text,
-        /(?:^|[^A-Za-z0-9_.@+-])(@[A-Za-z0-9](?:[\w.'’-]*[A-Za-z0-9])?)/g,
+        /(?:^|[^\p{L}\p{N}\p{M}_.@+-])(@[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}_.'’-]*[\p{L}\p{N}\p{M}])?)/gu,
         []
       ).map((match) => match.value)
       for (const mention of mentions) {

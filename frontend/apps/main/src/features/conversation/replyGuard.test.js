@@ -45,6 +45,14 @@ describe('reply guard', () => {
       expect(excerptsFor('@Anna took a look already.', 'mentions')).toEqual(['@Anna'])
     })
 
+    it('flags a mention written with non-ASCII letters', () => {
+      expect(excerptsFor('Передаю @Мария, посмотри пожалуйста.', 'mentions')).toEqual(['@Мария'])
+    })
+
+    it('does not flag an email address with a non-ASCII local part', () => {
+      expect(excerptsFor('Write to josé@example.com or to 田中@example.jp.', 'mentions')).toEqual([])
+    })
+
     it('does not flag the at sign inside an email address', () => {
       expect(
         excerptsFor('Write to support@libredesk.io or to anna.k+desk@example.co.uk.', 'mentions')
