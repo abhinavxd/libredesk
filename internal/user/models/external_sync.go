@@ -1,6 +1,9 @@
 package models
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // Identity fields the widget integration supplies through the JWT and the desk remembers in users.external_sync.
 const (
@@ -55,17 +58,28 @@ func UnmarshalExternalSync(raw json.RawMessage) map[string]string {
 func ResolveExternalSync(current, synced, incoming map[string]string) (apply, next map[string]string) {
 	apply, next = map[string]string{}, map[string]string{}
 	for _, field := range ExternalSyncFields {
-		in := incoming[field]
+		in := NormalizeExternalSyncValue(field, incoming[field])
 		if in == "" {
-			if last := synced[field]; last != "" {
+			if last := NormalizeExternalSyncValue(field, synced[field]); last != "" {
 				next[field] = last
 			}
 			continue
 		}
 		next[field] = in
-		if cur := current[field]; cur != in && (cur == "" || cur == synced[field]) {
+		cur := NormalizeExternalSyncValue(field, current[field])
+		if cur != in && (cur == "" || cur == NormalizeExternalSyncValue(field, synced[field])) {
 			apply[field] = in
 		}
 	}
 	return apply, next
+}
+
+// NormalizeExternalSyncValue puts a supplied value into the form the desk stores it in, so that the
+// comparison above sees "Ada@Example.com " and "ada@example.com" as the same address rather than as
+// an agent's correction. Names and phone numbers are stored as given.
+func NormalizeExternalSyncValue(field, value string) string {
+	if field == ExternalSyncEmail {
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+	return value
 }

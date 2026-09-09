@@ -1,8 +1,10 @@
 package user
 
 import (
+	"maps"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
@@ -415,11 +417,11 @@ func TestResolveContactConcurrent(t *testing.T) {
 	race(models.ContactSync, "race-sync-ext@example.com", "ext-race-sync")
 }
 
-func TestUpdateContactBasicInfoExternalSync(t *testing.T) {
+func TestSyncContactExternalIdentity(t *testing.T) {
 	mgr, db := newTestManager(t)
 
 	contact := newContact("ada@example.com", "ext-sync-1", "Ada", "L")
-	contact.ExternalSync = []byte(`{"first_name":"Ada"}`)
+	contact.ExternalSync = []byte(`{"first_name":"Ada","email":"ada@example.com"}`)
 	resolve(t, mgr, contact, models.ContactSync)
 
 	externalSync := func() string {
@@ -430,30 +432,67 @@ func TestUpdateContactBasicInfoExternalSync(t *testing.T) {
 		}
 		return raw
 	}
-
-	if got, want := externalSync(), `{"first_name": "Ada"}`; got != want {
+	if got, want := externalSync(), `{"email": "ada@example.com", "first_name": "Ada"}`; got != want {
 		t.Errorf("external_sync after create = %s, want %s", got, want)
 	}
 
-	// A record given updates it; an empty field leaves the contact's value alone.
-	if err := mgr.UpdateContactBasicInfo(contact.ID, "Augusta", "", "", "", "", []byte(`{"first_name":"Augusta"}`)); err != nil {
-		t.Fatalf("UpdateContactBasicInfo: %v", err)
+	// Fields the contact still holds from the integration follow its claim; the email is stored in
+	// the desk's form; the last name the integration never supplied is left alone.
+	applied, err := mgr.SyncContactExternalIdentity(contact.ID, map[string]string{
+		models.ExternalSyncFirstName: "Augusta", models.ExternalSyncLastName: "Lovelace", models.ExternalSyncEmail: " Ada@Example.org ",
+	})
+	if err != nil {
+		t.Fatalf("SyncContactExternalIdentity: %v", err)
 	}
-	if row := fetchRow(t, db, contact.ID); row.FirstName != "Augusta" || row.LastName != "L" {
-		t.Errorf("contact after sync = %+v, want first name Augusta and last name L", row)
+	if want := map[string]string{models.ExternalSyncFirstName: "Augusta", models.ExternalSyncEmail: "ada@example.org"}; !maps.Equal(applied, want) {
+		t.Errorf("applied = %v, want %v", applied, want)
 	}
-	if got, want := externalSync(), `{"first_name": "Augusta"}`; got != want {
+	if row := fetchRow(t, db, contact.ID); row.FirstName != "Augusta" || row.LastName != "L" || row.Email != "ada@example.org" {
+		t.Errorf("contact after sync = %+v, want first name Augusta, last name L, email ada@example.org", row)
+	}
+	if got, want := externalSync(), `{"email": "ada@example.org", "last_name": "Lovelace", "first_name": "Augusta"}`; got != want {
 		t.Errorf("external_sync after sync = %s, want %s", got, want)
 	}
 
-	// Every other caller passes nil and leaves the record standing.
-	if err := mgr.UpdateContactBasicInfo(contact.ID, "", "", "ada@example.org", "", "", nil); err != nil {
+	// An agent's edit is seen by the next sync and kept, while the record still follows the claim.
+	if err := mgr.UpdateContactBasicInfo(contact.ID, "Countess", "", "", "", ""); err != nil {
 		t.Fatalf("UpdateContactBasicInfo: %v", err)
 	}
-	if row := fetchRow(t, db, contact.ID); row.Email != "ada@example.org" {
-		t.Errorf("contact email = %q, want ada@example.org", row.Email)
-	}
-	if got, want := externalSync(), `{"first_name": "Augusta"}`; got != want {
+	if got, want := externalSync(), `{"email": "ada@example.org", "last_name": "Lovelace", "first_name": "Augusta"}`; got != want {
 		t.Errorf("external_sync after a non-integration update = %s, want %s", got, want)
+	}
+	applied, err = mgr.SyncContactExternalIdentity(contact.ID, map[string]string{models.ExternalSyncFirstName: "Ada", models.ExternalSyncEmail: "ada@example.org"})
+	if err != nil {
+		t.Fatalf("SyncContactExternalIdentity: %v", err)
+	}
+	if len(applied) != 0 {
+		t.Errorf("applied after an agent edit = %v, want nothing", applied)
+	}
+	if row := fetchRow(t, db, contact.ID); row.FirstName != "Countess" || row.Email != "ada@example.org" {
+		t.Errorf("contact after a sync over an agent edit = %+v, want the agent's first name Countess", row)
+	}
+	if got, want := externalSync(), `{"email": "ada@example.org", "last_name": "Lovelace", "first_name": "Ada"}`; got != want {
+		t.Errorf("external_sync after a sync over an agent edit = %s, want %s", got, want)
+	}
+
+	// An unchanged claim writes nothing at all.
+	var before time.Time
+	if err := db.QueryRow(`SELECT updated_at FROM users WHERE id = $1`, contact.ID).Scan(&before); err != nil {
+		t.Fatalf("reading updated_at: %v", err)
+	}
+	if applied, err = mgr.SyncContactExternalIdentity(contact.ID, map[string]string{models.ExternalSyncFirstName: "Ada", models.ExternalSyncEmail: "ADA@example.org"}); err != nil {
+		t.Fatalf("SyncContactExternalIdentity: %v", err)
+	}
+	var after time.Time
+	if err := db.QueryRow(`SELECT updated_at FROM users WHERE id = $1`, contact.ID).Scan(&after); err != nil {
+		t.Fatalf("reading updated_at: %v", err)
+	}
+	if len(applied) != 0 || !after.Equal(before) {
+		t.Errorf("an unchanged claim wrote: applied = %v, updated_at %v -> %v", applied, before, after)
+	}
+
+	// A contact that no longer exists is not an error.
+	if applied, err := mgr.SyncContactExternalIdentity(contact.ID+1000, map[string]string{models.ExternalSyncFirstName: "Nobody"}); err != nil || applied != nil {
+		t.Errorf("sync of a missing contact = %v, %v; want nil, nil", applied, err)
 	}
 }
