@@ -239,6 +239,19 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	}
 }
 
+// ProductNameFromInbox derives a product name from an inbox name by dropping a trailing role word such as
+// "Support" or "App" ("Drifttt Support" and "Drifttt App" are both "Drifttt"); an inbox named after the
+// product alone is returned unchanged.
+func ProductNameFromInbox(inboxName string) string {
+	name := strings.TrimSpace(inboxName)
+	for _, suffix := range []string{" support", " app", " help", " helpdesk"} {
+		if len(name) > len(suffix) && strings.EqualFold(name[len(name)-len(suffix):], suffix) {
+			return strings.TrimSpace(name[:len(name)-len(suffix)])
+		}
+	}
+	return name
+}
+
 // BuildTemplateData builds the common template data map for rendering message content variables.
 func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[string]any, error) {
 	conversation, err := m.GetConversation(0, conversationUUID, "")
@@ -257,6 +270,13 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 			"Subject":         conversation.Subject.String,
 			"Priority":        conversation.Priority.String,
 			"UUID":            conversation.UUID,
+		},
+		// The inbox the reply leaves from, so a global outgoing template can sign or brand per product
+		// ("Slava from Drifttt") instead of needing one template per inbox.
+		"Inbox": map[string]any{
+			"Name":    conversation.InboxName,
+			"Channel": conversation.InboxChannel,
+			"Product": ProductNameFromInbox(conversation.InboxName),
 		},
 		"Contact": map[string]any{
 			"FirstName": conversation.Contact.FirstName,
@@ -1183,7 +1203,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
-			true,          /** private **/
+			true,         /** private **/
 		)
 		if err != nil {
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
