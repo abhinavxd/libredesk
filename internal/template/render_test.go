@@ -55,7 +55,7 @@ func renderDefaultOutgoing(t *testing.T, content string, data any) string {
 
 func TestDefaultOutgoingEmailTemplate(t *testing.T) {
 	withSignature := map[string]any{"Inbox": map[string]any{"Signature": "Slava from Drifttt"}}
-	if got, want := renderDefaultOutgoing(t, "Hi", withSignature), "Hi<p>Slava from Drifttt</p>"; got != want {
+	if got, want := renderDefaultOutgoing(t, "Hi", withSignature), "Hi<div>Slava from Drifttt</div>"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 

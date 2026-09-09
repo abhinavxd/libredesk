@@ -28,7 +28,7 @@ const (
 	// DefaultOutgoingEmailTemplate is used when the installation has no default outgoing email
 	// template of its own. It appends the sending inbox's signature so a fresh install signs
 	// replies as soon as an inbox has one; installs that already have a template row keep it.
-	DefaultOutgoingEmailTemplate = `{{ template "content" . }}{{ if .Inbox.Signature }}<p>{{ .Inbox.Signature }}</p>{{ end }}`
+	DefaultOutgoingEmailTemplate = `{{ template "content" . }}{{ if .Inbox.Signature }}<div>{{ .Inbox.Signature }}</div>{{ end }}`
 )
 
 // RenderString renders Go template variables in the given content string
