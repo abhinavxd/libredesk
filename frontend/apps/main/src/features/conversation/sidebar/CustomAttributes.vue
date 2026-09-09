@@ -22,7 +22,7 @@
       <div class="sidebar-label flex items-center gap-2" v-else>
         <Checkbox
           v-if="attribute.data_type === 'checkbox'"
-          :disabled="loading"
+          :disabled="loading || attribute.read_only"
           @update:checked="
             (value) => {
               editingValue = value
@@ -42,6 +42,14 @@
             {{ attribute.description }}
           </TooltipContent>
         </Tooltip>
+        <Tooltip v-if="attribute.read_only">
+          <TooltipTrigger>
+            <Lock class="text-muted-foreground" size="12" />
+          </TooltipTrigger>
+          <TooltipContent>
+            {{ t('conversation.sidebar.managedAttribute') }}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       <!-- Value -->
@@ -53,7 +61,18 @@
           <span class="sidebar-value break-all" v-if="attribute.data_type !== 'checkbox'">
             {{ customAttributes?.[attribute.key] ?? '-' }}
           </span>
-          <div class="flex items-center gap-0.5 transition-opacity duration-200 flex-shrink-0 can-hover:opacity-0 can-hover:group-hover/item:opacity-100">
+          <Tooltip v-if="attribute.read_only">
+            <TooltipTrigger class="p-1 flex-shrink-0 cursor-default">
+              <Lock size="12" class="text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent>
+              {{ t('conversation.sidebar.managedAttribute') }}
+            </TooltipContent>
+          </Tooltip>
+          <div
+            v-else
+            class="flex items-center gap-0.5 transition-opacity duration-200 flex-shrink-0 can-hover:opacity-0 can-hover:group-hover/item:opacity-100"
+          >
             <button
               class="p-1 rounded-md hover:bg-muted cursor-pointer transition-colors"
               @click="startEditing(attribute)"
@@ -141,7 +160,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { Pencil, Trash2, Check, X, Info } from 'lucide-vue-next'
+import { Pencil, Trash2, Check, X, Info, Lock } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { useI18n } from 'vue-i18n'
 
@@ -166,6 +185,7 @@ const editingAttributeKey = ref(null)
 const editingValue = ref(null)
 
 const startEditing = (attribute) => {
+  if (attribute.read_only) return
   errorMessage.value = ''
   editingAttributeKey.value = attribute.key
   const currentValue = props.customAttributes?.[attribute.key]
@@ -234,7 +254,7 @@ const getValidationSchema = (attribute) => {
 
 const saveAttribute = (key) => {
   const attribute = props.attributes.find((attr) => attr.key === key)
-  if (!attribute) return
+  if (!attribute || attribute.read_only) return
 
   try {
     const schema = getValidationSchema(attribute)
@@ -255,6 +275,7 @@ const saveAttribute = (key) => {
 }
 
 const deleteAttribute = (attribute) => {
+  if (attribute.read_only) return
   const updatedAttributes = { ...(props.customAttributes || {}) }
   delete updatedAttributes[attribute.key]
   emit('update:setattributes', updatedAttributes)

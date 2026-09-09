@@ -18,4 +18,6 @@ type CustomAttribute struct {
 	DataType    string         `db:"data_type" json:"data_type"`
 	Regex       string         `db:"regex" json:"regex"`
 	RegexHint   string         `db:"regex_hint" json:"regex_hint"`
+	// ReadOnly marks the attribute as managed by an integration, agents can see the value but cannot edit it by hand.
+	ReadOnly bool `db:"read_only" json:"read_only"`
 }

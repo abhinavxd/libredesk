@@ -136,6 +136,21 @@
       </FormItem>
     </FormField>
 
+    <FormField name="read_only" v-slot="{ value, handleChange }">
+      <FormItem>
+        <FormControl>
+          <div class="flex items-center space-x-2">
+            <Checkbox :checked="value" @update:checked="handleChange" />
+            <Label>{{ $t('admin.customAttributes.readOnly.label') }}</Label>
+          </div>
+        </FormControl>
+        <FormDescription>
+          {{ $t('admin.customAttributes.readOnly.description') }}
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <!-- Form submit button slot -->
     <slot name="footer"></slot>
   </form>
@@ -167,6 +182,8 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { Input } from '@shared-ui/components/ui/input'
+import { Checkbox } from '@shared-ui/components/ui/checkbox'
+import { Label } from '@shared-ui/components/ui/label'
 
 const props = defineProps({
   form: {
