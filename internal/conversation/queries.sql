@@ -676,15 +676,12 @@ DELETE FROM conversations WHERE uuid = $1;
 
 -- name: get-conversation-attachments
 -- Media rows carry no foreign key to the message, so the files have to be collected before the cascade removes the messages.
+-- The rows themselves are left in place: once their messages are gone they match get-unlinked-message-media
+-- and the periodic sweep removes any file the eager delete could not.
 SELECT m.uuid, m.content_type
 FROM media m
 JOIN conversation_messages cm ON cm.id = m.model_id
 WHERE m.model_type = 'messages' AND cm.conversation_id = $1;
-
--- name: delete-conversation-attachments
-DELETE FROM media
-WHERE model_type = 'messages'
-  AND model_id IN (SELECT id FROM conversation_messages WHERE conversation_id = $1);
 
 -- name: get-incoming-message-source-ids
 -- Message-IDs of the mails the contact sent in, used to purge them from the mailbox.

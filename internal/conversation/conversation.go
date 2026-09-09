@@ -335,7 +335,6 @@ type queries struct {
 	UnsnoozeAll                         *sqlx.Stmt `query:"unsnooze-all"`
 	DeleteConversation                  *sqlx.Stmt `query:"delete-conversation"`
 	GetConversationAttachments          *sqlx.Stmt `query:"get-conversation-attachments"`
-	DeleteConversationAttachments       *sqlx.Stmt `query:"delete-conversation-attachments"`
 	GetIncomingMessageSourceIDs         *sqlx.Stmt `query:"get-incoming-message-source-ids"`
 	RemoveConversationAssignee          *sqlx.Stmt `query:"remove-conversation-assignee"`
 

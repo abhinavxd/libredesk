@@ -4,7 +4,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 )
 
-// DeletedAttachment identifies a stored file whose media row was removed along with its conversation.
+// DeletedAttachment identifies a stored file whose message was removed along with its conversation.
 // Media rows have no foreign key to conversation_messages, so the caller has to drop the files itself.
 type DeletedAttachment struct {
 	UUID        string `db:"uuid"`
@@ -22,8 +22,10 @@ type ConversationDeletion struct {
 //
 // Messages, activity, participants, mentions, last-seen rows, drafts, tags, CSAT responses,
 // applied SLAs, AI events and notifications all cascade from conversations, so a single delete
-// clears them. Media rows are polymorphic and do not cascade, so they are removed in the same
-// transaction and the files they point at are returned for the caller to delete from the store.
+// clears them. Media rows are polymorphic and do not cascade; they are deliberately left behind
+// and returned for the caller to delete eagerly, because a row that outlives its message is exactly
+// what the periodic unlinked-media sweep looks for. A file the eager delete cannot remove therefore
+// keeps its row and is retried by the sweep instead of being orphaned in the store.
 func (m *Manager) DeleteConversationWithData(conversationID int, uuid string) (ConversationDeletion, error) {
 	var out ConversationDeletion
 
@@ -40,11 +42,6 @@ func (m *Manager) DeleteConversationWithData(conversationID int, uuid string) (C
 	}
 	if err := tx.Stmtx(m.q.GetConversationAttachments).Select(&out.Attachments, conversationID); err != nil {
 		m.lo.Error("error fetching conversation attachments", "uuid", uuid, "error", err)
-		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	// Must run before the conversation delete, it resolves the messages that are about to cascade away.
-	if _, err := tx.Stmtx(m.q.DeleteConversationAttachments).Exec(conversationID); err != nil {
-		m.lo.Error("error deleting conversation attachments", "uuid", uuid, "error", err)
 		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	res, err := tx.Stmtx(m.q.DeleteConversation).Exec(uuid)
