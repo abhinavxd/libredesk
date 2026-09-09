@@ -45,6 +45,11 @@ describe('reply guard', () => {
       expect(excerptsFor('@Anna took a look already.', 'mentions')).toEqual(['@Anna'])
     })
 
+    it('treats combining marks as part of a word', () => {
+      // "Slava" followed by a combining accent is still one word, not the bare internal name.
+      expect(excerptsFor('Ask Slavá to confirm.', 'internalVocabulary')).toEqual([])
+    })
+
     it('flags a mention written with non-ASCII letters', () => {
       expect(excerptsFor('Передаю @Мария, посмотри пожалуйста.', 'mentions')).toEqual(['@Мария'])
     })
