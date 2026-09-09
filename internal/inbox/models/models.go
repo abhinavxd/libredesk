@@ -37,14 +37,20 @@ type Inbox struct {
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.
 type Config struct {
-	AuthType             string       `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
-	OAuth                *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2"
-	SMTP                 []SMTPConfig `json:"smtp"`
-	IMAP                 []IMAPConfig `json:"imap"`
-	From                 string       `json:"from"`
-	FromNameTemplate     string       `json:"from_name_template"`
-	ReplyTo              string       `json:"reply_to"`
-	EnablePlusAddressing bool         `json:"enable_plus_addressing"`
+	AuthType         string       `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
+	OAuth            *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2"
+	SMTP             []SMTPConfig `json:"smtp"`
+	IMAP             []IMAPConfig `json:"imap"`
+	From             string       `json:"from"`
+	FromNameTemplate string       `json:"from_name_template"`
+	ReplyTo          string       `json:"reply_to"`
+	// ProductName is the brand this inbox speaks for, exposed to outgoing email templates as
+	// {{ .Inbox.Product }}. Empty falls back to the product derived from the inbox name.
+	ProductName string `json:"product_name"`
+	// Signature is a template rendered with the outgoing email template data and exposed as
+	// {{ .Inbox.Signature }}, e.g. "{{ .Agent.FirstName }} from {{ .Inbox.Product }}".
+	Signature            string `json:"signature"`
+	EnablePlusAddressing bool   `json:"enable_plus_addressing"`
 }
 
 // OAuthConfig holds OAuth 2.0 authentication details.

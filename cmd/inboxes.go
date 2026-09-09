@@ -432,6 +432,8 @@ func trimInboxFields(inb *imodels.Inbox) error {
 // Passwords and secrets are intentionally NOT trimmed.
 func trimEmailConfig(cfg *imodels.Config) {
 	cfg.ReplyTo = strings.TrimSpace(cfg.ReplyTo)
+	cfg.ProductName = strings.TrimSpace(cfg.ProductName)
+	cfg.Signature = strings.TrimSpace(cfg.Signature)
 
 	// Trim IMAP configs.
 	for i := range cfg.IMAP {

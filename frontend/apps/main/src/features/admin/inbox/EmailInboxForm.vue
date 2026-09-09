@@ -64,6 +64,42 @@
       </FormItem>
     </FormField>
 
+    <FormField v-if="showFormFields" v-slot="{ componentField }" name="product_name">
+      <FormItem>
+        <FormLabel>{{ $t('admin.inbox.productName') }}</FormLabel>
+        <FormControl>
+          <Input
+            type="text"
+            :placeholder="t('admin.inbox.productName.placeholder')"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          {{ $t('admin.inbox.productName.description') }}
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-if="showFormFields" v-slot="{ componentField }" name="signature">
+      <FormItem>
+        <FormLabel>{{ $t('admin.inbox.signature') }}</FormLabel>
+        <FormControl>
+          <Textarea
+            class="min-h-24"
+            :placeholder="t('admin.inbox.signature.placeholder')"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          {{ $t('admin.inbox.signature.description') }}
+          <br />
+          {{ $t('admin.inbox.signature.variables') }}
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <!-- Toggle Fields -->
     <FormField v-if="showFormFields" v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
@@ -793,6 +829,7 @@ import {
   FormDescription
 } from '@shared-ui/components/ui/form/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
+import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import {
@@ -890,6 +927,8 @@ const form = useForm({
     from: '',
     from_name_template: '',
     reply_to: '',
+    product_name: '',
+    signature: '',
     enabled: true,
     csat_enabled: false,
     prompt_tags_on_reply: false,
