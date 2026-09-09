@@ -93,6 +93,14 @@ func (m *Manager) BroadcastConversationRead(userID int, state map[string]any) {
 	})
 }
 
+// BroadcastConversationDelete tells list subscribers that a conversation is gone so they can drop the row.
+func (m *Manager) BroadcastConversationDelete(conversationUUID string) {
+	m.broadcastToConversationListSubs(conversationUUID, wsmodels.Message{
+		Type: wsmodels.MessageTypeConversationDelete,
+		Data: map[string]any{"uuid": conversationUUID},
+	})
+}
+
 func (m *Manager) BroadcastContactUpdate(contactID int, data map[string]any) {
 	data["contact_id"] = contactID
 	var uuids []string

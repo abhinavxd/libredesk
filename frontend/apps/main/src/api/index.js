@@ -353,6 +353,7 @@ const sendMessage = (uuid, data) =>
     }
   })
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
+const deleteConversation = (uuid, params) => http.delete(`/api/v1/conversations/${uuid}`, { params })
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
@@ -745,6 +746,7 @@ export default {
   toggleAutomationRule,
   deleteAutomationRule,
   createConversation,
+  deleteConversation,
   sendMessage,
   retryMessage,
   deleteMessage,
