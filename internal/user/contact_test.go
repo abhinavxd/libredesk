@@ -414,3 +414,46 @@ func TestResolveContactConcurrent(t *testing.T) {
 	race(models.ContactSync, "race-sync@example.com", "")
 	race(models.ContactSync, "race-sync-ext@example.com", "ext-race-sync")
 }
+
+func TestUpdateContactBasicInfoExternalSync(t *testing.T) {
+	mgr, db := newTestManager(t)
+
+	contact := newContact("ada@example.com", "ext-sync-1", "Ada", "L")
+	contact.ExternalSync = []byte(`{"first_name":"Ada"}`)
+	resolve(t, mgr, contact, models.ContactSync)
+
+	externalSync := func() string {
+		t.Helper()
+		var raw string
+		if err := db.QueryRow(`SELECT external_sync::text FROM users WHERE id = $1`, contact.ID).Scan(&raw); err != nil {
+			t.Fatalf("reading external_sync: %v", err)
+		}
+		return raw
+	}
+
+	if got, want := externalSync(), `{"first_name": "Ada"}`; got != want {
+		t.Errorf("external_sync after create = %s, want %s", got, want)
+	}
+
+	// A record given updates it; an empty field leaves the contact's value alone.
+	if err := mgr.UpdateContactBasicInfo(contact.ID, "Augusta", "", "", "", "", []byte(`{"first_name":"Augusta"}`)); err != nil {
+		t.Fatalf("UpdateContactBasicInfo: %v", err)
+	}
+	if row := fetchRow(t, db, contact.ID); row.FirstName != "Augusta" || row.LastName != "L" {
+		t.Errorf("contact after sync = %+v, want first name Augusta and last name L", row)
+	}
+	if got, want := externalSync(), `{"first_name": "Augusta"}`; got != want {
+		t.Errorf("external_sync after sync = %s, want %s", got, want)
+	}
+
+	// Every other caller passes nil and leaves the record standing.
+	if err := mgr.UpdateContactBasicInfo(contact.ID, "", "", "ada@example.org", "", "", nil); err != nil {
+		t.Fatalf("UpdateContactBasicInfo: %v", err)
+	}
+	if row := fetchRow(t, db, contact.ID); row.Email != "ada@example.org" {
+		t.Errorf("contact email = %q, want ada@example.org", row.Email)
+	}
+	if got, want := externalSync(), `{"first_name": "Augusta"}`; got != want {
+		t.Errorf("external_sync after a non-integration update = %s, want %s", got, want)
+	}
+}

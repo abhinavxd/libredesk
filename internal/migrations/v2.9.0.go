@@ -247,5 +247,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS index_unique_help_articles_on_translation_grou
 `); err != nil {
 		return err
 	}
+
+	// Remembers the identity an external integration last supplied for a contact, so a later sync
+	// can tell its own value from one an agent corrected by hand.
+	if _, err := db.Exec(`
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS external_sync JSONB DEFAULT '{}'::jsonb NOT NULL;
+	`); err != nil {
+		return err
+	}
 	return nil
 }
