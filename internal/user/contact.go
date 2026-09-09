@@ -2,6 +2,7 @@ package user
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -15,6 +16,9 @@ import (
 func (u *Manager) ResolveContact(user *models.User, policy models.ContactPolicy) error {
 	if len(user.CustomAttributes) == 0 {
 		user.CustomAttributes = []byte("{}")
+	}
+	if len(user.ExternalSync) == 0 {
+		user.ExternalSync = []byte("{}")
 	}
 
 	user.Email = null.NewString(strings.ToLower(strings.TrimSpace(user.Email.String)), user.Email.Valid)
@@ -47,9 +51,16 @@ func (u *Manager) CreateContact(user *models.User) error {
 	return nil
 }
 
-// UpdateContactBasicInfo updates only the name, email and phone of a contact.
-func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, phoneNumber, phoneNumberCountryCode string) error {
-	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email)), phoneNumber, phoneNumberCountryCode); err != nil {
+// UpdateContactBasicInfo updates only the name, email and phone of a contact; an empty field is left as is.
+// externalSync records the identity an external integration supplied and is nil for every other caller,
+// which leaves the contact's existing record untouched.
+func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, phoneNumber, phoneNumberCountryCode string, externalSync json.RawMessage) error {
+	// An empty record has to reach Postgres as a NULL, not as an empty string it would reject as JSON.
+	var record any
+	if len(externalSync) > 0 {
+		record = []byte(externalSync)
+	}
+	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email)), phoneNumber, phoneNumberCountryCode, record); err != nil {
 		u.lo.Error("error updating contact basic info", "error", err)
 		return fmt.Errorf("updating contact basic info: %w", err)
 	}
@@ -186,7 +197,7 @@ func (u *Manager) syncContact(user *models.User) error {
 		}
 
 		// Upsert by ext_id - creates new or updates email/name on ext_id conflict.
-		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes, user.PhoneNumber, user.PhoneNumberCountryCode).Scan(&user.ID); err != nil {
+		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes, user.PhoneNumber, user.PhoneNumberCountryCode, user.ExternalSync).Scan(&user.ID); err != nil {
 			u.lo.Error("error inserting contact with external ID", "error", err)
 			return fmt.Errorf("inserting contact with external ID: %w", err)
 		}

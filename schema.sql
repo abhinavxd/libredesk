@@ -176,6 +176,8 @@ CREATE TABLE users (
     avatar_url TEXT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
 	external_user_id TEXT NULL,
+	-- Identity an external integration last supplied for this contact, so a later sync can tell its own value from an agent's edit.
+	external_sync JSONB DEFAULT '{}'::jsonb NOT NULL,
     reset_password_token TEXT NULL,
     reset_password_token_expiry TIMESTAMPTZ NULL,
 	availability_status user_availability_status DEFAULT 'offline' NOT NULL,
