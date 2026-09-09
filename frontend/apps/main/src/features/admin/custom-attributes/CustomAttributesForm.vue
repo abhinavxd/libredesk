@@ -140,8 +140,8 @@
       <FormItem>
         <FormControl>
           <div class="flex items-center space-x-2">
-            <Checkbox :checked="value" @update:checked="handleChange" />
-            <Label>{{ $t('admin.customAttributes.readOnly.label') }}</Label>
+            <Checkbox id="custom-attribute-read-only" :checked="value" @update:checked="handleChange" />
+            <Label for="custom-attribute-read-only">{{ $t('admin.customAttributes.readOnly.label') }}</Label>
           </div>
         </FormControl>
         <FormDescription>
