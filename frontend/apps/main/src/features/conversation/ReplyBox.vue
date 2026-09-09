@@ -37,6 +37,12 @@
     </AlertDialogContent>
   </AlertDialog>
 
+  <ReplyGuardDialog
+    v-model:open="showReplyGuard"
+    :matches="replyGuardMatches"
+    @confirm="processSend(false, false, deferredStatus, true)"
+  />
+
   <div class="text-foreground bg-background">
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
@@ -179,6 +185,8 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
+import ReplyGuardDialog from '@/features/conversation/ReplyGuardDialog.vue'
+import { findReplyGuardMatches, isGuardedMessageType } from '@/features/conversation/replyGuard'
 import { UserTypeAgent } from '@/constants/user'
 import { permissions as perms } from '@main/constants/permissions.js'
 
@@ -262,6 +270,8 @@ const activeContentRef = () =>
   isEditorFullscreen.value ? fullscreenContentRef.value : replyBoxContentRef.value
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
+const showReplyGuard = ref(false)
+const replyGuardMatches = ref([])
 const deferredStatus = ref(null)
 const mentions = ref([])
 
@@ -340,7 +350,12 @@ const draftPreview = computed(() => textContent.value.trim())
 
 const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.value.length)
 
-const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
+const processSend = async (
+  skipContactEmailCheck = false,
+  skipMissingTagsCheck = false,
+  statusToSet = null,
+  skipReplyGuard = false
+) => {
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
@@ -351,6 +366,18 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   const isPrivate = messageType.value === 'private_note'
 
   if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
+
+  // Outbound guard, checked first so internal text is caught before the agent is
+  // asked about anything else. Private notes are never guarded.
+  if (!skipReplyGuard && isGuardedMessageType(messageType.value)) {
+    const guardMatches = findReplyGuardMatches(textContent.value, { mentions: mentions.value })
+    if (guardMatches.length > 0) {
+      replyGuardMatches.value = guardMatches
+      deferredStatus.value = statusToSet
+      showReplyGuard.value = true
+      return
+    }
+  }
 
   const currentInbox = inboxStore.inboxes.find(
     (i) => i.id === conversationStore.current.inbox_id
