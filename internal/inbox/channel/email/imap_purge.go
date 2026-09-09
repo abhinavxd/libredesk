@@ -98,7 +98,7 @@ func (e *Email) purgeFromMailbox(ctx context.Context, cfg imodels.IMAPConfig, pe
 	}
 	defer client.Logout()
 
-	// Read-write, unlike the scan, which selects the mailbox read-only.
+	// Read-write: the purge moves, flags and expunges mails in the selected mailbox.
 	if _, err := client.Select(cfg.Mailbox, nil).Wait(); err != nil {
 		return fmt.Errorf("error selecting mailbox %q: %w", cfg.Mailbox, err)
 	}
@@ -119,16 +119,17 @@ func (e *Email) purgeMailbox(ctx context.Context, client purgeClient, mailbox st
 	if trash != "" && strings.EqualFold(trash, mailbox) {
 		trash = ""
 	}
-	if trash == "" {
-		e.lo.Warn("no Trash folder found, mails will be expunged", "mailbox", mailbox, "inbox_id", e.Identifier())
-	}
-
 	var (
 		canMove = client.HasCap(imap.CapMove)
 		// UID EXPUNGE removes only the mails this purge flagged. A plain EXPUNGE also drops
 		// anything another client left flagged \Deleted in the same mailbox, so it is never used.
 		canUIDExpunge = client.HasCap(imap.CapUIDPlus)
 	)
+	if trash == "" && canUIDExpunge {
+		e.lo.Warn("no Trash folder found, mails will be expunged", "mailbox", mailbox, "inbox_id", e.Identifier())
+	} else if trash == "" {
+		e.lo.Warn("no Trash folder found and no UID EXPUNGE support, mails will be left in the mailbox", "mailbox", mailbox, "inbox_id", e.Identifier())
+	}
 
 	for _, messageID := range sortedKeys(pending) {
 		if err := ctx.Err(); err != nil {
