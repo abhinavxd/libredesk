@@ -346,6 +346,8 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			IMAP                 []map[string]any  `json:"imap"`
 			SMTP                 []map[string]any  `json:"smtp"`
 			ReplyTo              string            `json:"reply_to"`
+			ProductName          string            `json:"product_name"`
+			Signature            string            `json:"signature"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
 		}
 		var updateCfg struct {
@@ -354,6 +356,8 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			IMAP                 []map[string]any  `json:"imap"`
 			SMTP                 []map[string]any  `json:"smtp"`
 			ReplyTo              string            `json:"reply_to"`
+			ProductName          string            `json:"product_name"`
+			Signature            string            `json:"signature"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
 		}
 

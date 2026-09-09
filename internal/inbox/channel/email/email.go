@@ -36,6 +36,8 @@ type Email struct {
 	from                 string
 	fromNameTemplate     string
 	replyTo              string
+	productName          string
+	signature            string
 	enablePlusAddressing bool
 	messageStore         inbox.MessageStore
 	userStore            inbox.UserStore
@@ -76,6 +78,8 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		from:                 opts.Config.From,
 		fromNameTemplate:     opts.Config.FromNameTemplate,
 		replyTo:              opts.Config.ReplyTo,
+		productName:          opts.Config.ProductName,
+		signature:            opts.Config.Signature,
 		smtpCfg:              opts.Config.SMTP,
 		imapCfg:              opts.Config.IMAP,
 		lo:                   opts.Lo,
@@ -153,6 +157,8 @@ func (e *Email) getCurrentConfig() models.Config {
 		From:                 e.from,
 		FromNameTemplate:     e.fromNameTemplate,
 		ReplyTo:              e.replyTo,
+		ProductName:          e.productName,
+		Signature:            e.signature,
 		OAuth:                oauth,
 		AuthType:             e.authType,
 		EnablePlusAddressing: e.enablePlusAddressing,
