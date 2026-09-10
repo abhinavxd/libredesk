@@ -131,43 +131,72 @@ func TestResendSendAPIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid `to` field")
 }
 
-func TestParseResendInboundPayload(t *testing.T) {
-	body := []byte(`{
-		"type": "email.received",
-		"data": {
-			"email_id": "email_abc123",
-			"from": "Jane Doe <jane@example.com>",
-			"to": ["support+conv-11111111-1111-4111-8111-111111111111@example.com"],
-			"subject": "Re: Help",
-			"html": "<p>reply</p>",
-			"text": "reply",
-			"headers": {"In-Reply-To": "<orig@example.com>", "References": "<orig@example.com> <mid2@example.com>"},
-			"attachments": [{"filename": "a.png", "content_type": "image/png", "content": "aGVsbG8="}]
-		}
-	}`)
-
-	inbound, err := parseResendInboundPayload(body)
-	require.NoError(t, err)
-	assert.Equal(t, "email_abc123", inbound.MessageID)
-	assert.Equal(t, "Jane Doe <jane@example.com>", inbound.From)
-	assert.Equal(t, "Re: Help", inbound.Subject)
-	assert.Equal(t, "orig@example.com", inbound.InReplyTo)
-	assert.Equal(t, []string{"orig@example.com", "mid2@example.com"}, inbound.References)
-	require.Len(t, inbound.Attachments, 1)
-	assert.Equal(t, "a.png", inbound.Attachments[0].Filename)
-	assert.Equal(t, []byte("hello"), inbound.Attachments[0].Content)
-}
-
-func TestParseResendInboundPayloadRejectsNonInboundEvents(t *testing.T) {
-	for _, eventType := range []string{"email.delivered", "email.bounced", "email.sent", ""} {
-		body := []byte(`{"type":"` + eventType + `","data":{"email_id":"email_x"}}`)
-		_, err := parseResendInboundPayload(body)
-		require.Error(t, err, "event type %q should be rejected", eventType)
+func TestParseResendInboundEnvelope(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantErr bool
+	}{
+		{"valid", `{"type":"email.received","data":{"email_id":"email_1","message_id":"<m@x>","from":"a@x.com"}}`, false},
+		{"wrong event type", `{"type":"email.delivered","data":{"email_id":"email_1"}}`, true},
+		{"empty event type", `{"data":{"email_id":"email_1"}}`, true},
+		{"missing email_id", `{"type":"email.received","data":{"from":"a@x.com"}}`, true},
+		{"malformed json", `{"type":`, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseResendInboundEnvelope([]byte(tc.body))
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
 	}
 }
 
-func TestParseResendHeadersListShape(t *testing.T) {
-	raw := json.RawMessage(`[{"name":"In-Reply-To","value":"<x@example.com>"}]`)
-	headers := parseResendHeaders(raw)
-	assert.Equal(t, "<x@example.com>", headers["In-Reply-To"])
+func TestResendVerifyAndParseWebhook(t *testing.T) {
+	const rawEML = "From: Jane <jane@example.com>\r\nSubject: Re: Help\r\nMessage-ID: <m123@example.com>\r\n\r\nhello there\r\n"
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/emails/receiving/email_abc", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer re_test_key", r.Header.Get("Authorization"))
+		json.NewEncoder(w).Encode(map[string]any{
+			"raw": map[string]string{"download_url": "https://" + r.Host + "/dl/raw.eml"},
+		})
+	})
+	mux.HandleFunc("/dl/raw.eml", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(rawEML))
+	})
+	srv := httptest.NewTLSServer(mux)
+	defer srv.Close()
+
+	provider := newResendProvider(imodels.HTTPAPIConfig{
+		APIKey:        "re_test_key",
+		WebhookSecret: base64.StdEncoding.EncodeToString([]byte("whsecret-32-bytes-xxxxxxxxxxxxx!")),
+	})
+	provider.baseURL = srv.URL
+	provider.client = srv.Client()
+
+	body := []byte(`{"type":"email.received","data":{"email_id":"email_abc","message_id":"<m123@example.com>","from":"jane@example.com","received_for":["support+conv-abc@example.com"]}}`)
+	headers := signSvix(t, provider.webhookSecret, "msg_1", time.Now(), body)
+
+	inbound, err := provider.VerifyAndParseWebhook(context.Background(), headers, body)
+	require.NoError(t, err)
+	assert.Equal(t, []byte(rawEML), inbound.RawMessage)
+	assert.Equal(t, "m123@example.com", inbound.MessageID)
+	assert.Equal(t, "jane@example.com", inbound.From)
+	assert.Equal(t, []string{"support+conv-abc@example.com"}, inbound.Recipients)
+}
+
+func TestResendVerifyAndParseWebhookRejectsBadSignature(t *testing.T) {
+	provider := newResendProvider(imodels.HTTPAPIConfig{
+		APIKey:        "re_test_key",
+		WebhookSecret: base64.StdEncoding.EncodeToString([]byte("whsecret-32-bytes-xxxxxxxxxxxxx!")),
+	})
+	body := []byte(`{"type":"email.received","data":{"email_id":"email_abc"}}`)
+	headers := http.Header{"Svix-Id": {"x"}, "Svix-Timestamp": {"1"}, "Svix-Signature": {"v1,bad"}}
+
+	_, err := provider.VerifyAndParseWebhook(context.Background(), headers, body)
+	require.Error(t, err)
 }

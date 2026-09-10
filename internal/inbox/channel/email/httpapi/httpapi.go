@@ -19,14 +19,14 @@ type Attachment struct {
 
 // OutboundEmail is the normalized shape passed to a Provider for sending.
 type OutboundEmail struct {
-	From        string
-	To          []string
-	CC          []string
-	BCC         []string
-	ReplyTo     string
-	Subject     string
-	HTML        string
-	Text        string
+	From    string
+	To      []string
+	CC      []string
+	BCC     []string
+	ReplyTo string
+	Subject string
+	HTML    string
+	Text    string
 	// Headers carries additional RFC headers the provider should attach to the outgoing
 	// message where supported (Message-ID, In-Reply-To, References, loop-prevention, etc).
 	Headers     map[string]string
@@ -41,10 +41,22 @@ type InboundAttachment struct {
 	Content     []byte
 }
 
-// InboundEmail is the normalized shape a Provider produces after parsing an inbound webhook payload.
+// InboundEmail is the normalized shape a Provider produces from an inbound webhook.
+//
+// When RawMessage is set it is the full RFC822 message and the caller parses it directly
+// (this is what the Resend provider returns, since its webhook only carries metadata and the
+// full message is fetched from Resend's API). The structured fields are used by providers
+// that deliver parsed content in the webhook itself. MessageID and From are always populated
+// where available so the caller can dedupe / drop blocked senders before parsing the body.
 type InboundEmail struct {
-	MessageID   string
-	From        string
+	RawMessage []byte
+
+	MessageID string
+	From      string
+	// Recipients is the envelope recipient list (RCPT TO). It's the authoritative address for
+	// plus-address conversation routing, since the MIME To: header can be rewritten in transit.
+	Recipients []string
+
 	To          []string
 	CC          []string
 	BCC         []string
@@ -66,8 +78,9 @@ type Provider interface {
 	Send(ctx context.Context, msg OutboundEmail) (messageID string, err error)
 
 	// VerifyAndParseWebhook authenticates an inbound webhook request using the provider's
-	// signature scheme and, if valid, parses the body into a normalized InboundEmail.
-	VerifyAndParseWebhook(headers http.Header, body []byte) (InboundEmail, error)
+	// signature scheme and returns a normalized InboundEmail, fetching the full message from
+	// the provider's API when the webhook only carries metadata.
+	VerifyAndParseWebhook(ctx context.Context, headers http.Header, body []byte) (InboundEmail, error)
 }
 
 // New returns a Provider for the given HTTP API config.

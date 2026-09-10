@@ -34,7 +34,7 @@ func (f *fakeProvider) Send(ctx context.Context, msg httpapi.OutboundEmail) (str
 	return "msg-id-123", nil
 }
 
-func (f *fakeProvider) VerifyAndParseWebhook(headers http.Header, body []byte) (httpapi.InboundEmail, error) {
+func (f *fakeProvider) VerifyAndParseWebhook(ctx context.Context, headers http.Header, body []byte) (httpapi.InboundEmail, error) {
 	if f.verifyErr != nil {
 		return httpapi.InboundEmail{}, f.verifyErr
 	}
@@ -162,7 +162,7 @@ func TestReceiveWebhook(t *testing.T) {
 	userStore := &fakeUserStore{blocked: map[string]bool{}}
 	e := newWebhookTestEmail(provider, msgStore, userStore)
 
-	err := e.ReceiveWebhook(http.Header{}, []byte(`{}`))
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
 	require.NoError(t, err)
 	require.Len(t, msgStore.enqueued, 1)
 
@@ -184,7 +184,7 @@ func TestReceiveWebhookVerifyFailure(t *testing.T) {
 	userStore := &fakeUserStore{blocked: map[string]bool{}}
 	e := newWebhookTestEmail(provider, msgStore, userStore)
 
-	err := e.ReceiveWebhook(http.Header{}, []byte(`{}`))
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
 	require.Error(t, err)
 	assert.Empty(t, msgStore.enqueued)
 }
@@ -195,7 +195,7 @@ func TestReceiveWebhookDuplicateMessageSkipped(t *testing.T) {
 	userStore := &fakeUserStore{blocked: map[string]bool{}}
 	e := newWebhookTestEmail(provider, msgStore, userStore)
 
-	err := e.ReceiveWebhook(http.Header{}, []byte(`{}`))
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
 	require.NoError(t, err)
 	assert.Empty(t, msgStore.enqueued)
 }
@@ -206,7 +206,7 @@ func TestReceiveWebhookBlockedContactSkipped(t *testing.T) {
 	userStore := &fakeUserStore{blocked: map[string]bool{"blocked@example.com": true}}
 	e := newWebhookTestEmail(provider, msgStore, userStore)
 
-	err := e.ReceiveWebhook(http.Header{}, []byte(`{}`))
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
 	require.NoError(t, err)
 	assert.Empty(t, msgStore.enqueued)
 }
@@ -218,6 +218,73 @@ func TestReceiveWebhookWrongTransportRejected(t *testing.T) {
 	e := newWebhookTestEmail(provider, msgStore, userStore)
 	e.transport = imodels.TransportSMTPIMAP
 
-	err := e.ReceiveWebhook(http.Header{}, []byte(`{}`))
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
 	require.Error(t, err)
+}
+
+func TestReceiveWebhookFromRawMessage(t *testing.T) {
+	raw := "From: Jane Doe <jane@example.com>\r\n" +
+		"To: support+conv-11111111-1111-4111-8111-111111111111@example.com\r\n" +
+		"Subject: Re: Help\r\n" +
+		"Message-ID: <m123@example.com>\r\n" +
+		"In-Reply-To: <orig@example.com>\r\n" +
+		"References: <orig@example.com> <mid2@example.com>\r\n" +
+		"Content-Type: text/plain; charset=utf-8\r\n" +
+		"\r\n" +
+		"hello there\r\n"
+
+	provider := &fakeProvider{inbound: httpapi.InboundEmail{RawMessage: []byte(raw)}}
+	msgStore := &fakeMessageStore{existing: map[string]bool{}}
+	userStore := &fakeUserStore{blocked: map[string]bool{}}
+	e := newWebhookTestEmail(provider, msgStore, userStore)
+
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
+	require.NoError(t, err)
+	require.Len(t, msgStore.enqueued, 1)
+
+	got := msgStore.enqueued[0]
+	assert.Equal(t, ChannelEmail, got.Channel)
+	assert.Equal(t, 42, got.InboxID)
+	assert.Equal(t, "jane@example.com", got.Contact.Email.String)
+	assert.Equal(t, "Jane", got.Contact.FirstName)
+	assert.Equal(t, "Doe", got.Contact.LastName)
+	assert.Equal(t, "m123@example.com", got.SourceID.String)
+	assert.Equal(t, "orig@example.com", got.InReplyTo)
+	assert.Equal(t, []string{"orig@example.com", "mid2@example.com"}, got.References)
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", got.ConversationUUIDFromReplyTo)
+	assert.Contains(t, got.Content, "hello there")
+}
+
+func TestReceiveWebhookConvUUIDFromEnvelopeRecipient(t *testing.T) {
+	// MIME To: is the plain address (rewritten by a forwarder); the plus-addressed conversation
+	// UUID is only recoverable from the envelope recipient (received_for).
+	raw := "From: Jane <jane@example.com>\r\n" +
+		"To: support@example.com\r\n" +
+		"Subject: Re: Help\r\n" +
+		"Message-ID: <m9@example.com>\r\n\r\nbody\r\n"
+
+	provider := &fakeProvider{inbound: httpapi.InboundEmail{
+		RawMessage: []byte(raw),
+		Recipients: []string{"support+conv-22222222-2222-4222-8222-222222222222@example.com"},
+	}}
+	msgStore := &fakeMessageStore{existing: map[string]bool{}}
+	userStore := &fakeUserStore{blocked: map[string]bool{}}
+	e := newWebhookTestEmail(provider, msgStore, userStore)
+
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
+	require.NoError(t, err)
+	require.Len(t, msgStore.enqueued, 1)
+	assert.Equal(t, "22222222-2222-4222-8222-222222222222", msgStore.enqueued[0].ConversationUUIDFromReplyTo)
+}
+
+func TestReceiveWebhookFromRawMessageBlockedSender(t *testing.T) {
+	raw := "From: blocked@example.com\r\nSubject: hi\r\nMessage-ID: <b1@example.com>\r\n\r\nbody\r\n"
+	provider := &fakeProvider{inbound: httpapi.InboundEmail{RawMessage: []byte(raw)}}
+	msgStore := &fakeMessageStore{existing: map[string]bool{}}
+	userStore := &fakeUserStore{blocked: map[string]bool{"blocked@example.com": true}}
+	e := newWebhookTestEmail(provider, msgStore, userStore)
+
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
+	require.NoError(t, err)
+	assert.Empty(t, msgStore.enqueued)
 }

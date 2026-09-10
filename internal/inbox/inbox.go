@@ -74,7 +74,7 @@ type Inbox interface {
 // HTTP webhook (e.g. the email channel's http_api transport) instead of the Receive loop.
 // Callers should type-assert an Inbox against this interface before routing a webhook to it.
 type WebhookReceiver interface {
-	ReceiveWebhook(headers http.Header, body []byte) error
+	ReceiveWebhook(ctx context.Context, headers http.Header, body []byte) error
 }
 
 // MessageStore defines methods for storing and processing messages.

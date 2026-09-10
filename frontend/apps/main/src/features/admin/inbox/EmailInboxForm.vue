@@ -939,11 +939,13 @@ const callbackUrl = computed(() => {
 })
 
 // Computed inbound webhook URL for the HTTP API transport. Only meaningful once the inbox
-// has been saved and has a UUID (new, unsaved inboxes don't have one yet).
+// has been saved and has a UUID (new, unsaved inboxes don't have one yet). The endpoint is
+// always served from the same origin as the admin panel, so use the browser's current
+// origin - correct out of the box and right even behind a TLS-terminating proxy, without
+// depending on the app.root_url setting being configured.
 const webhookUrl = computed(() => {
   if (!props.initialValues?.uuid) return ''
-  const rootUrl = appSettingsStore.settings['app.root_url']
-  return `${rootUrl}/api/v1/webhooks/email/${props.initialValues.uuid}`
+  return `${window.location.origin}/api/v1/webhooks/email/${props.initialValues.uuid}`
 })
 
 const isHTTPAPIInbox = computed(() => setupMethod.value === TRANSPORT_HTTP_API)

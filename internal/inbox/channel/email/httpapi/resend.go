@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -19,21 +20,23 @@ const resendAPIBaseURL = "https://api.resend.com"
 // resendEventInboundEmail is the webhook event type Resend sends for a received inbound email.
 const resendEventInboundEmail = "email.received"
 
-// resendClient is shared across all Resend provider instances; Resend calls are infrequent
+// maxInboundMessageBytes caps the size of a downloaded raw inbound message.
+const maxInboundMessageBytes = 40 << 20 // 40 MiB
+
+// resendHTTPClient is shared across all Resend provider instances; Resend calls are infrequent
 // relative to SMTP so a single pooled client is sufficient.
-var resendClient = &http.Client{Timeout: 20 * time.Second}
+var resendHTTPClient = &http.Client{Timeout: 30 * time.Second}
 
 // resendProvider implements Provider for the Resend (https://resend.com) transactional email API.
 //
-// NOTE: field names for both the send request and the inbound webhook payload below are based
-// on Resend's publicly documented API shape at the time this was written. Resend's inbound-email
-// webhook feature is newer and more likely to have changed - verify payload field names against
-// https://resend.com/docs before relying on inbound parsing in production, and adjust
-// parseInboundPayload accordingly if they differ.
+// Outbound uses POST /emails. Inbound uses the email.received webhook (metadata only) plus
+// GET /emails/receiving/{id} to fetch the full RFC822 message via the signed raw.download_url
+// it returns; that message is then run through the same enmime pipeline as the IMAP path.
 type resendProvider struct {
 	apiKey        string
 	webhookSecret string
-	baseURL       string // overridable in tests; defaults to resendAPIBaseURL
+	baseURL       string       // overridable in tests; defaults to resendAPIBaseURL
+	client        *http.Client // overridable in tests; defaults to resendHTTPClient
 }
 
 func newResendProvider(cfg imodels.HTTPAPIConfig) *resendProvider {
@@ -41,6 +44,7 @@ func newResendProvider(cfg imodels.HTTPAPIConfig) *resendProvider {
 		apiKey:        cfg.APIKey,
 		webhookSecret: cfg.WebhookSecret,
 		baseURL:       resendAPIBaseURL,
+		client:        resendHTTPClient,
 	}
 }
 
@@ -110,7 +114,7 @@ func (p *resendProvider) Send(ctx context.Context, msg OutboundEmail) (string, e
 	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := resendClient.Do(httpReq)
+	resp, err := p.client.Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("calling resend api: %w", err)
 	}
@@ -136,127 +140,136 @@ func (p *resendProvider) Send(ctx context.Context, msg OutboundEmail) (string, e
 	return sendResp.ID, nil
 }
 
-// resendInboundEnvelope wraps the resend webhook event envelope shared across event types.
+// resendInboundEnvelope is the webhook event envelope shared across Resend event types.
+// The email.received payload carries metadata only - the body, headers and attachment bytes
+// are fetched separately from the Receiving API using email_id.
 type resendInboundEnvelope struct {
-	Type string            `json:"type"`
-	Data resendInboundData `json:"data"`
+	Type string `json:"type"`
+	Data struct {
+		EmailID     string   `json:"email_id"`
+		MessageID   string   `json:"message_id"`
+		From        string   `json:"from"`
+		ReceivedFor []string `json:"received_for"` // envelope recipients (authoritative for plus-address routing)
+	} `json:"data"`
 }
 
-type resendInboundData struct {
-	EmailID     string                    `json:"email_id"`
-	MessageID   string                    `json:"message_id"`
-	From        string                    `json:"from"`
-	To          []string                  `json:"to"`
-	CC          []string                  `json:"cc"`
-	BCC         []string                  `json:"bcc"`
-	Subject     string                    `json:"subject"`
-	HTML        string                    `json:"html"`
-	Text        string                    `json:"text"`
-	Headers     json.RawMessage           `json:"headers"`
-	Attachments []resendInboundAttachment `json:"attachments"`
+// resendReceivedEmail is the GET /emails/receiving/{id} response. Only the raw download URL
+// is used; the full message is parsed from the downloaded RFC822 bytes.
+type resendReceivedEmail struct {
+	Raw struct {
+		DownloadURL string `json:"download_url"`
+	} `json:"raw"`
 }
 
-type resendInboundAttachment struct {
-	Filename    string `json:"filename"`
-	ContentType string `json:"content_type"`
-	ContentID   string `json:"content_id"`
-	Content     string `json:"content"` // base64-encoded
+// parseResendInboundEnvelope unmarshals a webhook body and rejects any event that isn't an
+// inbound email. Resend delivers every event type (email.sent, email.delivered, ...) to the
+// same endpoint, so this guards against a delivery event being turned into a fake message.
+func parseResendInboundEnvelope(body []byte) (resendInboundEnvelope, error) {
+	var env resendInboundEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return env, fmt.Errorf("parsing resend webhook payload: %w", err)
+	}
+	if env.Type != resendEventInboundEmail {
+		return env, fmt.Errorf("ignoring resend webhook event %q", env.Type)
+	}
+	if env.Data.EmailID == "" {
+		return env, fmt.Errorf("resend webhook missing email_id")
+	}
+	return env, nil
 }
 
-// VerifyAndParseWebhook verifies the Svix-style signature Resend attaches to webhook requests,
-// then parses the inbound-email payload into a normalized InboundEmail.
-func (p *resendProvider) VerifyAndParseWebhook(headers http.Header, body []byte) (InboundEmail, error) {
+// VerifyAndParseWebhook verifies the Svix-style signature Resend attaches to webhook requests
+// and returns the raw RFC822 message (fetched from the Receiving API) plus the metadata the
+// caller needs to dedupe and drop blocked senders.
+func (p *resendProvider) VerifyAndParseWebhook(ctx context.Context, headers http.Header, body []byte) (InboundEmail, error) {
 	if p.webhookSecret == "" {
 		return InboundEmail{}, fmt.Errorf("webhook secret not configured")
 	}
 	if err := verifySvixSignature(p.webhookSecret, headers, body); err != nil {
 		return InboundEmail{}, fmt.Errorf("verifying webhook signature: %w", err)
 	}
-	return parseResendInboundPayload(body)
+
+	env, err := parseResendInboundEnvelope(body)
+	if err != nil {
+		return InboundEmail{}, err
+	}
+
+	raw, err := p.fetchRawMessage(ctx, env.Data.EmailID)
+	if err != nil {
+		return InboundEmail{}, err
+	}
+
+	return InboundEmail{
+		RawMessage: raw,
+		MessageID:  strings.Trim(env.Data.MessageID, "<>"),
+		From:       env.Data.From,
+		Recipients: env.Data.ReceivedFor,
+	}, nil
 }
 
-func parseResendInboundPayload(body []byte) (InboundEmail, error) {
-	var envelope resendInboundEnvelope
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		return InboundEmail{}, fmt.Errorf("parsing resend webhook payload: %w", err)
+// fetchRawMessage resolves the raw message download URL for a received email and downloads it.
+func (p *resendProvider) fetchRawMessage(ctx context.Context, emailID string) ([]byte, error) {
+	var received resendReceivedEmail
+	if err := p.apiGetJSON(ctx, "/emails/receiving/"+url.PathEscape(emailID), &received); err != nil {
+		return nil, fmt.Errorf("fetching received email %s: %w", emailID, err)
 	}
-
-	// Resend delivers many event types to the same webhook endpoint (email.sent,
-	// email.delivered, email.bounced, ...). Only email.received carries an inbound message;
-	// reject the rest so a delivery event can't be turned into a bogus incoming message.
-	if envelope.Type != resendEventInboundEmail {
-		return InboundEmail{}, fmt.Errorf("ignoring resend webhook event %q", envelope.Type)
+	if received.Raw.DownloadURL == "" {
+		return nil, fmt.Errorf("received email %s has no raw download url", emailID)
 	}
-
-	data := envelope.Data
-	messageID := data.MessageID
-	if messageID == "" {
-		messageID = data.EmailID
-	}
-
-	headerMap := parseResendHeaders(data.Headers)
-
-	inbound := InboundEmail{
-		MessageID:  strings.Trim(messageID, "<>"),
-		From:       data.From,
-		To:         data.To,
-		CC:         data.CC,
-		BCC:        data.BCC,
-		Subject:    data.Subject,
-		HTML:       data.HTML,
-		Text:       data.Text,
-		InReplyTo:  strings.Trim(headerMap["In-Reply-To"], "<>"),
-		References: splitReferences(headerMap["References"]),
-	}
-	for _, att := range data.Attachments {
-		content, err := base64.StdEncoding.DecodeString(att.Content)
-		if err != nil {
-			continue
-		}
-		inbound.Attachments = append(inbound.Attachments, InboundAttachment{
-			Filename:    att.Filename,
-			ContentType: att.ContentType,
-			ContentID:   att.ContentID,
-			Content:     content,
-		})
-	}
-	return inbound, nil
+	return p.downloadRaw(ctx, received.Raw.DownloadURL)
 }
 
-// parseResendHeaders accepts either a {"Header-Name": "value"} map or a
-// [{"name": "Header-Name", "value": "value"}] array, since it's unconfirmed which shape
-// Resend's inbound webhook uses for raw headers.
-func parseResendHeaders(raw json.RawMessage) map[string]string {
-	headers := map[string]string{}
-	if len(raw) == 0 {
-		return headers
+// apiGetJSON performs an authenticated GET against the Resend API and decodes the JSON body.
+func (p *resendProvider) apiGetJSON(ctx context.Context, path string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.baseURL+path, nil)
+	if err != nil {
+		return err
 	}
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
 
-	var asMap map[string]string
-	if err := json.Unmarshal(raw, &asMap); err == nil {
-		return asMap
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return err
 	}
+	defer resp.Body.Close()
 
-	var asList []struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return err
 	}
-	if err := json.Unmarshal(raw, &asList); err == nil {
-		for _, h := range asList {
-			headers[h.Name] = h.Value
-		}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("resend api %s returned %d: %s", path, resp.StatusCode, strings.TrimSpace(string(b)))
 	}
-	return headers
+	return json.Unmarshal(b, out)
 }
 
-func splitReferences(references string) []string {
-	if references == "" {
-		return nil
+// downloadRaw fetches the raw message from a provider-issued signed URL.
+func (p *resendProvider) downloadRaw(ctx context.Context, rawURL string) ([]byte, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" {
+		return nil, fmt.Errorf("invalid raw message download url")
 	}
-	fields := strings.Fields(references)
-	out := make([]string, 0, len(fields))
-	for _, f := range fields {
-		out = append(out, strings.Trim(f, " <>"))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
 	}
-	return out
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("downloading raw message: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("downloading raw message returned %d", resp.StatusCode)
+	}
+
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxInboundMessageBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("reading raw message: %w", err)
+	}
+	if len(raw) > maxInboundMessageBytes {
+		return nil, fmt.Errorf("raw message exceeds %d bytes", maxInboundMessageBytes)
+	}
+	return raw, nil
 }
