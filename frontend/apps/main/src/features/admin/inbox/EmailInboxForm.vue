@@ -129,29 +129,8 @@
       </FormItem>
     </FormField>
 
-    <FormField v-if="setupMethod" v-slot="{ componentField }" name="auth_type">
-      <FormItem>
-        <FormControl>
-          <Input
-            type="hidden"
-            :value="setupMethod === 'manual' || isHTTPAPIInbox ? AUTH_TYPE_PASSWORD : AUTH_TYPE_OAUTH2"
-            v-bind="componentField"
-          />
-        </FormControl>
-      </FormItem>
-    </FormField>
-
-    <FormField v-if="setupMethod" v-slot="{ componentField }" name="transport">
-      <FormItem>
-        <FormControl>
-          <Input
-            type="hidden"
-            :value="isHTTPAPIInbox ? TRANSPORT_HTTP_API : TRANSPORT_SMTP_IMAP"
-            v-bind="componentField"
-          />
-        </FormControl>
-      </FormItem>
-    </FormField>
+    <!-- auth_type and transport are written to the form model by the setupMethod watcher
+         (the shared Input wrapper can't carry them via a :value binding). -->
 
     <!-- Setup Method Selection -->
     <div v-show="!isOAuthInbox && setupMethod === null" class="space-y-4">
@@ -1148,4 +1127,14 @@ watch(
   },
   { deep: true, immediate: true }
 )
+
+// The shared Input wrapper only forwards modelValue, so the hidden auth_type/transport
+// inputs can't drive the form via a :value binding. Write them to the form model directly
+// whenever the chosen setup method changes.
+watch(setupMethod, (method) => {
+  if (!method) return
+  const isHTTPAPI = method === TRANSPORT_HTTP_API
+  form.setFieldValue('transport', isHTTPAPI ? TRANSPORT_HTTP_API : TRANSPORT_SMTP_IMAP)
+  form.setFieldValue('auth_type', method === 'manual' || isHTTPAPI ? AUTH_TYPE_PASSWORD : AUTH_TYPE_OAUTH2)
+})
 </script>

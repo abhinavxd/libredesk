@@ -158,6 +158,14 @@ func TestParseResendInboundPayload(t *testing.T) {
 	assert.Equal(t, []byte("hello"), inbound.Attachments[0].Content)
 }
 
+func TestParseResendInboundPayloadRejectsNonInboundEvents(t *testing.T) {
+	for _, eventType := range []string{"email.delivered", "email.bounced", "email.sent", ""} {
+		body := []byte(`{"type":"` + eventType + `","data":{"email_id":"email_x"}}`)
+		_, err := parseResendInboundPayload(body)
+		require.Error(t, err, "event type %q should be rejected", eventType)
+	}
+}
+
 func TestParseResendHeadersListShape(t *testing.T) {
 	raw := json.RawMessage(`[{"name":"In-Reply-To","value":"<x@example.com>"}]`)
 	headers := parseResendHeaders(raw)

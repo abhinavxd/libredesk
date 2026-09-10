@@ -16,6 +16,9 @@ import (
 
 const resendAPIBaseURL = "https://api.resend.com"
 
+// resendEventInboundEmail is the webhook event type Resend sends for a received inbound email.
+const resendEventInboundEmail = "email.received"
+
 // resendClient is shared across all Resend provider instances; Resend calls are infrequent
 // relative to SMTP so a single pooled client is sufficient.
 var resendClient = &http.Client{Timeout: 20 * time.Second}
@@ -176,6 +179,13 @@ func parseResendInboundPayload(body []byte) (InboundEmail, error) {
 	var envelope resendInboundEnvelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return InboundEmail{}, fmt.Errorf("parsing resend webhook payload: %w", err)
+	}
+
+	// Resend delivers many event types to the same webhook endpoint (email.sent,
+	// email.delivered, email.bounced, ...). Only email.received carries an inbound message;
+	// reject the rest so a delivery event can't be turned into a bogus incoming message.
+	if envelope.Type != resendEventInboundEmail {
+		return InboundEmail{}, fmt.Errorf("ignoring resend webhook event %q", envelope.Type)
 	}
 
 	data := envelope.Data
