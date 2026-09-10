@@ -303,7 +303,7 @@
   "admin.inbox.help.email": "Connect your Google or Microsoft email account, configure IMAP and SMTP settings manually, or send/receive through a transactional email HTTPS API like Resend. Each added inbox creates a new email channel for receiving customer emails.",
   "admin.inbox.help.livechat": "Create live chat widgets that can be embedded on your website for real-time customer support.",
   "admin.inbox.httpApi.apiKey": "API Key",
-  "admin.inbox.httpApi.apiKey.description": "API key used to authenticate outgoing send requests to the provider.",
+  "admin.inbox.httpApi.apiKey.description": "Used both to send mail and to fetch inbound messages. It needs full access - a send-only key cannot receive replies.",
   "admin.inbox.httpApi.config": "HTTP API Configuration",
   "admin.inbox.httpApi.provider": "Provider",
   "admin.inbox.httpApi.setupDescription": "Send email through a transactional email HTTPS API, like Resend, instead of SMTP/IMAP",
