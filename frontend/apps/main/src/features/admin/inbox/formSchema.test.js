@@ -269,8 +269,19 @@ describe('Email Inbox Form Schema', () => {
             })).not.toThrow()
         })
 
-        test('api_key optional (blank preserves existing value on edit)', () => {
-            expect(() => schema.parse({ ...validHTTPAPIForm, http_api: { provider: 'resend', api_key: '' } })).not.toThrow()
+        test('api_key required', () => {
+            expect(() => schema.parse({ ...validHTTPAPIForm, http_api: { provider: 'resend', api_key: '' } })).toThrow()
+        })
+
+        test('masked api_key accepted (resubmitted unchanged on edit)', () => {
+            expect(() => schema.parse({ ...validHTTPAPIForm, http_api: { provider: 'resend', api_key: '••••••••••' } })).not.toThrow()
+        })
+
+        test('webhook_secret stays optional', () => {
+            expect(() => schema.parse({
+                ...validHTTPAPIForm,
+                http_api: { provider: 'resend', api_key: 'sk_test', webhook_secret: '' }
+            })).not.toThrow()
         })
     })
 })

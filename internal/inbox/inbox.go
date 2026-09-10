@@ -419,13 +419,15 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			}
 		}
 
-		// Preserve existing HTTP API fields (api_key, webhook_secret) if update has them empty
+		// Preserve existing HTTP API fields (api_key, webhook_secret) when the update leaves them
+		// empty or resubmits the masked value. Unlike SMTP/IMAP, the frontend keeps the masked
+		// api_key in the payload so it still passes the non-empty validation check.
 		if currentCfg.HTTPAPI != nil {
 			if updateCfg.HTTPAPI == nil {
 				updateCfg.HTTPAPI = make(map[string]string)
 			}
 			for k, v := range currentCfg.HTTPAPI {
-				if updateCfg.HTTPAPI[k] == "" {
+				if updateCfg.HTTPAPI[k] == "" || strings.Contains(updateCfg.HTTPAPI[k], stringutil.PasswordDummy) {
 					updateCfg.HTTPAPI[k] = v
 				}
 			}

@@ -100,12 +100,8 @@ const submitForm = (values) => {
       }
     })
 
-    if (payload.config.http_api.api_key?.includes('•')) {
-      payload.config.http_api.api_key = ''
-    }
-    if (payload.config.http_api.webhook_secret?.includes('•')) {
-      payload.config.http_api.webhook_secret = ''
-    }
+    // http_api.api_key / webhook_secret are intentionally left masked: the backend requires a
+    // non-empty api_key and treats the masked value as "keep the existing credential".
   } else if (inbox.value.channel === 'livechat') {
     payload = {
       ...values,

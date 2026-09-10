@@ -417,9 +417,11 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 }
 
 // validateHTTPAPIEmailConfig validates the email inbox configuration when using the http_api
-// transport. It deliberately does not require api_key/webhook_secret to be non-empty: like
-// SMTP/IMAP passwords, they may be submitted blank on an update to preserve the existing
-// encrypted value (see Manager.Update's preservation logic).
+// transport. An empty api_key is always a misconfiguration (unlike an SMTP password, which is
+// valid for unauthenticated relays). On edit the frontend resubmits the masked api_key rather
+// than blanking it, so a non-empty check here doesn't block credential preservation; the
+// masked value is recognised and preserved in Manager.Update. webhook_secret stays optional -
+// it's only needed to receive inbound mail.
 func validateHTTPAPIEmailConfig(app *App, cfg imodels.Config) error {
 	if cfg.HTTPAPI == nil {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "http_api"), nil)
@@ -428,6 +430,9 @@ func validateHTTPAPIEmailConfig(app *App, cfg imodels.Config) error {
 	case imodels.HTTPAPIProviderResend:
 	default:
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if cfg.HTTPAPI.APIKey == "" {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "api_key"), nil)
 	}
 	return nil
 }

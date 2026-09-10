@@ -84,6 +84,15 @@ export const createFormSchema = (t) => z.object({
         message: t('globals.messages.required')
       })
     }
+    // On edit the api_key is resubmitted masked (non-empty), so this only trips for a new
+    // inbox left blank. webhook_secret stays optional (only needed to receive mail).
+    if (!data.http_api?.api_key) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['http_api', 'api_key'],
+        message: t('globals.messages.required')
+      })
+    }
     return
   }
 

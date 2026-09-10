@@ -251,6 +251,14 @@ func TestValidateEmailConfig(t *testing.T) {
 		{"imap empty tls type", `{"imap":[{"host":"imap.example.com","port":993,"mailbox":"INBOX"}]}`, true},
 		{"imap starttls", `{"imap":[{"host":"imap.example.com","port":143,"mailbox":"INBOX","tls_type":"starttls"}]}`, false},
 		{"imap none", `{"imap":[{"host":"imap.example.com","port":143,"mailbox":"INBOX","tls_type":"none"}]}`, false},
+
+		{"http_api valid", `{"transport":"http_api","http_api":{"provider":"resend","api_key":"re_x"}}`, false},
+		{"http_api ignores invalid smtp/imap", `{"transport":"http_api","http_api":{"provider":"resend","api_key":"re_x"},"imap":[{"host":"","port":0}],"smtp":[{"host":"","port":0}]}`, false},
+		{"http_api missing block", `{"transport":"http_api"}`, true},
+		{"http_api missing api_key", `{"transport":"http_api","http_api":{"provider":"resend"}}`, true},
+		{"http_api empty api_key", `{"transport":"http_api","http_api":{"provider":"resend","api_key":""}}`, true},
+		{"http_api unknown provider", `{"transport":"http_api","http_api":{"provider":"mailgun","api_key":"x"}}`, true},
+		{"unknown transport", `{"transport":"pigeon"}`, true},
 	}
 
 	for _, tc := range tests {
