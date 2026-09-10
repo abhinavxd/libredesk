@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -67,6 +68,13 @@ type Inbox interface {
 	FromNameTemplate() string
 	ReplyToAddress() string
 	Channel() string
+}
+
+// WebhookReceiver is implemented by inbox channels that receive inbound messages via an
+// HTTP webhook (e.g. the email channel's http_api transport) instead of the Receive loop.
+// Callers should type-assert an Inbox against this interface before routing a webhook to it.
+type WebhookReceiver interface {
+	ReceiveWebhook(headers http.Header, body []byte) error
 }
 
 // MessageStore defines methods for storing and processing messages.
@@ -341,18 +349,22 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	switch current.Channel {
 	case "email":
 		var currentCfg struct {
+			Transport            string            `json:"transport"`
 			AuthType             string            `json:"auth_type"`
 			OAuth                map[string]string `json:"oauth"`
 			IMAP                 []map[string]any  `json:"imap"`
 			SMTP                 []map[string]any  `json:"smtp"`
+			HTTPAPI              map[string]string `json:"http_api"`
 			ReplyTo              string            `json:"reply_to"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
 		}
 		var updateCfg struct {
+			Transport            string            `json:"transport"`
 			AuthType             string            `json:"auth_type"`
 			OAuth                map[string]string `json:"oauth"`
 			IMAP                 []map[string]any  `json:"imap"`
 			SMTP                 []map[string]any  `json:"smtp"`
+			HTTPAPI              map[string]string `json:"http_api"`
 			ReplyTo              string            `json:"reply_to"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
 		}
@@ -369,12 +381,16 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 
-		if len(updateCfg.IMAP) == 0 {
-			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptyIMAP"), nil)
-		}
+		isHTTPAPITransport := updateCfg.Transport == imodels.TransportHTTPAPI
 
-		if len(updateCfg.SMTP) == 0 {
-			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptySMTP"), nil)
+		if !isHTTPAPITransport {
+			if len(updateCfg.IMAP) == 0 {
+				return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptyIMAP"), nil)
+			}
+
+			if len(updateCfg.SMTP) == 0 {
+				return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptySMTP"), nil)
+			}
 		}
 
 		// Preserve existing IMAP passwords if update has empty password
@@ -399,6 +415,18 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			for k, v := range currentCfg.OAuth {
 				if updateCfg.OAuth[k] == "" {
 					updateCfg.OAuth[k] = v
+				}
+			}
+		}
+
+		// Preserve existing HTTP API fields (api_key, webhook_secret) if update has them empty
+		if currentCfg.HTTPAPI != nil {
+			if updateCfg.HTTPAPI == nil {
+				updateCfg.HTTPAPI = make(map[string]string)
+			}
+			for k, v := range currentCfg.HTTPAPI {
+				if updateCfg.HTTPAPI[k] == "" {
+					updateCfg.HTTPAPI[k] = v
 				}
 			}
 		}
@@ -653,6 +681,20 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
+	// Encrypt HTTP API fields if present
+	if httpAPIMap, ok := cfg["http_api"].(map[string]any); ok {
+		fields := []string{"api_key", "webhook_secret"}
+		for _, fieldName := range fields {
+			if fieldValue, ok := httpAPIMap[fieldName].(string); ok && fieldValue != "" {
+				encrypted, err := crypto.Encrypt(fieldValue, m.encryptionKey)
+				if err != nil {
+					return nil, fmt.Errorf("encrypting HTTP API %s: %w", fieldName, err)
+				}
+				httpAPIMap[fieldName] = encrypted
+			}
+		}
+	}
+
 	encrypted, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling encrypted config: %w", err)
@@ -715,6 +757,21 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 					continue
 				}
 				oauthMap[fieldName] = decrypted
+			}
+		}
+	}
+
+	if httpAPIMap, ok := cfg["http_api"].(map[string]any); ok {
+		fields := []string{"api_key", "webhook_secret"}
+		for _, fieldName := range fields {
+			if fieldValue, ok := httpAPIMap[fieldName].(string); ok && fieldValue != "" {
+				decrypted, err := crypto.Decrypt(fieldValue, m.encryptionKey)
+				if err != nil {
+					m.lo.Error("error decrypting HTTP API field, clearing field", "field", fieldName, "error", err)
+					httpAPIMap[fieldName] = ""
+					continue
+				}
+				httpAPIMap[fieldName] = decrypted
 			}
 		}
 	}

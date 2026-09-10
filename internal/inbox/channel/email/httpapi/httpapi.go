@@ -1,0 +1,86 @@
+// Package httpapi implements sending and receiving email through HTTPS transactional
+// email APIs (e.g. Resend) as an alternative to direct SMTP/IMAP connections.
+package httpapi
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+)
+
+// Attachment is a file attached to an outbound message.
+type Attachment struct {
+	Filename    string
+	ContentType string
+	Content     []byte
+}
+
+// OutboundEmail is the normalized shape passed to a Provider for sending.
+type OutboundEmail struct {
+	From        string
+	To          []string
+	CC          []string
+	BCC         []string
+	ReplyTo     string
+	Subject     string
+	HTML        string
+	Text        string
+	// Headers carries additional RFC headers the provider should attach to the outgoing
+	// message where supported (Message-ID, In-Reply-To, References, loop-prevention, etc).
+	Headers     map[string]string
+	Attachments []Attachment
+}
+
+// InboundAttachment is a file extracted from an inbound webhook payload.
+type InboundAttachment struct {
+	Filename    string
+	ContentType string
+	ContentID   string
+	Content     []byte
+}
+
+// InboundEmail is the normalized shape a Provider produces after parsing an inbound webhook payload.
+type InboundEmail struct {
+	MessageID   string
+	From        string
+	To          []string
+	CC          []string
+	BCC         []string
+	Subject     string
+	HTML        string
+	Text        string
+	InReplyTo   string
+	References  []string
+	Attachments []InboundAttachment
+}
+
+// Provider sends outbound mail through, and parses inbound webhook payloads from, a
+// specific HTTPS transactional email API.
+type Provider interface {
+	// Name returns the provider identifier (matches imodels.HTTPAPIConfig.Provider).
+	Name() string
+
+	// Send delivers msg through the provider's API and returns the provider-assigned message ID.
+	Send(ctx context.Context, msg OutboundEmail) (messageID string, err error)
+
+	// VerifyAndParseWebhook authenticates an inbound webhook request using the provider's
+	// signature scheme and, if valid, parses the body into a normalized InboundEmail.
+	VerifyAndParseWebhook(headers http.Header, body []byte) (InboundEmail, error)
+}
+
+// New returns a Provider for the given HTTP API config.
+func New(cfg imodels.HTTPAPIConfig) (Provider, error) {
+	if cfg.APIKey == "" {
+		return nil, fmt.Errorf("http api key is required")
+	}
+	switch cfg.Provider {
+	case imodels.HTTPAPIProviderResend:
+		return newResendProvider(cfg), nil
+	case "":
+		return nil, fmt.Errorf("http api provider is required")
+	default:
+		return nil, fmt.Errorf("unsupported http api provider %q", cfg.Provider)
+	}
+}

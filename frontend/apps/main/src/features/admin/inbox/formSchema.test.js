@@ -241,4 +241,36 @@ describe('Email Inbox Form Schema', () => {
     test('empty object', () => {
         expect(() => schema.parse({})).toThrow()
     })
+
+    describe('http_api transport', () => {
+        const validHTTPAPIForm = {
+            name: 'Support',
+            from: 'Support <desk@example.com>',
+            auth_type: 'password',
+            transport: 'http_api',
+            imap: validImap,
+            smtp: validSmtp,
+            http_api: { provider: 'resend', api_key: 'sk_test' }
+        }
+
+        test('valid http_api form', () => {
+            expect(() => schema.parse(validHTTPAPIForm)).not.toThrow()
+        })
+
+        test('http_api provider missing', () => {
+            expect(() => schema.parse({ ...validHTTPAPIForm, http_api: { api_key: 'sk_test' } })).toThrow()
+        })
+
+        test('imap/smtp username and password not required for http_api transport', () => {
+            expect(() => schema.parse({
+                ...validHTTPAPIForm,
+                imap: { ...validImap, username: '', password: '' },
+                smtp: { ...validSmtp, username: '', password: '' }
+            })).not.toThrow()
+        })
+
+        test('api_key optional (blank preserves existing value on edit)', () => {
+            expect(() => schema.parse({ ...validHTTPAPIForm, http_api: { provider: 'resend', api_key: '' } })).not.toThrow()
+        })
+    })
 })
