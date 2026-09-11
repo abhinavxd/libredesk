@@ -24,8 +24,24 @@ const resendEventInboundEmail = "email.received"
 const maxInboundMessageBytes = 40 << 20 // 40 MiB
 
 // resendHTTPClient is shared across all Resend provider instances; Resend calls are infrequent
-// relative to SMTP so a single pooled client is sufficient.
-var resendHTTPClient = &http.Client{Timeout: 30 * time.Second}
+// relative to SMTP so a single pooled client is sufficient. Redirects are constrained to HTTPS
+// so a downgrade can't leak the API key or a raw message over cleartext.
+var resendHTTPClient = &http.Client{
+	Timeout:       30 * time.Second,
+	CheckRedirect: httpsOnlyRedirect,
+}
+
+// httpsOnlyRedirect refuses any redirect hop that isn't HTTPS and caps the redirect chain
+// (setting CheckRedirect replaces net/http's default 10-redirect limit).
+func httpsOnlyRedirect(req *http.Request, via []*http.Request) error {
+	if req.URL.Scheme != "https" {
+		return fmt.Errorf("refusing non-https redirect (scheme %q)", req.URL.Scheme)
+	}
+	if len(via) >= 10 {
+		return fmt.Errorf("stopped after 10 redirects")
+	}
+	return nil
+}
 
 // resendProvider implements Provider for the Resend (https://resend.com) transactional email API.
 //

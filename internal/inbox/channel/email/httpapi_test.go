@@ -178,6 +178,40 @@ func TestReceiveWebhook(t *testing.T) {
 	assert.Equal(t, "<p>hi</p>", got.Content)
 }
 
+func TestReceiveWebhookStructuredConvUUIDFromBCC(t *testing.T) {
+	provider := &fakeProvider{inbound: httpapi.InboundEmail{
+		MessageID: "msg-bcc",
+		From:      "jane@example.com",
+		To:        []string{"support@example.com"},
+		BCC:       []string{"support+conv-33333333-3333-4333-8333-333333333333@example.com"},
+	}}
+	msgStore := &fakeMessageStore{existing: map[string]bool{}}
+	userStore := &fakeUserStore{blocked: map[string]bool{}}
+	e := newWebhookTestEmail(provider, msgStore, userStore)
+
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
+	require.NoError(t, err)
+	require.Len(t, msgStore.enqueued, 1)
+	assert.Equal(t, "33333333-3333-4333-8333-333333333333", msgStore.enqueued[0].ConversationUUIDFromReplyTo)
+}
+
+func TestReceiveWebhookRawMessageIDFallback(t *testing.T) {
+	// Raw message with no Message-ID header - the webhook metadata's message_id is used.
+	raw := "From: Jane <jane@example.com>\r\nSubject: hi\r\n\r\nbody\r\n"
+	provider := &fakeProvider{inbound: httpapi.InboundEmail{
+		RawMessage: []byte(raw),
+		MessageID:  "webhook-msg-id",
+	}}
+	msgStore := &fakeMessageStore{existing: map[string]bool{}}
+	userStore := &fakeUserStore{blocked: map[string]bool{}}
+	e := newWebhookTestEmail(provider, msgStore, userStore)
+
+	err := e.ReceiveWebhook(context.Background(), http.Header{}, []byte(`{}`))
+	require.NoError(t, err)
+	require.Len(t, msgStore.enqueued, 1)
+	assert.Equal(t, "webhook-msg-id", msgStore.enqueued[0].SourceID.String)
+}
+
 func TestReceiveWebhookVerifyFailure(t *testing.T) {
 	provider := &fakeProvider{verifyErr: errors.New("bad signature")}
 	msgStore := &fakeMessageStore{existing: map[string]bool{}}

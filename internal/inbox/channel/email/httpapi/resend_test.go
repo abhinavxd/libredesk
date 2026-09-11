@@ -189,6 +189,12 @@ func TestResendVerifyAndParseWebhook(t *testing.T) {
 	assert.Equal(t, []string{"support+conv-abc@example.com"}, inbound.Recipients)
 }
 
+func TestHTTPSOnlyRedirect(t *testing.T) {
+	assert.NoError(t, httpsOnlyRedirect(httptest.NewRequest(http.MethodGet, "https://cdn.resend.app/x", nil), nil))
+	assert.Error(t, httpsOnlyRedirect(httptest.NewRequest(http.MethodGet, "http://cdn.resend.app/x", nil), nil))
+	assert.Error(t, httpsOnlyRedirect(httptest.NewRequest(http.MethodGet, "https://x/y", nil), make([]*http.Request, 10)))
+}
+
 func TestResendVerifyAndParseWebhookRejectsBadSignature(t *testing.T) {
 	provider := newResendProvider(imodels.HTTPAPIConfig{
 		APIKey:        "re_test_key",

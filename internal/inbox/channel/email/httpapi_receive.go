@@ -57,6 +57,11 @@ func (e *Email) enqueueInboundFromRawMessage(inbound httpapi.InboundEmail) error
 
 	messageID := strings.Trim(strings.TrimSpace(envelope.GetHeader(headerMessageID)), "<>")
 	if messageID == "" {
+		// Fall back to the message ID from the webhook metadata when the raw message lacks a
+		// Message-ID header.
+		messageID = strings.Trim(strings.TrimSpace(inbound.MessageID), "<>")
+	}
+	if messageID == "" {
 		e.lo.Error("dropping inbound webhook message: no Message-ID", "inbox_id", e.id)
 		return nil
 	}
@@ -138,7 +143,8 @@ func (e *Email) enqueueInboundFromStructured(inbound httpapi.InboundEmail) error
 
 	conversationUUID := convUUIDFromRecipients(inbound.Recipients)
 	if conversationUUID == "" {
-		conversationUUID = convUUIDFromRecipients(append(append([]string{}, toLower...), ccLower...))
+		all := append(append(append([]string{}, toLower...), ccLower...), bccLower...)
+		conversationUUID = convUUIDFromRecipients(all)
 	}
 
 	meta, err := json.Marshal(map[string]any{
