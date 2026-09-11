@@ -295,6 +295,13 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/ai/assistants/{id}/preview", perm(handleAIAssistantPreview, "ai:manage"))
 	g.GET("/api/v1/ai/assistants/{id}/stats", perm(handleGetAIAssistantStats, "ai:manage"))
 
+	// Guided pre-chat forms: branching question flows that hand off to an AI assistant, a team, or the unassigned queue.
+	g.GET("/api/v1/guided-forms", perm(handleGetGuidedForms, "inboxes:manage"))
+	g.GET("/api/v1/guided-forms/{id}", perm(handleGetGuidedForm, "inboxes:manage"))
+	g.POST("/api/v1/guided-forms", perm(handleCreateGuidedForm, "inboxes:manage"))
+	g.PUT("/api/v1/guided-forms/{id}", perm(handleUpdateGuidedForm, "inboxes:manage"))
+	g.DELETE("/api/v1/guided-forms/{id}", perm(handleDeleteGuidedForm, "inboxes:manage"))
+
 	// AI FAQ learning: review queue for suggestions mined from resolved conversations + on/off setting.
 	g.GET("/api/v1/ai/faq-suggestions", perm(handleGetAIFaqSuggestions, "ai:manage"))
 	g.POST("/api/v1/ai/faq-suggestions/{id}/approve", perm(handleApproveAIFaqSuggestion, "ai:manage"))
@@ -372,6 +379,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", rateLimit(widgetAuth(handleChatUpdateLastSeen), "widget"))
 	g.GET("/api/v1/widget/chat/conversations/{uuid}", rateLimit(widgetAuth(handleChatGetConversation), "widget"))
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", rateLimit(widgetAuth(handleChatSendMessage), "widget"))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/guided-form/skip", rateLimit(widgetAuth(handleSkipGuidedForm), "widget"))
 	g.POST("/api/v1/widget/media/upload", rateLimit(widgetAuth(handleWidgetMediaUpload), "widget"))
 
 	// getAndHead registers both methods: uptime checkers and link validators probe with HEAD.

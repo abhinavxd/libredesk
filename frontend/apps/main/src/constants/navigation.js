@@ -164,6 +164,13 @@ export const adminNavItems = [
         permission: 'automations:manage',
         isTitleKeyPlural: true,
         icon: 'Workflow'
+      },
+      {
+        titleKey: 'admin.guidedForms.title',
+        href: '/admin/guided-forms',
+        createRouteName: 'new-guided-form',
+        permission: 'inboxes:manage',
+        icon: 'ListTree'
       }
     ]
   },

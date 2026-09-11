@@ -26,6 +26,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/colorlog"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/guidedform"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/report"
@@ -121,6 +122,7 @@ type App struct {
 	view             *view.Manager
 	ai               *ai.Manager
 	aiAgent          *aiagent.Manager
+	guidedForm       *guidedform.Manager
 	helpcenter       *helpcenter.Manager
 	search           *search.Manager
 	activityLog      *activitylog.Manager
@@ -255,6 +257,8 @@ func main() {
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
 		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings, user, notifier, rdb)
+		customAttribute             = initCustomAttribute(db, i18n)
+		guidedForm                  = initGuidedForm(db, i18n, conversation, customAttribute, user)
 		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
@@ -268,6 +272,7 @@ func main() {
 	}
 	automation.SetSystemUserID(systemUser.ID)
 	conversation.SetAIAgent(aiAgent)
+	conversation.SetGuidedFormEngine(guidedForm)
 
 	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL)
 
@@ -287,6 +292,7 @@ func main() {
 	go helpCenter.RunSearchLogCleaner(ctx)
 	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
 	go ai.Run(ctx)
+	go guidedForm.RunAbandonedSweeper(ctx, 5*time.Minute)
 
 	var app = &App{
 		ctx:              ctx,
@@ -311,7 +317,7 @@ func main() {
 		automation:       automation,
 		businessHours:    businessHours,
 		activityLog:      initActivityLog(db, i18n),
-		customAttribute:  initCustomAttribute(db, i18n),
+		customAttribute:  customAttribute,
 		authz:            initAuthz(i18n),
 		view:             initView(db, i18n),
 		report:           initReport(db, i18n),
@@ -321,6 +327,7 @@ func main() {
 		macro:            initMacro(db, i18n),
 		ai:               ai,
 		aiAgent:          aiAgent,
+		guidedForm:       guidedForm,
 		helpcenter:       helpCenter,
 		importer:         initImporter(i18n),
 		webhook:          webhook,

@@ -23,7 +23,11 @@
               </TabsList>
             </Tabs>
           </div>
-          <LivechatWidgetPreview :config="livechatPreview" :user-type="previewUserType" />
+          <LivechatWidgetPreview
+            :config="livechatPreview"
+            :user-type="previewUserType"
+            :inbox-uuid="livechatPreviewInboxUuid"
+          />
         </div>
         <div class="space-y-1">
           <p class="text-sm text-muted-foreground">{{ $t('admin.inbox.help.livechat') }}</p>
@@ -75,5 +79,7 @@ import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 
 const previewUserType = ref('visitors')
 const livechatPreview = ref(null)
+const livechatPreviewInboxUuid = ref('')
 provide('livechatPreview', livechatPreview)
+provide('livechatPreviewInboxUuid', livechatPreviewInboxUuid)
 </script>

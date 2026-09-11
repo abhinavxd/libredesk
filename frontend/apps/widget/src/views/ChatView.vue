@@ -13,13 +13,33 @@
     />
 
     <!-- Messages container (when no pre-chat form) -->
-    <ChatMessages v-else ref="chatMessages" :showPreChatForm="showPreChatForm" />
+    <ChatMessages
+      v-else
+      ref="chatMessages"
+      :showPreChatForm="showPreChatForm"
+      @quick-reply="handleQuickReply"
+    />
 
     <!-- Error display -->
     <WidgetError :errorMessage="errorMessage" />
 
+    <!-- Escape hatch out of an in-progress guided form -->
+    <div v-if="isInGuidedForm" class="px-4 py-1.5 border-t">
+      <button
+        type="button"
+        class="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+        @click="skipGuidedForm"
+      >
+        {{ $t('widget.talkToHuman') }}
+      </button>
+    </div>
+
     <!-- Message input (only when pre-chat form is not shown) -->
-    <MessageInput v-if="!showPreChatForm && !isConversationClosed" @error="handleError" />
+    <MessageInput
+      v-if="!showPreChatForm && !isConversationClosed"
+      ref="messageInput"
+      @error="handleError"
+    />
 
     <!-- Closed conversation notice -->
     <div v-if="isConversationClosed" class="border-t p-4 text-center text-sm text-muted-foreground">
@@ -34,7 +54,8 @@ import { useWidgetStore } from '../store/widget.js'
 import { useUserStore } from '../store/user.js'
 import { useChatStore } from '../store/chat.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api, { saveSession } from '@widget/api/index.js'
+import api from '@widget/api/index.js'
+import { initConversation } from '@widget/composables/useChatInit.js'
 import WidgetError from '@widget/components/WidgetError.vue'
 import ChatHeader from '@widget/components/ChatHeader.vue'
 import ChatMessages from '@widget/components/ChatMessages.vue'
@@ -48,6 +69,29 @@ const errorMessage = ref('')
 const preChatFormSubmitted = ref(false)
 const isInitializing = ref(false)
 const config = computed(() => widgetStore.config)
+const messageInput = ref(null)
+
+// Forwards a guided-form choice button click to the same send path as typed messages.
+const handleQuickReply = (text) => {
+  messageInput.value?.sendQuickReply(text)
+}
+
+// Lets a visitor bail out of an in-progress guided form and reach a human directly, instead of
+// being stuck answering questions until something matches a branch.
+const isInGuidedForm = computed(
+  () =>
+    chatStore.currentConversation?.assignee?.type === 'guided_form_bot' &&
+    !!chatStore.currentConversation?.guided_form_allow_skip
+)
+
+const skipGuidedForm = async () => {
+  if (!chatStore.currentConversation?.uuid) return
+  try {
+    await api.skipGuidedForm(chatStore.currentConversation.uuid)
+  } catch (error) {
+    errorMessage.value = handleHTTPError(error).message
+  }
+}
 
 // Determine if pre-chat form should be shown
 const showPreChatForm = computed(() => {
@@ -91,10 +135,11 @@ const handleError = (message) => {
   }
 }
 
-// Handle pre-chat form submission - init chat with form data and message
+// Handle pre-chat form submission - init chat with form data and message.
 const handlePreChatFormSubmit = async ({ formData, message }) => {
-  // Auto-submit with no message (e.g., all fields excluded) - just skip to chat
-  if (!message) {
+  // No message and nothing to proactively start a conversation with (no guided form) - just
+  // skip to an empty chat and wait for the visitor to type.
+  if (!message && !config.value?.has_guided_form) {
     preChatFormSubmitted.value = true
     return
   }
@@ -103,27 +148,13 @@ const handlePreChatFormSubmit = async ({ formData, message }) => {
   errorMessage.value = ''
 
   try {
-    const payload = {
-      message: message
-    }
-
+    const payload = {}
+    if (message) payload.message = message
     if (Object.keys(formData).length > 0) {
       payload.form_data = formData
     }
 
-    const resp = await api.initChatConversation(payload)
-    const { conversation, session_token, user, messages, business_hours_id, working_hours_utc_offset } = resp.data.data
-    conversation.business_hours_id = business_hours_id
-    conversation.working_hours_utc_offset = working_hours_utc_offset
-
-    if (!userStore.userSessionToken && session_token) {
-      saveSession(session_token, user, userStore, true)
-    }
-
-    chatStore.addConversationToList(conversation)
-    chatStore.setCurrentConversation(conversation)
-    chatStore.replaceMessages(messages)
-
+    await initConversation(payload)
     preChatFormSubmitted.value = true
   } catch (error) {
     errorMessage.value = handleHTTPError(error).message

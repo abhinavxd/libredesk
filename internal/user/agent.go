@@ -31,9 +31,9 @@ func (u *Manager) MonitorUserAvailability(ctx context.Context, onUsersOffline fu
 	}
 }
 
-// GetAgent retrieves an agent (or AI assistant) by ID and caches it.
+// GetAgent retrieves an agent (or AI assistant / guided-form bot) by ID and caches it.
 func (u *Manager) GetAgent(id int, email string) (models.User, error) {
-	agent, err := u.Get(id, email, []string{models.UserTypeAgent, models.UserTypeAIAssistant})
+	agent, err := u.Get(id, email, []string{models.UserTypeAgent, models.UserTypeAIAssistant, models.UserTypeGuidedFormBot})
 	if err != nil {
 		return models.User{}, err
 	}
@@ -82,7 +82,7 @@ func (u *Manager) InvalidateAllAgentCache() {
 // GetAgentsCompact returns agents and AI assistants matching search, all of them when pageSize is 0.
 func (u *Manager) GetAgentsCompact(search, userType string, enabledOnly bool, page, pageSize int) ([]models.UserCompact, error) {
 	var users = make([]models.UserCompact, 0)
-	if err := u.q.GetAgentsCompact.Select(&users, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant}), search, userType, enabledOnly, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
+	if err := u.q.GetAgentsCompact.Select(&users, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant, models.UserTypeGuidedFormBot}), search, userType, enabledOnly, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
 		u.lo.Error("error fetching users from db", "error", err)
 		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -92,7 +92,7 @@ func (u *Manager) GetAgentsCompact(search, userType string, enabledOnly bool, pa
 // GetAgentsCompactByIDs returns the agents and AI assistants with the given IDs.
 func (u *Manager) GetAgentsCompactByIDs(ids []int) ([]models.UserCompact, error) {
 	var users = make([]models.UserCompact, 0)
-	if err := u.q.GetAgentsCompactByIDs.Select(&users, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant}), pq.Array(ids)); err != nil {
+	if err := u.q.GetAgentsCompactByIDs.Select(&users, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant, models.UserTypeGuidedFormBot}), pq.Array(ids)); err != nil {
 		u.lo.Error("error fetching users by ids from db", "error", err)
 		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

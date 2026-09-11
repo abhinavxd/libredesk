@@ -1286,6 +1286,7 @@ const previewConfig = computed(() => ({
 
 // InboxView renders the preview in the help rail; feed it this form's live config while mounted.
 const livechatPreview = inject('livechatPreview', null)
+const livechatPreviewInboxUuid = inject('livechatPreviewInboxUuid', null)
 watch(
   previewConfig,
   (cfg) => {
@@ -1293,8 +1294,12 @@ watch(
   },
   { immediate: true, deep: true }
 )
+if (livechatPreviewInboxUuid) {
+  livechatPreviewInboxUuid.value = props.initialValues?.uuid || ''
+}
 onBeforeUnmount(() => {
   if (livechatPreview) livechatPreview.value = null
+  if (livechatPreviewInboxUuid) livechatPreviewInboxUuid.value = ''
 })
 
 // Switching to gradient with no colors set would render a blank picker (black),

@@ -109,6 +109,7 @@ type Manager struct {
 	continuityConfig           ContinuityConfig
 	subjectRefFormat           string
 	aiAgent                    AIAgentEngine
+	guidedForm                 GuidedFormEngine
 }
 
 // AIAgentEngine is notified when a conversation assigned to an AI assistant may need a response.
@@ -118,9 +119,20 @@ type AIAgentEngine interface {
 	AssistantExpectation(userID int) string
 }
 
+// GuidedFormEngine is notified when a conversation assigned to a guided-form bot may need its
+// next question asked or its latest answer processed.
+type GuidedFormEngine interface {
+	HandleConversationEvent(conversationID, assigneeUserID int)
+}
+
 // SetAIAgent wires the AI agent engine after construction to avoid an import cycle.
 func (c *Manager) SetAIAgent(e AIAgentEngine) {
 	c.aiAgent = e
+}
+
+// SetGuidedFormEngine wires the guided form engine after construction to avoid an import cycle.
+func (c *Manager) SetGuidedFormEngine(e GuidedFormEngine) {
+	c.guidedForm = e
 }
 
 // WidgetConversationView represents the conversation data for widget clients
@@ -833,6 +845,9 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 
 	if c.aiAgent != nil {
 		c.aiAgent.HandleConversationEvent(conversation.ID, assigneeID)
+	}
+	if c.guidedForm != nil {
+		c.guidedForm.HandleConversationEvent(conversation.ID, assigneeID)
 	}
 
 	return nil

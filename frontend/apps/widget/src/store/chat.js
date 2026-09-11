@@ -125,6 +125,7 @@ export const useChatStore = defineStore('chat', () => {
             const conversation = resp.data.data.conversation
             conversation.business_hours_id = resp.data.data.business_hours_id
             conversation.working_hours_utc_offset = resp.data.data.working_hours_utc_offset
+            conversation.guided_form_allow_skip = resp.data.data.guided_form_allow_skip
             setCurrentConversation(conversation)
             replaceMessages(resp.data.data.messages)
             if (resp.data.data.messages.length > 0) {

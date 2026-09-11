@@ -1183,7 +1183,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
-			true,          /** private **/
+			true,         /** private **/
 		)
 		if err != nil {
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
@@ -1428,6 +1428,11 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		// If assigned to an AI assistant, let it respond to this inbound customer message.
 		if m.aiAgent != nil && conversation.AssignedUserID.Valid {
 			m.aiAgent.HandleConversationEvent(conversation.ID, conversation.AssignedUserID.Int)
+		}
+
+		// If assigned to a guided-form bot, let it process the answer and ask the next question.
+		if m.guidedForm != nil && conversation.AssignedUserID.Valid {
+			m.guidedForm.HandleConversationEvent(conversation.ID, conversation.AssignedUserID.Int)
 		}
 
 		if conversation.SLAPolicyID.Int == 0 {

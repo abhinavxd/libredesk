@@ -500,6 +500,11 @@ const previewAIAssistant = (id, data) =>
   http.post(`/api/v1/ai/assistants/${id}/preview`, data, { timeout: AI_TIMEOUT })
 const getAIAssistantStats = (id, range) =>
   http.get(`/api/v1/ai/assistants/${id}/stats`, { params: range ? { range } : {} })
+const getGuidedForms = () => http.get('/api/v1/guided-forms')
+const getGuidedForm = (id) => http.get(`/api/v1/guided-forms/${id}`)
+const createGuidedForm = (data) => http.post('/api/v1/guided-forms', data)
+const updateGuidedForm = (id, data) => http.put(`/api/v1/guided-forms/${id}`, data)
+const deleteGuidedForm = (id) => http.delete(`/api/v1/guided-forms/${id}`)
 const getAISnippets = () => http.get('/api/v1/ai/snippets')
 const createAISnippet = (data) => http.post('/api/v1/ai/snippets', data)
 const importAISnippetFromURL = (data) =>
@@ -777,6 +782,11 @@ export default {
   deleteAIAssistant,
   previewAIAssistant,
   getAIAssistantStats,
+  getGuidedForms,
+  getGuidedForm,
+  createGuidedForm,
+  updateGuidedForm,
+  deleteGuidedForm,
   getAISnippets,
   createAISnippet,
   importAISnippetFromURL,

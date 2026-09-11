@@ -28,6 +28,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/guidedform"
 	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
@@ -1055,6 +1056,19 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
 	if err != nil {
 		log.Fatalf("error initializing AI agent manager: %v", err)
+	}
+	return m
+}
+
+// initGuidedForm inits the guided pre-chat form manager.
+func initGuidedForm(db *sqlx.DB, i18n *i18n.I18n, convo *conversation.Manager, customAttributeManager *customAttribute.Manager, userManager *user.Manager) *guidedform.Manager {
+	m, err := guidedform.New(guidedform.Opts{
+		DB:   db,
+		Lo:   initLogger("guided_form"),
+		I18n: i18n,
+	}, convo, customAttributeManager, userManager)
+	if err != nil {
+		log.Fatalf("error initializing guided form manager: %v", err)
 	}
 	return m
 }

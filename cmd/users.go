@@ -74,7 +74,7 @@ func handleGetAgentsCompact(r *fastglue.Request) error {
 		enabledOnly = string(r.RequestCtx.QueryArgs().Peek("enabled")) == "true"
 	)
 	switch userType {
-	case "", models.UserTypeAgent, models.UserTypeAIAssistant:
+	case "", models.UserTypeAgent, models.UserTypeAIAssistant, models.UserTypeGuidedFormBot:
 	default:
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
