@@ -457,7 +457,21 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		e.lo.Error("error parsing email envelope", "error", err.Error(), "message_id", incomingMsg.SourceID.String)
 	}
 
-	// Extract all HTML content by traversing the tree
+	populateIncomingFromEnvelope(envelope, &incomingMsg)
+
+	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.SourceID.String,
+		"collected_attachments", len(incomingMsg.Attachments),
+		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines),
+		"other_parts", len(envelope.OtherParts))
+
+	return e.messageStore.EnqueueIncoming(incomingMsg)
+}
+
+// populateIncomingFromEnvelope fills the message body, content type, threading headers,
+// plus-address conversation routing and attachments on msg from a parsed MIME envelope.
+// Shared by the IMAP poll and the HTTP-API inbound-webhook receive paths.
+func populateIncomingFromEnvelope(envelope *enmime.Envelope, msg *models.IncomingMessage) {
+	// Extract all HTML content by traversing the tree.
 	var allHTML strings.Builder
 	if envelope.Root != nil {
 		htmlParts := extractAllHTMLParts(envelope.Root)
@@ -470,53 +484,36 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		}
 	}
 
-	// Set message content - prioritize combined HTML
-	if allHTML.Len() > 0 {
-		incomingMsg.Content = allHTML.String()
-		incomingMsg.ContentType = models.ContentTypeHTML
-		e.lo.Debug("extracted HTML content from parts", "message_id", incomingMsg.SourceID.String, "content", incomingMsg.Content)
-	} else if len(envelope.HTML) > 0 {
-		incomingMsg.Content = envelope.HTML
-		incomingMsg.ContentType = models.ContentTypeHTML
-	} else if len(envelope.Text) > 0 {
-		incomingMsg.Content = envelope.Text
-		incomingMsg.ContentType = models.ContentTypeText
+	// Set message content - prioritize combined HTML.
+	switch {
+	case allHTML.Len() > 0:
+		msg.Content = allHTML.String()
+		msg.ContentType = models.ContentTypeHTML
+	case len(envelope.HTML) > 0:
+		msg.Content = envelope.HTML
+		msg.ContentType = models.ContentTypeHTML
+	case len(envelope.Text) > 0:
+		msg.Content = envelope.Text
+		msg.ContentType = models.ContentTypeText
 	}
 
-	e.lo.Debug("envelope HTML content", "message_id", incomingMsg.SourceID.String, "content", incomingMsg.Content)
-	e.lo.Debug("envelope text content", "message_id", incomingMsg.SourceID.String, "content", envelope.Text)
-
-	// Clean headers
-	inReplyTo := strings.ReplaceAll(strings.ReplaceAll(envelope.GetHeader("In-Reply-To"), "<", ""), ">", "")
+	// Clean threading headers.
+	msg.InReplyTo = strings.ReplaceAll(strings.ReplaceAll(envelope.GetHeader("In-Reply-To"), "<", ""), ">", "")
 	references := strings.Fields(envelope.GetHeader("References"))
 	for i, ref := range references {
 		references[i] = strings.Trim(strings.TrimSpace(ref), " <>")
 	}
+	msg.References = references
 
-	incomingMsg.InReplyTo = inReplyTo
-	incomingMsg.References = references
+	// Extract conversation UUID from plus-addressed recipient (e.g., inbox+conv-{uuid}@domain).
+	msg.ConversationUUIDFromReplyTo = extractConversationUUIDFromRecipient(envelope)
 
-	// Extract conversation UUID from plus-addressed recipient (e.g., inbox+conv-{uuid}@domain)
-	incomingMsg.ConversationUUIDFromReplyTo = extractConversationUUIDFromRecipient(envelope)
-	if incomingMsg.ConversationUUIDFromReplyTo != "" {
-		e.lo.Debug("extracted conversation UUID from plus-addressed recipient",
-			"conversation_uuid", incomingMsg.ConversationUUIDFromReplyTo,
-			"message_id", incomingMsg.SourceID.String)
-	}
+	msg.Attachments = collectAttachments(envelope)
 
-	incomingMsg.Attachments = collectAttachments(envelope)
-
-	incomingMsg.Content = stringutil.SanitizeUTF8(incomingMsg.Content)
-	incomingMsg.Subject = stringutil.SanitizeUTF8(incomingMsg.Subject)
-	incomingMsg.Contact.FirstName = stringutil.SanitizeUTF8(incomingMsg.Contact.FirstName)
-	incomingMsg.Contact.LastName = stringutil.SanitizeUTF8(incomingMsg.Contact.LastName)
-
-	e.lo.Debug("enqueuing incoming email message", "message_id", incomingMsg.SourceID.String,
-		"collected_attachments", len(incomingMsg.Attachments),
-		"attachments", len(envelope.Attachments), "inline_attachments", len(envelope.Inlines),
-		"other_parts", len(envelope.OtherParts))
-
-	return e.messageStore.EnqueueIncoming(incomingMsg)
+	msg.Content = stringutil.SanitizeUTF8(msg.Content)
+	msg.Subject = stringutil.SanitizeUTF8(msg.Subject)
+	msg.Contact.FirstName = stringutil.SanitizeUTF8(msg.Contact.FirstName)
+	msg.Contact.LastName = stringutil.SanitizeUTF8(msg.Contact.LastName)
 }
 
 // collectAttachments builds the attachment list from an envelope's attachment, inline, and unclassified parts.

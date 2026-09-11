@@ -129,17 +129,8 @@
       </FormItem>
     </FormField>
 
-    <FormField v-if="setupMethod" v-slot="{ componentField }" name="auth_type">
-      <FormItem>
-        <FormControl>
-          <Input
-            type="hidden"
-            :value="setupMethod === 'manual' ? AUTH_TYPE_PASSWORD : AUTH_TYPE_OAUTH2"
-            v-bind="componentField"
-          />
-        </FormControl>
-      </FormItem>
-    </FormField>
+    <!-- auth_type and transport are written to the form model by the setupMethod watcher
+         (the shared Input wrapper can't carry them via a :value binding). -->
 
     <!-- Setup Method Selection -->
     <div v-show="!isOAuthInbox && setupMethod === null" class="space-y-4">
@@ -167,11 +158,78 @@
         />
         <MenuCard
           class="shrink-0 w-92 max-w-none"
+          :title="$t('admin.inbox.httpApi.title')"
+          :subTitle="$t('admin.inbox.httpApi.setupDescription')"
+          :icon="Webhook"
+          @click="setupMethod = TRANSPORT_HTTP_API"
+        />
+        <MenuCard
+          class="shrink-0 w-92 max-w-none"
           :title="$t('admin.inbox.oauth.otherProvider')"
           :subTitle="$t('admin.inbox.oauth.otherProviderDescription')"
           :icon="Mail"
           @click="setupMethod = 'manual'"
         />
+      </div>
+    </div>
+
+    <!-- HTTP API Configuration -->
+    <div v-show="isHTTPAPIInbox" class="box p-4 space-y-4">
+      <h3 class="font-semibold">{{ $t('admin.inbox.httpApi.config') }}</h3>
+
+      <FormField v-slot="{ componentField }" name="http_api.provider">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.httpApi.provider') }}</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="HTTP_API_PROVIDER_RESEND">Resend</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="http_api.api_key">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.httpApi.apiKey') }}</FormLabel>
+          <FormControl>
+            <Input type="password" placeholder="re_••••••••" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ $t('admin.inbox.httpApi.apiKey.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="http_api.webhook_secret">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.httpApi.webhookSecret') }}</FormLabel>
+          <FormControl>
+            <Input type="password" placeholder="whsec_••••••••" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ $t('admin.inbox.httpApi.webhookSecret.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <div class="space-y-1">
+        <label class="text-sm font-medium">{{ $t('admin.inbox.httpApi.webhookUrl') }}</label>
+        <div v-if="webhookUrl" class="flex items-center gap-2">
+          <Input :model-value="webhookUrl" readonly class="font-mono text-xs" />
+          <Button type="button" variant="outline" size="sm" @click="copyToClipboard(webhookUrl)">
+            {{ $t('globals.terms.copy') }}
+          </Button>
+        </div>
+        <p v-else class="text-xs text-muted-foreground">
+          {{ $t('admin.inbox.httpApi.webhookUrl.unavailable') }}
+        </p>
+        <p class="!mt-2 text-muted-foreground text-xs">
+          {{ $t('admin.inbox.httpApi.webhookUrl.description') }}
+        </p>
       </div>
     </div>
 
@@ -810,7 +868,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
-import { CheckCircle2, RefreshCw, Mail, Lightbulb } from 'lucide-vue-next'
+import { CheckCircle2, RefreshCw, Mail, Lightbulb, Webhook } from 'lucide-vue-next'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
@@ -822,6 +880,11 @@ import {
   PROVIDER_GOOGLE,
   PROVIDER_MICROSOFT
 } from '@/constants/auth.js'
+import {
+  TRANSPORT_SMTP_IMAP,
+  TRANSPORT_HTTP_API,
+  HTTP_API_PROVIDER_RESEND
+} from '@/constants/inbox.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useAppSettingsStore } from '@/stores/appSettings'
 
@@ -855,7 +918,7 @@ const appSettingsStore = useAppSettingsStore()
 // OAuth detection
 const isOAuthInbox = ref(false)
 
-// Setup method selection: null | PROVIDER_GOOGLE | PROVIDER_MICROSOFT | 'manual'
+// Setup method selection: null | PROVIDER_GOOGLE | PROVIDER_MICROSOFT | 'manual' | TRANSPORT_HTTP_API
 const setupMethod = ref(null)
 
 // OAuth modal state
@@ -875,11 +938,24 @@ const callbackUrl = computed(() => {
   return `${rootUrl}/api/v1/inboxes/oauth/${selectedProvider.value}/callback`
 })
 
-// Show form fields when OAuth is connected or manual setup is selected
+// Computed inbound webhook URL for the HTTP API transport. Only meaningful once the inbox
+// has been saved and has a UUID (new, unsaved inboxes don't have one yet). The endpoint is
+// always served from the same origin as the admin panel, so use the browser's current
+// origin - correct out of the box and right even behind a TLS-terminating proxy, without
+// depending on the app.root_url setting being configured.
+const webhookUrl = computed(() => {
+  if (!props.initialValues?.uuid) return ''
+  return `${window.location.origin}/api/v1/webhooks/email/${props.initialValues.uuid}`
+})
+
+const isHTTPAPIInbox = computed(() => setupMethod.value === TRANSPORT_HTTP_API)
+
+// Show form fields when OAuth is connected, or manual/HTTP API setup is selected
 const showFormFields = computed(
   () =>
     isOAuthInbox.value ||
     setupMethod.value === 'manual' ||
+    isHTTPAPIInbox.value ||
     (props.initialValues?.imap && Object.keys(props.initialValues?.imap).length > 0)
 )
 
@@ -895,6 +971,12 @@ const form = useForm({
     prompt_tags_on_reply: false,
     enable_plus_addressing: true,
     auth_type: AUTH_TYPE_PASSWORD,
+    transport: TRANSPORT_SMTP_IMAP,
+    http_api: {
+      provider: HTTP_API_PROVIDER_RESEND,
+      api_key: '',
+      webhook_secret: ''
+    },
     imap: {
       host: 'imap.gmail.com',
       port: 993,
@@ -1033,7 +1115,10 @@ watch(
     if (Object.keys(newValues).length === 0) {
       return
     }
-    if (newValues.config?.auth_type === AUTH_TYPE_OAUTH2) {
+    if (newValues.config?.transport === TRANSPORT_HTTP_API) {
+      isOAuthInbox.value = false
+      setupMethod.value = TRANSPORT_HTTP_API
+    } else if (newValues.config?.auth_type === AUTH_TYPE_OAUTH2) {
       isOAuthInbox.value = true
       setupMethod.value = 'oauth'
     } else {
@@ -1044,4 +1129,14 @@ watch(
   },
   { deep: true, immediate: true }
 )
+
+// The shared Input wrapper only forwards modelValue, so the hidden auth_type/transport
+// inputs can't drive the form via a :value binding. Write them to the form model directly
+// whenever the chosen setup method changes.
+watch(setupMethod, (method) => {
+  if (!method) return
+  const isHTTPAPI = method === TRANSPORT_HTTP_API
+  form.setFieldValue('transport', isHTTPAPI ? TRANSPORT_HTTP_API : TRANSPORT_SMTP_IMAP)
+  form.setFieldValue('auth_type', method === 'manual' || isHTTPAPI ? AUTH_TYPE_PASSWORD : AUTH_TYPE_OAUTH2)
+})
 </script>
