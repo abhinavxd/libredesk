@@ -509,6 +509,21 @@ VALUES ($1, (SELECT id FROM conversations WHERE uuid = $2), NOW())
 ON CONFLICT (conversation_id, user_id)
 DO UPDATE SET last_seen_at = NOW(), updated_at = NOW();
 
+-- name: get-conversation-seen-by
+SELECT
+    cls.user_id,
+    u.first_name,
+    u.last_name,
+    u.avatar_url,
+    cls.last_seen_at
+FROM conversation_last_seen cls
+JOIN users u ON cls.user_id = u.id
+JOIN conversations c ON cls.conversation_id = c.id
+WHERE c.uuid = $1
+  AND u.deleted_at IS NULL
+ORDER BY cls.last_seen_at DESC;
+
+
 -- name: update-conversation-last-message
 -- $1=id, $2=uuid, $3=content, $4=sender_type, $5=timestamp, $6=message_type, $7=private, $8=sender_id
 UPDATE conversations SET
