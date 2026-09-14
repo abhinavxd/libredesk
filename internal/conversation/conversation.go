@@ -31,7 +31,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
-	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	slaModels "github.com/abhinavxd/libredesk/internal/sla/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -86,6 +85,10 @@ var conversationListAllowedFields = dbutil.AllowedFields{
 	"inboxes":               inboxesAllowedFields,
 }
 
+type notificationDispatcher interface {
+	Send(nmodels.Notification) []nmodels.DeliveryResult
+}
+
 // Manager handles the operations related to conversations
 type Manager struct {
 	q                          queries
@@ -99,7 +102,7 @@ type Manager struct {
 	settingsStore              settingsStore
 	csatStore                  csatStore
 	webhookStore               webhookStore
-	dispatcher                 *notifier.Dispatcher
+	dispatcher                 notificationDispatcher
 	lo                         *logf.Logger
 	db                         *sqlx.DB
 	i18n                       *i18n.I18n
@@ -254,7 +257,7 @@ func New(
 	automation *automation.Engine,
 	template *template.Manager,
 	webhook webhookStore,
-	dispatcher *notifier.Dispatcher,
+	dispatcher notificationDispatcher,
 	opts Opts) (*Manager, error) {
 
 	var q queries
@@ -1278,19 +1281,20 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 	}
 
 	// Send notification.
-	m.dispatcher.Send(notifier.Notification{
-		Type:             nmodels.NotificationTypeAssignment,
-		RecipientIDs:     []int{agent.ID},
+	m.dispatcher.Send(nmodels.Notification{
+		Type: nmodels.NotificationTypeAssignment,
+		Recipients: []nmodels.Recipient{{
+			UserID: agent.ID,
+			Email: &nmodels.EmailNotification{
+				Recipient: agent.Email.String,
+				Subject:   subject,
+				Content:   content,
+			},
+		}},
 		Title:            m.i18n.Ts("notification.conversationAssigned", "referenceNumber", conversation.ReferenceNumber),
 		Body:             conversation.Subject,
 		ConversationID:   null.IntFrom(conversation.ID),
 		ConversationUUID: conversation.UUID,
-		// Parms required for email
-		Email: &notifier.EmailNotification{
-			Recipients: []string{agent.Email.String},
-			Subject:    subject,
-			Content:    content,
-		},
 	})
 	return nil
 }
@@ -1382,50 +1386,29 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		candidateIDs[i] = recipient.ID
 	}
 
-	channels, err := m.dispatcher.EnabledChannels(candidateIDs, group.nType)
-	if err != nil {
-		m.lo.Error("error fetching notification preferences", "type", group.nType, "error", err)
-		return
-	}
-	if len(channels) == 0 {
-		return
-	}
-	notifiableIDs := make([]int, 0, len(candidateIDs))
-	for _, id := range candidateIDs {
-		if len(channels[id]) > 0 {
-			notifiableIDs = append(notifiableIDs, id)
-		}
-	}
-
-	claimedIDs, err := m.claimUnreadRecipients(conversation, notifiableIDs, message.CreatedAt)
+	claimedIDs, err := m.claimUnreadRecipients(conversation, candidateIDs, message.CreatedAt)
 	if err != nil {
 		return
 	}
 
-	var (
-		recipientIDs []int
-		emails       []notifier.EmailNotification
-	)
+	var recipients []nmodels.Recipient
 	for _, recipient := range group.recipients {
 		if !slices.Contains(claimedIDs, recipient.ID) {
 			continue
 		}
-		var email notifier.EmailNotification
-		if slices.Contains(channels[recipient.ID], nmodels.NotificationChannelEmail) {
-			if rendered := m.renderNotificationEmail(group.tmpl, conversation, message, recipient, author); rendered != nil {
-				email = *rendered
-			}
+		email := m.renderNotificationEmail(group.tmpl, conversation, message, recipient, author)
+		if email != nil {
+			email.Delay = newReplyEmailDelay
 		}
-		recipientIDs = append(recipientIDs, recipient.ID)
-		emails = append(emails, email)
+		recipients = append(recipients, nmodels.Recipient{UserID: recipient.ID, Email: email})
 	}
-	if len(recipientIDs) == 0 {
+	if len(recipients) == 0 {
 		return
 	}
 
-	unstored := m.dispatcher.SendWithEmailsAfter(notifier.Notification{
+	results := m.dispatcher.Send(nmodels.Notification{
 		Type:             group.nType,
-		RecipientIDs:     recipientIDs,
+		Recipients:       recipients,
 		Title:            group.title,
 		Body:             conversation.Subject,
 		ConversationID:   null.IntFrom(conversation.ID),
@@ -1433,8 +1416,15 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		ConversationUUID: conversation.UUID,
 		MessageUUID:      message.UUID,
 		MessageCreatedAt: null.TimeFrom(message.CreatedAt),
-	}, emails, newReplyEmailDelay, channels)
-	m.clearReplyNotified(conversation.UUID, unstored...)
+	})
+	var untracked []int
+	for _, result := range results {
+		if !slices.Contains(result.Channels, nmodels.NotificationChannelInApp) &&
+			!slices.Contains(result.Channels, nmodels.NotificationChannelEmail) {
+			untracked = append(untracked, result.RecipientID)
+		}
+	}
+	m.clearReplyNotified(conversation.UUID, untracked...)
 }
 
 // claimUnreadRecipients holds the reply notification lock across the unread check and the claim, returning the claimed recipients.
@@ -1487,7 +1477,7 @@ func (m *Manager) clearReplyNotified(conversationUUID string, userIDs ...int) {
 }
 
 // renderNotificationEmail returns nil when the recipient has no email or the template fails to render.
-func (m *Manager) renderNotificationEmail(tmplName string, conversation models.Conversation, message models.Message, recipient, author umodels.User) *notifier.EmailNotification {
+func (m *Manager) renderNotificationEmail(tmplName string, conversation models.Conversation, message models.Message, recipient, author umodels.User) *nmodels.EmailNotification {
 	if recipient.Email.String == "" {
 		return nil
 	}
@@ -1501,10 +1491,10 @@ func (m *Manager) renderNotificationEmail(tmplName string, conversation models.C
 		m.lo.Error("error rendering template", "template", tmplName, "conversation_uuid", conversation.UUID, "error", err)
 		return nil
 	}
-	return &notifier.EmailNotification{
-		Recipients: []string{recipient.Email.String},
-		Subject:    subject,
-		Content:    content,
+	return &nmodels.EmailNotification{
+		Recipient: recipient.Email.String,
+		Subject:   subject,
+		Content:   content,
 	}
 }
 
@@ -1558,7 +1548,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	}
 	messageContent := sanitizeNotificationHTML(message.Content, rootURL)
 
-	recipientIDs, emails := m.buildRecipientEmails(userIDs, func(recipient umodels.User) (string, string, error) {
+	recipients := m.buildNotificationRecipients(userIDs, func(recipient umodels.User) (string, string, error) {
 		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned,
 			map[string]any{
 				"Conversation": map[string]any{
@@ -1594,14 +1584,13 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 		return subject, content, err
 	})
 
-	if len(recipientIDs) == 0 {
+	if len(recipients) == 0 {
 		return
 	}
 
-	// Send notification via dispatcher (handles in-app, WebSocket, and email).
-	m.dispatcher.SendWithEmails(notifier.Notification{
+	m.dispatcher.Send(nmodels.Notification{
 		Type:             nmodels.NotificationTypeMention,
-		RecipientIDs:     recipientIDs,
+		Recipients:       recipients,
 		Title:            m.i18n.Ts("notification.mentionedInConversation", "author", author.FullName(), "referenceNumber", conversation.ReferenceNumber),
 		Body:             null.StringFrom(message.TextContent),
 		ConversationID:   null.IntFrom(conversation.ID),
@@ -1611,7 +1600,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 		MessageUUID:      message.UUID,
 		ActorFirstName:   author.FirstName,
 		ActorLastName:    author.LastName,
-	}, emails)
+	})
 }
 
 // UnassignOpen unassigns all open conversations belonging to a user.
@@ -1782,7 +1771,7 @@ func (m *Manager) notifyAutomation(subject, message string, entries []string, co
 		userIDs = userIDs[:amodels.MaxNotifyRecipients]
 	}
 
-	recipientIDs, emails := m.buildRecipientEmails(userIDs, func(recipient umodels.User) (string, string, error) {
+	recipients := m.buildNotificationRecipients(userIDs, func(recipient umodels.User) (string, string, error) {
 		content, err := m.template.RenderEmailWithTemplate(
 			map[string]any{
 				"Conversation": map[string]any{
@@ -1816,49 +1805,44 @@ func (m *Manager) notifyAutomation(subject, message string, entries []string, co
 		return subject, content, err
 	})
 
-	m.dispatcher.SendWithEmails(notifier.Notification{
+	m.dispatcher.Send(nmodels.Notification{
 		Type:             nmodels.NotificationTypeMention,
-		RecipientIDs:     recipientIDs,
+		Recipients:       recipients,
 		Title:            subject,
 		Body:             null.StringFrom(message),
 		ConversationID:   null.IntFrom(conv.ID),
 		ConversationUUID: conv.UUID,
-	}, emails)
+	})
 	return nil
 }
 
-// buildRecipientEmails fetches each recipient and renders their email, returning emails index-aligned with recipient IDs; on fetch or render failure the in-app notification still goes out with a zero-value email.
-func (m *Manager) buildRecipientEmails(userIDs []int, render func(recipient umodels.User) (subject, content string, err error)) ([]int, []notifier.EmailNotification) {
-	var (
-		recipientIDs []int
-		emails       []notifier.EmailNotification
-	)
+func (m *Manager) buildNotificationRecipients(userIDs []int, render func(recipient umodels.User) (subject, content string, err error)) []nmodels.Recipient {
+	recipients := make([]nmodels.Recipient, 0, len(userIDs))
 	for _, id := range userIDs {
-		recipientIDs = append(recipientIDs, id)
+		delivery := nmodels.Recipient{UserID: id}
 
 		recipient, err := m.userStore.GetAgentCachedOrLoad(id)
 		if err != nil {
 			m.lo.Error("error fetching agent for email notification", "user_id", id, "error", err)
-			emails = append(emails, notifier.EmailNotification{})
+			recipients = append(recipients, delivery)
 			continue
 		}
 
-		var email notifier.EmailNotification
 		if recipient.Email.String != "" {
 			subject, content, err := render(recipient)
 			if err != nil {
 				m.lo.Error("error rendering email notification", "user_id", id, "error", err)
 			} else {
-				email = notifier.EmailNotification{
-					Recipients: []string{recipient.Email.String},
-					Subject:    subject,
-					Content:    content,
+				delivery.Email = &nmodels.EmailNotification{
+					Recipient: recipient.Email.String,
+					Subject:   subject,
+					Content:   content,
 				}
 			}
 		}
-		emails = append(emails, email)
+		recipients = append(recipients, delivery)
 	}
-	return recipientIDs, emails
+	return recipients
 }
 
 func (m *Manager) resolveNotifyRecipients(entries []string, conv models.Conversation) []int {

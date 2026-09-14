@@ -3,7 +3,6 @@ package notifier
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
@@ -51,16 +51,9 @@ type PushSubscriptionInput struct {
 	Auth     string `json:"auth"`
 }
 
-type PushPayload struct {
-	Title string `json:"title"`
-	Body  string `json:"body,omitempty"`
-	Tag   string `json:"tag,omitempty"`
-	URL   string `json:"url"`
-}
-
 type pushDelivery struct {
 	UserID  int
-	Payload PushPayload
+	Payload nmodels.PushPayload
 }
 
 type pushSubscriptionStore interface {
@@ -153,7 +146,7 @@ func (m *PushManager) Delete(userID int, endpoint string) error {
 	return nil
 }
 
-func (m *PushManager) Send(userID int, payload PushPayload) bool {
+func (m *PushManager) Send(userID int, payload nmodels.PushPayload) bool {
 	if m.publicKey == "" || m.privateKey == "" {
 		return false
 	}
@@ -309,18 +302,6 @@ func vapidSubject(rootURL string) string {
 		return rootURL
 	}
 	return "support@libredesk.io"
-}
-
-func pushRoute(notificationType, conversationUUID, messageUUID string) string {
-	list := "assigned"
-	if notificationType == "mention" {
-		list = "mentioned"
-	}
-	target := fmt.Sprintf("/inboxes/%s/conversation/%s", list, conversationUUID)
-	if messageUUID != "" {
-		target += "?scrollTo=" + messageUUID
-	}
-	return target
 }
 
 func newPushHTTPClient(lo *logf.Logger) *http.Client {

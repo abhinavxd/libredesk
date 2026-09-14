@@ -13,6 +13,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	nchannels "github.com/abhinavxd/libredesk/internal/notification/channels"
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/testutil"
@@ -41,7 +42,7 @@ type countingPush struct {
 	count int
 }
 
-func (p *countingPush) Send(int, notifier.PushPayload) bool {
+func (p *countingPush) Send(int, nmodels.PushPayload) bool {
 	p.count++
 	return true
 }
@@ -206,8 +207,12 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 		mr := miniredis.RunT(t)
 		replyRedis = mr
 		m := &Manager{lo: &lo, i18n: i18n, template: templates, rdb: redis.NewClient(&redis.Options{Addr: mr.Addr()}),
-			userStore:  replyUserStore{agent: umodels.User{ID: userID, Email: null.StringFrom("history@example.com"), Enabled: true, Permissions: []string{authzmodels.PermConversationsRead, authzmodels.PermConversationsReadAssigned}}},
-			dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{Lo: &lo, Prefs: &replyPreferences{channels: channels}, EmailQueue: emailQueue, EmailEnabled: true, InApp: inApp}),
+			userStore: replyUserStore{agent: umodels.User{ID: userID, Email: null.StringFrom("history@example.com"), Enabled: true, Permissions: []string{authzmodels.PermConversationsRead, authzmodels.PermConversationsReadAssigned}}},
+			dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{
+				Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil, &lo), nchannels.NewEmail(emailQueue)),
+				Prefs:    &replyPreferences{channels: channels},
+				Lo:       &lo,
+			}),
 		}
 		m.q.GetConversationParticipantAgents = q.Participants
 		m.q.UpsertUserLastSeen = q.LastSeen
@@ -368,12 +373,18 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 	t.Run("push only agent keeps no claim", func(t *testing.T) {
 		m := newManager(nmodels.NotificationChannelPush)
 		push := &countingPush{}
-		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{Lo: &lo, Prefs: &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelPush}},
-			Push: push, EmailQueue: emailQueue, EmailEnabled: true, InApp: inApp})
+		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{
+			Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil, &lo), nchannels.NewEmail(emailQueue), nchannels.NewPush(push)),
+			Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelPush}},
+			Lo:       &lo,
+		})
 		m.NotifyNewReply(conv, message, false)
 
-		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{Lo: &lo, Prefs: &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelInApp}},
-			EmailQueue: emailQueue, EmailEnabled: true, InApp: inApp})
+		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{
+			Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil, &lo), nchannels.NewEmail(emailQueue)),
+			Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelInApp}},
+			Lo:       &lo,
+		})
 		m.NotifyNewReply(conv, message, false)
 
 		var count int

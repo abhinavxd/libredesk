@@ -23,6 +23,11 @@ type replyNotificationStore interface {
 	ReleaseReplyNotification(conversationID, userID int, messageCreatedAt time.Time)
 }
 
+type EmailSender interface {
+	Send(Message) error
+	SendSync(Message) error
+}
+
 type emailQueueQueries struct {
 	IsSeen  *sqlx.Stmt `query:"is-notification-seen"`
 	Enqueue *sqlx.Stmt `query:"enqueue-notification-email"`
@@ -47,14 +52,14 @@ type queuedEmail struct {
 
 type EmailQueue struct {
 	q                 emailQueueQueries
-	outbound          *Service
+	outbound          EmailSender
 	conversationStore replyNotificationStore
 	lo                *logf.Logger
 }
 
 type EmailQueueOpts struct {
 	DB       *sqlx.DB
-	Outbound *Service
+	Outbound EmailSender
 	Lo       *logf.Logger
 }
 
@@ -74,7 +79,7 @@ func (q *EmailQueue) SetConversationStore(store replyNotificationStore) {
 	q.conversationStore = store
 }
 
-func (q *EmailQueue) Send(e queuedEmail) bool {
+func (q *EmailQueue) Send(e models.Email) bool {
 	if err := q.outbound.Send(Message{
 		RecipientEmails: []string{e.Recipient},
 		Subject:         e.Subject,
@@ -87,7 +92,7 @@ func (q *EmailQueue) Send(e queuedEmail) bool {
 	return true
 }
 
-func (q *EmailQueue) SendAfter(e queuedEmail, delay time.Duration) bool {
+func (q *EmailQueue) SendAfter(e models.Email, delay time.Duration) bool {
 	if _, err := q.q.Enqueue.Exec(e.UserID, e.NotificationID, e.Type, e.ConversationID, e.Recipient,
 		e.Subject, e.Content, time.Now().Add(delay), e.MessageCreatedAt); err != nil {
 		q.lo.Error("error queueing notification email", "user_id", e.UserID, "type", e.Type, "error", err)

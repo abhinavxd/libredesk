@@ -3,9 +3,11 @@ package notifier
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/abhinavxd/libredesk/internal/notification/channels"
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -22,26 +24,64 @@ func (p fakePreferences) EnabledChannels([]int, models.NotificationType) (map[in
 
 type fakePushDispatcher struct {
 	userID  int
-	payload PushPayload
+	payload models.PushPayload
 }
 
-func (p *fakePushDispatcher) Send(userID int, payload PushPayload) bool {
+type fakeChannelProvider struct {
+	channel        models.NotificationChannel
+	result         channels.Result
+	notificationID null.Int
+}
+
+func (p *fakePushDispatcher) Send(userID int, payload models.PushPayload) bool {
 	p.userID = userID
 	p.payload = payload
 	return true
 }
 
+func (p *fakeChannelProvider) Channel() models.NotificationChannel {
+	return p.channel
+}
+
+func (p *fakeChannelProvider) Send(delivery channels.Delivery) channels.Result {
+	p.notificationID = delivery.NotificationID
+	return p.result
+}
+
+func TestDispatcherPassesResultsThroughProviders(t *testing.T) {
+	inApp := &fakeChannelProvider{
+		channel: models.NotificationChannelInApp,
+		result:  channels.Result{Sent: true, NotificationID: null.IntFrom(7)},
+	}
+	email := &fakeChannelProvider{channel: models.NotificationChannelEmail}
+	d := NewDispatcher(DispatcherOpts{
+		Pipeline: channels.NewPipeline(email, inApp),
+		Prefs: fakePreferences{channels: map[int][]models.NotificationChannel{
+			42: {models.NotificationChannelInApp, models.NotificationChannelEmail},
+		}},
+	})
+
+	results := d.Send(models.Notification{Type: models.NotificationTypeMention, Recipients: []models.Recipient{{UserID: 42}}})
+
+	if email.notificationID.Int != 7 {
+		t.Fatalf("email notification ID = %d, want 7", email.notificationID.Int)
+	}
+	if len(results) != 1 || !slices.Equal(results[0].Channels, []models.NotificationChannel{models.NotificationChannelInApp}) {
+		t.Fatalf("delivery results = %#v", results)
+	}
+}
+
 func TestDispatcherSendsPushUsingNotificationRoute(t *testing.T) {
 	push := &fakePushDispatcher{}
-	d := &Dispatcher{
-		prefs: fakePreferences{channels: map[int][]models.NotificationChannel{
+	d := NewDispatcher(DispatcherOpts{
+		Prefs: fakePreferences{channels: map[int][]models.NotificationChannel{
 			42: {models.NotificationChannelPush},
 		}},
-		push: push,
-	}
-	d.Send(Notification{
+		Pipeline: channels.NewPipeline(channels.NewPush(push)),
+	})
+	d.Send(models.Notification{
 		Type:             models.NotificationTypeMention,
-		RecipientIDs:     []int{42},
+		Recipients:       []models.Recipient{{UserID: 42}},
 		Title:            "You were mentioned",
 		Body:             null.StringFrom("A teammate mentioned you"),
 		ConversationUUID: "conversation-uuid",
@@ -61,16 +101,16 @@ func TestDispatcherSendsPushUsingNotificationRoute(t *testing.T) {
 
 func TestDispatcherDoesNotSendPushWhenDisabled(t *testing.T) {
 	push := &fakePushDispatcher{}
-	d := &Dispatcher{
-		prefs: fakePreferences{channels: map[int][]models.NotificationChannel{
+	d := NewDispatcher(DispatcherOpts{
+		Prefs: fakePreferences{channels: map[int][]models.NotificationChannel{
 			42: nil,
 		}},
-		push: push,
-	}
-	d.Send(Notification{
-		Type:         models.NotificationTypeMention,
-		RecipientIDs: []int{42},
-		Title:        "You were mentioned",
+		Pipeline: channels.NewPipeline(channels.NewPush(push)),
+	})
+	d.Send(models.Notification{
+		Type:       models.NotificationTypeMention,
+		Recipients: []models.Recipient{{UserID: 42}},
+		Title:      "You were mentioned",
 	})
 
 	if push.userID != 0 {
@@ -82,15 +122,15 @@ func TestDispatcherHandlesPreferenceLookupFailure(t *testing.T) {
 	var logs bytes.Buffer
 	lo := logf.New(logf.Opts{Writer: &logs})
 	push := &fakePushDispatcher{}
-	d := &Dispatcher{
-		prefs: fakePreferences{err: errors.New("lookup failed")},
-		push:  push,
-		lo:    &lo,
-	}
-	d.Send(Notification{
-		Type:         models.NotificationTypeMention,
-		RecipientIDs: []int{42},
-		Title:        "You were mentioned",
+	d := NewDispatcher(DispatcherOpts{
+		Prefs:    fakePreferences{err: errors.New("lookup failed")},
+		Pipeline: channels.NewPipeline(channels.NewPush(push)),
+		Lo:       &lo,
+	})
+	d.Send(models.Notification{
+		Type:       models.NotificationTypeMention,
+		Recipients: []models.Recipient{{UserID: 42}},
+		Title:      "You were mentioned",
 	})
 
 	if push.userID != 0 {

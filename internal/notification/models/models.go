@@ -71,6 +71,57 @@ type NotificationPreference struct {
 	Enabled          bool                `db:"enabled" json:"enabled"`
 }
 
+type Recipient struct {
+	UserID int
+	Email  *EmailNotification
+}
+
+type Notification struct {
+	Type             NotificationType
+	Recipients       []Recipient
+	Title            string
+	Body             null.String
+	ConversationID   null.Int
+	MessageID        null.Int
+	MessageCreatedAt null.Time
+	ActorID          null.Int
+	Meta             json.RawMessage
+	ConversationUUID string
+	MessageUUID      string
+	ActorFirstName   string
+	ActorLastName    string
+}
+
+type EmailNotification struct {
+	Recipient string
+	Subject   string
+	Content   string
+	Delay     time.Duration
+}
+
+type Email struct {
+	UserID           int
+	NotificationID   null.Int
+	Type             NotificationType
+	ConversationID   null.Int
+	Recipient        string
+	Subject          string
+	Content          string
+	MessageCreatedAt null.Time
+}
+
+type PushPayload struct {
+	Title string `json:"title"`
+	Body  string `json:"body,omitempty"`
+	Tag   string `json:"tag,omitempty"`
+	URL   string `json:"url"`
+}
+
+type DeliveryResult struct {
+	RecipientID int
+	Channels    []NotificationChannel
+}
+
 // DefaultEnabled reports the preference for a type when the agent has no stored row for it.
 func DefaultEnabled(nType NotificationType) bool {
 	return !slices.Contains(defaultDisabledTypes, nType)

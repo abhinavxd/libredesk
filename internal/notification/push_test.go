@@ -12,6 +12,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/jmoiron/sqlx/types"
 	"github.com/zerodha/logf"
 )
@@ -72,7 +73,7 @@ func TestPushManagerDeliverSendsEverySubscription(t *testing.T) {
 		},
 	}
 
-	if err := m.deliver(t.Context(), pushDelivery{UserID: 7, Payload: PushPayload{
+	if err := m.deliver(t.Context(), pushDelivery{UserID: 7, Payload: nmodels.PushPayload{
 		Title: "Assigned conversation",
 		Body:  "A conversation was assigned to you",
 		Tag:   "assignment_conv-1",
@@ -88,7 +89,7 @@ func TestPushManagerDeliverSendsEverySubscription(t *testing.T) {
 func TestPushManagerDeliverBoundsPreview(t *testing.T) {
 	for _, content := range []string{"", "Short note", strings.Repeat("a", 100), strings.Repeat("a", 101), strings.Repeat("a", 400), strings.Repeat("a", 401), strings.Repeat("a", 10000), strings.Repeat("世界🙂", 2000), strings.Repeat("<&>\x00\"\\", 2000), strings.Repeat("\x00", 2000)} {
 		t.Run(fmt.Sprintf("bytes_%d", len(content)), func(t *testing.T) {
-			original := PushPayload{Title: content, Body: content, Tag: "mention_" + strings.Repeat("a", 36), URL: pushRoute("mention", strings.Repeat("a", 36), strings.Repeat("b", 36))}
+			original := nmodels.PushPayload{Title: content, Body: content, Tag: "mention_" + strings.Repeat("a", 36), URL: "/inboxes/mentioned/conversation/123?scrollTo=456"}
 			called := false
 			m := &PushManager{
 				store: &fakePushStore{subscriptions: []PushSubscription{{ID: 1}}},
@@ -97,7 +98,7 @@ func TestPushManagerDeliverBoundsPreview(t *testing.T) {
 					if len(payload) > 3993 {
 						t.Fatalf("payload has %d bytes, exceeds Web Push capacity", len(payload))
 					}
-					var got PushPayload
+					var got nmodels.PushPayload
 					if err := json.Unmarshal(payload, &got); err != nil {
 						t.Fatal(err)
 					}
@@ -134,7 +135,7 @@ func TestPushManagerDeliverDeletesExpiredSubscription(t *testing.T) {
 		},
 	}
 
-	if err := m.deliver(t.Context(), pushDelivery{UserID: 7, Payload: PushPayload{Title: "Mention"}}); err != nil {
+	if err := m.deliver(t.Context(), pushDelivery{UserID: 7, Payload: nmodels.PushPayload{Title: "Mention"}}); err != nil {
 		t.Fatal(err)
 	}
 	if store.deletedID != 23 {

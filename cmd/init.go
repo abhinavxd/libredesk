@@ -39,6 +39,7 @@ import (
 	fs "github.com/abhinavxd/libredesk/internal/media/stores/localfs"
 	"github.com/abhinavxd/libredesk/internal/media/stores/s3"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	notificationchannels "github.com/abhinavxd/libredesk/internal/notification/channels"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
@@ -1216,14 +1217,17 @@ func initPushNotification(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18
 
 // initNotifDispatcher initializes the notification dispatcher.
 func initNotifDispatcher(userNotification *notifier.UserNotificationManager, prefs *notifier.PreferenceManager, push *notifier.PushManager, emailQueue *notifier.EmailQueue, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+	providers := []notificationchannels.Provider{
+		notificationchannels.NewInApp(userNotification, wsHub, initLogger("notification-in-app")),
+	}
+	if emailEnabled {
+		providers = append(providers, notificationchannels.NewEmail(emailQueue))
+	}
+	providers = append(providers, notificationchannels.NewPush(push))
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
-		InApp:        userNotification,
-		EmailQueue:   emailQueue,
-		WSHub:        wsHub,
-		Prefs:        prefs,
-		Push:         push,
-		EmailEnabled: emailEnabled,
-		Lo:           initLogger("notification-dispatcher"),
+		Pipeline: notificationchannels.NewPipeline(providers...),
+		Prefs:    prefs,
+		Lo:       initLogger("notification-dispatcher"),
 	})
 }
 

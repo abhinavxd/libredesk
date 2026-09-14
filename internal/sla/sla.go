@@ -16,7 +16,6 @@ import (
 	cstatusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
-	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/sla/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -63,6 +62,10 @@ var metricNotificationTypes = map[string]struct{ warning, breach nmodels.Notific
 	MetricResolution:    {nmodels.NotificationTypeSLAResolutionWarn, nmodels.NotificationTypeSLAResolutionBreach},
 }
 
+type notificationDispatcher interface {
+	Send(nmodels.Notification) []nmodels.DeliveryResult
+}
+
 type Manager struct {
 	q                queries
 	lo               *logf.Logger
@@ -72,7 +75,7 @@ type Manager struct {
 	appSettingsStore appSettingsStore
 	businessHrsStore businessHrsStore
 	template         *template.Manager
-	dispatcher       *notifier.Dispatcher
+	dispatcher       notificationDispatcher
 	wg               sync.WaitGroup
 	opts             Opts
 }
@@ -149,7 +152,7 @@ func New(
 	businessHrsStore businessHrsStore,
 	template *template.Manager,
 	userStore userStore,
-	dispatcher *notifier.Dispatcher,
+	dispatcher notificationDispatcher,
 ) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile(
@@ -781,18 +784,20 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 		}
 
 		// Send notification via dispatcher (handles in-app, WebSocket, and email).
-		m.dispatcher.Send(notifier.Notification{
-			Type:             notifType,
-			RecipientIDs:     []int{recipientID},
+		m.dispatcher.Send(nmodels.Notification{
+			Type: notifType,
+			Recipients: []nmodels.Recipient{{
+				UserID: recipientID,
+				Email: &nmodels.EmailNotification{
+					Recipient: agent.Email.String,
+					Subject:   subject,
+					Content:   content,
+				},
+			}},
 			Title:            notificationTitle,
 			Body:             null.StringFrom(notificationBody),
 			ConversationID:   null.IntFrom(appliedSLA.ConversationID),
 			ConversationUUID: appliedSLA.ConversationUUID,
-			Email: &notifier.EmailNotification{
-				Recipients: []string{agent.Email.String},
-				Subject:    subject,
-				Content:    content,
-			},
 		})
 
 		// Mark the notification as processed.

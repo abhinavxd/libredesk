@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/notification/channels"
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/volatiletech/null/v9"
@@ -51,17 +52,23 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := NewDispatcher(DispatcherOpts{
-		EmailQueue:   queue,
-		EmailEnabled: true,
-		Prefs:        fakePreferences{channels: map[int][]models.NotificationChannel{userID: {models.NotificationChannelEmail}}},
+		Pipeline: channels.NewPipeline(channels.NewEmail(queue)),
+		Prefs:    fakePreferences{channels: map[int][]models.NotificationChannel{userID: {models.NotificationChannelEmail}}},
 	})
 	messageTime := time.Now().UTC().Add(-time.Minute).Truncate(time.Microsecond)
-	n := Notification{
-		Type:             models.NotificationTypeNewReply,
-		RecipientIDs:     []int{userID},
+	n := models.Notification{
+		Type: models.NotificationTypeNewReply,
+		Recipients: []models.Recipient{{
+			UserID: userID,
+			Email: &models.EmailNotification{
+				Recipient: "read@example.com",
+				Subject:   "Reply",
+				Content:   "First reply",
+				Delay:     time.Minute,
+			},
+		}},
 		ConversationID:   null.IntFrom(convID),
 		MessageCreatedAt: null.TimeFrom(messageTime),
-		Email:            &EmailNotification{Recipients: []string{"read@example.com"}, Subject: "Reply", Content: "First reply"},
 	}
 	db.MustExec(`INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at) VALUES ($1, $2, $3)`, userID, convID, messageTime.Add(-time.Second))
 	for _, tt := range []struct {
@@ -75,7 +82,7 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, tt.readTime)
-			d.SendAfter(n, time.Minute)
+			d.Send(n)
 			db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
 			due := queue.due()
 			if len(due) != 1 {
@@ -93,10 +100,10 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 
 	t.Run("coalesced reply uses latest message", func(t *testing.T) {
 		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, messageTime.Add(time.Second))
-		d.SendAfter(n, time.Minute)
+		d.Send(n)
 		n.MessageCreatedAt = null.TimeFrom(messageTime.Add(2 * time.Second))
-		n.Email.Content = "Second reply"
-		d.SendAfter(n, time.Minute)
+		n.Recipients[0].Email.Content = "Second reply"
+		d.Send(n)
 		db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
 		due := queue.due()
 		if len(due) != 1 || due[0].Content != "Second reply" {
@@ -121,7 +128,7 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 
 	t.Run("legacy email without message time", func(t *testing.T) {
 		n.MessageCreatedAt = null.Time{}
-		d.SendAfter(n, time.Minute)
+		d.Send(n)
 		db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
 		due := queue.due()
 		if len(due) != 1 {
@@ -178,15 +185,15 @@ func TestDelayedEmailRetriesThenGivesUp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := NewDispatcher(DispatcherOpts{EmailQueue: queue, EmailEnabled: true, Prefs: fakePreferences{channels: map[int][]models.NotificationChannel{userID: {models.NotificationChannelEmail}}}})
-	n := Notification{Type: models.NotificationTypeNewReply, RecipientIDs: []int{userID}, ConversationID: null.IntFrom(convID)}
-	email := []EmailNotification{{Recipients: []string{"queued@example.com"}, Subject: "Reply", Content: "Reply"}}
-	send := func(emails []EmailNotification) {
-		channels, err := d.EnabledChannels(n.RecipientIDs, n.Type)
-		if err != nil {
-			t.Fatal(err)
-		}
-		d.SendWithEmailsAfter(n, emails, time.Minute, channels)
+	d := NewDispatcher(DispatcherOpts{
+		Pipeline: channels.NewPipeline(channels.NewEmail(queue)),
+		Prefs:    fakePreferences{channels: map[int][]models.NotificationChannel{userID: {models.NotificationChannelEmail}}},
+	})
+	n := models.Notification{Type: models.NotificationTypeNewReply, Recipients: []models.Recipient{{UserID: userID}}, ConversationID: null.IntFrom(convID)}
+	email := &models.EmailNotification{Recipient: "queued@example.com", Subject: "Reply", Content: "Reply", Delay: time.Minute}
+	send := func(email *models.EmailNotification) {
+		n.Recipients[0].Email = email
+		d.Send(n)
 	}
 	queued := func() int {
 		var count int
@@ -264,7 +271,7 @@ func TestClaimedEmailRemainsRecoverable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	email := queuedEmail{
+	email := models.Email{
 		UserID:    userID,
 		Type:      models.NotificationTypeNewReply,
 		Recipient: "recover@example.com",
@@ -337,7 +344,7 @@ func TestAbandonedReplyEmailReleasesSuppression(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db.MustExec(`DELETE FROM notification_email_queue`)
 			messageTime := time.Now().UTC().Truncate(time.Microsecond)
-			email := queuedEmail{UserID: userID, Type: tt.nType, ConversationID: null.IntFrom(convID),
+			email := models.Email{UserID: userID, Type: tt.nType, ConversationID: null.IntFrom(convID),
 				MessageCreatedAt: null.TimeFrom(messageTime), Recipient: "abandon@example.com", Subject: "Reply", Content: "Reply"}
 			if tt.inApp {
 				email.NotificationID = null.IntFrom(notificationID)
