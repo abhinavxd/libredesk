@@ -152,8 +152,6 @@ func handleSubmitCSATResponse(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid UUID", nil, envelope.InputError)
 	}
 
-	// Trim feedback if it exceeds max length. Truncate by runes so a
-	// multibyte UTF-8 character is never split into invalid bytes.
 	req.Feedback = truncateFeedback(req.Feedback)
 
 	// Update CSAT response
@@ -218,10 +216,6 @@ func validateCSATForm(r *fastglue.Request) (int, string, json.RawMessage, string
 	return rating, feedback, metaJSON, ""
 }
 
-// truncateFeedback caps feedback at maxCsatFeedbackLength runes. Truncating by
-// runes rather than bytes avoids splitting a multibyte UTF-8 character, which
-// would otherwise produce invalid UTF-8 that the database rejects, failing the
-// whole submission (including the rating).
 func truncateFeedback(s string) string {
 	if len(s) <= maxCsatFeedbackLength {
 		return s
