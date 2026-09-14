@@ -60,7 +60,7 @@
                   <TooltipContent>{{ contactFullName }}</TooltipContent>
                 </Tooltip>
                 <div class="flex items-center gap-1 flex-shrink-0">
-                  <PriorityDot :priority="conversation.priority" />
+                  <PriorityMarker :priority="conversation.priority" />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <component
@@ -177,7 +177,7 @@ import {
   ContextMenuTrigger
 } from '@shared-ui/components/ui/context-menu'
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
-import PriorityDot from '@main/features/conversation/PriorityDot.vue'
+import PriorityMarker from '@main/features/conversation/PriorityMarker.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'

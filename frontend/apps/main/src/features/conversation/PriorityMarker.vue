@@ -1,9 +1,11 @@
 <template>
   <Tooltip v-if="priorityName">
     <TooltipTrigger asChild>
-      <span
-        class="h-2 w-2 rounded-full flex-shrink-0"
-        :class="dotClass"
+      <PriorityIcon
+        :level="marker.level"
+        :size="13"
+        class="flex-shrink-0"
+        :class="marker.class"
         role="img"
         :aria-label="priorityLabel"
       />
@@ -14,16 +16,16 @@
 
 <script setup>
 import { computed } from 'vue'
+import PriorityIcon from '@shared-ui/components/icons/PriorityIcon.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { useI18n } from 'vue-i18n'
 
-// Priorities are seeded rows (Low, Medium, High) and are not translated, so match on the
-// name and keep anything unrecognised neutral rather than inventing a colour for it.
-const PRIORITY_DOT_CLASSES = {
-  low: 'bg-muted-foreground',
-  medium: 'bg-warning-600',
-  high: 'bg-destructive'
+const PRIORITY_MARKERS = {
+  low: { level: 1, class: 'text-muted-foreground' },
+  medium: { level: 2, class: 'text-warning-600' },
+  high: { level: 3, class: 'text-destructive' }
 }
+const UNKNOWN_MARKER = { level: 0, class: 'text-muted-foreground' }
 
 const props = defineProps({
   priority: {
@@ -36,9 +38,7 @@ const { t } = useI18n()
 
 const priorityName = computed(() => (props.priority || '').trim())
 
-const dotClass = computed(
-  () => PRIORITY_DOT_CLASSES[priorityName.value.toLowerCase()] || 'bg-muted-foreground'
-)
+const marker = computed(() => PRIORITY_MARKERS[priorityName.value.toLowerCase()] || UNKNOWN_MARKER)
 
 const priorityLabel = computed(() => `${t('globals.terms.priority', 1)}: ${priorityName.value}`)
 </script>
