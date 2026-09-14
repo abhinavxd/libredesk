@@ -61,6 +61,7 @@ SELECT
     u.api_key,
     u.api_key_last_used_at,
     u.external_user_id,
+    u.external_sync,
     u.api_secret,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
@@ -183,14 +184,17 @@ JOIN roles r ON r.name = role_name
 RETURNING user_id;
 
 -- name: insert-contact-with-external-id
-INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes, phone_number, phone_number_country_code)
-VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO users (email, type, first_name, last_name, "password", avatar_url, external_user_id, custom_attributes, phone_number, phone_number_country_code, external_sync)
+VALUES ($1, 'contact', $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10::jsonb, '{}'::jsonb))
 ON CONFLICT (external_user_id) WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NOT NULL
 DO UPDATE SET email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
               first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
               last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
               phone_number = COALESCE(NULLIF(EXCLUDED.phone_number, ''), users.phone_number),
               phone_number_country_code = COALESCE(NULLIF(EXCLUDED.phone_number_country_code, ''), users.phone_number_country_code),
+              -- Only a caller that supplies an identity rewrites the record; an agent creating a
+              -- conversation for the same external id must not wipe what the integration sent.
+              external_sync = COALESCE(NULLIF(EXCLUDED.external_sync, '{}'::jsonb), users.external_sync),
               updated_at = now()
 RETURNING id;
 
@@ -269,6 +273,32 @@ SET first_name = COALESCE(NULLIF($2, ''), first_name),
     email = COALESCE(NULLIF($4, ''), email),
     phone_number = COALESCE(NULLIF($5, ''), phone_number),
     phone_number_country_code = COALESCE(NULLIF($6, ''), phone_number_country_code),
+    updated_at = now()
+WHERE id = $1 AND type IN ('contact', 'visitor');
+
+-- name: lock-contact-external-identity
+-- Read for an identity sync, locking the row so the decision made from these values and the write
+-- that follows cannot be interleaved with an agent's edit or a second sync.
+SELECT first_name,
+       COALESCE(last_name, '') AS last_name,
+       COALESCE(email, '') AS email,
+       COALESCE(phone_number, '') AS phone_number,
+       COALESCE(phone_number_country_code, '') AS phone_number_country_code,
+       external_sync
+FROM users
+WHERE id = $1 AND type IN ('contact', 'visitor')
+FOR UPDATE;
+
+-- name: sync-contact-external-identity
+-- $2-$6 are the identity fields an external integration writes ('' leaves the field alone); $7 records
+-- what it supplied.
+UPDATE users
+SET first_name = COALESCE(NULLIF($2, ''), first_name),
+    last_name = COALESCE(NULLIF($3, ''), last_name),
+    email = COALESCE(NULLIF($4, ''), email),
+    phone_number = COALESCE(NULLIF($5, ''), phone_number),
+    phone_number_country_code = COALESCE(NULLIF($6, ''), phone_number_country_code),
+    external_sync = $7::jsonb,
     updated_at = now()
 WHERE id = $1 AND type IN ('contact', 'visitor');
 
@@ -389,6 +419,7 @@ SELECT
     u.phone_number,
     u.country,
     u.external_user_id,
+    u.external_sync,
     u.custom_attributes,
     u.api_key,
     u.api_key_last_used_at,
