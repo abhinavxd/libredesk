@@ -3,11 +3,13 @@ package notifier
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/jmoiron/sqlx/types"
 	"github.com/zerodha/logf"
@@ -80,6 +82,46 @@ func TestPushManagerDeliverSendsEverySubscription(t *testing.T) {
 	}
 	if len(endpoints) != 2 {
 		t.Fatalf("sent to %d endpoints, want 2", len(endpoints))
+	}
+}
+
+func TestPushManagerDeliverBoundsPreview(t *testing.T) {
+	for _, content := range []string{"", "Short note", strings.Repeat("a", 100), strings.Repeat("a", 101), strings.Repeat("a", 400), strings.Repeat("a", 401), strings.Repeat("a", 10000), strings.Repeat("世界🙂", 2000), strings.Repeat("<&>\x00\"\\", 2000), strings.Repeat("\x00", 2000)} {
+		t.Run(fmt.Sprintf("bytes_%d", len(content)), func(t *testing.T) {
+			original := PushPayload{Title: content, Body: content, Tag: "mention_" + strings.Repeat("a", 36) + "_" + strings.Repeat("b", 36), URL: pushRoute("mention", strings.Repeat("a", 36), strings.Repeat("b", 36))}
+			called := false
+			m := &PushManager{
+				store: &fakePushStore{subscriptions: []PushSubscription{{ID: 1}}},
+				sender: func(_ context.Context, payload []byte, _ PushSubscription, _, _, _ string) (*http.Response, error) {
+					called = true
+					if len(payload) > 3993 {
+						t.Fatalf("payload has %d bytes, exceeds Web Push capacity", len(payload))
+					}
+					var got PushPayload
+					if err := json.Unmarshal(payload, &got); err != nil {
+						t.Fatal(err)
+					}
+					if got.URL != original.URL || got.Tag != original.Tag {
+						t.Fatal("routing fields changed")
+					}
+					for _, preview := range []string{got.Title, got.Body} {
+						if !utf8.ValidString(preview) || !strings.HasPrefix(content, strings.TrimSuffix(preview, "…")) {
+							t.Fatal("invalid preview")
+						}
+						if len(content) < 100 && preview != content {
+							t.Fatal("short content changed")
+						}
+					}
+					return nil, nil
+				},
+			}
+			if err := m.deliver(t.Context(), pushDelivery{UserID: 1, Payload: original}); err != nil {
+				t.Fatal(err)
+			}
+			if !called {
+				t.Fatal("push was not delivered")
+			}
+		})
 	}
 }
 

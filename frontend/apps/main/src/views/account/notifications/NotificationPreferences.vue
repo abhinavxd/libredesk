@@ -98,7 +98,6 @@ const fetchPreferences = async () => {
     const { data } = await api.getNotificationPreferences()
     emailEnabled.value = data.data.email_enabled
     vapidPublicKey.value = data.data.vapid_public_key
-    await pushNotifications.refresh(vapidPublicKey.value)
     const byType = {}
     for (const pref of data.data.preferences) {
       byType[pref.notification_type] ??= { type: pref.notification_type }

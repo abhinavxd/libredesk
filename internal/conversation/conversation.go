@@ -43,6 +43,7 @@ import (
 	"github.com/jmoiron/sqlx/types"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -67,6 +68,9 @@ const (
 <a href="{{ RootURL }}/inboxes/all/conversation/{{ .Conversation.UUID }}">#{{ .Conversation.ReferenceNumber }}</a>
 </p>`
 	newReplyEmailDelay = 2 * time.Minute
+
+	replyNotificationKeyPrefix = "conv:reply:notified:"
+	replyNotificationTTL       = 7 * 24 * time.Hour
 )
 
 var conversationFilterRenderers = dbutil.FieldRenderers{
@@ -107,6 +111,7 @@ type Manager struct {
 	outgoingProcessingMessages sync.Map
 	closed                     bool
 	closedMu                   sync.RWMutex
+	rdb                        *redis.Client
 	wg                         sync.WaitGroup
 	continuityConfig           ContinuityConfig
 	subjectRefFormat           string
@@ -218,6 +223,7 @@ type ContinuityConfig struct {
 // Opts holds the options for creating a new Manager.
 type Opts struct {
 	DB                       *sqlx.DB
+	Redis                    *redis.Client
 	Lo                       *logf.Logger
 	OutgoingMessageQueueSize int
 	IncomingMessageQueueSize int
@@ -286,6 +292,7 @@ func New(
 		automation:                 automation,
 		template:                   template,
 		db:                         opts.DB,
+		rdb:                        opts.Redis,
 		lo:                         opts.Lo,
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
@@ -312,7 +319,6 @@ type queries struct {
 	GetConversationsByContactEmailForAI *sqlx.Stmt `query:"get-conversations-by-contact-email-for-ai"`
 	GetConversationParticipants         *sqlx.Stmt `query:"get-conversation-participants"`
 	GetConversationParticipantAgents    *sqlx.Stmt `query:"get-conversation-participant-agents"`
-	GetAgentsWithoutUnseenReplies       *sqlx.Stmt `query:"get-agents-without-unseen-replies"`
 	GetUserActiveConversationsCount     *sqlx.Stmt `query:"get-user-active-conversations-count"`
 	GetSidebarStandardCounts            *sqlx.Stmt `query:"get-sidebar-standard-counts"`
 	GetConversationsCountBase           string     `query:"get-conversations-count-base"`
@@ -545,6 +551,7 @@ func (c *Manager) UpdateUserLastSeen(uuid string, userID int) error {
 		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	c.releaseReplyNotifications(uuid, []int{userID})
 	return nil
 }
 
@@ -554,6 +561,7 @@ func (c *Manager) MarkAsUnread(uuid string, userID int) error {
 		c.lo.Error("error marking conversation as unread", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	c.releaseReplyNotifications(uuid, []int{userID})
 	return nil
 }
 
@@ -1260,7 +1268,14 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 		if p.ID == message.SenderID || p.ID == assigneeID {
 			continue
 		}
-		participating = append(participating, p)
+		agent, err := m.userStore.GetAgent(p.ID, "")
+		if err != nil {
+			m.lo.Error("error fetching participant for new reply notification", "user_id", p.ID, "error", err)
+			continue
+		}
+		if agent.Enabled && authz.CanReadAssignment(agent, conversation.AssignedUserID, conversation.AssignedTeamID) {
+			participating = append(participating, agent)
+		}
 	}
 
 	assigneeType, assigneeTmpl := nmodels.NotificationTypeNewReply, template.TmplNewReply
@@ -1270,9 +1285,16 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 		assigneeTitle = m.i18n.Ts("notification.conversationReopened", "referenceNumber", conversation.ReferenceNumber)
 	}
 
+	var assignees []umodels.User
 	var assigneeChannels, participatingChannels map[int][]nmodels.NotificationChannel
 	if assigneeID != 0 && assigneeID != message.SenderID {
-		assigneeChannels = m.dispatcher.EnabledChannels([]int{assigneeID}, assigneeType)
+		agent, err := m.userStore.GetAgent(assigneeID, "")
+		if err != nil {
+			m.lo.Error("error fetching agent for new reply notification", "user_id", assigneeID, "error", err)
+		} else if agent.Enabled && authz.CanReadAssignment(agent, conversation.AssignedUserID, conversation.AssignedTeamID) {
+			assignees = append(assignees, agent)
+			assigneeChannels = m.dispatcher.EnabledChannels([]int{assigneeID}, assigneeType)
+		}
 	}
 	if len(participating) > 0 {
 		ids := make([]int, 0, len(participating))
@@ -1285,8 +1307,6 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 		return
 	}
 
-	// A recipient who already has unseen replies has an unread notification for this conversation,
-	// notifying again per message would spam them during a burst.
 	candidateIDs := make([]int, 0, len(assigneeChannels)+len(participatingChannels))
 	for id := range assigneeChannels {
 		candidateIDs = append(candidateIDs, id)
@@ -1294,26 +1314,28 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 	for id := range participatingChannels {
 		candidateIDs = append(candidateIDs, id)
 	}
-	notifiable := m.agentsWithoutUnseenReplies(conversation.UUID, candidateIDs, message.ID)
+	// A reopen always alerts the assignee.
+	if reopened && len(assigneeChannels) > 0 {
+		m.markReplyNotified(conversation.UUID, assigneeID)
+		candidateIDs = slices.DeleteFunc(candidateIDs, func(id int) bool { return id == assigneeID })
+	}
+	claimed := m.claimReplyNotifications(conversation.UUID, candidateIDs)
 
-	var assignees []umodels.User
-	if len(assigneeChannels) > 0 && (reopened || slices.Contains(notifiable, assigneeID)) {
-		if agent, err := m.userStore.GetAgent(assigneeID, ""); err != nil {
-			m.lo.Error("error fetching agent for new reply notification", "user_id", assigneeID, "error", err)
-		} else {
-			assignees = append(assignees, agent)
-		}
+	if len(assigneeChannels) == 0 || (!reopened && !slices.Contains(claimed, assigneeID)) {
+		assignees = nil
 	}
 	participating = slices.DeleteFunc(participating, func(p umodels.User) bool {
-		return len(participatingChannels[p.ID]) == 0 || !slices.Contains(notifiable, p.ID)
+		return len(participatingChannels[p.ID]) == 0 || !slices.Contains(claimed, p.ID)
 	})
 	if len(assignees) == 0 && len(participating) == 0 {
+		m.releaseReplyNotifications(conversation.UUID, claimed)
 		return
 	}
 
 	sender, err := m.userStore.Get(message.SenderID, "", []string{})
 	if err != nil {
 		m.lo.Error("error fetching sender for new reply notification", "user_id", message.SenderID, "error", err)
+		m.releaseReplyNotifications(conversation.UUID, claimed)
 		return
 	}
 
@@ -1337,7 +1359,7 @@ func (m *Manager) notifyNewReplyRecipients(conversation models.Conversation, mes
 			emails[i] = *rendered
 		}
 	}
-	m.dispatcher.SendWithEmailsAfter(notifier.Notification{
+	notified := m.dispatcher.SendWithEmailsAfter(notifier.Notification{
 		Type:             nType,
 		RecipientIDs:     recipientIDs,
 		Title:            title,
@@ -1346,17 +1368,53 @@ func (m *Manager) notifyNewReplyRecipients(conversation models.Conversation, mes
 		MessageID:        null.IntFrom(message.ID),
 		ConversationUUID: conversation.UUID,
 		MessageUUID:      message.UUID,
+		MessageCreatedAt: null.TimeFrom(message.CreatedAt),
 	}, emails, newReplyEmailDelay)
+	undelivered := slices.DeleteFunc(slices.Clone(recipientIDs), func(id int) bool { return slices.Contains(notified, id) })
+	m.releaseReplyNotifications(conversation.UUID, undelivered)
 }
 
-// agentsWithoutUnseenReplies returns the given agents that have seen every incoming message older than the given one.
-func (m *Manager) agentsWithoutUnseenReplies(conversationUUID string, userIDs []int, messageID int) []int {
-	var caughtUp []int
-	if err := m.q.GetAgentsWithoutUnseenReplies.Select(&caughtUp, conversationUUID, pq.Array(userIDs), messageID); err != nil {
-		m.lo.Error("error fetching agents without unseen replies", "conversation_uuid", conversationUUID, "error", err)
+// claimReplyNotifications claims and returns the agents with no outstanding reply notification.
+func (m *Manager) claimReplyNotifications(conversationUUID string, userIDs []int) []int {
+	if len(userIDs) == 0 {
+		return nil
+	}
+	ctx := context.Background()
+	pipe := m.rdb.Pipeline()
+	claims := make([]*redis.BoolCmd, len(userIDs))
+	for i, userID := range userIDs {
+		claims[i] = pipe.SetNX(ctx, replyNotificationKey(conversationUUID, userID), "", replyNotificationTTL)
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		m.lo.Error("error claiming reply notifications", "conversation_uuid", conversationUUID, "error", err)
 		return userIDs
 	}
-	return caughtUp
+	claimed := make([]int, 0, len(userIDs))
+	for i, userID := range userIDs {
+		if claims[i].Val() {
+			claimed = append(claimed, userID)
+		}
+	}
+	return claimed
+}
+
+func (m *Manager) markReplyNotified(conversationUUID string, userID int) {
+	if err := m.rdb.Set(context.Background(), replyNotificationKey(conversationUUID, userID), "", replyNotificationTTL).Err(); err != nil {
+		m.lo.Error("error recording reply notification", "conversation_uuid", conversationUUID, "user_id", userID, "error", err)
+	}
+}
+
+func (m *Manager) releaseReplyNotifications(conversationUUID string, userIDs []int) {
+	if len(userIDs) == 0 {
+		return
+	}
+	keys := make([]string, len(userIDs))
+	for i, userID := range userIDs {
+		keys[i] = replyNotificationKey(conversationUUID, userID)
+	}
+	if err := m.rdb.Del(context.Background(), keys...).Err(); err != nil {
+		m.lo.Error("error releasing reply notifications", "conversation_uuid", conversationUUID, "error", err)
+	}
 }
 
 // renderNotificationEmail returns nil when the recipient has no email or the template fails to render.
@@ -2443,4 +2501,8 @@ func listTypeWhereClause(conditions []string) string {
 		return ""
 	}
 	return "AND (" + strings.Join(conditions, " OR ") + ")"
+}
+
+func replyNotificationKey(conversationUUID string, userID int) string {
+	return replyNotificationKeyPrefix + conversationUUID + ":" + strconv.Itoa(userID)
 }

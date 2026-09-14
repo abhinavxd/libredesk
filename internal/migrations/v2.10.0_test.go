@@ -78,3 +78,34 @@ func TestV2_10_0NotificationMigration(t *testing.T) {
 		t.Errorf("notification template count = %d, want 3", templateCount)
 	}
 }
+
+func TestV2_10_0PreservesExistingQueuedEmails(t *testing.T) {
+	db := testutil.NewDB(t, "migration_v2_10_0_queue")
+	var expectedColumn string
+	columnQuery := `SELECT data_type || ':' || is_nullable || ':' || COALESCE(column_default, '') FROM information_schema.columns WHERE table_name = 'notification_email_queue' AND column_name = 'message_created_at'`
+	if err := db.Get(&expectedColumn, columnQuery); err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`ALTER TABLE notification_email_queue DROP COLUMN message_created_at`)
+	db.MustExec(`INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'queued@example.com', 'Agent', '')`)
+	db.MustExec(`INSERT INTO notification_email_queue (user_id, notification_type, recipient_email, subject, content, send_at) VALUES ((SELECT id FROM users LIMIT 1), 'new_reply', 'queued@example.com', 'Reply', 'Pending reply', now())`)
+	for range 2 {
+		if err := V2_10_0(db, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var actualColumn string
+	if err := db.Get(&actualColumn, columnQuery); err != nil {
+		t.Fatal(err)
+	}
+	if actualColumn != expectedColumn {
+		t.Fatalf("migration column = %q, schema column = %q", actualColumn, expectedColumn)
+	}
+	var preserved bool
+	if err := db.Get(&preserved, `SELECT content = 'Pending reply' AND message_created_at IS NULL FROM notification_email_queue`); err != nil {
+		t.Fatal(err)
+	}
+	if !preserved {
+		t.Fatal("existing queued email changed")
+	}
+}

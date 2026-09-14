@@ -20,9 +20,10 @@ type fakePushDispatcher struct {
 	payload PushPayload
 }
 
-func (p *fakePushDispatcher) Send(userID int, payload PushPayload) {
+func (p *fakePushDispatcher) Send(userID int, payload PushPayload) bool {
 	p.userID = userID
 	p.payload = payload
+	return true
 }
 
 func TestDispatcherSendsPushUsingNotificationRoute(t *testing.T) {

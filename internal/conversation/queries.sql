@@ -545,22 +545,6 @@ WHERE conversation_participants.conversation_id = (SELECT id FROM conversations 
   AND users.enabled
   AND users.deleted_at IS NULL;
 
--- name: get-agents-without-unseen-replies
-SELECT candidate.id
-FROM unnest($2::INT[]) AS candidate(id), conversations c
-WHERE c.uuid = $1
-  AND NOT EXISTS (
-    SELECT 1 FROM conversation_messages
-    WHERE conversation_id = c.id
-      AND type = 'incoming'
-      AND id < $3
-      AND created_at > COALESCE(
-          (SELECT last_seen_at FROM conversation_last_seen
-           WHERE conversation_id = c.id AND user_id = candidate.id),
-          '1970-01-01'::TIMESTAMPTZ
-      )
-);
-
 -- name: insert-conversation-participant
 INSERT INTO conversation_participants
 (user_id, conversation_id)

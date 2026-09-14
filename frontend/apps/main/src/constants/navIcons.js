@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   Bot,
   BookOpen,
   CircleDot,
@@ -32,6 +33,7 @@ import {
 // Icon names referenced by string in navigation.js.
 export const navIconMap = {
   BarChart3,
+  Bell,
   Bot,
   BookOpen,
   CircleDot,

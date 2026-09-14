@@ -25,6 +25,8 @@ const (
 	pushPublicKeySetting  = "notification.push.vapid_public_key"
 	pushPrivateKeySetting = "notification.push.vapid_private_key"
 	pushTTL               = 86400
+	pushTitleRunes        = 100
+	pushBodyRunes         = 400
 )
 
 type pushSender func(context.Context, []byte, PushSubscription, string, string, string) (*http.Response, error)
@@ -151,11 +153,13 @@ func (m *PushManager) Delete(userID int, endpoint string) error {
 	return nil
 }
 
-func (m *PushManager) Send(userID int, payload PushPayload) {
+func (m *PushManager) Send(userID int, payload PushPayload) bool {
 	select {
 	case m.queue <- pushDelivery{UserID: userID, Payload: payload}:
+		return true
 	default:
 		m.lo.Error("push notification queue is full", "user_id", userID)
+		return false
 	}
 }
 
@@ -185,6 +189,8 @@ func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) error 
 	if err != nil {
 		return err
 	}
+	delivery.Payload.Title = pushPreview(delivery.Payload.Title, pushTitleRunes)
+	delivery.Payload.Body = pushPreview(delivery.Payload.Body, pushBodyRunes)
 	payload, err := json.Marshal(delivery.Payload)
 	if err != nil {
 		return err
@@ -320,4 +326,15 @@ func newPushHTTPClient(lo *logf.Logger) *http.Client {
 		Transport: ssrf.NewTransport(control, 10*time.Second),
 		Timeout:   10 * time.Second,
 	}
+}
+
+func pushPreview(text string, limit int) string {
+	count := 0
+	for i := range text {
+		if count == limit {
+			return text[:i] + "…"
+		}
+		count++
+	}
+	return text
 }

@@ -301,6 +301,7 @@ func initConversations(
 	template *tmpl.Manager,
 	webhook *webhook.Manager,
 	dispatcher *notifier.Dispatcher,
+	rdb *redis.Client,
 ) *conversation.Manager {
 	continuityConfig := &conversation.ContinuityConfig{}
 	if ko.Exists("conversation.continuity_scan_interval") {
@@ -309,6 +310,7 @@ func initConversations(
 
 	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, dispatcher, conversation.Opts{
 		DB:                       db,
+		Redis:                    rdb,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
 		IncomingMessageQueueSize: ko.MustInt("message.incoming_queue_size"),

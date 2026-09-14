@@ -22,20 +22,21 @@ type NotificationPreferenceStore interface {
 }
 
 type PushDispatcher interface {
-	Send(userID int, payload PushPayload)
+	Send(userID int, payload PushPayload) bool
 }
 
 // Notification represents a notification to be sent through all channels.
 type Notification struct {
 	// Core notification fields
-	Type           models.NotificationType
-	RecipientIDs   []int
-	Title          string
-	Body           null.String
-	ConversationID null.Int
-	MessageID      null.Int
-	ActorID        null.Int
-	Meta           json.RawMessage
+	Type             models.NotificationType
+	RecipientIDs     []int
+	Title            string
+	Body             null.String
+	ConversationID   null.Int
+	MessageID        null.Int
+	MessageCreatedAt null.Time
+	ActorID          null.Int
+	Meta             json.RawMessage
 
 	// For Websocket broadcast
 	ConversationUUID string
@@ -123,8 +124,8 @@ func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) 
 	d.dispatch(n, emails, 0)
 }
 
-func (d *Dispatcher) SendWithEmailsAfter(n Notification, emails []EmailNotification, emailDelay time.Duration) {
-	d.dispatch(n, emails, emailDelay)
+func (d *Dispatcher) SendWithEmailsAfter(n Notification, emails []EmailNotification, emailDelay time.Duration) []int {
+	return d.dispatch(n, emails, emailDelay)
 }
 
 func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
@@ -151,17 +152,20 @@ func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
 	return emails
 }
 
-func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration) {
+func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration) []int {
 	if len(n.RecipientIDs) == 0 {
-		return
+		return nil
 	}
+	var notified []int
 	enabled := d.EnabledChannels(n.RecipientIDs, n.Type)
 
 	for i, recipientID := range n.RecipientIDs {
+		sent := false
 		var notificationID null.Int
 		if slices.Contains(enabled[recipientID], models.NotificationChannelInApp) {
 			if created := d.sendToRecipient(recipientID, n); created != nil {
 				notificationID = null.IntFrom(created.ID)
+				sent = true
 			}
 		}
 
@@ -169,30 +173,35 @@ func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailD
 			slices.Contains(enabled[recipientID], models.NotificationChannelEmail) {
 			e := emails[i]
 			queued := queuedEmail{
-				UserID:         recipientID,
-				NotificationID: notificationID,
-				Type:           n.Type,
-				ConversationID: n.ConversationID,
-				Recipient:      e.Recipients[0],
-				Subject:        e.Subject,
-				Content:        e.Content,
+				UserID:           recipientID,
+				NotificationID:   notificationID,
+				Type:             n.Type,
+				ConversationID:   n.ConversationID,
+				MessageCreatedAt: n.MessageCreatedAt,
+				Recipient:        e.Recipients[0],
+				Subject:          e.Subject,
+				Content:          e.Content,
 			}
 			if emailDelay > 0 {
-				d.emailQueue.SendAfter(queued, emailDelay)
+				sent = d.emailQueue.SendAfter(queued, emailDelay) || sent
 			} else {
-				d.emailQueue.Send(queued)
+				sent = d.emailQueue.Send(queued) || sent
 			}
 		}
 
 		if d.push != nil && slices.Contains(enabled[recipientID], models.NotificationChannelPush) {
-			d.push.Send(recipientID, PushPayload{
+			sent = d.push.Send(recipientID, PushPayload{
 				Title: n.Title,
 				Body:  n.Body.String,
 				Tag:   fmt.Sprintf("%s_%s_%s", n.Type, n.ConversationUUID, n.MessageUUID),
 				URL:   pushRoute(string(n.Type), n.ConversationUUID, n.MessageUUID),
-			})
+			}) || sent
+		}
+		if sent {
+			notified = append(notified, recipientID)
 		}
 	}
+	return notified
 }
 
 // sendToRecipient creates in-app notification and broadcasts via Websocket.

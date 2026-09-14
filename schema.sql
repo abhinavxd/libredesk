@@ -991,6 +991,7 @@ CREATE TABLE notification_email_queue (
 	subject TEXT NOT NULL,
 	content TEXT NOT NULL,
 	queued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	message_created_at TIMESTAMPTZ,
 	send_at TIMESTAMPTZ NOT NULL,
 	CONSTRAINT constraint_uniq_notification_email_queue UNIQUE (user_id, notification_type, conversation_id)
 );
