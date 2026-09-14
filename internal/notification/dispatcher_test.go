@@ -1,16 +1,13 @@
 package notifier
 
 import (
-	"bytes"
 	"errors"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/notification/channels"
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/volatiletech/null/v9"
-	"github.com/zerodha/logf"
 )
 
 type fakePreferences struct {
@@ -22,7 +19,7 @@ func (p fakePreferences) EnabledChannels([]int, models.NotificationType) (map[in
 	return p.channels, p.err
 }
 
-type fakePushDispatcher struct {
+type fakePushSender struct {
 	userID  int
 	payload models.PushPayload
 }
@@ -33,7 +30,7 @@ type fakeChannelProvider struct {
 	notificationID null.Int
 }
 
-func (p *fakePushDispatcher) Send(userID int, payload models.PushPayload) bool {
+func (p *fakePushSender) Send(userID int, payload models.PushPayload) bool {
 	p.userID = userID
 	p.payload = payload
 	return true
@@ -61,7 +58,10 @@ func TestDispatcherPassesResultsThroughProviders(t *testing.T) {
 		}},
 	})
 
-	results := d.Send(models.Notification{Type: models.NotificationTypeMention, Recipients: []models.Recipient{{UserID: 42}}})
+	results, err := d.Send(models.Notification{Type: models.NotificationTypeMention, Recipients: []models.Recipient{{UserID: 42}}})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if email.notificationID.Int != 7 {
 		t.Fatalf("email notification ID = %d, want 7", email.notificationID.Int)
@@ -72,7 +72,7 @@ func TestDispatcherPassesResultsThroughProviders(t *testing.T) {
 }
 
 func TestDispatcherSendsPushUsingNotificationRoute(t *testing.T) {
-	push := &fakePushDispatcher{}
+	push := &fakePushSender{}
 	d := NewDispatcher(DispatcherOpts{
 		Prefs: fakePreferences{channels: map[int][]models.NotificationChannel{
 			42: {models.NotificationChannelPush},
@@ -100,7 +100,7 @@ func TestDispatcherSendsPushUsingNotificationRoute(t *testing.T) {
 }
 
 func TestDispatcherDoesNotSendPushWhenDisabled(t *testing.T) {
-	push := &fakePushDispatcher{}
+	push := &fakePushSender{}
 	d := NewDispatcher(DispatcherOpts{
 		Prefs: fakePreferences{channels: map[int][]models.NotificationChannel{
 			42: nil,
@@ -118,25 +118,23 @@ func TestDispatcherDoesNotSendPushWhenDisabled(t *testing.T) {
 	}
 }
 
-func TestDispatcherHandlesPreferenceLookupFailure(t *testing.T) {
-	var logs bytes.Buffer
-	lo := logf.New(logf.Opts{Writer: &logs})
-	push := &fakePushDispatcher{}
+func TestDispatcherReturnsPreferenceLookupFailure(t *testing.T) {
+	lookupErr := errors.New("lookup failed")
+	push := &fakePushSender{}
 	d := NewDispatcher(DispatcherOpts{
-		Prefs:    fakePreferences{err: errors.New("lookup failed")},
+		Prefs:    fakePreferences{err: lookupErr},
 		Pipeline: channels.NewPipeline(channels.NewPush(push)),
-		Lo:       &lo,
 	})
-	d.Send(models.Notification{
+	_, err := d.Send(models.Notification{
 		Type:       models.NotificationTypeMention,
 		Recipients: []models.Recipient{{UserID: 42}},
 		Title:      "You were mentioned",
 	})
 
+	if !errors.Is(err, lookupErr) {
+		t.Fatalf("error = %v, want %v", err, lookupErr)
+	}
 	if push.userID != 0 {
 		t.Fatalf("sent push to user %d after preference lookup failed", push.userID)
-	}
-	if !strings.Contains(logs.String(), "error fetching notification preferences") {
-		t.Fatalf("missing preference lookup error log: %s", logs.String())
 	}
 }

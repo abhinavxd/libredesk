@@ -1227,7 +1227,6 @@ func initNotifDispatcher(userNotification *notifier.UserNotificationManager, pre
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
 		Pipeline: notificationchannels.NewPipeline(providers...),
 		Prefs:    prefs,
-		Lo:       initLogger("notification-dispatcher"),
 	})
 }
 

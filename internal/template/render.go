@@ -3,8 +3,9 @@ package template
 import (
 	"bytes"
 	"fmt"
+	htmltemplate "html/template"
 	"strings"
-	"text/template"
+	texttemplate "text/template"
 
 	"github.com/valyala/fasthttp"
 )
@@ -32,7 +33,7 @@ const (
 // RenderString renders Go template variables in the given content string
 // without wrapping it in the base email template. Returns original content on any error.
 func (m *Manager) RenderString(data any, content string) string {
-	t, err := template.New("content").Funcs(m.funcMap).Parse(content)
+	t, err := htmltemplate.New("content").Funcs(m.funcMap).Parse(content)
 	if err != nil {
 		return content
 	}
@@ -67,12 +68,12 @@ func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, err
 		defaultTmpl.Body = `{{ template "content" . }}`
 	}
 
-	baseTemplate, err := template.New(TmplBase).Funcs(m.funcMap).Parse(defaultTmpl.Body)
+	baseTemplate, err := htmltemplate.New(TmplBase).Funcs(m.funcMap).Parse(defaultTmpl.Body)
 	if err != nil {
 		return "", fmt.Errorf("parsing base template: %w", err)
 	}
 
-	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Parse(content)
+	contentTemplate, err := htmltemplate.New(TmplContent).Funcs(m.funcMap).Parse(content)
 	if err != nil {
 		return "", fmt.Errorf("parsing content template: %w", err)
 	}
@@ -102,7 +103,7 @@ func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, stri
 
 	executeSubjectTemplate := func(subject string) (string, error) {
 		var sb strings.Builder
-		subjectTmpl, err := template.New("subject").Funcs(m.funcMap).Parse(subject)
+		subjectTmpl, err := texttemplate.New("subject").Funcs(m.funcMap).Parse(subject)
 		if err != nil {
 			return "", fmt.Errorf("parsing subject template: %w", err)
 		}
@@ -121,12 +122,12 @@ func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, stri
 		defaultTmpl.Body = `{{ template "content" . }}`
 	}
 
-	baseTemplate, err := template.New(TmplBase).Funcs(m.funcMap).Parse(defaultTmpl.Body)
+	baseTemplate, err := htmltemplate.New(TmplBase).Funcs(m.funcMap).Parse(defaultTmpl.Body)
 	if err != nil {
 		return "", "", fmt.Errorf("parsing base template: %w", err)
 	}
 
-	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Parse(tmpl.Body)
+	contentTemplate, err := htmltemplate.New(TmplContent).Funcs(m.funcMap).Parse(tmpl.Body)
 	if err != nil {
 		return "", "", fmt.Errorf("parsing content template: %w", err)
 	}

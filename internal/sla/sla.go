@@ -63,7 +63,7 @@ var metricNotificationTypes = map[string]struct{ warning, breach nmodels.Notific
 }
 
 type notificationDispatcher interface {
-	Send(nmodels.Notification) []nmodels.DeliveryResult
+	Send(nmodels.Notification) ([]nmodels.DeliveryResult, error)
 }
 
 type Manager struct {
@@ -671,18 +671,12 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 
 		// Recipient not found?
 		if recipientID == 0 {
-			if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
-				m.lo.Error("error marking notification as processed", "error", err)
-			}
 			continue
 		}
 
 		agent, err := m.userStore.GetAgent(recipientID, "")
 		if err != nil {
 			m.lo.Error("error fetching agent for SLA notification", "recipient_id", recipientID, "error", err)
-			if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
-				m.lo.Error("error marking notification as processed", "error", err)
-			}
 			continue
 		}
 
@@ -763,7 +757,7 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 
 		if err != nil {
 			m.lo.Error("error rendering email template", "template", template.TmplConversationAssigned, "scheduled_notification_id", scheduledNotification.ID, "error", err)
-			continue
+			return fmt.Errorf("rendering SLA notification: %w", err)
 		}
 
 		notifType := metricNotificationTypes[scheduledNotification.Metric].warning
@@ -783,8 +777,7 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			notificationBody = m.i18n.Ts("notification.slaDueIn", "duration", dueIn)
 		}
 
-		// Send notification via dispatcher (handles in-app, WebSocket, and email).
-		m.dispatcher.Send(nmodels.Notification{
+		if _, err := m.dispatcher.Send(nmodels.Notification{
 			Type: notifType,
 			Recipients: []nmodels.Recipient{{
 				UserID: recipientID,
@@ -798,12 +791,12 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			Body:             null.StringFrom(notificationBody),
 			ConversationID:   null.IntFrom(appliedSLA.ConversationID),
 			ConversationUUID: appliedSLA.ConversationUUID,
-		})
-
-		// Mark the notification as processed.
-		if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
-			m.lo.Error("error marking notification as processed", "error", err)
+		}); err != nil {
+			return fmt.Errorf("sending SLA notification: %w", err)
 		}
+	}
+	if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
+		m.lo.Error("error marking notification as processed", "error", err)
 	}
 	return nil
 }

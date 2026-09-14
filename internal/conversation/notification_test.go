@@ -35,6 +35,7 @@ type replyUserStore struct {
 type replyPreferences struct {
 	recipients []int
 	channels   []nmodels.NotificationChannel
+	err        error
 	mu         sync.Mutex
 }
 
@@ -57,6 +58,9 @@ func (p *replyPreferences) EnabledChannels(ids []int, _ nmodels.NotificationType
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.recipients = append(p.recipients, ids...)
+	if p.err != nil {
+		return nil, p.err
+	}
 	enabled := make(map[int][]nmodels.NotificationChannel)
 	if len(p.channels) > 0 {
 		for _, id := range ids {
@@ -197,7 +201,6 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 			dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{
 				Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil, &lo), nchannels.NewEmail(emailQueue)),
 				Prefs:    &replyPreferences{channels: channels},
-				Lo:       &lo,
 			}),
 		}
 		m.q.GetConversationParticipantAgents = q.Participants
@@ -362,14 +365,12 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{
 			Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil, &lo), nchannels.NewEmail(emailQueue), nchannels.NewPush(push)),
 			Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelPush}},
-			Lo:       &lo,
 		})
 		m.NotifyNewReply(conv, message, false)
 
 		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{
 			Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil, &lo), nchannels.NewEmail(emailQueue)),
 			Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelInApp}},
-			Lo:       &lo,
 		})
 		m.NotifyNewReply(conv, message, false)
 
@@ -387,6 +388,15 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 		db.Get(&count, `SELECT count(*) FROM user_notifications`)
 		if count != 0 {
 			t.Fatalf("notifications = %d, want 0", count)
+		}
+	})
+
+	t.Run("preference failure releases claim", func(t *testing.T) {
+		m := newManager()
+		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{Prefs: &replyPreferences{err: errors.New("lookup failed")}})
+		m.NotifyNewReply(conv, message, false)
+		if replyRedis.Exists(replyNotifiedKey(conv.UUID, userID)) {
+			t.Fatal("preference failure left a reply suppression claim")
 		}
 	})
 

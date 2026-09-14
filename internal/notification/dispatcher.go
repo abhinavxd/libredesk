@@ -1,9 +1,10 @@
 package notifier
 
 import (
+	"fmt"
+
 	"github.com/abhinavxd/libredesk/internal/notification/channels"
 	"github.com/abhinavxd/libredesk/internal/notification/models"
-	"github.com/zerodha/logf"
 )
 
 type NotificationPreferenceStore interface {
@@ -13,34 +14,27 @@ type NotificationPreferenceStore interface {
 type Dispatcher struct {
 	pipeline channels.Pipeline
 	prefs    NotificationPreferenceStore
-	lo       *logf.Logger
 }
 
 // DispatcherOpts contains options for creating a new Dispatcher.
 type DispatcherOpts struct {
 	Pipeline channels.Pipeline
 	Prefs    NotificationPreferenceStore
-	Lo       *logf.Logger
 }
 
 // NewDispatcher creates a new notification Dispatcher.
 func NewDispatcher(opts DispatcherOpts) *Dispatcher {
-	return &Dispatcher{pipeline: opts.Pipeline, prefs: opts.Prefs, lo: opts.Lo}
+	return &Dispatcher{pipeline: opts.Pipeline, prefs: opts.Prefs}
 }
 
-func (d *Dispatcher) Send(n models.Notification) []models.DeliveryResult {
+func (d *Dispatcher) Send(n models.Notification) ([]models.DeliveryResult, error) {
 	recipientIDs := make([]int, len(n.Recipients))
 	for i, recipient := range n.Recipients {
 		recipientIDs[i] = recipient.UserID
 	}
 	enabled, err := d.prefs.EnabledChannels(recipientIDs, n.Type)
 	if err != nil {
-		d.lo.Error("error fetching notification preferences", "type", n.Type, "error", err)
-		results := make([]models.DeliveryResult, len(recipientIDs))
-		for i, recipientID := range recipientIDs {
-			results[i].RecipientID = recipientID
-		}
-		return results
+		return nil, fmt.Errorf("fetching notification preferences: %w", err)
 	}
 
 	results := make([]models.DeliveryResult, 0, len(n.Recipients))
@@ -53,5 +47,5 @@ func (d *Dispatcher) Send(n models.Notification) []models.DeliveryResult {
 			),
 		})
 	}
-	return results
+	return results, nil
 }

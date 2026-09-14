@@ -86,7 +86,7 @@ var conversationListAllowedFields = dbutil.AllowedFields{
 }
 
 type notificationDispatcher interface {
-	Send(nmodels.Notification) []nmodels.DeliveryResult
+	Send(nmodels.Notification) ([]nmodels.DeliveryResult, error)
 }
 
 // Manager handles the operations related to conversations
@@ -1280,8 +1280,7 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 		return fmt.Errorf("rendering template: %w", err)
 	}
 
-	// Send notification.
-	m.dispatcher.Send(nmodels.Notification{
+	if _, err := m.dispatcher.Send(nmodels.Notification{
 		Type: nmodels.NotificationTypeAssignment,
 		Recipients: []nmodels.Recipient{{
 			UserID: agent.ID,
@@ -1295,7 +1294,9 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 		Body:             conversation.Subject,
 		ConversationID:   null.IntFrom(conversation.ID),
 		ConversationUUID: conversation.UUID,
-	})
+	}); err != nil {
+		return fmt.Errorf("sending assignment notification: %w", err)
+	}
 	return nil
 }
 
@@ -1406,7 +1407,7 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		return
 	}
 
-	results := m.dispatcher.Send(nmodels.Notification{
+	results, err := m.dispatcher.Send(nmodels.Notification{
 		Type:             group.nType,
 		Recipients:       recipients,
 		Title:            group.title,
@@ -1417,6 +1418,11 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		MessageUUID:      message.UUID,
 		MessageCreatedAt: null.TimeFrom(message.CreatedAt),
 	})
+	if err != nil {
+		m.lo.Error("error sending reply notification", "type", group.nType, "error", err)
+		m.clearReplyNotified(conversation.UUID, claimedIDs...)
+		return
+	}
 	var untracked []int
 	for _, result := range results {
 		if !slices.Contains(result.Channels, nmodels.NotificationChannelInApp) &&
@@ -1588,7 +1594,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 		return
 	}
 
-	m.dispatcher.Send(nmodels.Notification{
+	if _, err := m.dispatcher.Send(nmodels.Notification{
 		Type:             nmodels.NotificationTypeMention,
 		Recipients:       recipients,
 		Title:            m.i18n.Ts("notification.mentionedInConversation", "author", author.FullName(), "referenceNumber", conversation.ReferenceNumber),
@@ -1600,7 +1606,9 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 		MessageUUID:      message.UUID,
 		ActorFirstName:   author.FirstName,
 		ActorLastName:    author.LastName,
-	})
+	}); err != nil {
+		m.lo.Error("error sending mention notification", "error", err)
+	}
 }
 
 // UnassignOpen unassigns all open conversations belonging to a user.
@@ -1805,14 +1813,16 @@ func (m *Manager) notifyAutomation(subject, message string, entries []string, co
 		return subject, content, err
 	})
 
-	m.dispatcher.Send(nmodels.Notification{
+	if _, err := m.dispatcher.Send(nmodels.Notification{
 		Type:             nmodels.NotificationTypeMention,
 		Recipients:       recipients,
 		Title:            subject,
 		Body:             null.StringFrom(message),
 		ConversationID:   null.IntFrom(conv.ID),
 		ConversationUUID: conv.UUID,
-	})
+	}); err != nil {
+		return fmt.Errorf("sending automation notification: %w", err)
+	}
 	return nil
 }
 
