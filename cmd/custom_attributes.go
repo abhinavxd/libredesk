@@ -14,6 +14,7 @@ var (
 	// disallowedKeys contains keys that are not allowed for custom attributes as they're the default fields.
 	disallowedKeys = []string{
 		"contact_email",
+		"to",
 		"content",
 		"subject",
 		"status",

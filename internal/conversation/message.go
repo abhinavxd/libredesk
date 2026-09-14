@@ -496,7 +496,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 	}
 
 	// Process post-message hooks (reopen, waiting since, automation, SLA).
-	if err := m.ProcessIncomingMessageHooks(conversationUUID, isNewConversation); err != nil {
+	if err := m.ProcessIncomingMessageHooks(conversationUUID, isNewConversation, nil); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", conversationUUID, "error", err)
 	}
 
@@ -893,7 +893,13 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	m.broadcastMessageToWidgetClients(&msg)
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation); err != nil {
+	var recipients struct {
+		To []string `json:"to"`
+	}
+	if err := json.Unmarshal(msg.Meta, &recipients); err != nil {
+		m.lo.Warn("error reading incoming message recipients", "conversation_uuid", msg.ConversationUUID, "error", err)
+	}
+	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation, recipients.To); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 		return models.Message{}, fmt.Errorf("processing incoming message hooks: %w", err)
 	}
@@ -1015,7 +1021,7 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
 	// isNewConversation = false since conversation always exists for live chat.
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, false); err != nil {
+	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, false, nil); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 	}
 
@@ -1386,7 +1392,7 @@ func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) e
 // ProcessIncomingMessageHooks handles automation rules, webhooks, SLA events, and other post-processing
 // for incoming messages. This allows other channels to insert messages first and then call this
 // function to trigger the necessary hooks.
-func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConversation bool) error {
+func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConversation bool, incomingTo []string) error {
 	// Start waiting since clock, cleared when agent replies.
 	m.StartConversationWaitingSince(conversationUUID, time.Now())
 
@@ -1394,7 +1400,11 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	if isNewConversation {
 		conversation, err := m.GetConversation(0, conversationUUID, "")
 		if err == nil {
-			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, conversation)
+			conversation.IncomingTo = incomingTo
+			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, struct {
+				models.Conversation
+				To []string `json:"to"`
+			}{Conversation: conversation, To: conversation.IncomingTo})
 			m.automation.EvaluateNewConversationRules(conversation)
 		}
 		return nil
@@ -1422,6 +1432,7 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	if err != nil {
 		m.lo.Error("error fetching conversation for incoming message hooks", "conversation_uuid", conversationUUID, "error", err)
 	} else {
+		conversation.IncomingTo = incomingTo
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming, previousValues, umodels.User{ID: conversation.ContactID})
 
