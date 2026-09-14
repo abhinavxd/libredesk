@@ -105,7 +105,14 @@
               >
                 {{ sanitizedContent }}
               </div>
-              <div v-else ref="messageContentEl" @click="onMessageContentClick">
+              <div
+                v-else
+                ref="messageContentEl"
+                @click="onMessageContentClick"
+                :class="{
+                  'email-light-canvas': !isOutgoing && convStore.current?.inbox_channel === 'email'
+                }"
+              >
                 <Letter
                   :html="sanitizedContent"
                   :allowedSchemas="allowedSchemas"
