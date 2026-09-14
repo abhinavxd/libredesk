@@ -60,6 +60,8 @@ const submitForm = (values) => {
     const config = {
       auth_type: values.auth_type,
       reply_to: values.reply_to,
+      product_name: values.product_name || '',
+      signature: values.signature || '',
       enable_plus_addressing: values.enable_plus_addressing,
       imap: [{ ...values.imap }],
       smtp: [{ ...values.smtp }]
@@ -144,6 +146,8 @@ onMounted(async () => {
     inboxData.oauth = inboxData?.config?.oauth || {}
     inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
     inboxData.reply_to = inboxData?.config?.reply_to || ''
+    inboxData.product_name = inboxData?.config?.product_name || ''
+    inboxData.signature = inboxData?.config?.signature || ''
     inbox.value = inboxData
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

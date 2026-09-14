@@ -24,20 +24,36 @@ const (
 	// Template names for rendering.
 	TmplBase    = "base"
 	TmplContent = "content"
+
+	// DefaultOutgoingEmailTemplate is used when the installation has no default outgoing email
+	// template of its own. It appends the sending inbox's signature so a fresh install signs
+	// replies as soon as an inbox has one; installs that already have a template row keep it.
+	DefaultOutgoingEmailTemplate = `{{ template "content" . }}{{ if .Inbox.Signature }}<div>{{ .Inbox.Signature }}</div>{{ end }}`
 )
 
 // RenderString renders Go template variables in the given content string
 // without wrapping it in the base email template. Returns original content on any error.
 func (m *Manager) RenderString(data any, content string) string {
-	t, err := template.New("content").Funcs(m.funcMap).Parse(content)
+	rendered, err := m.RenderStringWithError(data, content)
 	if err != nil {
 		return content
 	}
+	return rendered
+}
+
+// RenderStringWithError renders Go template variables in the given content string without wrapping it in
+// the base email template, reporting the parse or execution error instead of swallowing it. Callers that
+// must not emit a half-rendered string, such as an admin-authored inbox signature, use this.
+func (m *Manager) RenderStringWithError(data any, content string) (string, error) {
+	t, err := template.New("content").Funcs(m.funcMap).Parse(content)
+	if err != nil {
+		return "", fmt.Errorf("parsing template: %w", err)
+	}
 	var buf strings.Builder
 	if err := t.Execute(&buf, data); err != nil {
-		return content
+		return "", fmt.Errorf("executing template: %w", err)
 	}
-	return buf.String()
+	return buf.String(), nil
 }
 
 // RenderStoredTemplate fetches a template by name and renders its body with the provided data
@@ -61,7 +77,7 @@ func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, err
 	}
 
 	if defaultTmpl.Body == "" {
-		defaultTmpl.Body = `{{ template "content" . }}`
+		defaultTmpl.Body = DefaultOutgoingEmailTemplate
 	}
 
 	baseTemplate, err := template.New(TmplBase).Funcs(m.funcMap).Parse(defaultTmpl.Body)
@@ -115,7 +131,7 @@ func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, stri
 	}
 
 	if defaultTmpl.Body == "" {
-		defaultTmpl.Body = `{{ template "content" . }}`
+		defaultTmpl.Body = DefaultOutgoingEmailTemplate
 	}
 
 	baseTemplate, err := template.New(TmplBase).Funcs(m.funcMap).Parse(defaultTmpl.Body)

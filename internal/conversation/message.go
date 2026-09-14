@@ -22,6 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -239,6 +240,63 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	}
 }
 
+// ProductNameFromInbox derives a product name from an inbox name by dropping a trailing role word such as
+// "Support" or "App" ("Drifttt Support" and "Drifttt App" are both "Drifttt"); an inbox named after the
+// product alone is returned unchanged.
+func ProductNameFromInbox(inboxName string) string {
+	name := strings.TrimSpace(inboxName)
+	for _, suffix := range []string{" support", " app", " help", " helpdesk"} {
+		if len(name) > len(suffix) && strings.EqualFold(name[len(name)-len(suffix):], suffix) {
+			return strings.TrimSpace(name[:len(name)-len(suffix)])
+		}
+	}
+	return name
+}
+
+// resolveInboxProduct returns the product an inbox speaks for: its configured `product_name`, falling back
+// to the product derived from the inbox name when the admin has not set one.
+func resolveInboxProduct(inboxName, configuredProductName string) string {
+	if product := strings.TrimSpace(configuredProductName); product != "" {
+		return product
+	}
+	return ProductNameFromInbox(inboxName)
+}
+
+// emailInboxBranding returns the configured product name and signature template of an inbox. Both are empty
+// for a non-email inbox, for an inbox that cannot be read, and for a config that cannot be decoded, so a
+// broken inbox config degrades to the derived product name rather than blocking the reply.
+func (m *Manager) emailInboxBranding(inboxID int) (productName, signature string) {
+	record, err := m.inboxStore.GetDBRecord(inboxID)
+	if err != nil {
+		m.lo.Error("error fetching inbox record for template data", "inbox_id", inboxID, "error", err)
+		return "", ""
+	}
+	if record.Channel != inbox.ChannelEmail || len(record.Config) == 0 {
+		return "", ""
+	}
+	var config imodels.Config
+	if err := json.Unmarshal(record.Config, &config); err != nil {
+		m.lo.Error("error decoding inbox config for template data", "inbox_id", inboxID, "error", err)
+		return "", ""
+	}
+	return config.ProductName, strings.TrimSpace(config.Signature)
+}
+
+// renderInboxSignature renders an inbox's signature template with the outgoing message template data. An
+// unset signature yields an empty string, and so does one that fails to parse or execute: a typo in a
+// signature is logged and dropped rather than pasted into the customer's email.
+func (m *Manager) renderInboxSignature(signature string, data map[string]any) string {
+	if signature == "" {
+		return ""
+	}
+	rendered, err := m.template.RenderStringWithError(data, signature)
+	if err != nil {
+		m.lo.Error("error rendering inbox signature", "error", err)
+		return ""
+	}
+	return rendered
+}
+
 // BuildTemplateData builds the common template data map for rendering message content variables.
 func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[string]any, error) {
 	conversation, err := m.GetConversation(0, conversationUUID, "")
@@ -251,12 +309,23 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 		return nil, fmt.Errorf("fetching message sender user: %w", err)
 	}
 
+	configuredProduct, signature := m.emailInboxBranding(conversation.InboxID)
+
 	data := map[string]any{
 		"Conversation": map[string]any{
 			"ReferenceNumber": conversation.ReferenceNumber,
 			"Subject":         conversation.Subject.String,
 			"Priority":        conversation.Priority.String,
 			"UUID":            conversation.UUID,
+		},
+		// The inbox the reply leaves from, so a global outgoing template can sign or brand per product
+		// ("Slava from Drifttt") instead of needing one template per inbox. Signature is filled in below,
+		// once the data it is rendered against exists.
+		"Inbox": map[string]any{
+			"Name":      conversation.InboxName,
+			"Channel":   conversation.InboxChannel,
+			"Product":   resolveInboxProduct(conversation.InboxName, configuredProduct),
+			"Signature": "",
 		},
 		"Contact": map[string]any{
 			"FirstName": conversation.Contact.FirstName,
@@ -276,6 +345,14 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 			"FullName":  sender.FullName(),
 			"Email":     sender.Email.String,
 		},
+		// Agent mirrors Author under the name the inbox From-name and signature templates use, so the
+		// same variables work in both inbox fields.
+		"Agent": map[string]any{
+			"FirstName": sender.FirstName,
+			"LastName":  sender.LastName,
+			"FullName":  sender.FullName(),
+			"Email":     sender.Email.String,
+		},
 		// Lets templates disclose AI-composed replies, e.g. {{ if .IsAIComposed }}Composed by AI{{ end }}.
 		"IsAIComposed": sender.Type == umodels.UserTypeAIAssistant,
 	}
@@ -288,7 +365,16 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 			"FullName":  "",
 			"Email":     "",
 		}
+		data["Agent"] = map[string]any{
+			"FirstName": "",
+			"LastName":  "",
+			"FullName":  "",
+			"Email":     "",
+		}
 	}
+
+	// Render the inbox signature last: it is a template over this same data.
+	data["Inbox"].(map[string]any)["Signature"] = m.renderInboxSignature(signature, data)
 
 	return data, nil
 }
@@ -1183,7 +1269,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
-			true,          /** private **/
+			true,         /** private **/
 		)
 		if err != nil {
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)

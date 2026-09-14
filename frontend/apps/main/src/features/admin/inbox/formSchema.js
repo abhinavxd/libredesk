@@ -3,6 +3,13 @@ import { isGoDuration, validateEmail, isValidTemplate } from '@shared-ui/utils/s
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@main/constants/auth.js'
 
 const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
+const SIGNATURE_VARS = [
+  '.Agent.FirstName',
+  '.Agent.LastName',
+  '.Agent.FullName',
+  '.Inbox.Product',
+  '.Inbox.Name'
+]
 
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, t('globals.messages.required')),
@@ -19,6 +26,14 @@ export const createFormSchema = (t) => z.object({
     .optional()
     .refine((v) => !v || validateEmail(v), {
       message: t('validation.invalidEmail')
+    }),
+  product_name: z.string().optional().default(''),
+  signature: z
+    .string()
+    .optional()
+    .default('')
+    .refine((val) => isValidTemplate(val, SIGNATURE_VARS), {
+      message: t('admin.inbox.signature.invalidTemplate')
     }),
   enabled: z.boolean().optional(),
   csat_enabled: z.boolean().optional(),

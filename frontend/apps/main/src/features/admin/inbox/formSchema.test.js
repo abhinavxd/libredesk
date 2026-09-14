@@ -106,6 +106,39 @@ describe('Email Inbox Form Schema', () => {
         expect(() => schema.parse({ ...validForm, from_name_template: 'Support team' })).not.toThrow()
     })
 
+    test('product_name defaults to empty string', () => {
+        expect(schema.parse(validForm).product_name).toBe('')
+    })
+
+    test('product_name accepted', () => {
+        expect(schema.parse({ ...validForm, product_name: 'Drifttt' }).product_name).toBe('Drifttt')
+    })
+
+    test('signature defaults to empty string', () => {
+        expect(schema.parse(validForm).signature).toBe('')
+    })
+
+    test('signature with allowed variables', () => {
+        for (const v of ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Product', '.Inbox.Name']) {
+            expect(() => schema.parse({ ...validForm, signature: `{{ ${v} }}` })).not.toThrow()
+        }
+    })
+
+    test('signature with simple html accepted', () => {
+        expect(() => schema.parse({
+            ...validForm,
+            signature: '<b>{{ .Agent.FirstName }}</b> from {{ .Inbox.Product }}'
+        })).not.toThrow()
+    })
+
+    test('signature with an unknown variable', () => {
+        expect(() => schema.parse({ ...validForm, signature: '{{ .Inbox.Signature }}' })).toThrow()
+    })
+
+    test('signature with unbalanced braces', () => {
+        expect(() => schema.parse({ ...validForm, signature: '{{ .Agent.FirstName' })).toThrow()
+    })
+
     test('reply_to optional', () => {
         expect(() => schema.parse(validForm)).not.toThrow()
     })
