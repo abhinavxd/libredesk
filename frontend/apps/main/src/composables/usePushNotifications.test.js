@@ -89,8 +89,10 @@ describe('createPushNotifications', () => {
 
   it('waits for the first worker to become active before subscribing', async () => {
     const { browser, registration, pushManager } = makeBrowser({ permission: 'granted' })
-    const { promise, resolve } = Promise.withResolvers()
-    browser.navigator.serviceWorker.ready = promise
+    let resolveReady
+    browser.navigator.serviceWorker.ready = new Promise(resolve => {
+      resolveReady = resolve
+    })
     pushManager.subscribe.mockResolvedValue(subscription)
     const api = { createPushSubscription: vi.fn().mockResolvedValue({}) }
     const state = createPushNotifications(api, browser)
@@ -102,7 +104,7 @@ describe('createPushNotifications', () => {
     expect(api.createPushSubscription).not.toHaveBeenCalled()
     expect(state.enabled.value).toBe(false)
 
-    resolve(registration)
+    resolveReady(registration)
     await expect(enabling).resolves.toBe(true)
     expect(pushManager.subscribe).toHaveBeenCalledOnce()
     expect(api.createPushSubscription).toHaveBeenCalledOnce()

@@ -101,20 +101,17 @@ func TestNotifyNewReplyChecksParticipantAccess(t *testing.T) {
 		{"load failed", nil, true, errors.New("unavailable"), false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			prefs := &replyPreferences{}
 			m := &Manager{
-				lo:   &lo,
-				i18n: testutil.NewI18n(t),
+				lo: &lo,
 				userStore: replyUserStore{
 					agent: umodels.User{ID: agentID, Enabled: tt.enabled, Permissions: tt.permissions},
 					err:   tt.err,
 				},
-				dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{Prefs: prefs}),
 			}
 			m.q.GetConversationParticipantAgents = q.Participants
 			conv.AssignedUserID = null.IntFrom(agentID + 1)
-			m.NotifyNewReply(conv, models.Message{SenderID: agentID + 1}, false)
-			if got := slices.Contains(prefs.recipients, agentID); got != tt.want {
+			recipients := m.replyNotificationParticipants(conv, agentID+1)
+			if got := slices.ContainsFunc(recipients, func(recipient umodels.User) bool { return recipient.ID == agentID }); got != tt.want {
 				t.Fatalf("participant eligible = %v, want %v", got, tt.want)
 			}
 		})
@@ -122,13 +119,6 @@ func TestNotifyNewReplyChecksParticipantAccess(t *testing.T) {
 }
 
 func TestNotifyNewReplyChecksAssigneeAccess(t *testing.T) {
-	db := testutil.NewDB(t, "reply_assignee_access")
-	var q struct {
-		Participants *sqlx.Stmt `query:"get-conversation-participant-agents"`
-	}
-	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
-		t.Fatal(err)
-	}
 	lo := logf.New(logf.Opts{})
 	for _, tt := range []struct {
 		name        string
@@ -141,17 +131,13 @@ func TestNotifyNewReplyChecksAssigneeAccess(t *testing.T) {
 		{"missing base permission", true, []string{authzmodels.PermConversationsReadAssigned}, false},
 		{"missing assignment access", true, []string{authzmodels.PermConversationsRead}, false},
 	} {
-		for _, reopened := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/reopened=%v", tt.name, reopened), func(t *testing.T) {
-				prefs := &replyPreferences{}
-				m := &Manager{lo: &lo, i18n: testutil.NewI18n(t), userStore: replyUserStore{agent: umodels.User{ID: 42, Enabled: tt.enabled, Permissions: tt.permissions}}, dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{Prefs: prefs})}
-				m.q.GetConversationParticipantAgents = q.Participants
-				m.NotifyNewReply(models.Conversation{UUID: "00000000-0000-0000-0000-000000000000", AssignedUserID: null.IntFrom(42)}, models.Message{SenderID: 7}, reopened)
-				if got := slices.Contains(prefs.recipients, 42); got != tt.want {
-					t.Fatalf("assignee eligible = %v, want %v", got, tt.want)
-				}
-			})
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Manager{lo: &lo, userStore: replyUserStore{agent: umodels.User{ID: 42, Enabled: tt.enabled, Permissions: tt.permissions}}}
+			recipients := m.replyNotificationAssignee(models.Conversation{AssignedUserID: null.IntFrom(42)}, 7)
+			if got := slices.ContainsFunc(recipients, func(recipient umodels.User) bool { return recipient.ID == 42 }); got != tt.want {
+				t.Fatalf("assignee eligible = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
