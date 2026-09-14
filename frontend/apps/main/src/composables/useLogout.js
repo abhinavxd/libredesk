@@ -4,7 +4,7 @@ const defaultBrowser = typeof window === 'undefined' ? {} : window
 
 export const createLogout = (pushNotifications, browser = defaultBrowser) => async () => {
   try {
-    await pushNotifications.clearSubscription()
+    await pushNotifications.disable()
   } catch {
     browser.location.href = '/logout'
     return

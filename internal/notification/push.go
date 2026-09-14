@@ -59,9 +59,8 @@ type PushPayload struct {
 }
 
 type pushDelivery struct {
-	UserID     int
-	Payload    PushPayload
-	OnDelivery func(bool)
+	UserID  int
+	Payload PushPayload
 }
 
 type pushSubscriptionStore interface {
@@ -154,12 +153,12 @@ func (m *PushManager) Delete(userID int, endpoint string) error {
 	return nil
 }
 
-func (m *PushManager) Send(userID int, payload PushPayload, onDelivery func(bool)) bool {
+func (m *PushManager) Send(userID int, payload PushPayload) bool {
 	if m.publicKey == "" || m.privateKey == "" {
 		return false
 	}
 	select {
-	case m.queue <- pushDelivery{UserID: userID, Payload: payload, OnDelivery: onDelivery}:
+	case m.queue <- pushDelivery{UserID: userID, Payload: payload}:
 		return true
 	default:
 		m.lo.Error("push notification queue is full", "user_id", userID)
@@ -181,29 +180,24 @@ func (m *PushManager) worker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case delivery := <-m.queue:
-			delivered, err := m.deliver(ctx, delivery)
-			if err != nil {
+			if err := m.deliver(ctx, delivery); err != nil {
 				m.lo.Error("error sending push notification", "user_id", delivery.UserID, "error", err)
-			}
-			if delivery.OnDelivery != nil {
-				delivery.OnDelivery(delivered)
 			}
 		}
 	}
 }
 
-func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) (bool, error) {
+func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) error {
 	subscriptions, err := m.store.List(delivery.UserID)
 	if err != nil {
-		return false, err
+		return err
 	}
 	delivery.Payload.Title = pushPreview(delivery.Payload.Title, pushTitleRunes)
 	delivery.Payload.Body = pushPreview(delivery.Payload.Body, pushBodyRunes)
 	payload, err := json.Marshal(delivery.Payload)
 	if err != nil {
-		return false, err
+		return err
 	}
-	delivered := false
 	for _, subscription := range subscriptions {
 		resp, err := m.sender(ctx, payload, subscription, m.subject, m.publicKey, m.privateKey)
 		if err != nil {
@@ -223,11 +217,9 @@ func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) (bool,
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			m.lo.Error("push endpoint returned error", "subscription_id", subscription.ID, "status", resp.StatusCode)
-			continue
 		}
-		delivered = true
 	}
-	return delivered, nil
+	return nil
 }
 
 func (s *sqlPushStore) List(userID int) ([]PushSubscription, error) {

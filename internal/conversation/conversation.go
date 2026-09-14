@@ -68,8 +68,9 @@ const (
 <p>
 <a href="{{ RootURL }}/inboxes/all/conversation/{{ .Conversation.UUID }}">#{{ .Conversation.ReferenceNumber }}</a>
 </p>`
-	newReplyEmailDelay   = 2 * time.Minute
-	replyNotificationTTL = 7 * 24 * time.Hour
+	newReplyEmailDelay     = 2 * time.Minute
+	replyNotifiedKeyPrefix = "conversation:reply-notified:"
+	replyNotifiedTTL       = 7 * 24 * time.Hour
 )
 
 var conversationFilterRenderers = dbutil.FieldRenderers{
@@ -108,9 +109,6 @@ type Manager struct {
 	incomingMessageQueue       chan models.IncomingMessage
 	outgoingMessageQueue       chan models.Message
 	outgoingProcessingMessages sync.Map
-	replyNotificationMu        sync.Mutex
-	replyNotifications         map[replyNotificationRecipient]replyNotificationState
-	replyNotificationToken     uint64
 	closed                     bool
 	closedMu                   sync.RWMutex
 	rdb                        *redis.Client
@@ -120,19 +118,11 @@ type Manager struct {
 	aiAgent                    AIAgentEngine
 }
 
-type replyNotificationRecipient struct {
-	conversationUUID string
-	userID           int
-}
-
-type replyNotificationClaim struct {
-	recipient replyNotificationRecipient
-	token     uint64
-}
-
-type replyNotificationState struct {
-	token uint64
-	timer *time.Timer
+type replyNotificationGroup struct {
+	nType      nmodels.NotificationType
+	tmpl       string
+	title      string
+	recipients []umodels.User
 }
 
 // AIAgentEngine is notified when a conversation assigned to an AI assistant may need a response.
@@ -314,7 +304,6 @@ func New(
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
 		outgoingProcessingMessages: sync.Map{},
-		replyNotifications:         make(map[replyNotificationRecipient]replyNotificationState),
 		continuityConfig:           continuityConfig,
 		subjectRefFormat:           subjectRefFormat,
 	}
@@ -570,9 +559,7 @@ func (c *Manager) UpdateUserLastSeen(uuid string, userID int) error {
 		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	c.replyNotificationMu.Lock()
-	c.deleteReplyNotificationLocked(replyNotificationRecipient{conversationUUID: uuid, userID: userID})
-	c.replyNotificationMu.Unlock()
+	c.clearReplyNotified(uuid, userID)
 	return nil
 }
 
@@ -582,9 +569,7 @@ func (c *Manager) MarkAsUnread(uuid string, userID int) error {
 		c.lo.Error("error marking conversation as unread", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	c.replyNotificationMu.Lock()
-	c.deleteReplyNotificationLocked(replyNotificationRecipient{conversationUUID: uuid, userID: userID})
-	c.replyNotificationMu.Unlock()
+	c.clearReplyNotified(uuid, userID)
 	return nil
 }
 
@@ -1280,201 +1265,178 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 
 // NotifyNewReply notifies the assigned agent and the other participating agents of an incoming reply.
 func (m *Manager) NotifyNewReply(conversation models.Conversation, message models.Message, reopened bool) {
+	assigneeType, assigneeTmpl, assigneeTitleKey := nmodels.NotificationTypeNewReply, template.TmplNewReply, "notification.newReply"
+	if reopened {
+		assigneeType, assigneeTmpl, assigneeTitleKey = nmodels.NotificationTypeConversationReopened, template.TmplConversationReopened, "notification.conversationReopened"
+	}
+
+	groups := []replyNotificationGroup{
+		{
+			nType:      assigneeType,
+			tmpl:       assigneeTmpl,
+			title:      m.i18n.Ts(assigneeTitleKey, "referenceNumber", conversation.ReferenceNumber),
+			recipients: m.replyNotificationAssignee(conversation, message.SenderID),
+		},
+		{
+			nType:      nmodels.NotificationTypeNewReplyParticipating,
+			tmpl:       template.TmplNewReplyParticipating,
+			title:      m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber),
+			recipients: m.replyNotificationParticipants(conversation, message.SenderID),
+		},
+	}
+	if !slices.ContainsFunc(groups, func(g replyNotificationGroup) bool { return len(g.recipients) > 0 }) {
+		return
+	}
+
+	author, err := m.userStore.Get(message.SenderID, "", []string{})
+	if err != nil {
+		m.lo.Error("error fetching sender for new reply notification", "user_id", message.SenderID, "error", err)
+		return
+	}
+
+	for _, group := range groups {
+		m.sendReplyNotification(conversation, message, group, author)
+	}
+}
+
+func (m *Manager) replyNotificationAssignee(conversation models.Conversation, senderID int) []umodels.User {
+	assigneeID := conversation.AssignedUserID.Int
+	if assigneeID == 0 || assigneeID == senderID {
+		return nil
+	}
+	agent, ok := m.notifiableAgent(assigneeID, conversation)
+	if !ok {
+		return nil
+	}
+	return []umodels.User{agent}
+}
+
+func (m *Manager) replyNotificationParticipants(conversation models.Conversation, senderID int) []umodels.User {
 	var participants []umodels.User
 	if err := m.q.GetConversationParticipantAgents.Select(&participants, conversation.UUID); err != nil {
 		m.lo.Error("error fetching participants for new reply notification", "conversation_uuid", conversation.UUID, "error", err)
+		return nil
 	}
-
-	assigneeID := conversation.AssignedUserID.Int
-	var participating []umodels.User
-	for _, p := range participants {
-		if p.ID == message.SenderID || p.ID == assigneeID {
+	agents := make([]umodels.User, 0, len(participants))
+	for _, participant := range participants {
+		if participant.ID == senderID || participant.ID == conversation.AssignedUserID.Int {
 			continue
 		}
-		agent, err := m.userStore.GetAgent(p.ID, "")
-		if err != nil {
-			m.lo.Error("error fetching participant for new reply notification", "user_id", p.ID, "error", err)
-			continue
-		}
-		if agent.Enabled && authz.CanReadAssignment(agent, conversation.AssignedUserID, conversation.AssignedTeamID) {
-			participating = append(participating, agent)
+		if agent, ok := m.notifiableAgent(participant.ID, conversation); ok {
+			agents = append(agents, agent)
 		}
 	}
-
-	assigneeType, assigneeTmpl := nmodels.NotificationTypeNewReply, template.TmplNewReply
-	assigneeTitle := m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber)
-	if reopened {
-		assigneeType, assigneeTmpl = nmodels.NotificationTypeConversationReopened, template.TmplConversationReopened
-		assigneeTitle = m.i18n.Ts("notification.conversationReopened", "referenceNumber", conversation.ReferenceNumber)
-	}
-
-	var assignees []umodels.User
-	var assigneeChannels, participatingChannels map[int][]nmodels.NotificationChannel
-	if assigneeID != 0 && assigneeID != message.SenderID {
-		agent, err := m.userStore.GetAgent(assigneeID, "")
-		if err != nil {
-			m.lo.Error("error fetching agent for new reply notification", "user_id", assigneeID, "error", err)
-		} else if agent.Enabled && authz.CanReadAssignment(agent, conversation.AssignedUserID, conversation.AssignedTeamID) {
-			assignees = append(assignees, agent)
-			assigneeChannels = m.dispatcher.EnabledChannels([]int{assigneeID}, assigneeType)
-		}
-	}
-	if len(participating) > 0 {
-		ids := make([]int, 0, len(participating))
-		for _, p := range participating {
-			ids = append(ids, p.ID)
-		}
-		participatingChannels = m.dispatcher.EnabledChannels(ids, nmodels.NotificationTypeNewReplyParticipating)
-	}
-	if len(assigneeChannels) == 0 && len(participatingChannels) == 0 {
-		return
-	}
-
-	candidateIDs := make([]int, 0, len(assigneeChannels)+len(participatingChannels))
-	for id := range assigneeChannels {
-		candidateIDs = append(candidateIDs, id)
-	}
-	for id := range participatingChannels {
-		candidateIDs = append(candidateIDs, id)
-	}
-	forceUserID := 0
-	if reopened && len(assigneeChannels) > 0 {
-		forceUserID = assigneeID
-	}
-	claimed := m.claimReplyNotifications(conversation, message.CreatedAt, candidateIDs, forceUserID)
-
-	if _, ok := claimed[assigneeID]; len(assigneeChannels) == 0 || !ok {
-		assignees = nil
-	}
-	participating = slices.DeleteFunc(participating, func(p umodels.User) bool {
-		_, ok := claimed[p.ID]
-		return len(participatingChannels[p.ID]) == 0 || !ok
-	})
-	if len(assignees) == 0 && len(participating) == 0 {
-		m.releaseReplyNotifications(claimed)
-		return
-	}
-
-	sender, err := m.userStore.Get(message.SenderID, "", []string{})
-	if err != nil {
-		m.lo.Error("error fetching sender for new reply notification", "user_id", message.SenderID, "error", err)
-		m.releaseReplyNotifications(claimed)
-		return
-	}
-
-	m.notifyNewReplyRecipients(conversation, message, assigneeType, assigneeTmpl, assigneeTitle, assignees, assigneeChannels, claimed, sender)
-	m.notifyNewReplyRecipients(conversation, message, nmodels.NotificationTypeNewReplyParticipating, template.TmplNewReplyParticipating,
-		m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber), participating, participatingChannels, claimed, sender)
+	return agents
 }
 
-func (m *Manager) notifyNewReplyRecipients(conversation models.Conversation, message models.Message, nType nmodels.NotificationType, tmplName, title string, recipients []umodels.User, channels map[int][]nmodels.NotificationChannel, claims map[int]replyNotificationClaim, author umodels.User) {
-	if len(recipients) == 0 {
+func (m *Manager) notifiableAgent(userID int, conversation models.Conversation) (umodels.User, bool) {
+	agent, err := m.userStore.GetAgent(userID, "")
+	if err != nil {
+		m.lo.Error("error fetching agent for new reply notification", "user_id", userID, "error", err)
+		return umodels.User{}, false
+	}
+	if !agent.Enabled || !authz.CanReadAssignment(agent, conversation.AssignedUserID, conversation.AssignedTeamID) {
+		return umodels.User{}, false
+	}
+	return agent, true
+}
+
+func (m *Manager) sendReplyNotification(conversation models.Conversation, message models.Message, group replyNotificationGroup, author umodels.User) {
+	if len(group.recipients) == 0 {
 		return
 	}
-	recipientIDs := make([]int, len(recipients))
-	emails := make([]notifier.EmailNotification, len(recipients))
-	for i, recipient := range recipients {
-		recipientIDs[i] = recipient.ID
-		if !slices.Contains(channels[recipient.ID], nmodels.NotificationChannelEmail) {
-			continue
-		}
-		if rendered := m.renderNotificationEmail(tmplName, conversation, message, recipient, author); rendered != nil {
-			emails[i] = *rendered
+	candidateIDs := make([]int, len(group.recipients))
+	for i, recipient := range group.recipients {
+		candidateIDs[i] = recipient.ID
+	}
+
+	channels := m.dispatcher.EnabledChannels(candidateIDs, group.nType)
+	if len(channels) == 0 {
+		return
+	}
+	notifiableIDs := make([]int, 0, len(candidateIDs))
+	for _, id := range candidateIDs {
+		if len(channels[id]) > 0 {
+			notifiableIDs = append(notifiableIDs, id)
 		}
 	}
-	m.dispatcher.SendWithEmailsAfter(notifier.Notification{
-		Type:             nType,
+
+	var unreadIDs []int
+	if err := m.q.GetUsersWithUnreadConversationMessage.Select(&unreadIDs, conversation.ID, pq.Array(notifiableIDs), message.CreatedAt); err != nil {
+		m.lo.Error("error checking conversation unread state", "conversation_uuid", conversation.UUID, "error", err)
+		return
+	}
+	claimedIDs := m.claimReplyNotified(conversation.UUID, unreadIDs)
+
+	var (
+		recipientIDs []int
+		emails       []notifier.EmailNotification
+	)
+	for _, recipient := range group.recipients {
+		if !slices.Contains(claimedIDs, recipient.ID) {
+			continue
+		}
+		var email notifier.EmailNotification
+		if slices.Contains(channels[recipient.ID], nmodels.NotificationChannelEmail) {
+			if rendered := m.renderNotificationEmail(group.tmpl, conversation, message, recipient, author); rendered != nil {
+				email = *rendered
+			}
+		}
+		recipientIDs = append(recipientIDs, recipient.ID)
+		emails = append(emails, email)
+	}
+	if len(recipientIDs) == 0 {
+		return
+	}
+
+	// A recipient with nothing stored to find later keeps no claim, so the next reply alerts them again.
+	unstored := m.dispatcher.SendWithEmailsAfter(notifier.Notification{
+		Type:             group.nType,
 		RecipientIDs:     recipientIDs,
-		Title:            title,
+		Title:            group.title,
 		Body:             conversation.Subject,
 		ConversationID:   null.IntFrom(conversation.ID),
 		MessageID:        null.IntFrom(message.ID),
 		ConversationUUID: conversation.UUID,
 		MessageUUID:      message.UUID,
 		MessageCreatedAt: null.TimeFrom(message.CreatedAt),
-	}, emails, newReplyEmailDelay, channels, func(userID int, delivered bool) {
-		m.resolveReplyNotification(claims[userID], delivered)
-	})
+	}, emails, newReplyEmailDelay, channels)
+	m.clearReplyNotified(conversation.UUID, unstored...)
 }
 
-func (m *Manager) claimReplyNotifications(conversation models.Conversation, messageCreatedAt time.Time, userIDs []int, forceUserID int) map[int]replyNotificationClaim {
-	if len(userIDs) == 0 {
-		return nil
+func (m *Manager) claimReplyNotified(conversationUUID string, userIDs []int) []int {
+	if len(userIDs) == 0 || m.rdb == nil {
+		return userIDs
 	}
-	m.replyNotificationMu.Lock()
-	defer m.replyNotificationMu.Unlock()
-	if m.replyNotifications == nil {
-		m.replyNotifications = make(map[replyNotificationRecipient]replyNotificationState)
+	ctx := context.Background()
+	pipe := m.rdb.Pipeline()
+	claims := make([]*redis.BoolCmd, len(userIDs))
+	for i, userID := range userIDs {
+		claims[i] = pipe.SetNX(ctx, replyNotifiedKey(conversationUUID, userID), 1, replyNotifiedTTL)
 	}
-	candidateIDs := make([]int, 0, len(userIDs))
-	for _, userID := range userIDs {
-		recipient := replyNotificationRecipient{conversationUUID: conversation.UUID, userID: userID}
-		if _, exists := m.replyNotifications[recipient]; !exists || userID == forceUserID {
-			candidateIDs = append(candidateIDs, userID)
+	if _, err := pipe.Exec(ctx); err != nil {
+		m.lo.Error("error claiming reply notifications", "conversation_uuid", conversationUUID, "error", err)
+		return userIDs
+	}
+	claimed := make([]int, 0, len(userIDs))
+	for i, userID := range userIDs {
+		if claims[i].Val() {
+			claimed = append(claimed, userID)
 		}
-	}
-	if len(candidateIDs) == 0 {
-		return nil
-	}
-	var unreadIDs []int
-	if err := m.q.GetUsersWithUnreadConversationMessage.Select(&unreadIDs, conversation.ID, pq.Array(candidateIDs), messageCreatedAt); err != nil {
-		m.lo.Error("error checking conversation unread state", "conversation_uuid", conversation.UUID, "error", err)
-		return nil
-	}
-	unread := make(map[int]struct{}, len(unreadIDs))
-	for _, userID := range unreadIDs {
-		unread[userID] = struct{}{}
-	}
-	claimed := make(map[int]replyNotificationClaim, len(userIDs))
-	for _, userID := range candidateIDs {
-		recipient := replyNotificationRecipient{conversationUUID: conversation.UUID, userID: userID}
-		if _, ok := unread[userID]; !ok {
-			m.deleteReplyNotificationLocked(recipient)
-			continue
-		}
-		m.replyNotificationToken++
-		claim := replyNotificationClaim{recipient: recipient, token: m.replyNotificationToken}
-		m.deleteReplyNotificationLocked(recipient)
-		m.replyNotifications[recipient] = replyNotificationState{
-			token: claim.token,
-			timer: time.AfterFunc(replyNotificationTTL, func() { m.expireReplyNotification(claim) }),
-		}
-		claimed[userID] = claim
 	}
 	return claimed
 }
 
-func (m *Manager) resolveReplyNotification(claim replyNotificationClaim, delivered bool) {
-	if delivered {
+func (m *Manager) clearReplyNotified(conversationUUID string, userIDs ...int) {
+	if len(userIDs) == 0 || m.rdb == nil {
 		return
 	}
-	m.replyNotificationMu.Lock()
-	defer m.replyNotificationMu.Unlock()
-	if state, ok := m.replyNotifications[claim.recipient]; ok && state.token == claim.token {
-		m.deleteReplyNotificationLocked(claim.recipient)
+	keys := make([]string, len(userIDs))
+	for i, userID := range userIDs {
+		keys[i] = replyNotifiedKey(conversationUUID, userID)
 	}
-}
-
-func (m *Manager) releaseReplyNotifications(claims map[int]replyNotificationClaim) {
-	for _, claim := range claims {
-		m.resolveReplyNotification(claim, false)
-	}
-}
-
-func (m *Manager) expireReplyNotification(claim replyNotificationClaim) {
-	m.replyNotificationMu.Lock()
-	defer m.replyNotificationMu.Unlock()
-	if state, ok := m.replyNotifications[claim.recipient]; ok && state.token == claim.token {
-		delete(m.replyNotifications, claim.recipient)
-	}
-}
-
-func (m *Manager) deleteReplyNotificationLocked(recipient replyNotificationRecipient) {
-	if state, ok := m.replyNotifications[recipient]; ok {
-		if state.timer != nil {
-			state.timer.Stop()
-		}
-		delete(m.replyNotifications, recipient)
+	if err := m.rdb.Del(context.Background(), keys...).Err(); err != nil {
+		m.lo.Error("error clearing reply notification", "user_ids", userIDs, "conversation_uuid", conversationUUID, "error", err)
 	}
 }
 
@@ -2483,6 +2445,10 @@ func renderTagFilter(operator, value string, paramIndex int) (string, []any, err
 	default:
 		return "", nil, fmt.Errorf("invalid operator for tags: %s", operator)
 	}
+}
+
+func replyNotifiedKey(conversationUUID string, userID int) string {
+	return replyNotifiedKeyPrefix + conversationUUID + ":" + strconv.Itoa(userID)
 }
 
 func notificationTemplateData(conversation models.Conversation, recipient, author umodels.User) map[string]any {

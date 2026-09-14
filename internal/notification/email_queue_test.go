@@ -117,7 +117,7 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 	})
 }
 
-func TestDispatcherReportsDelayedEmailDelivery(t *testing.T) {
+func TestDelayedEmailRetriesThenGivesUp(t *testing.T) {
 	db := testutil.NewDB(t, "reply_email_recipients")
 	var userID, inboxID, convID int
 	if err := db.Get(&userID, `INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'queued@example.com', 'Agent', '') RETURNING id`); err != nil {
@@ -139,85 +139,66 @@ func TestDispatcherReportsDelayedEmailDelivery(t *testing.T) {
 	d := NewDispatcher(DispatcherOpts{EmailQueue: queue, EmailEnabled: true, Prefs: fakePreferences{channels: map[int][]models.NotificationChannel{userID: {models.NotificationChannelEmail}}}})
 	n := Notification{Type: models.NotificationTypeNewReply, RecipientIDs: []int{userID}, ConversationID: null.IntFrom(convID)}
 	email := []EmailNotification{{Recipients: []string{"queued@example.com"}, Subject: "Reply", Content: "Reply"}}
-	var deliveries []bool
-	onDelivery := func(_ int, delivered bool) {
-		deliveries = append(deliveries, delivered)
+	send := func(emails []EmailNotification) {
+		d.SendWithEmailsAfter(n, emails, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type))
 	}
-	d.SendWithEmailsAfter(n, nil, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type), onDelivery)
-	if len(deliveries) != 1 || deliveries[0] {
-		t.Fatalf("missing email deliveries = %v", deliveries)
+	queued := func() int {
+		var count int
+		if err := db.Get(&count, `SELECT COUNT(*) FROM notification_email_queue`); err != nil {
+			t.Fatal(err)
+		}
+		return count
 	}
-	deliveries = nil
-	d.SendWithEmailsAfter(n, email, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type), onDelivery)
-	if len(deliveries) != 0 {
-		t.Fatalf("queued email completed before delivery: %v", deliveries)
+	claimOne := func() queuedEmail {
+		t.Helper()
+		db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
+		due := queue.due()
+		if len(due) != 1 {
+			t.Fatalf("queued emails = %d, want 1", len(due))
+		}
+		return due[0]
 	}
-	db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
-	due := queue.due()
-	if len(due) != 1 {
-		t.Fatalf("queued emails = %d, want 1", len(due))
+
+	send(nil)
+	if queued() != 0 {
+		t.Fatal("a notification without an email body was queued")
 	}
-	queue.deliver(due[0])
-	if len(deliveries) != 1 || !deliveries[0] {
-		t.Fatalf("successful email deliveries = %v", deliveries)
+
+	send(email)
+	if queued() != 1 {
+		t.Fatal("email was not queued")
 	}
-	var queued int
-	if err := db.Get(&queued, `SELECT COUNT(*) FROM notification_email_queue`); err != nil {
-		t.Fatal(err)
+	if !queue.deliver(claimOne()) {
+		t.Fatal("email was not delivered")
 	}
-	if queued != 0 {
-		t.Fatalf("queued emails after delivery = %d, want 0", queued)
+	if queued() != 0 {
+		t.Fatalf("queued emails after delivery = %d, want 0", queued())
 	}
-	deliveries = nil
+
 	provider.err = errors.New("SMTP unavailable")
-	d.SendWithEmailsAfter(n, email, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type), onDelivery)
-	db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
-	due = queue.due()
-	if len(due) != 1 {
-		t.Fatalf("queued emails = %d, want 1", len(due))
+	send(email)
+	if queue.deliver(claimOne()) {
+		t.Fatal("failed send reported as delivered")
 	}
-	queue.deliver(due[0])
-	if len(deliveries) != 1 || deliveries[0] {
-		t.Fatalf("failed email deliveries = %v", deliveries)
-	}
-	if err := db.Get(&queued, `SELECT COUNT(*) FROM notification_email_queue`); err != nil {
-		t.Fatal(err)
-	}
-	if queued != 1 {
-		t.Fatalf("queued emails after failure = %d, want 1", queued)
+	if queued() != 1 {
+		t.Fatalf("queued emails after failure = %d, want 1", queued())
 	}
 	for attempt := 2; attempt <= emailQueueMaxAttempts; attempt++ {
-		db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
-		due = queue.due()
-		if len(due) != 1 {
-			t.Fatalf("queued emails for attempt %d = %d, want 1", attempt, len(due))
-		}
-		queue.deliver(due[0])
+		queue.deliver(claimOne())
 	}
-	if err := db.Get(&queued, `SELECT COUNT(*) FROM notification_email_queue`); err != nil {
-		t.Fatal(err)
+	if queued() != 0 {
+		t.Fatalf("queued emails after final failure = %d, want 0", queued())
 	}
-	if queued != 0 {
-		t.Fatalf("queued emails after final failure = %d, want 0", queued)
-	}
-	deliveries = nil
-	d.SendWithEmailsAfter(n, email, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type), onDelivery)
+
+	send(email)
 	db.MustExec(`UPDATE notification_email_queue SET attempts = $1`, emailQueueMaxAttempts-1)
-	d.SendWithEmailsAfter(n, email, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type), onDelivery)
+	send(email)
 	var attempts int
 	if err := db.Get(&attempts, `SELECT attempts FROM notification_email_queue`); err != nil {
 		t.Fatal(err)
 	}
 	if attempts != 0 {
 		t.Fatalf("attempts after replacement = %d, want 0", attempts)
-	}
-	if err := queue.q.Enqueue.Close(); err != nil {
-		t.Fatal(err)
-	}
-	deliveries = nil
-	d.SendWithEmailsAfter(n, email, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type), onDelivery)
-	if len(deliveries) != 1 || deliveries[0] {
-		t.Fatalf("failed enqueue deliveries = %v", deliveries)
 	}
 }
 
@@ -244,7 +225,7 @@ func TestClaimedEmailRemainsRecoverable(t *testing.T) {
 		Subject:   "Reply",
 		Content:   "Pending reply",
 	}
-	if !queue.SendAfter(email, -time.Second, nil) {
+	if !queue.SendAfter(email, -time.Second) {
 		t.Fatal("queueing email failed")
 	}
 	claimed := queue.due()

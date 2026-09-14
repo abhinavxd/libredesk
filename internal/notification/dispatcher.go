@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/notification/models"
@@ -23,7 +22,7 @@ type NotificationPreferenceStore interface {
 }
 
 type PushDispatcher interface {
-	Send(userID int, payload PushPayload, onDelivery func(bool)) bool
+	Send(userID int, payload PushPayload) bool
 }
 
 // Notification represents a notification to be sent through all channels.
@@ -54,13 +53,6 @@ type EmailNotification struct {
 	Recipients []string
 	Subject    string
 	Content    string
-}
-
-type deliveryTracker struct {
-	mu        sync.Mutex
-	remaining int
-	completed bool
-	callback  func(bool)
 }
 
 // Dispatcher coordinates sending notifications through multiple channels: WS, DB, email.
@@ -121,42 +113,20 @@ func (d *Dispatcher) EnabledChannels(recipientIDs []int, nType models.Notificati
 // For each recipient: creates in-app notification (DB), broadcasts via Websocket,
 // and sends email if Email field is provided.
 func (d *Dispatcher) Send(n Notification) {
-	d.dispatch(n, d.expandEmails(n), 0, d.EnabledChannels(n.RecipientIDs, n.Type), nil)
+	d.dispatch(n, d.expandEmails(n), 0, d.EnabledChannels(n.RecipientIDs, n.Type))
 }
 
 func (d *Dispatcher) SendAfter(n Notification, emailDelay time.Duration) {
-	d.dispatch(n, d.expandEmails(n), emailDelay, d.EnabledChannels(n.RecipientIDs, n.Type), nil)
+	d.dispatch(n, d.expandEmails(n), emailDelay, d.EnabledChannels(n.RecipientIDs, n.Type))
 }
 
 func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) {
-	d.dispatch(n, emails, 0, d.EnabledChannels(n.RecipientIDs, n.Type), nil)
+	d.dispatch(n, emails, 0, d.EnabledChannels(n.RecipientIDs, n.Type))
 }
 
-func (d *Dispatcher) SendWithEmailsAfter(n Notification, emails []EmailNotification, emailDelay time.Duration, channels map[int][]models.NotificationChannel, onDelivery func(int, bool)) {
-	d.dispatch(n, emails, emailDelay, channels, onDelivery)
-}
-
-func (t *deliveryTracker) finish(delivered bool) {
-	t.mu.Lock()
-	if t.completed {
-		t.mu.Unlock()
-		return
-	}
-	if delivered {
-		t.completed = true
-	} else if t.remaining > 0 {
-		t.remaining--
-	}
-	if !t.completed && t.remaining > 0 {
-		t.mu.Unlock()
-		return
-	}
-	t.completed = true
-	callback := t.callback
-	t.mu.Unlock()
-	if callback != nil {
-		callback(delivered)
-	}
+// SendWithEmailsAfter returns the recipients it stored no notification for.
+func (d *Dispatcher) SendWithEmailsAfter(n Notification, emails []EmailNotification, emailDelay time.Duration, channels map[int][]models.NotificationChannel) []int {
+	return d.dispatch(n, emails, emailDelay, channels)
 }
 
 func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
@@ -183,78 +153,55 @@ func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
 	return emails
 }
 
-func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration, enabled map[int][]models.NotificationChannel, onDelivery func(int, bool)) {
-	if len(n.RecipientIDs) == 0 {
-		return
-	}
-
+// dispatch hands the notification to every channel the recipient has enabled and returns the
+// recipients it stored nothing for. Push is left out of that answer: it goes straight to the browser
+// with nothing kept, so a push that fails later cannot be found again.
+func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration, enabled map[int][]models.NotificationChannel) []int {
+	var unstored []int
 	for i, recipientID := range n.RecipientIDs {
-		emailEnabled := i < len(emails) && len(emails[i].Recipients) > 0 &&
-			slices.Contains(enabled[recipientID], models.NotificationChannelEmail)
-		pushEnabled := d.push != nil && slices.Contains(enabled[recipientID], models.NotificationChannelPush)
-		asyncAttempts := 0
-		if emailEnabled && emailDelay > 0 {
-			asyncAttempts++
-		}
-		if pushEnabled {
-			asyncAttempts++
-		}
-		tracker := &deliveryTracker{
-			remaining: asyncAttempts,
-			callback: func(delivered bool) {
-				if onDelivery != nil {
-					onDelivery(recipientID, delivered)
-				}
-			},
-		}
-		delivered := false
+		channels := enabled[recipientID]
+		stored := false
+
 		var notificationID null.Int
-		if slices.Contains(enabled[recipientID], models.NotificationChannelInApp) {
+		if slices.Contains(channels, models.NotificationChannelInApp) {
 			if created := d.sendToRecipient(recipientID, n); created != nil {
 				notificationID = null.IntFrom(created.ID)
-				delivered = true
-				tracker.finish(true)
+				stored = true
 			}
 		}
 
-		if emailEnabled {
-			e := emails[i]
+		if i < len(emails) && len(emails[i].Recipients) > 0 && slices.Contains(channels, models.NotificationChannelEmail) {
 			queued := queuedEmail{
 				UserID:           recipientID,
 				NotificationID:   notificationID,
 				Type:             n.Type,
 				ConversationID:   n.ConversationID,
 				MessageCreatedAt: n.MessageCreatedAt,
-				Recipient:        e.Recipients[0],
-				Subject:          e.Subject,
-				Content:          e.Content,
+				Recipient:        emails[i].Recipients[0],
+				Subject:          emails[i].Subject,
+				Content:          emails[i].Content,
 			}
 			if emailDelay > 0 {
-				if !d.emailQueue.SendAfter(queued, emailDelay, tracker.finish) {
-					tracker.finish(false)
-				}
+				stored = d.emailQueue.SendAfter(queued, emailDelay) || stored
 			} else {
-				delivered = d.emailQueue.Send(queued) || delivered
-				if delivered {
-					tracker.finish(true)
-				}
+				stored = d.emailQueue.Send(queued) || stored
 			}
 		}
 
-		if pushEnabled {
-			if !d.push.Send(recipientID, PushPayload{
+		if d.push != nil && slices.Contains(channels, models.NotificationChannelPush) {
+			d.push.Send(recipientID, PushPayload{
 				Title: n.Title,
 				Body:  n.Body.String,
-				Tag:   fmt.Sprintf("%s_%s_%s", n.Type, n.ConversationUUID, n.MessageUUID),
+				Tag:   fmt.Sprintf("%s_%s", n.Type, n.ConversationUUID),
 				URL:   pushRoute(string(n.Type), n.ConversationUUID, n.MessageUUID),
-			}, tracker.finish) {
-				tracker.finish(false)
-			}
+			})
 		}
-		if !delivered && asyncAttempts == 0 {
-			tracker.finish(false)
+
+		if !stored {
+			unstored = append(unstored, recipientID)
 		}
 	}
+	return unstored
 }
 
 // sendToRecipient creates in-app notification and broadcasts via Websocket.

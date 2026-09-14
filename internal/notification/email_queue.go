@@ -2,7 +2,6 @@ package notifier
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -40,22 +39,12 @@ type queuedEmail struct {
 	Subject          string                  `db:"subject"`
 	Content          string                  `db:"content"`
 	MessageCreatedAt null.Time               `db:"message_created_at"`
-	onDelivery       func(bool)
-}
-
-type emailDeliveryKey struct {
-	userID            int
-	notificationType  models.NotificationType
-	conversationID    int
-	conversationIDSet bool
 }
 
 type EmailQueue struct {
-	q                 emailQueueQueries
-	outbound          *Service
-	lo                *logf.Logger
-	deliveryMu        sync.Mutex
-	deliveryCallbacks map[emailDeliveryKey]func(bool)
+	q        emailQueueQueries
+	outbound *Service
+	lo       *logf.Logger
 }
 
 type EmailQueueOpts struct {
@@ -70,10 +59,9 @@ func NewEmailQueue(opts EmailQueueOpts) (*EmailQueue, error) {
 		return nil, err
 	}
 	return &EmailQueue{
-		q:                 q,
-		outbound:          opts.Outbound,
-		lo:                opts.Lo,
-		deliveryCallbacks: make(map[emailDeliveryKey]func(bool)),
+		q:        q,
+		outbound: opts.Outbound,
+		lo:       opts.Lo,
 	}, nil
 }
 
@@ -90,24 +78,11 @@ func (q *EmailQueue) Send(e queuedEmail) bool {
 	return true
 }
 
-func (q *EmailQueue) SendAfter(e queuedEmail, delay time.Duration, onDelivery func(bool)) bool {
-	q.deliveryMu.Lock()
+func (q *EmailQueue) SendAfter(e queuedEmail, delay time.Duration) bool {
 	if _, err := q.q.Enqueue.Exec(e.UserID, e.NotificationID, e.Type, e.ConversationID, e.Recipient,
 		e.Subject, e.Content, time.Now().Add(delay), e.MessageCreatedAt); err != nil {
-		q.deliveryMu.Unlock()
 		q.lo.Error("error queueing notification email", "user_id", e.UserID, "type", e.Type, "error", err)
 		return false
-	}
-	key := e.deliveryKey()
-	previous := q.deliveryCallbacks[key]
-	if onDelivery == nil {
-		delete(q.deliveryCallbacks, key)
-	} else {
-		q.deliveryCallbacks[key] = onDelivery
-	}
-	q.deliveryMu.Unlock()
-	if previous != nil {
-		previous(false)
 	}
 	return true
 }
@@ -124,7 +99,6 @@ func (q *EmailQueue) Run(ctx context.Context) {
 			for _, e := range q.due() {
 				if q.seen(e) {
 					q.delete(e)
-					e.complete(false)
 					continue
 				}
 				q.deliver(e)
@@ -134,17 +108,10 @@ func (q *EmailQueue) Run(ctx context.Context) {
 }
 
 func (q *EmailQueue) due() []queuedEmail {
-	q.deliveryMu.Lock()
-	defer q.deliveryMu.Unlock()
 	var due []queuedEmail
 	if err := q.q.Claim.Select(&due, emailQueueBatch, time.Now().Add(emailQueueClaimLease)); err != nil {
 		q.lo.Error("error claiming due notification emails", "error", err)
 		return nil
-	}
-	for i := range due {
-		key := due[i].deliveryKey()
-		due[i].onDelivery = q.deliveryCallbacks[key]
-		delete(q.deliveryCallbacks, key)
 	}
 	return due
 }
@@ -171,11 +138,9 @@ func (q *EmailQueue) deliver(e queuedEmail) bool {
 		} else {
 			q.retry(e)
 		}
-		e.complete(false)
 		return false
 	}
 	q.delete(e)
-	e.complete(true)
 	return true
 }
 
@@ -188,20 +153,5 @@ func (q *EmailQueue) delete(e queuedEmail) {
 func (q *EmailQueue) retry(e queuedEmail) {
 	if _, err := q.q.Retry.Exec(e.ID, time.Now().Add(emailQueueRetryDelay), e.ClaimedAt); err != nil {
 		q.lo.Error("error scheduling notification email retry", "user_id", e.UserID, "type", e.Type, "error", err)
-	}
-}
-
-func (e queuedEmail) deliveryKey() emailDeliveryKey {
-	return emailDeliveryKey{
-		userID:            e.UserID,
-		notificationType:  e.Type,
-		conversationID:    e.ConversationID.Int,
-		conversationIDSet: e.ConversationID.Valid,
-	}
-}
-
-func (e queuedEmail) complete(delivered bool) {
-	if e.onDelivery != nil {
-		e.onDelivery(delivered)
 	}
 }

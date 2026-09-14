@@ -71,17 +71,13 @@ func TestPushManagerDeliverSendsEverySubscription(t *testing.T) {
 		},
 	}
 
-	delivered, err := m.deliver(t.Context(), pushDelivery{UserID: 7, Payload: PushPayload{
+	if err := m.deliver(t.Context(), pushDelivery{UserID: 7, Payload: PushPayload{
 		Title: "Assigned conversation",
 		Body:  "A conversation was assigned to you",
-		Tag:   "assignment_conv-1_msg-1",
+		Tag:   "assignment_conv-1",
 		URL:   "/inboxes/assigned/conversation/conv-1?scrollTo=msg-1",
-	}})
-	if err != nil {
+	}}); err != nil {
 		t.Fatal(err)
-	}
-	if !delivered {
-		t.Fatal("push was not delivered")
 	}
 	if len(endpoints) != 2 {
 		t.Fatalf("sent to %d endpoints, want 2", len(endpoints))
@@ -91,7 +87,7 @@ func TestPushManagerDeliverSendsEverySubscription(t *testing.T) {
 func TestPushManagerDeliverBoundsPreview(t *testing.T) {
 	for _, content := range []string{"", "Short note", strings.Repeat("a", 100), strings.Repeat("a", 101), strings.Repeat("a", 400), strings.Repeat("a", 401), strings.Repeat("a", 10000), strings.Repeat("世界🙂", 2000), strings.Repeat("<&>\x00\"\\", 2000), strings.Repeat("\x00", 2000)} {
 		t.Run(fmt.Sprintf("bytes_%d", len(content)), func(t *testing.T) {
-			original := PushPayload{Title: content, Body: content, Tag: "mention_" + strings.Repeat("a", 36) + "_" + strings.Repeat("b", 36), URL: pushRoute("mention", strings.Repeat("a", 36), strings.Repeat("b", 36))}
+			original := PushPayload{Title: content, Body: content, Tag: "mention_" + strings.Repeat("a", 36), URL: pushRoute("mention", strings.Repeat("a", 36), strings.Repeat("b", 36))}
 			called := false
 			m := &PushManager{
 				store: &fakePushStore{subscriptions: []PushSubscription{{ID: 1}}},
@@ -118,7 +114,7 @@ func TestPushManagerDeliverBoundsPreview(t *testing.T) {
 					return nil, nil
 				},
 			}
-			if _, err := m.deliver(t.Context(), pushDelivery{UserID: 1, Payload: original}); err != nil {
+			if err := m.deliver(t.Context(), pushDelivery{UserID: 1, Payload: original}); err != nil {
 				t.Fatal(err)
 			}
 			if !called {
@@ -137,10 +133,8 @@ func TestPushManagerDeliverDeletesExpiredSubscription(t *testing.T) {
 		},
 	}
 
-	if delivered, err := m.deliver(t.Context(), pushDelivery{UserID: 7, Payload: PushPayload{Title: "Mention"}}); err != nil {
+	if err := m.deliver(t.Context(), pushDelivery{UserID: 7, Payload: PushPayload{Title: "Mention"}}); err != nil {
 		t.Fatal(err)
-	} else if delivered {
-		t.Fatal("expired subscription reported as delivered")
 	}
 	if store.deletedID != 23 {
 		t.Fatalf("deleted subscription %d, want 23", store.deletedID)
