@@ -116,16 +116,16 @@ func TestDispatcherReportsQueuedEmailRecipients(t *testing.T) {
 	d := NewDispatcher(DispatcherOpts{EmailQueue: queue, EmailEnabled: true, Prefs: fakePreferences{channels: map[int][]models.NotificationChannel{userID: {models.NotificationChannelEmail}}}})
 	n := Notification{Type: models.NotificationTypeNewReply, RecipientIDs: []int{userID}}
 	email := []EmailNotification{{Recipients: []string{"queued@example.com"}, Subject: "Reply", Content: "Reply"}}
-	if got := d.SendWithEmailsAfter(n, nil, time.Minute); len(got) != 0 {
+	if got := d.SendWithEmailsAfter(n, nil, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type)); len(got) != 0 {
 		t.Fatalf("missing email reported as notified: %v", got)
 	}
-	if got := d.SendWithEmailsAfter(n, email, time.Minute); len(got) != 1 || got[0] != userID {
+	if got := d.SendWithEmailsAfter(n, email, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type)); len(got) != 1 || got[0] != userID {
 		t.Fatalf("queued email recipients = %v", got)
 	}
 	if err := queue.q.Enqueue.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if got := d.SendWithEmailsAfter(n, email, time.Minute); len(got) != 0 {
+	if got := d.SendWithEmailsAfter(n, email, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type)); len(got) != 0 {
 		t.Fatalf("failed enqueue reported as notified: %v", got)
 	}
 }

@@ -1369,7 +1369,7 @@ func (m *Manager) notifyNewReplyRecipients(conversation models.Conversation, mes
 		ConversationUUID: conversation.UUID,
 		MessageUUID:      message.UUID,
 		MessageCreatedAt: null.TimeFrom(message.CreatedAt),
-	}, emails, newReplyEmailDelay)
+	}, emails, newReplyEmailDelay, channels)
 	undelivered := slices.DeleteFunc(slices.Clone(recipientIDs), func(id int) bool { return slices.Contains(notified, id) })
 	m.releaseReplyNotifications(conversation.UUID, undelivered)
 }

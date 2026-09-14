@@ -88,10 +88,8 @@ func (q *EmailQueue) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			// The batch is already deleted from the table, so finish it even on shutdown.
 			for _, e := range q.due() {
-				if ctx.Err() != nil {
-					return
-				}
 				if q.seen(e) {
 					continue
 				}

@@ -72,11 +72,7 @@ type NotificationPreference struct {
 }
 
 // DefaultEnabled reports the preference for a type when the agent has no stored row for it.
-
-func DefaultEnabled(nType NotificationType, channel NotificationChannel) bool {
-	if channel == NotificationChannelPush {
-		return false
-	}
+func DefaultEnabled(nType NotificationType) bool {
 	return !slices.Contains(defaultDisabledTypes, nType)
 }
 

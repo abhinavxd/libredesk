@@ -108,7 +108,7 @@ func NewPushManager(opts PushManagerOpts) (*PushManager, error) {
 	}
 	privateKey, publicKey, err := loadVAPIDKeys(opts.Settings)
 	if err != nil {
-		return nil, err
+		opts.Lo.Error("error loading VAPID keys, push notifications are off", "error", err)
 	}
 	m := &PushManager{
 		store:       &sqlPushStore{q: q},
@@ -154,6 +154,9 @@ func (m *PushManager) Delete(userID int, endpoint string) error {
 }
 
 func (m *PushManager) Send(userID int, payload PushPayload) bool {
+	if m.publicKey == "" || m.privateKey == "" {
+		return false
+	}
 	select {
 	case m.queue <- pushDelivery{UserID: userID, Payload: payload}:
 		return true
@@ -208,7 +211,7 @@ func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) error 
 		_ = resp.Body.Close()
 		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone {
 			if err := m.store.DeleteByID(subscription.ID); err != nil {
-				return err
+				m.lo.Error("error deleting expired push subscription", "subscription_id", subscription.ID, "error", err)
 			}
 			continue
 		}

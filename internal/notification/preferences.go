@@ -67,7 +67,7 @@ func (m *PreferenceManager) EnabledChannels(userIDs []int, nType models.Notifica
 		for _, channel := range models.NotificationChannels {
 			on, ok := stored[[2]any{userID, channel}]
 			if !ok {
-				on = models.DefaultEnabled(nType, channel)
+				on = models.DefaultEnabled(nType)
 			}
 			if on {
 				enabled[userID] = append(enabled[userID], channel)
@@ -95,7 +95,7 @@ func (m *PreferenceManager) GetMatrix(userID int) ([]models.NotificationPreferen
 		for _, channel := range models.NotificationChannels {
 			on, ok := stored[[2]any{nType, channel}]
 			if !ok {
-				on = models.DefaultEnabled(nType, channel)
+				on = models.DefaultEnabled(nType)
 			}
 			matrix = append(matrix, models.NotificationPreference{
 				NotificationType: nType,

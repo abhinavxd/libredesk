@@ -113,19 +113,20 @@ func (d *Dispatcher) EnabledChannels(recipientIDs []int, nType models.Notificati
 // For each recipient: creates in-app notification (DB), broadcasts via Websocket,
 // and sends email if Email field is provided.
 func (d *Dispatcher) Send(n Notification) {
-	d.dispatch(n, d.expandEmails(n), 0)
+	d.dispatch(n, d.expandEmails(n), 0, d.EnabledChannels(n.RecipientIDs, n.Type))
 }
 
 func (d *Dispatcher) SendAfter(n Notification, emailDelay time.Duration) {
-	d.dispatch(n, d.expandEmails(n), emailDelay)
+	d.dispatch(n, d.expandEmails(n), emailDelay, d.EnabledChannels(n.RecipientIDs, n.Type))
 }
 
 func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) {
-	d.dispatch(n, emails, 0)
+	d.dispatch(n, emails, 0, d.EnabledChannels(n.RecipientIDs, n.Type))
 }
 
-func (d *Dispatcher) SendWithEmailsAfter(n Notification, emails []EmailNotification, emailDelay time.Duration) []int {
-	return d.dispatch(n, emails, emailDelay)
+// SendWithEmailsAfter takes the channel map the caller already read via EnabledChannels.
+func (d *Dispatcher) SendWithEmailsAfter(n Notification, emails []EmailNotification, emailDelay time.Duration, channels map[int][]models.NotificationChannel) []int {
+	return d.dispatch(n, emails, emailDelay, channels)
 }
 
 func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
@@ -152,12 +153,11 @@ func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
 	return emails
 }
 
-func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration) []int {
+func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration, enabled map[int][]models.NotificationChannel) []int {
 	if len(n.RecipientIDs) == 0 {
 		return nil
 	}
 	var notified []int
-	enabled := d.EnabledChannels(n.RecipientIDs, n.Type)
 
 	for i, recipientID := range n.RecipientIDs {
 		sent := false
