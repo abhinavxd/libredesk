@@ -105,11 +105,13 @@
               >
                 {{ sanitizedContent }}
               </div>
-main.scss              <div
+              <div
                 v-else
                 ref="messageContentEl"
                 @click="onMessageContentClick"
-                :class="{ 'email-light-canvas': !isOutgoing }"
+                :class="{
+                  'email-light-canvas': !isOutgoing && convStore.current?.inbox_channel === 'email'
+                }"
               >
                 <Letter
                   :html="sanitizedContent"
