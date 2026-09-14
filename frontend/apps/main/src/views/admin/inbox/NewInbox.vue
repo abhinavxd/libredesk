@@ -117,6 +117,7 @@ const submitForm = (values) => {
   const payload = {
     name: values.name,
     from: values.from,
+    aliases: values.aliases || [],
     from_name_template: values.from_name_template || '',
     channel: channelName,
     enabled: values.enabled ?? true,

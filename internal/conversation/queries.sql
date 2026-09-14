@@ -191,6 +191,7 @@ SELECT
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
    COALESCE(inb.config->>'reply_to', '') as inbox_reply_to,
+   COALESCE((SELECT jsonb_agg(jsonb_build_object('email', email, 'verification_status', verification_status, 'verified_at', verified_at) ORDER BY position, id) FROM inbox_email_addresses WHERE inbox_id = inb.id AND kind = 'alias'), '[]'::jsonb) AS inbox_aliases,
    COALESCE(inb.channel::TEXT, '') as inbox_channel,
    c.status_id,
    c.priority_id,

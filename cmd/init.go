@@ -742,10 +742,15 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 
 	inbox, err := email.New(msgStore, usrStore, email.Opts{
 		ID:                   inboxRecord.ID,
+		UUID:                 inboxRecord.UUID,
 		Name:                 inboxRecord.Name,
+		Aliases:              inboxRecord.Aliases,
 		Config:               config,
 		Lo:                   initLogger("email_inbox"),
 		TokenRefreshCallback: tokenRefreshCallback,
+		AliasVerificationCallback: func(ctx context.Context, token, from string) error {
+			return mgr.CompleteAliasVerification(ctx, inboxRecord.ID, token, from)
+		},
 	})
 
 	if err != nil {

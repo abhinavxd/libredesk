@@ -22,6 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -179,7 +180,19 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	outbound := message.ToOutbound()
 
 	if inb.Channel() == inbox.ChannelEmail {
+		emailInbox, ok := inb.(inbox.EmailInbox)
+		selected := message.SendFrom()
+		if selected == "" && ok {
+			selected = emailInbox.PrimaryAddress()
+		}
+		if !ok || !emailInbox.SendsAddress(selected) {
+			handleError(errors.New("message sender address is no longer owned by the inbox"), "invalid email sender")
+			return
+		}
 		outbound.From = m.emailFromAddress(inb, message)
+		if selected != emailInbox.PrimaryAddress() {
+			outbound.ReplyTo = selected
+		}
 
 		// Set "In-Reply-To" and "References" headers for email threading.
 		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
@@ -504,7 +517,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 }
 
 // QueueReply queues a reply message in a conversation.
-func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]interface{}) (models.Message, error) {
+func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, sendFrom string, metaMap map[string]interface{}) (models.Message, error) {
 	var (
 		message = models.Message{}
 	)
@@ -522,6 +535,11 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	var sourceID string
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
+		sendFrom, err = m.resolveSendFrom(conversationUUID, inboxRecord, sendFrom)
+		if err != nil {
+			return models.Message{}, err
+		}
+		metaMap["send_from"] = sendFrom
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
 		to = stringutil.RemoveEmpty(to)
 		cc = stringutil.RemoveEmpty(cc)
@@ -1183,7 +1201,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
-			true,          /** private **/
+			true,         /** private **/
 		)
 		if err != nil {
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
@@ -1516,6 +1534,11 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 // Falls back to the inbox's default from address if the template is empty, the sender is not an agent, or any errors occur.
 func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) string {
 	from := inb.FromAddress()
+	if emailInbox, ok := inb.(inbox.EmailInbox); ok {
+		if selected := message.SendFrom(); selected != "" && emailInbox.SendsAddress(selected) {
+			from = selected
+		}
+	}
 
 	tpl := inb.FromNameTemplate()
 	if tpl == "" || message.SenderType != models.SenderTypeAgent {
@@ -1566,4 +1589,61 @@ func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) stri
 	}
 	addr.Name = name
 	return addr.String()
+}
+
+func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.Inbox, requested string) (string, error) {
+	owned, err := inbox.SendableEmailAddresses(inboxRecord.From, inboxRecord.Aliases)
+	if err != nil {
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	ownedSet := make(map[string]struct{}, len(owned))
+	for _, address := range owned {
+		ownedSet[address] = struct{}{}
+	}
+
+	selected := requested
+	if selected == "" {
+		var latest struct {
+			Type string          `db:"type"`
+			Meta json.RawMessage `db:"meta"`
+		}
+		err := m.db.Get(&latest, `
+			SELECT m.type, m.meta
+			FROM conversation_messages m
+			JOIN conversations c ON c.id = m.conversation_id
+			WHERE c.uuid = $1 AND m.private = false AND m.type IN ('incoming', 'outgoing')
+			ORDER BY m.id DESC LIMIT 1`, conversationUUID)
+		if err == nil {
+			key := "send_from"
+			if latest.Type == models.MessageIncoming {
+				key = "inbox_address"
+			}
+			selected = metaStringValue(latest.Meta, key)
+		} else if err != sql.ErrNoRows {
+			return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+	}
+	if selected == "" {
+		selected = owned[0]
+	}
+	normalized, err := inbox.NormalizeEmailAddress(selected)
+	if err != nil {
+		return "", envelope.NewError(envelope.InputError, "Invalid sender address.", nil)
+	}
+	if _, ok := ownedSet[normalized]; !ok && requested == "" {
+		return owned[0], nil
+	}
+	if _, ok := ownedSet[normalized]; !ok {
+		return "", envelope.NewError(envelope.InputError, "Sender address does not belong to this inbox.", nil)
+	}
+	return normalized, nil
+}
+
+func metaStringValue(meta json.RawMessage, key string) string {
+	var values map[string]any
+	if err := json.Unmarshal(meta, &values); err != nil {
+		return ""
+	}
+	value, _ := values[key].(string)
+	return value
 }
