@@ -174,6 +174,52 @@ func TestValidateCustomAttribute(t *testing.T) {
 	}
 }
 
+func TestValidateReadOnlyCustomAttributes(t *testing.T) {
+	app := newValidatorTestApp(t)
+	definitions := []cmodels.CustomAttribute{
+		{Name: "Plan", AppliesTo: "contact", DataType: "text", Description: "Customer plan", Key: "plan", ReadOnly: true},
+		{Name: "Seats", AppliesTo: "contact", DataType: "number", Description: "Licensed seats", Key: "seats", ReadOnly: true},
+		{Name: "Note", AppliesTo: "contact", DataType: "text", Description: "Agent note", Key: "note"},
+	}
+
+	tests := []struct {
+		name     string
+		stored   string
+		incoming map[string]any
+		wantErr  bool
+	}{
+		{"read only value unchanged", `{"plan":"gold"}`, map[string]any{"plan": "gold"}, false},
+		{"read only number unchanged", `{"seats":5}`, map[string]any{"seats": float64(5)}, false},
+		{"editable value changed", `{"plan":"gold","note":"a"}`, map[string]any{"plan": "gold", "note": "b"}, false},
+		{"editable value removed", `{"plan":"gold","note":"a"}`, map[string]any{"plan": "gold"}, false},
+		{"no stored attributes", ``, map[string]any{"note": "a"}, false},
+		{"read only null dropped", `{"plan":null}`, map[string]any{}, false},
+		{"read only value changed", `{"plan":"gold"}`, map[string]any{"plan": "silver"}, true},
+		{"read only value removed", `{"plan":"gold"}`, map[string]any{}, true},
+		{"read only value nulled", `{"plan":"gold"}`, map[string]any{"plan": nil}, true},
+		{"read only value set by hand", `{}`, map[string]any{"plan": "gold"}, true},
+		{"read only number changed", `{"seats":5}`, map[string]any{"seats": float64(6)}, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateReadOnlyCustomAttributes(app, definitions, json.RawMessage(tc.stored), tc.incoming)
+			assertValidation(t, err, tc.wantErr)
+		})
+	}
+}
+
+func TestValidateReadOnlyCustomAttributesWithoutReadOnlyDefinitions(t *testing.T) {
+	app := newValidatorTestApp(t)
+	definitions := []cmodels.CustomAttribute{
+		{Name: "Note", AppliesTo: "contact", DataType: "text", Description: "Agent note", Key: "note"},
+	}
+
+	if err := validateReadOnlyCustomAttributes(app, definitions, json.RawMessage(`{"note":"a"}`), map[string]any{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateSLA(t *testing.T) {
 	app := newValidatorTestApp(t)
 	notification := smodels.SlaNotification{Type: "warning", TimeDelayType: "after", Metric: "first_response", TimeDelay: "30m", Recipients: []string{"assigned_user"}}

@@ -150,6 +150,18 @@ describe('Custom Attributes Form Schema', () => {
         expect(() => schema.parse({ ...validForm, regex: '^a+$', regex_hint: 'letters' })).not.toThrow()
     })
 
+    test('read_only defaults to false', () => {
+        expect(schema.parse(validForm).read_only).toBe(false)
+    })
+
+    test('read_only accepts true', () => {
+        expect(schema.parse({ ...validForm, read_only: true }).read_only).toBe(true)
+    })
+
+    test('read_only rejects a non boolean', () => {
+        expect(() => schema.parse({ ...validForm, read_only: 'yes' })).toThrow()
+    })
+
     test('empty object', () => {
         expect(() => schema.parse({})).toThrow()
     })

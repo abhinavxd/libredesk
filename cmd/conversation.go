@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mime"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	camodels "github.com/abhinavxd/libredesk/internal/custom_attribute/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -706,8 +708,13 @@ func handleUpdateConversationCustomAttributes(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	_, err = enforceConversationAccess(app, uuid, user)
+	conversation, err := enforceConversationAccess(app, uuid, user)
 	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Attributes managed by an integration cannot be edited by hand.
+	if err := enforceReadOnlyCustomAttributes(app, "conversation", conversation.CustomAttributes, attributes); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -740,12 +747,59 @@ func handleUpdateContactCustomAttributes(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+
+	// Attributes managed by an integration cannot be edited by hand.
+	if err := enforceReadOnlyCustomAttributes(app, "contact", conversation.Contact.CustomAttributes, attributes); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
 	if err := app.user.SaveCustomAttributes(conversation.ContactID, attributes, false); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	// Broadcast update.
 	app.conversation.BroadcastContactUpdate(conversation.ContactID, map[string]any{"custom_attributes": attributes})
 	return r.SendEnvelope(true)
+}
+
+// enforceReadOnlyCustomAttributes blocks manual edits to custom attributes an admin marked as managed by an integration.
+// It loads the definitions for appliesTo and rejects the request if it changes or drops the stored value of a read only key.
+// Only the agent facing update routes call this, values pushed by integrations - the widget identity JWT, automations and
+// the API - are written by other code paths and stay untouched.
+func enforceReadOnlyCustomAttributes(app *App, appliesTo string, stored json.RawMessage, incoming map[string]any) error {
+	definitions, err := app.customAttribute.GetAll(appliesTo)
+	if err != nil {
+		return err
+	}
+	return validateReadOnlyCustomAttributes(app, definitions, stored, incoming)
+}
+
+// validateReadOnlyCustomAttributes compares the incoming attributes against the stored ones for every read only definition.
+func validateReadOnlyCustomAttributes(app *App, definitions []camodels.CustomAttribute, stored json.RawMessage, incoming map[string]any) error {
+	current := map[string]any{}
+	if len(stored) > 0 {
+		if err := json.Unmarshal(stored, &current); err != nil {
+			app.lo.Error("error unmarshalling stored custom attributes", "error", err)
+			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+	}
+	for _, definition := range definitions {
+		if !definition.ReadOnly {
+			continue
+		}
+		storedValue, hasStored := current[definition.Key]
+		incomingValue, hasIncoming := incoming[definition.Key]
+		// A null value is the same as an unset one, so dropping it is not an edit.
+		hasStored = hasStored && storedValue != nil
+		hasIncoming = hasIncoming && incomingValue != nil
+		if !hasStored && !hasIncoming {
+			continue
+		}
+		if hasStored && hasIncoming && reflect.DeepEqual(storedValue, incomingValue) {
+			continue
+		}
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("errors.readOnlyCustomAttribute", "name", definition.Name), nil)
+	}
+	return nil
 }
 
 // enforceConversationAccess fetches the conversation and checks if the user has access to it.

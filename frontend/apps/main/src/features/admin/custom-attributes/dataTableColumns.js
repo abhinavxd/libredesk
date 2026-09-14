@@ -1,5 +1,7 @@
 import { h } from 'vue'
 import dataTableDropdown from '@/features/admin/custom-attributes/dataTableDropdown.vue'
+import { Badge } from '@shared-ui/components/ui/badge'
+import { Lock } from 'lucide-vue-next'
 import { format } from 'date-fns'
 
 export const createColumns = (t, { onEdit } = {}) => [
@@ -44,6 +46,27 @@ export const createColumns = (t, { onEdit } = {}) => [
         },
         cell: function ({ row }) {
             return h('div', { class: 'text-center' }, row.getValue('applies_to'))
+        }
+    },
+    {
+        accessorKey: 'read_only',
+        enableGlobalFilter: false,
+        header: function () {
+            return h('div', { class: 'text-center' }, t('admin.customAttributes.managed'))
+        },
+        cell: function ({ row }) {
+            if (!row.getValue('read_only')) return h('div', { class: 'text-center text-muted-foreground' }, '-')
+            return h('div', { class: 'text-center' }, [
+                h(
+                    Badge,
+                    {
+                        variant: 'secondary',
+                        class: 'text-xs gap-1',
+                        title: t('admin.customAttributes.readOnly.label')
+                    },
+                    () => [h(Lock, { size: 12 }), t('admin.customAttributes.managed')]
+                )
+            ])
         }
     },
     {
