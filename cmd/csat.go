@@ -86,9 +86,15 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 	}
 
 	if err := app.csat.UpdateResponse(uuid, rating, feedback, metaJSON); err != nil {
+		// Surface only known, user-safe messages; never leak raw driver errors
+		// (e.g. a malformed UUID triggers a Postgres syntax error string).
+		msg := app.i18n.T("globals.messages.somethingWentWrong")
+		if e, ok := err.(envelope.Error); ok {
+			msg = e.Error()
+		}
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": err.Error(),
+				"ErrorMessage": msg,
 			},
 		})
 	}
