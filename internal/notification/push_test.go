@@ -3,6 +3,7 @@ package notifier
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -175,6 +176,15 @@ func TestPushHTTPClientBlocksPrivateEndpoints(t *testing.T) {
 
 	if _, err := newPushHTTPClient(&lo).Do(request); err == nil {
 		t.Fatal("private endpoint request succeeded")
+	}
+}
+
+func TestPushHTTPClientRejectsRedirects(t *testing.T) {
+	lo := logf.New(logf.Opts{})
+	client := newPushHTTPClient(&lo)
+
+	if err := client.CheckRedirect(&http.Request{}, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("redirect error = %v, want %v", err, http.ErrUseLastResponse)
 	}
 }
 

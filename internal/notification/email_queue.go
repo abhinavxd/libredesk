@@ -97,7 +97,11 @@ func (q *EmailQueue) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			for _, e := range q.due() {
-				if q.seen(e) {
+				seen, err := q.seen(e)
+				if err != nil {
+					continue
+				}
+				if seen {
 					q.delete(e)
 					continue
 				}
@@ -116,13 +120,13 @@ func (q *EmailQueue) due() []queuedEmail {
 	return due
 }
 
-func (q *EmailQueue) seen(e queuedEmail) bool {
+func (q *EmailQueue) seen(e queuedEmail) (bool, error) {
 	var seen bool
 	if err := q.q.IsSeen.Get(&seen, e.UserID, e.NotificationID, e.ConversationID, e.MessageCreatedAt); err != nil {
 		q.lo.Error("error checking notification seen state", "user_id", e.UserID, "type", e.Type, "error", err)
-		return false
+		return false, err
 	}
-	return seen
+	return seen, nil
 }
 
 func (q *EmailQueue) deliver(e queuedEmail) bool {

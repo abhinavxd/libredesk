@@ -32,9 +32,9 @@ let root
 const settle = async () => { for (let i = 0; i < 10; i++) await nextTick() }
 afterEach(() => { app?.unmount(); root?.remove(); vi.clearAllMocks() })
 
-const mount = async () => {
+const mount = async (vapidPublicKey = 'test-key') => {
   getPreferences.mockResolvedValue({ data: { data: {
-    email_enabled: true, vapid_public_key: 'test-key', preferences: [
+    email_enabled: true, vapid_public_key: vapidPublicKey, preferences: [
       { notification_type: 'new_reply', channel: 'email', enabled: true },
       { notification_type: 'new_reply', channel: 'in_app', enabled: false }
     ]
@@ -61,5 +61,12 @@ describe('notification preferences', () => {
     await mount()
     expect(root.textContent).toContain('notification.type.newReply')
     expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('disables browser notifications when push is unavailable', async () => {
+    await mount('')
+    const browserPush = root.querySelector('button')
+    expect(browserPush.disabled).toBe(true)
+    expect(root.textContent).toContain('notification.browserPush.unavailable')
   })
 })

@@ -326,8 +326,9 @@ func pushRoute(notificationType, conversationUUID, messageUUID string) string {
 func newPushHTTPClient(lo *logf.Logger) *http.Client {
 	control := ssrf.NewControl(true, nil, lo)
 	return &http.Client{
-		Transport: ssrf.NewTransport(control, 10*time.Second),
-		Timeout:   10 * time.Second,
+		Transport:     ssrf.NewTransport(control, 10*time.Second),
+		Timeout:       10 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 }
 

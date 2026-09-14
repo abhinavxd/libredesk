@@ -73,7 +73,11 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 			if len(due) != 1 {
 				t.Fatalf("queued emails = %d, want 1", len(due))
 			}
-			if got := queue.seen(due[0]); got != tt.want {
+			got, err := queue.seen(due[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
 				t.Fatalf("seen = %v, want %v", got, tt.want)
 			}
 		})
@@ -90,11 +94,19 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 		if len(due) != 1 || due[0].Content != "Second reply" {
 			t.Fatalf("unexpected coalesced emails: %#v", due)
 		}
-		if queue.seen(due[0]) {
+		seen, err := queue.seen(due[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if seen {
 			t.Fatal("unread second reply suppressed")
 		}
 		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, messageTime.Add(3*time.Second))
-		if !queue.seen(due[0]) {
+		seen, err = queue.seen(due[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !seen {
 			t.Fatal("read second reply was not suppressed")
 		}
 	})
@@ -107,14 +119,36 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 		if len(due) != 1 {
 			t.Fatalf("queued emails = %d, want 1", len(due))
 		}
-		if queue.seen(due[0]) {
+		seen, err := queue.seen(due[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if seen {
 			t.Fatal("legacy unread email suppressed")
 		}
 		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = now()`)
-		if !queue.seen(due[0]) {
+		seen, err = queue.seen(due[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !seen {
 			t.Fatal("legacy read email was not suppressed")
 		}
 	})
+}
+
+func TestDelayedEmailSeenCheckReturnsDatabaseError(t *testing.T) {
+	db := testutil.NewDB(t, "notification_email_seen_error")
+	lo := logf.New(logf.Opts{})
+	queue, err := NewEmailQueue(EmailQueueOpts{DB: db, Lo: &lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`DROP TABLE conversation_last_seen`)
+
+	if _, err := queue.seen(queuedEmail{}); err == nil {
+		t.Fatal("seen-state database error was ignored")
+	}
 }
 
 func TestDelayedEmailRetriesThenGivesUp(t *testing.T) {

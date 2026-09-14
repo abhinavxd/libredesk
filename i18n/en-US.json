@@ -1378,6 +1378,7 @@
   "notification.browserPush.blocked": "Browser notifications are blocked. Allow them in your browser settings to receive notifications on this device.",
   "notification.browserPush.description": "Receive notifications on this device when libredesk is closed.",
   "notification.browserPush.title": "Browser notifications",
+  "notification.browserPush.unavailable": "Browser notifications are unavailable because push is not configured. Ask an administrator to configure push notifications.",
   "notification.browserPush.unsupported": "This browser does not support push notifications. Use a supported browser to receive notifications when libredesk is closed.",
   "notification.channel.inApp": "In-app",
   "notification.channel.push": "Push",

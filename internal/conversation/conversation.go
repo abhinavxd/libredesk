@@ -1510,7 +1510,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	if err != nil {
 		m.lo.Error("error fetching root URL for mention notification", "error", err)
 	}
-	messageContent := htmltemplate.HTML(absolutizeConversationReferenceLinks(message.Content, rootURL))
+	messageContent := sanitizeNotificationHTML(message.Content, rootURL)
 
 	recipientIDs, emails := m.buildRecipientEmails(userIDs, func(recipient umodels.User) (string, string, error) {
 		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned,

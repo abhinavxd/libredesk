@@ -17,7 +17,11 @@
         </div>
         <Switch
           :checked="pushNotifications.enabled.value"
-          :disabled="!pushNotifications.supported.value || pushNotifications.permission.value === 'denied'"
+          :disabled="
+            !pushNotifications.supported.value ||
+            pushNotifications.permission.value === 'denied' ||
+            !vapidPublicKey
+          "
           :aria-label="$t('notification.browserPush.title')"
           @update:checked="updateBrowserPush"
         />
@@ -115,6 +119,7 @@ const fetchPreferences = async () => {
 const browserPushDescription = computed(() => {
   if (!pushNotifications.supported.value) return t('notification.browserPush.unsupported')
   if (pushNotifications.permission.value === 'denied') return t('notification.browserPush.blocked')
+  if (!vapidPublicKey.value) return t('notification.browserPush.unavailable')
   return t('notification.browserPush.description')
 })
 
