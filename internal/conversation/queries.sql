@@ -509,6 +509,14 @@ VALUES ($1, (SELECT id FROM conversations WHERE uuid = $2), NOW())
 ON CONFLICT (conversation_id, user_id)
 DO UPDATE SET last_seen_at = NOW(), updated_at = NOW();
 
+-- name: get-users-with-unread-conversation-message
+SELECT requested.user_id
+FROM unnest($2::BIGINT[]) AS requested(user_id)
+WHERE NOT EXISTS (
+    SELECT 1 FROM conversation_last_seen
+    WHERE conversation_id = $1 AND user_id = requested.user_id AND last_seen_at >= $3
+);
+
 -- name: update-conversation-last-message
 -- $1=id, $2=uuid, $3=content, $4=sender_type, $5=timestamp, $6=message_type, $7=private, $8=sender_id
 UPDATE conversations SET

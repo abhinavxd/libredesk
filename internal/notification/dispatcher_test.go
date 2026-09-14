@@ -20,10 +20,44 @@ type fakePushDispatcher struct {
 	payload PushPayload
 }
 
-func (p *fakePushDispatcher) Send(userID int, payload PushPayload) bool {
+func (p *fakePushDispatcher) Send(userID int, payload PushPayload, onDelivery func(bool)) bool {
 	p.userID = userID
 	p.payload = payload
+	if onDelivery != nil {
+		onDelivery(true)
+	}
 	return true
+}
+
+func TestDeliveryTrackerKeepsSuccessfulDelivery(t *testing.T) {
+	var deliveries []bool
+	tracker := &deliveryTracker{remaining: 2, callback: func(delivered bool) {
+		deliveries = append(deliveries, delivered)
+	}}
+
+	tracker.finish(true)
+	tracker.finish(false)
+	tracker.finish(false)
+
+	if len(deliveries) != 1 || !deliveries[0] {
+		t.Fatalf("deliveries = %v, want one success", deliveries)
+	}
+}
+
+func TestDeliveryTrackerWaitsForEveryFailure(t *testing.T) {
+	var deliveries []bool
+	tracker := &deliveryTracker{remaining: 2, callback: func(delivered bool) {
+		deliveries = append(deliveries, delivered)
+	}}
+
+	tracker.finish(false)
+	if len(deliveries) != 0 {
+		t.Fatalf("delivery completed with an attempt pending: %v", deliveries)
+	}
+	tracker.finish(false)
+	if len(deliveries) != 1 || deliveries[0] {
+		t.Fatalf("deliveries = %v, want one failure", deliveries)
+	}
 }
 
 func TestDispatcherSendsPushUsingNotificationRoute(t *testing.T) {

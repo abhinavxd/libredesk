@@ -25,6 +25,7 @@ type userChannelPreference struct {
 }
 
 type PreferenceManager struct {
+	db   *sqlx.DB
 	lo   *logf.Logger
 	i18n *i18n.I18n
 	q    prefQueries
@@ -43,18 +44,18 @@ func NewPreferenceManager(opts PreferenceManagerOpts) (*PreferenceManager, error
 		return nil, err
 	}
 	return &PreferenceManager{
+		db:   opts.DB,
 		q:    q,
 		lo:   opts.Lo,
 		i18n: opts.I18n,
 	}, nil
 }
 
-// EnabledChannels returns the channels each of the users receives the notification type on. On a lookup
-// failure the type's default applies, an unreadable preference must not deliver what nobody opted into.
 func (m *PreferenceManager) EnabledChannels(userIDs []int, nType models.NotificationType) map[int][]models.NotificationChannel {
 	var rows []userChannelPreference
 	if err := m.q.GetPreferencesType.Select(&rows, pq.Array(userIDs), nType); err != nil {
 		m.lo.Error("error fetching notification preferences", "type", nType, "error", err)
+		return map[int][]models.NotificationChannel{}
 	}
 
 	stored := make(map[[2]any]bool, len(rows))
@@ -114,10 +115,23 @@ func (m *PreferenceManager) Update(userID int, prefs []models.NotificationPrefer
 			!slices.Contains(models.NotificationChannels, p.Channel) {
 			return envelope.NewError(envelope.InputError, m.i18n.T("notification.invalidPreference"), nil)
 		}
-		if _, err := m.q.UpsertPreference.Exec(userID, p.NotificationType, p.Channel, p.Enabled); err != nil {
+	}
+
+	tx, err := m.db.Beginx()
+	if err != nil {
+		m.lo.Error("error starting notification preference update", "user_id", userID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	defer tx.Rollback()
+	for _, p := range prefs {
+		if _, err := tx.Stmtx(m.q.UpsertPreference).Exec(userID, p.NotificationType, p.Channel, p.Enabled); err != nil {
 			m.lo.Error("error updating notification preference", "user_id", userID, "type", p.NotificationType, "channel", p.Channel, "error", err)
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
+	}
+	if err := tx.Commit(); err != nil {
+		m.lo.Error("error committing notification preference update", "user_id", userID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

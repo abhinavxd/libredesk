@@ -76,10 +76,12 @@ func V2_10_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			queued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			message_created_at TIMESTAMPTZ,
 			send_at TIMESTAMPTZ NOT NULL,
+			attempts INTEGER NOT NULL DEFAULT 0,
 			CONSTRAINT constraint_uniq_notification_email_queue UNIQUE (user_id, notification_type, conversation_id)
 		);
 		CREATE INDEX IF NOT EXISTS index_notification_email_queue_on_send_at ON notification_email_queue(send_at);
 		ALTER TABLE notification_email_queue ADD COLUMN IF NOT EXISTS message_created_at TIMESTAMPTZ;
+		ALTER TABLE notification_email_queue ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
 
 		INSERT INTO settings ("key", value) VALUES
 			('notification.push.vapid_public_key', '""'::jsonb),

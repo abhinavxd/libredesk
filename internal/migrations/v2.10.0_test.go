@@ -81,12 +81,15 @@ func TestV2_10_0NotificationMigration(t *testing.T) {
 
 func TestV2_10_0PreservesExistingQueuedEmails(t *testing.T) {
 	db := testutil.NewDB(t, "migration_v2_10_0_queue")
-	var expectedColumn string
-	columnQuery := `SELECT data_type || ':' || is_nullable || ':' || COALESCE(column_default, '') FROM information_schema.columns WHERE table_name = 'notification_email_queue' AND column_name = 'message_created_at'`
-	if err := db.Get(&expectedColumn, columnQuery); err != nil {
+	columnQuery := `SELECT data_type || ':' || is_nullable || ':' || COALESCE(column_default, '') FROM information_schema.columns WHERE table_name = 'notification_email_queue' AND column_name = $1`
+	var expectedMessageTimeColumn, expectedAttemptsColumn string
+	if err := db.Get(&expectedMessageTimeColumn, columnQuery, "message_created_at"); err != nil {
 		t.Fatal(err)
 	}
-	db.MustExec(`ALTER TABLE notification_email_queue DROP COLUMN message_created_at`)
+	if err := db.Get(&expectedAttemptsColumn, columnQuery, "attempts"); err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`ALTER TABLE notification_email_queue DROP COLUMN message_created_at, DROP COLUMN attempts`)
 	db.MustExec(`INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'queued@example.com', 'Agent', '')`)
 	db.MustExec(`INSERT INTO notification_email_queue (user_id, notification_type, recipient_email, subject, content, send_at) VALUES ((SELECT id FROM users LIMIT 1), 'new_reply', 'queued@example.com', 'Reply', 'Pending reply', now())`)
 	for range 2 {
@@ -94,15 +97,21 @@ func TestV2_10_0PreservesExistingQueuedEmails(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	var actualColumn string
-	if err := db.Get(&actualColumn, columnQuery); err != nil {
+	var actualMessageTimeColumn, actualAttemptsColumn string
+	if err := db.Get(&actualMessageTimeColumn, columnQuery, "message_created_at"); err != nil {
 		t.Fatal(err)
 	}
-	if actualColumn != expectedColumn {
-		t.Fatalf("migration column = %q, schema column = %q", actualColumn, expectedColumn)
+	if err := db.Get(&actualAttemptsColumn, columnQuery, "attempts"); err != nil {
+		t.Fatal(err)
+	}
+	if actualMessageTimeColumn != expectedMessageTimeColumn {
+		t.Fatalf("message time column = %q, schema column = %q", actualMessageTimeColumn, expectedMessageTimeColumn)
+	}
+	if actualAttemptsColumn != expectedAttemptsColumn {
+		t.Fatalf("attempts column = %q, schema column = %q", actualAttemptsColumn, expectedAttemptsColumn)
 	}
 	var preserved bool
-	if err := db.Get(&preserved, `SELECT content = 'Pending reply' AND message_created_at IS NULL FROM notification_email_queue`); err != nil {
+	if err := db.Get(&preserved, `SELECT content = 'Pending reply' AND message_created_at IS NULL AND attempts = 0 FROM notification_email_queue`); err != nil {
 		t.Fatal(err)
 	}
 	if !preserved {

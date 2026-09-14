@@ -17,9 +17,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	"github.com/alicebob/miniredis/v2"
 	"github.com/jmoiron/sqlx"
-	"github.com/redis/go-redis/v9"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -33,6 +31,7 @@ type replyUserStore struct {
 type replyPreferences struct {
 	recipients []int
 	channels   []nmodels.NotificationChannel
+	mu         sync.Mutex
 }
 
 type replyPush struct {
@@ -40,11 +39,13 @@ type replyPush struct {
 	count  int
 }
 
-func (p *replyPush) Send(int, notifier.PushPayload) bool {
+func (p *replyPush) Send(_ int, _ notifier.PushPayload, onDelivery func(bool)) bool {
 	if p.reject {
-		return false
+		onDelivery(false)
+		return true
 	}
 	p.count++
+	onDelivery(true)
 	return true
 }
 
@@ -54,13 +55,9 @@ func (s replyUserStore) Get(int, string, []string) (umodels.User, error) {
 
 func (s replyUserStore) GetAgent(int, string) (umodels.User, error) { return s.agent, s.err }
 
-func newReplyRedis(t *testing.T) (*redis.Client, *miniredis.Miniredis) {
-	t.Helper()
-	mr := miniredis.RunT(t)
-	return redis.NewClient(&redis.Options{Addr: mr.Addr()}), mr
-}
-
 func (p *replyPreferences) EnabledChannels(ids []int, _ nmodels.NotificationType) map[int][]nmodels.NotificationChannel {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.recipients = append(p.recipients, ids...)
 	enabled := make(map[int][]nmodels.NotificationChannel)
 	if len(p.channels) > 0 {
@@ -107,10 +104,8 @@ func TestNotifyNewReplyChecksParticipantAccess(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			prefs := &replyPreferences{}
-			rdb, _ := newReplyRedis(t)
 			m := &Manager{
 				lo:   &lo,
-				rdb:  rdb,
 				i18n: testutil.NewI18n(t),
 				userStore: replyUserStore{
 					agent: umodels.User{ID: agentID, Enabled: tt.enabled, Permissions: tt.permissions},
@@ -151,8 +146,7 @@ func TestNotifyNewReplyChecksAssigneeAccess(t *testing.T) {
 		for _, reopened := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/reopened=%v", tt.name, reopened), func(t *testing.T) {
 				prefs := &replyPreferences{}
-				rdb, _ := newReplyRedis(t)
-				m := &Manager{lo: &lo, rdb: rdb, i18n: testutil.NewI18n(t), userStore: replyUserStore{agent: umodels.User{ID: 42, Enabled: tt.enabled, Permissions: tt.permissions}}, dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{Prefs: prefs})}
+				m := &Manager{lo: &lo, i18n: testutil.NewI18n(t), userStore: replyUserStore{agent: umodels.User{ID: 42, Enabled: tt.enabled, Permissions: tt.permissions}}, dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{Prefs: prefs})}
 				m.q.GetConversationParticipantAgents = q.Participants
 				m.NotifyNewReply(models.Conversation{UUID: "00000000-0000-0000-0000-000000000000", AssignedUserID: null.IntFrom(42)}, models.Message{SenderID: 7}, reopened)
 				if got := slices.Contains(prefs.recipients, 42); got != tt.want {
@@ -184,6 +178,7 @@ func TestReplyNotificationSuppressedUntilConversationRead(t *testing.T) {
 	var q struct {
 		Participants *sqlx.Stmt `query:"get-conversation-participant-agents"`
 		LastSeen     *sqlx.Stmt `query:"upsert-user-last-seen"`
+		Unread       *sqlx.Stmt `query:"get-users-with-unread-conversation-message"`
 	}
 	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
 		t.Fatal(err)
@@ -210,13 +205,13 @@ func TestReplyNotificationSuppressedUntilConversationRead(t *testing.T) {
 			db.MustExec(`DELETE FROM user_notifications`)
 			prefs := &replyPreferences{}
 			push := &replyPush{}
-			rdb, mr := newReplyRedis(t)
-			m := &Manager{lo: &lo, rdb: rdb, i18n: i18n, template: templates,
+			m := &Manager{lo: &lo, i18n: i18n, template: templates,
 				userStore:  replyUserStore{agent: umodels.User{ID: userID, Email: null.StringFrom("history@example.com"), Enabled: true, Permissions: []string{authzmodels.PermConversationsRead, authzmodels.PermConversationsReadAssigned}}},
 				dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{Lo: &lo, Prefs: prefs, Push: push, EmailQueue: emailQueue, EmailEnabled: true, InApp: inApp}),
 			}
 			m.q.GetConversationParticipantAgents = q.Participants
 			m.q.UpsertUserLastSeen = q.LastSeen
+			m.q.GetUsersWithUnreadConversationMessage = q.Unread
 
 			delivered := func() bool {
 				var count int
@@ -233,7 +228,10 @@ func TestReplyNotificationSuppressedUntilConversationRead(t *testing.T) {
 				return count > 0
 			}
 			claimed := func() bool {
-				return mr.Exists(replyNotificationKey(conv.UUID, userID))
+				m.replyNotificationMu.Lock()
+				defer m.replyNotificationMu.Unlock()
+				_, ok := m.replyNotifications[replyNotificationRecipient{conversationUUID: conv.UUID, userID: userID}]
+				return ok
 			}
 
 			message := models.Message{ID: messageID, SenderID: userID + 1, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
@@ -271,20 +269,34 @@ func TestReplyNotificationSuppressedUntilConversationRead(t *testing.T) {
 				t.Fatal("reopened conversation alert was suppressed")
 			}
 
+			if err := m.UpdateUserLastSeen(conv.UUID, userID); err != nil {
+				t.Fatal(err)
+			}
+			readReply := next
+			readReply.CreatedAt = time.Now().Add(-time.Minute)
+			m.NotifyNewReply(conv, readReply, false)
+			if delivered() || claimed() {
+				t.Fatal("reply read before notification dispatch was marked notified")
+			}
+
 			if channel != nmodels.NotificationChannelPush {
 				return
 			}
-			mr.FlushAll()
+			m.replyNotificationMu.Lock()
+			m.deleteReplyNotificationLocked(replyNotificationRecipient{conversationUUID: conv.UUID, userID: userID})
+			m.replyNotificationMu.Unlock()
 			push.reject = true
-			m.NotifyNewReply(conv, next, false)
+			freshReply := next
+			freshReply.CreatedAt = time.Now().Add(time.Minute)
+			m.NotifyNewReply(conv, freshReply, false)
 			if claimed() {
-				t.Fatal("failed push enqueue suppressed later replies")
+				t.Fatal("failed push delivery suppressed later replies")
 			}
 			push.reject = false
 			push.count = 0
 			var wg sync.WaitGroup
 			for range 8 {
-				wg.Go(func() { m.NotifyNewReply(conv, next, false) })
+				wg.Go(func() { m.NotifyNewReply(conv, freshReply, false) })
 			}
 			wg.Wait()
 			if push.count != 1 {

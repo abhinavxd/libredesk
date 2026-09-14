@@ -2,6 +2,7 @@ package notifier
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -12,31 +13,49 @@ import (
 )
 
 const (
-	emailQueueTick  = 15 * time.Second
-	emailQueueBatch = 500
+	emailQueueTick        = 15 * time.Second
+	emailQueueBatch       = 500
+	emailQueueClaimLease  = 5 * time.Minute
+	emailQueueMaxAttempts = 3
+	emailQueueRetryDelay  = time.Minute
 )
 
 type emailQueueQueries struct {
 	IsSeen  *sqlx.Stmt `query:"is-notification-seen"`
 	Enqueue *sqlx.Stmt `query:"enqueue-notification-email"`
-	Dequeue *sqlx.Stmt `query:"dequeue-due-notification-emails"`
+	Claim   *sqlx.Stmt `query:"claim-due-notification-emails"`
+	Delete  *sqlx.Stmt `query:"delete-claimed-notification-email"`
+	Retry   *sqlx.Stmt `query:"retry-claimed-notification-email"`
 }
 
 type queuedEmail struct {
+	ID               int64                   `db:"id"`
+	ClaimedAt        time.Time               `db:"updated_at"`
 	UserID           int                     `db:"user_id"`
 	NotificationID   null.Int                `db:"notification_id"`
 	Type             models.NotificationType `db:"notification_type"`
 	ConversationID   null.Int                `db:"conversation_id"`
+	Attempts         int                     `db:"attempts"`
 	Recipient        string                  `db:"recipient_email"`
 	Subject          string                  `db:"subject"`
 	Content          string                  `db:"content"`
 	MessageCreatedAt null.Time               `db:"message_created_at"`
+	onDelivery       func(bool)
+}
+
+type emailDeliveryKey struct {
+	userID            int
+	notificationType  models.NotificationType
+	conversationID    int
+	conversationIDSet bool
 }
 
 type EmailQueue struct {
-	q        emailQueueQueries
-	outbound *Service
-	lo       *logf.Logger
+	q                 emailQueueQueries
+	outbound          *Service
+	lo                *logf.Logger
+	deliveryMu        sync.Mutex
+	deliveryCallbacks map[emailDeliveryKey]func(bool)
 }
 
 type EmailQueueOpts struct {
@@ -51,9 +70,10 @@ func NewEmailQueue(opts EmailQueueOpts) (*EmailQueue, error) {
 		return nil, err
 	}
 	return &EmailQueue{
-		q:        q,
-		outbound: opts.Outbound,
-		lo:       opts.Lo,
+		q:                 q,
+		outbound:          opts.Outbound,
+		lo:                opts.Lo,
+		deliveryCallbacks: make(map[emailDeliveryKey]func(bool)),
 	}, nil
 }
 
@@ -70,11 +90,24 @@ func (q *EmailQueue) Send(e queuedEmail) bool {
 	return true
 }
 
-func (q *EmailQueue) SendAfter(e queuedEmail, delay time.Duration) bool {
+func (q *EmailQueue) SendAfter(e queuedEmail, delay time.Duration, onDelivery func(bool)) bool {
+	q.deliveryMu.Lock()
 	if _, err := q.q.Enqueue.Exec(e.UserID, e.NotificationID, e.Type, e.ConversationID, e.Recipient,
 		e.Subject, e.Content, time.Now().Add(delay), e.MessageCreatedAt); err != nil {
+		q.deliveryMu.Unlock()
 		q.lo.Error("error queueing notification email", "user_id", e.UserID, "type", e.Type, "error", err)
 		return false
+	}
+	key := e.deliveryKey()
+	previous := q.deliveryCallbacks[key]
+	if onDelivery == nil {
+		delete(q.deliveryCallbacks, key)
+	} else {
+		q.deliveryCallbacks[key] = onDelivery
+	}
+	q.deliveryMu.Unlock()
+	if previous != nil {
+		previous(false)
 	}
 	return true
 }
@@ -88,22 +121,30 @@ func (q *EmailQueue) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// The batch is already deleted from the table, so finish it even on shutdown.
 			for _, e := range q.due() {
 				if q.seen(e) {
+					q.delete(e)
+					e.complete(false)
 					continue
 				}
-				q.Send(e)
+				q.deliver(e)
 			}
 		}
 	}
 }
 
 func (q *EmailQueue) due() []queuedEmail {
+	q.deliveryMu.Lock()
+	defer q.deliveryMu.Unlock()
 	var due []queuedEmail
-	if err := q.q.Dequeue.Select(&due, emailQueueBatch); err != nil {
-		q.lo.Error("error dequeueing due notification emails", "error", err)
+	if err := q.q.Claim.Select(&due, emailQueueBatch, time.Now().Add(emailQueueClaimLease)); err != nil {
+		q.lo.Error("error claiming due notification emails", "error", err)
 		return nil
+	}
+	for i := range due {
+		key := due[i].deliveryKey()
+		due[i].onDelivery = q.deliveryCallbacks[key]
+		delete(q.deliveryCallbacks, key)
 	}
 	return due
 }
@@ -115,4 +156,52 @@ func (q *EmailQueue) seen(e queuedEmail) bool {
 		return false
 	}
 	return seen
+}
+
+func (q *EmailQueue) deliver(e queuedEmail) bool {
+	if err := q.outbound.SendSync(Message{
+		RecipientEmails: []string{e.Recipient},
+		Subject:         e.Subject,
+		Content:         e.Content,
+		Provider:        ProviderEmail,
+	}); err != nil {
+		q.lo.Error("error delivering notification email", "user_id", e.UserID, "type", e.Type, "error", err)
+		if e.Attempts+1 >= emailQueueMaxAttempts {
+			q.delete(e)
+		} else {
+			q.retry(e)
+		}
+		e.complete(false)
+		return false
+	}
+	q.delete(e)
+	e.complete(true)
+	return true
+}
+
+func (q *EmailQueue) delete(e queuedEmail) {
+	if _, err := q.q.Delete.Exec(e.ID, e.ClaimedAt); err != nil {
+		q.lo.Error("error deleting delivered notification email", "user_id", e.UserID, "type", e.Type, "error", err)
+	}
+}
+
+func (q *EmailQueue) retry(e queuedEmail) {
+	if _, err := q.q.Retry.Exec(e.ID, time.Now().Add(emailQueueRetryDelay), e.ClaimedAt); err != nil {
+		q.lo.Error("error scheduling notification email retry", "user_id", e.UserID, "type", e.Type, "error", err)
+	}
+}
+
+func (e queuedEmail) deliveryKey() emailDeliveryKey {
+	return emailDeliveryKey{
+		userID:            e.UserID,
+		notificationType:  e.Type,
+		conversationID:    e.ConversationID.Int,
+		conversationIDSet: e.ConversationID.Valid,
+	}
+}
+
+func (e queuedEmail) complete(delivered bool) {
+	if e.onDelivery != nil {
+		e.onDelivery(delivered)
+	}
 }

@@ -65,14 +65,20 @@ export const createPushNotifications = (apiClient = api, browser = defaultBrowse
     enabled.value = false
   }
 
-  const clearServerSubscription = async () => {
+  const clearSubscription = async () => {
     if (!supported.value) return
     const worker = await registerWorker()
     const subscription = await worker.pushManager.getSubscription()
-    if (subscription) await apiClient.deletePushSubscription(subscription.endpoint)
+    if (!subscription) return
+    try {
+      await apiClient.deletePushSubscription(subscription.endpoint)
+    } finally {
+      await subscription.unsubscribe()
+      enabled.value = false
+    }
   }
 
-  return { supported, permission, enabled, refresh, enable, disable, clearServerSubscription }
+  return { supported, permission, enabled, refresh, enable, disable, clearSubscription }
 }
 
 const pushNotifications = createPushNotifications()

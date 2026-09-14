@@ -101,15 +101,26 @@ describe('createPushNotifications', () => {
     expect(state.enabled.value).toBe(false)
   })
 
-  it('clears the server association without unsubscribing the browser', async () => {
+  it('clears the server association and unsubscribes the browser', async () => {
     subscription.unsubscribe.mockClear()
     const { browser } = makeBrowser({ permission: 'granted', subscription })
     const api = { deletePushSubscription: vi.fn().mockResolvedValue({}) }
     const state = createPushNotifications(api, browser)
 
-    await state.clearServerSubscription()
+    await state.clearSubscription()
 
     expect(api.deletePushSubscription).toHaveBeenCalledWith(subscription.endpoint)
-    expect(subscription.unsubscribe).not.toHaveBeenCalled()
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('unsubscribes the browser when clearing the server association fails', async () => {
+    subscription.unsubscribe.mockClear()
+    const { browser } = makeBrowser({ permission: 'granted', subscription })
+    const api = { deletePushSubscription: vi.fn().mockRejectedValue(new Error('offline')) }
+    const state = createPushNotifications(api, browser)
+
+    await expect(state.clearSubscription()).rejects.toThrow('offline')
+
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce()
   })
 })

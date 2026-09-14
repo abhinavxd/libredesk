@@ -993,6 +993,7 @@ CREATE TABLE notification_email_queue (
 	queued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 	message_created_at TIMESTAMPTZ,
 	send_at TIMESTAMPTZ NOT NULL,
+	attempts INTEGER NOT NULL DEFAULT 0,
 	CONSTRAINT constraint_uniq_notification_email_queue UNIQUE (user_id, notification_type, conversation_id)
 );
 CREATE INDEX index_notification_email_queue_on_send_at ON notification_email_queue(send_at);

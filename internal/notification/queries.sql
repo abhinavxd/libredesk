@@ -100,13 +100,31 @@ ON CONFLICT (user_id, notification_type, conversation_id) DO UPDATE SET
     subject = EXCLUDED.subject,
     content = EXCLUDED.content,
     message_created_at = EXCLUDED.message_created_at,
+    send_at = LEAST(notification_email_queue.send_at, EXCLUDED.send_at),
+    attempts = 0,
     queued_at = now(),
     updated_at = now();
 
--- name: dequeue-due-notification-emails
-DELETE FROM notification_email_queue
-WHERE id IN (
-    SELECT id FROM notification_email_queue WHERE send_at <= now() ORDER BY send_at LIMIT $1
+-- name: claim-due-notification-emails
+WITH due AS (
+    SELECT id
+    FROM notification_email_queue
+    WHERE send_at <= now()
+    ORDER BY send_at
+    LIMIT $1
+    FOR UPDATE SKIP LOCKED
 )
-RETURNING user_id, notification_id, notification_type, conversation_id, recipient_email, subject, content,
-    COALESCE(message_created_at, queued_at) AS message_created_at;
+UPDATE notification_email_queue AS q
+SET send_at = $2, updated_at = now()
+FROM due
+WHERE q.id = due.id
+RETURNING q.id, q.updated_at, q.user_id, q.notification_id, q.notification_type, q.conversation_id, q.attempts,
+    q.recipient_email, q.subject, q.content, COALESCE(q.message_created_at, q.queued_at) AS message_created_at;
+
+-- name: delete-claimed-notification-email
+DELETE FROM notification_email_queue WHERE id = $1 AND updated_at = $2;
+
+-- name: retry-claimed-notification-email
+UPDATE notification_email_queue
+SET send_at = $2, attempts = attempts + 1, updated_at = now()
+WHERE id = $1 AND updated_at = $3;
