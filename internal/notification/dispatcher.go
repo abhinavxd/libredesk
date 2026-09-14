@@ -225,6 +225,7 @@ func (d *Dispatcher) sendToRecipient(recipientID int, n Notification) *models.Us
 		return nil
 	}
 	notification.ConversationUUID = null.StringFrom(n.ConversationUUID)
+	notification.MessageUUID = null.StringFrom(n.MessageUUID)
 	notification.ActorFirstName = null.StringFrom(n.ActorFirstName)
 	notification.ActorLastName = null.StringFrom(n.ActorLastName)
 	d.broadcastNotification([]int{recipientID}, notification)
