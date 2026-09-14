@@ -37,6 +37,8 @@ type PreChatFormField struct {
 	Order             int    `json:"order"`
 	IsDefault         bool   `json:"is_default"`
 	CustomAttributeID int    `json:"custom_attribute_id"`
+	Pattern           string `json:"pattern"`
+	PatternMessage    string `json:"pattern_message"`
 }
 
 // ContinuityConfig holds per-inbox conversation continuity settings.
