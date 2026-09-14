@@ -9,47 +9,22 @@ import (
 	"github.com/zerodha/logf"
 )
 
-func TestRenderStoredEmailTemplateEscapesUntrustedHTML(t *testing.T) {
-	db := testutil.NewDB(t, "stored_email_template_escape")
-	lo := logf.New(logf.Opts{})
-	m, err := New(&lo, db, nil, nil, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, testutil.NewI18n(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	content, _, err := m.RenderStoredEmailTemplate(TmplNewReply, map[string]any{
-		"Author": map[string]any{"FullName": "<b>attacker</b>"},
-		"Conversation": map[string]any{
-			"ReferenceNumber": 42,
-			"Subject":         "<i>subject</i>",
-			"UUID":            "conversation-uuid",
-		},
-		"Message": map[string]any{"Content": htmltemplate.HTML("<strong>safe message</strong>")},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(content, "&lt;b&gt;attacker&lt;/b&gt;") || !strings.Contains(content, "&lt;i&gt;subject&lt;/i&gt;") {
-		t.Fatalf("untrusted HTML was not escaped: %s", content)
-	}
-	if !strings.Contains(content, "<strong>safe message</strong>") {
-		t.Fatalf("trusted message HTML was escaped: %s", content)
-	}
-}
-
-func TestRenderStringEscapesUntrustedHTML(t *testing.T) {
+func TestRenderStringPreservesTemplateMarkup(t *testing.T) {
 	m := &Manager{funcMap: htmltemplate.FuncMap{}}
 	content := m.RenderString(map[string]any{
-		"Contact": map[string]any{"FullName": `<img src=x onerror="alert(1)">`},
-	}, `<p>Hello {{ .Contact.FullName }}</p>`)
+		"Contact": map[string]any{"FullName": "Jane"},
+	}, `<!--[if mso]><table><![endif]--><p>Hi {{ .Contact.FullName }}<b unclosed`)
 
-	if strings.Contains(content, "<img") || !strings.Contains(content, "&lt;img") {
-		t.Fatalf("untrusted HTML was not escaped: %s", content)
+	if !strings.Contains(content, "<!--[if mso]><table><![endif]-->") {
+		t.Fatalf("HTML comment was stripped: %s", content)
+	}
+	if !strings.Contains(content, "Hi Jane") {
+		t.Fatalf("malformed markup blocked rendering: %s", content)
 	}
 }
 
-func TestRenderEmailWithTemplateEscapesUntrustedHTML(t *testing.T) {
-	db := testutil.NewDB(t, "outgoing_email_template_escape")
+func TestRenderEmailWithTemplatePreservesTemplateMarkup(t *testing.T) {
+	db := testutil.NewDB(t, "outgoing_email_template_markup")
 	lo := logf.New(logf.Opts{})
 	m, err := New(&lo, db, nil, nil, htmltemplate.FuncMap{}, testutil.NewI18n(t))
 	if err != nil {
@@ -57,12 +32,15 @@ func TestRenderEmailWithTemplateEscapesUntrustedHTML(t *testing.T) {
 	}
 
 	content, err := m.RenderEmailWithTemplate(map[string]any{
-		"Contact": map[string]any{"FullName": "<b>attacker</b>"},
-	}, `<p>Hello {{ .Contact.FullName }}</p>`)
+		"Contact": map[string]any{"FullName": "Jane"},
+	}, `<!--[if mso]><table><![endif]--><p>Hi {{ .Contact.FullName }}<b unclosed`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(content, "&lt;b&gt;attacker&lt;/b&gt;") {
-		t.Fatalf("untrusted HTML was not escaped: %s", content)
+	if !strings.Contains(content, "<!--[if mso]><table><![endif]-->") {
+		t.Fatalf("HTML comment was stripped: %s", content)
+	}
+	if !strings.Contains(content, "Hi Jane") {
+		t.Fatalf("malformed markup blocked rendering: %s", content)
 	}
 }

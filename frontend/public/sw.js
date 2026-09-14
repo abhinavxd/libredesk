@@ -1,5 +1,14 @@
+const readPayload = (event) => {
+  try {
+    return event.data ? event.data.json() : null
+  } catch {
+    return null
+  }
+}
+
 self.addEventListener('push', (event) => {
-  const notification = event.data.json()
+  const notification = readPayload(event)
+  if (!notification?.title) return
   event.waitUntil(self.registration.showNotification(notification.title, {
     body: notification.body,
     tag: notification.tag,
@@ -11,7 +20,9 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = new URL(event.notification.data.url, self.location.origin)
+  const url = event.notification.data?.url
+  if (!url) return
+  const target = new URL(url, self.location.origin)
   if (target.origin !== self.location.origin) return
 
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {

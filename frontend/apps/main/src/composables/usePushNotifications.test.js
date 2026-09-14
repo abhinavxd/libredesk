@@ -15,6 +15,7 @@ const makeBrowser = ({ permission = 'default', subscription = null } = {}) => {
     navigator: {
       serviceWorker: {
         register: vi.fn().mockResolvedValue(registration),
+        getRegistration: vi.fn().mockResolvedValue(registration),
         ready: Promise.resolve(registration)
       }
     },

@@ -20,6 +20,11 @@ export const createPushNotifications = (apiClient = api, browser = defaultBrowse
     return registration
   }
 
+  const existingWorker = async () => {
+    registration ??= await browser.navigator.serviceWorker.getRegistration('/sw.js')
+    return registration
+  }
+
   const save = async (subscription) => {
     const value = subscription.toJSON()
     await apiClient.createPushSubscription({
@@ -55,8 +60,8 @@ export const createPushNotifications = (apiClient = api, browser = defaultBrowse
 
   const disable = async () => {
     if (!supported.value) return
-    const worker = await registerWorker()
-    const subscription = await worker.pushManager.getSubscription()
+    const worker = await existingWorker()
+    const subscription = await worker?.pushManager.getSubscription()
     if (!subscription) {
       enabled.value = false
       return

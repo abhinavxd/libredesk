@@ -159,9 +159,7 @@ func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
 	return emails
 }
 
-// dispatch hands the notification to every channel the recipient has enabled and returns the
-// recipients it stored nothing for. Push is left out of that answer: it goes straight to the browser
-// with nothing kept, so a push that fails later cannot be found again.
+// dispatch sends on every channel the recipient enabled and returns the recipients nothing was stored for; push never counts as stored.
 func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration, enabled map[int][]models.NotificationChannel, preferenceErr error) []int {
 	if preferenceErr != nil {
 		d.lo.Error("error fetching notification preferences", "type", n.Type, "error", preferenceErr)

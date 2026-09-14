@@ -127,7 +127,13 @@ const browserPushDescription = computed(() => {
 const updateBrowserPush = async (value) => {
   try {
     if (value) {
-      await pushNotifications.enable(vapidPublicKey.value)
+      const granted = await pushNotifications.enable(vapidPublicKey.value)
+      if (!granted) {
+        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+          variant: 'destructive',
+          description: t('notification.browserPush.blocked')
+        })
+      }
     } else {
       await pushNotifications.disable()
     }

@@ -3,12 +3,7 @@ import { usePushNotifications } from '@main/composables/usePushNotifications'
 const defaultBrowser = typeof window === 'undefined' ? {} : window
 
 export const createLogout = (pushNotifications, browser = defaultBrowser) => async () => {
-  try {
-    await pushNotifications.disable()
-  } catch {
-    browser.location.href = '/logout'
-    return
-  }
+  await Promise.resolve(pushNotifications.disable()).catch(() => {})
   browser.location.href = '/logout'
 }
 

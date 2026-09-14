@@ -584,13 +584,14 @@ func (m *Manager) ReleaseReplyNotification(conversationID, userID int, messageCr
 	if m.rdb == nil {
 		return
 	}
-	m.replyNotificationMu.Lock()
-	defer m.replyNotificationMu.Unlock()
-
 	uuid, err := m.GetConversationUUID(conversationID)
 	if err != nil {
 		return
 	}
+
+	m.replyNotificationMu.Lock()
+	defer m.replyNotificationMu.Unlock()
+
 	claim, err := m.rdb.Get(context.Background(), replyNotifiedKey(uuid, userID)).Int64()
 	if errors.Is(err, redis.Nil) {
 		return
@@ -1396,15 +1397,10 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		}
 	}
 
-	m.replyNotificationMu.Lock()
-	defer m.replyNotificationMu.Unlock()
-
-	var unreadIDs []int
-	if err := m.q.GetUsersWithUnreadConversationMessage.Select(&unreadIDs, conversation.ID, pq.Array(notifiableIDs), message.CreatedAt); err != nil {
-		m.lo.Error("error checking conversation unread state", "conversation_uuid", conversation.UUID, "error", err)
+	claimedIDs, err := m.claimUnreadRecipients(conversation, notifiableIDs, message.CreatedAt)
+	if err != nil {
 		return
 	}
-	claimedIDs := m.claimReplyNotified(conversation.UUID, unreadIDs, message.CreatedAt)
 
 	var (
 		recipientIDs []int
@@ -1439,6 +1435,19 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		MessageCreatedAt: null.TimeFrom(message.CreatedAt),
 	}, emails, newReplyEmailDelay, channels)
 	m.clearReplyNotified(conversation.UUID, unstored...)
+}
+
+// claimUnreadRecipients holds the reply notification lock across the unread check and the claim, returning the claimed recipients.
+func (m *Manager) claimUnreadRecipients(conversation models.Conversation, userIDs []int, messageCreatedAt time.Time) ([]int, error) {
+	m.replyNotificationMu.Lock()
+	defer m.replyNotificationMu.Unlock()
+
+	var unreadIDs []int
+	if err := m.q.GetUsersWithUnreadConversationMessage.Select(&unreadIDs, conversation.ID, pq.Array(userIDs), messageCreatedAt); err != nil {
+		m.lo.Error("error checking conversation unread state", "conversation_uuid", conversation.UUID, "error", err)
+		return nil, err
+	}
+	return m.claimReplyNotified(conversation.UUID, unreadIDs, messageCreatedAt), nil
 }
 
 func (m *Manager) claimReplyNotified(conversationUUID string, userIDs []int, messageCreatedAt time.Time) []int {
