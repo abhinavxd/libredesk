@@ -907,6 +907,7 @@
   "globals.messages.replying": "Replying",
   "globals.messages.required": "{name} Required",
   "globals.messages.reset": "Reset",
+  "globals.messages.resetToDefault": "Reset to default",
   "globals.messages.revoke": "Revoke",
   "globals.messages.save": "Save",
   "globals.messages.saveChanges": "Save changes",
