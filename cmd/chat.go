@@ -203,8 +203,6 @@ func handleChatInit(r *fastglue.Request) error {
 	if len(req.Message) > maxChatMessageLength {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
 	}
-	// Optional subject: a single line, whitespace-collapsed, so an app or a pre-chat form can file a titled
-	// conversation the way an email does. Never required — the embedded widget does not send one.
 	subject, ok := normalizeChatSubject(req.Subject)
 	if !ok {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatSubjectLength)), nil, envelope.InputError)
@@ -960,9 +958,6 @@ func verifyStandardJWT(jwtToken string, inboxSecret string) (Claims, error) {
 	return *claims, nil
 }
 
-// normalizeChatSubject collapses all whitespace in a widget-supplied subject to single spaces and trims it,
-// then enforces maxChatSubjectLength as a count of characters (Unicode code points), not UTF-8 bytes, so a
-// non-ASCII subject is not cut short of the documented limit. Returns false when the subject is too long.
 func normalizeChatSubject(subject string) (string, bool) {
 	subject = strings.Join(strings.Fields(subject), " ")
 	if utf8.RuneCountInString(subject) > maxChatSubjectLength {
