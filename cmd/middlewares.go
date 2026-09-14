@@ -251,6 +251,25 @@ func rateLimit(handler fastglue.FastRequestHandler, ruleName string) fastglue.Fa
 	}
 }
 
+// limitBody rejects a request whose declared Content-Length exceeds maxBytes,
+// before the handler reads or processes the body. It guards public,
+// unauthenticated endpoints on deployments that are not fronted by a
+// size-limiting reverse proxy, where the global max_body_size (100MB) is the
+// only other bound.
+func limitBody(handler fastglue.FastRequestHandler, maxBytes int) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		// The server has already buffered the body, so its length is
+		// authoritative; the declared Content-Length rejects an oversized
+		// request even for a chunked/omitted body edge case.
+		if r.RequestCtx.Request.Header.ContentLength() > maxBytes ||
+			len(r.RequestCtx.Request.Body()) > maxBytes {
+			return r.SendErrorEnvelope(fasthttp.StatusRequestEntityTooLarge,
+				"Request body too large.", nil, envelope.InputError)
+		}
+		return handler(r)
+	}
+}
+
 // authOrSignedURL allows access if user is authenticated OR if URL has valid signature.
 // Used for media endpoints that support both access methods.
 func authOrSignedURL(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {

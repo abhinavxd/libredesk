@@ -15,6 +15,11 @@ type csatResponse struct {
 }
 
 const (
+	// maxCsatBodyBytes caps the request body on the public CSAT submit
+	// endpoints: ~2x the largest legitimate submission (rating + a
+	// 1000-char feedback, worst-case ~12KB when URL-encoded).
+	maxCsatBodyBytes = 24 * 1024
+
 	maxCsatFeedbackLength = 1000
 	maxCsatMetaKeys       = 100
 	maxCsatMetaKeyLength  = 100

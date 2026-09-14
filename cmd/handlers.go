@@ -344,7 +344,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/activity-logs", perm(handleGetActivityLogs, "activity_logs:manage"))
 
 	// CSAT.
-	g.POST("/api/v1/csat/{uuid}/response", rateLimit(handleSubmitCSATResponse, "public"))
+	g.POST("/api/v1/csat/{uuid}/response", rateLimit(limitBody(handleSubmitCSATResponse, maxCsatBodyBytes), "public"))
 
 	// User notifications.
 	g.GET("/api/v1/notifications", auth(handleGetUserNotifications))
@@ -413,7 +413,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	g.GET("/csat/{uuid}", rateLimit(handleShowCSAT, "public"))
 	g.GET("/csat/{uuid}/widget", rateLimit(handleShowCSATWidget, "public"))
-	g.POST("/csat/{uuid}", rateLimit(handleUpdateCSATResponse, "public"))
+	g.POST("/csat/{uuid}", rateLimit(limitBody(handleUpdateCSATResponse, maxCsatBodyBytes), "public"))
 
 	// Health check.
 	g.GET("/health", handleHealthCheck)
