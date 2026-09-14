@@ -38,16 +38,17 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	GetTeams          *sqlx.Stmt `query:"get-teams"`
-	GetUserTeams      *sqlx.Stmt `query:"get-user-teams"`
-	GetTeamsCompact   *sqlx.Stmt `query:"get-teams-compact"`
-	GetTeam           *sqlx.Stmt `query:"get-team"`
-	InsertTeam        *sqlx.Stmt `query:"insert-team"`
-	UpdateTeam        *sqlx.Stmt `query:"update-team"`
-	DeleteTeam        *sqlx.Stmt `query:"delete-team"`
-	GetTeamMembers    *sqlx.Stmt `query:"get-team-members"`
-	UpsertUserTeams   *sqlx.Stmt `query:"upsert-user-teams"`
-	UserBelongsToTeam *sqlx.Stmt `query:"user-belongs-to-team"`
+	GetTeams             *sqlx.Stmt `query:"get-teams"`
+	GetUserTeams         *sqlx.Stmt `query:"get-user-teams"`
+	GetTeamsCompact      *sqlx.Stmt `query:"get-teams-compact"`
+	GetTeamsCompactByIDs *sqlx.Stmt `query:"get-teams-compact-by-ids"`
+	GetTeam              *sqlx.Stmt `query:"get-team"`
+	InsertTeam           *sqlx.Stmt `query:"insert-team"`
+	UpdateTeam           *sqlx.Stmt `query:"update-team"`
+	DeleteTeam           *sqlx.Stmt `query:"delete-team"`
+	GetTeamMembers       *sqlx.Stmt `query:"get-team-members"`
+	UpsertUserTeams      *sqlx.Stmt `query:"upsert-user-teams"`
+	UserBelongsToTeam    *sqlx.Stmt `query:"user-belongs-to-team"`
 }
 
 // New creates and returns a new instance of the Manager.
@@ -76,14 +77,27 @@ func (u *Manager) GetAll() ([]models.Team, error) {
 	return teams, nil
 }
 
-// GetAllCompact retrieves all teams with limited fields.
-func (u *Manager) GetAllCompact() ([]models.TeamCompact, error) {
+// GetAllCompact retrieves teams with limited fields matching query, all of them when pageSize is 0.
+func (u *Manager) GetAllCompact(query string, page, pageSize int) ([]models.TeamCompact, error) {
 	var teams = make([]models.TeamCompact, 0)
-	if err := u.q.GetTeamsCompact.Select(&teams); err != nil {
+	if err := u.q.GetTeamsCompact.Select(&teams, query, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return teams, nil
 		}
 		u.lo.Error("error fetching teams", "error", err)
+		return teams, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return teams, nil
+}
+
+// GetAllCompactByIDs retrieves the teams with the given IDs with limited fields.
+func (u *Manager) GetAllCompactByIDs(ids []int) ([]models.TeamCompact, error) {
+	var teams = make([]models.TeamCompact, 0)
+	if err := u.q.GetTeamsCompactByIDs.Select(&teams, pq.Array(ids)); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return teams, nil
+		}
+		u.lo.Error("error fetching teams by ids", "error", err)
 		return teams, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return teams, nil

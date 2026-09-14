@@ -248,7 +248,7 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 	if err != nil {
 		return "", err
 	}
-	if err := t.m.storePendingOTP(t.conv.UUID, code); err != nil {
+	if err := t.m.storePendingOTP(t.conv.UUID, code, email); err != nil {
 		return "", err
 	}
 	body := t.m.i18n.Ts("ai.agent.verificationEmailBody", "code", code)
@@ -288,7 +288,7 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 		t.m.lo.Error("error recording verification send count", "conversation_uuid", t.conv.UUID, "error", err)
 	}
 	t.m.lo.Debug("ai agent sent verification code", "conversation_uuid", t.conv.UUID, "email", email)
-	return "A verification code has been emailed to the customer. Tell them you have sent a code to their email and ask them to reply with it.", nil
+	return fmt.Sprintf("A verification code has been emailed to %s. Tell them you have sent a code to that address, quoting it exactly, and ask them to reply with the code, checking their spam folder if it is not in the inbox.", email), nil
 }
 
 // checkEmailVerificationTool verifies the code the customer entered against the pending one.

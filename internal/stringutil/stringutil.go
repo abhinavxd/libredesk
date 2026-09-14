@@ -5,15 +5,17 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/mail"
-	"path/filepath"
+	"path"
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
-	"github.com/jaytaylor/html2text"
+	"github.com/inbucket/html2text"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -21,11 +23,13 @@ const (
 )
 
 var (
-	regexpNonAlNum  = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
-	regexpSpaces    = regexp.MustCompile(`[\s]+`)
-	uuidV4Regex     = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
-	regexpRefNumber = regexp.MustCompile(`#(\d+)`)
-	regexpConvUUID  = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+	regexpUnsafeFileChars = regexp.MustCompile(`[\x00-\x1f\x7f\x{80}-\x{9f}]+`)
+	regexpSpaces          = regexp.MustCompile(`[\s]+`)
+	uuidV4Regex           = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
+	regexpRefNumber       = regexp.MustCompile(`#(\d+)`)
+	regexpSlugChars       = regexp.MustCompile(`[^a-z0-9\-_]+`)
+	regexpHyphens         = regexp.MustCompile(`-+`)
+	regexpConvUUID        = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
 
 	// markdownRenderer escapes raw HTML in the input; single newlines render as <br>.
 	markdownRenderer = goldmark.New(
@@ -43,6 +47,26 @@ func SanitizeUTF8(s string) string {
 	return strings.ToValidUTF8(s, "�")
 }
 
+// GenerateSlug generates a URL-friendly slug from a title; a script with no ASCII form falls back to a random slug.
+func GenerateSlug(title string) string {
+	slug := strings.ToLower(strings.TrimSpace(foldAccents(title)))
+	slug = regexpSpaces.ReplaceAllString(slug, "-")
+	slug = regexpSlugChars.ReplaceAllString(slug, "")
+	slug = regexpHyphens.ReplaceAllString(slug, "-")
+	slug = strings.Trim(slug, "-")
+
+	if slug == "" {
+		randomSlug, err := RandomAlphanumeric(12)
+		if err != nil {
+			slug = "untitled"
+		} else {
+			slug = strings.ToLower(randomSlug)
+		}
+	}
+
+	return slug
+}
+
 // HTML2Text converts HTML to plain text, dropping link URLs.
 func HTML2Text(html string) string {
 	return htmlToText(html, html2text.Options{TextOnly: true})
@@ -57,20 +81,16 @@ func Markdown2HTML(md string) string {
 	return b.String()
 }
 
-// SanitizeFilename sanitizes the provided filename.
+// SanitizeFilename removes control characters and path separators, preserving Unicode.
 func SanitizeFilename(fName string) string {
-	// Trim whitespace.
-	name := strings.TrimSpace(fName)
-
-	// Replace whitespace and "/" with "-"
+	name := strings.TrimSpace(SanitizeUTF8(fName))
+	name = path.Base(strings.ReplaceAll(name, `\`, "/"))
 	name = regexpSpaces.ReplaceAllString(name, "-")
-
-	// Remove or replace any non-alphanumeric characters
-	name = regexpNonAlNum.ReplaceAllString(name, "")
-
-	// Convert to lowercase
-	name = strings.ToLower(name)
-	return filepath.Base(name)
+	name = regexpUnsafeFileChars.ReplaceAllString(name, "")
+	if name == "" || name == "." || name == ".." || name == "/" {
+		return "attachment"
+	}
+	return name
 }
 
 // RandomAlphanumeric generates a random alphanumeric string of length n.
@@ -116,6 +136,15 @@ func RemoveEmpty(s []string) []string {
 		}
 	}
 	return r
+}
+
+// NormalizeMessageID strips surrounding whitespace and the optional angle brackets from an RFC 5322 Message-ID, and rejects values containing line breaks (which would produce malformed In-Reply-To/References headers). source_id is stored unbracketed; BuildEmailThreadingHeaders re-adds the brackets when composing them.
+func NormalizeMessageID(id string) string {
+	id = strings.Trim(strings.TrimSpace(id), "<>")
+	if strings.ContainsAny(id, "\r\n") {
+		return ""
+	}
+	return id
 }
 
 // GenerateEmailMessageID generates an RFC-compliant Message-ID for an email without angle brackets.
@@ -270,4 +299,15 @@ func htmlToText(html string, opts html2text.Options) string {
 		return ""
 	}
 	return strings.TrimSpace(out)
+}
+
+func foldAccents(s string) string {
+	var b strings.Builder
+	for _, r := range norm.NFD.String(s) {
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return norm.NFC.String(b.String())
 }

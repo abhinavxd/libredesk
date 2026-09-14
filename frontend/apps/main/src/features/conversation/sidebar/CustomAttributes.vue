@@ -53,7 +53,7 @@
           <span class="sidebar-value break-all" v-if="attribute.data_type !== 'checkbox'">
             {{ customAttributes?.[attribute.key] ?? '-' }}
           </span>
-          <div class="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 flex-shrink-0">
+          <div class="flex items-center gap-0.5 transition-opacity duration-200 flex-shrink-0 can-hover:opacity-0 can-hover:group-hover/item:opacity-100">
             <button
               class="p-1 rounded-md hover:bg-muted cursor-pointer transition-colors"
               @click="startEditing(attribute)"

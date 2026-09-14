@@ -10,6 +10,20 @@ SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE key
 -- name: get-prompts
 SELECT id, created_at, updated_at, key, title FROM ai_prompts ORDER BY title;
 
+-- name: get-prompt-by-id
+SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE id = $1;
+
+-- name: insert-prompt
+INSERT INTO ai_prompts (key, title, content) VALUES ($1, $2, $3)
+RETURNING id, created_at, updated_at, key, title, content;
+
+-- name: update-prompt
+UPDATE ai_prompts SET title = $2, content = $3, updated_at = now() WHERE id = $1
+RETURNING id, created_at, updated_at, key, title, content;
+
+-- name: delete-prompt
+DELETE FROM ai_prompts WHERE id = $1;
+
 -- name: get-knowledge-base-items
 SELECT id, created_at, updated_at, type, title, content, enabled, source, source_url, embedded_fingerprint FROM ai_knowledge_base ORDER BY updated_at DESC;
 
@@ -30,6 +44,45 @@ DELETE FROM ai_knowledge_base WHERE id = $1;
 
 -- name: set-knowledge-base-embedded-fingerprint
 UPDATE ai_knowledge_base SET embedded_fingerprint = $2 WHERE id = $1;
+
+-- name: get-embeddable-help-articles
+WITH RECURSIVE published_collections AS (
+    SELECT c.id FROM article_collections c
+    JOIN help_centers hc ON hc.id = c.help_center_id AND hc.is_active
+    WHERE c.parent_id IS NULL AND c.is_published = true
+    UNION
+    SELECT c.id FROM article_collections c JOIN published_collections p ON c.parent_id = p.id
+    WHERE c.is_published = true
+)
+SELECT a.id, a.title, a.content, a.status, a.ai_enabled, a.embedded_fingerprint,
+    a.collection_id IN (SELECT id FROM published_collections) AS is_reachable
+FROM help_articles a
+WHERE (a.status = 'published' AND a.ai_enabled) OR a.embedded_fingerprint <> '';
+
+-- name: get-embeddable-help-article
+WITH RECURSIVE published_collections AS (
+    SELECT c.id FROM article_collections c
+    JOIN help_centers hc ON hc.id = c.help_center_id AND hc.is_active
+    WHERE c.parent_id IS NULL AND c.is_published = true
+    UNION
+    SELECT c.id FROM article_collections c JOIN published_collections p ON c.parent_id = p.id
+    WHERE c.is_published = true
+)
+SELECT a.id, a.title, a.content, a.status, a.ai_enabled, a.embedded_fingerprint,
+    a.collection_id IN (SELECT id FROM published_collections) AS is_reachable
+FROM help_articles a
+WHERE a.id = $1;
+
+-- name: help-article-exists
+SELECT EXISTS(SELECT 1 FROM help_articles WHERE id = $1);
+
+-- name: set-help-article-embedded-fingerprint
+UPDATE help_articles SET embedded_fingerprint = $2 WHERE id = $1;
+
+-- name: delete-orphan-help-article-embeddings
+DELETE FROM embeddings e
+WHERE e.source_type = 'help_article' AND NOT EXISTS (SELECT 1 FROM help_articles a WHERE a.id = e.source_id)
+RETURNING e.source_id;
 
 -- name: insert-embedding
 INSERT INTO embeddings (source_type, source_id, chunk_text, embedding, dimensions) VALUES ($1, $2, $3, $4, $5);

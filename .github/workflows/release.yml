@@ -40,8 +40,17 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24.3"
-          cache: true
+          go-version: "1.25.0"
+          cache: false
+
+      - name: Restore Go build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: release-go-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: release-go-${{ runner.os }}-
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -55,7 +64,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v5
         with:
           version: latest
-          args: release --parallelism 1 --clean
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_ORG: libredesk

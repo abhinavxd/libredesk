@@ -1,0 +1,22 @@
+From: Frank Mac <frank@example.com>
+To: support@example.org
+Subject: Photo and document
+Message-ID: <apple-inline-test@example.com>
+Date: Wed, 15 Jul 2026 15:30:00 +0200
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="Apple-Mail=_TEST-BOUNDARY-1234"
+X-Mailer: Apple Mail (2.3776.700.51)
+
+--Apple-Mail=_TEST-BOUNDARY-1234
+Content-Type: image/png; name="photo.png"
+Content-Disposition: inline; filename="photo.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+--Apple-Mail=_TEST-BOUNDARY-1234
+Content-Type: application/pdf; name="document.pdf"
+Content-Disposition: inline; filename="document.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJSBmYWtlIHBkZiBmb3IgdGVzdHMKMSAwIG9iago8PD4+CmVuZG9iagp0cmFpbGVy
+--Apple-Mail=_TEST-BOUNDARY-1234--

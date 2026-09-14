@@ -102,10 +102,21 @@ demo-build:
 	@echo "→ Building in demo mode..."
 	@export VITE_DEMO_BUILD="true" && $(MAKE) build
 
-# Run tests.
+# Run tests. Integration tests need a Postgres; start one with `make test-db` first, else they skip.
 .PHONY: test
 test:
 	@echo "→ Running Go tests..."
 	go test -count=1 ./...
 	@echo "→ Running frontend tests..."
 	cd ${FRONTEND_DIR} && npx pnpm install --frozen-lockfile && npx pnpm test:run
+
+# Start a throwaway Postgres for integration tests. Remove it with `make test-db-down`.
+.PHONY: test-db
+test-db:
+	docker run -d --name libredesk-test-db -p 127.0.0.1:5433:5432 \
+		-e POSTGRES_USER=libredesk -e POSTGRES_PASSWORD=libredesk -e POSTGRES_DB=libredesk \
+		postgres:17-alpine
+
+.PHONY: test-db-down
+test-db-down:
+	docker rm -f libredesk-test-db

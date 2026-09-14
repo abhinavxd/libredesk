@@ -1,0 +1,25 @@
+/* Geist (SIL OFL 1.1) - see fonts/LICENSE.txt. */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/static/public/static/fonts/Geist-Variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/static/public/static/fonts/Geist-Italic-Variable.woff2') format('woff2');
+}
+
+/* Form controls default to the browser UI font, not the page font. */
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+}

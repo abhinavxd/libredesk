@@ -9,25 +9,14 @@ import (
 	"github.com/fasthttp/websocket"
 )
 
-// SafeBool is a thread-safe boolean.
-type SafeBool struct {
-	flag bool
-	mu   sync.RWMutex
-}
-
-// Set sets the value of the SafeBool.
-func (b *SafeBool) Set(value bool) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.flag = value
-}
-
-// Get returns the value of the SafeBool.
-func (b *SafeBool) Get() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return b.flag
-}
+const (
+	pongWait        = 60 * time.Second
+	pingPeriod      = 25 * time.Second
+	writeWait       = 10 * time.Second
+	closeFrameWait  = 1 * time.Second
+	maxMessageSize  = 64 << 10
+	maxListSubUUIDs = 500
+)
 
 // Client is a single connected WS user.
 type Client struct {
@@ -40,22 +29,24 @@ type Client struct {
 	// WebSocket connection.
 	Conn *websocket.Conn
 
-	// To prevent pushes to the channel.
-	Closed SafeBool
-
 	// Buffered channel of outbound ws messages.
 	Send chan models.WSMessage
+
+	// sendMu guards every send on Send and its close; a send racing the close panics.
+	sendMu sync.Mutex
+	closed bool
 }
 
 // Serve handles heartbeats and sending messages to the client.
 func (c *Client) Serve() {
-	var heartBeatTicker = time.NewTicker(2 * time.Second)
+	var heartBeatTicker = time.NewTicker(pingPeriod)
 	defer heartBeatTicker.Stop()
 	defer c.Conn.Close()
-	
+
 	for {
 		select {
 		case <-heartBeatTicker.C:
+			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -63,26 +54,32 @@ func (c *Client) Serve() {
 			if !ok {
 				return
 			}
-			c.Conn.WriteMessage(msg.MessageType, msg.Data)
+			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.Conn.WriteMessage(msg.MessageType, msg.Data); err != nil {
+				return
+			}
 		}
 	}
 }
 
 // Listen is a block method that listens for incoming messages from the client.
 func (c *Client) Listen() {
+	c.Conn.SetReadLimit(maxMessageSize)
+	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.Conn.SetPongHandler(func(string) error {
+		return c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+
 	for {
 		msgType, msg, err := c.Conn.ReadMessage()
 		if err != nil {
 			break
 		}
 
-		if msgType == websocket.TextMessage {
-			c.processIncomingMessage(msg)
-		} else {
-			c.Hub.RemoveClient(c)
-			c.close()
-			return
+		if msgType != websocket.TextMessage {
+			break
 		}
+		c.processIncomingMessage(msg)
 	}
 	c.Hub.RemoveClient(c)
 	c.close()
@@ -99,7 +96,7 @@ func (c *Client) processIncomingMessage(data []byte) {
 	}
 
 	// Try to parse as JSON message
-	var msg models.Message
+	var msg models.IncomingMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
 		c.SendError("invalid message format")
 		return
@@ -117,18 +114,11 @@ func (c *Client) processIncomingMessage(data []byte) {
 	}
 }
 
-const maxListSubUUIDs = 500
-
-func (c *Client) handleListSubscribe(data interface{}) {
-	dataBytes, err := json.Marshal(data)
-	if err != nil {
-		c.SendError("invalid list_subscribe payload")
-		return
-	}
+func (c *Client) handleListSubscribe(data json.RawMessage) {
 	var payload struct {
 		UUIDs []string `json:"uuids"`
 	}
-	if err := json.Unmarshal(dataBytes, &payload); err != nil {
+	if err := json.Unmarshal(data, &payload); err != nil {
 		c.SendError("invalid list_subscribe payload")
 		return
 	}
@@ -137,21 +127,16 @@ func (c *Client) handleListSubscribe(data interface{}) {
 	}
 	authorized, err := c.Hub.conversationStore.FilterAuthorizedListUUIDs(c.ID, payload.UUIDs)
 	if err != nil {
+		c.Hub.lo.Error("FilterAuthorizedListUUIDs failed", "client_id", c.ID, "error", err)
 		return
 	}
 	c.Hub.SubscribeListReplace(c, authorized)
 }
 
 // handleConversationSubscribe registers the open-conversation sub; authz is enforced because content (not just typing) flows through it.
-func (c *Client) handleConversationSubscribe(data interface{}) {
-	dataBytes, err := json.Marshal(data)
-	if err != nil {
-		c.SendError("invalid subscription data")
-		return
-	}
-
+func (c *Client) handleConversationSubscribe(data json.RawMessage) {
 	var subscribeMsg models.ConversationSubscribe
-	if err := json.Unmarshal(dataBytes, &subscribeMsg); err != nil {
+	if err := json.Unmarshal(data, &subscribeMsg); err != nil {
 		c.SendError("invalid subscription format")
 		return
 	}
@@ -176,16 +161,9 @@ func (c *Client) handleConversationSubscribe(data interface{}) {
 // authenticated agent. A hostile agent could broadcast fake typing to any
 // conversation UUID (including widget clients), but typing is ephemeral and
 // cosmetic; adding per-frame authz isn't worth the DB cost today.
-func (c *Client) handleTyping(data interface{}) {
-	// Convert the data to JSON and then unmarshal to TypingMessage
-	dataBytes, err := json.Marshal(data)
-	if err != nil {
-		c.SendError("invalid typing data")
-		return
-	}
-
+func (c *Client) handleTyping(data json.RawMessage) {
 	var typingMsg models.TypingMessage
-	if err := json.Unmarshal(dataBytes, &typingMsg); err != nil {
+	if err := json.Unmarshal(data, &typingMsg); err != nil {
 		c.SendError("invalid typing format")
 		return
 	}
@@ -198,10 +176,30 @@ func (c *Client) handleTyping(data interface{}) {
 	c.Hub.BroadcastTypingToConversation(typingMsg.ConversationUUID, typingMsg)
 }
 
-// close closes the client connection.
+// close closes the Send channel; it is idempotent.
 func (c *Client) close() {
-	c.Closed.Set(true)
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+	if c.closed {
+		return
+	}
+	c.closed = true
 	close(c.Send)
+}
+
+// trySend reports whether the message was queued; it drops when the client is closed or its buffer is full.
+func (c *Client) trySend(msg models.WSMessage) bool {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+	if c.closed {
+		return false
+	}
+	select {
+	case c.Send <- msg:
+		return true
+	default:
+		return false
+	}
 }
 
 // SendError sends an error message to client.
@@ -212,23 +210,14 @@ func (c *Client) SendError(msg string) {
 	}
 	b, _ := json.Marshal(out)
 
-	select {
-	case c.Send <- models.WSMessage{Data: b, MessageType: websocket.TextMessage}:
-	default:
-		c.Hub.lo.Warn("client send channel full, could not send error message", "client_id", c.ID)
+	if !c.trySend(models.WSMessage{Data: b, MessageType: websocket.TextMessage}) {
+		c.Hub.lo.Warn("could not queue error message to client, closing connection", "client_id", c.ID)
 		c.Hub.RemoveClient(c)
 		c.close()
 	}
 }
 
 // SendMessage sends a message to client.
-func (c *Client) SendMessage(b []byte, typ byte) {
-	if c.Closed.Get() {
-		c.Hub.lo.Warn("attempted to send message to closed client", "client_id", c.ID)
-		return
-	}
-	select {
-	case c.Send <- models.WSMessage{Data: b, MessageType: websocket.TextMessage}:
-	default:
-	}
+func (c *Client) SendMessage(b []byte, typ int) {
+	c.trySend(models.WSMessage{Data: b, MessageType: typ})
 }

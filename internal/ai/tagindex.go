@@ -27,6 +27,7 @@ func (m *Manager) reconcileTags(ctx context.Context) {
 	if len(stale) == 0 && len(removed) == 0 {
 		return
 	}
+	m.lo.Debug("reindex tags", "total", len(tags), "stale", len(stale), "removed", len(removed))
 
 	touched := slices.Clone(removed)
 	chunks := make([]indexedChunk, 0, len(stale))
@@ -57,6 +58,7 @@ func (m *Manager) reconcileTags(ctx context.Context) {
 	if err := m.commitEmbeddings(models.SourceTag, touched, chunks); err != nil {
 		return
 	}
+	m.lo.Debug("reindex tags embedded", "embedded", len(chunks), "removed", len(removed), "names", strings.Join(tagNames(stale), ","))
 	m.lo.Info("reconciled tag embeddings", "embedded", len(chunks), "removed", len(removed), "total", len(tags))
 }
 
@@ -67,6 +69,7 @@ func (m *Manager) purgeTagEmbeddings() {
 	m.tagGen.Add(1)
 	// Clearing the index even on a failed delete keeps this self-healing: the next reconcile re-embeds every tag and overwrites the rows left behind.
 	m.index.removeSourceType(models.SourceTag)
+	m.lo.Debug("reindex tags purged")
 	if _, err := m.q.DeleteEmbeddingsBySourceType.Exec(models.SourceTag); err != nil {
 		m.lo.Error("error deleting tag embeddings", "error", err)
 	}
@@ -74,7 +77,7 @@ func (m *Manager) purgeTagEmbeddings() {
 
 // tagCandidates returns the current names of the tags most similar to text, most similar first; a name only the index still knows is dropped.
 func (m *Manager) tagCandidates(ctx context.Context, text string, k int, tags []models.TagRef) ([]string, error) {
-	results, err := m.searchSource(ctx, text, k, models.SourceTag)
+	results, err := m.searchSources(ctx, text, k, models.SourceTag)
 	if err != nil {
 		return nil, err
 	}

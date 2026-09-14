@@ -1,0 +1,30 @@
+From: Carol Customer <carol@example.com>
+To: support@example.org
+Subject: Invoice and logo
+Message-ID: <mixed-attachments-test@example.com>
+Date: Wed, 15 Jul 2026 15:20:00 +0200
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="----=_Mixed_ABC"
+
+------=_Mixed_ABC
+Content-Type: multipart/related; boundary="----=_Related_ABC"
+
+------=_Related_ABC
+Content-Type: text/html; charset="utf-8"
+
+<html><body><p>Invoice attached.</p><img src="cid:logo@example.com"></body></html>
+------=_Related_ABC
+Content-Type: image/png; name="logo.png"
+Content-Disposition: inline; filename="logo.png"
+Content-Transfer-Encoding: base64
+Content-ID: <logo@example.com>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+------=_Related_ABC--
+------=_Mixed_ABC
+Content-Type: application/pdf; name="invoice.pdf"
+Content-Disposition: attachment; filename="invoice.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJSBmYWtlIHBkZiBmb3IgdGVzdHMKMSAwIG9iago8PD4+CmVuZG9iagp0cmFpbGVy
+------=_Mixed_ABC--

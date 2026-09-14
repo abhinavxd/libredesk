@@ -6,7 +6,7 @@ package main
 
 import (
 	"encoding/json"
-	"io"
+	"fmt"
 	"net/http"
 	"regexp"
 	"time"
@@ -15,6 +15,8 @@ import (
 )
 
 const updateCheckURL = "https://updates.libredesk.io/updates.json"
+
+const updateCheckTimeout = 10 * time.Second
 
 type AppUpdate struct {
 	Update struct {
@@ -44,28 +46,12 @@ func checkUpdates(curVersion string, interval time.Duration, app *App) {
 	// Strip -* suffix.
 	curVersion = reSemver.ReplaceAllString(curVersion, "")
 
+	client := &http.Client{Timeout: updateCheckTimeout}
+
 	fnCheck := func() {
-		resp, err := http.Get(updateCheckURL)
+		out, err := fetchAppUpdate(client, updateCheckURL)
 		if err != nil {
 			app.lo.Error("error checking for app updates", "err", err)
-			return
-		}
-
-		if resp.StatusCode != 200 {
-			app.lo.Error("non-ok status code checking for app updates", "status", resp.StatusCode)
-			return
-		}
-
-		b, err := io.ReadAll(resp.Body)
-		if err != nil {
-			app.lo.Error("error reading response body", "err", err)
-			return
-		}
-		resp.Body.Close()
-
-		var out AppUpdate
-		if err := json.Unmarshal(b, &out); err != nil {
-			app.lo.Error("error unmarshalling response body", "err", err)
 			return
 		}
 
@@ -79,7 +65,7 @@ func checkUpdates(curVersion string, interval time.Duration, app *App) {
 		}
 
 		app.Lock()
-		app.update = &out
+		app.update = out
 		app.Unlock()
 	}
 
@@ -95,4 +81,23 @@ func checkUpdates(curVersion string, interval time.Duration, app *App) {
 	for range ticker.C {
 		fnCheck()
 	}
+}
+
+func fetchAppUpdate(client *http.Client, url string) (*AppUpdate, error) {
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var out AppUpdate
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+
+	return &out, nil
 }

@@ -1,0 +1,30 @@
+From: Mail Delivery System <MAILER-DAEMON@mx.example.org>
+To: support@example.org
+Subject: Undelivered Mail Returned to Sender
+Message-ID: <bounce-dsn-test@mx.example.org>
+Date: Wed, 15 Jul 2026 15:02:11 +0200
+MIME-Version: 1.0
+Content-Type: multipart/report; report-type=delivery-status; boundary="----=_Report_ABC"
+
+------=_Report_ABC
+Content-Type: text/plain; charset="utf-8"
+
+This is the mail system at host mx.example.org.
+
+Your message could not be delivered to one or more recipients.
+------=_Report_ABC
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; mx.example.org
+
+Final-Recipient: rfc822; nobody@example.com
+Action: failed
+Status: 5.1.1
+------=_Report_ABC
+Content-Type: text/rfc822-headers
+
+From: support@example.org
+To: nobody@example.com
+Subject: Your ticket update
+Message-ID: <original-msg@example.org>
+------=_Report_ABC--

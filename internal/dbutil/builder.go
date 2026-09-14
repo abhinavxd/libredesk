@@ -105,24 +105,9 @@ func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOp
 		return "", nil, fmt.Errorf("invalid page size: %d", opts.PageSize)
 	}
 
-	root, err := parseFilters(filtersJSON)
+	query, args, err := BuildFilterQuery(baseQuery, existingArgs, filtersJSON, allowedFields, renderers, opts.Location)
 	if err != nil {
 		return "", nil, err
-	}
-
-	loc := stringutil.NormalizeTimezone(opts.Location)
-
-	whereClause, filterArgs, err := buildWhereClause(root, existingArgs, allowedFields, renderers, loc)
-	if err != nil {
-		return "", nil, err
-	}
-
-	query := baseQuery
-	args := existingArgs
-
-	if whereClause != "" {
-		query += " AND " + whereClause
-		args = append(args, filterArgs...)
 	}
 
 	if opts.OrderBy != "" {
@@ -147,6 +132,31 @@ func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOp
 	offset := (opts.Page - 1) * opts.PageSize
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
 	args = append(args, opts.PageSize, offset)
+
+	return query, args, nil
+}
+
+// BuildFilterQuery appends validated filter conditions with AND to a base query that already has a WHERE clause.
+func BuildFilterQuery(baseQuery string, existingArgs []any, filtersJSON string, allowedFields AllowedFields, renderers FieldRenderers, loc string) (string, []any, error) {
+	root, err := parseFilters(filtersJSON)
+	if err != nil {
+		return "", nil, err
+	}
+
+	loc = stringutil.NormalizeTimezone(loc)
+
+	whereClause, filterArgs, err := buildWhereClause(root, existingArgs, allowedFields, renderers, loc)
+	if err != nil {
+		return "", nil, err
+	}
+
+	query := baseQuery
+	args := existingArgs
+
+	if whereClause != "" {
+		query += " AND " + whereClause
+		args = append(args, filterArgs...)
+	}
 
 	return query, args, nil
 }

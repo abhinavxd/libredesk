@@ -1,3 +1,6 @@
+-- name: get-webhooks-compact
+SELECT id, name FROM webhooks ORDER BY name;
+
 -- name: get-all-webhooks
 SELECT
     id,

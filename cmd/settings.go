@@ -69,7 +69,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	// Reload the settings and templates.
 	if err := reloadSettings(app); err != nil {
 		app.lo.Error("error reloading settings", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 
 	// Check if language changed and reload i18n if needed.
@@ -84,7 +84,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 
 	if err := reloadTemplates(app); err != nil {
 		app.lo.Error("error reloading templates", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	return r.SendEnvelope(true)
 }

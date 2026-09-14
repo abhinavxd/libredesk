@@ -8,13 +8,13 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 )
 
-// DeletePrivateMessage soft-deletes a private note, unlinks its media for GC, and returns the tombstone text.
-func (m *Manager) DeletePrivateMessage(conversationUUID, messageUUID string) (string, error) {
+// DeletePrivateMessage soft-deletes a private note, unlinks its media for GC, and returns the tombstone text. A senderID of 0 skips the author check.
+func (m *Manager) DeletePrivateMessage(conversationUUID, messageUUID string, senderID int) (string, error) {
 	m.lo.Info("deleting private note", "conversation_uuid", conversationUUID, "message_uuid", messageUUID)
 
 	var previewUpdated bool
 	deletedPreview := m.i18n.T("conversation.privateNoteDeleted")
-	if err := m.q.DeletePrivateMessage.Get(&previewUpdated, messageUUID, conversationUUID, deletedPreview); err != nil {
+	if err := m.q.DeletePrivateMessage.Get(&previewUpdated, messageUUID, conversationUUID, deletedPreview, senderID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", m.i18n.Ts("globals.terms.message")), nil)
 		}

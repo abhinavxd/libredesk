@@ -1,32 +1,18 @@
 package conversation
 
 import (
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/knadh/go-i18n"
+	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/volatiletech/null/v9"
 )
 
-func newTestI18n(t *testing.T) *i18n.I18n {
-	t.Helper()
-	b, err := os.ReadFile("../../i18n/en-US.json")
-	if err != nil {
-		t.Fatalf("reading i18n file: %v", err)
-	}
-	in, err := i18n.New(b)
-	if err != nil {
-		t.Fatalf("loading i18n: %v", err)
-	}
-	return in
-}
-
 func TestBuildTranscript(t *testing.T) {
-	m := &Manager{i18n: newTestI18n(t)}
+	m := &Manager{i18n: testutil.NewI18n(t)}
 
 	created := time.Date(2026, time.May, 11, 10, 0, 0, 0, time.UTC)
 	downloaded := time.Date(2026, time.June, 2, 16, 10, 0, 0, time.UTC)

@@ -16,6 +16,11 @@ import (
 	"github.com/zerodha/logf"
 )
 
+const (
+	minDays = 0
+	maxDays = 365
+)
+
 var (
 	//go:embed queries.sql
 	efs embed.FS
@@ -86,6 +91,7 @@ func (m *Manager) GetOverViewCounts() (json.RawMessage, error) {
 
 // GetOverviewSLA returns overview SLA data
 func (m *Manager) GetOverviewSLA(days int) (json.RawMessage, error) {
+	days = clampDays(days)
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})
@@ -119,6 +125,7 @@ func (m *Manager) GetOverviewSLA(days int) (json.RawMessage, error) {
 
 // GetOverviewChart returns overview chart data
 func (m *Manager) GetOverviewChart(days int) (json.RawMessage, error) {
+	days = clampDays(days)
 	var stats = json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
@@ -139,6 +146,7 @@ func (m *Manager) GetOverviewChart(days int) (json.RawMessage, error) {
 
 // GetOverviewCSAT returns CSAT metrics for the overview dashboard
 func (m *Manager) GetOverviewCSAT(days int) (json.RawMessage, error) {
+	days = clampDays(days)
 	var stats = json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
@@ -159,6 +167,7 @@ func (m *Manager) GetOverviewCSAT(days int) (json.RawMessage, error) {
 
 // GetOverviewMessageVolume returns message volume metrics for the overview dashboard
 func (m *Manager) GetOverviewMessageVolume(days int) (json.RawMessage, error) {
+	days = clampDays(days)
 	var stats = json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
@@ -179,6 +188,7 @@ func (m *Manager) GetOverviewMessageVolume(days int) (json.RawMessage, error) {
 
 // GetOverviewTagDistribution returns tag distribution metrics for the overview dashboard
 func (m *Manager) GetOverviewTagDistribution(days int) (json.RawMessage, error) {
+	days = clampDays(days)
 	var stats = json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
@@ -195,4 +205,14 @@ func (m *Manager) GetOverviewTagDistribution(days int) (json.RawMessage, error) 
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return stats, nil
+}
+
+func clampDays(days int) int {
+	if days < minDays {
+		return minDays
+	}
+	if days > maxDays {
+		return maxDays
+	}
+	return days
 }

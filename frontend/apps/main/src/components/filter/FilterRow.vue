@@ -1,9 +1,13 @@
 <template>
-  <div class="group flex items-center gap-3">
-    <div class="flex gap-2 w-full">
+  <div class="group flex items-start gap-2 sm:items-center" data-cy="filter-row">
+    <div class="grid min-w-0 flex-1 gap-2 sm:grid-cols-3">
       <div
-        class="flex-1 rounded-md"
-        :class="[shake && missingField && 'animate-shake', showInvalid && missingField && 'ring-1 ring-destructive']"
+        class="min-w-0 rounded-md"
+        data-cy="filter-field"
+        :class="[
+          shake && missingField && 'animate-shake',
+          showInvalid && missingField && 'ring-1 ring-destructive'
+        ]"
       >
         <Select :model-value="modelValue.field" @update:model-value="onFieldChange">
           <SelectTrigger>
@@ -20,8 +24,12 @@
       </div>
 
       <div
-        class="flex-1 rounded-md"
-        :class="[shake && missingOperator && 'animate-shake', showInvalid && missingOperator && 'ring-1 ring-destructive']"
+        class="min-w-0 rounded-md"
+        data-cy="filter-operator"
+        :class="[
+          shake && missingOperator && 'animate-shake',
+          showInvalid && missingOperator && 'ring-1 ring-destructive'
+        ]"
       >
         <Select
           v-if="modelValue.field"
@@ -42,32 +50,41 @@
       </div>
 
       <div
-        class="flex-1 rounded-md"
-        :class="[shake && missingValue && 'animate-shake', showInvalid && missingValue && 'ring-1 ring-destructive']"
+        class="min-w-0 rounded-md"
+        data-cy="filter-value"
+        :class="[
+          shake && missingValue && 'animate-shake',
+          showInvalid && missingValue && 'ring-1 ring-destructive'
+        ]"
       >
         <div v-if="modelValue.field && modelValue.operator">
-          <template v-if="modelValue.operator !== OPERATOR.SET && modelValue.operator !== OPERATOR.NOT_SET">
+          <template
+            v-if="modelValue.operator !== OPERATOR.SET && modelValue.operator !== OPERATOR.NOT_SET"
+          >
+            <SelectTagCombobox
+              v-if="fieldEntity === 'tag'"
+              :multiple="fieldType === FIELD_TYPE.MULTI_SELECT"
+              value-field="id"
+              v-model="leafValue"
+            />
+
             <SelectTag
-              v-if="fieldType === FIELD_TYPE.MULTI_SELECT"
+              v-else-if="fieldType === FIELD_TYPE.MULTI_SELECT"
               v-model="leafValue"
               :items="fieldOptions"
               :placeholder="t('placeholders.selectTags')"
             />
 
-            <SelectComboBox
-              v-else-if="fieldOptions.length > 0 && modelValue.field === 'assigned_user_id'"
+            <SelectAgentCombobox
+              v-else-if="fieldEntity === 'agent'"
               v-model="leafValue"
-              :items="fieldOptions"
               :placeholder="t('placeholders.selectValue')"
-              type="user"
             />
 
-            <SelectComboBox
-              v-else-if="fieldOptions.length > 0 && modelValue.field === 'assigned_team_id'"
+            <SelectTeamCombobox
+              v-else-if="fieldEntity === 'team'"
               v-model="leafValue"
-              :items="fieldOptions"
               :placeholder="t('placeholders.selectValue')"
-              type="team"
             />
 
             <SelectComboBox
@@ -107,6 +124,9 @@ import { useI18n } from 'vue-i18n'
 import { FIELD_TYPE, OPERATOR, operatorLabel } from '@/constants/filterConfig'
 import CloseButton from '@/components/button/CloseButton.vue'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
+import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
+import SelectTagCombobox from '@/components/combobox/SelectTagCombobox.vue'
 import SelectTag from '@shared-ui/components/ui/select/SelectTag.vue'
 import DateFilterValue from '@/components/filter/DateFilterValue.vue'
 
@@ -123,6 +143,7 @@ const { t } = useI18n()
 const fieldConfig = computed(() => props.fields.find((f) => f.field === modelValue.value.field))
 const fieldOptions = computed(() => fieldConfig.value?.options || [])
 const fieldOperators = computed(() => fieldConfig.value?.operators || [])
+const fieldEntity = computed(() => fieldConfig.value?.entity || '')
 const fieldType = computed(() => fieldConfig.value?.type || '')
 
 // "contains any of" only applies to multi-value fields; single-value text stays "contains"

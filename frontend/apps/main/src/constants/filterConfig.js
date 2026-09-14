@@ -15,6 +15,8 @@ export const FIELD_TYPE = {
     RICHTEXT: 'richtext',
     BOOLEAN: 'boolean',
     DATE: 'date',
+    WEBHOOK: 'webhook',
+    RECIPIENTS: 'recipients',
 }
 
 export const OPERATOR = {
@@ -26,7 +28,8 @@ export const OPERATOR = {
     NOT_CONTAINS: 'not contains',
     GREATER_THAN: 'greater than',
     LESS_THAN: 'less than',
-    BETWEEN: 'between'
+    BETWEEN: 'between',
+    STARTS_WITH: 'starts with'
 }
 
 // operatorLabel returns a clearer display label for operators whose meaning is ambiguous with
@@ -50,6 +53,16 @@ export const FIELD_OPERATORS = {
         OPERATOR.NOT_SET,
         OPERATOR.CONTAINS,
         OPERATOR.NOT_CONTAINS
+    ],
+    // "starts with" is only implemented by the automation evaluator, not the SQL filter builder.
+    TEXT_AUTOMATION: [
+        OPERATOR.EQUALS,
+        OPERATOR.NOT_EQUALS,
+        OPERATOR.SET,
+        OPERATOR.NOT_SET,
+        OPERATOR.CONTAINS,
+        OPERATOR.NOT_CONTAINS,
+        OPERATOR.STARTS_WITH
     ],
     // For text columns that do not support partial matching, only allow exact match operators.
     TEXT_EXACT: [OPERATOR.EQUALS, OPERATOR.NOT_EQUALS, OPERATOR.SET, OPERATOR.NOT_SET],

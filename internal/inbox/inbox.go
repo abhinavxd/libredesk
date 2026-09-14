@@ -486,6 +486,24 @@ func (m *Manager) UpdateConfig(id int, config json.RawMessage) error {
 	return nil
 }
 
+// CloseLiveChatClients disconnects widget websocket clients and returns the number of inboxes closed.
+func (m *Manager) CloseLiveChatClients() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var n int
+	for _, inb := range m.inboxes {
+		if inb.Channel() != ChannelLiveChat {
+			continue
+		}
+		if err := inb.Close(); err != nil {
+			m.lo.Error("error closing livechat inbox", "error", err)
+			continue
+		}
+		n++
+	}
+	return n
+}
+
 // stopInbox cancels the receiver for a single inbox, waits for its goroutine
 // to exit, then closes the inbox. Caller must NOT hold m.mu.
 func (m *Manager) stopInbox(id int) {

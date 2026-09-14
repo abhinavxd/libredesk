@@ -1,0 +1,22 @@
+{{ define "classic-help-center" }}
+{{ template "classic-header" . }}
+
+{{ if and .Data.Popular .Data.HelpCenter.Theme.Layout.ShowPopularArticles }}
+<section class="hc-popular">
+    {{ with .Data.HelpCenter.Theme.Layout.PopularArticlesLabel }}<h2>{{ . }}</h2>{{ end }}
+    <ul>
+        {{ range .Data.Popular }}
+        <li><a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}"><span>{{ .Title }}</span>{{ template "hc-arrow-icon" }}</a></li>
+        {{ end }}
+    </ul>
+</section>
+{{ end }}
+
+{{ if .Data.Tree }}
+{{ template "hc-collections-grid" (map "HelpCenter" .Data.HelpCenter "Tree" .Data.Tree "L" .L "Heading" "h2") }}
+{{ else }}
+<p class="hc-empty">{{ $.L.T "helpCenter.noPublishedContent" }}</p>
+{{ end }}
+
+{{ template "classic-footer" . }}
+{{ end }}

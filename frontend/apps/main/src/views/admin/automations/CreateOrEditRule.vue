@@ -50,9 +50,7 @@
                 <FormControl>
                   <Select v-bind="componentField" @update:modelValue="handleInput">
                     <SelectTrigger>
-                      <SelectValue
-                        :placeholder="t('placeholders.selectType')"
-                      />
+                      <SelectValue :placeholder="t('placeholders.selectType')" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -95,7 +93,9 @@
             </div>
           </div>
 
-          <p class="font-semibold">{{ $t('admin.automation.matchTheseRules') }}</p>
+          <h4 class="text-base font-semibold text-foreground">
+            {{ $t('admin.automation.matchTheseRules') }}
+          </h4>
 
           <RuleBox
             v-if="form.values.type"
@@ -135,7 +135,9 @@
             :type="form.values.type"
             :groupIndex="1"
           />
-          <p class="font-semibold mt-2">{{ $t('admin.automation.performTheseActions') }}</p>
+          <h4 class="text-base font-semibold text-foreground mt-2">
+            {{ $t('admin.automation.performTheseActions') }}
+          </h4>
 
           <ActionBox
             :actions="getActions()"
@@ -143,7 +145,9 @@
             @add-action="handleAddAction"
             @remove-action="handleRemoveAction"
           />
-          <Button type="submit" :isLoading="isLoading">{{ isNewForm ? $t('globals.messages.create') : $t('globals.messages.save') }}</Button>
+          <Button type="submit" :isLoading="isLoading">{{
+            isNewForm ? $t('globals.messages.create') : $t('globals.messages.save')
+          }}</Button>
         </div>
       </form>
     </div>
@@ -242,6 +246,7 @@ const breadcrumbPageLabel = () => {
   if (props.id > 0) return t('automation.editRule')
   return t('automation.newRule')
 }
+
 
 const isNewForm = computed(() => {
   return props.id ? false : true
@@ -402,6 +407,14 @@ const getRulesValidationError = () => {
     // CSAT action does not require value, set dummy value.
     if (action.type === 'send_csat') {
       action.value = ['0']
+    }
+
+    // Notify uses its own fields instead of value.
+    if (action.type === 'notify') {
+      if (!action.subject?.trim() || !action.message?.trim() || !action.recipients?.length) {
+        return t('admin.automation.validation.setActionValue')
+      }
+      continue
     }
 
     // Empty array, no value selected.

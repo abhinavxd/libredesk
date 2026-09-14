@@ -36,6 +36,7 @@ const draftKey = (uuid, type) => `${uuid}::${type}`
 
 const metaSignature = (meta) =>
   JSON.stringify({
+    macro_id: meta?.macro_id || 0,
     macro_actions: meta?.macro_actions || [],
     attachments: (meta?.attachments || []).map(a => a.uuid)
   })
@@ -52,6 +53,7 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
   const isLoading = ref(false)
   const loadedAttachments = ref([])
   const loadedMacroActions = ref([])
+  const loadedMacroID = ref(0)
 
   // Live-key guard: the editor is transiently empty during open/switch and must not clobber a stored draft.
   const loadedKey = ref(null)
@@ -59,7 +61,9 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
 
   const buildDraft = () => {
     const meta = {}
-    const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
+    const macro = conversationStore.getMacro(MACRO_CONTEXT.REPLY)
+    const macroActions = macro?.actions || []
+    if (macro?.id > 0) meta.macro_id = macro.id
     if (macroActions.length > 0) meta.macro_actions = macroActions
     if (uploadedFiles?.value?.length > 0) {
       meta.attachments = uploadedFiles.value.map(file => ({
@@ -80,6 +84,7 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     textContent.value = ''
     loadedAttachments.value = validateAttachments(draft?.meta?.attachments)
     loadedMacroActions.value = validateMacroActions(draft?.meta?.macro_actions)
+    loadedMacroID.value = Number(draft?.meta?.macro_id) > 0 ? Number(draft.meta.macro_id) : 0
   }
 
   const load = async (uuid, type) => {
@@ -168,6 +173,7 @@ export function useDraftManager (conversationUUID, messageType, uploadedFiles = 
     isLoading,
     clearDraft,
     loadedAttachments,
-    loadedMacroActions
+    loadedMacroActions,
+    loadedMacroID
   }
 }

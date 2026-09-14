@@ -52,16 +52,15 @@
         </FormItem>
       </FormField>
 
-      <FormField v-if="form.values.visibility === 'team'" v-slot="{ componentField }" name="team_id">
+      <FormField
+        v-if="form.values.visibility === 'team'"
+        v-slot="{ componentField }"
+        name="team_id"
+      >
         <FormItem>
           <FormLabel>{{ t('globals.terms.team') }}</FormLabel>
           <FormControl>
-            <SelectComboBox
-              v-bind="componentField"
-              :items="tStore.options"
-              :placeholder="t('placeholders.selectTeam')"
-              type="team"
-            />
+            <SelectTeamCombobox v-bind="componentField" />
           </FormControl>
           <FormMessage />
         </FormItem>
@@ -97,8 +96,7 @@ import {
   createRoot
 } from '@/components/filter/filterTree'
 import { useConversationFilters } from '@/composables/useConversationFilters'
-import { useTeamStore } from '@/stores/team'
-import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
 import {
   Select,
   SelectContent,
@@ -115,7 +113,6 @@ const { t } = useI18n()
 const formLoading = ref(false)
 const validateTick = ref(0)
 provide('filterValidateTick', validateTick)
-const tStore = useTeamStore()
 const props = defineProps({
   initialValues: {
     type: Object,
@@ -149,7 +146,8 @@ const filterFields = computed(() =>
     field,
     type: value.type,
     operators: value.operators,
-    options: value.options ?? []
+    options: value.options ?? [],
+    entity: value.entity
   }))
 )
 

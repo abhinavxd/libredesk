@@ -39,8 +39,7 @@ const updateMacro = async (payload) => {
     formLoading.value = true
     await api.updateMacro(macro.value.id, payload)
     
-    // Reload macros from server
-    await macroStore.loadMacros(true)
+    macroStore.clearCache()
     
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')

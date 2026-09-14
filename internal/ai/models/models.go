@@ -22,8 +22,9 @@ const (
 	KnowledgeTypeSnippet = "snippet"
 
 	// Source types for embeddings.
-	SourceSnippet = "snippet"
-	SourceTag     = "tag"
+	SourceSnippet     = "snippet"
+	SourceTag         = "tag"
+	SourceHelpArticle = "help_article"
 
 	// ai_knowledge_base.source values.
 	KnowledgeSourceManual       = "manual"
@@ -86,6 +87,17 @@ type KnowledgeBaseItem struct {
 	SourceURL string    `db:"source_url" json:"source_url"`
 	// EmbeddedFingerprint is the content+model+dimensions signature last successfully embedded; empty means it needs (re)embedding.
 	EmbeddedFingerprint string `db:"embedded_fingerprint" json:"-"`
+}
+
+// HelpArticleItem is the minimal help_articles projection the embedding reconciler needs.
+type HelpArticleItem struct {
+	ID                  int    `db:"id"`
+	Title               string `db:"title"`
+	Content             string `db:"content"`
+	Status              string `db:"status"`
+	AIEnabled           bool   `db:"ai_enabled"`
+	IsReachable         bool   `db:"is_reachable"`
+	EmbeddedFingerprint string `db:"embedded_fingerprint"`
 }
 
 // Tool is a custom, admin-defined HTTP tool the assistant can call.

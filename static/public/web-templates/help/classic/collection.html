@@ -1,0 +1,53 @@
+{{ define "classic-article-items" }}
+<ul class="hc-article-list">
+    {{ range .Articles }}
+    <li><a href="{{ $.Base }}/articles/{{ .Slug }}">{{ template "hc-doc-icon" }}{{ .Title }}{{ template "hc-arrow-icon" }}</a></li>
+    {{ end }}
+</ul>
+{{ end }}
+
+{{ define "classic-help-collection" }}
+{{ template "classic-header" . }}
+
+<nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
+    <ol>
+        <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
+        <li><span class="hc-current" aria-current="page">{{ .Data.Collection.Name }}</span></li>
+    </ol>
+</nav>
+
+<header class="hc-collection-head">
+    <div class="hc-collection-icon{{ if .Data.HelpCenter.Theme.Cards.ShowIconTile }} hc-icon-tile{{ end }}">{{ with LucideIcon .Data.Collection.Icon }}{{ . }}{{ else }}{{ LucideIcon "folder" }}{{ end }}</div>
+    <div class="hc-collection-headings">
+        <h1>{{ .Data.Collection.Name }}</h1>
+        {{ if .Data.Collection.Description }}<p class="hc-desc">{{ .Data.Collection.Description }}</p>{{ end }}
+    </div>
+</header>
+
+{{ if .Data.Collection.Articles }}
+<div class="hc-article-panel">
+    {{ template "classic-article-items" (map "Articles" .Data.Collection.Articles "Base" .Data.HelpCenter.BasePath) }}
+</div>
+{{ end }}
+
+{{ range .Data.Collection.Children }}
+<section class="hc-collection-block" aria-labelledby="hc-col-{{ .Slug }}">
+    <h2 id="hc-col-{{ .Slug }}"><a class="hc-block-head" href="{{ $.Data.HelpCenter.BasePath }}/collections/{{ .Slug }}">{{ .Name }}</a></h2>
+    {{ if .Description }}<p class="hc-block-desc">{{ .Description }}</p>{{ end }}
+    {{ if .Articles }}{{ template "classic-article-items" (map "Articles" .Articles "Base" $.Data.HelpCenter.BasePath) }}{{ end }}
+    {{ range .Children }}
+    <div class="hc-block-sub">
+        <h3><a class="hc-block-subhead" href="{{ $.Data.HelpCenter.BasePath }}/collections/{{ .Slug }}">{{ .Name }}</a></h3>
+        {{ if .Description }}<p class="hc-block-desc">{{ .Description }}</p>{{ end }}
+        {{ if .Articles }}{{ template "classic-article-items" (map "Articles" .Articles "Base" $.Data.HelpCenter.BasePath) }}{{ end }}
+    </div>
+    {{ end }}
+</section>
+{{ end }}
+
+{{ if and (not .Data.Collection.Articles) (not .Data.Collection.Children) }}
+<p class="hc-empty">{{ $.L.T "helpCenter.noArticles" }}</p>
+{{ end }}
+
+{{ template "classic-footer" . }}
+{{ end }}

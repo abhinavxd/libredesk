@@ -9,6 +9,7 @@ const props = defineProps({
   open: { type: Boolean, required: false, default: true },
   defaultOpen: { type: Boolean, required: false },
   searchTerm: { type: String, required: false },
+  selectedValue: { type: null, required: false },
   multiple: { type: Boolean, required: false },
   disabled: { type: Boolean, required: false },
   name: { type: String, required: false },
@@ -21,7 +22,12 @@ const props = defineProps({
   class: { type: null, required: false }
 })
 
-const emits = defineEmits(['update:modelValue', 'update:open', 'update:searchTerm'])
+const emits = defineEmits([
+  'update:modelValue',
+  'update:open',
+  'update:searchTerm',
+  'update:selectedValue'
+])
 
 const delegatedProps = computed(() => {
   const { class: _, ...delegated } = props

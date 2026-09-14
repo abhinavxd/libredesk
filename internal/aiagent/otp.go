@@ -27,8 +27,8 @@ const (
 	otpMaxConvSends = 6
 )
 
-// checkOTPScript matches the pending code and sets the verified flag on match, all in one step.
-// Returns 1 on match, 0 on miss/expiry, -1 on corrupt data (key cleared).
+// checkOTPScript matches the pending code and, on match, stores the attested email as the verified
+// value, all in one step. Returns 1 on match, 0 on miss/expiry, -1 on corrupt data (key cleared).
 var checkOTPScript = redis.NewScript(`
 local raw = redis.call('GET', KEYS[1])
 if not raw then
@@ -39,9 +39,13 @@ if not ok or type(p) ~= 'table' then
 	redis.call('DEL', KEYS[1])
 	return -1
 end
+if type(p.email) ~= 'string' or p.email == '' then
+	redis.call('DEL', KEYS[1])
+	return 0
+end
 if p.code == ARGV[1] then
 	redis.call('DEL', KEYS[1])
-	redis.call('SET', KEYS[2], '1', 'EX', ARGV[3])
+	redis.call('SET', KEYS[2], p.email, 'EX', ARGV[3])
 	return 1
 end
 p.attempts = (p.attempts or 0) + 1
@@ -65,20 +69,32 @@ return n
 // pendingOTP is the JSON stored at otpPendingKeyPrefix while a code awaits entry.
 type pendingOTP struct {
 	Code     string `json:"code"`
+	Email    string `json:"email"`
 	Attempts int    `json:"attempts"`
 }
 
 func otpPendingKey(convUUID string) string  { return otpPendingKeyPrefix + convUUID }
 func otpVerifiedKey(convUUID string) string { return otpVerifiedKeyPrefix + convUUID }
 
+func normalizeOTPEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
 // otpSendsKey scopes the send budget to one address so correcting a mistyped email gets a fresh one.
 func otpSendsKey(convUUID, email string) string {
-	return otpSendsKeyPrefix + convUUID + ":" + strings.ToLower(strings.TrimSpace(email))
+	return otpSendsKeyPrefix + convUUID + ":" + normalizeOTPEmail(email)
 }
 
 func otpConvSendsKey(convUUID string) string { return otpSendsKeyPrefix + convUUID }
 
-func (m *Manager) isConversationVerified(convUUID string) bool {
+// isConversationVerified holds the invariant "verified == the contact's current email is the one
+// proven by OTP": the verified value stores the attested address, and a contact email rebound
+// after verification (from this or any sibling conversation) no longer matches.
+func (m *Manager) isConversationVerified(convUUID, contactEmail string) bool {
+	email := normalizeOTPEmail(contactEmail)
+	if email == "" {
+		return false
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	v, err := m.redis.Get(ctx, otpVerifiedKey(convUUID)).Result()
@@ -88,7 +104,7 @@ func (m *Manager) isConversationVerified(convUUID string) bool {
 		}
 		return false
 	}
-	return v == "1"
+	return v == email
 }
 
 // clearConversationVerified drops the verified flag and any pending code so a changed email must be
@@ -121,10 +137,10 @@ func (m *Manager) incrOTPSends(convUUID, email string) error {
 	return incrOTPSendsScript.Run(ctx, m.redis, []string{otpConvSendsKey(convUUID)}, ttl).Err()
 }
 
-func (m *Manager) storePendingOTP(convUUID, code string) error {
+func (m *Manager) storePendingOTP(convUUID, code, email string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	b, err := json.Marshal(pendingOTP{Code: code})
+	b, err := json.Marshal(pendingOTP{Code: code, Email: normalizeOTPEmail(email)})
 	if err != nil {
 		return err
 	}

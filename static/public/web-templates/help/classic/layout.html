@@ -1,0 +1,76 @@
+{{ define "classic-header" }}
+{{ template "hc-head" . }}
+<body>
+    <a class="hc-skip-link" href="#hc-main">{{ .L.T "helpCenter.skipToContent" }}</a>
+    {{ template "hc-announcement" . }}
+    <header class="hc-top">
+        <nav class="hc-nav" aria-label="{{ .L.T "globals.terms.main" }}">
+            <a class="hc-brand" href="{{ .Data.HelpCenter.BasePath }}">
+                {{ if .Data.HelpCenter.LogoURL }}<img src="{{ .Data.HelpCenter.LogoURL }}" alt="{{ .Data.HelpCenter.Name }}" />{{ else }}<span class="hc-name">{{ .Data.HelpCenter.Name }}</span>{{ end }}
+            </a>
+            {{ if or .Data.HelpCenter.NavLinks (gt (len .Data.HelpCenter.AvailableLocales) 1) }}
+            <button type="button" class="hc-nav-toggle" data-hc-nav-toggle aria-expanded="false" aria-controls="hc-nav-links" aria-label="{{ .L.T "globals.terms.menu" }}">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
+            </button>
+            <div class="hc-nav-links" id="hc-nav-links">
+                {{ range .Data.HelpCenter.NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
+                {{ if gt (len .Data.HelpCenter.AvailableLocales) 1 }}{{ template "hc-lang-switcher" . }}{{ end }}
+            </div>
+            {{ end }}
+        </nav>
+        <div class="hc-hero{{ if not .Data.LandingHero }} hc-slim{{ end }}">
+            {{ if .Data.LandingHero }}
+            {{ $heroText := .Data.HelpCenter.HeaderText }}{{ if not $heroText }}{{ $heroText = .Data.HelpCenter.PageTitle }}{{ end }}
+            <h1>{{ $heroText }}</h1>
+            {{ if .Data.HelpCenter.TaglineHTML }}<p class="hc-hero-tagline">{{ .Data.HelpCenter.TaglineHTML }}</p>{{ end }}
+            {{ end }}
+            <form class="hc-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search" data-hc-base="{{ .Data.HelpCenter.BasePath }}" data-hc-slug="{{ .Data.HelpCenter.Slug }}" data-hc-locale="{{ .Data.HelpCenter.CurrentLocale }}" data-hc-empty="{{ $.L.T "helpCenter.noResults" }}" data-hc-results-one="{{ $.L.Tc "helpCenter.resultsCount" 1 }}" data-hc-results="{{ $.L.Tc "helpCenter.resultsCount" 2 }}">
+                {{ template "hc-search-icon" "hc-search-icon" }}
+                <input type="search" name="q" value="{{ .Data.Query }}" placeholder="{{ $.L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ $.L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
+                <button type="submit">{{ $.L.T "globals.terms.search" }}</button>
+            </form>
+        </div>
+    </header>
+    <main id="hc-main" tabindex="-1">
+{{ end }}
+
+{{ define "classic-footer" }}
+    </main>
+    <footer class="hc-footer">
+        <div class="hc-footer-inner">
+            {{ if .Data.HelpCenter.FooterTaglineHTML }}<p class="hc-footer-tagline">{{ .Data.HelpCenter.FooterTaglineHTML }}</p>{{ end }}
+            {{ if .Data.HelpCenter.Theme.FooterLinks }}
+            <nav class="hc-footer-links" aria-label="{{ $.L.T "globals.terms.footer" }}">
+                {{ range .Data.HelpCenter.Theme.FooterLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
+            </nav>
+            {{ end }}
+            {{ if .Data.HelpCenter.Theme.SocialLinks }}
+            <div class="hc-footer-social">
+                {{ range .Data.HelpCenter.Theme.SocialLinks }}<a href="{{ .URL }}" target="_blank" rel="noreferrer" aria-label="{{ .Platform }}">{{ template "hc-social-icon" .Platform }}</a>{{ end }}
+            </div>
+            {{ end }}
+            <p class="hc-footer-powered">{{ $.L.T "helpCenter.poweredBy" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
+        </div>
+    </footer>
+    {{ template "hc-shared-behavior" }}
+    <script>
+    (function () {
+        var navToggle = document.querySelector('[data-hc-nav-toggle]');
+        var nav = document.querySelector('.hc-nav');
+        if (navToggle && nav) {
+            navToggle.addEventListener('click', function () {
+                var open = nav.hasAttribute('data-nav-open');
+                if (open) { nav.removeAttribute('data-nav-open'); } else { nav.setAttribute('data-nav-open', ''); }
+                navToggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+            });
+            var closeNav = function () { nav.removeAttribute('data-nav-open'); navToggle.setAttribute('aria-expanded', 'false'); };
+            document.addEventListener('click', function (e) { if (!nav.contains(e.target)) closeNav(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeNav(); });
+        }
+    })();
+    </script>
+    <script src="/static/public/static/help-center-search.js?v={{ AssetVer }}" defer></script>
+    {{ if .Data.HelpCenter.CustomJS }}<script>{{ .Data.HelpCenter.CustomJS }}</script>{{ end }}
+</body>
+</html>
+{{ end }}

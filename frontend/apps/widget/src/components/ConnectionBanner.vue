@@ -2,7 +2,7 @@
 import { useOnline } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { useWidgetStore } from '@widget/store/widget.js'
-import BaseBanner from './BaseBanner.vue'
+import BaseBanner from '@shared-ui/components/BaseBanner.vue'
 
 const isOnline = useOnline()
 const { connectionFailed, connecting, connected } = storeToRefs(useWidgetStore())

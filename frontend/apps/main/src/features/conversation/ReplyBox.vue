@@ -41,13 +41,19 @@
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
-        class="max-w-[60%] max-h-[75%] h-[70%] bg-card text-card-foreground p-4 flex flex-col"
-        :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
+        class="bg-card text-card-foreground p-4 flex flex-col overflow-hidden"
+        :class="[
+          isCramped
+            ? 'top-0 left-0 translate-x-0 translate-y-0 w-full max-w-none h-[var(--visual-viewport-height,100dvh)] max-h-none rounded-none'
+            : 'max-w-[60%] h-[70%] max-h-[75%] rounded-lg',
+          { '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }
+        ]"
         @escapeKeyDown="isEditorFullscreen = false"
         :hide-close-button="true"
       >
         <ReplyBoxContent
           v-if="isEditorFullscreen"
+          ref="fullscreenContentRef"
           :isFullscreen="true"
           :aiPrompts="aiPrompts"
           :isSending="isSending"
@@ -71,17 +77,42 @@
           @filesDropped="uploadFiles"
           @aiPromptSelected="handleAiPromptSelected"
           :isGenerating="isGenerating"
+          :canSendReply="canSendReply"
+          :canSendPrivateNote="canSendPrivateNote"
           @generateReply="handleGenerateReply"
           class="h-full flex-grow"
         />
       </DialogContent>
     </Dialog>
 
+    <div v-if="isCramped && !isEditorFullscreen" class="p-2">
+      <Button
+        type="button"
+        variant="outline"
+        class="w-full h-11 justify-start font-normal min-w-0"
+        :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
+        @click="isEditorFullscreen = true"
+      >
+        <Pencil class="shrink-0 text-muted-foreground" />
+        <span v-if="draftPreview" class="truncate">{{ draftPreview }}</span>
+        <span v-else class="truncate text-muted-foreground">
+          {{ messageType === 'private_note' ? $t('globals.terms.privateNote') : $t('globals.terms.reply') }}
+        </span>
+        <span
+          v-if="attachmentCount"
+          class="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+        >
+          <Paperclip class="w-3.5 h-3.5" />
+          {{ attachmentCount }}
+        </span>
+      </Button>
+    </div>
+
     <!-- Main Editor non-fullscreen -->
     <div
       class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
       :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
-      v-if="!isEditorFullscreen"
+      v-if="!isCramped && !isEditorFullscreen"
     >
       <ReplyBoxContent
         ref="replyBoxContentRef"
@@ -108,6 +139,8 @@
         @filesDropped="uploadFiles"
         @aiPromptSelected="handleAiPromptSelected"
         :isGenerating="isGenerating"
+        :canSendReply="canSendReply"
+        :canSendPrivateNote="canSendPrivateNote"
         @generateReply="handleGenerateReply"
       />
     </div>
@@ -115,7 +148,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, toRaw, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, toRaw, nextTick, onMounted, onUnmounted } from 'vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
@@ -138,11 +171,16 @@ import {
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
 import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
+import { Button } from '@shared-ui/components/ui/button'
+import { Pencil, Paperclip } from 'lucide-vue-next'
+import { useVisualViewportHeight } from '@main/composables/useVisualViewportHeight'
+import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
+import { permissions as perms } from '@main/constants/permissions.js'
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
@@ -150,6 +188,18 @@ const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
+const isCramped = useIsComposerCramped()
+useVisualViewportHeight()
+
+const canSendReply = computed(() => userStore.can(perms.MESSAGES_WRITE))
+const canSendPrivateNote = computed(() => userStore.can(perms.MESSAGES_WRITE_PRIVATE))
+const defaultMessageType = computed(() => (canSendReply.value ? 'reply' : 'private_note'))
+const isAllowedMessageType = (type) =>
+  (type === 'reply' && canSendReply.value) || (type === 'private_note' && canSendPrivateNote.value)
+const resolveAllowedDraftType = (uuid) => {
+  const type = conversationStore.resolveDraftType(uuid)
+  return isAllowedMessageType(type) ? type : defaultMessageType.value
+}
 
 // Setup file upload composable
 const {
@@ -171,14 +221,15 @@ watch(
   async (uuid, prevUuid) => {
     if (prevUuid) conversationStore.setSelectedDraftType(prevUuid, messageType.value)
     if (!uuid) {
-      messageType.value = 'reply'
+      messageType.value = defaultMessageType.value
       return
     }
-    messageType.value = conversationStore.resolveDraftType(uuid)
+    const initialType = resolveAllowedDraftType(uuid)
+    messageType.value = initialType
     // Prefetch may still be in flight on first load; re-resolve once drafts land.
     await conversationStore.draftsReady
-    if (uuid !== currentConversationUUID.value) return
-    messageType.value = conversationStore.resolveDraftType(uuid)
+    if (uuid !== currentConversationUUID.value || messageType.value !== initialType) return
+    messageType.value = resolveAllowedDraftType(uuid)
   },
   { immediate: true }
 )
@@ -190,7 +241,8 @@ const {
   isLoading: isDraftLoading,
   clearDraft,
   loadedAttachments,
-  loadedMacroActions
+  loadedMacroActions,
+  loadedMacroID
 } = useDraftManager(currentConversationUUID, messageType, mediaFiles)
 
 // Rest of existing state
@@ -205,6 +257,9 @@ const emailErrors = ref([])
 const aiPromptStore = useAiPromptStore()
 const aiPrompts = computed(() => aiPromptStore.prompts)
 const replyBoxContentRef = ref(null)
+const fullscreenContentRef = ref(null)
+const activeContentRef = () =>
+  isEditorFullscreen.value ? fullscreenContentRef.value : replyBoxContentRef.value
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
 const deferredStatus = ref(null)
@@ -242,17 +297,36 @@ const handleGenerateReply = () =>
 // Copilot's "Insert into reply" replaces the draft with its answer (already HTML from the panel),
 // forcing reply mode so a private note in progress does not silently receive customer-facing text.
 const handleCopilotInsertReply = (html) => {
-  if (!html) return
+  if (!html || !canSendReply.value) return
   if (messageType.value === 'private_note') messageType.value = 'reply'
   htmlContent.value = html
 }
 
+const setMessageTypeFromPalette = (type) => {
+  if (isGenerating.value || !isAllowedMessageType(type)) return
+  messageType.value = type
+}
+
+const focusFromPalette = () => {
+  // The cramped layout renders no editor until the fullscreen dialog opens.
+  if (isCramped.value && !isEditorFullscreen.value) {
+    isEditorFullscreen.value = true
+    nextTick(() => fullscreenContentRef.value?.focus())
+    return
+  }
+  activeContentRef()?.focus()
+}
+
 onMounted(() => {
   emitter.on(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
+  emitter.on(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
+  emitter.on(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
 })
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
+  emitter.off(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
+  emitter.off(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
 })
 
 /**
@@ -261,6 +335,10 @@ onUnmounted(() => {
 const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
+
+const draftPreview = computed(() => textContent.value.trim())
+
+const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.value.length)
 
 const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
   let hasMessageSendingErrored = false
@@ -271,6 +349,8 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   const hasContent = hasTextContent.value || hasInlineImage(html) || mediaFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
   const isPrivate = messageType.value === 'private_note'
+
+  if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
 
   const currentInbox = inboxStore.inboxes.find(
     (i) => i.id === conversationStore.current.inbox_id
@@ -401,7 +481,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   if (!hasMessageSendingErrored) {
     const macroID = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.id
     const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
-    if (macroID > 0 && macroActions.length > 0) {
+    if (macroID > 0) {
       try {
         await api.applyMacro(convUUID, macroID, macroActions)
       } catch (error) {
@@ -444,12 +524,13 @@ watch(
   { deep: true }
 )
 
-// Reset first so a loaded draft never inherits the previous conversation's macro id/message_content (drafts store only actions).
+// Reset first so a loaded draft never inherits the previous conversation's macro (drafts store no message_content).
 watch(
-  loadedMacroActions,
-  (actions) => {
+  [loadedMacroID, loadedMacroActions],
+  ([id, actions]) => {
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
-    if (actions.length) conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
+    if (id > 0) conversationStore.setMacro({ id, actions: [...toRaw(actions)] }, MACRO_CONTEXT.REPLY)
+    else if (actions.length) conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
   },
   { deep: true }
 )
@@ -500,7 +581,7 @@ watch(
   () => conversationStore.current?.uuid,
   () => {
     setTimeout(() => {
-      replyBoxContentRef.value?.focus()
+      activeContentRef()?.focus()
     }, 100)
   }
 )

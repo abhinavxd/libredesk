@@ -10,6 +10,9 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Bump whenever ChunkHTMLContent changes the text it emits for unchanged input; it feeds reindex fingerprints.
+const ChunkerVersion = 3
+
 var (
 	sentenceRegex     = regexp.MustCompile(`[.!?]+[\s]+`)
 	headingInnerRegex = regexp.MustCompile(`(?is)<h[1-6][^>]*>(.*?)</h[1-6]>`)
@@ -85,6 +88,8 @@ func ChunkHTMLContent(title, htmlContent string, config ...ChunkConfig) ([]strin
 	if strings.TrimSpace(htmlContent) == "" {
 		return []string{buildEmbeddingText(title, "", "")}, nil
 	}
+
+	htmlContent = prepareHTMLForEmbedding(htmlContent)
 
 	boundaries, err := parseHTMLBoundaries(htmlContent, cfg)
 	if err != nil {

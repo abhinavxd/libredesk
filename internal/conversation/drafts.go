@@ -19,7 +19,7 @@ func (m *Manager) UpsertConversationDraft(conversationID, userID int, draftType,
 		return draft, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	draft.Content = m.resolveDraftInlineCIDs(draft.Content)
+	draft.Content = m.resolveDraftInlineCIDs(conversationID, draft.Content)
 	return draft, nil
 }
 
@@ -30,7 +30,7 @@ func (m *Manager) GetAllUserDrafts(userID int) ([]models.ConversationDraft, erro
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	for i := range drafts {
-		drafts[i].Content = m.resolveDraftInlineCIDs(drafts[i].Content)
+		drafts[i].Content = m.resolveDraftInlineCIDs(int(drafts[i].ConversationID), drafts[i].Content)
 	}
 	return drafts, nil
 }
@@ -67,14 +67,15 @@ func (m *Manager) DeleteStaleDrafts(ctx context.Context, retentionPeriod time.Du
 	return nil
 }
 
-func (m *Manager) resolveDraftInlineCIDs(content string) string {
+// resolveDraftInlineCIDs rewrites inline cid: refs to media URLs, resolving only unattached media or media linked to the draft's own conversation.
+func (m *Manager) resolveDraftInlineCIDs(conversationID int, content string) string {
 	cids := extractInlineContentIDs(content)
 	for _, cid := range cids {
 		uuid := strings.TrimPrefix(cid, "ldsk-")
 		if uuid == "" {
 			continue
 		}
-		media, err := m.mediaStore.Get(0, uuid)
+		media, err := m.mediaStore.GetDraftInlineMedia(uuid, conversationID)
 		if err != nil {
 			continue
 		}

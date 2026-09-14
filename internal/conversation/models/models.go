@@ -45,15 +45,17 @@ var (
 	MessageStatusFailed   = "failed"
 	MessageStatusReceived = "received"
 
-	ActivityStatusChange       = "status_change"
-	ActivityPriorityChange     = "priority_change"
-	ActivityAssignedUserChange = "assigned_user_change"
-	ActivityAssignedTeamChange = "assigned_team_change"
-	ActivitySelfAssign         = "self_assign"
-	ActivityTagAdded           = "tag_added"
-	ActivityTagRemoved         = "tag_removed"
-	ActivitySLASet             = "sla_set"
-	ActivityParticipantAdded   = "participant_added"
+	ActivityStatusChange        = "status_change"
+	ActivityPriorityChange      = "priority_change"
+	ActivityAssignedUserChange  = "assigned_user_change"
+	ActivityAssignedTeamChange  = "assigned_team_change"
+	ActivityAssigneeUserRemoved = "assignee_user_removed"
+	ActivitySelfAssign          = "self_assign"
+	ActivitySelfUnassign        = "self_unassign"
+	ActivityTagAdded            = "tag_added"
+	ActivityTagRemoved          = "tag_removed"
+	ActivitySLASet              = "sla_set"
+	ActivityParticipantAdded    = "participant_added"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"
@@ -157,6 +159,12 @@ type ConversationListContact struct {
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
 }
 
+// ConversationRef is a lightweight (id, uuid) reference to a conversation.
+type ConversationRef struct {
+	ID   int    `db:"id" json:"id"`
+	UUID string `db:"uuid" json:"uuid"`
+}
+
 type Conversation struct {
 	ID                        int                    `db:"id" json:"id"`
 	CreatedAt                 time.Time              `db:"created_at" json:"created_at"`
@@ -166,6 +174,7 @@ type Conversation struct {
 	InboxID                   int                    `db:"inbox_id" json:"inbox_id"`
 	ClosedAt                  null.Time              `db:"closed_at" json:"closed_at"`
 	ResolvedAt                null.Time              `db:"resolved_at" json:"resolved_at"`
+	ContactLastSeenAt         null.Time              `db:"contact_last_seen_at" json:"contact_last_seen_at"`
 	ReferenceNumber           string                 `db:"reference_number" json:"reference_number"`
 	Priority                  null.String            `db:"priority" json:"priority"`
 	PriorityID                null.Int               `db:"priority_id" json:"priority_id"`
@@ -196,6 +205,7 @@ type Conversation struct {
 	SLAPolicyID               null.Int               `db:"sla_policy_id" json:"sla_policy_id"`
 	SlaPolicyName             null.String            `db:"sla_policy_name" json:"sla_policy_name"`
 	AppliedSLAID              null.Int               `db:"applied_sla_id" json:"applied_sla_id"`
+	NextSLADeadlineAt         null.Time              `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	FirstResponseDueAt        null.Time              `db:"first_response_deadline_at" json:"first_response_deadline_at"`
 	ResolutionDueAt           null.Time              `db:"resolution_deadline_at" json:"resolution_deadline_at"`
 	NextResponseDueAt         null.Time              `db:"next_response_deadline_at" json:"next_response_deadline_at"`
@@ -342,6 +352,21 @@ func (m *Message) IsContinuityMessage() bool {
 	}
 	isContinuity, _ := meta["continuity_email"].(bool)
 	return isContinuity
+}
+
+// ShouldEvaluateAutomation reports whether this outgoing message may trigger automation rules; machine-generated messages must not, else they loop.
+func (m *Message) ShouldEvaluateAutomation(systemUserID int) bool {
+	return m.SenderID != systemUserID && !m.IsAutomated()
+}
+
+// IsAutomated returns true if the message was produced by an automation rule action.
+func (m *Message) IsAutomated() bool {
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(m.Meta), &meta); err != nil {
+		return false
+	}
+	isAutomated, _ := meta["is_automated"].(bool)
+	return isAutomated
 }
 
 // csatMeta unmarshals the message meta and returns the map and whether is_csat is true.

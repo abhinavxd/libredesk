@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	maxAvatarSizeMB = 2
+	// Bounds the request body only; the stored file is capped by image.AvatarMaxDim regardless.
+	maxAvatarSizeMB = 10
 )
 
 type resetPasswordRequest struct {
@@ -64,10 +65,28 @@ func handleGetAgents(r *fastglue.Request) error {
 	return r.SendEnvelope(agents)
 }
 
-// handleGetAgentsCompact returns all agents in a compact format.
+// handleGetAgentsCompact returns agents in a compact format, all of them without page params.
 func handleGetAgentsCompact(r *fastglue.Request) error {
-	var app = r.Context.(*App)
-	agents, err := app.user.GetAgentsCompact()
+	var (
+		app         = r.Context.(*App)
+		query       = string(r.RequestCtx.QueryArgs().Peek("q"))
+		userType    = string(r.RequestCtx.QueryArgs().Peek("type"))
+		enabledOnly = string(r.RequestCtx.QueryArgs().Peek("enabled")) == "true"
+	)
+	switch userType {
+	case "", models.UserTypeAgent, models.UserTypeAIAssistant:
+	default:
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+	if ids := getIDsParam(r, "ids"); len(ids) > 0 {
+		agents, err := app.user.GetAgentsCompactByIDs(ids)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		return r.SendEnvelope(agents)
+	}
+	page, pageSize := getOptionalPagination(r)
+	agents, err := app.user.GetAgentsCompact(query, userType, enabledOnly, page, pageSize)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -196,9 +215,8 @@ func handleCreateAgent(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
-	// Validate agent request
-	if err := validateAgentRequest(r, &req); err != nil {
-		return err
+	if err := validateAgentRequest(app, &req); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 
 	agent, err := app.user.CreateAgent(req.FirstName, req.LastName, req.Email, req.Roles)
@@ -263,9 +281,8 @@ func handleUpdateAgent(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
-	// Validate agent request
-	if err := validateAgentRequest(r, &req); err != nil {
-		return err
+	if err := validateAgentRequest(app, &req); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 
 	agent, err := app.user.GetAgent(id, "")
@@ -514,16 +531,22 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 
 	srcFileName := stringutil.SanitizeFilename(fileHeader.Filename)
 	srcContentType := fileHeader.Header.Get("Content-Type")
-	srcFileSize := fileHeader.Size
 
-	// Reset ptr.
-	file.Seek(0, 0)
+	resized, err := image.Downscale(image.AvatarMaxDim, file)
+	if err != nil {
+		app.lo.Error("error downscaling avatar", "user_id", user.ID, "error", err)
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.fileTypeisNotAnImage"), nil)
+	}
+	srcFileSize := resized.Len()
+
 	linkedModel := null.StringFrom(mmodels.ModelUser)
 	linkedID := null.IntFrom(user.ID)
 	disposition := null.NewString("", false)
 	contentID := ""
 	meta := []byte("{}")
-	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, contentID, linkedModel, linkedID, file, int(srcFileSize), disposition, meta)
+	// Agent and AI assistant avatars are public: both appear as authors on the help center.
+	private := user.Type != models.UserTypeAgent && user.Type != models.UserTypeAIAssistant
+	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, contentID, linkedModel, linkedID, resized, srcFileSize, disposition, meta, private)
 	if err != nil {
 		app.lo.Error("error uploading file", "user_id", user.ID, "error", err)
 		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorUploadingFile"), nil)
@@ -610,26 +633,30 @@ func handleRevokeAPIKey(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
-// validateAgentRequest validates common agent request fields and normalizes the email
-func validateAgentRequest(r *fastglue.Request, req *agentReq) error {
-	var app = r.Context.(*App)
-
-	// Normalize email
+func validateAgentRequest(app *App, req *agentReq) error {
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	req.FirstName = strings.TrimSpace(req.FirstName)
+	req.LastName = strings.TrimSpace(req.LastName)
 	if req.Email == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`email`"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`email`"), nil)
 	}
 
 	if !stringutil.ValidEmail(req.Email) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidEmail"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
 	}
 
 	if req.Roles == nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`role`"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`role`"), nil)
 	}
 
 	if req.FirstName == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`first_name`"), nil, envelope.InputError)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`first_name`"), nil)
+	}
+
+	switch req.AvailabilityStatus {
+	case "", models.Online, models.Offline, models.Away, models.AwayManual, models.AwayAndReassigning:
+	default:
+		return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidAvailabilityStatus"), nil)
 	}
 
 	return nil

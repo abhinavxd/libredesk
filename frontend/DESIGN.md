@@ -92,7 +92,7 @@ In light mode `card` is pure white against a near-white background. In dark mode
 
 ## 3. Typography
 
-Font: Instrument Sans. Sizes: `text-xs` 12 · `text-sm` 14 · `text-base` 16 · `text-lg` 18 ·
+Font: Geist. Sizes: `text-xs` 12 · `text-sm` 14 · `text-base` 16 · `text-lg` 18 ·
 `text-xl` 20 · `text-2xl` 24 · `text-3xl` 30. Weights: 400 body · 500 labels · 600 headings ·
 700 rare emphasis.
 
