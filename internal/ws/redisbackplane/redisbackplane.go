@@ -27,16 +27,26 @@ func (b *Backplane) Publish(ctx context.Context, payload []byte) error {
 	return b.rdb.Publish(ctx, b.channel, payload).Err()
 }
 
+// backplaneChannelSize is the buffer for both the go-redis pub/sub channel and
+// the delivered channel, sized to absorb bursts without dropping envelopes.
+const backplaneChannelSize = 1024
+
 // Subscribe returns a channel of payloads published by any instance. go-redis
 // transparently reconnects the underlying subscription; the returned channel is
 // closed when ctx is cancelled.
+//
+// Delivery applies backpressure rather than dropping: the Hub must not silently
+// discard control envelopes (e.g. KickUser). The Hub's consumer delivers to local
+// clients without blocking, so a blocking send here only slows the reader under
+// sustained overload instead of losing messages.
 func (b *Backplane) Subscribe(ctx context.Context) (<-chan []byte, error) {
 	pubsub := b.rdb.Subscribe(ctx, b.channel)
-	out := make(chan []byte, 1024)
+	out := make(chan []byte, backplaneChannelSize)
+	b.lo.Debug("ws backplane subscribed", "channel", b.channel)
 	go func() {
 		defer close(out)
 		defer pubsub.Close()
-		msgs := pubsub.Channel()
+		msgs := pubsub.Channel(redis.WithChannelSize(backplaneChannelSize))
 		for {
 			select {
 			case <-ctx.Done():
@@ -47,10 +57,8 @@ func (b *Backplane) Subscribe(ctx context.Context) (<-chan []byte, error) {
 				}
 				select {
 				case out <- []byte(msg.Payload):
-				default:
-					// Drop rather than stall the receive loop; a missed envelope
-					// costs one instance a live update until the next event.
-					b.lo.Warn("ws backplane consumer lagging, dropping message")
+				case <-ctx.Done():
+					return
 				}
 			}
 		}
