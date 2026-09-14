@@ -3,7 +3,6 @@
     <div class="flex flex-col space-y-5 max-w-2xl">
       <div class="space-y-1">
         <span class="sub-title">{{ $t('globals.terms.notification', 2) }}</span>
-        <p class="text-muted-foreground text-xs">{{ $t('account.notifications.description') }}</p>
       </div>
 
       <p v-if="!emailEnabled" class="text-muted-foreground text-xs">
@@ -12,7 +11,9 @@
 
       <div class="flex items-center justify-between gap-4 border border-border rounded-md px-4 py-3">
         <div class="space-y-1">
-          <p class="text-sm text-foreground">{{ $t('notification.browserPush.title') }}</p>
+          <p class="text-sm text-foreground">
+            {{ $t('globals.terms.browserNotification', 2) }}
+          </p>
           <p class="text-xs text-muted-foreground">{{ browserPushDescription }}</p>
         </div>
         <Switch
@@ -22,7 +23,7 @@
             pushNotifications.permission.value === 'denied' ||
             !vapidPublicKey
           "
-          :aria-label="$t('notification.browserPush.title')"
+          :aria-label="$t('globals.terms.browserNotification', 2)"
           @update:checked="updateBrowserPush"
         />
       </div>
@@ -76,9 +77,9 @@ const vapidPublicKey = ref('')
 const pushNotifications = usePushNotifications()
 
 const channels = [
-  { key: 'in_app', labelKey: 'notification.channel.inApp' },
+  { key: 'in_app', labelKey: 'globals.terms.inApp' },
   { key: 'email', labelKey: 'globals.terms.email' },
-  { key: 'push', labelKey: 'notification.channel.push' }
+  { key: 'push', labelKey: 'globals.terms.push' }
 ]
 
 const typeLabels = {
