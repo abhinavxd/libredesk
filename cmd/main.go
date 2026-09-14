@@ -33,6 +33,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/sla"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/abhinavxd/libredesk/internal/view"
+	"github.com/abhinavxd/libredesk/internal/ws/redisbackplane"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/abhinavxd/libredesk/internal/automation"
@@ -90,6 +91,10 @@ const (
 	sampleEncKey = "your-32-char-random-string-here!"
 
 	serverShutdownTimeout = 8 * time.Second
+
+	// wsBackplaneChannel is the Redis pub/sub channel over which WebSocket
+	// broadcasts are relayed between instances for multi-instance deployments.
+	wsBackplaneChannel = "libredesk:ws:broadcast"
 )
 
 // App is the global app context which is passed and injected in the http handlers.
@@ -261,6 +266,10 @@ func main() {
 	)
 
 	wsHub.SetConversationStore(conversation)
+	// Relay WebSocket broadcasts across instances over Redis so real-time updates
+	// work when running more than one replica. Redis is already a hard dependency.
+	wsHub.SetBackplane(redisbackplane.New(rdb, wsBackplaneChannel, initLogger("ws-backplane")))
+	go wsHub.ConsumeBackplane(ctx)
 	automation.SetConversationStore(conversation)
 	systemUser, err := user.GetSystemUser()
 	if err != nil {

@@ -7,7 +7,6 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
-	"github.com/abhinavxd/libredesk/internal/ws"
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
 )
 
@@ -89,19 +88,6 @@ func (m *Manager) BroadcastContactUpdate(contactID int, data map[string]any) {
 	if len(uuids) == 0 {
 		return
 	}
-	seen := map[*ws.Client]struct{}{}
-	for _, uuid := range uuids {
-		for _, c := range m.wsHub.ListSubscribers(uuid) {
-			seen[c] = struct{}{}
-		}
-	}
-	if len(seen) == 0 {
-		return
-	}
-	clients := make([]*ws.Client, 0, len(seen))
-	for c := range seen {
-		clients = append(clients, c)
-	}
 	messageBytes, err := json.Marshal(wsmodels.Message{
 		Type: "contact_update",
 		Data: data,
@@ -110,7 +96,7 @@ func (m *Manager) BroadcastContactUpdate(contactID int, data map[string]any) {
 		m.lo.Error("error marshalling contact_update WS message", "error", err)
 		return
 	}
-	m.wsHub.PushToClients(clients, messageBytes)
+	m.wsHub.BroadcastToConversations(uuids, messageBytes)
 }
 
 // BroadcastTypingToConversation broadcasts typing status to all subscribers of a conversation.
@@ -131,7 +117,7 @@ func (m *Manager) BroadcastTypingToConversation(conversationUUID string, isTypin
 	}
 
 	// Always broadcast to agent clients (main app WebSocket clients)
-	m.wsHub.BroadcastTypingToAllConversationClients(conversationUUID, messageBytes)
+	m.wsHub.BroadcastToConversations([]string{conversationUUID}, messageBytes)
 
 	// Broadcast to widget clients (customers) only if this typing event comes from agents
 	if broadcastToWidgets {
@@ -185,16 +171,12 @@ func (m *Manager) broadcastToUsers(userIDs []int, message wsmodels.Message) {
 
 // broadcastToConversationListSubs pushes a message to the conversation's list and open subscribers.
 func (m *Manager) broadcastToConversationListSubs(conversationUUID string, message wsmodels.Message) {
-	clients := m.wsHub.ListSubscribers(conversationUUID)
-	if len(clients) == 0 {
-		return
-	}
 	messageBytes, err := json.Marshal(message)
 	if err != nil {
 		m.lo.Error("error marshalling WS message", "error", err)
 		return
 	}
-	m.wsHub.PushToClients(clients, messageBytes)
+	m.wsHub.BroadcastToConversations([]string{conversationUUID}, messageBytes)
 }
 
 // broadcastTypingToWidgetClients broadcasts typing status to widget clients (customers) for a conversation.

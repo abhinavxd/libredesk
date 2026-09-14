@@ -8,12 +8,19 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
+	"github.com/google/uuid"
 	"github.com/zerodha/logf"
 )
 
 // Hub maintains the set of registered websockets clients.
 type Hub struct {
 	lo *logf.Logger
+
+	// instanceID uniquely identifies this process so backplane envelopes it
+	// published (and already delivered locally) can be skipped on receipt.
+	instanceID string
+	// backplane relays broadcasts to other instances; nil means single-instance.
+	backplane Backplane
 
 	clients      map[int][]*Client
 	clientsMutex sync.RWMutex
@@ -41,6 +48,7 @@ type conversationStore interface {
 func NewHub(lo *logf.Logger, userStore userStore) *Hub {
 	return &Hub{
 		lo:                lo,
+		instanceID:        uuid.NewString(),
 		clients:           make(map[int][]*Client, 64),
 		clientsMutex:      sync.RWMutex{},
 		convSubsList:      make(map[string]map[*Client]struct{}, 1024),
@@ -52,7 +60,14 @@ func NewHub(lo *logf.Logger, userStore userStore) *Hub {
 	}
 }
 
+// KickUser closes every connection of the user on all instances.
 func (h *Hub) KickUser(userID int) {
+	h.kickUserLocal(userID)
+	h.publish(envelope{Kind: envelopeKick, Users: []int{userID}})
+}
+
+// kickUserLocal closes the user's connections on this instance only.
+func (h *Hub) kickUserLocal(userID int) {
 	h.clientsMutex.RLock()
 	clients := append([]*Client(nil), h.clients[userID]...)
 	h.clientsMutex.RUnlock()
@@ -197,16 +212,25 @@ func (h *Hub) ConnectedUserIDs() []int {
 	return out
 }
 
-// PushToClients sends a raw payload directly to the given client connections.
-func (h *Hub) PushToClients(clients []*Client, data []byte) {
-	for _, c := range clients {
-		c.SendMessage(data, websocket.TextMessage)
-	}
-}
-
-// BroadcastMessage broadcasts a message to the specified users.
+// BroadcastMessage broadcasts a message to the specified users on all instances.
 // If no users are specified, the message is broadcast to all users.
 func (h *Hub) BroadcastMessage(msg models.BroadcastMessage) {
+	h.broadcastMessageLocal(msg)
+	h.publish(envelope{Kind: envelopeUsers, Users: msg.Users, Data: msg.Data})
+}
+
+// BroadcastToConversations delivers data to the subscribers of the given
+// conversations on all instances, each client at most once.
+func (h *Hub) BroadcastToConversations(uuids []string, data []byte) {
+	if len(uuids) == 0 {
+		return
+	}
+	h.broadcastToConversationsLocal(uuids, data)
+	h.publish(envelope{Kind: envelopeConvs, Convs: uuids, Data: data})
+}
+
+// broadcastMessageLocal delivers to matching users' clients on this instance only.
+func (h *Hub) broadcastMessageLocal(msg models.BroadcastMessage) {
 	h.clientsMutex.RLock()
 	defer h.clientsMutex.RUnlock()
 
@@ -231,12 +255,6 @@ func (h *Hub) BroadcastMessage(msg models.BroadcastMessage) {
 func (h *Hub) BroadcastTypingToConversation(conversationUUID string, typingMsg models.TypingMessage) {
 	if h.conversationStore != nil && !typingMsg.IsPrivateMessage {
 		h.conversationStore.BroadcastTypingToWidgetClientsOnly(conversationUUID, typingMsg.IsTyping)
-	}
-}
-
-func (h *Hub) BroadcastTypingToAllConversationClients(conversationUUID string, data []byte) {
-	for _, c := range h.ListSubscribers(conversationUUID) {
-		c.SendMessage(data, websocket.TextMessage)
 	}
 }
 
