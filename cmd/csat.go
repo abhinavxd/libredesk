@@ -152,10 +152,9 @@ func handleSubmitCSATResponse(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid UUID", nil, envelope.InputError)
 	}
 
-	// Trim feedback if it exceeds max length.
-	if len(req.Feedback) > maxCsatFeedbackLength {
-		req.Feedback = req.Feedback[:maxCsatFeedbackLength]
-	}
+	// Trim feedback if it exceeds max length. Truncate by runes so a
+	// multibyte UTF-8 character is never split into invalid bytes.
+	req.Feedback = truncateFeedback(req.Feedback)
 
 	// Update CSAT response
 	if err := app.csat.UpdateResponse(uuid, req.Rating, req.Feedback, nil); err != nil {
@@ -187,9 +186,7 @@ func validateCSATForm(r *fastglue.Request) (int, string, json.RawMessage, string
 		return 0, "", nil, "csat.pleaseFillRequired"
 	}
 
-	if len(feedback) > maxCsatFeedbackLength {
-		feedback = feedback[:maxCsatFeedbackLength]
-	}
+	feedback = truncateFeedback(feedback)
 
 	// Collect extra form fields into meta, skipping the known fields.
 	meta := make(map[string]string)
@@ -219,4 +216,19 @@ func validateCSATForm(r *fastglue.Request) (int, string, json.RawMessage, string
 	}
 
 	return rating, feedback, metaJSON, ""
+}
+
+// truncateFeedback caps feedback at maxCsatFeedbackLength runes. Truncating by
+// runes rather than bytes avoids splitting a multibyte UTF-8 character, which
+// would otherwise produce invalid UTF-8 that the database rejects, failing the
+// whole submission (including the rating).
+func truncateFeedback(s string) string {
+	if len(s) <= maxCsatFeedbackLength {
+		return s
+	}
+	r := []rune(s)
+	if len(r) <= maxCsatFeedbackLength {
+		return s
+	}
+	return string(r[:maxCsatFeedbackLength])
 }
