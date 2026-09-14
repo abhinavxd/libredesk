@@ -1,18 +1,23 @@
 package notifier
 
 import (
+	"bytes"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/volatiletech/null/v9"
+	"github.com/zerodha/logf"
 )
 
 type fakePreferences struct {
 	channels map[int][]models.NotificationChannel
+	err      error
 }
 
-func (p fakePreferences) EnabledChannels([]int, models.NotificationType) map[int][]models.NotificationChannel {
-	return p.channels
+func (p fakePreferences) EnabledChannels([]int, models.NotificationType) (map[int][]models.NotificationChannel, error) {
+	return p.channels, p.err
 }
 
 type fakePushDispatcher struct {
@@ -70,5 +75,28 @@ func TestDispatcherDoesNotSendPushWhenDisabled(t *testing.T) {
 
 	if push.userID != 0 {
 		t.Fatalf("sent push to user %d when push is disabled", push.userID)
+	}
+}
+
+func TestDispatcherHandlesPreferenceLookupFailure(t *testing.T) {
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
+	push := &fakePushDispatcher{}
+	d := &Dispatcher{
+		prefs: fakePreferences{err: errors.New("lookup failed")},
+		push:  push,
+		lo:    &lo,
+	}
+	d.Send(Notification{
+		Type:         models.NotificationTypeMention,
+		RecipientIDs: []int{42},
+		Title:        "You were mentioned",
+	})
+
+	if push.userID != 0 {
+		t.Fatalf("sent push to user %d after preference lookup failed", push.userID)
+	}
+	if !strings.Contains(logs.String(), "error fetching notification preferences") {
+		t.Fatalf("missing preference lookup error log: %s", logs.String())
 	}
 }

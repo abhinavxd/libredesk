@@ -51,11 +51,10 @@ func NewPreferenceManager(opts PreferenceManagerOpts) (*PreferenceManager, error
 	}, nil
 }
 
-func (m *PreferenceManager) EnabledChannels(userIDs []int, nType models.NotificationType) map[int][]models.NotificationChannel {
+func (m *PreferenceManager) EnabledChannels(userIDs []int, nType models.NotificationType) (map[int][]models.NotificationChannel, error) {
 	var rows []userChannelPreference
 	if err := m.q.GetPreferencesType.Select(&rows, pq.Array(userIDs), nType); err != nil {
-		m.lo.Error("error fetching notification preferences", "type", nType, "error", err)
-		return map[int][]models.NotificationChannel{}
+		return nil, err
 	}
 
 	stored := make(map[[2]any]bool, len(rows))
@@ -75,7 +74,7 @@ func (m *PreferenceManager) EnabledChannels(userIDs []int, nType models.Notifica
 			}
 		}
 	}
-	return enabled
+	return enabled, nil
 }
 
 // GetMatrix returns the effective preference for every agent notification type and channel.

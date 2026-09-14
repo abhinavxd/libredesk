@@ -51,7 +51,7 @@ func (s replyUserStore) Get(int, string, []string) (umodels.User, error) {
 
 func (s replyUserStore) GetAgent(int, string) (umodels.User, error) { return s.agent, s.err }
 
-func (p *replyPreferences) EnabledChannels(ids []int, _ nmodels.NotificationType) map[int][]nmodels.NotificationChannel {
+func (p *replyPreferences) EnabledChannels(ids []int, _ nmodels.NotificationType) (map[int][]nmodels.NotificationChannel, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.recipients = append(p.recipients, ids...)
@@ -61,7 +61,7 @@ func (p *replyPreferences) EnabledChannels(ids []int, _ nmodels.NotificationType
 			enabled[id] = slices.Clone(p.channels)
 		}
 	}
-	return enabled
+	return enabled, nil
 }
 
 func TestNotifyNewReplyChecksParticipantAccess(t *testing.T) {

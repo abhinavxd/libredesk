@@ -174,7 +174,11 @@ func TestDelayedEmailRetriesThenGivesUp(t *testing.T) {
 	n := Notification{Type: models.NotificationTypeNewReply, RecipientIDs: []int{userID}, ConversationID: null.IntFrom(convID)}
 	email := []EmailNotification{{Recipients: []string{"queued@example.com"}, Subject: "Reply", Content: "Reply"}}
 	send := func(emails []EmailNotification) {
-		d.SendWithEmailsAfter(n, emails, time.Minute, d.EnabledChannels(n.RecipientIDs, n.Type))
+		channels, err := d.EnabledChannels(n.RecipientIDs, n.Type)
+		if err != nil {
+			t.Fatal(err)
+		}
+		d.SendWithEmailsAfter(n, emails, time.Minute, channels)
 	}
 	queued := func() int {
 		var count int

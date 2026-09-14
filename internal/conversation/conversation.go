@@ -1350,7 +1350,11 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		candidateIDs[i] = recipient.ID
 	}
 
-	channels := m.dispatcher.EnabledChannels(candidateIDs, group.nType)
+	channels, err := m.dispatcher.EnabledChannels(candidateIDs, group.nType)
+	if err != nil {
+		m.lo.Error("error fetching notification preferences", "type", group.nType, "error", err)
+		return
+	}
 	if len(channels) == 0 {
 		return
 	}

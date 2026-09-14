@@ -8,7 +8,7 @@ import (
 	"github.com/zerodha/logf"
 )
 
-func TestEnabledChannelsFailsClosed(t *testing.T) {
+func TestEnabledChannelsReturnsLookupFailure(t *testing.T) {
 	db := testutil.NewDB(t, "notification_preferences_read_failure")
 	lo := logf.New(logf.Opts{})
 	manager, err := NewPreferenceManager(PreferenceManagerOpts{
@@ -23,9 +23,12 @@ func TestEnabledChannelsFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	channels := manager.EnabledChannels([]int{1}, models.NotificationTypeAssignment)
-	if len(channels) != 0 {
-		t.Fatalf("enabled channels = %v, want none", channels)
+	channels, err := manager.EnabledChannels([]int{1}, models.NotificationTypeAssignment)
+	if err == nil {
+		t.Fatal("preference lookup failure was not returned")
+	}
+	if channels != nil {
+		t.Fatalf("enabled channels = %v, want nil", channels)
 	}
 }
 

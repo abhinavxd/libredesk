@@ -18,7 +18,7 @@ type WSHub interface {
 }
 
 type NotificationPreferenceStore interface {
-	EnabledChannels(recipientIDs []int, nType models.NotificationType) map[int][]models.NotificationChannel
+	EnabledChannels(recipientIDs []int, nType models.NotificationType) (map[int][]models.NotificationChannel, error)
 }
 
 type PushDispatcher interface {
@@ -92,8 +92,11 @@ func NewDispatcher(opts DispatcherOpts) *Dispatcher {
 
 // EnabledChannels returns the channels each recipient will actually be notified on, accounting for
 // their preferences and the globally configured channels.
-func (d *Dispatcher) EnabledChannels(recipientIDs []int, nType models.NotificationType) map[int][]models.NotificationChannel {
-	enabled := d.prefs.EnabledChannels(recipientIDs, nType)
+func (d *Dispatcher) EnabledChannels(recipientIDs []int, nType models.NotificationType) (map[int][]models.NotificationChannel, error) {
+	enabled, err := d.prefs.EnabledChannels(recipientIDs, nType)
+	if err != nil {
+		return nil, err
+	}
 	if !d.emailEnabled || d.emailQueue == nil {
 		for recipientID, channels := range enabled {
 			channels = slices.DeleteFunc(channels, func(c models.NotificationChannel) bool {
@@ -106,27 +109,30 @@ func (d *Dispatcher) EnabledChannels(recipientIDs []int, nType models.Notificati
 			enabled[recipientID] = channels
 		}
 	}
-	return enabled
+	return enabled, nil
 }
 
 // Send sends a notification through all configured channels.
 // For each recipient: creates in-app notification (DB), broadcasts via Websocket,
 // and sends email if Email field is provided.
 func (d *Dispatcher) Send(n Notification) {
-	d.dispatch(n, d.expandEmails(n), 0, d.EnabledChannels(n.RecipientIDs, n.Type))
+	channels, err := d.EnabledChannels(n.RecipientIDs, n.Type)
+	d.dispatch(n, d.expandEmails(n), 0, channels, err)
 }
 
 func (d *Dispatcher) SendAfter(n Notification, emailDelay time.Duration) {
-	d.dispatch(n, d.expandEmails(n), emailDelay, d.EnabledChannels(n.RecipientIDs, n.Type))
+	channels, err := d.EnabledChannels(n.RecipientIDs, n.Type)
+	d.dispatch(n, d.expandEmails(n), emailDelay, channels, err)
 }
 
 func (d *Dispatcher) SendWithEmails(n Notification, emails []EmailNotification) {
-	d.dispatch(n, emails, 0, d.EnabledChannels(n.RecipientIDs, n.Type))
+	channels, err := d.EnabledChannels(n.RecipientIDs, n.Type)
+	d.dispatch(n, emails, 0, channels, err)
 }
 
 // SendWithEmailsAfter returns the recipients it stored no notification for.
 func (d *Dispatcher) SendWithEmailsAfter(n Notification, emails []EmailNotification, emailDelay time.Duration, channels map[int][]models.NotificationChannel) []int {
-	return d.dispatch(n, emails, emailDelay, channels)
+	return d.dispatch(n, emails, emailDelay, channels, nil)
 }
 
 func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
@@ -156,7 +162,12 @@ func (d *Dispatcher) expandEmails(n Notification) []EmailNotification {
 // dispatch hands the notification to every channel the recipient has enabled and returns the
 // recipients it stored nothing for. Push is left out of that answer: it goes straight to the browser
 // with nothing kept, so a push that fails later cannot be found again.
-func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration, enabled map[int][]models.NotificationChannel) []int {
+func (d *Dispatcher) dispatch(n Notification, emails []EmailNotification, emailDelay time.Duration, enabled map[int][]models.NotificationChannel, preferenceErr error) []int {
+	if preferenceErr != nil {
+		d.lo.Error("error fetching notification preferences", "type", n.Type, "error", preferenceErr)
+		return slices.Clone(n.RecipientIDs)
+	}
+
 	var unstored []int
 	for i, recipientID := range n.RecipientIDs {
 		channels := enabled[recipientID]
