@@ -17,6 +17,15 @@ const (
 	AuthTypeOAuth2   = "oauth2"
 )
 
+// Transport type constants for the email channel.
+const (
+	TransportSMTPIMAP = "smtp_imap" // Traditional SMTP (send) + IMAP (receive).
+	TransportHTTPAPI  = "http_api"  // HTTPS transactional email API (send) + provider webhook (receive).
+)
+
+// HTTPAPIProviderResend identifies the Resend HTTP API provider.
+const HTTPAPIProviderResend = "resend"
+
 // Inbox represents a inbox record in DB.
 type Inbox struct {
 	ID                 int             `db:"id" json:"id"`
@@ -37,14 +46,29 @@ type Inbox struct {
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.
 type Config struct {
-	AuthType             string       `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
-	OAuth                *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2"
-	SMTP                 []SMTPConfig `json:"smtp"`
-	IMAP                 []IMAPConfig `json:"imap"`
-	From                 string       `json:"from"`
-	FromNameTemplate     string       `json:"from_name_template"`
-	ReplyTo              string       `json:"reply_to"`
-	EnablePlusAddressing bool         `json:"enable_plus_addressing"`
+	Transport            string         `json:"transport"` // TransportSMTPIMAP (default) or TransportHTTPAPI
+	AuthType             string         `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
+	OAuth                *OAuthConfig   `json:"oauth"`      // OAuth config when auth_type is "oauth2"
+	SMTP                 []SMTPConfig   `json:"smtp"`
+	IMAP                 []IMAPConfig   `json:"imap"`
+	HTTPAPI              *HTTPAPIConfig `json:"http_api"` // HTTP API config when transport is "http_api"
+	From                 string         `json:"from"`
+	FromNameTemplate     string         `json:"from_name_template"`
+	ReplyTo              string         `json:"reply_to"`
+	EnablePlusAddressing bool           `json:"enable_plus_addressing"`
+}
+
+// IsHTTPAPITransport returns true if the config uses the HTTP API transport (e.g. Resend)
+// instead of SMTP/IMAP.
+func (c Config) IsHTTPAPITransport() bool {
+	return c.Transport == TransportHTTPAPI
+}
+
+// HTTPAPIConfig holds credentials for sending/receiving email via a transactional email HTTP API.
+type HTTPAPIConfig struct {
+	Provider      string `json:"provider"`       // e.g. "resend"
+	APIKey        string `json:"api_key"`        // Provider API key used to send mail
+	WebhookSecret string `json:"webhook_secret"` // Secret used to verify inbound webhook signatures
 }
 
 // OAuthConfig holds OAuth 2.0 authentication details.
@@ -128,6 +152,16 @@ func (m *Inbox) ClearPasswords() error {
 			oauthMap["access_token"] = dummyPassword
 			oauthMap["refresh_token"] = dummyPassword
 			oauthMap["client_secret"] = dummyPassword
+		}
+
+		// Clear HTTP API sensitive fields if present
+		if httpAPIMap, ok := cfg["http_api"].(map[string]interface{}); ok {
+			if apiKey, ok := httpAPIMap["api_key"].(string); ok && apiKey != "" {
+				httpAPIMap["api_key"] = dummyPassword
+			}
+			if webhookSecret, ok := httpAPIMap["webhook_secret"].(string); ok && webhookSecret != "" {
+				httpAPIMap["webhook_secret"] = dummyPassword
+			}
 		}
 
 		clearedConfig, err := json.Marshal(cfg)

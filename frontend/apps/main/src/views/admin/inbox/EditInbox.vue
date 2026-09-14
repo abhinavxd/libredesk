@@ -38,6 +38,7 @@ import CopyButton from '@/components/button/CopyButton.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
+import { TRANSPORT_SMTP_IMAP } from '@/constants/inbox.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
@@ -59,10 +60,12 @@ const submitForm = (values) => {
   if (inbox.value.channel === 'email') {
     const config = {
       auth_type: values.auth_type,
+      transport: values.transport || TRANSPORT_SMTP_IMAP,
       reply_to: values.reply_to,
       enable_plus_addressing: values.enable_plus_addressing,
       imap: [{ ...values.imap }],
-      smtp: [{ ...values.smtp }]
+      smtp: [{ ...values.smtp }],
+      http_api: { ...values.http_api }
     }
 
     if (values.auth_type === AUTH_TYPE_OAUTH2) {
@@ -96,6 +99,9 @@ const submitForm = (values) => {
         smtp.password = ''
       }
     })
+
+    // http_api.api_key / webhook_secret are intentionally left masked: the backend requires a
+    // non-empty api_key and treats the masked value as "keep the existing credential".
   } else if (inbox.value.channel === 'livechat') {
     payload = {
       ...values,
@@ -134,14 +140,12 @@ onMounted(async () => {
     let inboxData = resp.data.data
 
     // Modify the inbox data as per the zod schema.
-    if (inboxData?.config?.imap) {
-      inboxData.imap = inboxData?.config?.imap[0]
-    }
-    if (inboxData?.config?.smtp) {
-      inboxData.smtp = inboxData?.config?.smtp[0]
-    }
+    inboxData.imap = inboxData?.config?.imap?.[0] || {}
+    inboxData.smtp = inboxData?.config?.smtp?.[0] || {}
     inboxData.auth_type = inboxData?.config?.auth_type || AUTH_TYPE_PASSWORD
     inboxData.oauth = inboxData?.config?.oauth || {}
+    inboxData.transport = inboxData?.config?.transport || TRANSPORT_SMTP_IMAP
+    inboxData.http_api = inboxData?.config?.http_api || {}
     inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
     inboxData.reply_to = inboxData?.config?.reply_to || ''
     inbox.value = inboxData

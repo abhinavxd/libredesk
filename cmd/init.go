@@ -706,12 +706,14 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
-	if len(config.SMTP) == 0 {
-		log.Printf("WARNING: Zero SMTP servers configured for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
-	}
+	if config.Transport != imodels.TransportHTTPAPI {
+		if len(config.SMTP) == 0 {
+			log.Printf("WARNING: Zero SMTP servers configured for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
+		}
 
-	if len(config.IMAP) == 0 {
-		log.Printf("WARNING: Zero IMAP clients configured for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
+		if len(config.IMAP) == 0 {
+			log.Printf("WARNING: Zero IMAP clients configured for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
+		}
 	}
 
 	config.From = inboxRecord.From

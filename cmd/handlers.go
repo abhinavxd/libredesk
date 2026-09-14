@@ -194,6 +194,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/inboxes/oauth/{provider}/authorize", perm(handleOAuthAuthorize, "inboxes:manage"))
 	g.GET("/api/v1/inboxes/oauth/{provider}/callback", perm(handleOAuthCallback, "inboxes:manage"))
 
+	// Inbound email webhook for email inboxes using the http_api transport (e.g. Resend).
+	g.POST("/api/v1/webhooks/email/{uuid}", rateLimit(handleInboundEmailWebhook, "public"))
+
 	// Roles.
 	g.GET("/api/v1/roles", auth(handleGetRoles))
 	g.GET("/api/v1/roles/{id}", perm(handleGetRole, "roles:manage"))
