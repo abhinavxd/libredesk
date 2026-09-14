@@ -31,8 +31,6 @@ func handleGetGeneralSettings(r *fastglue.Request) error {
 	settings["app.update"] = app.update
 	// Set app version.
 	settings["app.version"] = versionString
-	// Set restart required flag.
-	settings["app.restart_required"] = app.restartRequired
 	return r.SendEnvelope(settings)
 }
 
@@ -131,6 +129,12 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	req.IdleTimeout = strings.TrimSpace(req.IdleTimeout)
 	req.WaitTimeout = strings.TrimSpace(req.WaitTimeout)
 
+	// One save at a time from here on: the current-password read, the
+	// persist and the publish below must not interleave with another save,
+	// or the database and the running notifier end up on different configs.
+	app.emailSettingsMu.Lock()
+	defer app.emailSettingsMu.Unlock()
+
 	out, err := app.setting.GetByPrefix("notification.email")
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -150,14 +154,24 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 		req.Password = cur.Password
 	}
 
+	// Build the provider from the request BEFORE anything is persisted, so a
+	// config the SMTP pool rejects is refused with nothing changed, rather
+	// than saved and then failing to apply.
+	provider, err := buildEmailNotifier(req)
+	if err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, err.Error(), nil, envelope.InputError)
+	}
+
 	if err := app.setting.Update(req); err != nil {
+		provider.Close()
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Email notification settings require app restart to take effect.
-	app.Lock()
-	app.restartRequired = true
-	app.Unlock()
+	// Publish the complete state to the running process: the provider first,
+	// then the flag that lets sends reach it. Neither reads koanf, which is
+	// why no reloadSettings is needed here; boot reads the database too.
+	app.notifier.SetProvider(provider)
+	app.notifDispatcher.SetEmailEnabled(req.Enabled)
 
 	return r.SendEnvelope(true)
 }

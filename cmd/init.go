@@ -46,6 +46,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/setting"
+	smodels "github.com/abhinavxd/libredesk/internal/setting/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/tag"
@@ -671,17 +672,57 @@ func initAutoAssigner(teamManager *team.Manager, userManager *user.Manager, conv
 	return e
 }
 
-// initNotifier initializes the notifier service with available providers.
-func initNotifier() *notifier.Service {
-	smtpCfg := imodels.SMTPConfig{}
-	if err := ko.UnmarshalWithConf("notification.email", &smtpCfg, koanf.UnmarshalConf{Tag: "json"}); err != nil {
-		log.Fatalf("error unmarshalling email notification provider config: %v", err)
+// loadEmailNotificationSettings reads the `notification.email.*` settings
+// from the database. The notifier is built from this struct, both at boot and
+// when the settings are saved, so it never reads koanf on the live path (koanf
+// is reloaded under the App lock and is not safe to read concurrently).
+func loadEmailNotificationSettings(settings *setting.Manager) (smodels.EmailNotification, error) {
+	var cfg smodels.EmailNotification
+	out, err := settings.GetByPrefix("notification.email")
+	if err != nil {
+		return cfg, err
 	}
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		return cfg, fmt.Errorf("unmarshalling email notification settings: %w", err)
+	}
+	return cfg, nil
+}
 
-	emailNotifier, err := emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
+// buildEmailNotifier builds the email notification provider from the given
+// settings. Building does not connect, so a config the pool rejects (an
+// unknown auth protocol, say) fails here and nothing is left half-applied.
+func buildEmailNotifier(cfg smodels.EmailNotification) (*emailnotifier.Email, error) {
+	smtpCfg := imodels.SMTPConfig{
+		Username:          cfg.Username,
+		Password:          cfg.Password,
+		AuthProtocol:      cfg.AuthProtocol,
+		TLSType:           cfg.TLSType,
+		TLSSkipVerify:     cfg.TLSSkipVerify,
+		Host:              cfg.Host,
+		Port:              cfg.Port,
+		HelloHostname:     cfg.HelloHostname,
+		MaxConns:          cfg.MaxConns,
+		MaxMessageRetries: cfg.MaxMsgRetries,
+		IdleTimeout:       cfg.IdleTimeout,
+		// Mapped by name on purpose: the setting is `wait_timeout` while the
+		// pool option's JSON tag is `pool_wait_timeout`, so the koanf
+		// unmarshal this replaced never filled it and the pool always ran on
+		// the library default.
+		PoolWaitTimeout: cfg.WaitTimeout,
+	}
+	return emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
 		Lo:        initLogger("email-notifier"),
-		FromEmail: ko.String("notification.email.email_address"),
+		FromEmail: cfg.EmailAddress,
 	})
+}
+
+// initNotifier initializes the notifier service with available providers.
+func initNotifier(settings *setting.Manager) *notifier.Service {
+	cfg, err := loadEmailNotificationSettings(settings)
+	if err != nil {
+		log.Fatalf("error loading email notification settings: %v", err)
+	}
+	emailNotifier, err := buildEmailNotifier(cfg)
 	if err != nil {
 		log.Fatalf("error initializing email notifier: %v", err)
 	}
