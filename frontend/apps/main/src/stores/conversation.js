@@ -609,6 +609,33 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  // Drops a deleted conversation from the list, the caches and the open pane.
+  function removeConversation (uuid) {
+    if (!uuid) return
+    const index = conversations.data?.findIndex(c => c.uuid === uuid) ?? -1
+    if (index !== -1) {
+      conversations.data.splice(index, 1)
+      conversations.total = Math.max(0, conversations.total - 1)
+    }
+    selectedUUIDs.value.delete(uuid)
+    conversationDataCache.delete(uuid)
+    staleConversationUUIDs.delete(uuid)
+    messages.data.purgeConversation(uuid)
+    if (conversation.data?.uuid === uuid) {
+      conversation.data = null
+    }
+    incrementMessageVersion()
+  }
+
+  // Deletes a conversation on the server, then drops it locally. Returns the API payload, which
+  // names the mails the mailbox purge could not remove; errors are left for the caller to report.
+  async function deleteConversation (uuid, { purgeMail = true } = {}) {
+    const response = await api.deleteConversation(uuid, { purge_mail: purgeMail })
+    removeConversation(uuid)
+    fetchSidebarCounts({ force: true })
+    return response.data.data
+  }
+
   function fetchNextConversations () {
     if (conversations.fetching || !conversations.hasMore) return
     fetchConversationsList(false, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page + 1)
@@ -1305,6 +1332,8 @@ export const useConversationStore = defineStore('conversation', () => {
     removeDraft,
     hasDraft,
     deleteMessage,
+    deleteConversation,
+    removeConversation,
     conversationHasDraft,
     conversationDraftPreview,
     getMediaPreview,

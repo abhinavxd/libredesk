@@ -73,10 +73,49 @@
             >
               {{ t('conversation.summarize') }}
             </DropdownMenuItem>
+            <template v-if="userStore.can(perms.CONVERSATIONS_DELETE)">
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                class="text-destructive focus:text-destructive"
+                @click="openDeleteDialog"
+              >
+                {{ t('conversation.delete') }}
+              </DropdownMenuItem>
+            </template>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
     </div>
+
+    <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ t('conversation.delete') }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t('conversation.deleteConfirmation') }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div v-if="isEmailConversation" class="flex items-start space-x-3">
+          <Checkbox
+            id="delete-conversation-purge-mail"
+            :checked="purgeMail"
+            @update:checked="(value) => (purgeMail = value === true)"
+          />
+          <label for="delete-conversation-purge-mail" class="text-sm leading-tight">
+            {{ t('conversation.deletePurgeMail') }}
+            <span class="block text-muted-foreground">
+              {{ t('conversation.deletePurgeMailHint') }}
+            </span>
+          </label>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" @click="confirmDelete">
+            {{ t('globals.messages.delete') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <!-- Messages & reply box -->
     <div class="flex flex-col flex-grow overflow-hidden">
@@ -97,8 +136,20 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
@@ -114,6 +165,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
 import api from '@main/api'
 import { permissions as perms } from '@main/constants/permissions.js'
+import { deletionToast } from '@main/utils/conversation-delete'
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const emitter = useEmitter()
@@ -180,6 +232,42 @@ const summarize = async () => {
     })
   } finally {
     isSummarizing.value = false
+  }
+}
+
+const deleteDialogOpen = ref(false)
+const isDeleting = ref(false)
+const purgeMail = ref(true)
+const isEmailConversation = computed(() => conversationStore.current?.inbox_channel === 'email')
+
+const openDeleteDialog = () => {
+  purgeMail.value = true
+  deleteDialogOpen.value = true
+}
+
+const confirmDelete = async () => {
+  const conversation = conversationStore.current
+  if (!conversation?.uuid || isDeleting.value) return
+  try {
+    isDeleting.value = true
+    const result = await conversationStore.deleteConversation(conversation.uuid, {
+      purgeMail: isEmailConversation.value && purgeMail.value
+    })
+    const toast = deletionToast(result)
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: toast.variant,
+      description:
+        toast.count > 0 ? t(toast.key, toast.count, { count: toast.count }) : t(toast.key)
+    })
+    deleteDialogOpen.value = false
+    goBackToList()
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isDeleting.value = false
   }
 }
 
