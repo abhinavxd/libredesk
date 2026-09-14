@@ -111,6 +111,7 @@ type Manager struct {
 	outgoingProcessingMessages sync.Map
 	closed                     bool
 	closedMu                   sync.RWMutex
+	replyNotificationMu        sync.Mutex
 	rdb                        *redis.Client
 	wg                         sync.WaitGroup
 	continuityConfig           ContinuityConfig
@@ -177,7 +178,6 @@ type teamStore interface {
 
 type userStore interface {
 	Get(int, string, []string) (umodels.User, error)
-	GetAgent(int, string) (umodels.User, error)
 	GetAgentCachedOrLoad(int) (umodels.User, error)
 	GetSystemUser() (umodels.User, error)
 	ResolveContact(user *umodels.User, policy umodels.ContactPolicy) error
@@ -555,6 +555,9 @@ func (c *Manager) GetConversationsCreatedAfter(after time.Time, afterID, limit i
 
 // UpdateUserLastSeen updates the last seen timestamp for a specific user on a conversation.
 func (c *Manager) UpdateUserLastSeen(uuid string, userID int) error {
+	c.replyNotificationMu.Lock()
+	defer c.replyNotificationMu.Unlock()
+
 	if _, err := c.q.UpsertUserLastSeen.Exec(userID, uuid); err != nil {
 		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -565,12 +568,40 @@ func (c *Manager) UpdateUserLastSeen(uuid string, userID int) error {
 
 // MarkAsUnread marks a conversation as unread for a specific user by setting last_seen to before the last message.
 func (c *Manager) MarkAsUnread(uuid string, userID int) error {
+	c.replyNotificationMu.Lock()
+	defer c.replyNotificationMu.Unlock()
+
 	if _, err := c.q.MarkConversationUnread.Exec(userID, uuid); err != nil {
 		c.lo.Error("error marking conversation as unread", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	c.clearReplyNotified(uuid, userID)
 	return nil
+}
+
+// ReleaseReplyNotification clears reply suppression for an abandoned email, preserving newer claims.
+func (m *Manager) ReleaseReplyNotification(conversationID, userID int, messageCreatedAt time.Time) {
+	if m.rdb == nil {
+		return
+	}
+	m.replyNotificationMu.Lock()
+	defer m.replyNotificationMu.Unlock()
+
+	uuid, err := m.GetConversationUUID(conversationID)
+	if err != nil {
+		return
+	}
+	claim, err := m.rdb.Get(context.Background(), replyNotifiedKey(uuid, userID)).Int64()
+	if errors.Is(err, redis.Nil) {
+		return
+	}
+	if err != nil {
+		m.lo.Error("error fetching reply notification claim", "conversation_uuid", uuid, "user_id", userID, "error", err)
+		return
+	}
+	if claim == 1 || claim == messageCreatedAt.UnixMicro() {
+		m.clearReplyNotified(uuid, userID)
+	}
 }
 
 // UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.
@@ -831,7 +862,7 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	agent, err := c.userStore.GetAgent(assigneeID, "")
+	agent, err := c.userStore.GetAgentCachedOrLoad(assigneeID)
 	if err == nil {
 		c.SignAvatarURL(&agent.AvatarURL)
 		// Always send expectation (empty for humans) so it clears when the AI hands off to an agent.
@@ -1231,7 +1262,7 @@ func (m *Manager) SendTransientEmail(inboxID, conversationID int, conversationUU
 
 // NotifyAssignment sends notifications (in-app, WebSocket, email) for an assigned conversation.
 func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversation) error {
-	agent, err := m.userStore.GetAgent(userIDs[0], "")
+	agent, err := m.userStore.GetAgentCachedOrLoad(userIDs[0])
 	if err != nil {
 		m.lo.Error("error fetching agent", "user_id", userIDs[0], "error", err)
 		return fmt.Errorf("fetching agent: %w", err)
@@ -1330,7 +1361,7 @@ func (m *Manager) replyNotificationParticipants(conversation models.Conversation
 }
 
 func (m *Manager) notifiableAgent(userID int, conversation models.Conversation) (umodels.User, bool) {
-	agent, err := m.userStore.GetAgent(userID, "")
+	agent, err := m.userStore.GetAgentCachedOrLoad(userID)
 	if err != nil {
 		m.lo.Error("error fetching agent for new reply notification", "user_id", userID, "error", err)
 		return umodels.User{}, false
@@ -1365,12 +1396,15 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		}
 	}
 
+	m.replyNotificationMu.Lock()
+	defer m.replyNotificationMu.Unlock()
+
 	var unreadIDs []int
 	if err := m.q.GetUsersWithUnreadConversationMessage.Select(&unreadIDs, conversation.ID, pq.Array(notifiableIDs), message.CreatedAt); err != nil {
 		m.lo.Error("error checking conversation unread state", "conversation_uuid", conversation.UUID, "error", err)
 		return
 	}
-	claimedIDs := m.claimReplyNotified(conversation.UUID, unreadIDs)
+	claimedIDs := m.claimReplyNotified(conversation.UUID, unreadIDs, message.CreatedAt)
 
 	var (
 		recipientIDs []int
@@ -1393,7 +1427,6 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		return
 	}
 
-	// A recipient with nothing stored to find later keeps no claim, so the next reply alerts them again.
 	unstored := m.dispatcher.SendWithEmailsAfter(notifier.Notification{
 		Type:             group.nType,
 		RecipientIDs:     recipientIDs,
@@ -1408,7 +1441,7 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 	m.clearReplyNotified(conversation.UUID, unstored...)
 }
 
-func (m *Manager) claimReplyNotified(conversationUUID string, userIDs []int) []int {
+func (m *Manager) claimReplyNotified(conversationUUID string, userIDs []int, messageCreatedAt time.Time) []int {
 	if len(userIDs) == 0 || m.rdb == nil {
 		return userIDs
 	}
@@ -1416,7 +1449,7 @@ func (m *Manager) claimReplyNotified(conversationUUID string, userIDs []int) []i
 	pipe := m.rdb.Pipeline()
 	claims := make([]*redis.BoolCmd, len(userIDs))
 	for i, userID := range userIDs {
-		claims[i] = pipe.SetNX(ctx, replyNotifiedKey(conversationUUID, userID), 1, replyNotifiedTTL)
+		claims[i] = pipe.SetNX(ctx, replyNotifiedKey(conversationUUID, userID), messageCreatedAt.UnixMicro(), replyNotifiedTTL)
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		m.lo.Error("error claiming reply notifications", "conversation_uuid", conversationUUID, "error", err)
@@ -1476,7 +1509,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	}
 
 	// Get the user who made the mention.
-	author, err := m.userStore.GetAgent(mentionedByUserID, "")
+	author, err := m.userStore.GetAgentCachedOrLoad(mentionedByUserID)
 	if err != nil {
 		m.lo.Error("error fetching author for mention notification", "user_id", mentionedByUserID, "error", err)
 		return
@@ -2154,7 +2187,7 @@ func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) 
 
 	// Fetch assignee details if assigned
 	if conversation.AssignedUserID.Int > 0 {
-		assignee, err := m.userStore.GetAgent(conversation.AssignedUserID.Int, "")
+		assignee, err := m.userStore.GetAgentCachedOrLoad(conversation.AssignedUserID.Int)
 		if err != nil {
 			m.lo.Error("error fetching conversation assignee for widget", "conversation_uuid", conversation.UUID, "error", err)
 		} else {

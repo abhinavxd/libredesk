@@ -19,6 +19,10 @@ const (
 	emailQueueRetryDelay  = time.Minute
 )
 
+type replyNotificationStore interface {
+	ReleaseReplyNotification(conversationID, userID int, messageCreatedAt time.Time)
+}
+
 type emailQueueQueries struct {
 	IsSeen  *sqlx.Stmt `query:"is-notification-seen"`
 	Enqueue *sqlx.Stmt `query:"enqueue-notification-email"`
@@ -42,9 +46,10 @@ type queuedEmail struct {
 }
 
 type EmailQueue struct {
-	q        emailQueueQueries
-	outbound *Service
-	lo       *logf.Logger
+	q                 emailQueueQueries
+	outbound          *Service
+	conversationStore replyNotificationStore
+	lo                *logf.Logger
 }
 
 type EmailQueueOpts struct {
@@ -63,6 +68,10 @@ func NewEmailQueue(opts EmailQueueOpts) (*EmailQueue, error) {
 		outbound: opts.Outbound,
 		lo:       opts.Lo,
 	}, nil
+}
+
+func (q *EmailQueue) SetConversationStore(store replyNotificationStore) {
+	q.conversationStore = store
 }
 
 func (q *EmailQueue) Send(e queuedEmail) bool {
@@ -138,7 +147,7 @@ func (q *EmailQueue) deliver(e queuedEmail) bool {
 	}); err != nil {
 		q.lo.Error("error delivering notification email", "user_id", e.UserID, "type", e.Type, "error", err)
 		if e.Attempts+1 >= emailQueueMaxAttempts {
-			q.delete(e)
+			q.abandon(e)
 		} else {
 			q.retry(e)
 		}
@@ -148,10 +157,28 @@ func (q *EmailQueue) deliver(e queuedEmail) bool {
 	return true
 }
 
-func (q *EmailQueue) delete(e queuedEmail) {
-	if _, err := q.q.Delete.Exec(e.ID, e.ClaimedAt); err != nil {
-		q.lo.Error("error deleting delivered notification email", "user_id", e.UserID, "type", e.Type, "error", err)
+func (q *EmailQueue) abandon(e queuedEmail) {
+	if !q.delete(e) || e.NotificationID.Valid || !e.ConversationID.Valid || q.conversationStore == nil {
+		return
 	}
+	switch e.Type {
+	case models.NotificationTypeNewReply, models.NotificationTypeNewReplyParticipating, models.NotificationTypeConversationReopened:
+		q.conversationStore.ReleaseReplyNotification(e.ConversationID.Int, e.UserID, e.MessageCreatedAt.Time)
+	}
+}
+
+func (q *EmailQueue) delete(e queuedEmail) bool {
+	result, err := q.q.Delete.Exec(e.ID, e.ClaimedAt)
+	if err != nil {
+		q.lo.Error("error deleting delivered notification email", "user_id", e.UserID, "type", e.Type, "error", err)
+		return false
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		q.lo.Error("error counting deleted notification emails", "user_id", e.UserID, "type", e.Type, "error", err)
+		return false
+	}
+	return deleted > 0
 }
 
 func (q *EmailQueue) retry(e queuedEmail) {

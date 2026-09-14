@@ -15,12 +15,20 @@ type emailDeliveryProvider struct {
 	err error
 }
 
+type replyNotificationRecorder struct {
+	release func(int, int, time.Time)
+}
+
 func (p *emailDeliveryProvider) Send(Message) error {
 	return p.err
 }
 
 func (p *emailDeliveryProvider) Name() string {
 	return ProviderEmail
+}
+
+func (s *replyNotificationRecorder) ReleaseReplyNotification(conversationID, userID int, messageCreatedAt time.Time) {
+	s.release(conversationID, userID, messageCreatedAt)
 }
 
 func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
@@ -283,5 +291,95 @@ func TestClaimedEmailRemainsRecoverable(t *testing.T) {
 	db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
 	if due := queue.due(); len(due) != 1 {
 		t.Fatalf("emails after lease expiry = %d, want 1", len(due))
+	}
+}
+
+func TestAbandonedReplyEmailReleasesSuppression(t *testing.T) {
+	db := testutil.NewDB(t, "notification_email_abandonment")
+	var userID, inboxID, convID, notificationID int
+	if err := db.Get(&userID, `INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'abandon@example.com', 'Agent', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Test', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&convID, `INSERT INTO conversations (contact_id, inbox_id, status_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, userID, inboxID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&notificationID, `INSERT INTO user_notifications (user_id, notification_type, title, conversation_id) VALUES ($1, 'new_reply', 'Reply', $2) RETURNING id`, userID, convID); err != nil {
+		t.Fatal(err)
+	}
+	lo := logf.New(logf.Opts{})
+	provider := &emailDeliveryProvider{}
+	queue, err := NewEmailQueue(EmailQueueOpts{DB: db, Outbound: NewService(map[string]Notifier{ProviderEmail: provider}, 1, 1, &lo), Lo: &lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name         string
+		nType        models.NotificationType
+		inApp        bool
+		replaced     bool
+		delivered    bool
+		attempts     int
+		wantReleased bool
+		wantQueued   int
+	}{
+		{name: "email only", nType: models.NotificationTypeNewReply, attempts: 2, wantReleased: true},
+		{name: "participant", nType: models.NotificationTypeNewReplyParticipating, attempts: 2, wantReleased: true},
+		{name: "reopened", nType: models.NotificationTypeConversationReopened, attempts: 2, wantReleased: true},
+		{name: "in app remains", nType: models.NotificationTypeNewReply, inApp: true, attempts: 2},
+		{name: "retry remains", nType: models.NotificationTypeNewReply, attempts: 1, wantQueued: 1},
+		{name: "newer email remains", nType: models.NotificationTypeNewReply, replaced: true, attempts: 2, wantQueued: 1},
+		{name: "successful delivery", nType: models.NotificationTypeNewReply, delivered: true, attempts: 2},
+		{name: "unrelated notification", nType: models.NotificationTypeAssignment, attempts: 2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			db.MustExec(`DELETE FROM notification_email_queue`)
+			messageTime := time.Now().UTC().Truncate(time.Microsecond)
+			email := queuedEmail{UserID: userID, Type: tt.nType, ConversationID: null.IntFrom(convID),
+				MessageCreatedAt: null.TimeFrom(messageTime), Recipient: "abandon@example.com", Subject: "Reply", Content: "Reply"}
+			if tt.inApp {
+				email.NotificationID = null.IntFrom(notificationID)
+			}
+			released := false
+			queue.SetConversationStore(&replyNotificationRecorder{release: func(gotConv, gotUser int, gotTime time.Time) {
+				released = true
+				if gotConv != convID || gotUser != userID || !gotTime.Equal(messageTime) {
+					t.Fatalf("released wrong reply: conversation=%d, user=%d, time=%v", gotConv, gotUser, gotTime)
+				}
+			}})
+			if !queue.SendAfter(email, -time.Second) {
+				t.Fatal("queueing email failed")
+			}
+			db.MustExec(`UPDATE notification_email_queue SET attempts = $1`, tt.attempts)
+			due := queue.due()
+			if len(due) != 1 {
+				t.Fatalf("due emails = %d, want 1", len(due))
+			}
+			if tt.replaced {
+				email.MessageCreatedAt = null.TimeFrom(messageTime.Add(time.Minute))
+				if !queue.SendAfter(email, time.Minute) {
+					t.Fatal("replacing queued email failed")
+				}
+			}
+			provider.err = errors.New("SMTP unavailable")
+			if tt.delivered {
+				provider.err = nil
+			}
+			if delivered := queue.deliver(due[0]); delivered != tt.delivered {
+				t.Fatalf("delivered = %v, want %v", delivered, tt.delivered)
+			}
+			if released != tt.wantReleased {
+				t.Fatalf("released = %v, want %v", released, tt.wantReleased)
+			}
+			var count int
+			if err := db.Get(&count, `SELECT count(*) FROM notification_email_queue`); err != nil {
+				t.Fatal(err)
+			}
+			if count != tt.wantQueued {
+				t.Fatalf("queued emails = %d, want %d", count, tt.wantQueued)
+			}
+		})
 	}
 }

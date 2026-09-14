@@ -266,6 +266,7 @@ func main() {
 	)
 
 	wsHub.SetConversationStore(conversation)
+	notificationEmailQueue.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
 	systemUser, err := user.GetSystemUser()
 	if err != nil {
@@ -290,7 +291,9 @@ func main() {
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
 	go helpCenter.RunSearchLogCleaner(ctx)
-	go notificationEmailQueue.Run(ctx)
+	if ko.Bool("notification.email.enabled") {
+		go notificationEmailQueue.Run(ctx)
+	}
 	go pushNotification.Run(ctx)
 	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
 	go ai.Run(ctx)

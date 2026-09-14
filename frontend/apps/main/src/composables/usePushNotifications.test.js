@@ -14,7 +14,8 @@ const makeBrowser = ({ permission = 'default', subscription = null } = {}) => {
     },
     navigator: {
       serviceWorker: {
-        register: vi.fn().mockResolvedValue(registration)
+        register: vi.fn().mockResolvedValue(registration),
+        ready: Promise.resolve(registration)
       }
     },
     PushManager: function PushManager () {}
@@ -83,6 +84,28 @@ describe('createPushNotifications', () => {
 
     expect(pushManager.subscribe).not.toHaveBeenCalled()
     expect(state.permission.value).toBe('denied')
+  })
+
+  it('waits for the first worker to become active before subscribing', async () => {
+    const { browser, registration, pushManager } = makeBrowser({ permission: 'granted' })
+    const { promise, resolve } = Promise.withResolvers()
+    browser.navigator.serviceWorker.ready = promise
+    pushManager.subscribe.mockResolvedValue(subscription)
+    const api = { createPushSubscription: vi.fn().mockResolvedValue({}) }
+    const state = createPushNotifications(api, browser)
+
+    const enabling = state.enable('AQID')
+    await vi.waitFor(() => expect(browser.navigator.serviceWorker.register).toHaveBeenCalledOnce())
+
+    expect(pushManager.subscribe).not.toHaveBeenCalled()
+    expect(api.createPushSubscription).not.toHaveBeenCalled()
+    expect(state.enabled.value).toBe(false)
+
+    resolve(registration)
+    await expect(enabling).resolves.toBe(true)
+    expect(pushManager.subscribe).toHaveBeenCalledOnce()
+    expect(api.createPushSubscription).toHaveBeenCalledOnce()
+    expect(state.enabled.value).toBe(true)
   })
 
   it('unsubscribes the current browser and deletes its endpoint', async () => {

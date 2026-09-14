@@ -41,7 +41,8 @@ export const createPushNotifications = (apiClient = api, browser = defaultBrowse
     if (!supported.value || !vapidPublicKey) return false
     permission.value = await browser.Notification.requestPermission()
     if (permission.value !== 'granted') return false
-    const worker = await registerWorker()
+    await registerWorker()
+    const worker = await browser.navigator.serviceWorker.ready
     const existing = await worker.pushManager.getSubscription()
     const subscription = existing || await worker.pushManager.subscribe({
       userVisibleOnly: true,
