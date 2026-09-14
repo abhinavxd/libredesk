@@ -152,6 +152,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Contacts.
 	g.GET("/api/v1/contacts", perm(handleGetContacts, "contacts:read_all"))
+	g.POST("/api/v1/contacts", perm(handleCreateContact, "contacts:write"))
 	g.GET("/api/v1/contacts/{id}", perm(handleGetContact, "contacts:read"))
 	g.PUT("/api/v1/contacts/{id}", perm(handleUpdateContact, "contacts:write"))
 	g.PUT("/api/v1/contacts/{id}/block", perm(handleBlockContact, "contacts:block"))
@@ -251,6 +252,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// AI completions.
 	g.GET("/api/v1/ai/prompts", auth(handleGetAIPrompts))
+	g.GET("/api/v1/ai/prompts/{id}", perm(handleGetAIPrompt, "ai:manage"))
+	g.POST("/api/v1/ai/prompts", perm(handleCreateAIPrompt, "ai:manage"))
+	g.PUT("/api/v1/ai/prompts/{id}", perm(handleUpdateAIPrompt, "ai:manage"))
+	g.DELETE("/api/v1/ai/prompts/{id}", perm(handleDeleteAIPrompt, "ai:manage"))
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
 
 	// AI provider config (completion / embedding).

@@ -204,6 +204,12 @@ const updateRole = (id, data) =>
 const deleteRole = (id) => http.delete(`/api/v1/roles/${id}`)
 const getContacts = (params) => http.get('/api/v1/contacts', { params })
 const getContact = (id) => http.get(`/api/v1/contacts/${id}`)
+const createContact = (data) =>
+  http.post('/api/v1/contacts', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
 const updateContact = (id, data) =>
   http.put(`/api/v1/contacts/${id}`, data, {
     headers: {
@@ -459,6 +465,10 @@ const updateSharedView = (id, data) =>
 const deleteSharedView = (id) => http.delete(`/api/v1/shared-views/${id}`)
 
 const getAiPrompts = () => http.get('/api/v1/ai/prompts')
+const getAIPrompt = (id) => http.get(`/api/v1/ai/prompts/${id}`)
+const createAIPrompt = (data) => http.post('/api/v1/ai/prompts', data)
+const updateAIPrompt = (id, data) => http.put(`/api/v1/ai/prompts/${id}`, data)
+const deleteAIPrompt = (id) => http.delete(`/api/v1/ai/prompts/${id}`)
 const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
   timeout: AI_TIMEOUT,
   headers: {
@@ -750,6 +760,10 @@ export default {
   updateSharedView,
   deleteSharedView,
   getAiPrompts,
+  getAIPrompt,
+  createAIPrompt,
+  updateAIPrompt,
+  deleteAIPrompt,
   aiCompletion,
   getAIConfig,
   updateAIConfig,
@@ -812,6 +826,7 @@ export default {
   removeAssignee,
   getContacts,
   getContact,
+  createContact,
   updateContact,
   blockContact,
   deleteContact,

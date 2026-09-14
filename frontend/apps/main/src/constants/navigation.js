@@ -66,6 +66,13 @@ export const adminNavItems = [
         icon: 'NotebookText'
       },
       {
+        titleKey: 'admin.ai.editorPrompts',
+        href: '/admin/ai/editor-prompts',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'WandSparkles'
+      },
+      {
         titleKey: 'admin.ai.suggestions',
         href: '/admin/ai/suggestions',
         permission: 'ai:manage',
