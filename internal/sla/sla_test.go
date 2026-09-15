@@ -3,15 +3,19 @@ package sla
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	htmltemplate "html/template"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	bmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
+	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/sla/models"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
+	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
@@ -28,6 +32,12 @@ type stubUserStore struct{}
 type stubAppSettingsStore struct{}
 
 type stubBusinessHrsStore struct{ bh bmodels.BusinessHours }
+
+type stubNotificationDispatcher struct {
+	err     error
+	succeed int
+	sentTo  []int
+}
 
 type appliedRow struct {
 	ID          int          `db:"id"`
@@ -50,6 +60,16 @@ func (stubAppSettingsStore) GetByPrefix(prefix string) (types.JSONText, error) {
 
 func (s stubBusinessHrsStore) Get(id int) (bmodels.BusinessHours, error) {
 	return s.bh, nil
+}
+
+func (s *stubNotificationDispatcher) Send(n nmodels.Notification) ([]nmodels.DeliveryResult, error) {
+	if len(s.sentTo) >= s.succeed {
+		return nil, s.err
+	}
+	for _, recipient := range n.Recipients {
+		s.sentTo = append(s.sentTo, recipient.UserID)
+	}
+	return nil, nil
 }
 
 func TestApplySLASetsDeadlinesAndConversation(t *testing.T) {
@@ -471,6 +491,68 @@ func TestSendNotificationSkipsMetMetric(t *testing.T) {
 
 	if queryInt(t, db, `SELECT COUNT(*) FROM scheduled_sla_notifications WHERE id = $1 AND processed_at IS NOT NULL`, pending[0].ID) != 1 {
 		t.Fatal("expected met-metric notification marked processed without sending")
+	}
+}
+
+func TestSendNotificationKeepsPendingWhenDispatchFails(t *testing.T) {
+	m, db := newTestManager(t)
+	policy := insertPolicy(t, db, "p1", "1h", "2h", "")
+	conv := insertConversation(t, db, "c1")
+	applySLA(t, m, conv, policy)
+	appliedID := fetchApplied(t, db, conv)[0].ID
+	db.MustExec(`INSERT INTO scheduled_sla_notifications (applied_sla_id, metric, notification_type, recipients, send_at) VALUES ($1, 'first_response', 'warning', '{1}', NOW() - INTERVAL '1 min')`, appliedID)
+
+	var pending []models.ScheduledSLANotification
+	if err := m.q.GetScheduledSLANotifications.Select(&pending); err != nil {
+		t.Fatal(err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("pending notifications = %d, want 1", len(pending))
+	}
+	renderer, err := template.New(m.lo, db, nil, nil, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatchErr := errors.New("preference lookup failed")
+	m.template = renderer
+	m.dispatcher = &stubNotificationDispatcher{err: dispatchErr}
+
+	if err := m.SendNotification(pending[0]); !errors.Is(err, dispatchErr) {
+		t.Fatalf("error = %v, want %v", err, dispatchErr)
+	}
+	if queryInt(t, db, `SELECT COUNT(*) FROM scheduled_sla_notifications WHERE id = $1 AND processed_at IS NOT NULL`, pending[0].ID) != 0 {
+		t.Fatal("failed notification was marked processed")
+	}
+}
+
+func TestSendNotificationRetriesOnlyUndeliveredRecipients(t *testing.T) {
+	m, db := newTestManager(t)
+	policy := insertPolicy(t, db, "p1", "1h", "2h", "")
+	conv := insertConversation(t, db, "c1")
+	applySLA(t, m, conv, policy)
+	appliedID := fetchApplied(t, db, conv)[0].ID
+	db.MustExec(`INSERT INTO scheduled_sla_notifications (applied_sla_id, metric, notification_type, recipients, send_at) VALUES ($1, 'first_response', 'warning', '{1,2,3}', NOW() - INTERVAL '1 min')`, appliedID)
+
+	var pending []models.ScheduledSLANotification
+	if err := m.q.GetScheduledSLANotifications.Select(&pending); err != nil {
+		t.Fatal(err)
+	}
+	renderer, err := template.New(m.lo, db, nil, nil, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatchErr := errors.New("preference lookup failed")
+	m.template = renderer
+	m.dispatcher = &stubNotificationDispatcher{err: dispatchErr, succeed: 1}
+
+	if err := m.SendNotification(pending[0]); !errors.Is(err, dispatchErr) {
+		t.Fatalf("error = %v, want %v", err, dispatchErr)
+	}
+	if got := queryStr(t, db, `SELECT array_to_string(recipients, ',') FROM scheduled_sla_notifications WHERE id = $1`, pending[0].ID); got != "2,3" {
+		t.Fatalf("recipients = %q, want \"2,3\"", got)
+	}
+	if queryInt(t, db, `SELECT COUNT(*) FROM scheduled_sla_notifications WHERE id = $1 AND processed_at IS NOT NULL`, pending[0].ID) != 0 {
+		t.Fatal("partially delivered notification was marked processed")
 	}
 }
 

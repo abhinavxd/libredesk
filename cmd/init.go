@@ -39,6 +39,7 @@ import (
 	fs "github.com/abhinavxd/libredesk/internal/media/stores/localfs"
 	"github.com/abhinavxd/libredesk/internal/media/stores/s3"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	notificationchannels "github.com/abhinavxd/libredesk/internal/notification/channels"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
@@ -301,6 +302,7 @@ func initConversations(
 	template *tmpl.Manager,
 	webhook *webhook.Manager,
 	dispatcher *notifier.Dispatcher,
+	rdb *redis.Client,
 ) *conversation.Manager {
 	continuityConfig := &conversation.ContinuityConfig{}
 	if ko.Exists("conversation.continuity_scan_interval") {
@@ -309,6 +311,7 @@ func initConversations(
 
 	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, dispatcher, conversation.Opts{
 		DB:                       db,
+		Redis:                    rdb,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
 		IncomingMessageQueueSize: ko.MustInt("message.incoming_queue_size"),
@@ -1163,6 +1166,19 @@ func initUserNotification(db *sqlx.DB, i18n *i18n.I18n) *notifier.UserNotificati
 	return m
 }
 
+// initNotificationPreference inits the notification preference manager.
+func initNotificationPreference(db *sqlx.DB, i18n *i18n.I18n) *notifier.PreferenceManager {
+	m, err := notifier.NewPreferenceManager(notifier.PreferenceManagerOpts{
+		DB:   db,
+		Lo:   initLogger("notification-preference"),
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing notification preference manager: %v", err)
+	}
+	return m
+}
+
 // initImporter inits the importer manager.
 func initImporter(i18n *i18n.I18n) *importer.Importer {
 	return importer.New(importer.Opts{
@@ -1171,14 +1187,46 @@ func initImporter(i18n *i18n.I18n) *importer.Importer {
 	})
 }
 
+func initNotificationEmailQueue(db *sqlx.DB, outbound *notifier.Service) *notifier.EmailQueue {
+	q, err := notifier.NewEmailQueue(notifier.EmailQueueOpts{
+		DB:       db,
+		Outbound: outbound,
+		Lo:       initLogger("notification-email-queue"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing notification email queue: %v", err)
+	}
+	return q
+}
+
+func initPushNotification(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *notifier.PushManager {
+	m, err := notifier.NewPushManager(notifier.PushManagerOpts{
+		DB:          db,
+		Settings:    settings,
+		Lo:          initLogger("push-notification"),
+		I18n:        i18n,
+		RootURL:     ko.String("app.root_url"),
+		Concurrency: ko.MustInt("notification.concurrency"),
+		QueueSize:   ko.MustInt("notification.queue_size"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing push notification manager: %v", err)
+	}
+	return m
+}
+
 // initNotifDispatcher initializes the notification dispatcher.
-func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+func initNotifDispatcher(userNotification *notifier.UserNotificationManager, prefs *notifier.PreferenceManager, push *notifier.PushManager, emailQueue *notifier.EmailQueue, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+	providers := []notificationchannels.Provider{
+		notificationchannels.NewInApp(userNotification, wsHub, initLogger("notification-in-app")),
+	}
+	if emailEnabled {
+		providers = append(providers, notificationchannels.NewEmail(emailQueue))
+	}
+	providers = append(providers, notificationchannels.NewPush(push))
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
-		InApp:        userNotification,
-		Outbound:     outbound,
-		WSHub:        wsHub,
-		EmailEnabled: emailEnabled,
-		Lo:           initLogger("notification-dispatcher"),
+		Pipeline: notificationchannels.NewPipeline(providers...),
+		Prefs:    prefs,
 	})
 }
 

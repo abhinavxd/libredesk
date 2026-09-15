@@ -122,6 +122,7 @@ import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
 import PrimaryNavItems from '@main/components/sidebar/PrimaryNavItems.vue'
 import { useIsMobile } from '@shared-ui/composables'
 import api from '@main/api'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 
 const route = useRoute()
 const emitter = useEmitter()
@@ -165,6 +166,7 @@ const openCreateConversationDialog = ref(false)
 const createConversationContact = ref(null)
 const { t } = useI18n()
 const notificationStore = useNotificationStore()
+const pushNotifications = usePushNotifications()
 
 // Update browser tab title with unread notification count.
 // Watch both unreadCount and route so the prefix is preserved after navigation.
@@ -214,8 +216,14 @@ const initStores = async () => {
     inboxStore.fetchInboxes(),
     slaStore.fetchSlas(),
     tagStore.fetchTags(),
-    customAttributeStore.fetchCustomAttributes()
+    customAttributeStore.fetchCustomAttributes(),
+    refreshPushSubscription()
   ])
+}
+
+const refreshPushSubscription = async () => {
+  const { data } = await api.getNotificationPreferences()
+  await pushNotifications.refresh(data.data.vapid_public_key)
 }
 
 const createView = () => {
