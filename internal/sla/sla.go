@@ -16,7 +16,6 @@ import (
 	cstatusmodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
-	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/sla/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -57,6 +56,16 @@ var metricLabels = map[string]string{
 	MetricNextResponse:  "Next response",
 }
 
+var metricNotificationTypes = map[string]struct{ warning, breach nmodels.NotificationType }{
+	MetricFirstResponse: {nmodels.NotificationTypeSLAFirstResponseWarn, nmodels.NotificationTypeSLAFirstResponseBreach},
+	MetricNextResponse:  {nmodels.NotificationTypeSLANextResponseWarn, nmodels.NotificationTypeSLANextResponseBreach},
+	MetricResolution:    {nmodels.NotificationTypeSLAResolutionWarn, nmodels.NotificationTypeSLAResolutionBreach},
+}
+
+type notificationDispatcher interface {
+	Send(nmodels.Notification) ([]nmodels.DeliveryResult, error)
+}
+
 type Manager struct {
 	q                queries
 	lo               *logf.Logger
@@ -66,7 +75,7 @@ type Manager struct {
 	appSettingsStore appSettingsStore
 	businessHrsStore businessHrsStore
 	template         *template.Manager
-	dispatcher       *notifier.Dispatcher
+	dispatcher       notificationDispatcher
 	wg               sync.WaitGroup
 	opts             Opts
 }
@@ -128,6 +137,7 @@ type queries struct {
 	LockConversations                 *sqlx.Stmt `query:"lock-conversations"`
 	CloseSettledAppliedSLAs           *sqlx.Stmt `query:"close-settled-applied-slas"`
 	UpdateSLANotificationProcessed    *sqlx.Stmt `query:"update-notification-processed"`
+	UpdateSLANotificationRecipients   *sqlx.Stmt `query:"update-notification-recipients"`
 	UpdateSLAEventAsBreached          *sqlx.Stmt `query:"update-sla-event-as-breached"`
 	UpdateSLAEventAsMet               *sqlx.Stmt `query:"update-sla-event-as-met"`
 	SetLatestSLAEventMetAt            *sqlx.Stmt `query:"set-latest-sla-event-met-at"`
@@ -143,7 +153,7 @@ func New(
 	businessHrsStore businessHrsStore,
 	template *template.Manager,
 	userStore userStore,
-	dispatcher *notifier.Dispatcher,
+	dispatcher notificationDispatcher,
 ) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile(
@@ -615,7 +625,7 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 	}
 
 	// Send to all recipients (agents).
-	for _, recipientS := range scheduledNotification.Recipients {
+	for i, recipientS := range scheduledNotification.Recipients {
 		// Check if SLA is already met, if met mark notification as processed and return.
 		switch scheduledNotification.Metric {
 		case MetricFirstResponse:
@@ -662,18 +672,12 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 
 		// Recipient not found?
 		if recipientID == 0 {
-			if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
-				m.lo.Error("error marking notification as processed", "error", err)
-			}
 			continue
 		}
 
 		agent, err := m.userStore.GetAgent(recipientID, "")
 		if err != nil {
 			m.lo.Error("error fetching agent for SLA notification", "recipient_id", recipientID, "error", err)
-			if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
-				m.lo.Error("error marking notification as processed", "error", err)
-			}
 			continue
 		}
 
@@ -757,12 +761,9 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			continue
 		}
 
-		// Determine notification type for in-app notification.
-		var notifType nmodels.NotificationType
+		notifType := metricNotificationTypes[scheduledNotification.Metric].warning
 		if scheduledNotification.NotificationType == NotificationTypeBreach {
-			notifType = nmodels.NotificationTypeSLABreach
-		} else {
-			notifType = nmodels.NotificationTypeSLAWarning
+			notifType = metricNotificationTypes[scheduledNotification.Metric].breach
 		}
 
 		notificationTitle := m.i18n.Ts("notification.slaAlert",
@@ -777,25 +778,30 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			notificationBody = m.i18n.Ts("notification.slaDueIn", "duration", dueIn)
 		}
 
-		// Send notification via dispatcher (handles in-app, WebSocket, and email).
-		m.dispatcher.Send(notifier.Notification{
-			Type:             notifType,
-			RecipientIDs:     []int{recipientID},
+		if _, err := m.dispatcher.Send(nmodels.Notification{
+			Type: notifType,
+			Recipients: []nmodels.Recipient{{
+				UserID: recipientID,
+				Email: &nmodels.EmailNotification{
+					Recipient: agent.Email.String,
+					Subject:   subject,
+					Content:   content,
+				},
+			}},
 			Title:            notificationTitle,
 			Body:             null.StringFrom(notificationBody),
 			ConversationID:   null.IntFrom(appliedSLA.ConversationID),
 			ConversationUUID: appliedSLA.ConversationUUID,
-			Email: &notifier.EmailNotification{
-				Recipients: []string{agent.Email.String},
-				Subject:    subject,
-				Content:    content,
-			},
-		})
-
-		// Mark the notification as processed.
-		if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
-			m.lo.Error("error marking notification as processed", "error", err)
+		}); err != nil {
+			// The retry must not re-notify recipients that already got this alert.
+			if _, uerr := m.q.UpdateSLANotificationRecipients.Exec(scheduledNotification.ID, scheduledNotification.Recipients[i:]); uerr != nil {
+				m.lo.Error("error updating pending notification recipients", "scheduled_notification_id", scheduledNotification.ID, "error", uerr)
+			}
+			return fmt.Errorf("sending SLA notification: %w", err)
 		}
+	}
+	if _, err := m.q.UpdateSLANotificationProcessed.Exec(scheduledNotification.ID); err != nil {
+		m.lo.Error("error marking notification as processed", "error", err)
 	}
 	return nil
 }

@@ -54,7 +54,18 @@
       </FormItem>
     </FormField>
 
-    <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
+    <div class="flex gap-2">
+      <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
+      <Button
+        v-if="initialValues?.is_builtin && defaultBody"
+        type="button"
+        variant="outline"
+        :disabled="isLoading"
+        @click="resetToDefault"
+      >
+        {{ $t('globals.messages.resetToDefault') }}
+      </Button>
+    </div>
   </form>
 </template>
 
@@ -78,6 +89,7 @@ import CodeEditor from '@main/components/editor/CodeEditor.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import { Label } from '@shared-ui/components/ui/label/index.js'
 import { useI18n } from 'vue-i18n'
+import { BUILT_IN_TEMPLATE_BODIES } from './defaults.js'
 
 const props = defineProps({
   initialValues: {
@@ -120,6 +132,14 @@ const isOutgoingTemplate = computed(() => {
 const hideSubject = computed(() => {
   return isOutgoingTemplate.value || props.initialValues?.name === 'CSAT request'
 })
+
+const defaultBody = computed(() => {
+  return BUILT_IN_TEMPLATE_BODIES[props.initialValues?.name]
+})
+
+const resetToDefault = () => {
+  form.setFieldValue('body', defaultBody.value, false)
+}
 
 // Watch for changes in initialValues and update the form.
 watch(
