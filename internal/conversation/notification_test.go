@@ -4,6 +4,7 @@ import (
 	"errors"
 	htmltemplate "html/template"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -219,6 +220,44 @@ func TestReplyNotificationsAlertForEveryMessage(t *testing.T) {
 		m.NotifyNewReply(conv, next, true)
 		if notifications() != 3 {
 			t.Fatalf("notifications after reopened reply = %d, want 3", notifications())
+		}
+	})
+
+	t.Run("reply notifications remove quoted text", func(t *testing.T) {
+		m := newManager(nmodels.NotificationChannelInApp, nmodels.NotificationChannelEmail)
+		replyConversation := conv
+		replyConversation.Subject = null.StringFrom("Conversation subject")
+		reply := message
+		reply.ContentType = models.ContentTypeHTML
+		reply.Content = `<div>Live chat reply</div><div class="gmail_quote gmail_quote_container"><blockquote>Earlier message</blockquote></div>`
+		reply.TextContent = "Live chat reply\nEarlier message"
+		m.NotifyNewReply(replyConversation, reply, false)
+
+		var body string
+		db.Get(&body, `SELECT body FROM user_notifications LIMIT 1`)
+		if body != "Live chat reply" {
+			t.Fatalf("notification body = %q, want fresh reply", body)
+		}
+
+		var emailContent string
+		db.Get(&emailContent, `SELECT content FROM notification_email_queue LIMIT 1`)
+		if !strings.Contains(emailContent, "Live chat reply") || strings.Contains(emailContent, "Earlier message") {
+			t.Fatalf("queued email contains quoted history: %q", emailContent)
+		}
+	})
+
+	t.Run("assignment body falls back to last message", func(t *testing.T) {
+		m := newManager(nmodels.NotificationChannelInApp)
+		assigned := conv
+		assigned.LastMessage = null.StringFrom("Live chat opening message")
+		if err := m.NotifyAssignment([]int{userID}, assigned); err != nil {
+			t.Fatal(err)
+		}
+
+		var body string
+		db.Get(&body, `SELECT body FROM user_notifications LIMIT 1`)
+		if body != assigned.LastMessage.String {
+			t.Fatalf("notification body = %q, want %q", body, assigned.LastMessage.String)
 		}
 	})
 

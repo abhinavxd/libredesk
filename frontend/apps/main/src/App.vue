@@ -92,6 +92,7 @@ import { useTagStore } from './stores/tag'
 import { useCustomAttributeStore } from './stores/customAttributes'
 import { useIdleDetection } from './composables/useIdleDetection'
 import { useNotificationStore } from './stores/notification'
+import { useAiPromptStore } from '@main/stores/aiPrompt'
 import { useViewStore } from './stores/view'
 import { useKeyboardShortcutsDialog } from './composables/useKeyboardShortcutsDialog'
 import KeyboardShortcutsDialog from './components/KeyboardShortcutsDialog.vue'
@@ -166,6 +167,7 @@ const openCreateConversationDialog = ref(false)
 const createConversationContact = ref(null)
 const { t } = useI18n()
 const notificationStore = useNotificationStore()
+const aiPromptStore = useAiPromptStore()
 const pushNotifications = usePushNotifications()
 
 // Update browser tab title with unread notification count.
@@ -217,6 +219,7 @@ const initStores = async () => {
     slaStore.fetchSlas(),
     tagStore.fetchTags(),
     customAttributeStore.fetchCustomAttributes(),
+    aiPromptStore.fetchPrompts(),
     refreshPushSubscription()
   ])
 }

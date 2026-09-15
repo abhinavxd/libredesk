@@ -1109,7 +1109,9 @@ VALUES('email_notification'::template_type, '
     Subject: {{ .Conversation.Subject }}
 </div>
 
-<blockquote>{{ .Message.Content }}</blockquote>
+<blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">
+{{ .Message.Content }}
+</blockquote>
 
 <p>
     <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
@@ -1132,7 +1134,9 @@ VALUES('email_notification'::template_type, '
     Subject: {{ .Conversation.Subject }}
 </div>
 
-<blockquote>{{ .Message.Content }}</blockquote>
+<blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">
+{{ .Message.Content }}
+</blockquote>
 
 <p>
     <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
@@ -1155,7 +1159,9 @@ VALUES('email_notification'::template_type, '
     Subject: {{ .Conversation.Subject }}
 </div>
 
-<blockquote>{{ .Message.Content }}</blockquote>
+<blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">
+{{ .Message.Content }}
+</blockquote>
 
 <p>
     <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>

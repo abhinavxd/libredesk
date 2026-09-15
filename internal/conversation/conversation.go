@@ -2,6 +2,7 @@
 package conversation
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"embed"
@@ -1249,7 +1250,7 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 			},
 		}},
 		Title:            m.i18n.Ts("notification.conversationAssigned", "referenceNumber", conversation.ReferenceNumber),
-		Body:             conversation.Subject,
+		Body:             null.StringFrom(cmp.Or(conversation.Subject.String, conversation.LastMessage.String)),
 		ConversationID:   null.IntFrom(conversation.ID),
 		ConversationUUID: conversation.UUID,
 	}); err != nil {
@@ -1340,6 +1341,7 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 	if len(group.recipients) == 0 {
 		return
 	}
+	messageText := replyNotificationText(message)
 	candidateIDs := make([]int, len(group.recipients))
 	for i, recipient := range group.recipients {
 		candidateIDs[i] = recipient.ID
@@ -1349,7 +1351,7 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		data := notificationTemplateData(conversation, recipient, author)
 		data["Message"] = map[string]any{
 			"UUID":    message.UUID,
-			"Content": htmltemplate.HTML(strings.ReplaceAll(html.EscapeString(message.TextContent), "\n", "<br>")),
+			"Content": htmltemplate.HTML(strings.ReplaceAll(html.EscapeString(messageText), "\n", "<br>")),
 		}
 		content, subject, err := m.template.RenderStoredEmailTemplate(group.tmpl, data)
 		return subject, content, err
@@ -1364,7 +1366,7 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		Type:             group.nType,
 		Recipients:       recipients,
 		Title:            group.title,
-		Body:             conversation.Subject,
+		Body:             null.StringFrom(cmp.Or(messageText, conversation.Subject.String)),
 		ConversationID:   null.IntFrom(conversation.ID),
 		MessageID:        null.IntFrom(message.ID),
 		ConversationUUID: conversation.UUID,
@@ -1422,7 +1424,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	if err != nil {
 		m.lo.Error("error fetching root URL for mention notification", "error", err)
 	}
-	messageContent := sanitizeNotificationHTML(message.Content, rootURL)
+	messageContent := htmltemplate.HTML(absolutizeConversationReferenceLinks(message.Content, rootURL))
 
 	recipients := m.buildNotificationRecipients(userIDs, func(recipient umodels.User) (string, string, error) {
 		data := notificationTemplateData(conversation, recipient, umodels.User{})
@@ -2393,4 +2395,12 @@ func listTypeWhereClause(conditions []string) string {
 		return ""
 	}
 	return "AND (" + strings.Join(conditions, " OR ") + ")"
+}
+
+func replyNotificationText(message models.Message) string {
+	full := strings.TrimSpace(message.TextContent)
+	if message.ContentType == models.ContentTypeHTML {
+		return cmp.Or(stringutil.HTML2TextNoQuotes(message.Content), full)
+	}
+	return cmp.Or(stringutil.TrimPlainTextQuotes(full), full)
 }

@@ -9,14 +9,24 @@
         {{ $t('notification.emailChannelDisabled') }}
       </p>
 
-      <div class="flex items-center justify-between gap-4 border border-border rounded-md px-4 py-3">
+      <div
+        class="flex items-center justify-between gap-4 border border-border rounded-md px-4 py-3"
+      >
         <div class="space-y-1">
           <p class="text-sm text-foreground">
             {{ $t('globals.terms.browserNotification', 2) }}
           </p>
-          <p class="text-xs text-muted-foreground">{{ browserPushDescription }}</p>
+          <p v-if="browserPushDescription" class="text-xs text-muted-foreground">
+            {{ browserPushDescription }}
+          </p>
         </div>
+        <DotLoader
+          v-if="isUpdatingBrowserPush"
+          role="status"
+          :aria-label="$t('globals.terms.loading')"
+        />
         <Switch
+          v-else
           :checked="pushNotifications.enabled.value"
           :disabled="
             !pushNotifications.supported.value ||
@@ -66,6 +76,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Switch } from '@shared-ui/components/ui/switch'
+import { DotLoader } from '@shared-ui/components/ui/loader'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -78,12 +89,13 @@ const rows = ref([])
 const emailEnabled = ref(true)
 const vapidPublicKey = ref('')
 const pendingUpdates = ref(new Set())
+const isUpdatingBrowserPush = ref(false)
 const pushNotifications = usePushNotifications()
 
 const channels = [
   { key: 'in_app', labelKey: 'globals.terms.inApp' },
   { key: 'email', labelKey: 'globals.terms.email' },
-  { key: 'push', labelKey: 'globals.terms.push' }
+  { key: 'push', labelKey: 'globals.terms.browser' }
 ]
 
 const typeLabels = {
@@ -126,11 +138,14 @@ const browserPushDescription = computed(() => {
   if (!pushNotifications.supported.value) return t('notification.browserPush.unsupported')
   if (pushNotifications.permission.value === 'denied') return t('notification.browserPush.blocked')
   if (!vapidPublicKey.value) return t('notification.browserPush.unavailable')
-  return t('notification.browserPush.description')
+  return ''
 })
 
 const updateBrowserPush = async (value) => {
+  if (isUpdatingBrowserPush.value) return
+
   try {
+    isUpdatingBrowserPush.value = true
     if (value) {
       const granted = await pushNotifications.enable(vapidPublicKey.value)
       if (!granted) {
@@ -147,6 +162,8 @@ const updateBrowserPush = async (value) => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  } finally {
+    isUpdatingBrowserPush.value = false
   }
 }
 

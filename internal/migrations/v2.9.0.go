@@ -133,7 +133,9 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
     Subject: {{ .Conversation.Subject }}
 </div>
 
-<blockquote>{{ .Message.Content }}</blockquote>
+<blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">
+{{ .Message.Content }}
+</blockquote>
 
 <p>
     <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
@@ -160,7 +162,9 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
     Subject: {{ .Conversation.Subject }}
 </div>
 
-<blockquote>{{ .Message.Content }}</blockquote>
+<blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">
+{{ .Message.Content }}
+</blockquote>
 
 <p>
     <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
@@ -187,7 +191,9 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
     Subject: {{ .Conversation.Subject }}
 </div>
 
-<blockquote>{{ .Message.Content }}</blockquote>
+<blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">
+{{ .Message.Content }}
+</blockquote>
 
 <p>
     <a href="{{ RootURL }}/inboxes/assigned/conversation/{{ .Conversation.UUID }}">View Conversation</a>
