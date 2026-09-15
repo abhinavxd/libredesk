@@ -24,7 +24,7 @@ func (p *emailDeliveryProvider) Name() string {
 	return ProviderEmail
 }
 
-func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
+func TestDelayedReplyEmailUsesQueueTime(t *testing.T) {
 	db := testutil.NewDB(t, "reply_email_time")
 	var userID, inboxID, convID int
 	if err := db.Get(&userID, `INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'read@example.com', 'Agent', '') RETURNING id`); err != nil {
@@ -47,7 +47,6 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 		Pipeline: channels.NewPipeline(channels.NewEmail(queue)),
 		Prefs:    fakePreferences{channels: map[int][]models.NotificationChannel{userID: {models.NotificationChannelEmail}}},
 	})
-	messageTime := time.Now().UTC().Add(-time.Minute).Truncate(time.Microsecond)
 	n := models.Notification{
 		Type: models.NotificationTypeNewReply,
 		Recipients: []models.Recipient{{
@@ -59,22 +58,25 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 				Delay:     time.Minute,
 			},
 		}},
-		ConversationID:   null.IntFrom(convID),
-		MessageCreatedAt: null.TimeFrom(messageTime),
+		ConversationID: null.IntFrom(convID),
 	}
-	db.MustExec(`INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at) VALUES ($1, $2, $3)`, userID, convID, messageTime.Add(-time.Second))
+	db.MustExec(`INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at) VALUES ($1, $2, now() - interval '1 hour')`, userID, convID)
 	for _, tt := range []struct {
-		name     string
-		readTime time.Time
-		want     bool
+		name       string
+		readOffset time.Duration
+		want       bool
 	}{
-		{"read before reply", messageTime.Add(-time.Second), false},
-		{"read at reply", messageTime, true},
-		{"read before enqueue", messageTime.Add(time.Second), true},
+		{"read before queue", -time.Second, false},
+		{"read at queue", 0, true},
+		{"read after queue", time.Second, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, tt.readTime)
 			d.Send(n)
+			var queuedAt time.Time
+			if err := db.Get(&queuedAt, `SELECT queued_at FROM notification_email_queue`); err != nil {
+				t.Fatal(err)
+			}
+			db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, queuedAt.Add(tt.readOffset))
 			db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
 			due := queue.due()
 			if len(due) != 1 {
@@ -91,28 +93,31 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 	}
 
 	t.Run("coalesced reply uses latest message", func(t *testing.T) {
-		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, messageTime.Add(time.Second))
+		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = now() - interval '1 hour'`)
 		d.Send(n)
 		var firstSendAt time.Time
 		if err := db.Get(&firstSendAt, `SELECT send_at FROM notification_email_queue`); err != nil {
 			t.Fatal(err)
 		}
-		n.MessageCreatedAt = null.TimeFrom(messageTime.Add(2 * time.Second))
 		n.Recipients[0].Email.Content = "Second reply"
 		n.Recipients[0].Email.Delay = 2 * time.Minute
 		d.Send(n)
-		var secondSendAt time.Time
-		if err := db.Get(&secondSendAt, `SELECT send_at FROM notification_email_queue`); err != nil {
+		var second struct {
+			SendAt   time.Time `db:"send_at"`
+			QueuedAt time.Time `db:"queued_at"`
+		}
+		if err := db.Get(&second, `SELECT send_at, queued_at FROM notification_email_queue`); err != nil {
 			t.Fatal(err)
 		}
-		if !secondSendAt.After(firstSendAt) {
-			t.Fatalf("coalesced email send time = %v, want after %v", secondSendAt, firstSendAt)
+		if !second.SendAt.After(firstSendAt) {
+			t.Fatalf("coalesced email send time = %v, want after %v", second.SendAt, firstSendAt)
 		}
 		db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
 		due := queue.due()
 		if len(due) != 1 || due[0].Content != "Second reply" {
 			t.Fatalf("unexpected coalesced emails: %#v", due)
 		}
+		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, second.QueuedAt.Add(-time.Second))
 		seen, err := queue.seen(due[0])
 		if err != nil {
 			t.Fatal(err)
@@ -120,38 +125,13 @@ func TestDelayedReplyEmailUsesMessageTime(t *testing.T) {
 		if seen {
 			t.Fatal("unread second reply suppressed")
 		}
-		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, messageTime.Add(3*time.Second))
+		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, second.QueuedAt)
 		seen, err = queue.seen(due[0])
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !seen {
 			t.Fatal("read second reply was not suppressed")
-		}
-	})
-
-	t.Run("legacy email without message time", func(t *testing.T) {
-		n.MessageCreatedAt = null.Time{}
-		d.Send(n)
-		db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
-		due := queue.due()
-		if len(due) != 1 {
-			t.Fatalf("queued emails = %d, want 1", len(due))
-		}
-		seen, err := queue.seen(due[0])
-		if err != nil {
-			t.Fatal(err)
-		}
-		if seen {
-			t.Fatal("legacy unread email suppressed")
-		}
-		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = now()`)
-		seen, err = queue.seen(due[0])
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !seen {
-			t.Fatal("legacy read email was not suppressed")
 		}
 	})
 }

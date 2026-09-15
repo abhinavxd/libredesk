@@ -92,14 +92,13 @@ SELECT COALESCE((SELECT is_read FROM user_notifications WHERE id = $2 AND user_i
 
 -- name: enqueue-notification-email
 INSERT INTO notification_email_queue
-    (user_id, notification_id, notification_type, conversation_id, recipient_email, subject, content, send_at, message_created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    (user_id, notification_id, notification_type, conversation_id, recipient_email, subject, content, send_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (user_id, notification_type, conversation_id) DO UPDATE SET
     notification_id = EXCLUDED.notification_id,
     recipient_email = EXCLUDED.recipient_email,
     subject = EXCLUDED.subject,
     content = EXCLUDED.content,
-    message_created_at = EXCLUDED.message_created_at,
     send_at = EXCLUDED.send_at,
     attempts = 0,
     queued_at = now(),
@@ -119,7 +118,7 @@ SET send_at = $2, updated_at = now()
 FROM due
 WHERE q.id = due.id
 RETURNING q.id, q.updated_at, q.user_id, q.notification_id, q.notification_type, q.conversation_id, q.attempts,
-    q.recipient_email, q.subject, q.content, COALESCE(q.message_created_at, q.queued_at) AS message_created_at;
+    q.recipient_email, q.subject, q.content, q.queued_at;
 
 -- name: delete-claimed-notification-email
 DELETE FROM notification_email_queue WHERE id = $1 AND updated_at = $2;

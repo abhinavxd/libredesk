@@ -1369,7 +1369,6 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		MessageID:        null.IntFrom(message.ID),
 		ConversationUUID: conversation.UUID,
 		MessageUUID:      message.UUID,
-		MessageCreatedAt: null.TimeFrom(message.CreatedAt),
 	}); err != nil {
 		m.lo.Error("error sending reply notification", "type", group.nType, "error", err)
 	}

@@ -96,7 +96,6 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			subject TEXT NOT NULL,
 			content TEXT NOT NULL,
 			queued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-			message_created_at TIMESTAMPTZ,
 			send_at TIMESTAMPTZ NOT NULL,
 			attempts INTEGER NOT NULL DEFAULT 0,
 			CONSTRAINT constraint_uniq_notification_email_queue UNIQUE (user_id, notification_type, conversation_id)
@@ -106,11 +105,6 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	}
 	if _, err := db.Exec(`
 		CREATE INDEX IF NOT EXISTS index_notification_email_queue_on_send_at ON notification_email_queue(send_at);
-	`); err != nil {
-		return err
-	}
-	if _, err := db.Exec(`
-		ALTER TABLE notification_email_queue ADD COLUMN IF NOT EXISTS message_created_at TIMESTAMPTZ;
 	`); err != nil {
 		return err
 	}

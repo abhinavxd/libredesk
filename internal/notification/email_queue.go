@@ -33,17 +33,17 @@ type emailQueueQueries struct {
 }
 
 type queuedEmail struct {
-	ID               int64                   `db:"id"`
-	ClaimedAt        time.Time               `db:"updated_at"`
-	UserID           int                     `db:"user_id"`
-	NotificationID   null.Int                `db:"notification_id"`
-	Type             models.NotificationType `db:"notification_type"`
-	ConversationID   null.Int                `db:"conversation_id"`
-	Attempts         int                     `db:"attempts"`
-	Recipient        string                  `db:"recipient_email"`
-	Subject          string                  `db:"subject"`
-	Content          string                  `db:"content"`
-	MessageCreatedAt null.Time               `db:"message_created_at"`
+	ID             int64                   `db:"id"`
+	ClaimedAt      time.Time               `db:"updated_at"`
+	UserID         int                     `db:"user_id"`
+	NotificationID null.Int                `db:"notification_id"`
+	Type           models.NotificationType `db:"notification_type"`
+	ConversationID null.Int                `db:"conversation_id"`
+	Attempts       int                     `db:"attempts"`
+	Recipient      string                  `db:"recipient_email"`
+	Subject        string                  `db:"subject"`
+	Content        string                  `db:"content"`
+	QueuedAt       time.Time               `db:"queued_at"`
 }
 
 type EmailQueue struct {
@@ -85,7 +85,7 @@ func (q *EmailQueue) Send(e models.Email) bool {
 
 func (q *EmailQueue) SendAfter(e models.Email, delay time.Duration) bool {
 	if _, err := q.q.Enqueue.Exec(e.UserID, e.NotificationID, e.Type, e.ConversationID, e.Recipient,
-		e.Subject, e.Content, time.Now().Add(delay), e.MessageCreatedAt); err != nil {
+		e.Subject, e.Content, time.Now().Add(delay)); err != nil {
 		q.lo.Error("error queueing notification email", "user_id", e.UserID, "type", e.Type, "error", err)
 		return false
 	}
@@ -127,7 +127,7 @@ func (q *EmailQueue) due() []queuedEmail {
 
 func (q *EmailQueue) seen(e queuedEmail) (bool, error) {
 	var seen bool
-	if err := q.q.IsSeen.Get(&seen, e.UserID, e.NotificationID, e.ConversationID, e.MessageCreatedAt); err != nil {
+	if err := q.q.IsSeen.Get(&seen, e.UserID, e.NotificationID, e.ConversationID, e.QueuedAt); err != nil {
 		q.lo.Error("error checking notification seen state", "user_id", e.UserID, "type", e.Type, "error", err)
 		return false, err
 	}

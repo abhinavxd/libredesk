@@ -83,7 +83,6 @@ type Notification struct {
 	Body             null.String
 	ConversationID   null.Int
 	MessageID        null.Int
-	MessageCreatedAt null.Time
 	ActorID          null.Int
 	Meta             json.RawMessage
 	ConversationUUID string
@@ -100,14 +99,13 @@ type EmailNotification struct {
 }
 
 type Email struct {
-	UserID           int
-	NotificationID   null.Int
-	Type             NotificationType
-	ConversationID   null.Int
-	Recipient        string
-	Subject          string
-	Content          string
-	MessageCreatedAt null.Time
+	UserID         int
+	NotificationID null.Int
+	Type           NotificationType
+	ConversationID null.Int
+	Recipient      string
+	Subject        string
+	Content        string
 }
 
 type PushPayload struct {

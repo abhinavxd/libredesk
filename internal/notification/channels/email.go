@@ -29,14 +29,13 @@ func (p *email) Send(delivery Delivery) Result {
 		return Result{}
 	}
 	message := models.Email{
-		UserID:           delivery.Recipient.UserID,
-		NotificationID:   delivery.NotificationID,
-		Type:             delivery.Notification.Type,
-		ConversationID:   delivery.Notification.ConversationID,
-		MessageCreatedAt: delivery.Notification.MessageCreatedAt,
-		Recipient:        notification.Recipient,
-		Subject:          notification.Subject,
-		Content:          notification.Content,
+		UserID:         delivery.Recipient.UserID,
+		NotificationID: delivery.NotificationID,
+		Type:           delivery.Notification.Type,
+		ConversationID: delivery.Notification.ConversationID,
+		Recipient:      notification.Recipient,
+		Subject:        notification.Subject,
+		Content:        notification.Content,
 	}
 	if notification.Delay > 0 {
 		return Result{Sent: p.queue.SendAfter(message, notification.Delay)}
