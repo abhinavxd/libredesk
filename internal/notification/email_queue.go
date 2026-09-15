@@ -19,10 +19,6 @@ const (
 	emailQueueRetryDelay  = time.Minute
 )
 
-type replyNotificationStore interface {
-	ReleaseReplyNotification(conversationID, userID int, messageCreatedAt time.Time)
-}
-
 type EmailSender interface {
 	Send(Message) error
 	SendSync(Message) error
@@ -51,10 +47,9 @@ type queuedEmail struct {
 }
 
 type EmailQueue struct {
-	q                 emailQueueQueries
-	outbound          EmailSender
-	conversationStore replyNotificationStore
-	lo                *logf.Logger
+	q        emailQueueQueries
+	outbound EmailSender
+	lo       *logf.Logger
 }
 
 type EmailQueueOpts struct {
@@ -73,10 +68,6 @@ func NewEmailQueue(opts EmailQueueOpts) (*EmailQueue, error) {
 		outbound: opts.Outbound,
 		lo:       opts.Lo,
 	}, nil
-}
-
-func (q *EmailQueue) SetConversationStore(store replyNotificationStore) {
-	q.conversationStore = store
 }
 
 func (q *EmailQueue) Send(e models.Email) bool {
@@ -152,7 +143,7 @@ func (q *EmailQueue) deliver(e queuedEmail) bool {
 	}); err != nil {
 		q.lo.Error("error delivering notification email", "user_id", e.UserID, "type", e.Type, "error", err)
 		if e.Attempts+1 >= emailQueueMaxAttempts {
-			q.abandon(e)
+			q.delete(e)
 		} else {
 			q.retry(e)
 		}
@@ -160,16 +151,6 @@ func (q *EmailQueue) deliver(e queuedEmail) bool {
 	}
 	q.delete(e)
 	return true
-}
-
-func (q *EmailQueue) abandon(e queuedEmail) {
-	if !q.delete(e) || e.NotificationID.Valid || !e.ConversationID.Valid || q.conversationStore == nil {
-		return
-	}
-	switch e.Type {
-	case models.NotificationTypeNewReply, models.NotificationTypeNewReplyParticipating, models.NotificationTypeConversationReopened:
-		q.conversationStore.ReleaseReplyNotification(e.ConversationID.Int, e.UserID, e.MessageCreatedAt.Time)
-	}
 }
 
 func (q *EmailQueue) delete(e queuedEmail) bool {

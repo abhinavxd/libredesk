@@ -109,10 +109,15 @@ func handleGetNotificationPreferences(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	pushEndpoints, err := app.pushNotification.Endpoints(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	return r.SendEnvelope(map[string]any{
 		"preferences":      prefs,
 		"email_enabled":    ko.Bool("notification.email.enabled"),
 		"vapid_public_key": app.pushNotification.PublicKey(),
+		"push_endpoints":   pushEndpoints,
 	})
 }
 

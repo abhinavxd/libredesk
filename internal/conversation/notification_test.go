@@ -2,7 +2,6 @@ package conversation
 
 import (
 	"errors"
-	"fmt"
 	htmltemplate "html/template"
 	"slices"
 	"sync"
@@ -18,10 +17,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	"github.com/alicebob/miniredis/v2"
-	"github.com/alicebob/miniredis/v2/server"
 	"github.com/jmoiron/sqlx"
-	"github.com/redis/go-redis/v9"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -145,7 +141,7 @@ func TestNotifyNewReplyChecksAssigneeAccess(t *testing.T) {
 	}
 }
 
-func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
+func TestReplyNotificationsAlertForEveryMessage(t *testing.T) {
 	db := testutil.NewDB(t, "reply_notification_history")
 	var userID, inboxID int
 	if err := db.Get(&userID, `INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'history@example.com', 'Agent', '') RETURNING id`); err != nil {
@@ -165,10 +161,6 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 
 	var q struct {
 		Participants *sqlx.Stmt `query:"get-conversation-participant-agents"`
-		LastSeen     *sqlx.Stmt `query:"upsert-user-last-seen"`
-		MarkUnread   *sqlx.Stmt `query:"mark-conversation-unread"`
-		Unread       *sqlx.Stmt `query:"get-users-with-unread-conversation-message"`
-		UUID         *sqlx.Stmt `query:"get-conversation-uuid"`
 	}
 	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
 		t.Fatal(err)
@@ -189,14 +181,10 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 	}
 	conv.AssignedUserID = null.IntFrom(userID)
 
-	var replyRedis *miniredis.Miniredis
 	newManager := func(channels ...nmodels.NotificationChannel) *Manager {
-		db.MustExec(`DELETE FROM conversation_last_seen`)
 		db.MustExec(`DELETE FROM notification_email_queue`)
 		db.MustExec(`DELETE FROM user_notifications`)
-		mr := miniredis.RunT(t)
-		replyRedis = mr
-		m := &Manager{lo: &lo, i18n: i18n, template: templates, rdb: redis.NewClient(&redis.Options{Addr: mr.Addr()}),
+		m := &Manager{lo: &lo, i18n: i18n, template: templates,
 			userStore: replyUserStore{agent: umodels.User{ID: userID, Email: null.StringFrom("history@example.com"), Enabled: true, Permissions: []string{authzmodels.PermConversationsRead, authzmodels.PermConversationsReadAssigned}}},
 			dispatcher: notifier.NewDispatcher(notifier.DispatcherOpts{
 				Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil, &lo), nchannels.NewEmail(emailQueue)),
@@ -204,21 +192,17 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 			}),
 		}
 		m.q.GetConversationParticipantAgents = q.Participants
-		m.q.UpsertUserLastSeen = q.LastSeen
-		m.q.MarkConversationUnread = q.MarkUnread
-		m.q.GetUsersWithUnreadConversationMessage = q.Unread
-		m.q.GetConversationUUID = q.UUID
 		return m
+	}
+	notifications := func() int {
+		var count int
+		db.Get(&count, `SELECT count(*) FROM user_notifications`)
+		return count
 	}
 	message := models.Message{ID: messageID, SenderID: userID + 1, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
 
-	t.Run("one alert per unread conversation", func(t *testing.T) {
+	t.Run("each reply creates an in-app alert", func(t *testing.T) {
 		m := newManager(nmodels.NotificationChannelInApp)
-		notifications := func() int {
-			var count int
-			db.Get(&count, `SELECT count(*) FROM user_notifications`)
-			return count
-		}
 
 		m.NotifyNewReply(conv, message, false)
 		if notifications() != 1 {
@@ -228,45 +212,17 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 		next := message
 		next.CreatedAt = message.CreatedAt.Add(time.Second)
 		m.NotifyNewReply(conv, next, false)
-		if notifications() != 1 {
-			t.Fatalf("notifications after a second unread reply = %d, want 1", notifications())
+		if notifications() != 2 {
+			t.Fatalf("notifications after second reply = %d, want 2", notifications())
 		}
 
 		m.NotifyNewReply(conv, next, true)
-		if notifications() != 1 {
-			t.Fatalf("notifications after a reopen on an unread conversation = %d, want 1", notifications())
-		}
-
-		if err := m.UpdateUserLastSeen(conv.UUID, userID); err != nil {
-			t.Fatal(err)
-		}
-		later := next
-		later.CreatedAt = time.Now().UTC().Add(time.Minute)
-		m.NotifyNewReply(conv, later, false)
-		if notifications() != 2 {
-			t.Fatalf("notifications after reading and replying again = %d, want 2", notifications())
-		}
-
-		if err := m.MarkAsUnread(conv.UUID, userID); err != nil {
-			t.Fatal(err)
-		}
-		m.NotifyNewReply(conv, later, false)
 		if notifications() != 3 {
-			t.Fatalf("notifications after marking unread and replying again = %d, want 3", notifications())
-		}
-
-		if err := m.UpdateUserLastSeen(conv.UUID, userID); err != nil {
-			t.Fatal(err)
-		}
-		read := later
-		read.CreatedAt = time.Now().Add(-time.Minute)
-		m.NotifyNewReply(conv, read, false)
-		if notifications() != 3 {
-			t.Fatalf("a reply the agent had already read was notified, notifications = %d", notifications())
+			t.Fatalf("notifications after reopened reply = %d, want 3", notifications())
 		}
 	})
 
-	t.Run("replies arriving together alert once", func(t *testing.T) {
+	t.Run("replies arriving together alert individually", func(t *testing.T) {
 		m := newManager(nmodels.NotificationChannelInApp)
 		var wg sync.WaitGroup
 		for range 8 {
@@ -274,92 +230,12 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 		}
 		wg.Wait()
 
-		var count int
-		db.Get(&count, `SELECT count(*) FROM user_notifications`)
-		if count != 1 {
-			t.Fatalf("notifications from concurrent replies = %d, want 1", count)
+		if notifications() != 8 {
+			t.Fatalf("notifications from concurrent replies = %d, want 8", notifications())
 		}
 	})
 
-	for _, markUnread := range []bool{false, true} {
-		t.Run(fmt.Sprintf("read during claim/markUnread=%v", markUnread), func(t *testing.T) {
-			m := newManager(nmodels.NotificationChannelInApp)
-			readDone := make(chan error, 1)
-			var once sync.Once
-			replyRedis.Server().SetPreHook(func(_ *server.Peer, cmd string, _ ...string) bool {
-				if cmd == "SET" {
-					once.Do(func() {
-						go func() {
-							if markUnread {
-								readDone <- m.MarkAsUnread(conv.UUID, userID)
-							} else {
-								readDone <- m.UpdateUserLastSeen(conv.UUID, userID)
-							}
-						}()
-						select {
-						case err := <-readDone:
-							readDone <- err
-						case <-time.After(100 * time.Millisecond):
-						}
-					})
-				}
-				return false
-			})
-
-			m.NotifyNewReply(conv, message, false)
-			if err := <-readDone; err != nil {
-				t.Fatal(err)
-			}
-			if replyRedis.Exists(replyNotifiedKey(conv.UUID, userID)) {
-				t.Fatal("completed read left a reply suppression claim")
-			}
-
-			next := message
-			next.CreatedAt = time.Now().UTC().Add(time.Minute)
-			m.NotifyNewReply(conv, next, false)
-			var count int
-			if err := db.Get(&count, `SELECT count(*) FROM user_notifications`); err != nil {
-				t.Fatal(err)
-			}
-			if count != 2 {
-				t.Fatalf("notifications after a concurrent read and a new reply = %d, want 2", count)
-			}
-		})
-	}
-
-	for _, state := range []string{"current", "legacy", "newer", "read"} {
-		t.Run("abandoned email releases only its claim/"+state, func(t *testing.T) {
-			m := newManager(nmodels.NotificationChannelEmail)
-			m.NotifyNewReply(conv, message, false)
-			key := replyNotifiedKey(conv.UUID, userID)
-			if state == "legacy" {
-				if err := replyRedis.Set(key, "1"); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if state == "newer" || state == "read" {
-				if err := m.UpdateUserLastSeen(conv.UUID, userID); err != nil {
-					t.Fatal(err)
-				}
-			}
-			next := message
-			next.CreatedAt = time.Now().UTC().Add(time.Minute)
-			if state == "newer" {
-				m.NotifyNewReply(conv, next, false)
-			}
-
-			m.ReleaseReplyNotification(conv.ID, userID, message.CreatedAt)
-			if got, want := replyRedis.Exists(key), state == "newer"; got != want {
-				t.Fatalf("claim after abandonment = %v, want %v", got, want)
-			}
-			m.NotifyNewReply(conv, next, false)
-			if !replyRedis.Exists(key) {
-				t.Fatal("next unread reply was not claimed")
-			}
-		})
-	}
-
-	t.Run("push only agent keeps no claim", func(t *testing.T) {
+	t.Run("push alerts for every reply", func(t *testing.T) {
 		m := newManager(nmodels.NotificationChannelPush)
 		push := &countingPush{}
 		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{
@@ -367,40 +243,30 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 			Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelPush}},
 		})
 		m.NotifyNewReply(conv, message, false)
-
-		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{
-			Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil, &lo), nchannels.NewEmail(emailQueue)),
-			Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelInApp}},
-		})
 		m.NotifyNewReply(conv, message, false)
-
-		var count int
-		db.Get(&count, `SELECT count(*) FROM user_notifications`)
-		if count != 1 {
-			t.Fatalf("notifications after a push that stored nothing = %d, want 1", count)
+		if push.count != 2 {
+			t.Fatalf("push notifications = %d, want 2", push.count)
 		}
 	})
 
 	t.Run("agent with no channel enabled is not notified", func(t *testing.T) {
 		m := newManager()
 		m.NotifyNewReply(conv, message, false)
-		var count int
-		db.Get(&count, `SELECT count(*) FROM user_notifications`)
-		if count != 0 {
-			t.Fatalf("notifications = %d, want 0", count)
+		if notifications() != 0 {
+			t.Fatalf("notifications = %d, want 0", notifications())
 		}
 	})
 
-	t.Run("preference failure releases claim", func(t *testing.T) {
+	t.Run("preference failure sends nothing", func(t *testing.T) {
 		m := newManager()
 		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{Prefs: &replyPreferences{err: errors.New("lookup failed")}})
 		m.NotifyNewReply(conv, message, false)
-		if replyRedis.Exists(replyNotifiedKey(conv.UUID, userID)) {
-			t.Fatal("preference failure left a reply suppression claim")
+		if notifications() != 0 {
+			t.Fatalf("notifications = %d, want 0", notifications())
 		}
 	})
 
-	t.Run("email only agent is alerted once until they read the conversation", func(t *testing.T) {
+	t.Run("email replies are clubbed in the queue", func(t *testing.T) {
 		m := newManager(nmodels.NotificationChannelEmail)
 		m.NotifyNewReply(conv, message, false)
 		next := message
@@ -411,18 +277,6 @@ func TestReplyNotificationsAlertOncePerUnreadConversation(t *testing.T) {
 		db.Get(&queued, `SELECT count(*) FROM notification_email_queue`)
 		if queued != 1 {
 			t.Fatalf("queued emails = %d, want 1", queued)
-		}
-
-		db.MustExec(`DELETE FROM notification_email_queue`)
-		if err := m.UpdateUserLastSeen(conv.UUID, userID); err != nil {
-			t.Fatal(err)
-		}
-		later := next
-		later.CreatedAt = time.Now().UTC().Add(time.Minute)
-		m.NotifyNewReply(conv, later, false)
-		db.Get(&queued, `SELECT count(*) FROM notification_email_queue`)
-		if queued != 1 {
-			t.Fatalf("queued emails after reading and replying again = %d, want 1", queued)
 		}
 	})
 }

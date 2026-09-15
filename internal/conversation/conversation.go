@@ -43,7 +43,6 @@ import (
 	"github.com/jmoiron/sqlx/types"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
-	"github.com/redis/go-redis/v9"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -67,9 +66,7 @@ const (
 <p>
 <a href="{{ RootURL }}/inboxes/all/conversation/{{ .Conversation.UUID }}">#{{ .Conversation.ReferenceNumber }}</a>
 </p>`
-	newReplyEmailDelay     = 2 * time.Minute
-	replyNotifiedKeyPrefix = "conversation:reply-notified:"
-	replyNotifiedTTL       = 7 * 24 * time.Hour
+	newReplyEmailDelay = 5 * time.Minute
 )
 
 var conversationFilterRenderers = dbutil.FieldRenderers{
@@ -114,8 +111,6 @@ type Manager struct {
 	outgoingProcessingMessages sync.Map
 	closed                     bool
 	closedMu                   sync.RWMutex
-	replyNotificationMu        sync.Mutex
-	rdb                        *redis.Client
 	wg                         sync.WaitGroup
 	continuityConfig           ContinuityConfig
 	subjectRefFormat           string
@@ -233,7 +228,6 @@ type ContinuityConfig struct {
 // Opts holds the options for creating a new Manager.
 type Opts struct {
 	DB                       *sqlx.DB
-	Redis                    *redis.Client
 	Lo                       *logf.Logger
 	OutgoingMessageQueueSize int
 	IncomingMessageQueueSize int
@@ -302,7 +296,6 @@ func New(
 		automation:                 automation,
 		template:                   template,
 		db:                         opts.DB,
-		rdb:                        opts.Redis,
 		lo:                         opts.Lo,
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
@@ -316,46 +309,45 @@ func New(
 
 type queries struct {
 	// Conversation queries.
-	GetConversationUUID                   *sqlx.Stmt `query:"get-conversation-uuid"`
-	GetConversation                       *sqlx.Stmt `query:"get-conversation"`
-	GetConversationListItem               *sqlx.Stmt `query:"get-conversation-list-item"`
-	GetConversationsCreatedAfter          *sqlx.Stmt `query:"get-conversations-created-after"`
-	GetUnassignedConversations            *sqlx.Stmt `query:"get-unassigned-conversations"`
-	GetConversations                      string     `query:"get-conversations"`
-	GetContactChatConversations           *sqlx.Stmt `query:"get-contact-chat-conversations"`
-	GetChatConversation                   *sqlx.Stmt `query:"get-chat-conversation"`
-	GetContactPreviousConversations       *sqlx.Stmt `query:"get-contact-previous-conversations"`
-	GetContactConversationsForAI          *sqlx.Stmt `query:"get-contact-conversations-for-ai"`
-	GetConversationsByContactEmailForAI   *sqlx.Stmt `query:"get-conversations-by-contact-email-for-ai"`
-	GetConversationParticipants           *sqlx.Stmt `query:"get-conversation-participants"`
-	GetConversationParticipantAgents      *sqlx.Stmt `query:"get-conversation-participant-agents"`
-	GetUserActiveConversationsCount       *sqlx.Stmt `query:"get-user-active-conversations-count"`
-	GetSidebarStandardCounts              *sqlx.Stmt `query:"get-sidebar-standard-counts"`
-	GetConversationsCountBase             string     `query:"get-conversations-count-base"`
-	StartConversationWaitingSince         *sqlx.Stmt `query:"start-conversation-waiting-since"`
-	UpdateConversationReplyTimestamps     *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
-	UpdateConversationContactLastSeen     *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
-	UpsertUserLastSeen                    *sqlx.Stmt `query:"upsert-user-last-seen"`
-	GetUsersWithUnreadConversationMessage *sqlx.Stmt `query:"get-users-with-unread-conversation-message"`
-	MarkConversationUnread                *sqlx.Stmt `query:"mark-conversation-unread"`
-	UpdateConversationAssignedUser        *sqlx.Stmt `query:"update-conversation-assigned-user"`
-	ClaimUnassignedConversation           *sqlx.Stmt `query:"claim-unassigned-conversation"`
-	UpdateConversationAssignedTeam        *sqlx.Stmt `query:"update-conversation-assigned-team"`
-	UpdateConversationCustomAttributes    *sqlx.Stmt `query:"update-conversation-custom-attributes"`
-	UpdateConversationPriority            *sqlx.Stmt `query:"update-conversation-priority"`
-	UpdateConversationStatus              *sqlx.Stmt `query:"update-conversation-status"`
-	UpdateConversationLastMessage         *sqlx.Stmt `query:"update-conversation-last-message"`
-	InsertConversationParticipant         *sqlx.Stmt `query:"insert-conversation-participant"`
-	InsertConversation                    *sqlx.Stmt `query:"insert-conversation"`
-	AddConversationTags                   *sqlx.Stmt `query:"add-conversation-tags"`
-	SetConversationTags                   *sqlx.Stmt `query:"set-conversation-tags"`
-	RemoveConversationTags                *sqlx.Stmt `query:"remove-conversation-tags"`
-	GetConversationTags                   *sqlx.Stmt `query:"get-conversation-tags"`
-	UnassignOpenConversations             *sqlx.Stmt `query:"unassign-open-conversations"`
-	ReOpenConversation                    *sqlx.Stmt `query:"re-open-conversation"`
-	UnsnoozeAll                           *sqlx.Stmt `query:"unsnooze-all"`
-	DeleteConversation                    *sqlx.Stmt `query:"delete-conversation"`
-	RemoveConversationAssignee            *sqlx.Stmt `query:"remove-conversation-assignee"`
+	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
+	GetConversation                     *sqlx.Stmt `query:"get-conversation"`
+	GetConversationListItem             *sqlx.Stmt `query:"get-conversation-list-item"`
+	GetConversationsCreatedAfter        *sqlx.Stmt `query:"get-conversations-created-after"`
+	GetUnassignedConversations          *sqlx.Stmt `query:"get-unassigned-conversations"`
+	GetConversations                    string     `query:"get-conversations"`
+	GetContactChatConversations         *sqlx.Stmt `query:"get-contact-chat-conversations"`
+	GetChatConversation                 *sqlx.Stmt `query:"get-chat-conversation"`
+	GetContactPreviousConversations     *sqlx.Stmt `query:"get-contact-previous-conversations"`
+	GetContactConversationsForAI        *sqlx.Stmt `query:"get-contact-conversations-for-ai"`
+	GetConversationsByContactEmailForAI *sqlx.Stmt `query:"get-conversations-by-contact-email-for-ai"`
+	GetConversationParticipants         *sqlx.Stmt `query:"get-conversation-participants"`
+	GetConversationParticipantAgents    *sqlx.Stmt `query:"get-conversation-participant-agents"`
+	GetUserActiveConversationsCount     *sqlx.Stmt `query:"get-user-active-conversations-count"`
+	GetSidebarStandardCounts            *sqlx.Stmt `query:"get-sidebar-standard-counts"`
+	GetConversationsCountBase           string     `query:"get-conversations-count-base"`
+	StartConversationWaitingSince       *sqlx.Stmt `query:"start-conversation-waiting-since"`
+	UpdateConversationReplyTimestamps   *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
+	UpdateConversationContactLastSeen   *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
+	UpsertUserLastSeen                  *sqlx.Stmt `query:"upsert-user-last-seen"`
+	MarkConversationUnread              *sqlx.Stmt `query:"mark-conversation-unread"`
+	UpdateConversationAssignedUser      *sqlx.Stmt `query:"update-conversation-assigned-user"`
+	ClaimUnassignedConversation         *sqlx.Stmt `query:"claim-unassigned-conversation"`
+	UpdateConversationAssignedTeam      *sqlx.Stmt `query:"update-conversation-assigned-team"`
+	UpdateConversationCustomAttributes  *sqlx.Stmt `query:"update-conversation-custom-attributes"`
+	UpdateConversationPriority          *sqlx.Stmt `query:"update-conversation-priority"`
+	UpdateConversationStatus            *sqlx.Stmt `query:"update-conversation-status"`
+	UpdateConversationLastMessage       *sqlx.Stmt `query:"update-conversation-last-message"`
+	InsertConversationParticipant       *sqlx.Stmt `query:"insert-conversation-participant"`
+	InsertConversation                  *sqlx.Stmt `query:"insert-conversation"`
+	AddConversationTags                 *sqlx.Stmt `query:"add-conversation-tags"`
+	SetConversationTags                 *sqlx.Stmt `query:"set-conversation-tags"`
+	RemoveConversationTags              *sqlx.Stmt `query:"remove-conversation-tags"`
+	GetConversationTags                 *sqlx.Stmt `query:"get-conversation-tags"`
+	UnassignOpenConversations           *sqlx.Stmt `query:"unassign-open-conversations"`
+	ReOpenConversation                  *sqlx.Stmt `query:"re-open-conversation"`
+	UnsnoozeAll                         *sqlx.Stmt `query:"unsnooze-all"`
+	DeleteConversation                  *sqlx.Stmt `query:"delete-conversation"`
+	RemoveConversationAssignee          *sqlx.Stmt `query:"remove-conversation-assignee"`
 
 	// Draft queries.
 	UpsertConversationDraft *sqlx.Stmt `query:"upsert-conversation-draft"`
@@ -558,54 +550,20 @@ func (c *Manager) GetConversationsCreatedAfter(after time.Time, afterID, limit i
 
 // UpdateUserLastSeen updates the last seen timestamp for a specific user on a conversation.
 func (c *Manager) UpdateUserLastSeen(uuid string, userID int) error {
-	c.replyNotificationMu.Lock()
-	defer c.replyNotificationMu.Unlock()
-
 	if _, err := c.q.UpsertUserLastSeen.Exec(userID, uuid); err != nil {
 		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	c.clearReplyNotified(uuid, userID)
 	return nil
 }
 
 // MarkAsUnread marks a conversation as unread for a specific user by setting last_seen to before the last message.
 func (c *Manager) MarkAsUnread(uuid string, userID int) error {
-	c.replyNotificationMu.Lock()
-	defer c.replyNotificationMu.Unlock()
-
 	if _, err := c.q.MarkConversationUnread.Exec(userID, uuid); err != nil {
 		c.lo.Error("error marking conversation as unread", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	c.clearReplyNotified(uuid, userID)
 	return nil
-}
-
-// ReleaseReplyNotification clears reply suppression for an abandoned email, preserving newer claims.
-func (m *Manager) ReleaseReplyNotification(conversationID, userID int, messageCreatedAt time.Time) {
-	if m.rdb == nil {
-		return
-	}
-	uuid, err := m.GetConversationUUID(conversationID)
-	if err != nil {
-		return
-	}
-
-	m.replyNotificationMu.Lock()
-	defer m.replyNotificationMu.Unlock()
-
-	claim, err := m.rdb.Get(context.Background(), replyNotifiedKey(uuid, userID)).Int64()
-	if errors.Is(err, redis.Nil) {
-		return
-	}
-	if err != nil {
-		m.lo.Error("error fetching reply notification claim", "conversation_uuid", uuid, "user_id", userID, "error", err)
-		return
-	}
-	if claim == 1 || claim == messageCreatedAt.UnixMicro() {
-		m.clearReplyNotified(uuid, userID)
-	}
 }
 
 // UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.
@@ -1387,27 +1345,22 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		candidateIDs[i] = recipient.ID
 	}
 
-	claimedIDs, err := m.claimUnreadRecipients(conversation, candidateIDs, message.CreatedAt)
-	if err != nil {
-		return
+	recipients := m.buildNotificationRecipients(candidateIDs, func(recipient umodels.User) (string, string, error) {
+		data := notificationTemplateData(conversation, recipient, author)
+		data["Message"] = map[string]any{
+			"UUID":    message.UUID,
+			"Content": htmltemplate.HTML(strings.ReplaceAll(html.EscapeString(message.TextContent), "\n", "<br>")),
+		}
+		content, subject, err := m.template.RenderStoredEmailTemplate(group.tmpl, data)
+		return subject, content, err
+	})
+	for i := range recipients {
+		if recipients[i].Email != nil {
+			recipients[i].Email.Delay = newReplyEmailDelay
+		}
 	}
 
-	var recipients []nmodels.Recipient
-	for _, recipient := range group.recipients {
-		if !slices.Contains(claimedIDs, recipient.ID) {
-			continue
-		}
-		email := m.renderNotificationEmail(group.tmpl, conversation, message, recipient, author)
-		if email != nil {
-			email.Delay = newReplyEmailDelay
-		}
-		recipients = append(recipients, nmodels.Recipient{UserID: recipient.ID, Email: email})
-	}
-	if len(recipients) == 0 {
-		return
-	}
-
-	results, err := m.dispatcher.Send(nmodels.Notification{
+	if _, err := m.dispatcher.Send(nmodels.Notification{
 		Type:             group.nType,
 		Recipients:       recipients,
 		Title:            group.title,
@@ -1417,90 +1370,8 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		ConversationUUID: conversation.UUID,
 		MessageUUID:      message.UUID,
 		MessageCreatedAt: null.TimeFrom(message.CreatedAt),
-	})
-	if err != nil {
+	}); err != nil {
 		m.lo.Error("error sending reply notification", "type", group.nType, "error", err)
-		m.clearReplyNotified(conversation.UUID, claimedIDs...)
-		return
-	}
-	var untracked []int
-	for _, result := range results {
-		if !slices.Contains(result.Channels, nmodels.NotificationChannelInApp) &&
-			!slices.Contains(result.Channels, nmodels.NotificationChannelEmail) {
-			untracked = append(untracked, result.RecipientID)
-		}
-	}
-	m.clearReplyNotified(conversation.UUID, untracked...)
-}
-
-// claimUnreadRecipients holds the reply notification lock across the unread check and the claim, returning the claimed recipients.
-func (m *Manager) claimUnreadRecipients(conversation models.Conversation, userIDs []int, messageCreatedAt time.Time) ([]int, error) {
-	m.replyNotificationMu.Lock()
-	defer m.replyNotificationMu.Unlock()
-
-	var unreadIDs []int
-	if err := m.q.GetUsersWithUnreadConversationMessage.Select(&unreadIDs, conversation.ID, pq.Array(userIDs), messageCreatedAt); err != nil {
-		m.lo.Error("error checking conversation unread state", "conversation_uuid", conversation.UUID, "error", err)
-		return nil, err
-	}
-	return m.claimReplyNotified(conversation.UUID, unreadIDs, messageCreatedAt), nil
-}
-
-func (m *Manager) claimReplyNotified(conversationUUID string, userIDs []int, messageCreatedAt time.Time) []int {
-	if len(userIDs) == 0 || m.rdb == nil {
-		return userIDs
-	}
-	ctx := context.Background()
-	pipe := m.rdb.Pipeline()
-	claims := make([]*redis.BoolCmd, len(userIDs))
-	for i, userID := range userIDs {
-		claims[i] = pipe.SetNX(ctx, replyNotifiedKey(conversationUUID, userID), messageCreatedAt.UnixMicro(), replyNotifiedTTL)
-	}
-	if _, err := pipe.Exec(ctx); err != nil {
-		m.lo.Error("error claiming reply notifications", "conversation_uuid", conversationUUID, "error", err)
-		return userIDs
-	}
-	claimed := make([]int, 0, len(userIDs))
-	for i, userID := range userIDs {
-		if claims[i].Val() {
-			claimed = append(claimed, userID)
-		}
-	}
-	return claimed
-}
-
-func (m *Manager) clearReplyNotified(conversationUUID string, userIDs ...int) {
-	if len(userIDs) == 0 || m.rdb == nil {
-		return
-	}
-	keys := make([]string, len(userIDs))
-	for i, userID := range userIDs {
-		keys[i] = replyNotifiedKey(conversationUUID, userID)
-	}
-	if err := m.rdb.Del(context.Background(), keys...).Err(); err != nil {
-		m.lo.Error("error clearing reply notification", "user_ids", userIDs, "conversation_uuid", conversationUUID, "error", err)
-	}
-}
-
-// renderNotificationEmail returns nil when the recipient has no email or the template fails to render.
-func (m *Manager) renderNotificationEmail(tmplName string, conversation models.Conversation, message models.Message, recipient, author umodels.User) *nmodels.EmailNotification {
-	if recipient.Email.String == "" {
-		return nil
-	}
-	data := notificationTemplateData(conversation, recipient, author)
-	data["Message"] = map[string]any{
-		"UUID":    message.UUID,
-		"Content": htmltemplate.HTML(strings.ReplaceAll(html.EscapeString(message.TextContent), "\n", "<br>")),
-	}
-	content, subject, err := m.template.RenderStoredEmailTemplate(tmplName, data)
-	if err != nil {
-		m.lo.Error("error rendering template", "template", tmplName, "conversation_uuid", conversation.UUID, "error", err)
-		return nil
-	}
-	return &nmodels.EmailNotification{
-		Recipient: recipient.Email.String,
-		Subject:   subject,
-		Content:   content,
 	}
 }
 
@@ -1555,38 +1426,18 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	messageContent := sanitizeNotificationHTML(message.Content, rootURL)
 
 	recipients := m.buildNotificationRecipients(userIDs, func(recipient umodels.User) (string, string, error) {
-		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned,
-			map[string]any{
-				"Conversation": map[string]any{
-					"ReferenceNumber": conversation.ReferenceNumber,
-					"Subject":         conversation.Subject.String,
-					"Priority":        conversation.Priority.String,
-					"UUID":            conversation.UUID,
-				},
-				"Recipient": map[string]any{
-					"FirstName": recipient.FirstName,
-					"LastName":  recipient.LastName,
-					"FullName":  recipient.FullName(),
-					"Email":     recipient.Email.String,
-				},
-				"Message": map[string]any{
-					"UUID":    message.UUID,
-					"Content": messageContent,
-				},
-				"MentionedBy": map[string]any{
-					"FirstName": author.FirstName,
-					"LastName":  author.LastName,
-					"FullName":  author.FullName(),
-					"Email":     author.Email.String,
-				},
-				// Automated messages do not have an author.
-				"Author": map[string]any{
-					"FirstName": "",
-					"LastName":  "",
-					"FullName":  "",
-					"Email":     "",
-				},
-			})
+		data := notificationTemplateData(conversation, recipient, umodels.User{})
+		data["Message"] = map[string]any{
+			"UUID":    message.UUID,
+			"Content": messageContent,
+		}
+		data["MentionedBy"] = map[string]any{
+			"FirstName": author.FirstName,
+			"LastName":  author.LastName,
+			"FullName":  author.FullName(),
+			"Email":     author.Email.String,
+		}
+		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplMentioned, data)
 		return subject, content, err
 	})
 
@@ -1780,41 +1631,14 @@ func (m *Manager) notifyAutomation(subject, message string, entries []string, co
 	}
 
 	recipients := m.buildNotificationRecipients(userIDs, func(recipient umodels.User) (string, string, error) {
-		content, err := m.template.RenderEmailWithTemplate(
-			map[string]any{
-				"Conversation": map[string]any{
-					"ReferenceNumber": conv.ReferenceNumber,
-					"Subject":         conv.Subject.String,
-					"Priority":        conv.Priority.String,
-					"UUID":            conv.UUID,
-				},
-				"Recipient": map[string]any{
-					"FirstName": recipient.FirstName,
-					"LastName":  recipient.LastName,
-					"FullName":  recipient.FullName(),
-					"Email":     recipient.Email.String,
-				},
-				"Contact": map[string]any{
-					"FirstName": conv.Contact.FirstName,
-					"LastName":  conv.Contact.LastName,
-					"FullName":  conv.Contact.FullName(),
-					"Email":     conv.Contact.Email.String,
-				},
-				// Automated messages do not have an author.
-				"Author": map[string]any{
-					"FirstName": "",
-					"LastName":  "",
-					"FullName":  "",
-					"Email":     "",
-				},
-				"Message": message,
-			},
-			automationNotifyEmailContent)
+		data := notificationTemplateData(conv, recipient, umodels.User{})
+		data["Message"] = message
+		content, err := m.template.RenderEmailWithTemplate(data, automationNotifyEmailContent)
 		return subject, content, err
 	})
 
 	if _, err := m.dispatcher.Send(nmodels.Notification{
-		Type:             nmodels.NotificationTypeMention,
+		Type:             nmodels.NotificationTypeAutomation,
 		Recipients:       recipients,
 		Title:            subject,
 		Body:             null.StringFrom(message),
@@ -2485,10 +2309,6 @@ func renderTagFilter(operator, value string, paramIndex int) (string, []any, err
 	default:
 		return "", nil, fmt.Errorf("invalid operator for tags: %s", operator)
 	}
-}
-
-func replyNotifiedKey(conversationUUID string, userID int) string {
-	return replyNotifiedKeyPrefix + conversationUUID + ":" + strconv.Itoa(userID)
 }
 
 func notificationTemplateData(conversation models.Conversation, recipient, author umodels.User) map[string]any {

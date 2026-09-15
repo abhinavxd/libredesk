@@ -100,7 +100,7 @@ ON CONFLICT (user_id, notification_type, conversation_id) DO UPDATE SET
     subject = EXCLUDED.subject,
     content = EXCLUDED.content,
     message_created_at = EXCLUDED.message_created_at,
-    send_at = LEAST(notification_email_queue.send_at, EXCLUDED.send_at),
+    send_at = EXCLUDED.send_at,
     attempts = 0,
     queued_at = now(),
     updated_at = now();

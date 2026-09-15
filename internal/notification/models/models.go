@@ -20,6 +20,7 @@ const (
 	NotificationTypeNewReply               NotificationType = "new_reply"
 	NotificationTypeNewReplyParticipating  NotificationType = "new_reply_participating"
 	NotificationTypeConversationReopened   NotificationType = "conversation_reopened"
+	NotificationTypeAutomation             NotificationType = "automation"
 	NotificationTypeSLAFirstResponseWarn   NotificationType = "sla_first_response_warning"
 	NotificationTypeSLAFirstResponseBreach NotificationType = "sla_first_response_breach"
 	NotificationTypeSLANextResponseWarn    NotificationType = "sla_next_response_warning"
@@ -27,7 +28,6 @@ const (
 	NotificationTypeSLAResolutionWarn      NotificationType = "sla_resolution_warning"
 	NotificationTypeSLAResolutionBreach    NotificationType = "sla_resolution_breach"
 
-	// Superseded by the per-metric types above, retained so existing notification rows still render.
 	NotificationTypeSLAWarning NotificationType = "sla_warning"
 	NotificationTypeSLABreach  NotificationType = "sla_breach"
 

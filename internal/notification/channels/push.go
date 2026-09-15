@@ -28,14 +28,14 @@ func (p *push) Send(delivery Delivery) Result {
 		Title: n.Title,
 		Body:  n.Body.String,
 		Tag:   fmt.Sprintf("%s_%s", n.Type, n.ConversationUUID),
-		URL:   pushRoute(string(n.Type), n.ConversationUUID, n.MessageUUID),
+		URL:   pushRoute(n.Type, n.ConversationUUID, n.MessageUUID),
 	})
 	return Result{Sent: sent}
 }
 
-func pushRoute(notificationType, conversationUUID, messageUUID string) string {
+func pushRoute(notificationType models.NotificationType, conversationUUID, messageUUID string) string {
 	list := "assigned"
-	if notificationType == "mention" {
+	if notificationType == models.NotificationTypeMention {
 		list = "mentioned"
 	}
 	route := fmt.Sprintf("/inboxes/%s/conversation/%s", list, conversationUUID)

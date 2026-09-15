@@ -49,7 +49,7 @@ describe('createPushNotifications', () => {
     const api = { createPushSubscription: vi.fn().mockResolvedValue({}) }
     const state = createPushNotifications(api, browser)
 
-    await state.refresh('vapid-key')
+    await state.refresh('vapid-key', [subscription.endpoint])
 
     expect(browser.Notification.requestPermission).not.toHaveBeenCalled()
     expect(api.createPushSubscription).toHaveBeenCalledWith({
@@ -58,6 +58,17 @@ describe('createPushNotifications', () => {
       auth: 'auth-secret'
     })
     expect(state.enabled.value).toBe(true)
+  })
+
+  it('does not claim a browser subscription the server does not hold for this user', async () => {
+    const { browser } = makeBrowser({ permission: 'granted', subscription })
+    const api = { createPushSubscription: vi.fn().mockResolvedValue({}) }
+    const state = createPushNotifications(api, browser)
+
+    await state.refresh('vapid-key', ['https://push.example/someone-else'])
+
+    expect(api.createPushSubscription).not.toHaveBeenCalled()
+    expect(state.enabled.value).toBe(false)
   })
 
   it('subscribes only after permission is granted', async () => {
@@ -118,7 +129,7 @@ describe('createPushNotifications', () => {
       deletePushSubscription: vi.fn().mockResolvedValue({})
     }
     const state = createPushNotifications(api, browser)
-    await state.refresh('vapid-key')
+    await state.refresh('vapid-key', [subscription.endpoint])
 
     await state.disable()
 

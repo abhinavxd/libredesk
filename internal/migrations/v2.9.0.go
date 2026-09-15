@@ -16,6 +16,7 @@ var notificationTypesV2_9_0 = []string{
 	"sla_resolution_warning",
 	"sla_resolution_breach",
 	"conversation_reopened",
+	"automation",
 }
 
 func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {

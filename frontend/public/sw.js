@@ -6,6 +6,12 @@ const readPayload = (event) => {
   }
 }
 
+self.addEventListener('install', () => self.skipWaiting())
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 self.addEventListener('push', (event) => {
   const notification = readPayload(event)
   if (!notification?.title) return
@@ -28,7 +34,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
     const client = clients[0]
     if (!client) return self.clients.openWindow(target.href)
-    if ('navigate' in client) await client.navigate(target.href)
-    return client.focus()
+    await client.focus()
+    return client.navigate(target.href).catch(() => self.clients.openWindow(target.href))
   }))
 })

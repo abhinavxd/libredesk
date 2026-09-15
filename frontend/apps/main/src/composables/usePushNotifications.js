@@ -34,12 +34,12 @@ export const createPushNotifications = (apiClient = api, browser = defaultBrowse
     })
   }
 
-  const refresh = async (vapidPublicKey) => {
+  const refresh = async (vapidPublicKey, savedEndpoints = []) => {
     if (!supported.value || !vapidPublicKey) return
     const worker = await registerWorker()
     const subscription = await worker.pushManager.getSubscription()
-    enabled.value = Boolean(subscription)
-    if (subscription) await save(subscription)
+    enabled.value = Boolean(subscription) && savedEndpoints.includes(subscription.endpoint)
+    if (enabled.value) await save(subscription)
   }
 
   const enable = async (vapidPublicKey) => {

@@ -223,7 +223,7 @@ const initStores = async () => {
 
 const refreshPushSubscription = async () => {
   const { data } = await api.getNotificationPreferences()
-  await pushNotifications.refresh(data.data.vapid_public_key)
+  await pushNotifications.refresh(data.data.vapid_public_key, data.data.push_endpoints)
 }
 
 const createView = () => {

@@ -258,7 +258,7 @@ func main() {
 		automation                  = initAutomationEngine(db, i18n)
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
-		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher, rdb)
+		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
 		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings, user, notifier, rdb)
 		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
@@ -266,7 +266,6 @@ func main() {
 	)
 
 	wsHub.SetConversationStore(conversation)
-	notificationEmailQueue.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
 	systemUser, err := user.GetSystemUser()
 	if err != nil {
