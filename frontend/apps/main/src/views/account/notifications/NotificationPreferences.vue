@@ -43,7 +43,10 @@
           <div v-for="channel in channels" :key="channel.key" class="w-20 flex justify-center">
             <Switch
               :checked="row[channel.key]"
-              :disabled="channel.key === 'email' && !emailEnabled"
+              :disabled="
+                (channel.key === 'email' && !emailEnabled) ||
+                pendingUpdates.has(preferenceKey(row.type, channel.key))
+              "
               :aria-label="
                 $t('notification.channelToggleLabel', {
                   channel: $t(channel.labelKey),
@@ -74,6 +77,7 @@ const emitter = useEmitter()
 const rows = ref([])
 const emailEnabled = ref(true)
 const vapidPublicKey = ref('')
+const pendingUpdates = ref(new Set())
 const pushNotifications = usePushNotifications()
 
 const channels = [
@@ -97,6 +101,7 @@ const typeLabels = {
 }
 
 const typeLabel = (type) => (typeLabels[type] ? t(typeLabels[type]) : type)
+const preferenceKey = (type, channel) => `${type}:${channel}`
 
 const fetchPreferences = async () => {
   try {
@@ -146,8 +151,12 @@ const updateBrowserPush = async (value) => {
 }
 
 const update = async (row, channel, value) => {
+  const key = preferenceKey(row.type, channel)
+  if (pendingUpdates.value.has(key)) return
+
   const previous = row[channel]
   row[channel] = value
+  pendingUpdates.value.add(key)
   try {
     await api.updateNotificationPreferences([
       { notification_type: row.type, channel, enabled: value }
@@ -161,6 +170,8 @@ const update = async (row, channel, value) => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  } finally {
+    pendingUpdates.value.delete(key)
   }
 }
 

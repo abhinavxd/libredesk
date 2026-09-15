@@ -57,6 +57,36 @@ describe('notification preferences', () => {
     expect(savePreferences).toHaveBeenCalledWith([{ notification_type: 'new_reply', channel: 'email', enabled: false }])
   })
 
+  it('prevents overlapping saves for the same preference', async () => {
+    let finishSave
+    savePreferences.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve
+        })
+    )
+    await mount()
+    const switches = root.querySelectorAll('button')
+    const inApp = switches[1]
+    const email = switches[2]
+
+    email.click()
+    email.click()
+    await nextTick()
+
+    expect(savePreferences).toHaveBeenCalledTimes(1)
+    expect(email.disabled).toBe(true)
+    expect(inApp.disabled).toBe(false)
+
+    inApp.click()
+    await settle()
+    expect(savePreferences).toHaveBeenCalledTimes(2)
+
+    finishSave({})
+    await settle()
+    expect(email.disabled).toBe(false)
+  })
+
   it('leaves the push subscription to the app shell', async () => {
     await mount()
     expect(root.textContent).toContain('notification.type.newReply')
