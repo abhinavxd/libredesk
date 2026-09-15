@@ -22,6 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
@@ -82,11 +83,15 @@ type customAttributeWidget struct {
 }
 
 type chatInitReq struct {
-	Message  string         `json:"message"`
-	FormData map[string]any `json:"form_data"`
+	DeliveryID string         `json:"delivery_id"`
+	BrowserKey string         `json:"browser_key"`
+	Message    string         `json:"message"`
+	FormData   map[string]any `json:"form_data"`
 }
 
 type chatSettingsResponse struct {
+	Campaigns    *struct{} `json:"campaigns,omitempty"`
+	HasCampaigns bool      `json:"has_campaigns"`
 	livechat.Config
 	// Hide server-side fields from the public widget response.
 	TrustedDomains         *struct{}                     `json:"trusted_domains,omitempty"`
@@ -130,7 +135,8 @@ func handleGetChatSettings(r *fastglue.Request) error {
 	}
 
 	response := chatSettingsResponse{
-		Config: config,
+		Config:       config,
+		HasCampaigns: slices.ContainsFunc(config.Campaigns, func(c proactive.Campaign) bool { return c.Enabled }),
 	}
 
 	// Get business hours data if office hours feature is enabled.
@@ -210,6 +216,10 @@ func handleChatInit(r *fastglue.Request) error {
 	config, err := getWidgetConfig(r)
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+	}
+
+	if req.DeliveryID != "" {
+		return handleWidgetCampaignReply(r, req, inbox, config)
 	}
 
 	// Check if user is already authenticated (has session token).

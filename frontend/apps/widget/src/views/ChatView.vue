@@ -1,7 +1,12 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Chat header -->
-    <ChatHeader @goBack="goBack" />
+    <ChatHeader @goBack="goBack" @error="handleError" />
+
+    <section v-if="proactive.pending && !chatStore.currentConversation.uuid" class="mx-4 mt-3 border rounded-lg p-3 bg-muted text-sm">
+      <p class="font-medium">{{ proactive.pending.snapshot.sender }}</p>
+      <p class="whitespace-pre-wrap">{{ proactive.pending.snapshot.message }}</p>
+    </section>
 
     <!-- Pre-chat form -->
     <PreChatForm
@@ -30,9 +35,9 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useWidgetStore } from '../store/widget.js'
-import { useUserStore } from '../store/user.js'
-import { useChatStore } from '../store/chat.js'
+import { useWidgetStore } from '@widget/store/widget.js'
+import { useUserStore } from '@widget/store/user.js'
+import { useChatStore } from '@widget/store/chat.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api, { saveSession } from '@widget/api/index.js'
 import WidgetError from '@widget/components/WidgetError.vue'
@@ -41,6 +46,8 @@ import ChatMessages from '@widget/components/ChatMessages.vue'
 import MessageInput from '@widget/components/MessageInput.vue'
 import PreChatForm from '@widget/components/PreChatForm.vue'
 
+import { useProactiveStore } from '@widget/store/proactive.js'
+const proactive = useProactiveStore()
 const widgetStore = useWidgetStore()
 const userStore = useUserStore()
 const chatStore = useChatStore()
@@ -79,6 +86,7 @@ const isConversationClosed = computed(() => {
 })
 
 const goBack = () => {
+  if (!chatStore.currentConversation?.uuid) proactive.abandon()
   widgetStore.navigateToMessages()
 }
 
@@ -104,7 +112,8 @@ const handlePreChatFormSubmit = async ({ formData, message }) => {
 
   try {
     const payload = {
-      message: message
+      message: message,
+      ...proactive.replyPayload()
     }
 
     if (Object.keys(formData).length > 0) {
@@ -125,6 +134,8 @@ const handlePreChatFormSubmit = async ({ formData, message }) => {
     chatStore.replaceMessages(messages)
 
     preChatFormSubmitted.value = true
+    chatStore.preChatDraft = {}
+    proactive.replied()
   } catch (error) {
     errorMessage.value = handleHTTPError(error).message
   } finally {

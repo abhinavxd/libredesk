@@ -24,6 +24,7 @@
         <div
           v-for="message in chatStore.getCurrentConversationMessages"
           :key="message.uuid"
+          :data-message-uuid="message.uuid"
           :class="[
             'flex flex-col',
             message.author.type === 'contact' || message.author.type === 'visitor'
@@ -154,8 +155,8 @@
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
 import { useDocumentVisibility, useDebounceFn } from '@vueuse/core'
-import { useWidgetStore } from '../store/widget.js'
-import { useChatStore } from '../store/chat.js'
+import { useWidgetStore } from '@widget/store/widget.js'
+import { useChatStore } from '@widget/store/chat.js'
 import { useRelativeTime } from '@widget/composables/useRelativeTime.js'
 import { useI18n } from 'vue-i18n'
 import { Letter } from 'vue-letter'
@@ -188,7 +189,7 @@ const currentConversationUUID = ref('')
 const quotedTextState = ref({})
 const { t } = useI18n()
 
-const { hasUserScrolled, scrollToBottom, handleScroll } = useStickyScroll(messagesContainer, contentEl, {
+const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(messagesContainer, contentEl, {
   onArriveBottom: () => { unreadMessages.value = 0 }
 })
 
@@ -262,7 +263,15 @@ watch(
     currentConversationUUID.value = newUUID
     unreadMessages.value = 0
     hasUserScrolled.value = false
-    nextTick(scrollToBottom)
+    nextTick(() => {
+      const id = chatStore.previewUnreadUUID
+      const target = id && contentEl.value?.querySelector(`[data-message-uuid="${id}"]`)
+      if (target) {
+        hasUserScrolled.value = true
+        scrollToOffset(target.getBoundingClientRect().top - messagesContainer.value.getBoundingClientRect().top + messagesContainer.value.scrollTop)
+        chatStore.previewUnreadUUID = null
+      } else scrollToBottom()
+    })
     if (widgetStore.isOpen && !chatStore.isLoadingConversation) {
       chatStore.updateCurrentConversationLastSeen()
     }

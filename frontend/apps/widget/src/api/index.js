@@ -135,6 +135,11 @@ const getAuthMe = () => http.get('/api/v1/widget/chat/auth/me')
 const initChatConversation = (data) => http.post('/api/v1/widget/chat/conversations/init', data)
 const getChatConversations = () => http.get('/api/v1/widget/chat/conversations')
 const getChatConversation = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}`)
+const downloadTranscript = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}/transcript`, { responseType: 'blob' })
+const getHelp = (locale) => http.get('/api/v1/widget/chat/help', { params: { locale } })
+const searchHelp = (q, locale) => http.get('/api/v1/widget/chat/help/search', { params: { q, locale } })
+const getHelpArticle = (slug, locale) => http.get(`/api/v1/widget/chat/help/articles/${encodeURIComponent(slug)}`, { params: { locale } })
+const sendHelpFeedback = (helpSlug, slug, locale, helpful) => http.post(`/api/v1/public/help-centers/${encodeURIComponent(helpSlug)}/articles/${encodeURIComponent(slug)}/feedback`, { helpful }, { params: { locale } })
 const sendChatMessage = (uuid, data) => http.post(`/api/v1/widget/chat/conversations/${uuid}/message`, data)
 const closeChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/close`)
 const uploadMedia = (conversationUUID, files) => {
@@ -155,7 +160,11 @@ const submitCSATResponse = (csatUuid, rating, feedback) =>
         feedback,
     })
 
+const nextCampaign = data => http.post('/api/v1/widget/chat/campaigns/next', data)
+const campaignEvent = data => http.post('/api/v1/widget/chat/campaigns/event', data)
+
 export default {
+    nextCampaign, campaignEvent,
     getWidgetSettings,
     getLanguage,
     getAvailableLanguages,
@@ -164,6 +173,11 @@ export default {
     initChatConversation,
     getChatConversations,
     getChatConversation,
+    downloadTranscript,
+    getHelp,
+    searchHelp,
+    getHelpArticle,
+    sendHelpFeedback,
     sendChatMessage,
     closeChatConversation,
     uploadMedia,

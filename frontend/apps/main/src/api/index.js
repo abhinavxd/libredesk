@@ -614,7 +614,10 @@ const markAllNotificationsAsRead = () => http.put('/api/v1/notifications/read-al
 const deleteNotification = (id) => http.delete(`/api/v1/notifications/${id}`)
 const deleteAllNotifications = () => http.delete('/api/v1/notifications')
 
+const getCampaignStats = (id, params) => http.get(`/api/v1/inboxes/${id}/campaign-stats`, { params })
+
 export default {
+ getCampaignStats,
   login,
   deleteUser,
   importAgents,

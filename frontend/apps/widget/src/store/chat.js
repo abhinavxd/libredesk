@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
-import api from '../api/index.js'
+import api from '@widget/api/index.js'
 import { deepMerge } from '@shared-ui/utils/object.js'
 import { TYPING_RECEIVE_TIMEOUT } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageCache from '@main/utils/conversation-message-cache.js'
@@ -8,6 +8,9 @@ import { useUserStore } from './user.js'
 
 export const useChatStore = defineStore('chat', () => {
     const userStore = useUserStore()
+    const previewUnreadUUID = ref(null)
+    const drafts = ref({})
+    const preChatDraft = ref({})
     // State
     let typingTimeout = null
     const isTyping = ref(false)
@@ -45,6 +48,7 @@ export const useChatStore = defineStore('chat', () => {
 
         // Update last_message in the conversation
         conv.last_message = {
+            attachments: message.attachments || [],
             content: message.text_content !== '' ? message.text_content : message.content,
             created_at: message.created_at,
             status: message.status,
@@ -121,7 +125,9 @@ export const useChatStore = defineStore('chat', () => {
 
         try {
             if (!silent) isLoadingConversation.value = true
+            const token = userStore.userSessionToken
             const resp = await api.getChatConversation(conversationUUID)
+            if (token !== userStore.userSessionToken) return false
             const conversation = resp.data.data.conversation
             conversation.business_hours_id = resp.data.data.business_hours_id
             conversation.working_hours_utc_offset = resp.data.data.working_hours_utc_offset
@@ -206,7 +212,9 @@ export const useChatStore = defineStore('chat', () => {
 
         try {
             if (!silent) isLoadingConversations.value = true
+            const token = userStore.userSessionToken
             const response = await api.getChatConversations()
+            if (token !== userStore.userSessionToken) return false
             conversations.value = response.data.data || []
             return true
         } catch {
@@ -260,6 +268,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     return {
+        drafts, preChatDraft, previewUnreadUUID,
         // State
         messageCache,
         isTyping,

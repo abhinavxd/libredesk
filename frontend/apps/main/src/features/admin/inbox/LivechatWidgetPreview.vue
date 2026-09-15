@@ -231,10 +231,36 @@
                   ></div>
                 </div>
 
-                <div v-if="homeApps.length" class="flex flex-col gap-3 p-4 bg-background">
-                  <template v-for="(item, index) in homeApps" :key="index">
+                <div v-if="homeItems.length" class="flex flex-col gap-3 p-4 bg-background">
+                  <template v-for="(item, index) in homeItems" :key="index">
+                    <!-- Mirrors the widget's HomeHelp card. -->
+                    <section
+                      v-if="item.type === 'help'"
+                      class="border rounded-lg p-3 space-y-2 bg-card"
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        class="w-full justify-start"
+                        @click="view = 'help'"
+                      >
+                        <Search class="size-4" />
+                        {{ $t('widget.searchArticles') }}
+                      </Button>
+                      <Button
+                        v-for="article in featuredArticles"
+                        :key="article.id"
+                        type="button"
+                        variant="ghost"
+                        class="w-full h-auto justify-start text-left whitespace-normal"
+                        @click="view = 'help'"
+                      >
+                        <FileText class="size-4 shrink-0" />
+                        {{ article.title }}
+                      </Button>
+                    </section>
                     <Card
-                      v-if="item.type === 'announcement'"
+                      v-else-if="item.type === 'announcement'"
                       class="overflow-hidden rounded-md hover:bg-accent transition-colors"
                     >
                       <img
@@ -266,6 +292,41 @@
                 </div>
               </div>
 
+              <!-- Help -->
+              <div v-else-if="view === 'help'" class="h-full flex flex-col">
+                <header class="flex items-center gap-2 border-b border-border p-3 shrink-0">
+                  <button
+                    v-if="helpCollection"
+                    type="button"
+                    class="flex items-center justify-center size-8 rounded-md hover:bg-accent text-foreground"
+                    @click="helpPath.pop()"
+                  >
+                    <ArrowLeft :size="16" />
+                  </button>
+                  <h3 class="font-medium truncate">{{ $t('globals.terms.help') }}</h3>
+                </header>
+                <div class="flex gap-2 p-3 border-b border-border shrink-0">
+                  <Input :placeholder="$t('widget.searchArticles')" readonly />
+                  <Button type="button" variant="outline">
+                    <Search class="size-4" />
+                  </Button>
+                </div>
+                <div class="flex-1 min-h-0 overflow-y-auto">
+                  <p
+                    v-if="!helpCollections.length && !helpArticles.length"
+                    class="p-4 text-sm text-muted-foreground"
+                  >
+                    {{ $t('widget.noArticles') }}
+                  </p>
+                  <HelpCollectionList
+                    v-else
+                    :collection="helpCollection"
+                    :collections="helpCollections"
+                    :articles="helpArticles"
+                    @collection="helpPath.push($event)"
+                  />
+                </div>
+              </div>
               <!-- Messages -->
               <div v-else class="h-full flex flex-col relative">
                 <div class="flex items-center justify-center p-4 border-b border-border shrink-0">
@@ -308,11 +369,11 @@
             </div>
 
             <!-- Bottom nav -->
-            <div class="grid grid-cols-2 border-t border-border bg-background shrink-0">
+            <div class="flex border-t border-border bg-background shrink-0">
               <button
                 type="button"
-                class="flex flex-col items-center gap-1 py-2"
-                :class="view === 'home' ? 'text-foreground' : 'text-muted-foreground'"
+                class="flex flex-col items-center justify-center gap-1 w-full py-4"
+                :class="view === 'home' ? 'text-primary' : 'text-muted-foreground'"
                 @click="view = 'home'"
               >
                 <House class="w-5 h-5" />
@@ -320,18 +381,52 @@
               </button>
               <button
                 type="button"
-                class="flex flex-col items-center gap-1 py-2"
-                :class="view === 'messages' ? 'text-foreground' : 'text-muted-foreground'"
+                class="flex flex-col items-center justify-center gap-1 w-full py-4"
+                :class="view === 'messages' ? 'text-primary' : 'text-muted-foreground'"
                 @click="view = 'messages'"
               >
                 <MessagesSquare class="w-5 h-5" />
                 <span class="text-xs font-medium">{{ $t('globals.terms.message', 2) }}</span>
+              </button>
+              <button
+                v-if="showHelpTab"
+                type="button"
+                class="flex flex-col items-center justify-center gap-1 w-full py-4"
+                :class="view === 'help' ? 'text-primary' : 'text-muted-foreground'"
+                @click="view = 'help'"
+              >
+                <CircleQuestionMark class="w-5 h-5" />
+                <span class="text-xs font-medium">{{ $t('globals.terms.help') }}</span>
               </button>
             </div>
           </template>
         </div>
       </div>
     </transition>
+
+    <!-- Proactive message, mirrors the card widget.js renders above the launcher. -->
+    <div v-if="campaign && !open" class="absolute" :style="campaignStyle">
+      <div
+        class="flex items-start border border-border rounded-xl bg-background text-foreground overflow-hidden shadow-lg"
+        :class="isDark ? 'dark' : 'light'"
+      >
+        <div class="flex items-start gap-2.5 flex-1 min-w-0 p-3 text-left">
+          <img
+            v-if="campaign.avatar"
+            :src="campaign.avatar"
+            alt=""
+            class="size-7 rounded-full object-cover shrink-0"
+          />
+          <span class="min-w-0">
+            <span class="block font-semibold text-sm">{{ campaign.sender }}</span>
+            <span class="block text-sm line-clamp-3">{{ campaignText }}</span>
+          </span>
+        </div>
+        <div class="flex items-center justify-center size-11 text-muted-foreground shrink-0">
+          <X :size="16" />
+        </div>
+      </div>
+    </div>
 
     <!-- Launcher -->
     <button
@@ -347,7 +442,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardContent } from '@shared-ui/components/ui/card'
@@ -356,6 +451,7 @@ import { Textarea } from '@shared-ui/components/ui/textarea'
 import {
   House,
   MessagesSquare,
+  CircleQuestionMark,
   ArrowRight,
   ArrowLeft,
   ArrowUp,
@@ -365,14 +461,19 @@ import {
   AlertTriangle,
   Paperclip,
   Smile,
-  Maximize2
+  Maximize2,
+  Search,
+  FileText,
+  X
 } from 'lucide-vue-next'
+import HelpCollectionList from '@shared-ui/components/HelpCollectionList.vue'
 import { hexToHSL, getContrastingHSL } from '@shared-ui/utils/color'
 import { renderTemplate } from '@shared-ui/utils/string'
 
 const DEFAULT_LAUNCHER_LOGO = '/static/public/launcher-logo.png'
 const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
 const LAUNCHER_SIZE = 52
+const SNIPPET_LENGTH = 240
 
 const props = defineProps({
   userType: {
@@ -498,7 +599,40 @@ const sampleLastMessage = computed(
   () => sampleMessages.value[sampleMessages.value.length - 1].content
 )
 
-const homeApps = computed(() => props.config.home_apps || [])
+const helpConfig = computed(() => props.config.help || {})
+const helpAudience = computed(() => helpConfig.value[props.userType] || {})
+const helpEnabled = computed(() => Boolean(helpConfig.value.help_center_id))
+const showHelpTab = computed(() => helpEnabled.value && Boolean(helpAudience.value.tab))
+
+const featuredArticles = computed(() =>
+  (helpConfig.value.featured_ids || [])
+    .map((id) => (props.config.help_articles || []).find((article) => article.id === id))
+    .filter(Boolean)
+)
+
+const helpPath = ref([])
+const helpCollection = computed(() => helpPath.value.at(-1))
+const helpCollections = computed(
+  () => helpCollection.value?.children || props.config.help_tree || []
+)
+const helpArticles = computed(() => helpCollection.value?.articles || [])
+watch(
+  () => helpConfig.value.help_center_id,
+  () => {
+    helpPath.value = []
+  }
+)
+
+const homeItems = computed(() =>
+  (props.config.home_apps || []).filter((item) => item.type !== 'help' || helpEnabled.value)
+)
+
+const campaign = computed(() => props.config.preview_campaign || null)
+// Only one of the two can show, so collapse the window to reveal the invitation.
+watch(campaign, (value) => {
+  if (value) open.value = false
+})
+const campaignText = computed(() => campaign.value?.message.slice(0, SNIPPET_LENGTH) || '')
 
 const prechatFields = computed(() =>
   (props.config.prechat_form?.fields || [])
@@ -524,6 +658,11 @@ const launcherColor = computed(() => {
   return HEX_COLOR.test(primary) ? primary : '#000000'
 })
 const launcherIconColor = computed(() => `hsl(${getContrastingHSL(launcherColor.value)})`)
+const campaignStyle = computed(() => ({
+  bottom: windowBottom.value + 'px',
+  [onLeft.value ? 'left' : 'right']: clampedSide.value + 'px',
+  width: `min(280px, calc(100% - ${clampedSide.value * 2}px))`
+}))
 const launcherStyle = computed(() => ({
   width: LAUNCHER_SIZE + 'px',
   height: LAUNCHER_SIZE + 'px',

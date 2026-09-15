@@ -10,6 +10,7 @@
             v-model="newMessage"
             @keydown="handleKeydown"
             @input="handleTyping"
+            :aria-label="$t('globals.terms.typeMessage')"
             :placeholder="$t('globals.terms.typeMessage')"
             :disabled="isSending"
             maxlength="10000"
@@ -52,21 +53,24 @@ import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { ArrowUp } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Textarea } from '@shared-ui/components/ui/textarea'
-import { useWidgetStore } from '../store/widget.js'
-import { useChatStore } from '../store/chat.js'
+import { useWidgetStore } from '@widget/store/widget.js'
+import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from '@widget/store/user.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { sendWidgetTyping } from '../websocket.js'
+import { sendWidgetTyping } from '@widget/websocket.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageInputActions from './MessageInputActions.vue'
 import api, { saveSession } from '@widget/api/index.js'
 
+import { useProactiveStore } from '@widget/store/proactive.js'
+const proactive = useProactiveStore()
 const emit = defineEmits(['error'])
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const messageInput = ref(null)
-const newMessage = ref('')
+const draftKey = computed(() => chatStore.currentConversation?.uuid || proactive.pending?.id || 'new')
+const newMessage = computed({ get: () => chatStore.drafts[draftKey.value] || '', set: value => { chatStore.drafts[draftKey.value] = value } })
 const isUploading = ref(false)
 const isSending = ref(false)
 const config = computed(() => widgetStore.config)
@@ -90,7 +94,7 @@ const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
 })
 
 const initChatConversation = async (messageText) => {
-  const resp = await api.initChatConversation({ message: messageText })
+  const resp = await api.initChatConversation({ message: messageText, ...proactive.replyPayload() })
   const { conversation, session_token, user, messages, business_hours_id, working_hours_utc_offset } = resp.data.data
   conversation.business_hours_id = business_hours_id
   conversation.working_hours_utc_offset = working_hours_utc_offset
@@ -105,6 +109,7 @@ const initChatConversation = async (messageText) => {
   // Update chat store with new conversation and messages.
   chatStore.setCurrentConversation(conversation)
   chatStore.replaceMessages(messages)
+  proactive.replied()
 }
 
 const sendMessageToConversation = async (messageText, tempMessageID) => {
@@ -164,6 +169,7 @@ const sendMessage = async () => {
       chatStore.removeMessage(chatStore.currentConversation.uuid, tempMessageID)
     }
 
+    newMessage.value = messageText
     emit('error', handleHTTPError(error).message)
   } finally {
     isSending.value = false

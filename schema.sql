@@ -1203,3 +1203,22 @@ INSERT INTO business_hours ("name", description, is_always_open, hours, holidays
 -- Default SLA policy
 INSERT INTO sla_policies ("name", description, first_response_time, resolution_time, next_response_time, notifications) VALUES
 ('Default', 'Default SLA policy, first response within 1 hour and resolution within 24 hours.', '1h', '24h', NULL, '[]'::jsonb);
+
+CREATE TABLE IF NOT EXISTS widget_campaign_deliveries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id UUID NOT NULL,
+    inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+    browser_key UUID NOT NULL,
+    session_key UUID NOT NULL,
+    contact_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    snapshot JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    displayed BOOLEAN NOT NULL DEFAULT FALSE,
+    opened BOOLEAN NOT NULL DEFAULT FALSE,
+    dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+    replied BOOLEAN NOT NULL DEFAULT FALSE,
+    conversation_uuid UUID REFERENCES conversations(uuid) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_widget_campaign_browser ON widget_campaign_deliveries(inbox_id, browser_key, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_widget_campaign_contact ON widget_campaign_deliveries(inbox_id, contact_id, created_at DESC) WHERE contact_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_widget_campaign_stats ON widget_campaign_deliveries(inbox_id, campaign_id, created_at);

@@ -28,6 +28,8 @@
             this.MOBILE_BREAKPOINT = 600;
             this.LAUNCHER_SIZE = 60;
             this.MOBILE_LAUNCHER_SIZE = 50;
+            this.CAMPAIGN_POLL_MIN = 5;
+            this.CAMPAIGN_POLL_MAX = 60;
 
             this.config = config;
             this.iframe = null;
@@ -37,6 +39,17 @@
             this.isChatVisible = false;
             this.widgetSettings = null;
             this.unreadCount = 0;
+            this.previewData = null;
+            this.previewHost = null;
+            this.previewTimers = new Map();
+            this.campaignData = null;
+            this.campaignActiveSeconds = 0;
+            this.campaignURL = location.href;
+            this.campaignEvent = "";
+            this.campaignBrowserKey = this.getCookie(this.getCookieName('campaign')) || this.randomKey();
+            this.setCookie(this.getCookieName('campaign'), this.campaignBrowserKey);
+            this.campaignSessionKey = this.getCookie(this.getCookieName('campaign-session')) || this.randomKey();
+            this.setCampaignSessionCookie();
             this.isMobile = window.innerWidth <= this.MOBILE_BREAKPOINT;
             this.isExpanded = false;
             this.hideLauncher = config.hideLauncher || false;
@@ -49,9 +62,24 @@
             this.init();
         }
 
+        // crypto.randomUUID is unavailable on plain-http host pages; getRandomValues is not.
+        randomKey () {
+            if (crypto.randomUUID) return crypto.randomUUID();
+            const bytes = crypto.getRandomValues(new Uint8Array(16));
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        }
+
+        dropCampaign (id) {
+            this.campaignData = null;
+            this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'dropped', id });
+        }
+
         postToIframe (data) {
             if (this.iframe && this.iframe.contentWindow) {
-                this.iframe.contentWindow.postMessage(data, '*');
+                this.iframe.contentWindow.postMessage(data, new URL(this.config.baseURL).origin);
             }
         }
 
@@ -96,6 +124,11 @@
                 cookie += ';Secure';
             }
             document.cookie = cookie;
+        }
+
+        setCampaignSessionCookie () {
+            const domain = this.getCookieDomain();
+            document.cookie = this.getCookieName('campaign-session') + '=' + this.campaignSessionKey + ';path=/;SameSite=Lax' + (domain ? ';domain=' + domain : '') + (location.protocol === 'https:' ? ';Secure' : '');
         }
 
         getCookie (name) {
@@ -280,7 +313,8 @@
                 : 'width 0.3s ease, height 0.3s ease, bottom 0.3s ease, border-radius 0.3s ease, box-shadow 0.3s ease';
 
             this.iframe = document.createElement('iframe');
-            this.iframe.src = `${this.config.baseURL}/widget?inbox_id=${this.config.inboxID}`;
+            this.iframe.src = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}`;
+            this.iframe.title = 'libredesk';
             this.iframe.style.cssText = `
                 position: fixed;
                 border: none;
@@ -379,9 +413,28 @@
         }
 
         handleMessage (event) {
-            if (event.source !== this.iframe.contentWindow) return;
+            if (event.source !== this.iframe?.contentWindow || event.origin !== new URL(this.config.baseURL).origin || !event.data) return;
 
             switch (event.data.type) {
+                case 'SHOW_CAMPAIGN':
+                    if (this.isChatVisible || this.unreadCount > 0 || this.hideLauncher) {
+                        this.dropCampaign(event.data.delivery.id);
+                        break;
+                    }
+                    this.campaignData = event.data.delivery;
+                    this.renderPreviews();
+                    if (this.previewHost) this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'displayed', id: this.campaignData.id });
+                    else this.dropCampaign(event.data.delivery.id);
+                    break;
+                case 'CLEAR_CAMPAIGN':
+                    this.campaignData = null;
+                    this.renderPreviews();
+                    break;
+                case 'REPLY_PREVIEWS':
+                    if (event.data.previews?.length && this.campaignData) this.dropCampaign(this.campaignData.id);
+                    this.previewData = event.data;
+                    this.renderPreviews();
+                    break;
                 case 'VUE_APP_READY':
                     this.handleVueAppReady();
                     break;
@@ -393,6 +446,7 @@
                     break;
                 case 'WIDGET_LOADED':
                     this.handleWidgetLoaded();
+                    if (event.data.campaigns) this.startCampaignTracking();
                     break;
                 case 'EXPAND_WIDGET':
                     this.expandWidget();
@@ -426,6 +480,7 @@
         handleResize () {
             const wasMobile = this.isMobile;
             this.sendMobileState();
+            this.renderPreviews();
             if (this.isChatVisible && wasMobile !== this.isMobile) {
                 this.applyIframeLayout();
                 this.updateLauncherVisibility();
@@ -446,7 +501,9 @@
                 this.postToIframe({
                     type: 'SET_JWT_TOKEN',
                     jwt: this.config.userJWT,
-                    visitorToken: visitorToken || ''
+                    visitorToken: visitorToken || '',
+                    campaignBrowserKey: this.campaignBrowserKey,
+                    campaignSessionKey: this.campaignSessionKey
                 });
                 return;
             }
@@ -455,7 +512,9 @@
             this.postToIframe({
                 type: 'SESSION_DATA',
                 sessionToken: sessionToken || '',
-                visitorToken: visitorToken || ''
+                visitorToken: visitorToken || '',
+                    campaignBrowserKey: this.campaignBrowserKey,
+                    campaignSessionKey: this.campaignSessionKey
             });
         }
 
@@ -477,6 +536,7 @@
 
             this.isMobile = window.innerWidth <= this.MOBILE_BREAKPOINT;
             this.isChatVisible = true;
+            this.renderPreviews();
 
             this.iframe.style.display = 'block';
             this.applyIframeLayout();
@@ -498,6 +558,7 @@
 
             this.iframe.style.display = 'none';
             this.isChatVisible = false;
+            this.renderPreviews();
             this.toggleButton.style.transform = 'scale(1)';
             this.updateLauncherVisibility();
 
@@ -580,17 +641,188 @@
             if (this._pageTrackInterval) clearInterval(this._pageTrackInterval);
         }
 
+        clearPreviews () {
+            this.previewData = null;
+            this.campaignData = null;
+            this.dismissedPreviews = [];
+            this.previewHost?.remove();
+            this.previewHost = null;
+            this.previewSignature = '';
+            for (const timer of this.previewTimers.values()) clearTimeout(timer);
+            this.previewTimers.clear();
+        }
+
+        dismissPreview (key) {
+            if (this.campaignData?.id === key) {
+                this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'dismissed', id: key });
+                this.campaignData = null;
+                this.renderPreviews();
+                return;
+            }
+            const storageKey = `libredesk-previews-${this.config.inboxID}-${this.previewData?.identity || 'visitor'}`;
+            let dismissed = this.dismissedPreviews || [];
+            try { dismissed = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch {}
+            dismissed = [...new Set([...dismissed, key])].slice(-200);
+            this.dismissedPreviews = dismissed;
+            try { localStorage.setItem(storageKey, JSON.stringify(dismissed)); } catch {}
+            this.renderPreviews();
+        }
+
+        renderPreviews () {
+            let data = this.previewData;
+            const invitation = this.campaignData;
+            if (invitation && this.unreadCount === 0 && data) {
+                const snapshot = invitation.snapshot;
+                data = { ...data, identity: 'campaign', config: { desktop: true, mobile: true, auto_hide_seconds: 0 }, previews: [{
+                    key: invitation.id, campaign: true, name: snapshot.sender, avatar: snapshot.avatar,
+                    text: snapshot.message.slice(0, 240),
+                }] };
+            }
+            const enabled = data?.config?.[this.isMobile ? 'mobile' : 'desktop'];
+            if (!data || !enabled || this.isChatVisible || this.hideLauncher) {
+                this.previewHost?.remove();
+                this.previewHost = null;
+                this.previewSignature = '';
+                return;
+            }
+            const storageKey = `libredesk-previews-${this.config.inboxID}-${data.identity || 'visitor'}`;
+            let dismissed = this.dismissedPreviews || [];
+            try { dismissed = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch {}
+            const previews = data.previews.filter(item => !dismissed.includes(item.key)).slice(0, 3);
+            const signature = JSON.stringify([previews, data.theme, data.labels, this.isMobile]);
+            if (signature === this.previewSignature) return;
+            this.previewSignature = signature;
+            this.previewHost?.remove();
+            this.previewHost = null;
+            if (!previews.length) return;
+            const host = document.createElement('div');
+            const side = this.widgetSettings.launcher.position === 'left' ? 'left' : 'right';
+            const spacing = this.widgetSettings.launcher.spacing;
+            Object.assign(host.style, { position: 'fixed', zIndex: '9998', bottom: `${spacing.bottom + (this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE) + 12}px`, [side]: `${spacing.side}px`, width: `min(320px, calc(100vw - ${spacing.side * 2}px))` });
+            const root = host.attachShadow({ mode: 'open' });
+            const style = document.createElement('style');
+            style.textContent = ':host{font:14px/1.5 system-ui}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid;outline-offset:2px}.stack{display:flex;flex-direction:column;gap:8px}.card{display:flex;align-items:flex-start;border:1px solid;border-radius:12px;overflow:hidden}.open{display:flex;gap:10px;align-items:flex-start;flex:1;min-width:0;padding:12px;text-align:left;border:0;background:transparent}.name{font-weight:600;display:block}.text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.avatar{width:28px;height:28px;border-radius:50%;object-fit:cover}.image{max-width:64px;max-height:48px;object-fit:cover}.close{padding:8px;min-height:44px;min-width:44px;border:0;background:transparent}.all{align-self:flex-end;border:1px solid;border-radius:6px;padding:4px 8px}';
+            root.append(style);
+            const stack = document.createElement('div');
+            stack.className = 'stack';
+            const notice = document.createElement('span');
+            notice.setAttribute('role', 'status');
+            notice.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';
+            notice.textContent = previews[0].text;
+            stack.append(notice);
+            const safeImage = (src, className) => {
+                if (!src) return null;
+                let url;
+                try { url = new URL(src, this.config.baseURL); } catch { return null; }
+                if (!['https:', 'http:'].includes(url.protocol)) return null;
+                const img = document.createElement('img');
+                img.src = url.href;
+                img.alt = '';
+                img.className = className;
+                return img;
+            };
+            for (const item of previews) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                Object.assign(card.style, { background: data.theme.background, color: data.theme.foreground, borderColor: data.theme.border });
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'open';
+                open.setAttribute('aria-label', `${data.labels.open}: ${item.name}. ${item.text}`);
+                open.addEventListener('click', () => {
+                    if (item.campaign) {
+                        this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'opened', id: item.key });
+                        this.campaignData = null;
+                    } else this.postToIframe({ type: 'OPEN_CONVERSATION', uuid: item.conversation });
+                    this.showChat();
+                });
+                const avatar = safeImage(item.avatar, 'avatar');
+                if (avatar) open.append(avatar);
+                const body = document.createElement('span');
+                const name = document.createElement('span');
+                name.className = 'name';
+                name.textContent = item.name;
+                const content = document.createElement('span');
+                content.className = 'text';
+                content.textContent = item.text;
+                body.append(name, content);
+                const image = safeImage(item.image, 'image');
+                if (image) body.append(image);
+                open.append(body);
+                const close = document.createElement('button');
+                close.type = 'button';
+                close.className = 'close';
+                close.textContent = '×';
+                close.setAttribute('aria-label', data.labels.dismiss);
+                close.addEventListener('click', () => { this.dismissPreview(item.key); this.toggleButton.focus(); });
+                card.append(open, close);
+                stack.append(card);
+                if (data.config.auto_hide_seconds > 0 && !this.previewTimers.has(item.key)) {
+                    this.previewTimers.set(item.key, setTimeout(() => this.dismissPreview(item.key), data.config.auto_hide_seconds * 1000));
+                }
+            }
+            if (previews.length > 1) {
+                const all = document.createElement('button');
+                all.type = 'button';
+                all.className = 'all';
+                all.textContent = data.labels.dismissAll;
+                Object.assign(all.style, { background: data.theme.background, color: data.theme.foreground, borderColor: data.theme.border });
+                all.addEventListener('click', () => { for (const item of previews) this.dismissPreview(item.key); this.toggleButton.focus(); });
+                stack.append(all);
+            }
+            root.append(stack);
+            document.body.append(host);
+            this.previewHost = host;
+        }
+
+        startCampaignTracking () {
+            if (this.campaignInterval) return;
+            let last = performance.now();
+            let elapsed = 0;
+            // Back off while nothing matches so a long visit doesn't poll the server every few seconds.
+            let gap = this.CAMPAIGN_POLL_MIN;
+            this.campaignInterval = setInterval(() => {
+                const now = performance.now();
+                const delta = Math.min((now - last) / 1000, 2);
+                last = now;
+                if (location.href !== this.campaignURL) {
+                    this.campaignURL = location.href;
+                    this.campaignActiveSeconds = 0;
+                    this.campaignEvent = '';
+                    elapsed = 0;
+                    gap = this.CAMPAIGN_POLL_MIN;
+                }
+                if (document.hidden || this.isChatVisible || this.hideLauncher) return;
+                this.campaignActiveSeconds += delta;
+                elapsed += delta;
+                if (elapsed < gap || this.unreadCount > 0 || this.campaignData) return;
+                elapsed = 0;
+                gap = Math.min(gap * 2, this.CAMPAIGN_POLL_MAX);
+                this.postToIframe({ type: 'CAMPAIGN_CONTEXT', context: { url: location.href, mobile: this.isMobile, active_seconds: Math.floor(this.campaignActiveSeconds), event: this.campaignEvent } });
+            }, 1000);
+        }
+
+        trackEvent (name) {
+            if (typeof name === 'string' && name.length <= 128) this.campaignEvent = name;
+        }
+
         setUser (jwt) {
+            this.clearPreviews();
             this.postToIframe({ type: 'SET_JWT_TOKEN', jwt: jwt });
         }
 
         logout () {
+            this.clearPreviews();
             this.deleteCookie(this.getCookieName('session'));
             this.deleteCookie(this.getCookieName('visitor'));
-            this.postToIframe({ type: 'CLEAR_SESSION' });
+            this.campaignBrowserKey = this.randomKey();
+            this.setCookie(this.getCookieName('campaign'), this.campaignBrowserKey);
+            this.postToIframe({ type: 'CLEAR_SESSION', campaignBrowserKey: this.campaignBrowserKey });
         }
 
         destroy () {
+            this.clearPreviews();
+            clearInterval(this.campaignInterval);
             this.stopPageTracking();
             window.removeEventListener('message', this._boundHandleMessage);
             window.removeEventListener('resize', this._boundHandleResize);

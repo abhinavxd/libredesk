@@ -28,6 +28,7 @@ import (
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/sla"
@@ -94,6 +95,7 @@ const (
 
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
+	proactive        *proactive.Manager
 	ctx              context.Context
 	fs               stuffbin.FileSystem
 	consts           atomic.Value
@@ -325,6 +327,7 @@ func main() {
 		importer:         initImporter(i18n),
 		webhook:          webhook,
 		contextLink:      initContextLink(db, i18n),
+		proactive:        initProactive(db, i18n),
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		fc:               initFastCache(rdb),

@@ -232,7 +232,8 @@ import {
 } from '@shared-ui/components/ui/form'
 import PhoneNumberInput from '@shared-ui/components/PhoneNumberInput.vue'
 import { countryCodeKey, defaultCountryCode } from '@shared-ui/utils/phone.js'
-import { useWidgetStore } from '../store/widget.js'
+import { useWidgetStore } from '@widget/store/widget.js'
+import { useChatStore } from '@widget/store/chat.js'
 import { useI18n } from 'vue-i18n'
 import { createPreChatFormSchema } from './preChatFormSchema.js'
 
@@ -250,7 +251,8 @@ const props = defineProps({
 const emit = defineEmits(['submit'])
 const { t } = useI18n()
 const widgetStore = useWidgetStore()
-const messageText = ref('')
+const chat = useChatStore()
+const messageText = computed({ get: () => chat.preChatDraft.message || '', set: value => { chat.preChatDraft.message = value } })
 const formRef = ref(null)
 
 const config = computed(() => widgetStore.config?.prechat_form || {})
@@ -276,6 +278,7 @@ const showForm = computed(() => preChatFormEnabled.value && sortedFields.value.l
 const formSchema = computed(() => toTypedSchema(createPreChatFormSchema(t, sortedFields.value)))
 
 // Generate initial values dynamically
+const savedFields = { ...chat.preChatDraft.fields }
 const initialValues = computed(() => {
   const values = {}
   sortedFields.value.forEach((field) => {
@@ -288,13 +291,15 @@ const initialValues = computed(() => {
       values[field.key] = ''
     }
   })
-  return values
+  return { ...values, ...savedFields }
 })
 
 const { handleSubmit, meta, values } = useForm({
   validationSchema: formSchema,
   initialValues
 })
+
+watch(values, fields => { chat.preChatDraft.fields = { ...fields } }, { deep: true })
 
 const requiredFieldsFilled = computed(() => {
   return sortedFields.value

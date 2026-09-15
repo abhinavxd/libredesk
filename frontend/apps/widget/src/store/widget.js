@@ -74,6 +74,12 @@ export const useWidgetStore = defineStore('widget', () => {
         }
     }
 
+    const navigateToHelp = () => {
+        currentView.value = 'help'
+        isInChatView.value = false
+        if (isExpanded.value) collapseWidget()
+    }
+
     const updateConfig = (newConfig) => {
         config.value = { ...newConfig }
     }
@@ -142,6 +148,7 @@ export const useWidgetStore = defineStore('widget', () => {
         navigateToChat,
         navigateToMessages,
         navigateToHome,
+        navigateToHelp,
         updateConfig,
         setMobileFullScreen,
         toggleExpand,

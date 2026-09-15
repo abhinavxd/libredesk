@@ -1,6 +1,8 @@
 <template>
   <div class="flex flex-col h-full">
-    <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50">
+    <div
+      class="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
+    >
       <div class="flex flex-col">
         <HomeHeader :config="config">
           <!-- Primary action renders on the gradient so it flows into the header. -->
@@ -17,10 +19,11 @@
         </HomeHeader>
 
         <!-- Home Apps (announcements + external links) sit on the normal background. -->
-        <div v-if="config.home_apps?.length" class="flex flex-col gap-3 p-4 bg-background">
+        <div v-if="homeItems.length" class="flex flex-col gap-3 p-4 bg-background">
           <div class="space-y-3">
-            <template v-for="(item, index) in config.home_apps" :key="index">
-              <AnnouncementCard v-if="item.type === 'announcement'" :announcement="item" />
+            <template v-for="(item, index) in homeItems" :key="index">
+              <HomeHelp v-if="item.type === 'help'" />
+              <AnnouncementCard v-else-if="item.type === 'announcement'" :announcement="item" />
               <HomeExternalLink v-else-if="item.type === 'external_link'" :link="item" />
             </template>
           </div>
@@ -42,12 +45,18 @@ import HomeHeader from '@widget/components/HomeHeader.vue'
 import HomeExternalLink from '@widget/components/HomeExternalLink.vue'
 import AnnouncementCard from '@widget/components/AnnouncementCard.vue'
 import RecentConversationCard from '@widget/components/RecentConversationCard.vue'
+import HomeHelp from '@widget/components/HomeHelp.vue'
+import { useHelpStore } from '@widget/store/help.js'
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const { t } = useI18n()
 const config = computed(() => widgetStore.config)
+const help = useHelpStore()
+const homeItems = computed(() =>
+  (config.value.home_apps || []).filter((item) => item.type !== 'help' || help.available)
+)
 
 const mostRecentConversation = computed(() => {
   const conversations = chatStore.getConversations

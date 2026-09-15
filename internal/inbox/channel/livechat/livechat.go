@@ -11,6 +11,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -25,6 +26,7 @@ const (
 
 	HomeAppAnnouncement = "announcement"
 	HomeAppExternalLink = "external_link"
+	HomeAppHelp         = "help"
 )
 
 type PreChatFormField struct {
@@ -46,15 +48,46 @@ type ContinuityConfig struct {
 	MinEmailInterval    string `json:"min_email_interval"`
 }
 
+type HomeApp struct {
+	Type        string `json:"type"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	ImageURL    string `json:"image_url,omitempty"`
+	URL         string `json:"url"`
+	Text        string `json:"text,omitempty"`
+}
+
+type HelpAudience struct {
+	Tab bool `json:"tab"`
+}
+
+type HelpConfig struct {
+	HelpCenterID int          `json:"help_center_id"`
+	Visitors     HelpAudience `json:"visitors"`
+	Users        HelpAudience `json:"users"`
+	FeaturedIDs  []int        `json:"featured_ids"`
+}
+
+type PreviewConfig struct {
+	Desktop         bool   `json:"desktop"`
+	Mobile          bool   `json:"mobile"`
+	Content         string `json:"content"`
+	AutoHideSeconds int    `json:"auto_hide_seconds"`
+}
+
 // Config holds the live chat inbox configuration.
 type Config struct {
-	BrandName        string `json:"brand_name"`
-	WebsiteURL       string `json:"website_url"`
-	DarkMode         bool   `json:"dark_mode"`
-	ShowPoweredBy    bool   `json:"show_powered_by"`
-	Language         string `json:"language"`
-	FallbackLanguage string `json:"fallback_language"`
-	Users            struct {
+	Campaigns             []proactive.Campaign `json:"campaigns"`
+	CampaignCooldownHours int                  `json:"campaign_cooldown_hours"`
+	Help                  HelpConfig           `json:"help"`
+	Previews              PreviewConfig        `json:"previews"`
+	BrandName             string               `json:"brand_name"`
+	WebsiteURL            string               `json:"website_url"`
+	DarkMode              bool                 `json:"dark_mode"`
+	ShowPoweredBy         bool                 `json:"show_powered_by"`
+	Language              string               `json:"language"`
+	FallbackLanguage      string               `json:"fallback_language"`
+	Users                 struct {
 		AllowStartConversation           bool   `json:"allow_start_conversation"`
 		PreventMultipleConversations     bool   `json:"prevent_multiple_conversations"`
 		PreventReplyToClosedConversation bool   `json:"prevent_reply_to_closed_conversation"`
@@ -77,6 +110,7 @@ type Config struct {
 	Features struct {
 		Emoji      bool `json:"emoji"`
 		FileUpload bool `json:"file_upload"`
+		Transcript bool `json:"transcript"`
 	} `json:"features"`
 	Launcher struct {
 		Spacing struct {
@@ -98,14 +132,7 @@ type Config struct {
 		Text    string `json:"text"`
 		Enabled bool   `json:"enabled"`
 	} `json:"notice_banner"`
-	HomeApps []struct {
-		Type        string `json:"type"`
-		Title       string `json:"title,omitempty"`
-		Description string `json:"description,omitempty"`
-		ImageURL    string `json:"image_url,omitempty"`
-		URL         string `json:"url"`
-		Text        string `json:"text,omitempty"`
-	} `json:"home_apps"`
+	HomeApps                       []HomeApp        `json:"home_apps"`
 	TrustedDomains                 []string         `json:"trusted_domains"`
 	BlockedIPs                     []string         `json:"blocked_ips"`
 	DirectToConversation           bool             `json:"direct_to_conversation"`

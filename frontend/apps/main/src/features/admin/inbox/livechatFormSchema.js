@@ -11,6 +11,36 @@ const rangeNumber = (t, min, max) => {
 }
 const spacingNumber = (t) => rangeNumber(t, 0, 200)
 
+export const defaultWidgetHelp = () => ({
+  help_center_id: 0,
+  visitors: { tab: true },
+  users: { tab: true },
+  featured_ids: []
+})
+export const defaultWidgetPreviews = () => ({ desktop: false, mobile: false, content: 'message', auto_hide_seconds: 0 })
+export const widgetConditionsSchema = z.object({
+  logical_op: z.enum(['AND', 'OR']),
+  rules: z.array(z.object({ field: z.string().min(1), field_type: z.literal('contact_custom_attribute'), operator: z.string().min(1), value: z.string(), case_sensitive_match: z.boolean() })).max(20)
+})
+export const defaultCampaign = () => ({
+  id: crypto.randomUUID(), name: '', enabled: false, message: '', sender_id: 0, team_id: 0,
+  audience: 'all', include_urls: [], exclude_urls: [], conditions: { logical_op: 'AND', rules: [] },
+  event: '', delay_seconds: 10,
+  business_hours_id: 0, business_hours: 'any', desktop: true, mobile: true,
+  repeat: 'once', repeat_hours: 24,
+})
+export const campaignSchema = z.object({
+  id: z.string().uuid(), name: z.string().trim().min(1).max(128), enabled: z.boolean(), message: z.string().trim().min(1).max(10000),
+  sender_id: z.number().int().min(0), team_id: z.number().int().min(0),
+  audience: z.enum(['all', 'visitors', 'users']), include_urls: z.array(z.string().max(2048)).max(20).transform(items => items.map(item => item.trim()).filter(Boolean)),
+  exclude_urls: z.array(z.string().max(2048)).max(20).transform(items => items.map(item => item.trim()).filter(Boolean)), conditions: widgetConditionsSchema,
+  event: z.string().max(128), delay_seconds: z.number().int().min(0).max(86400),
+  business_hours_id: z.number().int().min(0), business_hours: z.enum(['any', 'inside', 'outside']),
+  desktop: z.boolean(), mobile: z.boolean(),
+  repeat: z.enum(['once', 'session', 'interval']), repeat_hours: z.number().int().min(1).max(8760),
+})
+const helpAudience = z.object({ tab: z.boolean() })
+
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, { message: t('globals.messages.required') }),
   enabled: z.boolean(),
@@ -19,6 +49,14 @@ export const createFormSchema = (t) => z.object({
   secret: z.string().nullable().optional(),
   linked_email_inbox_id: z.number().nullable().optional(),
   config: z.object({
+    campaigns: z.array(campaignSchema).max(50).default([]),
+    campaign_cooldown_hours: z.number().int().min(1).max(8760).default(24),
+    help: z.object({
+      help_center_id: z.number().int().min(0),
+      visitors: helpAudience, users: helpAudience,
+      featured_ids: z.array(z.number().int().positive()).max(10),
+    }).default(defaultWidgetHelp),
+    previews: z.object({ desktop: z.boolean(), mobile: z.boolean(), content: z.enum(['message', 'generic']), auto_hide_seconds: z.number().int().min(0).max(300) }).default(defaultWidgetPreviews),
     brand_name: z.string().min(1, { message: t('globals.messages.required') }),
     website_url: optionalUrl(t),
     dark_mode: z.boolean(),
@@ -75,6 +113,7 @@ export const createFormSchema = (t) => z.object({
     features: z.object({
       file_upload: z.boolean(),
       emoji: z.boolean(),
+      transcript: z.boolean().default(false),
     }),
     continuity: z.object({
       offline_threshold: z.string().min(1, { message: t('globals.messages.required') }).refine(isGoDuration, { message: t('validation.invalidDuration') }),
@@ -86,7 +125,7 @@ export const createFormSchema = (t) => z.object({
     trusted_domains: z.string().optional(),
     blocked_ips: z.string().optional(),
     home_apps: z.array(z.object({
-      type: z.enum(['announcement', 'external_link']),
+      type: z.enum(['announcement', 'external_link', 'help']),
       title: z.string().optional().or(z.literal('')),
       description: z.string().optional().or(z.literal('')),
       image_url: optionalUrl(t),

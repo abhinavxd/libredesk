@@ -353,6 +353,13 @@ LIMIT 50;
 
 -- name: get-chat-conversation
 SELECT
+    COALESCE((SELECT json_agg(json_build_object('name', media.filename, 'content_type', media.content_type, 'uuid', media.uuid, 'size', media.size, 'content_id', media.content_id, 'disposition', media.disposition))
+      FROM media WHERE media.model_type = 'messages' AND media.model_id = (
+        SELECT m.id FROM conversation_messages m
+        WHERE m.conversation_id = c.id AND m.private = FALSE AND m.type IN ('incoming', 'outgoing')
+        ORDER BY m.created_at DESC, m.id DESC LIMIT 1
+      )), '[]'::json) AS "last_message.attachments",
+    COALESCE(c.contact_last_seen_at, c.created_at) AS contact_last_seen_at,
     c.created_at,
     c.uuid,
     cs.name as status,
@@ -390,6 +397,13 @@ WHERE c.uuid = $1
 
 -- name: get-contact-chat-conversations
 SELECT
+    COALESCE((SELECT json_agg(json_build_object('name', media.filename, 'content_type', media.content_type, 'uuid', media.uuid, 'size', media.size, 'content_id', media.content_id, 'disposition', media.disposition))
+      FROM media WHERE media.model_type = 'messages' AND media.model_id = (
+        SELECT m.id FROM conversation_messages m
+        WHERE m.conversation_id = c.id AND m.private = FALSE AND m.type IN ('incoming', 'outgoing')
+        ORDER BY m.created_at DESC, m.id DESC LIMIT 1
+      )), '[]'::json) AS "last_message.attachments",
+    COALESCE(c.contact_last_seen_at, c.created_at) AS contact_last_seen_at,
     c.created_at,
     c.uuid,
     cs.name as status,
@@ -1054,3 +1068,14 @@ FROM conversations
 WHERE contact_id = $1
 ORDER BY last_message_at DESC NULLS LAST
 LIMIT 200;
+
+-- name: lock-campaign-delivery
+SELECT COALESCE(conversation_uuid::text, '') FROM widget_campaign_deliveries WHERE id = $1 FOR UPDATE;
+
+-- name: complete-campaign-delivery
+UPDATE widget_campaign_deliveries
+SET conversation_uuid = $2, contact_id = $3, replied = TRUE, opened = TRUE, displayed = TRUE
+WHERE id = $1;
+
+-- name: assign-proactive-team
+UPDATE conversations SET assigned_team_id = NULLIF($2, 0) WHERE id = $1;

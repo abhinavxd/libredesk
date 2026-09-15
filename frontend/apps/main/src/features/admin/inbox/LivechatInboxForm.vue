@@ -8,6 +8,8 @@
         }}</TabsTrigger>
         <TabsTrigger value="messages">{{ $t('admin.inbox.livechat.tabs.messages') }}</TabsTrigger>
         <TabsTrigger value="features">{{ $t('globals.terms.features') }}</TabsTrigger>
+        <TabsTrigger value="campaigns">{{ $t('widget.proactiveMessages') }}</TabsTrigger>
+        <TabsTrigger value="help">{{ $t('globals.terms.helpCenter', 1) }}</TabsTrigger>
         <TabsTrigger value="prechat">{{ $t('admin.inbox.livechat.tabs.prechat') }}</TabsTrigger>
         <TabsTrigger value="users">{{ $t('globals.terms.users') }}</TabsTrigger>
         <TabsTrigger value="security">{{ $t('globals.terms.security') }}</TabsTrigger>
@@ -366,10 +368,14 @@
                         </div>
                         <div class="flex-1">
                           <div class="text-xs text-muted-foreground mb-2">
-                            {{ item.type === 'announcement' ? $t('globals.terms.announcement') : $t('admin.inbox.livechat.externalLinks') }}
+                            {{ homeAppLabel(item.type) }}
                           </div>
+                          <!-- Help articles card has nothing to fill in; it renders from the Help tab. -->
+                          <p v-if="item.type === 'help'" class="text-sm text-muted-foreground">
+                            {{ $t('widget.helpHomeAppHint') }}
+                          </p>
                           <!-- Announcement fields -->
-                          <div v-if="item.type === 'announcement'" class="flex flex-col gap-2">
+                          <div v-else-if="item.type === 'announcement'" class="flex flex-col gap-2">
                             <Input v-model="item.title" :placeholder="$t('globals.terms.title')" @change="updateHomeApps" />
                             <Textarea v-model="item.description" :placeholder="$t('globals.terms.description')" rows="6" @change="updateHomeApps" />
                             <div class="grid grid-cols-2 gap-2">
@@ -378,7 +384,7 @@
                             </div>
                           </div>
                           <!-- External link fields -->
-                          <div v-else class="grid grid-cols-2 gap-2">
+                          <div v-else-if="item.type === 'external_link'" class="grid grid-cols-2 gap-2">
                             <Input v-model="item.text" :placeholder="$t('placeholders.linkText')" @change="updateHomeApps" />
                             <Input v-model="item.url" placeholder="https://example.com" @change="updateHomeApps" />
                           </div>
@@ -399,7 +405,20 @@
                       <Plus class="w-4 h-4"/>
                       {{ $t('globals.messages.addExternalLink') }}
                     </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      :disabled="!form.values.config.help?.help_center_id || hasHelpHomeApp"
+                      @click="addHomeApp('help')"
+                    >
+                      <Plus class="w-4 h-4"/>
+                      {{ $t('widget.addHelpHomeApp') }}
+                    </Button>
                   </div>
+                  <p v-if="!form.values.config.help?.help_center_id" class="text-xs text-muted-foreground">
+                    {{ $t('widget.helpHomeAppRequiresCenter') }}
+                  </p>
                   <p v-if="showHomeAppsError && incompleteHomeApps" class="text-sm text-destructive flex items-start gap-1.5">
                     <TriangleAlert class="size-4 shrink-0 mt-0.5" />
                     <span>{{ $t('admin.inbox.livechat.homeApps.incomplete') }}</span>
@@ -636,6 +655,18 @@
 
           <!-- Chat Features -->
           <div class="space-y-4">
+            <h4 class="text-base font-semibold">{{ $t('widget.replyPreviews') }}</h4>
+            <FormField v-for="device in ['desktop', 'mobile']" :key="device" v-slot="{ componentField, handleChange }" :name="`config.previews.${device}`">
+              <FormItem><SwitchField :title="$t(`globals.terms.${device}`)" :checked="componentField.modelValue" @update:checked="handleChange" /></FormItem>
+            </FormField>
+            <FormField v-slot="{ componentField }" name="config.previews.content">
+              <FormItem><FormLabel>{{ $t('widget.previewContent') }}</FormLabel><Select v-bind="componentField"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="message">{{ $t('widget.messagePreview') }}</SelectItem><SelectItem value="generic">{{ $t('widget.genericNotice') }}</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+            </FormField>
+            <FormField v-slot="{ value, handleChange, meta }" name="config.previews.auto_hide_seconds">
+              <FormItem><FormLabel>{{ $t('widget.autoHideSeconds') }}</FormLabel><FormControl><Input type="number" min="0" max="300" :model-value="value" @update:model-value="value => handleChange(Number(value), meta.validated)" /></FormControl><FormMessage /></FormItem>
+            </FormField>
+          </div>
+          <div class="space-y-4">
             <h4 class="text-base font-semibold text-foreground">{{ $t('globals.terms.features') }}</h4>
 
             <div class="space-y-3">
@@ -664,6 +695,12 @@
                 </FormItem>
               </FormField>
 
+              <FormField v-slot="{ componentField, handleChange }" name="config.features.transcript">
+                <FormItem>
+                  <SwitchField :title="$t('conversation.downloadTranscript')" :checked="componentField.modelValue" @update:checked="handleChange" />
+                </FormItem>
+              </FormField>
+
               <FormField
                 v-slot="{ componentField, handleChange }"
                 name="config.direct_to_conversation"
@@ -679,6 +716,41 @@
               </FormField>
             </div>
           </div>
+        </div>
+
+        <!-- Proactive messages Tab -->
+        <div v-show="activeTab === 'campaigns'" class="space-y-3">
+          <WidgetCampaigns
+            :model-value="form.values.config.campaigns || []"
+            :inbox-id="initialValues.id || 0"
+            :cooldown="form.values.config.campaign_cooldown_hours || 24"
+            @update:model-value="form.setFieldValue('config.campaigns', $event, false)"
+            @update:cooldown="form.setFieldValue('config.campaign_cooldown_hours', $event, false)"
+            @update:preview="previewCampaign = $event"
+          />
+          <template v-for="(error, field) in form.errors.value" :key="field">
+            <p v-if="field.startsWith('config.campaign')" role="alert" class="text-sm text-destructive">
+              {{ error }}
+            </p>
+          </template>
+        </div>
+
+        <!-- Help Tab -->
+        <div v-show="activeTab === 'help'" class="space-y-3">
+          <WidgetHelpConfig
+            :model-value="form.values.config.help"
+            :centers="helpCenters"
+            :articles="helpArticles"
+            :failed="helpFailed"
+            @update:model-value="form.setFieldValue('config.help', $event, false)"
+          />
+          <p
+            v-if="Object.keys(form.errors.value).some((key) => key.startsWith('config.help'))"
+            role="alert"
+            class="text-sm text-destructive"
+          >
+            {{ $t('validation.invalidValue') }}
+          </p>
         </div>
 
         <!-- Security Tab -->
@@ -980,8 +1052,12 @@
 import { watch, computed, ref, inject, onMounted, onBeforeUnmount } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { createFormSchema } from './livechatFormSchema.js'
+import { createFormSchema, defaultWidgetHelp, defaultWidgetPreviews } from './livechatFormSchema.js'
+import WidgetHelpConfig from './WidgetHelpConfig.vue'
+import { useHelpCenterArticles } from './useHelpCenterArticles.js'
+import WidgetCampaigns from './WidgetCampaigns.vue'
 import { useInboxStore } from '@/stores/inbox'
+import api from '@/api'
 import {
   FormControl,
   FormField,
@@ -1007,6 +1083,7 @@ import { Label } from '@shared-ui/components/ui/label'
 import { Plus, X, TriangleAlert, GripVertical, Lightbulb } from 'lucide-vue-next'
 import Draggable from 'vuedraggable'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import PreChatFormConfig, { getDefaultPrechatFields } from './PreChatFormConfig.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import { useEmitter } from '@/composables/useEmitter'
@@ -1024,9 +1101,25 @@ const WIDGET_BG = { light: '#ffffff', dark: '#1a1a1e' }
 const DEFAULT_GRADIENT_START = '#2563eb'
 const DEFAULT_GRADIENT_END = '#1e40af'
 
+const TABS = [
+  'general',
+  'appearance',
+  'messages',
+  'features',
+  'campaigns',
+  'help',
+  'prechat',
+  'users',
+  'security',
+  'installation'
+]
+
 // Maps a field path prefix to its tab, so a failed submit jumps to the tab holding the error.
 // Ordered: specific prefixes before the general-tab fallbacks.
 const FIELD_TAB = [
+  ['config.help', 'help'],
+  ['config.previews', 'features'],
+  ['config.campaign', 'campaigns'],
   ['config.home_screen', 'appearance'],
   ['config.colors', 'appearance'],
   ['config.launcher', 'appearance'],
@@ -1080,7 +1173,10 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
-const activeTab = ref('general')
+const route = useRoute()
+const router = useRouter()
+const activeTab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'general')
+watch(activeTab, (tab) => router.replace({ query: { ...route.query, tab } }))
 const selectedUserTab = ref('visitors')
 const homeApps = ref([])
 const prechatConfig = ref({
@@ -1163,6 +1259,9 @@ const form = useForm({
     prompt_tags_on_reply: false,
     linked_email_inbox_id: null,
     config: {
+      help: defaultWidgetHelp(),
+      previews: defaultWidgetPreviews(),
+      campaigns: [], campaign_cooldown_hours: 24,
       brand_name: '',
       website_url: '',
       dark_mode: false,
@@ -1204,6 +1303,7 @@ const form = useForm({
         fade_background: false
       },
       features: {
+        transcript: props.isNewForm,
         file_upload: true,
         emoji: true
       },
@@ -1278,10 +1378,24 @@ const weakSecret = computed(() => {
   return typeof s === 'string' && s.length > 0 && s.length < 32
 })
 
+const helpCenters = ref([])
+const helpCenterID = computed(() => form.values.config?.help?.help_center_id || 0)
+const {
+  tree: helpTree,
+  articles: helpArticles,
+  failed: helpFailed
+} = useHelpCenterArticles(helpCenterID)
+
+// The campaign the admin is editing, mirrored in the preview as an invitation card.
+const previewCampaign = ref(null)
+
 // home_apps in form.values only syncs on change events, so pull the live ref for the preview.
 const previewConfig = computed(() => ({
   ...form.values.config,
-  home_apps: homeApps.value
+  home_apps: homeApps.value,
+  help_tree: helpTree.value,
+  help_articles: helpArticles.value,
+  preview_campaign: activeTab.value === 'campaigns' ? previewCampaign.value : null
 }))
 
 // InboxView renders the preview in the help rail; feed it this form's live config while mounted.
@@ -1313,11 +1427,22 @@ const onBackgroundTypeChange = (type) => {
 const addHomeApp = (type) => {
   if (type === 'announcement') {
     homeApps.value.push({ type: 'announcement', title: '', description: '', image_url: '', url: '' })
+  } else if (type === 'help') {
+    homeApps.value.push({ type: 'help' })
   } else {
     homeApps.value.push({ type: 'external_link', text: '', url: '' })
   }
   updateHomeApps()
 }
+
+const HOME_APP_LABELS = {
+  announcement: 'globals.terms.announcement',
+  external_link: 'admin.inbox.livechat.externalLinks',
+  help: 'globals.terms.helpCenter'
+}
+const homeAppLabel = (type) => t(HOME_APP_LABELS[type], 1)
+
+const hasHelpHomeApp = computed(() => homeApps.value.some((item) => item.type === 'help'))
 
 const removeHomeApp = (index) => {
   homeApps.value.splice(index, 1)
@@ -1329,15 +1454,19 @@ const updateHomeApps = () => {
   form.setFieldValue('config.home_apps', homeApps.value)
 }
 
-const isHomeAppEmpty = (item) =>
-  item.type === 'announcement'
+const isHomeAppEmpty = (item) => {
+  if (item.type === 'help') return false
+  return item.type === 'announcement'
     ? !item.title && !item.description && !item.image_url && !item.url
     : !item.text && !item.url
+}
 
-const isHomeAppComplete = (item) =>
-  item.type === 'announcement'
+const isHomeAppComplete = (item) => {
+  if (item.type === 'help') return true
+  return item.type === 'announcement'
     ? Boolean(item.title && item.image_url && item.url)
     : Boolean(item.text && item.url)
+}
 
 // A row with some data but missing required fields, so submit is blocked instead of
 // silently dropping what the user typed. Fully empty rows are dropped on submit.
@@ -1351,9 +1480,14 @@ const showHomeAppsError = ref(false)
 const textareaToLines = (value) =>
   typeof value === 'string' ? value.split('\n').map((line) => line.trim()).filter(Boolean) : []
 
-onMounted(() => {
+onMounted(async () => {
   inboxStore.fetchInboxes()
   appSettingsStore.fetchPublicConfig()
+  try {
+    helpCenters.value = (await api.getHelpCenters()).data.data || []
+  } catch {
+    helpFailed.value = true
+  }
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
@@ -1429,7 +1563,7 @@ watch(
       prechatConfig.value = pc
     }
 
-    form.setValues(newValues, false)
+    form.setValues({ ...newValues, config: { ...newValues.config, campaigns: newValues.config?.campaigns || [], campaign_cooldown_hours: newValues.config?.campaign_cooldown_hours || 24, help: newValues.config?.help || defaultWidgetHelp(), previews: newValues.config?.previews || defaultWidgetPreviews(), features: { ...newValues.config?.features, transcript: newValues.config?.features?.transcript ?? false } } }, false)
   },
   { deep: true, immediate: true }
 )

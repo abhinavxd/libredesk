@@ -41,6 +41,7 @@ import (
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/role"
@@ -1264,4 +1265,12 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 	}
 
 	return limiter
+}
+
+func initProactive(db *sqlx.DB, i18n *i18n.I18n) *proactive.Manager {
+	manager, err := proactive.New(proactive.Opts{DB: db, I18n: i18n, Lo: initLogger("proactive")})
+	if err != nil {
+		log.Fatalf("error initializing proactive messages: %v", err)
+	}
+	return manager
 }

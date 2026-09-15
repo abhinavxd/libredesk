@@ -29,11 +29,11 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
-import { useChatStore } from '../store/chat.js'
-import { useWidgetStore } from '../store/widget.js'
+import { useChatStore } from '@widget/store/chat.js'
+import { useWidgetStore } from '@widget/store/widget.js'
 import { useUserStore } from '@widget/store/user.js'
-import ConversationsList from '../components/ConversationsList.vue'
-import WidgetHeader from '../layouts/WidgetHeader.vue'
+import ConversationsList from '@widget/components/ConversationsList.vue'
+import WidgetHeader from '@widget/layouts/WidgetHeader.vue'
 
 const { t } = useI18n()
 const chatStore = useChatStore()

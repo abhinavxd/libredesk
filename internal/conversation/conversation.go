@@ -296,6 +296,9 @@ func New(
 }
 
 type queries struct {
+	LockCampaignDelivery     *sqlx.Stmt `query:"lock-campaign-delivery"`
+	CompleteCampaignDelivery *sqlx.Stmt `query:"complete-campaign-delivery"`
+	AssignProactiveTeam      *sqlx.Stmt `query:"assign-proactive-team"`
 	// Conversation queries.
 	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
 	GetConversation                     *sqlx.Stmt `query:"get-conversation"`
@@ -494,6 +497,7 @@ func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.
 			c.SignAvatarURL(&conversations[i].Assignee.AvatarURL)
 		}
 		c.SignAvatarURL(&conversations[i].LastChatMessage.Author.AvatarURL)
+		c.SignAttachmentURLs(conversations[i].LastChatMessage.Attachments)
 	}
 	return conversations, nil
 }
@@ -512,6 +516,7 @@ func (c *Manager) GetChatConversation(conversationUUID string) (models.ChatConve
 		c.SignAvatarURL(&conversation.Assignee.AvatarURL)
 	}
 	c.SignAvatarURL(&conversation.LastChatMessage.Author.AvatarURL)
+	c.SignAttachmentURLs(conversation.LastChatMessage.Attachments)
 	return conversation, nil
 }
 
@@ -2029,6 +2034,10 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 
 			// Strip agent email from widget responses.
 			author := msg.Author
+			if sender := proactiveSender(msg.Meta); sender != "" {
+				author.FirstName = sender
+				author.LastName = ""
+			}
 			author.Email = null.String{}
 
 			chatMessages = append(chatMessages, models.ChatMessage{
