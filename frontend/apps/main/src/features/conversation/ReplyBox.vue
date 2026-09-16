@@ -58,6 +58,7 @@
           :isSending="isSending"
           :isDraftLoading="isDraftLoading"
           :uploadingFiles="uploadingFiles"
+          :pendingFiles="pendingFiles"
           :uploadedFiles="mediaFiles"
           v-model:htmlContent="htmlContent"
           v-model:textContent="textContent"
@@ -71,9 +72,9 @@
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
           @send="processSend"
           @sendAndSetStatus="processSendAndSetStatus"
-          @fileUpload="handleFileUpload"
+          @fileUpload="handleFileSelect"
           @fileDelete="handleFileDelete"
-          @filesDropped="uploadFiles"
+          @filesDropped="addPendingFiles"
           @aiPromptSelected="handleAiPromptSelected"
           :isGenerating="isGenerating"
           @generateReply="handleGenerateReply"
@@ -118,6 +119,7 @@
         :isSending="isSending"
         :isDraftLoading="isDraftLoading"
         :uploadingFiles="uploadingFiles"
+        :pendingFiles="pendingFiles"
         :uploadedFiles="mediaFiles"
         v-model:htmlContent="htmlContent"
         v-model:textContent="textContent"
@@ -131,9 +133,9 @@
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
         @send="processSend"
         @sendAndSetStatus="processSendAndSetStatus"
-        @fileUpload="handleFileUpload"
+        @fileUpload="handleFileSelect"
         @fileDelete="handleFileDelete"
-        @filesDropped="uploadFiles"
+        @filesDropped="addPendingFiles"
         @aiPromptSelected="handleAiPromptSelected"
         :isGenerating="isGenerating"
         @generateReply="handleGenerateReply"
@@ -188,9 +190,8 @@ useVisualViewportHeight()
 // Setup file upload composable
 const {
   uploadingFiles,
-  handleFileUpload,
-  handleFileDelete,
-  uploadFiles,
+  upload,
+  handleFileDelete: removeUploadedFile,
   mediaFiles,
   clearMediaFiles,
   setMediaFiles
@@ -198,12 +199,36 @@ const {
   linkedModel: 'messages'
 })
 
+const pendingFiles = ref([])
+let pendingFileID = 0
+
+const addPendingFiles = (files) => {
+  pendingFiles.value.push(...Array.from(files).map((file) => ({
+    id: `pending-${++pendingFileID}`,
+    file
+  })))
+}
+
+const handleFileSelect = (event) => {
+  addPendingFiles(event.target.files)
+}
+
+const handleFileDelete = (id) => {
+  const pendingIndex = pendingFiles.value.findIndex((item) => item.id === id)
+  if (pendingIndex >= 0) {
+    pendingFiles.value.splice(pendingIndex, 1)
+    return
+  }
+  removeUploadedFile(id)
+}
+
 const messageType = ref('reply')
 const currentConversationUUID = computed(() => conversationStore.current?.uuid || null)
 watch(
   currentConversationUUID,
   async (uuid, prevUuid) => {
     if (prevUuid) conversationStore.setSelectedDraftType(prevUuid, messageType.value)
+    pendingFiles.value = []
     if (!uuid) {
       messageType.value = 'reply'
       return
@@ -299,7 +324,7 @@ const hasTextContent = computed(() => {
 
 const draftPreview = computed(() => textContent.value.trim())
 
-const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.value.length)
+const attachmentCount = computed(() => mediaFiles.value.length + pendingFiles.value.length)
 
 const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
   let hasMessageSendingErrored = false
@@ -307,7 +332,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
 
   const html = htmlContent.value
   if (hasPendingInlineUpload(html)) return
-  const hasContent = hasTextContent.value || hasInlineImage(html) || mediaFiles.value.length > 0
+  let hasContent = hasTextContent.value || hasInlineImage(html) || mediaFiles.value.length > 0 || pendingFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
   const isPrivate = messageType.value === 'private_note'
 
@@ -352,6 +377,28 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
         }
       }
     }
+  }
+
+  if (pendingFiles.value.length > 0) {
+    isSending.value = true
+    const filesToUpload = [...pendingFiles.value]
+    const uploadResults = await Promise.all(
+      filesToUpload.map(async (item) => ({ item, media: await upload(item.file) }))
+    )
+    const uploadedFiles = uploadResults.filter(({ media }) => media).map(({ media }) => media)
+    if (uploadedFiles.length > 0) {
+      setMediaFiles([...mediaFiles.value, ...uploadedFiles])
+    }
+
+    const uploadedIDs = new Set(
+      uploadResults.filter(({ media }) => media).map(({ item }) => item.id)
+    )
+    pendingFiles.value = pendingFiles.value.filter((item) => !uploadedIDs.has(item.id))
+    if (uploadResults.some(({ media }) => !media)) {
+      isSending.value = false
+      return
+    }
+    hasContent = true
   }
   let tempUUID = null
 

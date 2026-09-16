@@ -117,8 +117,9 @@
     <ReplyBoxAttachmentPreview
       :attachments="uploadedFiles"
       :uploadingFiles="uploadingFiles"
+      :pendingFiles="pendingFiles"
       :onDelete="handleOnFileDelete"
-      v-if="uploadedFiles.length > 0 || uploadingFiles.length > 0"
+      v-if="uploadedFiles.length > 0 || uploadingFiles.length > 0 || pendingFiles.length > 0"
       class="mt-2"
     />
 
@@ -229,6 +230,10 @@ const props = defineProps({
     type: Array,
     required: true
   },
+  pendingFiles: {
+    type: Array,
+    default: () => []
+  },
   uploadedFiles: {
     type: Array,
     required: false,
@@ -286,7 +291,8 @@ const enableSend = computed(() => {
     (textContent.value.trim().length > 0 ||
       hasInlineImage(html) ||
       conversationStore.getMacro('reply')?.actions?.length > 0 ||
-      props.uploadedFiles.length > 0) &&
+      props.uploadedFiles.length > 0 ||
+      props.pendingFiles.length > 0) &&
     emailErrors.value.length === 0 &&
     !props.uploadingFiles.length && !props.isDraftLoading
   )

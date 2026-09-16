@@ -26,6 +26,7 @@
         variant="outline"
         @click="triggerFileUpload"
         :pressed="false"
+        :disabled="isSending"
       >
         <Paperclip class="h-4 w-4" />
       </Toggle>

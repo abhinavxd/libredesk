@@ -30,7 +30,7 @@
         <button
           v-if="!attachment.loading"
           type="button"
-          @click.prevent="onDelete(attachment.uuid)"
+          @click.prevent="onDelete(attachment.uuid || attachment.tempId)"
           class="text-muted-foreground hover:text-destructive focus:outline-none rounded-md transition-colors duration-150"
           title="Remove attachment"
         >
@@ -57,6 +57,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  pendingFiles: {
+    type: Array,
+    default: () => []
+  },
   onDelete: {
     type: Function,
     required: true
@@ -64,6 +68,12 @@ const props = defineProps({
 })
 
 const allAttachments = computed(() => [
+  ...props.pendingFiles.map(({ id, file }) => ({
+    tempId: id,
+    filename: file.name,
+    size: file.size,
+    loading: false
+  })),
   ...props.uploadingFiles.map((file, i) => ({
     tempId: `${file.name}-${i}`,
     filename: file.name,
