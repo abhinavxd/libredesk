@@ -2,7 +2,7 @@
   <div class="flex flex-col h-screen">
     <SearchHeader />
     <div class="flex-1 overflow-y-auto">
-      <div class="max-w-6xl mx-auto px-4 py-6 space-y-4">
+      <div class="max-w-6xl mx-auto px-4 pt-6 space-y-4">
         <div class="relative">
           <SearchIcon
             class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none"
