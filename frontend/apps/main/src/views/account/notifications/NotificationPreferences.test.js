@@ -62,6 +62,7 @@ const mount = async (vapidPublicKey = 'test-key') => {
       data: {
         email_enabled: true,
         vapid_public_key: vapidPublicKey,
+        push_endpoints: ['https://push.example/subscription'],
         preferences: [
           { notification_type: 'new_reply', channel: 'email', enabled: true },
           { notification_type: 'new_reply', channel: 'in_app', enabled: false }
@@ -119,10 +120,9 @@ describe('notification preferences', () => {
     expect(email.disabled).toBe(false)
   })
 
-  it('leaves the push subscription to the app shell', async () => {
+  it('restores this browser push state from the saved endpoints', async () => {
     await mount()
-    expect(root.textContent).toContain('notification.type.newReply')
-    expect(refresh).not.toHaveBeenCalled()
+    expect(refresh).toHaveBeenCalledWith('test-key', ['https://push.example/subscription'])
   })
 
   it('disables browser notifications when push is unavailable', async () => {
