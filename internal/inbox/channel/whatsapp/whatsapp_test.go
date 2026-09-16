@@ -24,14 +24,14 @@ func TestConfigAccount(t *testing.T) {
 		WABAID:        "WABA1",
 		AccessToken:   "TOKEN",
 		AppSecret:     "SECRET",
-		APIVersion:    "v25.0",
+		APIVersion:    "v26.0",
 	}
 	acc := cfg.Account()
-	if acc.PhoneNumberID != "PN1" || acc.WABAID != "WABA1" || acc.AccessToken != "TOKEN" || acc.AppSecret != "SECRET" || acc.APIVersion != "v25.0" {
+	if acc.PhoneNumberID != "PN1" || acc.WABAID != "WABA1" || acc.AccessToken != "TOKEN" || acc.AppSecret != "SECRET" || acc.APIVersion != "v26.0" {
 		t.Fatalf("unexpected account: %+v", acc)
 	}
 	// The CSAT fields are libredesk-side and must not leak into Meta calls.
-	if acc.Version() != "v25.0" {
+	if acc.Version() != "v26.0" {
 		t.Fatalf("unexpected version %q", acc.Version())
 	}
 }
@@ -497,7 +497,7 @@ func testInbox(t *testing.T, handler http.HandlerFunc, updater SourceIDUpdater) 
 	inb, err := New(nil, Opts{
 		ID:            7,
 		Name:          "WA Inbox",
-		Config:        Config{PhoneNumberID: "PN1", WABAID: "WABA1", AccessToken: "TOKEN", APIVersion: "v25.0"},
+		Config:        Config{PhoneNumberID: "PN1", WABAID: "WABA1", AccessToken: "TOKEN", APIVersion: "v26.0"},
 		Client:        client,
 		Lo:            testLogger(),
 		SourceUpdater: updater,

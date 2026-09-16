@@ -3,7 +3,7 @@ package whatsapp
 
 import "time"
 
-const DefaultAPIVersion = "v25.0"
+const DefaultAPIVersion = "v26.0"
 
 // Account holds the per-inbox Meta Graph API credentials, already decrypted at the call site.
 type Account struct {

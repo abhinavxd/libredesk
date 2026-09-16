@@ -186,7 +186,7 @@
           <FormItem>
             <FormLabel>{{ $t('globals.terms.apiVersion') }}</FormLabel>
             <FormControl>
-              <Input type="text" placeholder="v25.0" v-bind="componentField" />
+              <Input type="text" placeholder="v26.0" v-bind="componentField" />
             </FormControl>
             <FormDescription>
               {{ $t('admin.inbox.whatsapp.apiVersion.description') }}
@@ -318,7 +318,7 @@ const form = useForm({
       access_token: '',
       app_secret: '',
       webhook_verify_token: '',
-      api_version: 'v25.0',
+      api_version: 'v26.0',
       csat_template_language: DEFAULT_CSAT_TEMPLATE_LANGUAGE,
       csat_template_body: DEFAULT_CSAT_TEMPLATE_BODY,
       csat_template_button_text: DEFAULT_CSAT_TEMPLATE_BUTTON_TEXT

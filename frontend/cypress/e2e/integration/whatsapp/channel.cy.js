@@ -43,7 +43,7 @@ describe('WhatsApp channel', () => {
         access_token: 'e2e-access-token',
         app_secret: appSecret,
         webhook_verify_token: verifyToken,
-        api_version: 'v25.0',
+        api_version: 'v26.0',
         csat_template_language: 'en_US',
         csat_template_body: 'How did we do?',
         csat_template_button_text: 'Rate us'

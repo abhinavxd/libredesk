@@ -10,7 +10,7 @@ describe('API: whatsapp', () => {
     access_token: 'dummy-access-token',
     app_secret: 'dummy-app-secret',
     webhook_verify_token: `verify-${stamp}`,
-    api_version: 'v25.0'
+    api_version: 'v26.0'
   }
 
   const createInbox = (overrides, options = {}) =>

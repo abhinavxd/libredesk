@@ -25,7 +25,7 @@ describe('WhatsApp inbox form', () => {
     cy.get('input[name="config.access_token"]').should('exist')
     cy.get('input[name="config.app_secret"]').should('exist')
     cy.get('input[name="config.webhook_verify_token"]').should('exist')
-    cy.get('input[name="config.api_version"]').should('have.value', 'v25.0')
+    cy.get('input[name="config.api_version"]').should('have.value', 'v26.0')
 
     // The callback URL only exists once the inbox has an id.
     cy.contains('Save the inbox to generate the webhook URL.').scrollIntoView()
