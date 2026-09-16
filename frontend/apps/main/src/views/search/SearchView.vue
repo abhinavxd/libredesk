@@ -1,23 +1,43 @@
 <template>
   <div class="flex flex-col h-screen">
-    <SearchHeader v-model="term" />
-    <SearchFilters :filters="filters" @update:filters="filters = $event" />
+    <SearchHeader />
     <div class="flex-1 overflow-y-auto">
-      <div v-if="loading" class="flex justify-center items-center h-64">
-        <Spinner />
-      </div>
-      <div v-else-if="error" class="mt-8 text-center space-y-4">
-        <p class="text-lg text-destructive">{{ error }}</p>
-        <Button @click="search"> {{ $t('globals.terms.tryAgain') }} </Button>
-      </div>
+      <div class="max-w-6xl mx-auto px-4 py-6 space-y-4">
+        <div class="relative">
+          <SearchIcon
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none"
+            aria-hidden="true"
+          />
+          <Input
+            ref="inputRef"
+            v-model="term"
+            :placeholder="$t('search.placeholder')"
+            class="h-12 pl-10 pr-10 text-base"
+          />
+          <button
+            v-if="term"
+            type="button"
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+            :aria-label="$t('globals.terms.clear')"
+            @click="term = ''"
+          >
+            <X class="w-4 h-4" />
+          </button>
+        </div>
 
-      <div v-else>
-        <p
-          v-if="searchPerformed && totalResults === 0"
-          class="mt-8 text-center text-muted-foreground"
-        >
-          {{ $t('search.noResultsForQuery', { query: term }) }}
-        </p>
+        <SearchFilters :filters="filters" @update:filters="filters = $event" />
+
+        <div v-if="loading" class="flex justify-center items-center h-64">
+          <Spinner />
+        </div>
+        <div v-else-if="error" class="py-16 text-center space-y-4">
+          <p class="text-destructive">{{ error }}</p>
+          <Button @click="search"> {{ $t('globals.terms.tryAgain') }} </Button>
+        </div>
+        <div v-else-if="searchPerformed && totalResults === 0" class="py-16 text-center space-y-1">
+          <p class="text-foreground font-medium">{{ $t('search.noResultsForQuery', { query: term }) }}</p>
+          <p class="text-sm text-muted-foreground">{{ $t('search.adjustSearchTerms') }}</p>
+        </div>
         <SearchResults
           v-else-if="searchPerformed"
           :results="results"
@@ -26,16 +46,15 @@
           @change-page="changePage"
           @change-per-page="changePerPage"
         />
-
         <p
           v-else-if="term.length > 0 && term.length < MIN_SEARCH_LENGTH"
-          class="mt-8 text-center text-muted-foreground"
+          class="py-16 text-center text-sm text-muted-foreground"
         >
           {{ $t('search.minQueryLength', { length: MIN_SEARCH_LENGTH }) }}
         </p>
-        <div v-else class="mt-16 text-center">
-          <h2 class="text-xl font-semibold text-primary mb-4">{{ $t('conversation.search') }}</h2>
-          <p class="text-lg text-muted-foreground">{{ $t('search.searchBy') }}</p>
+        <div v-else class="py-16 text-center space-y-2">
+          <SearchIcon class="w-8 h-8 mx-auto text-muted-foreground/60" aria-hidden="true" />
+          <p class="text-sm text-muted-foreground max-w-md mx-auto">{{ $t('search.searchBy') }}</p>
         </div>
       </div>
     </div>
@@ -43,10 +62,12 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { Search as SearchIcon, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
+import { Input } from '@shared-ui/components/ui/input'
 import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
 import SearchHeader from '@main/features/search/SearchHeader.vue'
 import SearchFilters from '@main/features/search/SearchFilters.vue'
@@ -69,6 +90,7 @@ const router = useRouter()
 const emptyPage = () => ({ results: [], total: 0, page: 1, per_page: DEFAULT_PER_PAGE, total_pages: 0 })
 const emptyResults = () => ({ conversations: emptyPage(), messages: emptyPage() })
 
+const inputRef = ref(null)
 const term = ref(String(route.query.q || ''))
 const filters = ref(filtersFromQuery(route.query))
 const activeTab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'conversations')
@@ -170,6 +192,8 @@ watch(filters, () => {
 watch(activeTab, syncRoute)
 
 if (term.value.length >= MIN_SEARCH_LENGTH) search()
+
+onMounted(() => inputRef.value?.$el?.focus?.())
 
 onBeforeUnmount(() => {
   clearTimeout(debounceTimer)

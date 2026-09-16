@@ -1,9 +1,10 @@
 <template>
-  <div class="max-w-5xl mx-auto px-4 py-4">
+  <div>
     <Tabs :model-value="activeTab" @update:model-value="emit('update:activeTab', $event)">
-      <TabsList class="grid w-full grid-cols-2 mb-4">
-        <TabsTrigger v-for="type in TYPES" :key="type" :value="type">
-          {{ t(tabLabelKeys[type], 2) }} ({{ results[type].total }})
+      <TabsList class="mb-3">
+        <TabsTrigger v-for="type in TYPES" :key="type" :value="type" class="gap-1.5">
+          {{ t(tabLabelKeys[type], 2) }}
+          <span class="text-xs tabular-nums text-muted-foreground">{{ results[type].total }}</span>
         </TabsTrigger>
       </TabsList>
 

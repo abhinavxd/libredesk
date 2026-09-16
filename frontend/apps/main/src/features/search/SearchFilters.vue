@@ -1,6 +1,6 @@
 <template>
-  <div class="flex flex-wrap items-center gap-2 px-4 py-2 border-b">
-    <div class="w-40">
+  <div class="flex flex-wrap items-center gap-2">
+    <div class="flex-1 min-w-28">
       <SelectComboBox
         :model-value="filters.status"
         :items="conversationStore.statusOptions"
@@ -9,7 +9,7 @@
         @update:model-value="set('status', $event)"
       />
     </div>
-    <div class="w-40">
+    <div class="flex-1 min-w-28">
       <SelectComboBox
         :model-value="filters.priority"
         :items="conversationStore.priorityOptions"
@@ -18,7 +18,7 @@
         @update:model-value="set('priority', $event)"
       />
     </div>
-    <div class="w-44">
+    <div class="flex-1 min-w-28">
       <SelectComboBox
         :model-value="filters.inbox"
         :items="inboxStore.options"
@@ -27,7 +27,7 @@
         @update:model-value="set('inbox', $event)"
       />
     </div>
-    <div class="w-44">
+    <div class="flex-1 min-w-28">
       <SelectAgentCombobox
         :model-value="filters.assignee"
         :placeholder="t('globals.terms.assignee')"
@@ -36,7 +36,7 @@
         @update:model-value="set('assignee', $event)"
       />
     </div>
-    <div class="w-44">
+    <div class="flex-1 min-w-28">
       <SelectTeamCombobox
         :model-value="filters.team"
         :placeholder="t('globals.terms.team')"
@@ -45,7 +45,7 @@
         @update:model-value="set('team', $event)"
       />
     </div>
-    <div class="min-w-44 max-w-96">
+    <div class="flex-[1.5] min-w-40">
       <SelectTagCombobox
         :model-value="filters.tags"
         :placeholder="t('globals.terms.tag', 2)"
@@ -54,7 +54,7 @@
         @update:model-value="set('tags', $event)"
       />
     </div>
-    <div class="w-60">
+    <div class="flex-1 min-w-44">
       <DateFilterValue
         :model-value="filters.created"
         range
@@ -66,6 +66,7 @@
       type="button"
       variant="ghost"
       size="sm"
+      class="text-muted-foreground"
       @click="emit('update:filters', emptyFilters())"
     >
       <X class="w-4 h-4 mr-1" />
