@@ -53,7 +53,9 @@
         <HighlightedText :text="snippet" :term="term" />
       </p>
 
-      <div class="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+      <div
+        class="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground [&>*+*]:before:content-['·'] [&>*+*]:before:mr-2 [&>*+*]:before:text-muted-foreground/60"
+      >
         <Badge v-if="status" variant="outline" class="font-normal">{{ status }}</Badge>
         <span v-if="item.priority" class="inline-flex items-center gap-1">
           <PriorityMarker :priority="item.priority" />
