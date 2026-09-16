@@ -10,6 +10,20 @@ SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE key
 -- name: get-prompts
 SELECT id, created_at, updated_at, key, title FROM ai_prompts ORDER BY title;
 
+-- name: get-prompt-by-id
+SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE id = $1;
+
+-- name: insert-prompt
+INSERT INTO ai_prompts (key, title, content) VALUES ($1, $2, $3)
+RETURNING id, created_at, updated_at, key, title, content;
+
+-- name: update-prompt
+UPDATE ai_prompts SET title = $2, content = $3, updated_at = now() WHERE id = $1
+RETURNING id, created_at, updated_at, key, title, content;
+
+-- name: delete-prompt
+DELETE FROM ai_prompts WHERE id = $1;
+
 -- name: get-knowledge-base-items
 SELECT id, created_at, updated_at, type, title, content, enabled, source, source_url, embedded_fingerprint FROM ai_knowledge_base ORDER BY updated_at DESC;
 

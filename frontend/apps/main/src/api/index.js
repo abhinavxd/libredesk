@@ -204,6 +204,12 @@ const updateRole = (id, data) =>
 const deleteRole = (id) => http.delete(`/api/v1/roles/${id}`)
 const getContacts = (params) => http.get('/api/v1/contacts', { params })
 const getContact = (id) => http.get(`/api/v1/contacts/${id}`)
+const createContact = (data) =>
+  http.post('/api/v1/contacts', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
 const updateContact = (id, data) =>
   http.put(`/api/v1/contacts/${id}`, data, {
     headers: {
@@ -470,6 +476,10 @@ const updateSharedView = (id, data) =>
 const deleteSharedView = (id) => http.delete(`/api/v1/shared-views/${id}`)
 
 const getAiPrompts = () => http.get('/api/v1/ai/prompts')
+const getAIPrompt = (id) => http.get(`/api/v1/ai/prompts/${id}`)
+const createAIPrompt = (data) => http.post('/api/v1/ai/prompts', data)
+const updateAIPrompt = (id, data) => http.put(`/api/v1/ai/prompts/${id}`, data)
+const deleteAIPrompt = (id) => http.delete(`/api/v1/ai/prompts/${id}`)
 const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
   timeout: AI_TIMEOUT,
   headers: {
@@ -624,6 +634,10 @@ const markNotificationAsRead = (id) => http.put(`/api/v1/notifications/${id}/rea
 const markAllNotificationsAsRead = () => http.put('/api/v1/notifications/read-all')
 const deleteNotification = (id) => http.delete(`/api/v1/notifications/${id}`)
 const deleteAllNotifications = () => http.delete('/api/v1/notifications')
+const getNotificationPreferences = () => http.get('/api/v1/notifications/preferences')
+const updateNotificationPreferences = (data) => http.put('/api/v1/notifications/preferences', data)
+const createPushSubscription = (data) => http.post('/api/v1/notifications/push-subscriptions', data)
+const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/push-subscriptions', { data: { endpoint } })
 
 export default {
   login,
@@ -762,6 +776,10 @@ export default {
   updateSharedView,
   deleteSharedView,
   getAiPrompts,
+  getAIPrompt,
+  createAIPrompt,
+  updateAIPrompt,
+  deleteAIPrompt,
   aiCompletion,
   getAIConfig,
   updateAIConfig,
@@ -824,6 +842,7 @@ export default {
   removeAssignee,
   getContacts,
   getContact,
+  createContact,
   updateContact,
   blockContact,
   deleteContact,
@@ -862,5 +881,9 @@ export default {
   markAllNotificationsAsRead,
   deleteNotification,
   deleteAllNotifications,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  createPushSubscription,
+  deletePushSubscription,
   getContactPageVisits
 }

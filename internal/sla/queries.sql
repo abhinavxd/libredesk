@@ -264,6 +264,12 @@ SET processed_at = NOW(),
       updated_at = NOW()
 WHERE id = $1;
 
+-- name: update-notification-recipients
+UPDATE scheduled_sla_notifications
+SET recipients = $2,
+      updated_at = NOW()
+WHERE id = $1;
+
 -- name: insert-next-response-sla-event
 INSERT INTO sla_events (applied_sla_id, sla_policy_id, type, deadline_at)
 SELECT $1, $2, 'next_response', $3

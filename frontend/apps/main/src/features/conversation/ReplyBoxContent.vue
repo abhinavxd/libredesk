@@ -7,18 +7,18 @@
       :class="{ 'mb-4': !isFullscreen, 'border-b border-border pb-4': isFullscreen }"
     >
       <Tabs v-model="messageType" class="rounded-lg">
-        <TabsList class="rounded-lg border bg-muted/50 p-0.5">
+        <TabsList>
           <TabsTrigger
             v-if="canSendReply"
             value="reply"
-            :class="TAB_TRIGGER_CLASS"
+            class="max-md:py-2.5"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
           <TabsTrigger
             v-if="canSendPrivateNote"
             value="private_note"
-            :class="TAB_TRIGGER_CLASS"
+            class="max-md:py-2.5"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
@@ -91,14 +91,15 @@
         v-model:textContent="textContent"
         :message-type="messageType"
         :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
-        :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
+        :enableConversationReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
-        @aiPromptSelected="handleAiPromptSelected"
+        :getConversationSuggestions="getConversationSuggestions"
+        @aiGenerationChange="emit('aiGenerationChange', $event)"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
         @filesDropped="handleFilesDropped"
@@ -145,9 +146,6 @@
 const RECIPIENT_INPUT_CLASS =
   'flex-grow border-input bg-card px-3 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-ring'
 
-const TAB_TRIGGER_CLASS =
-  'rounded-md px-3 py-1 text-sm transition-colors duration-150 max-md:py-2.5 data-[state=active]:bg-card data-[state=active]:shadow-sm'
-
 import { ref, computed, nextTick, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
@@ -169,6 +167,10 @@ import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api'
+import {
+  createLatestConversationSuggestionFetcher,
+  getConversationSuggestions as fetchConversationSuggestions
+} from '@main/components/editor/conversationReference'
 
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
@@ -217,6 +219,18 @@ const getSuggestions = async (query) => {
   return (await debouncedFetchSuggestions(query)) || []
 }
 
+const debouncedFetchConversationSuggestions = useDebounceFn(fetchConversationSuggestions, MENTION_DEBOUNCE_MS)
+const fetchLatestConversationSuggestions = createLatestConversationSuggestionFetcher(
+  debouncedFetchConversationSuggestions
+)
+
+const getConversationSuggestions = async (query) => {
+  if (messageType.value !== 'private_note') return []
+  const messageTypeAtRequest = messageType.value
+  const suggestions = (await fetchLatestConversationSuggestions(query)) || []
+  return messageType.value === messageTypeAtRequest ? suggestions : []
+}
+
 // Handle mentions changed from editor
 const handleMentionsChanged = (newMentions) => {
   mentions.value = newMentions
@@ -231,10 +245,6 @@ const props = defineProps({
   isFullscreen: {
     type: Boolean,
     default: false
-  },
-  aiPrompts: {
-    type: Array,
-    required: true
   },
   isSending: {
     type: Boolean,
@@ -276,7 +286,7 @@ const emit = defineEmits([
   'inlineImageUpload',
   'fileDelete',
   'filesDropped',
-  'aiPromptSelected',
+  'aiGenerationChange',
   'generateReply'
 ])
 
@@ -387,14 +397,10 @@ const handleEmojiSelect = (emoji) => {
   nextTick(() => (insertContent.value = emoji))
 }
 
-const handleAiPromptSelected = (key) => {
-  emit('aiPromptSelected', key)
-}
-
 // Watch and update macro view based on message type this filters our macros.
 watch(
   messageType,
-  (newType, oldType) => {
+  (newType) => {
     if (newType === 'reply') {
       macroStore.setCurrentView('replying')
     } else if (newType === 'private_note') {

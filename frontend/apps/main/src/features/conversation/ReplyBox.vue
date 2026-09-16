@@ -55,7 +55,6 @@
           v-if="isEditorFullscreen"
           ref="fullscreenContentRef"
           :isFullscreen="true"
-          :aiPrompts="aiPrompts"
           :isSending="isSending"
           :isDraftLoading="isDraftLoading"
           :uploadingFiles="uploadingFiles"
@@ -75,7 +74,7 @@
           @fileUpload="handleFileUpload"
           @fileDelete="handleFileDelete"
           @filesDropped="uploadFiles"
-          @aiPromptSelected="handleAiPromptSelected"
+          @aiGenerationChange="isGenerating = $event"
           :isGenerating="isGenerating"
           :canSendReply="canSendReply"
           :canSendPrivateNote="canSendPrivateNote"
@@ -117,7 +116,6 @@
       <ReplyBoxContent
         ref="replyBoxContentRef"
         :isFullscreen="false"
-        :aiPrompts="aiPrompts"
         :isSending="isSending"
         :isDraftLoading="isDraftLoading"
         :uploadingFiles="uploadingFiles"
@@ -137,7 +135,7 @@
         @fileUpload="handleFileUpload"
         @fileDelete="handleFileDelete"
         @filesDropped="uploadFiles"
-        @aiPromptSelected="handleAiPromptSelected"
+        @aiGenerationChange="isGenerating = $event"
         :isGenerating="isGenerating"
         :canSendReply="canSendReply"
         :canSendPrivateNote="canSendPrivateNote"
@@ -159,7 +157,6 @@ import api from '@main/api'
 import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
-import { useAiPromptStore } from '@main/stores/aiPrompt'
 import { useNotificationStore } from '@main/stores/notification'
 import {
   AlertDialog,
@@ -307,8 +304,6 @@ const cc = ref('')
 const bcc = ref('')
 const showBcc = ref(false)
 const emailErrors = ref([])
-const aiPromptStore = useAiPromptStore()
-const aiPrompts = computed(() => aiPromptStore.prompts)
 const replyBoxContentRef = ref(null)
 const fullscreenContentRef = ref(null)
 const activeContentRef = () =>
@@ -317,8 +312,6 @@ const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
 const deferredStatus = ref(null)
 const mentions = ref([])
-
-aiPromptStore.fetchPrompts()
 
 const runAiGeneration = async (requestFn) => {
   if (isGenerating.value) return
@@ -338,9 +331,6 @@ const runAiGeneration = async (requestFn) => {
     isGenerating.value = false
   }
 }
-
-const handleAiPromptSelected = (key) =>
-  runAiGeneration(() => api.aiCompletion({ prompt_key: key, content: htmlContent.value }))
 
 const handleGenerateReply = () =>
   runAiGeneration((uuid) =>

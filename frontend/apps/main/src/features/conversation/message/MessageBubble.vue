@@ -116,10 +116,14 @@
                 v-else-if="message.content_type !== 'text' && sanitizedContent"
                 ref="messageContentEl"
                 @click="onMessageContentClick"
+                :class="{
+                  'email-light-canvas': !isOutgoing && convStore.current?.inbox_channel === 'email'
+                }"
               >
                 <Letter
                   :html="sanitizedContent"
-                  :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+                  :allowedSchemas="allowedSchemas"
+                  :rewriteExternalLinks="rewriteMessageLink"
                   :allowed-css-properties="extendedCssProperties"
                   class="mb-1 native-html break-words"
                   :class="{ 'mb-3': message.attachments.length > 0 }"
@@ -413,6 +417,14 @@ const avatarFallback = computed(() => {
   const firstName = props.message.author?.first_name ?? (isOutgoing.value ? 'A' : 'U')
   return firstName.toUpperCase().substring(0, 2)
 })
+
+const allowedSchemas = ['cid', 'https', 'http', 'mailto']
+
+// vue-letter skips its own href schema check once a rewrite hook is set.
+const rewriteMessageLink = (href) => {
+  if (href.startsWith('/') && !href.startsWith('//')) return `${window.location.origin}${href}`
+  return allowedSchemas.includes(href.toLowerCase().split(':')[0]) ? href : ''
+}
 
 const sanitizedContent = computed(() => {
   if (props.message.meta?.is_csat) {

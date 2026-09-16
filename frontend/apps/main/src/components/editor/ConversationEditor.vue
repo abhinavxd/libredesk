@@ -12,9 +12,9 @@
     >
       <EditorToolbar
         :editor="editor"
-        :ai-prompts="aiPrompts"
+        show-ai
         @open-link="linkDialog?.open()"
-        @ai-prompt="emitPrompt"
+        @ai-generation-change="emit('aiGenerationChange', $event)"
       />
     </BubbleMenu>
     <EditorContent :editor="editor" class="native-html" />
@@ -41,25 +41,24 @@ const props = defineProps({
   insertContent: String,
   messageType: String,
   autoFocus: { type: Boolean, default: true },
-  aiPrompts: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
   enableMentions: { type: Boolean, default: false },
   getSuggestions: { type: Function, default: null },
+  enableConversationReferences: { type: Boolean, default: false },
+  getConversationSuggestions: { type: Function, default: null },
   enableInlineImages: { type: Boolean, default: false },
   linkedModel: { type: String, default: 'messages' }
 })
 
 const emit = defineEmits([
   'send',
-  'aiPromptSelected',
+  'aiGenerationChange',
   'mentionsChanged',
   'filesDropped',
   'toggleMessageType'
 ])
 
 const linkDialog = ref(null)
-
-const emitPrompt = (key) => emit('aiPromptSelected', key)
 
 // Suppress the formatting bubble when an image node is selected so it
 // doesn't fight with the image's own size/remove toolbar.
@@ -91,6 +90,8 @@ const { editor, extractMentions, focus } = useTextEditor({
   linkedModel: props.linkedModel,
   getSuggestions: props.getSuggestions,
   enableMentions: () => props.enableMentions,
+  getConversationSuggestions: props.getConversationSuggestions,
+  conversationReferencesEnabled: () => props.enableConversationReferences,
   onSend: () => {
     emit('send')
     stopTyping()

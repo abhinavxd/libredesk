@@ -13,6 +13,8 @@ export function useTextEditor({
   linkedModel = 'messages',
   getSuggestions = null,
   enableMentions = () => false,
+  getConversationSuggestions = null,
+  conversationReferencesEnabled = () => false,
   onSend = () => {},
   onToggleMessageType = null,
   onUpdate = () => {},
@@ -53,6 +55,8 @@ export function useTextEditor({
       attributes: { class: 'outline-none' },
       getSuggestions,
       enableMentions,
+      getConversationSuggestions,
+      conversationReferencesEnabled,
       handlePaste,
       handleDrop,
       handleKeyDown: (view, event) => {
