@@ -1,78 +1,84 @@
 <template>
   <router-link
     :to="{ name: 'inbox-conversation', params: { uuid: conversationUUID, type: 'assigned' } }"
-    class="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 px-4 py-3 hover:bg-accent/40 transition-colors"
+    class="flex gap-4 px-5 py-4 hover:bg-accent/40 transition-colors"
   >
-    <Avatar class="w-9 h-9 rounded-full mt-0.5">
+    <Avatar class="w-10 h-10 rounded-full shrink-0 mt-0.5">
       <AvatarImage :src="item.contact.avatar_url || ''" class="object-cover" />
       <AvatarFallback>{{ initials(item.contact.first_name) }}</AvatarFallback>
     </Avatar>
 
-    <div class="min-w-0 space-y-1">
-      <div class="flex items-baseline gap-2 text-sm min-w-0">
-        <span class="font-medium text-foreground truncate">
-          <HighlightedText :text="contactName" :term="term" />
-        </span>
-        <span v-if="item.contact.email" class="text-muted-foreground truncate">
-          <HighlightedText :text="item.contact.email" :term="term" />
-        </span>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-baseline justify-between gap-4">
+        <div class="flex items-baseline gap-2 min-w-0 text-sm">
+          <span class="font-medium text-foreground truncate">
+            <HighlightedText :text="contactName" :term="term" />
+          </span>
+          <span v-if="item.contact.email" class="text-muted-foreground truncate hidden sm:inline">
+            <HighlightedText :text="item.contact.email" :term="term" />
+          </span>
+        </div>
+        <time
+          :datetime="timestamp"
+          :title="format(new Date(timestamp), 'MMM d, yyyy HH:mm')"
+          class="text-xs text-muted-foreground whitespace-nowrap tabular-nums shrink-0"
+        >
+          {{ getRelativeTime(timestamp) }}
+        </time>
       </div>
 
-      <p class="text-sm truncate" :class="subject ? 'text-foreground font-medium' : 'text-muted-foreground italic'">
+      <p
+        class="mt-1 text-base leading-snug truncate"
+        :class="subject ? 'font-medium text-foreground' : 'text-muted-foreground'"
+      >
         <HighlightedText v-if="subject" :text="subject" :term="term" />
         <template v-else>{{ t('globals.terms.noSubject') }}</template>
       </p>
 
-      <p v-if="snippet" class="text-sm text-muted-foreground line-clamp-2 break-words">
+      <p
+        v-if="snippet"
+        class="mt-1 text-sm leading-relaxed text-muted-foreground break-words"
+        :class="isConversation ? 'truncate' : 'line-clamp-2'"
+      >
         <template v-if="!isConversation">
           <span class="text-foreground">{{ senderName }}</span>
-          <Badge v-if="item.private" variant="secondary" class="mx-1.5 text-xs font-normal">
+          <span v-if="item.private" class="mx-1.5 rounded-md bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
             {{ t('globals.terms.privateNote') }}
-          </Badge>
-          <Badge v-else-if="item.type === 'outgoing'" variant="outline" class="mx-1.5 text-xs font-normal">
+          </span>
+          <span v-else-if="item.type === 'outgoing'" class="mx-1.5 rounded-md border px-1.5 py-0.5 text-xs">
             {{ t('globals.terms.reply') }}
-          </Badge>
+          </span>
           <span v-else>: </span>
         </template>
         <HighlightedText :text="snippet" :term="term" />
       </p>
 
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground pt-0.5">
+      <div class="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <Badge v-if="status" variant="outline" class="font-normal">{{ status }}</Badge>
+        <span v-if="item.priority" class="inline-flex items-center gap-1">
+          <PriorityMarker :priority="item.priority" />
+          {{ item.priority }}
+        </span>
         <span class="tabular-nums">#{{ referenceNumber }}</span>
-        <span v-if="item.inbox_name" class="inline-flex items-center gap-1 min-w-0">
+        <span v-if="item.inbox_name" class="inline-flex items-center gap-1.5 min-w-0">
           <component :is="item.inbox_channel === 'livechat' ? MessageSquare : Mail" class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span class="truncate">{{ item.inbox_name }}</span>
         </span>
-        <span class="inline-flex items-center gap-1 min-w-0">
+        <span class="inline-flex items-center gap-1.5 min-w-0">
           <UserRound class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span class="truncate">{{ assigneeName || t('globals.terms.unassigned') }}</span>
         </span>
-        <span v-if="item.team_name" class="inline-flex items-center gap-1 min-w-0">
+        <span v-if="item.team_name" class="inline-flex items-center gap-1.5 min-w-0">
           <UsersRound class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span class="truncate">{{ item.team_name }}</span>
         </span>
-        <span v-if="item.tags?.length" class="inline-flex items-center gap-1 flex-wrap">
+        <span v-if="item.tags?.length" class="inline-flex items-center gap-1.5 flex-wrap">
           <Tag class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span v-for="tag in item.tags" :key="tag" class="rounded-md bg-secondary px-1.5 py-0.5 text-secondary-foreground">
             {{ tag }}
           </span>
         </span>
       </div>
-    </div>
-
-    <div class="flex flex-col items-end gap-1.5 shrink-0">
-      <time
-        :datetime="timestamp"
-        :title="format(new Date(timestamp), 'MMM d, yyyy HH:mm')"
-        class="text-xs text-muted-foreground whitespace-nowrap tabular-nums"
-      >
-        {{ getRelativeTime(timestamp) }}
-      </time>
-      <Badge v-if="status" variant="outline" class="text-xs font-normal">{{ status }}</Badge>
-      <span v-if="item.priority" class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <PriorityMarker :priority="item.priority" />
-        {{ item.priority }}
-      </span>
     </div>
   </router-link>
 </template>
