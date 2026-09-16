@@ -119,6 +119,17 @@
         </Button>
       </div>
     </div>
+
+    <div class="flex justify-end border-t border-border p-1">
+      <router-link
+        :to="{ name: 'account-notifications' }"
+        :class="buttonVariants({ variant: 'ghost', size: 'sm' })"
+        @click="emit('close')"
+      >
+        <Settings aria-hidden="true" />
+        <span>{{ t('notification.settings') }}</span>
+      </router-link>
+    </div>
   </div>
 </template>
 
@@ -132,6 +143,7 @@ import {
   CheckCheck,
   X,
   Trash2,
+  Settings,
   AtSign,
   UserPlus,
   MessageSquare,
@@ -139,7 +151,7 @@ import {
   AlertTriangle,
   AlertCircle
 } from 'lucide-vue-next'
-import { Button } from '@shared-ui/components/ui/button'
+import { Button, buttonVariants } from '@shared-ui/components/ui/button'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { useNotificationStore } from '@main/stores/notification'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'

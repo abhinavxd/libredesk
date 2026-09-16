@@ -1389,6 +1389,7 @@
   "notification.invalidPushSubscription": "This browser subscription is invalid. Disable and enable browser notifications, then try again.",
   "notification.mentionedInConversation": "{author} mentioned you in #{referenceNumber}",
   "notification.newReply": "New reply on #{referenceNumber}",
+  "notification.settings": "Notification settings",
   "notification.slaAlert": "SLA {type}: {metric} for #{referenceNumber}",
   "notification.slaDueIn": "Due in {duration}",
   "notification.slaOverdue": "Overdue by {duration}",
