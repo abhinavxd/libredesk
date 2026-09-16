@@ -13,7 +13,7 @@ describe('searchFilters', () => {
     const filters = {
       ...emptyFilters(),
       status: '2',
-      tags: [3, 7],
+      tags: ['3', '7'],
       created: '2026-01-01,2026-01-31'
     }
     expect(filtersFromQuery(queryFromFilters(filters))).toEqual(filters)
@@ -21,12 +21,12 @@ describe('searchFilters', () => {
 
   it('drops empty values and junk tag ids from the query', () => {
     expect(queryFromFilters(emptyFilters())).toEqual({})
-    expect(filtersFromQuery({ tags: 'a,0,-1,4,', status: '' }).tags).toEqual([4])
+    expect(filtersFromQuery({ tags: 'a,0,-1,4,', status: '' }).tags).toEqual(['4'])
   })
 
   it('reports whether any filter is active', () => {
     expect(hasActiveFilters(emptyFilters())).toBe(false)
-    expect(hasActiveFilters({ ...emptyFilters(), tags: [1] })).toBe(true)
+    expect(hasActiveFilters({ ...emptyFilters(), tags: ['1'] })).toBe(true)
     expect(hasActiveFilters({ ...emptyFilters(), inbox: '5' })).toBe(true)
   })
 
@@ -36,7 +36,7 @@ describe('searchFilters', () => {
       status: '1',
       assignee: UNASSIGNED,
       team: '9',
-      tags: [2, 5],
+      tags: ['2', '5'],
       created: '2026-01-01,2026-01-31'
     })
     expect(JSON.parse(json)).toEqual([

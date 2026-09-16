@@ -20,8 +20,7 @@ export const filtersFromQuery = (query) => {
     if (key === 'tags') {
       filters.tags = String(raw)
         .split(',')
-        .map((v) => Number(v))
-        .filter((v) => Number.isInteger(v) && v > 0)
+        .filter((v) => /^[1-9]\d*$/.test(v))
     } else {
       filters[key] = String(raw)
     }
@@ -62,7 +61,7 @@ export const toFiltersJSON = (filters) => {
   if (filters.inbox) rules.push(leaf('inbox_id', 'equals', filters.inbox))
   if (filters.assignee) rules.push(assignmentLeaf('assigned_user_id', filters.assignee))
   if (filters.team) rules.push(assignmentLeaf('assigned_team_id', filters.team))
-  if (filters.tags?.length) rules.push(leaf('tags', 'contains', JSON.stringify(filters.tags)))
+  if (filters.tags?.length) rules.push(leaf('tags', 'contains', JSON.stringify(filters.tags.map(Number))))
   if (filters.created) rules.push(leaf('created_at', 'between', filters.created))
   return rules.length ? JSON.stringify(rules) : ''
 }

@@ -45,7 +45,7 @@
         @update:model-value="set('team', $event)"
       />
     </div>
-    <div class="flex-[1.5] min-w-40">
+    <div class="flex-[2] min-w-56">
       <SelectTagCombobox
         :model-value="filters.tags"
         :placeholder="t('globals.terms.tag', 2)"
@@ -54,7 +54,7 @@
         @update:model-value="set('tags', $event)"
       />
     </div>
-    <div class="flex-1 min-w-44">
+    <div class="flex-[1.5] min-w-60">
       <DateFilterValue
         :model-value="filters.created"
         range
