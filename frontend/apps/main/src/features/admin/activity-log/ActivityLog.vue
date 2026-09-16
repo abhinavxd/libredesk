@@ -80,6 +80,7 @@
     </div>
 
     <PaginationBar
+      class="-mx-6 sm:-mx-8 -mb-6 sm:-mb-8 px-6 sm:px-8"
       v-model:page="page"
       v-model:per-page="perPage"
       :total-pages="totalPages"
