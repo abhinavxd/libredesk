@@ -7,18 +7,18 @@
       :class="{ 'mb-4': !isFullscreen, 'border-b border-border pb-4': isFullscreen }"
     >
       <Tabs v-model="messageType" class="rounded-lg">
-        <TabsList class="rounded-lg border bg-muted/50 p-0.5">
+        <TabsList>
           <TabsTrigger
             v-if="canSendReply"
             value="reply"
-            :class="TAB_TRIGGER_CLASS"
+            class="max-md:py-2.5"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
           <TabsTrigger
             v-if="canSendPrivateNote"
             value="private_note"
-            :class="TAB_TRIGGER_CLASS"
+            class="max-md:py-2.5"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
@@ -91,7 +91,6 @@
         v-model:textContent="textContent"
         :message-type="messageType"
         :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
-        :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
         :disabled="isDraftLoading"
@@ -100,7 +99,7 @@
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
         :getConversationSuggestions="getConversationSuggestions"
-        @aiPromptSelected="handleAiPromptSelected"
+        @aiGenerationChange="emit('aiGenerationChange', $event)"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
         @filesDropped="handleFilesDropped"
@@ -145,9 +144,6 @@
 <script setup>
 const RECIPIENT_INPUT_CLASS =
   'flex-grow border-input bg-card px-3 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-ring'
-
-const TAB_TRIGGER_CLASS =
-  'rounded-md px-3 py-1 text-sm transition-colors duration-150 max-md:py-2.5 data-[state=active]:bg-card data-[state=active]:shadow-sm'
 
 import { ref, computed, nextTick, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
@@ -248,10 +244,6 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  aiPrompts: {
-    type: Array,
-    required: true
-  },
   isSending: {
     type: Boolean,
     required: true
@@ -292,7 +284,7 @@ const emit = defineEmits([
   'inlineImageUpload',
   'fileDelete',
   'filesDropped',
-  'aiPromptSelected',
+  'aiGenerationChange',
   'generateReply'
 ])
 
@@ -398,10 +390,6 @@ const handleEmojiSelect = (emoji) => {
   insertContent.value = undefined
   // Force reactivity so the user can select the same emoji multiple times
   nextTick(() => (insertContent.value = emoji))
-}
-
-const handleAiPromptSelected = (key) => {
-  emit('aiPromptSelected', key)
 }
 
 // Watch and update macro view based on message type this filters our macros.

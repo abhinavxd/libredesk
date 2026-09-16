@@ -92,6 +92,7 @@ import { useTagStore } from './stores/tag'
 import { useCustomAttributeStore } from './stores/customAttributes'
 import { useIdleDetection } from './composables/useIdleDetection'
 import { useNotificationStore } from './stores/notification'
+import { useAiPromptStore } from '@main/stores/aiPrompt'
 import { useViewStore } from './stores/view'
 import { useKeyboardShortcutsDialog } from './composables/useKeyboardShortcutsDialog'
 import KeyboardShortcutsDialog from './components/KeyboardShortcutsDialog.vue'
@@ -122,6 +123,7 @@ import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
 import PrimaryNavItems from '@main/components/sidebar/PrimaryNavItems.vue'
 import { useIsMobile } from '@shared-ui/composables'
 import api from '@main/api'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 
 const route = useRoute()
 const emitter = useEmitter()
@@ -165,6 +167,8 @@ const openCreateConversationDialog = ref(false)
 const createConversationContact = ref(null)
 const { t } = useI18n()
 const notificationStore = useNotificationStore()
+const aiPromptStore = useAiPromptStore()
+const pushNotifications = usePushNotifications()
 
 // Update browser tab title with unread notification count.
 // Watch both unreadCount and route so the prefix is preserved after navigation.
@@ -214,8 +218,15 @@ const initStores = async () => {
     inboxStore.fetchInboxes(),
     slaStore.fetchSlas(),
     tagStore.fetchTags(),
-    customAttributeStore.fetchCustomAttributes()
+    customAttributeStore.fetchCustomAttributes(),
+    aiPromptStore.fetchPrompts(),
+    refreshPushSubscription()
   ])
+}
+
+const refreshPushSubscription = async () => {
+  const { data } = await api.getNotificationPreferences()
+  await pushNotifications.refresh(data.data.vapid_public_key, data.data.push_endpoints)
 }
 
 const createView = () => {

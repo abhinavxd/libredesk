@@ -12,7 +12,8 @@ import {
 } from 'lucide-vue-next'
 import { useUserStore } from '@main/stores/user'
 import { useKeyboardShortcutsDialog } from '@main/composables/useKeyboardShortcutsDialog'
-import { SECTIONS } from '../sections'
+import { useLogout } from '@main/composables/useLogout'
+import { SECTIONS } from '@main/features/command/sections'
 
 const AWAY_STATUSES = ['away_manual', 'away_and_reassigning']
 
@@ -21,6 +22,7 @@ export function useAccountCommands() {
   const mode = useColorMode()
   const userStore = useUserStore()
   const shortcutsDialog = useKeyboardShortcutsDialog()
+  const logout = useLogout()
 
   return computed(() => {
     const status = userStore.user.availability_status
@@ -70,9 +72,7 @@ export function useAccountCommands() {
         keywords: ['sign out'],
         section: SECTIONS.ACCOUNT,
         icon: LogOut,
-        run: () => {
-          window.location.href = '/logout'
-        }
+        run: logout
       }
     ]
   })
