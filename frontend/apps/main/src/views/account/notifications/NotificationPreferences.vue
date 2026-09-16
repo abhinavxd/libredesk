@@ -1,73 +1,77 @@
 <template>
-  <div class="h-full">
+  <div class="h-full relative">
     <div class="flex flex-col space-y-5 max-w-2xl">
       <div class="space-y-1">
         <span class="sub-title">{{ $t('globals.terms.notification', 2) }}</span>
       </div>
 
-      <p v-if="!emailEnabled" class="text-muted-foreground text-xs">
-        {{ $t('notification.emailChannelDisabled') }}
-      </p>
+      <Spinner v-if="isLoading" />
 
-      <div
-        class="flex items-center justify-between gap-4 border border-border rounded-md px-4 py-3"
-      >
-        <div class="space-y-1">
-          <p class="text-sm text-foreground">
-            {{ $t('globals.terms.browserNotification', 2) }}
-          </p>
-          <p v-if="browserPushDescription" class="text-xs text-muted-foreground">
-            {{ browserPushDescription }}
-          </p>
-        </div>
-        <DotLoader
-          v-if="isUpdatingBrowserPush"
-          role="status"
-          :aria-label="$t('globals.terms.loading')"
-        />
-        <Switch
-          v-else
-          :checked="pushNotifications.enabled.value"
-          :disabled="
-            !pushNotifications.supported.value ||
-            pushNotifications.permission.value === 'denied' ||
-            !vapidPublicKey
-          "
-          :aria-label="$t('globals.terms.browserNotification', 2)"
-          @update:checked="updateBrowserPush"
-        />
-      </div>
+      <template v-else>
+        <p v-if="!emailEnabled" class="text-muted-foreground text-xs">
+          {{ $t('notification.emailChannelDisabled') }}
+        </p>
 
-      <div class="border border-border rounded-md divide-y divide-border">
-        <div class="flex items-center px-4 py-2 text-xs font-medium text-muted-foreground">
-          <div class="flex-grow" />
-          <div v-for="channel in channels" :key="channel.key" class="w-20 text-center">
-            {{ $t(channel.labelKey) }}
+        <div
+          class="flex items-center justify-between gap-4 border border-border rounded-md px-4 py-3"
+        >
+          <div class="space-y-1">
+            <p class="text-sm text-foreground">
+              {{ $t('globals.terms.browserNotification', 2) }}
+            </p>
+            <p v-if="browserPushDescription" class="text-xs text-muted-foreground">
+              {{ browserPushDescription }}
+            </p>
           </div>
+          <DotLoader
+            v-if="isUpdatingBrowserPush"
+            role="status"
+            :aria-label="$t('globals.terms.loading')"
+          />
+          <Switch
+            v-else
+            :checked="pushNotifications.enabled.value"
+            :disabled="
+              !pushNotifications.supported.value ||
+              pushNotifications.permission.value === 'denied' ||
+              !vapidPublicKey
+            "
+            :aria-label="$t('globals.terms.browserNotification', 2)"
+            @update:checked="updateBrowserPush"
+          />
         </div>
 
-        <div v-for="row in rows" :key="row.type" class="flex items-center px-4 py-3">
-          <div class="flex-grow pr-4">
-            <p class="text-sm text-foreground">{{ typeLabel(row.type) }}</p>
+        <div class="border border-border rounded-md divide-y divide-border">
+          <div class="flex items-center px-4 py-2 text-xs font-medium text-muted-foreground">
+            <div class="flex-grow" />
+            <div v-for="channel in channels" :key="channel.key" class="w-20 text-center">
+              {{ $t(channel.labelKey) }}
+            </div>
           </div>
-          <div v-for="channel in channels" :key="channel.key" class="w-20 flex justify-center">
-            <Switch
-              :checked="row[channel.key]"
-              :disabled="
-                (channel.key === 'email' && !emailEnabled) ||
-                pendingUpdates.has(preferenceKey(row.type, channel.key))
-              "
-              :aria-label="
-                $t('notification.channelToggleLabel', {
-                  channel: $t(channel.labelKey),
-                  type: typeLabel(row.type)
-                })
-              "
-              @update:checked="update(row, channel.key, $event)"
-            />
+
+          <div v-for="row in rows" :key="row.type" class="flex items-center px-4 py-3">
+            <div class="flex-grow pr-4">
+              <p class="text-sm text-foreground">{{ typeLabel(row.type) }}</p>
+            </div>
+            <div v-for="channel in channels" :key="channel.key" class="w-20 flex justify-center">
+              <Switch
+                :checked="row[channel.key]"
+                :disabled="
+                  (channel.key === 'email' && !emailEnabled) ||
+                  pendingUpdates.has(preferenceKey(row.type, channel.key))
+                "
+                :aria-label="
+                  $t('notification.channelToggleLabel', {
+                    channel: $t(channel.labelKey),
+                    type: typeLabel(row.type)
+                  })
+                "
+                @update:checked="update(row, channel.key, $event)"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -77,6 +81,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Switch } from '@shared-ui/components/ui/switch'
 import { DotLoader } from '@shared-ui/components/ui/loader'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -86,6 +91,7 @@ import { usePushNotifications } from '@/composables/usePushNotifications'
 const { t } = useI18n()
 const emitter = useEmitter()
 const rows = ref([])
+const isLoading = ref(true)
 const emailEnabled = ref(true)
 const vapidPublicKey = ref('')
 const pendingUpdates = ref(new Set())
@@ -132,6 +138,8 @@ const fetchPreferences = async () => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
+  } finally {
+    isLoading.value = false
   }
 }
 

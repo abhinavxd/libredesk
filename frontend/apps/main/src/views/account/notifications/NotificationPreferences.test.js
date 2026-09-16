@@ -79,6 +79,39 @@ const mount = async (vapidPublicKey = 'test-key') => {
 }
 
 describe('notification preferences', () => {
+  it('shows a loader until preferences are loaded', async () => {
+    let finishLoad
+    getPreferences.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishLoad = resolve
+      })
+    )
+    root = document.createElement('div')
+    document.body.append(root)
+    app = createApp(NotificationPreferences)
+    app.config.globalProperties.$t = (key) => key
+    app.mount(root)
+    await nextTick()
+
+    expect(root.querySelector('[role="status"]')).not.toBeNull()
+    expect(root.querySelectorAll('button')).toHaveLength(0)
+
+    finishLoad({
+      data: {
+        data: {
+          email_enabled: true,
+          vapid_public_key: 'test-key',
+          push_endpoints: [],
+          preferences: []
+        }
+      }
+    })
+    await settle()
+
+    expect(root.querySelector('[role="status"]')).toBeNull()
+    expect(root.querySelectorAll('button')).toHaveLength(1)
+  })
+
   it('saves a channel toggle', async () => {
     await mount()
     const email = root.querySelectorAll('button')[2]
