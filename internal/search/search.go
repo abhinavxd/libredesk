@@ -13,31 +13,41 @@ import (
 	"github.com/zerodha/logf"
 )
 
+const maxPageSize = 100
+
 var (
 	//go:embed queries.sql
 	efs embed.FS
+
+	messageAllowedFields = []string{"created_at"}
 )
 
 // Manager is the search manager
 type Manager struct {
-	q    queries
-	lo   *logf.Logger
-	i18n *i18n.I18n
+	q               queries
+	db              *sqlx.DB
+	lo              *logf.Logger
+	i18n            *i18n.I18n
+	filterFields    dbutil.AllowedFields
+	filterRenderers dbutil.FieldRenderers
+	filterLocation  func() string
 }
 
 // Opts contains the options for creating a new search manager
 type Opts struct {
-	DB   *sqlx.DB
-	Lo   *logf.Logger
-	I18n *i18n.I18n
+	DB              *sqlx.DB
+	Lo              *logf.Logger
+	I18n            *i18n.I18n
+	FilterFields    dbutil.AllowedFields
+	FilterRenderers dbutil.FieldRenderers
+	FilterLocation  func() string
 }
 
 // queries contains all the prepared queries
 type queries struct {
-	SearchConversationsByRefNum       *sqlx.Stmt `query:"search-conversations-by-reference-number"`
-	SearchConversationsByContactEmail *sqlx.Stmt `query:"search-conversations-by-contact-email"`
-	SearchMessages                    *sqlx.Stmt `query:"search-messages"`
-	SearchContacts                    *sqlx.Stmt `query:"search-contacts"`
+	SearchConversations string     `query:"search-conversations"`
+	SearchMessages      string     `query:"search-messages"`
+	SearchContacts      *sqlx.Stmt `query:"search-contacts"`
 }
 
 // New creates a new search manager
@@ -46,39 +56,55 @@ func New(opts Opts) (*Manager, error) {
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
 		return nil, err
 	}
-	return &Manager{q: q, lo: opts.Lo, i18n: opts.I18n}, nil
+	return &Manager{
+		q:               q,
+		db:              opts.DB,
+		lo:              opts.Lo,
+		i18n:            opts.I18n,
+		filterFields:    opts.FilterFields,
+		filterRenderers: opts.FilterRenderers,
+		filterLocation:  opts.FilterLocation,
+	}, nil
 }
 
-// Conversations searches conversations the agent is allowed to read.
-func (s *Manager) Conversations(query string, scope models.ReadScope, limit int) ([]models.ConversationResult, error) {
-	args := scopeArgs(scope)
-
-	var refNumResults = make([]models.ConversationResult, 0)
-	if err := s.q.SearchConversationsByRefNum.Select(&refNumResults, append([]any{query}, args...)...); err != nil {
+// Conversations searches conversations the agent is allowed to read, returning the page and the total match count.
+func (s *Manager) Conversations(query models.Query, scope models.ReadScope) ([]models.ConversationResult, int, error) {
+	sql, args, err := s.buildQuery(s.q.SearchConversations, query, scope, "conversations.last_message_at", s.filterFields)
+	if err != nil {
+		return nil, 0, err
+	}
+	var results = make([]models.ConversationResult, 0)
+	if err := s.db.Select(&results, sql, args...); err != nil {
 		s.lo.Error("error searching conversations", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, 0, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-
-	var emailResults = make([]models.ConversationResult, 0)
-	if err := s.q.SearchConversationsByContactEmail.Select(&emailResults, append([]any{query}, append(args, limit)...)...); err != nil {
-		s.lo.Error("error searching conversations", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+	total := 0
+	if len(results) > 0 {
+		total = results[0].Total
 	}
-	results := append(refNumResults, emailResults...)
-	if len(results) > limit {
-		results = results[:limit]
-	}
-	return results, nil
+	return results, total, nil
 }
 
-// Messages searches messages in conversations the agent is allowed to read.
-func (s *Manager) Messages(query string, scope models.ReadScope, limit int) ([]models.MessageResult, error) {
+// Messages searches messages in conversations the agent is allowed to read, returning the page and the total match count.
+func (s *Manager) Messages(query models.Query, scope models.ReadScope) ([]models.MessageResult, int, error) {
+	fields := dbutil.AllowedFields{"conversation_messages": messageAllowedFields}
+	for model, f := range s.filterFields {
+		fields[model] = f
+	}
+	sql, args, err := s.buildQuery(s.q.SearchMessages, query, scope, "conversation_messages.created_at", fields)
+	if err != nil {
+		return nil, 0, err
+	}
 	var results = make([]models.MessageResult, 0)
-	if err := s.q.SearchMessages.Select(&results, append([]any{query}, append(scopeArgs(scope), limit)...)...); err != nil {
+	if err := s.db.Select(&results, sql, args...); err != nil {
 		s.lo.Error("error searching messages", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, 0, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	return results, nil
+	total := 0
+	if len(results) > 0 {
+		total = results[0].Total
+	}
+	return results, total, nil
 }
 
 // Contacts searches contacts based on the query
@@ -89,6 +115,30 @@ func (s *Manager) Contacts(query string, limit int) ([]models.ContactResult, err
 		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return results, nil
+}
+
+func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadScope, orderBy string, fields dbutil.AllowedFields) (string, []any, error) {
+	if query.Page < 1 {
+		query.Page = 1
+	}
+	if query.PageSize < 1 || query.PageSize > maxPageSize {
+		query.PageSize = maxPageSize
+	}
+	if query.Filters == "" {
+		query.Filters = "[]"
+	}
+	sql, args, err := dbutil.BuildPaginatedQuery(base, append([]any{query.Term}, scopeArgs(scope)...), dbutil.PaginationOptions{
+		Order:    dbutil.DESC,
+		OrderBy:  orderBy,
+		Page:     query.Page,
+		PageSize: query.PageSize,
+		Location: s.filterLocation(),
+	}, query.Filters, fields, s.filterRenderers)
+	if err != nil {
+		s.lo.Error("error building search query", "error", err)
+		return "", nil, envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
+	}
+	return sql, args, nil
 }
 
 func scopeArgs(scope models.ReadScope) []any {

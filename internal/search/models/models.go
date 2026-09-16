@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
 
@@ -18,21 +19,73 @@ type ReadScope struct {
 	ReadUnassigned bool
 }
 
+// Query is a search term plus the list filters and page the caller wants applied.
+type Query struct {
+	Term     string
+	Filters  string
+	Page     int
+	PageSize int
+}
+
+type Contact struct {
+	FirstName string      `db:"first_name" json:"first_name"`
+	LastName  null.String `db:"last_name" json:"last_name"`
+	Email     null.String `db:"email" json:"email"`
+	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
+}
+
+type Assignee struct {
+	FirstName null.String `db:"first_name" json:"first_name"`
+	LastName  null.String `db:"last_name" json:"last_name"`
+	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
+}
+
+type Sender struct {
+	FirstName null.String `db:"first_name" json:"first_name"`
+	LastName  null.String `db:"last_name" json:"last_name"`
+}
+
 type ConversationResult struct {
-	CreatedAt       time.Time `db:"created_at" json:"created_at"`
-	UUID            string    `db:"uuid" json:"uuid"`
-	ReferenceNumber string    `db:"reference_number" json:"reference_number"`
-	Subject         string    `db:"subject" json:"subject"`
-	Status          string    `db:"status" json:"status"`
+	Total           int            `db:"total" json:"-"`
+	CreatedAt       time.Time      `db:"created_at" json:"created_at"`
+	UUID            string         `db:"uuid" json:"uuid"`
+	ReferenceNumber string         `db:"reference_number" json:"reference_number"`
+	Subject         null.String    `db:"subject" json:"subject"`
+	LastMessage     null.String    `db:"last_message" json:"last_message"`
+	LastMessageAt   null.Time      `db:"last_message_at" json:"last_message_at"`
+	AssignedUserID  null.Int       `db:"assigned_user_id" json:"assigned_user_id"`
+	AssignedTeamID  null.Int       `db:"assigned_team_id" json:"assigned_team_id"`
+	Assignee        Assignee       `db:"assignee" json:"assignee"`
+	TeamName        null.String    `db:"team_name" json:"team_name"`
+	Status          null.String    `db:"status" json:"status"`
+	Priority        null.String    `db:"priority" json:"priority"`
+	InboxName       null.String    `db:"inbox_name" json:"inbox_name"`
+	InboxChannel    null.String    `db:"inbox_channel" json:"inbox_channel"`
+	Contact         Contact        `db:"contact" json:"contact"`
+	Tags            pq.StringArray `db:"tags" json:"tags"`
 }
 
 type MessageResult struct {
-	CreatedAt                   time.Time `db:"created_at" json:"created_at"`
-	TextContent                 string    `db:"text_content" json:"text_content"`
-	ConversationCreatedAt       time.Time `db:"conversation_created_at" json:"conversation_created_at"`
-	ConversationUUID            string    `db:"conversation_uuid" json:"conversation_uuid"`
-	ConversationReferenceNumber string    `db:"conversation_reference_number" json:"conversation_reference_number"`
-	ConversationStatus          string    `db:"conversation_status" json:"conversation_status"`
+	Total                       int         `db:"total" json:"-"`
+	UUID                        string      `db:"uuid" json:"uuid"`
+	CreatedAt                   time.Time   `db:"created_at" json:"created_at"`
+	Type                        string      `db:"type" json:"type"`
+	Private                     bool        `db:"private" json:"private"`
+	Snippet                     null.String `db:"snippet" json:"snippet"`
+	Sender                      Sender      `db:"sender" json:"sender"`
+	ConversationCreatedAt       time.Time   `db:"conversation_created_at" json:"conversation_created_at"`
+	ConversationUUID            string      `db:"conversation_uuid" json:"conversation_uuid"`
+	ConversationReferenceNumber string      `db:"conversation_reference_number" json:"conversation_reference_number"`
+	ConversationSubject         null.String `db:"conversation_subject" json:"conversation_subject"`
+	ConversationStatus          null.String `db:"conversation_status" json:"conversation_status"`
+	AssignedUserID              null.Int    `db:"assigned_user_id" json:"assigned_user_id"`
+	AssignedTeamID              null.Int    `db:"assigned_team_id" json:"assigned_team_id"`
+	Assignee                    Assignee    `db:"assignee" json:"assignee"`
+	TeamName                    null.String `db:"team_name" json:"team_name"`
+	Priority                    null.String `db:"priority" json:"priority"`
+	InboxName                   null.String `db:"inbox_name" json:"inbox_name"`
+	InboxChannel                null.String `db:"inbox_channel" json:"inbox_channel"`
+	Contact                     Contact     `db:"contact" json:"contact"`
 }
 
 type ContactResult struct {

@@ -13,14 +13,16 @@ describe('conversation reference suggestions', () => {
   it('maps a conversation result to a suggestion', async () => {
     const search = vi.fn().mockResolvedValue({
       data: {
-        data: [
-          {
-            uuid: 'conversation-uuid',
-            reference_number: '108',
-            subject: 'Payment failed',
-            status: 'Open'
-          }
-        ]
+        data: {
+          results: [
+            {
+              uuid: 'conversation-uuid',
+              reference_number: '108',
+              subject: 'Payment failed',
+              status: 'Open'
+            }
+          ]
+        }
       }
     })
     await expect(getConversationSuggestions('108', search)).resolves.toEqual([
@@ -28,10 +30,10 @@ describe('conversation reference suggestions', () => {
     ])
   })
 
-  it('caps the suggestion list', async () => {
-    const rows = Array.from({ length: 30 }, (_, i) => ({ uuid: `u${i}`, reference_number: `${i}` }))
-    const search = vi.fn().mockResolvedValue({ data: { data: rows } })
-    await expect(getConversationSuggestions('108', search)).resolves.toHaveLength(10)
+  it('asks the server for a capped page', async () => {
+    const search = vi.fn().mockResolvedValue({ data: { data: { results: [] } } })
+    await getConversationSuggestions('108', search)
+    expect(search).toHaveBeenCalledWith({ query: '108', page_size: 10 })
   })
 
   it('discards a response superseded by a newer query', async () => {
