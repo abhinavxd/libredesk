@@ -244,7 +244,10 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		if dialCode == "" {
 			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
 		}
-		toPhone = stringutil.NormalizeWhatsAppPhone(dialCode + contact.PhoneNumber.String)
+		toPhone, matchesCountry := stringutil.WhatsAppPhoneForDialCode(contact.PhoneNumber.String, dialCode)
+		if !matchesCountry {
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
+		}
 		if toPhone == "" {
 			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactNoPhone"), nil)
 		}
@@ -324,7 +327,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 
 func (m *Manager) validateWhatsAppContent(content string, hasAttachments bool) error {
 	if strings.TrimSpace(content) == "" && !hasAttachments {
-		return envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contentRequired"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.messageOrAttachmentRequired"), nil)
 	}
 	limit := whatsAppMaxTextLength
 	if hasAttachments {

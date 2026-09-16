@@ -11,7 +11,7 @@ export const createFormSchema = (t) =>
       .string()
       .min(1, t('globals.messages.required'))
       .max(512)
-      .regex(/^[a-z0-9_]+$/, t('admin.whatsappTemplates.nameInvalid')),
+      .regex(/^[a-z0-9_]+$/, t('globals.messages.lowercaseLettersNumbersUnderscoresOnly')),
     language: z.string().min(1, t('globals.messages.required')).max(20),
     category: z.enum(TEMPLATE_CATEGORIES),
     header_type: z.enum(HEADER_TYPES).optional(),

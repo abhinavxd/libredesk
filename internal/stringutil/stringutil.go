@@ -50,6 +50,27 @@ func NormalizeWhatsAppPhone(s string) string {
 	return b.String()
 }
 
+// WhatsAppPhoneForDialCode returns the Meta wa_id digits and whether an explicit international number matches the selected country.
+func WhatsAppPhoneForDialCode(phone, dialCode string) (string, bool) {
+	trimmed := strings.TrimSpace(phone)
+	digits := NormalizeWhatsAppPhone(trimmed)
+	isInternational := strings.HasPrefix(trimmed, "+") || strings.HasPrefix(digits, "00")
+	digits = strings.TrimPrefix(digits, "00")
+	if dialCode == "" {
+		return "", false
+	}
+	if digits == "" {
+		return "", true
+	}
+	if isInternational {
+		if !strings.HasPrefix(digits, dialCode) {
+			return "", false
+		}
+		return digits, true
+	}
+	return dialCode + digits, true
+}
+
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.
 func SanitizeUTF8(s string) string {
 	if s == "" {

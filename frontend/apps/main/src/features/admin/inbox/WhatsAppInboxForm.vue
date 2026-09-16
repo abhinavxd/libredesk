@@ -37,7 +37,6 @@
       <FormItem>
         <SwitchField
           :title="$t('globals.terms.enabled')"
-          :description="$t('admin.inbox.whatsapp.enabled.description')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />

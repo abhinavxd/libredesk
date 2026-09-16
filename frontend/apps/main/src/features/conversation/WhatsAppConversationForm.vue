@@ -35,7 +35,7 @@
               v-model="phoneNumber"
               class="rounded-l-none flex-1"
               inputmode="numeric"
-              :placeholder="t('conversation.whatsapp.numberPlaceholder')"
+              :placeholder="t('globals.messages.searchOrEnterNumber')"
               @input="handleSearchContacts"
               @keydown="handleSearchKeydown"
               @blur="clearSearchResults"

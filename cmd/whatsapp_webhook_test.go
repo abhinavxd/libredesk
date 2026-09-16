@@ -138,6 +138,7 @@ func TestLocalPhoneNumber(t *testing.T) {
 		{"plus prefixed with spaces", "+91 98765 43210", "91", "9876543210", false},
 		{"double zero prefixed", "00919876543210", "91", "9876543210", false},
 		{"plus with the wrong country", "+15550001111", "91", "", true},
+		{"country code only", "+91", "91", "", true},
 		{"empty", "", "91", "", true},
 		{"punctuation only", "+ - ", "91", "", true},
 		// A local number that happens to start with the dial code must not be trimmed.

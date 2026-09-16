@@ -113,7 +113,7 @@ const channels = [
   },
   {
     title: t('globals.terms.whatsapp'),
-    subTitle: t('admin.inbox.createWhatsAppInbox'),
+    subTitle: t('admin.inbox.help.whatsapp'),
     onClick: selectWhatsAppChannel,
     icon: WhatsAppIcon,
     badge: t('globals.terms.beta')

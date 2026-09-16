@@ -57,7 +57,7 @@
                 <Input type="text" placeholder="order_status" v-bind="componentField" />
               </FormControl>
               <FormDescription>{{
-                $t('admin.whatsappTemplates.name.description')
+                $t('globals.messages.lowercaseLettersNumbersUnderscoresOnly')
               }}</FormDescription>
               <FormMessage />
             </FormItem>
@@ -143,13 +143,11 @@
 
           <FormField v-slot="{ componentField }" name="footer_content">
             <FormItem>
-              <FormLabel>{{ $t('admin.whatsappTemplates.footer') }}</FormLabel>
+              <FormLabel>{{ $t('globals.messages.footerOptional') }}</FormLabel>
               <FormControl>
                 <Input type="text" maxlength="60" v-bind="componentField" />
               </FormControl>
-              <FormDescription>{{
-                $t('admin.whatsappTemplates.footer.description')
-              }}</FormDescription>
+              <FormDescription>{{ $t('globals.messages.maxLength', { max: 60 }) }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>

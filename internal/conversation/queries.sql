@@ -766,7 +766,17 @@ SELECT
 FROM conversation_messages m
 INNER JOIN conversations c ON c.id = m.conversation_id
 WHERE m.status = 'pending' AND m.type = 'outgoing' AND m.private = false
-AND NOT(m.id = ANY($1::INT[]))
+AND NOT (m.conversation_id = ANY($1::INT[]))
+AND NOT EXISTS (
+    SELECT 1
+    FROM conversation_messages earlier
+    WHERE earlier.conversation_id = m.conversation_id
+      AND earlier.status = 'pending'
+      AND earlier.type = 'outgoing'
+      AND earlier.private = false
+      AND earlier.id < m.id
+)
+ORDER BY m.id
 
 -- name: get-message
 SELECT

@@ -78,23 +78,16 @@ func (m *Manager) Run(ctx context.Context, incomingQWorkers, outgoingQWorkers, s
 		case <-ctx.Done():
 			return
 		case <-dbScanner.C:
-			var (
-				pendingMessages = []models.Message{}
-				messageIDs      = m.getOutgoingProcessingMessageIDs()
-			)
+			pendingMessages := []models.Message{}
+			processingConversationIDs := m.getOutgoingProcessingConversationIDs()
 
-			// Get pending outgoing messages and skip the currently processing message ids.
-			if err := m.q.GetOutgoingPendingMessages.Select(&pendingMessages, pq.Array(messageIDs)); err != nil {
+			if err := m.q.GetOutgoingPendingMessages.Select(&pendingMessages, pq.Array(processingConversationIDs)); err != nil {
 				m.lo.Error("error fetching pending messages from db", "error", err)
 				continue
 			}
 
-			// Prepare and push the message to the outgoing queue.
 			for _, message := range pendingMessages {
-				// Put the message ID in the processing map.
-				m.outgoingProcessingMessages.Store(message.ID, message.ID)
-
-				// Push the message to the outgoing message queue.
+				m.outgoingProcessingMessages.Store(message.ID, message.ConversationID)
 				m.outgoingMessageQueue <- message
 			}
 		}
@@ -1480,12 +1473,11 @@ func (m *Manager) attachAttachmentsToMessage(message *models.Message) error {
 	return nil
 }
 
-// getOutgoingProcessingMessageIDs returns the IDs of outgoing messages currently being processed.
-func (m *Manager) getOutgoingProcessingMessageIDs() []int {
-	var out = make([]int, 0)
-	m.outgoingProcessingMessages.Range(func(key, _ any) bool {
-		if k, ok := key.(int); ok {
-			out = append(out, k)
+func (m *Manager) getOutgoingProcessingConversationIDs() []int {
+	out := make([]int, 0)
+	m.outgoingProcessingMessages.Range(func(_, value any) bool {
+		if conversationID, ok := value.(int); ok {
+			out = append(out, conversationID)
 		}
 		return true
 	})

@@ -188,6 +188,11 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		return applyWhatsAppSystemEvent(app, m)
 	}
 
+	if ing := app.ingester(); ing != nil {
+		unlock := ing.lockSender(m.From)
+		defer unlock()
+	}
+
 	// Meta posts all events of an app to one callback URL, so the URL's inbox ID is not authoritative.
 	inbRec, cfg, err := resolveWhatsAppInbox(app, inboxID, m.PhoneNumberID)
 	if errors.Is(err, errNoEnabledWhatsAppInbox) {
@@ -209,19 +214,12 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		return nil
 	}
 
-	// Download media before taking the per-sender lock; a slow CDN must not stall other senders' workers.
 	attachments, err := fetchWhatsAppAttachments(ctx, app, cfg, m)
 	if err != nil {
 		return fmt.Errorf("downloading whatsapp media: %w", err)
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
-	}
-
-	// No unique constraint backs source_id, so this lock across the check and insert is the only duplicate guard.
-	if ing := app.ingester(); ing != nil {
-		unlock := ing.lockSender(m.From)
-		defer unlock()
 	}
 
 	if exists, err := app.conversation.AdvanceWhatsAppWindowForMessage(m.ID, m.Timestamp); err != nil {

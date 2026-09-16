@@ -1089,7 +1089,7 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 	}
 	dialCode := countries.DialCodeForISO(req.PhoneNumberCountryCode)
 	if dialCode == "" {
-		return 0, envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneCountryCodeInvalid"), nil)
+		return 0, envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.pickValidPhoneCountry"), nil)
 	}
 	local, err := localPhoneNumber(app, req.PhoneNumber, dialCode)
 	if err != nil {
@@ -1114,17 +1114,16 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 
 // localPhoneNumber returns the digits after the country dial code, accepting numbers typed with a leading + or 00.
 func localPhoneNumber(app *App, phone, dialCode string) (string, error) {
-	trimmed := strings.TrimSpace(phone)
-	digits := stringutil.NormalizeWhatsAppPhone(trimmed)
-	if strings.HasPrefix(trimmed, "+") || strings.HasPrefix(digits, "00") {
-		digits = strings.TrimPrefix(digits, "00")
-		if !strings.HasPrefix(digits, dialCode) {
-			return "", envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneCountryMismatch"), nil)
-		}
-		digits = strings.TrimPrefix(digits, dialCode)
+	phone, matchesCountry := stringutil.WhatsAppPhoneForDialCode(phone, dialCode)
+	if !matchesCountry {
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.phoneCountryMismatch"), nil)
 	}
-	if digits == "" {
-		return "", envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneInvalid"), nil)
+	if phone == "" {
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.enterValidPhoneNumber"), nil)
 	}
-	return digits, nil
+	local := strings.TrimPrefix(phone, dialCode)
+	if local == "" {
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.enterValidPhoneNumber"), nil)
+	}
+	return local, nil
 }
