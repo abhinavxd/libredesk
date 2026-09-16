@@ -1,8 +1,14 @@
 <template>
   <div class="flex flex-wrap gap-1 items-center">
-    <DropdownMenu v-if="aiPrompts.length > 0">
+    <DropdownMenu v-if="showAi && aiPromptStore.prompts.length > 0">
       <DropdownMenuTrigger as-child>
-        <Button type="button" size="sm" variant="ghost" class="flex items-center justify-center">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          class="flex items-center justify-center"
+          :disabled="isGenerating"
+        >
           <span class="flex items-center">
             <span class="text-medium">AI</span>
             <Bot size="14" class="ml-1" />
@@ -12,9 +18,9 @@
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem
-          v-for="prompt in aiPrompts"
+          v-for="prompt in aiPromptStore.prompts"
           :key="prompt.key"
-          @select="emit('aiPrompt', prompt.key)"
+          @select="complete(prompt.key)"
         >
           {{ prompt.title }}
         </DropdownMenuItem>
@@ -331,6 +337,7 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import {
   ChevronDown,
   Bold,
@@ -363,16 +370,20 @@ import {
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
+import { useAiPromptStore } from '@main/stores/aiPrompt'
 import { codeBlockLanguages } from './codeLanguages'
 
 const props = defineProps({
   editor: { type: Object, default: null },
   showArticleTools: { type: Boolean, default: false },
-  aiPrompts: { type: Array, default: () => [] },
+  showAi: { type: Boolean, default: false },
   enableInlineImages: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['openLink', 'openYoutube', 'openImage', 'aiPrompt'])
+const emit = defineEmits(['openLink', 'openYoutube', 'openImage', 'aiGenerationChange'])
+
+const aiPromptStore = useAiPromptStore()
+const isGenerating = ref(false)
 
 const alignments = [
   { dir: 'left', icon: AlignLeft, label: 'editor.tooltip.alignLeft' },
@@ -397,5 +408,19 @@ const getCurrentHeadingText = () => {
     if (props.editor.isActive('heading', { level })) return `H${level}`
   }
   return 'P'
+}
+
+const complete = async (promptKey) => {
+  if (!props.editor || isGenerating.value) return
+
+  isGenerating.value = true
+  emit('aiGenerationChange', true)
+  try {
+    const content = await aiPromptStore.complete(promptKey, props.editor.getHTML())
+    if (content !== null) props.editor.commands.setContent(content)
+  } finally {
+    isGenerating.value = false
+    emit('aiGenerationChange', false)
+  }
 }
 </script>

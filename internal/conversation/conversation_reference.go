@@ -1,6 +1,8 @@
 package conversation
 
-import "strings"
+import (
+	"strings"
+)
 
 func absolutizeConversationReferenceLinks(content, rootURL string) string {
 	if rootURL == "" {
