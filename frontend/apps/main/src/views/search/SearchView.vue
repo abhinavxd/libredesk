@@ -11,7 +11,8 @@
           <Input
             ref="inputRef"
             v-model="term"
-            :placeholder="$t('search.placeholder')"
+            :placeholder="$t('search.searchBy')"
+            :aria-label="$t('globals.terms.search')"
             class="h-12 pl-10 pr-10 text-base"
           />
           <button
@@ -21,7 +22,7 @@
             :aria-label="$t('globals.terms.clear')"
             @click="term = ''"
           >
-            <X class="w-4 h-4" />
+            <X class="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -44,7 +45,6 @@
           :term="term"
           v-model:active-tab="activeTab"
           @change-page="changePage"
-          @change-per-page="changePerPage"
         />
         <p
           v-else-if="term.length > 0 && term.length < MIN_SEARCH_LENGTH"
@@ -159,8 +159,7 @@ const fetchPage = async (type, page, perPage) => {
   }
 }
 
-const changePage = ({ type, page }) => fetchPage(type, page, results.value[type].per_page)
-const changePerPage = ({ type, perPage }) => fetchPage(type, 1, perPage)
+const changePage = ({ type, page, perPage }) => fetchPage(type, page, perPage)
 
 const syncRoute = () => {
   const query = { ...queryFromFilters(filters.value) }

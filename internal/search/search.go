@@ -3,6 +3,7 @@ package search
 
 import (
 	"embed"
+	"fmt"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
@@ -13,7 +14,12 @@ import (
 	"github.com/zerodha/logf"
 )
 
-const maxPageSize = 100
+const (
+	maxPageSize = 100
+
+	conversationResultOrder = "(conversations.reference_number = $1) DESC, conversations.last_message_at DESC NULLS LAST"
+	messageResultOrder      = "conversation_messages.created_at DESC NULLS LAST"
+)
 
 var (
 	//go:embed queries.sql
@@ -69,7 +75,7 @@ func New(opts Opts) (*Manager, error) {
 
 // Conversations searches conversations the agent is allowed to read, returning the page and the total match count.
 func (s *Manager) Conversations(query models.Query, scope models.ReadScope) ([]models.ConversationResult, int, error) {
-	sql, args, err := s.buildQuery(s.q.SearchConversations, query, scope, "conversations.last_message_at", s.filterFields)
+	sql, args, err := s.buildQuery(s.q.SearchConversations, query, scope, conversationResultOrder, s.filterFields)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -91,7 +97,7 @@ func (s *Manager) Messages(query models.Query, scope models.ReadScope) ([]models
 	for model, f := range s.filterFields {
 		fields[model] = f
 	}
-	sql, args, err := s.buildQuery(s.q.SearchMessages, query, scope, "conversation_messages.created_at", fields)
+	sql, args, err := s.buildQuery(s.q.SearchMessages, query, scope, messageResultOrder, fields)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -117,7 +123,7 @@ func (s *Manager) Contacts(query string, limit int) ([]models.ContactResult, err
 	return results, nil
 }
 
-func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadScope, orderBy string, fields dbutil.AllowedFields) (string, []any, error) {
+func NormalizeQuery(query models.Query) models.Query {
 	if query.Page < 1 {
 		query.Page = 1
 	}
@@ -127,17 +133,19 @@ func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadS
 	if query.Filters == "" {
 		query.Filters = "[]"
 	}
-	sql, args, err := dbutil.BuildPaginatedQuery(base, append([]any{query.Term}, scopeArgs(scope)...), dbutil.PaginationOptions{
-		Order:    dbutil.DESC,
-		OrderBy:  orderBy,
-		Page:     query.Page,
-		PageSize: query.PageSize,
-		Location: s.filterLocation(),
-	}, query.Filters, fields, s.filterRenderers)
+	return query
+}
+
+func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadScope, orderBy string, fields dbutil.AllowedFields) (string, []any, error) {
+	query = NormalizeQuery(query)
+	sql, args, err := dbutil.BuildFilterQuery(base, append([]any{query.Term}, scopeArgs(scope)...), query.Filters, fields, s.filterRenderers, s.filterLocation())
 	if err != nil {
 		s.lo.Error("error building search query", "error", err)
 		return "", nil, envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
 	}
+	sql += " ORDER BY " + orderBy
+	sql += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
+	args = append(args, query.PageSize, dbutil.PageOffset(query.Page, query.PageSize))
 	return sql, args, nil
 }
 

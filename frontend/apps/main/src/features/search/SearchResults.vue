@@ -29,8 +29,7 @@
           :page="results[type].page"
           :per-page="results[type].per_page"
           :total-pages="results[type].total_pages"
-          @update:page="emit('changePage', { type, page: $event })"
-          @update:per-page="emit('changePerPage', { type, perPage: $event })"
+          @change="emit('changePage', { type, ...$event })"
         />
       </TabsContent>
     </Tabs>
@@ -54,7 +53,7 @@ defineProps({
   term: { type: String, default: '' },
   activeTab: { type: String, required: true }
 })
-const emit = defineEmits(['update:activeTab', 'changePage', 'changePerPage'])
+const emit = defineEmits(['update:activeTab', 'changePage'])
 
 const { t } = useI18n()
 </script>

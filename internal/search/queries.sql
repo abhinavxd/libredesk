@@ -1,4 +1,16 @@
 -- name: search-conversations
+WITH matched_conversations AS (
+    SELECT id
+    FROM conversations
+    WHERE reference_number = $1
+
+    UNION ALL
+
+    SELECT conversations.id
+    FROM users
+    JOIN conversations ON conversations.contact_id = users.id
+    WHERE users.email ILIKE '%' || $1 || '%'
+)
 SELECT
     COUNT(*) OVER() AS total,
     conversations.created_at,
@@ -32,12 +44,7 @@ LEFT JOIN teams ON conversations.assigned_team_id = teams.id
 LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
 LEFT JOIN conversation_statuses cs ON conversations.status_id = cs.id
 LEFT JOIN conversation_priorities cp ON conversations.priority_id = cp.id
-WHERE (
-       conversations.reference_number::text = $1
-    OR conversations.subject ILIKE '%' || $1 || '%'
-    OR users.email ILIKE '%' || $1 || '%'
-    OR CONCAT_WS(' ', users.first_name, users.last_name) ILIKE '%' || $1 || '%'
-  )
+WHERE conversations.id IN (SELECT id FROM matched_conversations)
   AND $3
   AND (
        $4

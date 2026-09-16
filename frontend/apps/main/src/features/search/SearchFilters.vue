@@ -57,6 +57,7 @@
     <div class="flex-[1.5] min-w-60">
       <DateFilterValue
         :model-value="filters.created"
+        :placeholder="t('search.conversationCreatedDate')"
         range
         @update:model-value="set('created', $event)"
       />
@@ -69,8 +70,8 @@
       class="text-muted-foreground"
       @click="emit('update:filters', emptyFilters())"
     >
-      <X class="w-4 h-4 mr-1" />
-      {{ t('search.clearFilters') }}
+      <X class="w-4 h-4 mr-1" aria-hidden="true" />
+      {{ t('globals.messages.clearFilters') }}
     </Button>
   </div>
 </template>

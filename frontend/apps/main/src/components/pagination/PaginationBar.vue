@@ -8,7 +8,7 @@
           {{ t('globals.messages.pageNofTotal', { page, total: totalPages }) }}
         </span>
         <Select :model-value="perPage" @update:model-value="handlePerPageChange">
-          <SelectTrigger class="h-8 w-[70px]">
+          <SelectTrigger class="h-8 w-[70px]" :aria-label="t('globals.messages.resultsPerPage')">
             <SelectValue :placeholder="String(perPage)" />
           </SelectTrigger>
           <SelectContent>
@@ -24,19 +24,21 @@
           variant="ghost"
           size="sm"
           class="h-8 w-8 p-0"
+          :aria-label="t('globals.messages.firstPage')"
           :disabled="page <= 1"
           @click="goToPage(1)"
         >
-          <ChevronsLeft class="h-4 w-4" />
+          <ChevronsLeft class="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
           variant="ghost"
           size="sm"
           class="h-8 w-8 p-0"
+          :aria-label="t('globals.messages.previousPage')"
           :disabled="page <= 1"
           @click="goToPage(page - 1)"
         >
-          <ChevronLeft class="h-4 w-4" />
+          <ChevronLeft class="h-4 w-4" aria-hidden="true" />
         </Button>
 
         <div class="flex items-center bg-muted rounded-lg p-1">
@@ -66,19 +68,21 @@
           variant="ghost"
           size="sm"
           class="h-8 w-8 p-0"
+          :aria-label="t('globals.messages.nextPage')"
           :disabled="page >= totalPages"
           @click="goToPage(page + 1)"
         >
-          <ChevronRight class="h-4 w-4" />
+          <ChevronRight class="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
           variant="ghost"
           size="sm"
           class="h-8 w-8 p-0"
+          :aria-label="t('globals.messages.lastPage')"
           :disabled="page >= totalPages"
           @click="goToPage(totalPages)"
         >
-          <ChevronsRight class="h-4 w-4" />
+          <ChevronsRight class="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
     </div>
@@ -106,7 +110,7 @@ const props = defineProps({
   perPageOptions: { type: Array, default: () => [15, 30, 50, 100] }
 })
 
-const emit = defineEmits(['update:page', 'update:perPage'])
+const emit = defineEmits(['update:page', 'update:perPage', 'change'])
 
 const { t } = useI18n()
 
@@ -115,11 +119,13 @@ const visiblePages = computed(() => getVisiblePages(props.page, props.totalPages
 function goToPage(p) {
   if (p >= 1 && p <= props.totalPages && p !== props.page) {
     emit('update:page', p)
+    emit('change', { page: p, perPage: props.perPage })
   }
 }
 
 function handlePerPageChange(newPerPage) {
   emit('update:perPage', newPerPage)
   emit('update:page', 1)
+  emit('change', { page: 1, perPage: newPerPage })
 }
 </script>

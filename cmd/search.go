@@ -8,6 +8,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	searchmanager "github.com/abhinavxd/libredesk/internal/search"
 	smodels "github.com/abhinavxd/libredesk/internal/search/models"
 	"github.com/zerodha/fastglue"
 )
@@ -77,12 +78,13 @@ func searchInputs(r *fastglue.Request) (*App, amodels.User, smodels.Query, error
 		return app, user, smodels.Query{}, envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minSearchQueryLength)), nil)
 	}
 	page, pageSize := getPagination(r)
-	return app, user, smodels.Query{
+	query := searchmanager.NormalizeQuery(smodels.Query{
 		Term:     term,
 		Filters:  string(r.RequestCtx.QueryArgs().Peek("filters")),
 		Page:     page,
 		PageSize: pageSize,
-	}, nil
+	})
+	return app, user, query, nil
 }
 
 func pageResults(results any, total int, q smodels.Query) envelope.PageResults {
