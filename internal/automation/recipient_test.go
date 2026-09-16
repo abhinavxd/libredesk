@@ -17,14 +17,14 @@ func TestEvaluateRuleIncomingTo(t *testing.T) {
 		want       bool
 	}{
 		{
-			name:       "equals recipient case insensitively",
-			recipients: []string{"foundation@zerya.dev"},
+			name:       "equals any recipient case insensitively",
+			recipients: []string{"support@example.com", "foundation@zerya.dev"},
 			rule:       models.RuleDetail{Operator: models.RuleOperatorEquals, Value: "FOUNDATION@ZERYA.DEV"},
 			want:       true,
 		},
 		{
-			name:       "not equals rejects matching recipient",
-			recipients: []string{"foundation@zerya.dev"},
+			name:       "not equals requires all recipients to differ",
+			recipients: []string{"support@example.com", "foundation@zerya.dev"},
 			rule:       models.RuleDetail{Operator: models.RuleOperatorNotEqual, Value: "foundation@zerya.dev"},
 			want:       false,
 		},
@@ -54,6 +54,12 @@ func TestEvaluateRuleIncomingTo(t *testing.T) {
 			name: "not set matches missing recipients",
 			rule: models.RuleDetail{Operator: models.RuleOperatorNotSet},
 			want: true,
+		},
+		{
+			name:       "empty recipients are not set",
+			recipients: []string{"", "  "},
+			rule:       models.RuleDetail{Operator: models.RuleOperatorNotSet},
+			want:       true,
 		},
 	}
 
