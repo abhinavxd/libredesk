@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
+	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	smodels "github.com/abhinavxd/libredesk/internal/search/models"
 	"github.com/zerodha/fastglue"
@@ -11,6 +14,10 @@ import (
 
 const (
 	minSearchQueryLength = 3
+
+	maxConversationSearchLimit = 1000
+	maxMessageSearchLimit      = 30
+	maxContactSearchLimit      = 15
 )
 
 // handleSearchConversations searches conversations based on the query.
@@ -19,26 +26,15 @@ func handleSearchConversations(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	results, err := app.search.Conversations(q)
+	scope, err := readScope(app, user.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	uuids := make([]string, len(results))
-	for i, c := range results {
-		uuids[i] = c.UUID
-	}
-	allowed, err := app.conversation.FilterAuthorizedListUUIDs(user.ID, uuids)
+	results, err := app.search.Conversations(q, scope, searchLimit(r, maxConversationSearchLimit))
 	if err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, err)
 	}
-	set := uuidSet(allowed)
-	out := make([]smodels.ConversationResult, 0, len(allowed))
-	for _, c := range results {
-		if _, ok := set[c.UUID]; ok {
-			out = append(out, c)
-		}
-	}
-	return r.SendEnvelope(out)
+	return r.SendEnvelope(results)
 }
 
 // handleSearchMessages searches messages based on the query.
@@ -47,26 +43,15 @@ func handleSearchMessages(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	results, err := app.search.Messages(q)
+	scope, err := readScope(app, user.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	uuids := make([]string, len(results))
-	for i, m := range results {
-		uuids[i] = m.ConversationUUID
-	}
-	allowed, err := app.conversation.FilterAuthorizedListUUIDs(user.ID, uuids)
+	results, err := app.search.Messages(q, scope, searchLimit(r, maxMessageSearchLimit))
 	if err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, err)
 	}
-	set := uuidSet(allowed)
-	out := make([]smodels.MessageResult, 0, len(allowed))
-	for _, m := range results {
-		if _, ok := set[m.ConversationUUID]; ok {
-			out = append(out, m)
-		}
-	}
-	return r.SendEnvelope(out)
+	return r.SendEnvelope(results)
 }
 
 // handleSearchContacts searches contacts based on the query.
@@ -75,7 +60,7 @@ func handleSearchContacts(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	results, err := app.search.Contacts(q)
+	results, err := app.search.Contacts(q, searchLimit(r, maxContactSearchLimit))
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -92,10 +77,30 @@ func searchInputs(r *fastglue.Request) (*App, amodels.User, string, error) {
 	return app, user, q, nil
 }
 
-func uuidSet(uuids []string) map[string]struct{} {
-	s := make(map[string]struct{}, len(uuids))
-	for _, u := range uuids {
-		s[u] = struct{}{}
+func searchLimit(r *fastglue.Request, max int) int {
+	limit, err := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("limit")))
+	if err != nil || limit < 1 || limit > max {
+		return max
 	}
-	return s
+	return limit
+}
+
+func readScope(app *App, agentID int) (smodels.ReadScope, error) {
+	agent, err := app.user.GetAgentCachedOrLoad(agentID)
+	if err != nil {
+		return smodels.ReadScope{}, err
+	}
+	if !agent.Enabled {
+		return smodels.ReadScope{}, nil
+	}
+	return smodels.ReadScope{
+		UserID:         agent.ID,
+		TeamIDs:        agent.Teams.IDs(),
+		Read:           slices.Contains(agent.Permissions, authzmodels.PermConversationsRead),
+		ReadAll:        slices.Contains(agent.Permissions, authzmodels.PermConversationsReadAll),
+		ReadAssigned:   slices.Contains(agent.Permissions, authzmodels.PermConversationsReadAssigned),
+		ReadTeamAll:    slices.Contains(agent.Permissions, authzmodels.PermConversationsReadTeamAll),
+		ReadTeamInbox:  slices.Contains(agent.Permissions, authzmodels.PermConversationsReadTeamInbox),
+		ReadUnassigned: slices.Contains(agent.Permissions, authzmodels.PermConversationsReadUnassigned),
+	}, nil
 }

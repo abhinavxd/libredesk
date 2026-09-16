@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { countryCallingOptions } from '../constants/countries.js'
+import { timezoneCountries } from '../constants/timezoneCountries.js'
 
 export const PHONE_COUNTRY_CODE_SUFFIX = '_country_code'
 export const PHONE_NUMBER_MAX = 20
@@ -14,20 +15,7 @@ const VALID_COUNTRY_CODES = new Set(countryCallingOptions.map((c) => c.value))
 export const countryCodeKey = (fieldKey) => `${fieldKey}${PHONE_COUNTRY_CODE_SUFFIX}`
 
 export const defaultCountryCode = () => {
-  const locales =
-    typeof navigator !== 'undefined' ? [navigator.language, ...(navigator.languages || [])] : []
-  for (const locale of locales) {
-    if (!locale) continue
-    let region
-    try {
-      region = new Intl.Locale(locale).region
-    } catch {
-      region = locale.split('-')[1]
-    }
-    region = region?.toUpperCase()
-    if (region && VALID_COUNTRY_CODES.has(region)) return region
-  }
-  return DEFAULT_COUNTRY_CODE
+  return countryFromTimezone() || countryFromLanguage() || DEFAULT_COUNTRY_CODE
 }
 
 export const phoneNumberSchema = (t, required = false) => {
@@ -50,4 +38,32 @@ export const countryCodeSchema = (t, required = false) => {
     schema = schema.min(1, { message: t('globals.messages.required') })
   }
   return schema
+}
+
+const countryFromTimezone = () => {
+  let timezone
+  try {
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return ''
+  }
+  const country = timezoneCountries[timezone]
+  return country && VALID_COUNTRY_CODES.has(country) ? country : ''
+}
+
+const countryFromLanguage = () => {
+  const locales =
+    typeof navigator !== 'undefined' ? [navigator.language, ...(navigator.languages || [])] : []
+  for (const locale of locales) {
+    if (!locale) continue
+    let region
+    try {
+      region = new Intl.Locale(locale).region
+    } catch {
+      region = locale.split('-')[1]
+    }
+    region = region?.toUpperCase()
+    if (region && VALID_COUNTRY_CODES.has(region)) return region
+  }
+  return ''
 }

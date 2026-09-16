@@ -2,6 +2,7 @@
 package testutil
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -67,6 +68,24 @@ func NewI18n(t *testing.T) *i18n.I18n {
 		t.Fatalf("loading i18n: %v", err)
 	}
 	return mgr
+}
+
+// JSONKeys returns the set of top-level keys in v's JSON encoding.
+func JSONKeys(t *testing.T, v any) map[string]bool {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	fields := map[string]json.RawMessage{}
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	keys := make(map[string]bool, len(fields))
+	for k := range fields {
+		keys[k] = true
+	}
+	return keys
 }
 
 // repoRoot walks up from the working directory to the go.mod directory.

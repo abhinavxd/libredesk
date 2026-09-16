@@ -1,17 +1,20 @@
 <template>
-  <div class="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-    <div v-if="canRemove" class="flex justify-end">
-      <CloseButton :aria-label="t('filter.removeGroup')" :onClose="() => emit('remove')">
+  <div class="space-y-3 rounded-lg border border-border bg-muted/30 p-3" data-cy="filter-group">
+    <div class="flex items-center justify-between gap-3 border-b border-border pb-2">
+      <div class="flex items-center gap-2 text-sm font-medium text-foreground">
+        <span>{{ t('admin.automation.matchTheseRules') }}</span>
+        <ConnectorToggle :modelValue="group.logic" mode="all-any" @update:modelValue="setLogic" />
+      </div>
+      <CloseButton
+        v-if="canRemove"
+        :aria-label="t('filter.removeGroup')"
+        :onClose="() => emit('remove')"
+      >
         <Trash2 class="w-4 h-4" />
       </CloseButton>
     </div>
 
     <template v-for="(rule, index) in group.rules" :key="rule.__id">
-      <ConnectorToggle
-        v-if="index > 0"
-        :modelValue="group.logic"
-        @update:modelValue="setLogic"
-      />
       <FilterRow
         :modelValue="rule"
         :fields="fields"

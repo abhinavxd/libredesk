@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/setting/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
@@ -57,6 +58,9 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	}
 	// Trim whitespace and trailing slash from root URL.
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
+	if !httputil.IsValidHTTPURL(req.RootURL) {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("admin.general.rootURL.valid"), nil, envelope.InputError)
+	}
 
 	// Get current language before update.
 	app.Lock()
@@ -69,7 +73,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	// Reload the settings and templates.
 	if err := reloadSettings(app); err != nil {
 		app.lo.Error("error reloading settings", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 
 	// Check if language changed and reload i18n if needed.
@@ -84,7 +88,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 
 	if err := reloadTemplates(app); err != nil {
 		app.lo.Error("error reloading templates", "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	return r.SendEnvelope(true)
 }

@@ -33,9 +33,9 @@ func (m *mockConversationStore) GetConversation(teamID int, uuid, refNum string)
 	return args.Get(0).(cmodels.Conversation), args.Error(1)
 }
 
-func (m *mockConversationStore) GetConversationsCreatedAfter(t time.Time) ([]cmodels.Conversation, error) {
-	args := m.Called(t)
-	return args.Get(0).([]cmodels.Conversation), args.Error(1)
+func (m *mockConversationStore) GetConversationsCreatedAfter(t time.Time, afterID, limit int) ([]cmodels.ConversationRef, error) {
+	args := m.Called(t, afterID, limit)
+	return args.Get(0).([]cmodels.ConversationRef), args.Error(1)
 }
 
 // Test Helpers

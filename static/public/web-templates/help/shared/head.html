@@ -1,0 +1,37 @@
+{{ define "hc-head" }}
+<!DOCTYPE html>
+<html lang="{{ if .Data.HelpCenter.CurrentLocale }}{{ .Data.HelpCenter.CurrentLocale }}{{ else if .Data.HelpCenter.DefaultLocale }}{{ .Data.HelpCenter.DefaultLocale }}{{ else }}en{{ end }}" dir="{{ .Data.HelpCenter.Dir }}">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ .Data.Title }}</title>
+    {{ if .Data.MetaDescription }}<meta name="description" content="{{ .Data.MetaDescription }}" />{{ end }}
+    {{ if .Data.NoIndex }}<meta name="robots" content="noindex" />{{ end }}
+    {{ if .Data.CanonicalPath }}<link rel="canonical" href="{{ .Data.HelpCenter.BaseURL }}{{ .Data.CanonicalPath }}" />{{ end }}
+    {{ range .Data.Alternates }}<link rel="alternate" hreflang="{{ .Locale }}" href="{{ $.Data.HelpCenter.BaseURL }}{{ .Path }}" />
+    {{ end }}{{ if .Data.XDefaultPath }}<link rel="alternate" hreflang="x-default" href="{{ .Data.HelpCenter.BaseURL }}{{ .Data.XDefaultPath }}" />{{ end }}
+    <meta property="og:title" content="{{ .Data.Title }}" />
+    {{ if .Data.MetaDescription }}<meta property="og:description" content="{{ .Data.MetaDescription }}" />{{ end }}
+    <meta property="og:type" content="{{ if .Data.OGType }}{{ .Data.OGType }}{{ else }}website{{ end }}" />
+    <meta property="og:site_name" content="{{ .Data.HelpCenter.Name }}" />
+    <meta property="og:locale" content="{{ .Data.HelpCenter.OGLocale }}" />
+    {{ if .Data.CanonicalPath }}<meta property="og:url" content="{{ .Data.HelpCenter.BaseURL }}{{ .Data.CanonicalPath }}" />{{ end }}
+    {{ if .Data.OGImage }}<meta property="og:image" content="{{ .Data.OGImage }}" />{{ end }}
+    {{ if .Data.PublishedTime }}<meta property="article:published_time" content="{{ .Data.PublishedTime }}" />{{ end }}
+    {{ if .Data.ModifiedTime }}<meta property="article:modified_time" content="{{ .Data.ModifiedTime }}" />{{ end }}
+    <meta name="twitter:card" content="{{ if .Data.OGImage }}summary_large_image{{ else }}summary{{ end }}" />
+    <meta name="twitter:title" content="{{ .Data.Title }}" />
+    {{ if .Data.MetaDescription }}<meta name="twitter:description" content="{{ .Data.MetaDescription }}" />{{ end }}
+    {{ if .Data.OGImage }}<meta name="twitter:image" content="{{ .Data.OGImage }}" />{{ end }}
+    <meta name="theme-color" content="{{ .Data.HelpCenter.Color }}" />
+    {{ if .Data.HelpCenter.Theme.Favicon }}<link rel="icon" href="{{ .Data.HelpCenter.Theme.Favicon }}" />{{ else if ne FaviconURL "" }}<link rel="icon" href="{{ FaviconURL }}" />{{ end }}
+    <link rel="preload" href="/static/public/static/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/static/public/static/fonts.css?v={{ AssetVer }}" />
+    <link rel="stylesheet" href="/static/public/static/help-center-cards.css?v={{ AssetVer }}" />
+    <link rel="stylesheet" href="/static/public/static/help-center-{{ .Data.HelpCenter.Template }}.css?v={{ AssetVer }}" />
+    <link rel="stylesheet" href="/static/public/static/article-content.css?v={{ AssetVer }}" />
+    <style>:root { --hc-accent: {{ .Data.HelpCenter.Color }}; {{ .Data.HelpCenter.ThemeCSS }} }</style>
+    {{ if .Data.HelpCenter.CustomCSS }}<style>{{ .Data.HelpCenter.CustomCSS }}</style>{{ end }}
+    {{ if .Data.JSONLD }}<script type="application/ld+json">{{ .Data.JSONLD }}</script>{{ end }}
+</head>
+{{ end }}

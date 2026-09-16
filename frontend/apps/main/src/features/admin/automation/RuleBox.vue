@@ -10,7 +10,9 @@
           <RadioGroupItem value="OR" />
           <Label>
             <i18n-t keypath="admin.automation.matchBelow">
-              <template #any_or_all><b>{{ $t('admin.automation.any') }}</b></template>
+              <template #any_or_all
+                ><b>{{ $t('admin.automation.any') }}</b></template
+              >
             </i18n-t>
           </Label>
         </div>
@@ -18,7 +20,9 @@
           <RadioGroupItem value="AND" />
           <Label>
             <i18n-t keypath="admin.automation.matchBelow">
-              <template #any_or_all><b>{{ $t('admin.automation.all') }}</b></template>
+              <template #any_or_all
+                ><b>{{ $t('admin.automation.all') }}</b></template
+              >
             </i18n-t>
           </Label>
         </div>
@@ -106,11 +110,21 @@
 
               <!-- Select input -->
               <div v-if="inputType(index) === 'select'">
+                <SelectAgentCombobox
+                  v-if="getFieldEntity(rule.field, rule.field_type) === 'agent'"
+                  v-model="rule.value"
+                  @select="handleValueChange($event, index)"
+                />
+                <SelectTeamCombobox
+                  v-else-if="getFieldEntity(rule.field, rule.field_type) === 'team'"
+                  v-model="rule.value"
+                  @select="handleValueChange($event, index)"
+                />
                 <SelectComboBox
+                  v-else
                   v-model="rule.value"
                   :items="getFieldOptions(rule.field, rule.field_type)"
                   @select="handleValueChange($event, index)"
-                  :type="rule.field === 'assigned_user' ? 'user' : 'team'"
                 />
               </div>
 
@@ -185,9 +199,7 @@
       </div>
       <div>
         <Button type="button" variant="outline" size="sm" @click.prevent="addCondition">
-          {{
-            $t('actions.addCondition')
-          }}
+          {{ $t('actions.addCondition') }}
         </Button>
       </div>
     </div>
@@ -221,6 +233,8 @@ import { Input } from '@shared-ui/components/ui/input'
 import { useI18n } from 'vue-i18n'
 import { useConversationFilters } from '../../../composables/useConversationFilters'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
+import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
+import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
 import { operatorLabel } from '@/constants/filterConfig'
 
 const props = defineProps({
@@ -351,6 +365,12 @@ const getFieldOperators = (field, fieldType) => {
     return currentFilters.value[field]?.operators || []
   }
   return []
+}
+
+const getFieldEntity = (field, fieldType) => {
+  if ((fieldType || fieldTypeConstants.conversation) !== fieldTypeConstants.conversation)
+    return ''
+  return currentFilters.value[field]?.entity || ''
 }
 
 const getFieldOptions = (field, fieldType) => {

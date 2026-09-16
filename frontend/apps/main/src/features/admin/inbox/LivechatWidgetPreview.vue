@@ -8,7 +8,7 @@
         :style="{ bottom: windowBottom + 'px' }"
       >
         <div
-          class="libredesk-widget-preview flex flex-col h-full  bg-background text-foreground rounded-2xl overflow-hidden shadow-2xl border border-border"
+          class="libredesk-widget-preview flex flex-col h-full bg-background text-foreground rounded-2xl overflow-hidden shadow-2xl border border-border"
           :class="isDark ? 'dark' : 'light'"
           :style="primaryStyle"
         >
@@ -214,7 +214,7 @@
                       </p>
                     </div>
                   </div>
-                  <div class="relative z-10 px-4 pb-4">
+                  <div v-if="canStartConversation" class="relative z-10 px-4 pb-4">
                     <Button
                       type="button"
                       class="w-full flex items-center justify-center gap-1"
@@ -296,7 +296,7 @@
                     </div>
                   </div>
                 </div>
-                <div class="absolute bottom-0 inset-x-0">
+                <div v-if="canStartFromMessages" class="absolute bottom-0 inset-x-0">
                   <div
                     class="h-20 bg-gradient-to-t from-background via-background/80 to-transparent pointer-events-none"
                   ></div>
@@ -375,6 +375,10 @@ const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
 const LAUNCHER_SIZE = 52
 
 const props = defineProps({
+  userType: {
+    type: String,
+    default: 'visitors'
+  },
   config: {
     type: Object,
     default: () => ({})
@@ -463,15 +467,22 @@ const showFade = computed(
 )
 const fadeStyle = { background: 'linear-gradient(to bottom, transparent, hsl(var(--background)))' }
 
+const userTypeConfig = computed(() => props.config[props.userType] || {})
+
+const canStartConversation = computed(() => Boolean(userTypeConfig.value.allow_start_conversation))
+
+// The messages tab always previews an existing conversation, so it follows the multiple rule too.
+const canStartFromMessages = computed(
+  () => canStartConversation.value && userTypeConfig.value.prevent_multiple_conversations !== true
+)
+
 const startButtonText = computed(
-  () =>
-    props.config.visitors?.start_conversation_button_text ||
-    props.config.users?.start_conversation_button_text ||
-    t('globals.messages.sendUsMessage')
+  () => userTypeConfig.value.start_conversation_button_text || t('globals.messages.sendUsMessage')
 )
 const messagesButtonText = computed(
   () =>
-    props.config.users?.start_conversation_button_text || t('globals.messages.startNewConversation')
+    userTypeConfig.value.start_conversation_button_text ||
+    t('globals.messages.startNewConversation')
 )
 
 const sampleMessages = computed(() => [

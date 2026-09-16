@@ -6,14 +6,10 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
     <base target="_blank">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
     <style>
         body {
             background-color: #f4f4f5;
-            font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             font-size: 15px;
             line-height: 1.6;
             margin: 0;
@@ -123,10 +119,8 @@
         <div class="header">
             {{ if ne LogoURL "" }}
                 <img src="{{ LogoURL }}" alt="{{ SiteName }}" style="max-height: 25px; width: auto;">
-            {{ else if ne SiteName "" }}
-                <span style="font-size: 18px; font-weight: 700; color: #09090b;">{{ SiteName }}</span>
             {{ else }}
-                <span style="font-size: 18px; font-weight: 700; color: #09090b;">libredesk</span>
+                <img src="{{ RootURL }}/images/logo.png" alt="{{ SiteName }}" style="max-height: 25px; width: auto;">
             {{ end }}
         </div>
 {{ end }}

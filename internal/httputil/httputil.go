@@ -11,7 +11,7 @@ func IsValidHTTPURL(raw string) bool {
 	if err != nil {
 		return false
 	}
-	return u.Scheme == "http" || u.Scheme == "https"
+	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
 // IsOriginTrusted checks if the given origin is trusted based on the trusted domains list

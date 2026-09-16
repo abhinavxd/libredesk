@@ -50,9 +50,7 @@
                 <FormControl>
                   <Select v-bind="componentField" @update:modelValue="handleInput">
                     <SelectTrigger>
-                      <SelectValue
-                        :placeholder="t('placeholders.selectType')"
-                      />
+                      <SelectValue :placeholder="t('placeholders.selectType')" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -147,7 +145,9 @@
             @add-action="handleAddAction"
             @remove-action="handleRemoveAction"
           />
-          <Button type="submit" :isLoading="isLoading">{{ isNewForm ? $t('globals.messages.create') : $t('globals.messages.save') }}</Button>
+          <Button type="submit" :isLoading="isLoading">{{
+            isNewForm ? $t('globals.messages.create') : $t('globals.messages.save')
+          }}</Button>
         </div>
       </form>
     </div>
@@ -246,6 +246,7 @@ const breadcrumbPageLabel = () => {
   if (props.id > 0) return t('automation.editRule')
   return t('automation.newRule')
 }
+
 
 const isNewForm = computed(() => {
   return props.id ? false : true

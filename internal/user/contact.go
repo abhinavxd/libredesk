@@ -25,6 +25,28 @@ func (u *Manager) ResolveContact(user *models.User, policy models.ContactPolicy)
 	return u.reuseContact(user)
 }
 
+// CreateContact inserts an agent-created contact. Channel-sourced contacts go through ResolveContact.
+func (u *Manager) CreateContact(user *models.User) error {
+	password, err := u.newContactPassword()
+	if err != nil {
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	user.Email = null.NewString(strings.ToLower(strings.TrimSpace(user.Email.String)), user.Email.Valid)
+	if _, err := u.GetContactByEmail(user.Email.String); err == nil {
+		return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
+	} else if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
+		return err
+	}
+	if err := u.q.InsertContact.QueryRow(user.Email, user.FirstName, user.LastName, password, user.PhoneNumber, user.PhoneNumberCountryCode, user.Country).Scan(&user.ID); err != nil {
+		if dbutil.IsUniqueViolationError(err) {
+			return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
+		}
+		u.lo.Error("error creating contact", "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
 // UpdateContactBasicInfo updates only the name, email and phone of a contact.
 func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, phoneNumber, phoneNumberCountryCode string) error {
 	if _, err := u.q.UpdateContactBasicInfo.Exec(id, firstName, lastName, strings.ToLower(strings.TrimSpace(email)), phoneNumber, phoneNumberCountryCode); err != nil {
@@ -35,6 +57,7 @@ func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, pho
 }
 
 func (u *Manager) UpdateContact(id int, user models.User) error {
+	user.Email = null.NewString(strings.ToLower(strings.TrimSpace(user.Email.String)), user.Email.Valid)
 	if _, err := u.q.UpdateContact.Exec(id, user.FirstName, user.LastName, user.Email, user.AvatarURL, user.PhoneNumber, user.PhoneNumberCountryCode, user.Country); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
@@ -43,6 +66,29 @@ func (u *Manager) UpdateContact(id int, user models.User) error {
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
+}
+
+// DeleteContact permanently deletes a contact or visitor; conversations, messages, and notes are removed by DB cascades.
+func (u *Manager) DeleteContact(id int) error {
+	res, err := u.q.DeleteContact.Exec(id)
+	if err != nil {
+		u.lo.Error("error deleting contact", "contact_id", id, "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		return envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundUser"), nil)
+	}
+	return nil
+}
+
+// ExportContactData returns a contact's profile, non-private conversation messages, and CSAT responses as JSON.
+func (u *Manager) ExportContactData(id int) ([]byte, error) {
+	var data []byte
+	if err := u.q.ExportContactData.Get(&data, id); err != nil {
+		u.lo.Error("error exporting contact data", "contact_id", id, "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return data, nil
 }
 
 func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filtersJSON, location string) ([]models.UserCompact, error) {

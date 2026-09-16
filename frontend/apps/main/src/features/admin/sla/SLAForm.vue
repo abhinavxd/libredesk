@@ -202,15 +202,12 @@
                     {{ t('admin.sla.alertRecipients') }}
                   </FormLabel>
                   <FormControl>
-                    <SelectTag
-                      :items="
-                        usersStore.options
-                          .filter((o) => o.type !== 'ai_assistant')
-                          .concat({
-                            label: t('admin.sla.assignedUser'),
-                            value: 'assigned_user'
-                          })
-                      "
+                    <SelectAgentCombobox
+                      multiple
+                      exclude-ai-assistants
+                      :prepend-items="[
+                        { label: t('admin.sla.assignedUser'), value: 'assigned_user' }
+                      ]"
                       :placeholder="t('globals.messages.startTypingToSearch')"
                       v-model="componentField.modelValue"
                       @update:modelValue="handleChange"
@@ -294,7 +291,6 @@ import {
   Bell,
   SlidersHorizontal
 } from 'lucide-vue-next'
-import { useUsersStore } from '../../../stores/users'
 import {
   FormControl,
   FormField,
@@ -312,7 +308,7 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { useI18n } from 'vue-i18n'
-import { SelectTag } from '@shared-ui/components/ui/select'
+import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import { Input } from '@shared-ui/components/ui/input'
 
 const props = defineProps({
@@ -334,7 +330,6 @@ const props = defineProps({
   }
 })
 
-const usersStore = useUsersStore()
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
@@ -402,6 +397,7 @@ watch(
       ...newValues,
       notifications: transformedNotifications
     }, false)
+
   },
   { immediate: true, deep: true }
 )

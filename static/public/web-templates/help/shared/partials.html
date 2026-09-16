@@ -1,0 +1,91 @@
+{{ define "hc-announcement" }}
+    {{ if .Data.HelpCenter.AnnouncementHTML }}
+    <div class="hc-announcement" role="region" aria-label="{{ .L.T "globals.terms.announcement" }}" data-hc-announcement="{{ .Data.HelpCenter.AnnouncementKey }}">
+        <p>{{ .Data.HelpCenter.AnnouncementHTML }}{{ if .Data.HelpCenter.Theme.Announcement.LinkURL }} <a href="{{ .Data.HelpCenter.Theme.Announcement.LinkURL }}">{{ if .Data.HelpCenter.Theme.Announcement.LinkLabel }}{{ .Data.HelpCenter.Theme.Announcement.LinkLabel }}{{ else }}{{ .Data.HelpCenter.Theme.Announcement.LinkURL }}{{ end }}</a>{{ end }}</p>
+        <button type="button" data-hc-announcement-close aria-label="{{ .L.T "globals.messages.close" }}">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>
+        </button>
+    </div>
+    <script>(function () {
+        var el = document.currentScript.previousElementSibling;
+        try { if (localStorage.getItem('hc-announcement-' + el.dataset.hcAnnouncement) === '1') el.remove(); } catch (e) {}
+    })();</script>
+    {{ end }}
+{{ end }}
+
+{{ define "hc-lang-switcher" }}
+                <div class="hc-lang" data-hc-lang>
+                    <button type="button" class="hc-lang-btn" aria-expanded="false" aria-label="{{ .L.T "globals.terms.language" }}">
+                        <svg class="hc-lang-globe" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.5 2.4 2.5 12.6 0 15M10 2.5c-2.5 2.4-2.5 12.6 0 15" stroke-linecap="round"/></svg>
+                        <span class="hc-lang-current">{{ .Data.HelpCenter.CurrentLocale }}</span>
+                        <svg class="hc-lang-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <ul class="hc-lang-menu">
+                        {{ range .Data.LocaleLinks }}<li><a hreflang="{{ .Locale }}" href="{{ .Path }}"{{ if eq .Locale $.Data.HelpCenter.CurrentLocale }} class="hc-lang-active" aria-current="page"{{ end }}>{{ .Locale }}</a></li>{{ end }}
+                    </ul>
+                </div>
+{{ end }}
+
+{{ define "hc-search-icon" }}<svg{{ with . }} class="{{ . }}"{{ end }} viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="m18 18-4.5-4.5" stroke-linecap="round" /></svg>{{ end }}
+
+{{ define "hc-article-toc" }}
+{{ if not .Data.HelpCenter.Theme.Article.HideToc }}
+<nav class="hc-toc{{ if .Data.TOC }} hc-toc-open{{ end }}" id="hc-toc" aria-label="{{ .L.T "helpCenter.onThisPage" }}"{{ if not .Data.TOC }} hidden{{ end }}>
+    <button class="hc-toc-title" type="button" id="hc-toc-toggle" aria-expanded="{{ if .Data.TOC }}true{{ else }}false{{ end }}" aria-controls="hc-toc-list">
+        {{ .L.T "helpCenter.onThisPage" }}
+        <svg class="hc-toc-caret" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <ul id="hc-toc-list">{{ range .Data.TOC }}<li><a href="#{{ .ID }}">{{ .Title }}</a></li>{{ end }}</ul>
+</nav>
+{{ end }}
+{{ end }}
+
+{{ define "hc-helpful" }}
+<div class="hc-helpful" id="hc-helpful" role="group" aria-labelledby="hc-helpful-q" data-endpoint="/api/v1/public/help-centers/{{ .Data.HelpCenter.Slug }}/articles/{{ .Data.Article.Slug }}/feedback?locale={{ .Data.Article.Locale }}">
+    <span class="hc-helpful-q" id="hc-helpful-q">{{ .L.T "helpCenter.wasHelpful" }}</span>
+    <button type="button" data-helpful="true">{{ .L.T "globals.messages.yes" }}</button>
+    <button type="button" data-helpful="false">{{ .L.T "globals.messages.no" }}</button>
+    <span class="hc-helpful-thanks" hidden>{{ .L.T "helpCenter.feedbackThanks" }}</span>
+</div>
+{{ end }}
+
+{{ define "hc-doc-icon" }}<svg class="hc-doc" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 1.5h5L12.5 5v9.5h-8.5z" stroke-linejoin="round"/><path d="M8.5 1.5V5h4" stroke-linejoin="round"/></svg>{{ end }}
+{{ define "hc-arrow-icon" }}<svg class="hc-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ end }}
+
+{{ define "hc-social-icon" }}{{ if eq . "twitter" }}<svg viewBox="-1 -1 26 26" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-7.1 8.2L23.3 22h-6.6l-5.2-6.8L5.6 22H2.5l7.6-8.7L1 2h6.8l4.7 6.2L18.9 2Zm-1.2 18h1.8L7.4 3.9H5.5L17.7 20Z"/></svg>{{ else if eq . "github" }}<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49v-1.7c-2.78.62-3.37-1.22-3.37-1.22-.46-1.18-1.11-1.5-1.11-1.5-.9-.63.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.9 1.56 2.35 1.11 2.92.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.02-2.75-.1-.26-.44-1.3.1-2.72 0 0 .84-.28 2.75 1.05a9.36 9.36 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.54 1.42.2 2.46.1 2.72.64.72 1.02 1.63 1.02 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9v2.82c0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg>{{ else if eq . "linkedin" }}<svg viewBox="-2 -2 28 28" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.44-2.13 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28ZM5.34 7.43a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14ZM7.12 20.45H3.55V9h3.57v11.45ZM22.22 0H1.77C.79 0 0 .77 0 1.72v20.55C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.72C24 .77 23.2 0 22.22 0Z"/></svg>{{ else if eq . "facebook" }}<svg viewBox="-2 -2 28 28" fill="currentColor" aria-hidden="true"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07Z"/></svg>{{ else if eq . "instagram" }}<svg viewBox="-2 -2 28 28" fill="currentColor" aria-hidden="true"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg>{{ else if eq . "youtube" }}<svg viewBox="-2 -2 28 28" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.12-2.13C19.5 3.55 12 3.55 12 3.55s-7.5 0-9.38.52A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.12 2.13c1.88.52 9.38.52 9.38.52s7.5 0 9.38-.52a3 3 0 0 0 2.12-2.13A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8ZM9.6 15.6V8.4l6.2 3.6-6.2 3.6Z"/></svg>{{ else }}<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.5 2.4 2.5 12.6 0 15M10 2.5c-2.5 2.4-2.5 12.6 0 15" stroke-linecap="round"/></svg>{{ end }}{{ end }}
+
+{{ define "hc-collection-card" }}
+{{ $cards := .Theme.Cards }}
+<a class="hc-collection hc-collection-card hc-icon-{{ if $cards.IconPosition }}{{ $cards.IconPosition }}{{ else }}inline{{ end }}" href="{{ .Base }}/collections/{{ .Collection.Slug }}">
+    <div class="hc-card-head">
+        <div class="hc-collection-icon{{ if $cards.ShowIconTile }} hc-icon-tile{{ end }}">{{ with LucideIcon .Collection.Icon }}{{ . }}{{ else }}{{ LucideIcon "folder" }}{{ end }}</div>
+    </div>
+    <div class="hc-collection-body">
+        {{ if eq .Heading "h3" }}<h3>{{ .Collection.Name }}</h3>{{ else }}<h2>{{ .Collection.Name }}</h2>{{ end }}
+        {{ if and .Collection.Description (not $cards.HideDescription) }}<p class="hc-desc">{{ .Collection.Description }}</p>{{ end }}
+        {{ if and $cards.ShowAuthors .Collection.Authors }}
+        <span class="hc-card-meta">
+            {{ template "hc-avatar-stack" .Collection.Authors }}
+            <span>{{ .Collection.AuthorCount }} {{ $.L.Tc "helpCenter.authors" .Collection.AuthorCount }}{{ if not $cards.HideCount }} &middot; {{ .Collection.ArticleCount }} {{ $.L.Tc "helpCenter.article" .Collection.ArticleCount }}{{ end }}</span>
+        </span>
+        {{ else if not $cards.HideCount }}
+        <span class="hc-count">{{ .Collection.ArticleCount }} {{ $.L.Tc "helpCenter.article" .Collection.ArticleCount }}</span>
+        {{ end }}
+    </div>
+</a>
+{{ end }}
+
+{{ define "hc-collections-grid" }}
+{{ $layout := .HelpCenter.Theme.Layout }}
+<div class="hc-collections{{ if eq $layout.Collections "list" }} hc-layout-list{{ else if eq $layout.Columns 3 }} hc-cols-3{{ end }}">
+{{ range .Tree }}
+    {{ template "hc-collection-card" (map "Collection" . "Base" $.HelpCenter.BasePath "Theme" $.HelpCenter.Theme "L" $.L "Heading" $.Heading) }}
+{{ end }}
+</div>
+{{ end }}
+
+{{ define "hc-avatar-stack" }}
+<span class="hc-avatars">
+    {{ range . }}{{ if .Avatar }}<img class="hc-avatar" src="{{ .Avatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial" aria-hidden="true">{{ printf "%.1s" .Name }}</span>{{ end }}{{ end }}
+</span>
+{{ end }}

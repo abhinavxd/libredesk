@@ -50,16 +50,37 @@ const { t } = useI18n()
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const mod = isMac ? '⌘' : 'Ctrl'
+const alt = isMac ? '⌥' : 'Alt'
 
 const groups = computed(() => [
   {
     title: t('globals.terms.general'),
-    items: [{ label: t('shortcuts.openCommandBar'), keys: [mod, 'K'] }]
+    items: [
+      { label: t('shortcuts.openCommandBar'), keys: [mod, 'K'] },
+      { label: t('navigation.keyboardShortcuts'), keys: [mod, '/'] },
+      { label: t('conversation.newConversation'), keys: [alt, 'C'] }
+    ]
+  },
+  {
+    title: t('globals.terms.conversation', 2),
+    items: [
+      { label: t('shortcuts.previousConversation'), keys: [alt, 'J'] },
+      { label: t('shortcuts.nextConversation'), keys: [alt, 'K'] },
+      { label: t('globals.terms.snooze'), keys: [alt, 'Z'] },
+      { label: t('actions.setPriority'), keys: [alt, 'P'] },
+      { label: t('actions.assignAgent'), keys: [alt, 'A'] },
+      { label: t('command.switchToReply'), keys: [alt, 'R'] },
+      { label: t('command.switchToPrivateNote'), keys: [alt, 'N'] },
+      { label: t('conversation.bulkActions.selectConversation'), keys: [alt, 'X'] },
+      { label: t('globals.terms.resolve'), keys: [alt, 'E'] },
+      { label: t('globals.terms.reopen'), keys: [alt, 'O'] }
+    ]
   },
   {
     title: t('shortcuts.replyEditor'),
     items: [
       { label: t('actions.openMacros'), keys: [mod, 'M'] },
+      { label: t('shortcuts.toggleReplyType'), keys: [mod, 'P'] },
       { label: t('actions.sendReply'), keys: ['Ctrl', 'Enter'] },
       { label: t('globals.terms.bold'), keys: [mod, 'B'] },
       { label: t('globals.terms.italic'), keys: [mod, 'I'] }

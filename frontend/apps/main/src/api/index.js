@@ -204,6 +204,12 @@ const updateRole = (id, data) =>
 const deleteRole = (id) => http.delete(`/api/v1/roles/${id}`)
 const getContacts = (params) => http.get('/api/v1/contacts', { params })
 const getContact = (id) => http.get(`/api/v1/contacts/${id}`)
+const createContact = (data) =>
+  http.post('/api/v1/contacts', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
 const updateContact = (id, data) =>
   http.put(`/api/v1/contacts/${id}`, data, {
     headers: {
@@ -215,6 +221,8 @@ const blockContact = (id, data) => http.put(`/api/v1/contacts/${id}/block`, data
     'Content-Type': 'application/json'
   }
 })
+const deleteContact = (id) => http.delete(`/api/v1/contacts/${id}`)
+const exportContact = (id) => http.get(`/api/v1/contacts/${id}/export`, { responseType: 'blob' })
 const getTeam = (id) => http.get(`/api/v1/teams/${id}`)
 const getTeams = () => http.get('/api/v1/teams')
 const updateTeam = (id, data) => http.put(`/api/v1/teams/${id}`, data, {
@@ -227,7 +235,7 @@ const createTeam = (data) => http.post('/api/v1/teams', data, {
     'Content-Type': 'application/json'
   }
 })
-const getTeamsCompact = () => http.get('/api/v1/teams/compact')
+const getTeamsCompact = (params) => http.get('/api/v1/teams/compact', { params })
 const deleteTeam = (id) => http.delete(`/api/v1/teams/${id}`)
 const updateUser = (id, data) =>
   http.put(`/api/v1/agents/${id}`, data, {
@@ -236,7 +244,7 @@ const updateUser = (id, data) =>
     }
   })
 const getUsers = () => http.get('/api/v1/agents')
-const getUsersCompact = () => http.get('/api/v1/agents/compact')
+const getUsersCompact = (params) => http.get('/api/v1/agents/compact', { params })
 const updateCurrentUser = (data) =>
   http.put('/api/v1/agents/me', data, {
     headers: {
@@ -276,7 +284,7 @@ const createUser = (data) =>
       'Content-Type': 'application/json'
     }
   })
-const getTags = () => http.get('/api/v1/tags')
+const getTags = (params) => http.get('/api/v1/tags', { params })
 const importTags = (data) =>
   http.post('/api/v1/tags/import', data, {
     headers: {
@@ -347,7 +355,8 @@ const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { ab
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
-const getAllMacros = () => http.get('/api/v1/macros')
+const getMacrosCompact = (params) => http.get('/api/v1/macros/compact', { params })
+const searchMacros = (params) => http.get('/api/v1/macros/search', { params })
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
 const createMacro = (data) =>
   http.post('/api/v1/macros', data, {
@@ -378,6 +387,8 @@ const getAllConversations = (params) =>
   http.get('/api/v1/conversations/all', { params, abortOnRoute: true })
 const getMentionedConversations = (params) =>
   http.get('/api/v1/conversations/mentioned', { params, abortOnRoute: true })
+const getSidebarCounts = () => http.get('/api/v1/conversations/sidebar-counts')
+const getViewCount = (id) => http.get(`/api/v1/views/${id}/count`)
 const getViewConversations = (id, params) =>
   http.get(`/api/v1/views/${id}/conversations`, { params, abortOnRoute: true })
 const uploadMedia = (data) =>
@@ -454,6 +465,10 @@ const updateSharedView = (id, data) =>
 const deleteSharedView = (id) => http.delete(`/api/v1/shared-views/${id}`)
 
 const getAiPrompts = () => http.get('/api/v1/ai/prompts')
+const getAIPrompt = (id) => http.get(`/api/v1/ai/prompts/${id}`)
+const createAIPrompt = (data) => http.post('/api/v1/ai/prompts', data)
+const updateAIPrompt = (id, data) => http.put(`/api/v1/ai/prompts/${id}`, data)
+const deleteAIPrompt = (id) => http.delete(`/api/v1/ai/prompts/${id}`)
 const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
   timeout: AI_TIMEOUT,
   headers: {
@@ -506,6 +521,42 @@ const getCopilotMessages = (conversationUUID) =>
   http.get('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
 const clearCopilotMessages = (conversationUUID) =>
   http.delete('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
+const getHelpCenters = () => http.get('/api/v1/help-centers')
+const getHelpCenterLocales = () => http.get('/api/v1/help-centers/locales')
+const getHelpCenter = (id) => http.get(`/api/v1/help-centers/${id}`)
+const createHelpCenter = (data) => http.post('/api/v1/help-centers', data)
+const updateHelpCenter = (id, data) => http.put(`/api/v1/help-centers/${id}`, data)
+const deleteHelpCenter = (id) => http.delete(`/api/v1/help-centers/${id}`)
+const toggleHelpCenter = (id) => http.put(`/api/v1/help-centers/${id}/toggle`)
+const previewHelpCenter = (id, data, page) =>
+  http.post(`/api/v1/help-centers/${id}/preview`, data, {
+    responseType: 'text',
+    params: page ? { page } : {}
+  })
+const getHelpCenterTree = (id, locale) =>
+  http.get(`/api/v1/help-centers/${id}/tree`, { params: locale ? { locale } : {} })
+const getCollections = (helpCenterId) => http.get(`/api/v1/help-centers/${helpCenterId}/collections`)
+const createCollection = (helpCenterId, data) =>
+  http.post(`/api/v1/help-centers/${helpCenterId}/collections`, data)
+const updateCollection = (helpCenterId, id, data) =>
+  http.put(`/api/v1/help-centers/${helpCenterId}/collections/${id}`, data)
+const deleteCollection = (helpCenterId, id) =>
+  http.delete(`/api/v1/help-centers/${helpCenterId}/collections/${id}`)
+const toggleCollection = (id) => http.put(`/api/v1/collections/${id}/toggle`)
+const updateCollectionSortOrders = (helpCenterId, data) =>
+  http.put(`/api/v1/help-centers/${helpCenterId}/collection-sort-order`, data)
+const moveArticleToCollection = (id, data) => http.put(`/api/v1/articles/${id}/collection`, data)
+const updateArticleSortOrders = (collectionId, data) =>
+  http.put(`/api/v1/collections/${collectionId}/article-sort-order`, data)
+const getArticle = (collectionId, id) =>
+  http.get(`/api/v1/collections/${collectionId}/articles/${id}`)
+const createArticle = (collectionId, data) =>
+  http.post(`/api/v1/collections/${collectionId}/articles`, data)
+const updateArticle = (id, data) => http.put(`/api/v1/articles/${id}`, data)
+const deleteArticle = (collectionId, id) =>
+  http.delete(`/api/v1/collections/${collectionId}/articles/${id}`)
+const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data)
+const getHelpCenterInsights = (id) => http.get(`/api/v1/help-centers/${id}/insights`)
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
   headers: {
@@ -572,6 +623,10 @@ const markNotificationAsRead = (id) => http.put(`/api/v1/notifications/${id}/rea
 const markAllNotificationsAsRead = () => http.put('/api/v1/notifications/read-all')
 const deleteNotification = (id) => http.delete(`/api/v1/notifications/${id}`)
 const deleteAllNotifications = () => http.delete('/api/v1/notifications')
+const getNotificationPreferences = () => http.get('/api/v1/notifications/preferences')
+const updateNotificationPreferences = (data) => http.put('/api/v1/notifications/preferences', data)
+const createPushSubscription = (data) => http.post('/api/v1/notifications/push-subscriptions', data)
+const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/push-subscriptions', { data: { endpoint } })
 
 export default {
   login,
@@ -614,6 +669,8 @@ export default {
   getUnassignedConversations,
   getAllConversations,
   getMentionedConversations,
+  getSidebarCounts,
+  getViewCount,
   getTeamUnassignedConversations,
   getViewConversations,
   getOverviewCharts,
@@ -627,7 +684,8 @@ export default {
   getConversationTranscript,
   getCurrentUser,
   getCurrentUserTeams,
-  getAllMacros,
+  getMacrosCompact,
+  searchMacros,
   getMacro,
   createMacro,
   updateMacro,
@@ -702,6 +760,10 @@ export default {
   updateSharedView,
   deleteSharedView,
   getAiPrompts,
+  getAIPrompt,
+  createAIPrompt,
+  updateAIPrompt,
+  deleteAIPrompt,
   aiCompletion,
   getAIConfig,
   updateAIConfig,
@@ -724,6 +786,29 @@ export default {
   importAISnippetFromURL,
   updateAISnippet,
   deleteAISnippet,
+  getHelpCenters,
+  getHelpCenterLocales,
+  getHelpCenter,
+  createHelpCenter,
+  updateHelpCenter,
+  deleteHelpCenter,
+  toggleHelpCenter,
+  previewHelpCenter,
+  getHelpCenterTree,
+  getCollections,
+  createCollection,
+  updateCollection,
+  deleteCollection,
+  toggleCollection,
+  updateCollectionSortOrders,
+  updateArticleSortOrders,
+  moveArticleToCollection,
+  getArticle,
+  createArticle,
+  updateArticle,
+  deleteArticle,
+  updateArticleStatus,
+  getHelpCenterInsights,
   getAIFaqSuggestions,
   approveAIFaqSuggestion,
   rejectAIFaqSuggestion,
@@ -741,8 +826,11 @@ export default {
   removeAssignee,
   getContacts,
   getContact,
+  createContact,
   updateContact,
   blockContact,
+  deleteContact,
+  exportContact,
   getCustomAttributes,
   createCustomAttribute,
   updateCustomAttribute,
@@ -777,5 +865,9 @@ export default {
   markAllNotificationsAsRead,
   deleteNotification,
   deleteAllNotifications,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  createPushSubscription,
+  deletePushSubscription,
   getContactPageVisits
 }

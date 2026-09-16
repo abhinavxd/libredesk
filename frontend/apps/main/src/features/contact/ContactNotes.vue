@@ -182,7 +182,7 @@ const notesCache = new Map()
 </script>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { format, formatDistanceToNow } from 'date-fns'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardHeader, CardContent } from '@shared-ui/components/ui/card'
@@ -205,10 +205,10 @@ import {
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
 import { PlusIcon, MoreVerticalIcon, TrashIcon, ClockIcon } from 'lucide-vue-next'
-import Editor from '@main/components/editor/TextEditor.vue'
+import Editor from '@main/components/editor/ConversationEditor.vue'
 import { useI18n } from 'vue-i18n'
 import { useEmitter } from '@main/composables/useEmitter'
-import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { EMITTER_EVENTS, CONTACT_ACTIONS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { getInitials } from '@shared-ui/utils/string'
 import { useUserStore } from '@main/stores/user'
@@ -267,6 +267,13 @@ const relativeDate = (date) => formatDistanceToNow(new Date(date), { addSuffix: 
 const startAddingNote = () => {
   isAddingNote.value = true
 }
+
+const onPaletteAction = (action) => {
+  if (action === CONTACT_ACTIONS.ADD_NOTE && userStore.can('contact_notes:write')) startAddingNote()
+}
+
+onMounted(() => emitter.on(EMITTER_EVENTS.CONTACT_ACTION, onPaletteAction))
+onUnmounted(() => emitter.off(EMITTER_EVENTS.CONTACT_ACTION, onPaletteAction))
 
 const cancelAddNote = () => {
   isAddingNote.value = false

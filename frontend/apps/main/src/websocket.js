@@ -34,6 +34,8 @@ export class WebSocketClient {
   connect () {
     if (this.isReconnecting || this.manualClose) return
 
+    if (this.socket) this.socket.close()
+
     try {
       this.socket = new WebSocket('/ws')
       this.socket.addEventListener('open', this.handleOpen.bind(this))
@@ -46,7 +48,8 @@ export class WebSocketClient {
     }
   }
 
-  handleOpen () {
+  handleOpen (event) {
+    if (event.target !== this.socket) return
     console.log('WebSocket connected')
     const wasReconnect = this.reconnectAttempts > 0
     this.reconnectInterval = 1000
@@ -67,6 +70,7 @@ export class WebSocketClient {
   }
 
   handleMessage (event) {
+    if (event.target !== this.socket) return
     try {
       if (!event.data) return
 
@@ -114,16 +118,26 @@ export class WebSocketClient {
           } else {
             this.convStore.refreshConversationList()
           }
+          this.convStore.refreshSidebarCounts()
         },
         // Property updates for conversation and message.
         [WS_EVENT.MESSAGE_UPDATE]: () => this.convStore.mergeMessageUpdate(data.data),
-        [WS_EVENT.CONVERSATION_UPDATE]: () => this.convStore.mergeConversationUpdate(data.data),
+        [WS_EVENT.CONVERSATION_UPDATE]: () => {
+          this.convStore.mergeConversationUpdate(data.data)
+          if (data.data?.status) {
+            this.convStore.refreshSidebarCounts()
+          }
+        },
         [WS_EVENT.CONTACT_UPDATE]: () => this.convStore.mergeContactUpdate(data.data),
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)
         },
         // New notification.
-        [WS_EVENT.NEW_NOTIFICATION]: () => this.notificationStore.addNotification(data.data),
+        [WS_EVENT.NEW_NOTIFICATION]: () => {
+          this.notificationStore.addNotification(data.data)
+          // Mentions and assignments arrive as notifications without a conversation_update.
+          this.convStore.refreshSidebarCounts()
+        },
         [WS_EVENT.AGENT_AVAILABILITY_UPDATE]: () =>
           this.usersStore.setAvailability(data.data.agent_id, data.data.availability_status),
       }
@@ -140,11 +154,13 @@ export class WebSocketClient {
   }
 
   handleError (event) {
+    if (event.target !== this.socket) return
     console.error('WebSocket error:', event)
     this.reconnect()
   }
 
-  handleClose () {
+  handleClose (event) {
+    if (event.target !== this.socket) return
     this.clearPing()
     if (!this.manualClose) {
       this.reconnect()

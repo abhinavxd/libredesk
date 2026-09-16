@@ -1,0 +1,107 @@
+/* Collection cards on the landing page, shared by the classic and docs templates.
+   Loaded before the template stylesheet so either one can override the skin. */
+.hc-collections { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hc-collections.hc-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hc-collections.hc-layout-list { grid-template-columns: 1fr; }
+
+.hc-collection {
+    position: relative;
+    background: var(--hc-bg);
+    border: 1px solid var(--hc-border);
+    border-radius: var(--hc-radius);
+    padding: 1.15rem 1.25rem 1.25rem;
+    transition: border-color .15s, background-color .15s;
+    scroll-margin-top: 1rem;
+}
+.hc-collection:hover { border-color: var(--hc-accent-line); background: var(--hc-accent-tint); }
+
+a.hc-collection-card { display: flex; text-decoration: none; color: inherit; }
+a.hc-collection-card:hover { text-decoration: none; }
+.hc-collection-card h2,
+.hc-collection-card h3 {
+    margin: 0;
+    font-size: 1.05rem; font-weight: 650; letter-spacing: -.012em;
+    color: var(--hc-ink); transition: color .15s;
+}
+.hc-collection-card:hover h2, .hc-collection-card:hover h3 { color: var(--hc-accent-ink); }
+/* Column body keeps headings and meta aligned across a row when a card lacks a description. */
+.hc-collection-card .hc-collection-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+/* A grid row is as tall as its tallest card, so one long description stretches the whole row. */
+.hc-collection-card .hc-desc {
+    margin: .35rem 0 0;
+    color: var(--hc-muted); font-size: .89rem; line-height: 1.5;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+}
+.hc-collection-card .hc-count { position: absolute; top: 1.25rem; right: 1.25rem; margin: 0; }
+.hc-count { display: inline-block; margin-top: .5rem; font-size: .78rem; font-weight: 600; color: var(--hc-faint); }
+.hc-card-meta {
+    margin-top: auto; padding-top: .8rem; display: flex; align-items: center; gap: .55rem;
+    font-size: .78rem; font-weight: 600; color: var(--hc-faint);
+}
+
+/* Icon placement, set per help center and applied to every card. */
+a.hc-collection-card.hc-icon-inline { flex-direction: row; gap: 1rem; align-items: flex-start; }
+.hc-icon-inline .hc-collection-icon { margin-bottom: 0; }
+.hc-icon-inline .hc-collection-body { align-self: stretch; }
+
+/* The wrapper only becomes a box for the icon-above layout, which needs a full-bleed divider. */
+.hc-card-head { display: contents; }
+
+a.hc-collection-card.hc-icon-top { flex-direction: column; }
+.hc-icon-top .hc-card-head {
+    display: flex;
+    align-self: stretch;
+    margin: -1.15rem -1.25rem 1rem;
+    padding: 1.15rem 1.25rem;
+    border-bottom: 1px solid var(--hc-border);
+}
+.hc-icon-top .hc-collection-icon { margin-bottom: 0; }
+
+a.hc-collection-card.hc-icon-center { flex-direction: column; align-items: center; text-align: center; }
+.hc-icon-center .hc-collection-body { align-items: center; }
+a.hc-collection-card.hc-icon-center .hc-count { position: static; margin-top: .5rem; }
+.hc-icon-center .hc-card-meta { justify-content: center; }
+
+.hc-collection-icon {
+    flex: none; display: flex; align-items: center; justify-content: center;
+    margin-bottom: .6rem;
+}
+.hc-collection-icon svg { width: 1.5rem; height: 1.5rem; color: var(--hc-accent-ink); }
+.hc-collection-icon.hc-icon-tile {
+    width: 2.5rem; height: 2.5rem; margin-bottom: .85rem;
+    border: 1px solid var(--hc-border); border-radius: var(--hc-radius-sm);
+    transition: border-color .15s, background-color .15s;
+}
+.hc-collection-icon.hc-icon-tile svg { width: 1.35rem; height: 1.35rem; }
+.hc-collection-card:hover .hc-icon-tile { border-color: var(--hc-accent-line); background: var(--hc-accent-tint-2); }
+
+.hc-collections.hc-layout-list a.hc-collection-card { flex-direction: row; gap: 1.1rem; align-items: flex-start; text-align: left; }
+.hc-collections.hc-layout-list .hc-card-head { display: contents; }
+.hc-layout-list .hc-collection-icon { margin-bottom: 0; }
+.hc-collections.hc-layout-list .hc-collection-body { flex: 1; min-width: 0; align-items: flex-start; }
+.hc-collections.hc-layout-list a.hc-collection-card .hc-count { position: absolute; margin-top: 0; }
+.hc-collections.hc-layout-list .hc-card-meta { justify-content: flex-start; }
+
+/* Author avatar stacks */
+.hc-avatars { display: inline-flex; flex: none; }
+.hc-avatar {
+    width: 1.75rem; height: 1.75rem; border-radius: 50%;
+    border: 2px solid var(--hc-bg); object-fit: cover; display: block;
+}
+.hc-avatars > * + * { margin-left: -.5rem; }
+.hc-avatar-initial {
+    display: flex; align-items: center; justify-content: center;
+    background: var(--hc-accent-ink); color: var(--hc-bg);
+    font-size: .72rem; font-weight: 700; text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+    .hc-collections.hc-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+    .hc-collections, .hc-collections.hc-cols-3 { grid-template-columns: 1fr; }
+}
