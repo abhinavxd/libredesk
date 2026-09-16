@@ -56,7 +56,7 @@
         </TooltipTrigger>
         <TooltipContent>{{ $t('globals.messages.addEmoji') }}</TooltipContent>
       </Tooltip>
-      <Tooltip v-if="isWhatsApp">
+      <Tooltip v-if="showWhatsAppTemplate">
         <TooltipTrigger as-child>
           <Toggle
             :class="ICON_BUTTON_CLASS"
@@ -159,6 +159,7 @@ const emit = defineEmits(['emojiSelect', 'generateReply'])
 const props = defineProps({
   isFullscreen: Boolean,
   isWhatsApp: Boolean,
+  showWhatsAppTemplate: Boolean,
   isSending: Boolean,
   isGenerating: Boolean,
   enableSend: Boolean,

@@ -179,22 +179,29 @@
             <!-- Status Icons (outgoing only) -->
             <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
               <Lock :size="12" v-if="isPrivateMessage" class="text-muted-foreground" />
-              <Tooltip v-if="isReadByContact">
-                <TooltipTrigger>
-                  <CheckCheck :size="14" class="text-success" />
+              <Tooltip v-if="deliveryStatus">
+                <TooltipTrigger :aria-label="deliveryStatusLabel">
+                  <CheckCheck
+                    v-if="deliveryStatus === 'delivered' || deliveryStatus === 'read'"
+                    :size="14"
+                    :class="deliveryStatus === 'read' ? 'text-success' : 'text-muted-foreground'"
+                    aria-hidden="true"
+                  />
+                  <Check v-else :size="14" class="text-success" aria-hidden="true" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{{ t('globals.terms.read') }}</p>
+                  <p>{{ deliveryStatusLabel }}</p>
                 </TooltipContent>
               </Tooltip>
-              <Tooltip v-else-if="isDelivered">
-                <TooltipTrigger>
-                  <Check :size="14" class="text-success" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('globals.terms.sent') }}</p>
-                </TooltipContent>
-              </Tooltip>
+              <span
+                v-if="deliveryStatus"
+                class="sr-only"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {{ deliveryStatusLabel }}
+              </span>
               <Tooltip v-if="message.meta?.continuity_emailed">
                 <TooltipTrigger>
                   <Mail :size="12" class="text-muted-foreground" />
@@ -334,6 +341,7 @@ import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '@main/api'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
+import { getMessageDeliveryStatus } from './messageDeliveryStatus.js'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 
@@ -455,15 +463,13 @@ const canDeleteNote = computed(
     !isDeleted.value &&
     (props.message.sender_id === userStore.userID || userStore.hasAdminRole)
 )
-const isDelivered = computed(
-  () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
+const deliveryStatus = computed(() =>
+  getMessageDeliveryStatus(props.message, props.direction, convStore.current)
 )
-const isReadByContact = computed(() => {
-  const conversation = convStore.current
-  const lastSeenAt = conversation?.contact_last_seen_at
-  const isLiveChat = conversation?.inbox_channel === 'livechat'
-  if (!isDelivered.value || !lastSeenAt || !isLiveChat) return false
-  return new Date(props.message.created_at) <= new Date(lastSeenAt)
+const deliveryStatusLabel = computed(() => {
+  if (deliveryStatus.value === 'read') return t('globals.terms.read')
+  if (deliveryStatus.value === 'delivered') return t('globals.terms.delivered')
+  return t('globals.terms.sent')
 })
 const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
 

@@ -1087,6 +1087,7 @@
   "globals.terms.date": "Date",
   "globals.terms.day": "Day | Days",
   "globals.terms.default": "Default",
+  "globals.terms.delivered": "Delivered",
   "globals.terms.descending": "Descending",
   "globals.terms.description": "Description | Descriptions",
   "globals.terms.disabled": "Disabled",

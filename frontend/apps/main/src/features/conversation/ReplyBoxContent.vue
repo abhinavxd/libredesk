@@ -129,6 +129,7 @@
       class="mt-2"
       :isFullscreen="isFullscreen"
       :isWhatsApp="isWhatsAppConversation"
+      :showWhatsAppTemplate="isWhatsAppConversation && messageType !== 'private_note'"
       :handleFileUpload="handleFileUpload"
       :isSending="isSending"
       :enableSend="enableSend"

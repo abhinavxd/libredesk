@@ -264,7 +264,7 @@ const uploadFiles = (files) => {
   if (valid.length) _uploadFiles(valid)
 }
 
-const messageType = ref('reply')
+const messageType = defineModel('messageType', { default: 'reply' })
 const currentConversationUUID = computed(() => conversationStore.current?.uuid || null)
 watch(
   currentConversationUUID,
