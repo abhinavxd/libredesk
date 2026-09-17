@@ -17,6 +17,7 @@
       <div class="flex items-center gap-1">
         <Button
           type="button"
+          :aria-label="$t('globals.messages.previousPage')"
           variant="ghost"
           size="sm"
           :class="STEP_BUTTON_CLASS"
@@ -27,6 +28,7 @@
         </Button>
         <Button
           type="button"
+          :aria-label="$t('globals.messages.nextPage')"
           variant="ghost"
           size="sm"
           :class="STEP_BUTTON_CLASS"

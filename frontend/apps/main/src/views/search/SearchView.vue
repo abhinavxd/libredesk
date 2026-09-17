@@ -26,6 +26,7 @@
           <button
             v-if="term"
             type="button"
+            :aria-label="$t('globals.terms.clearSearch')"
             class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
             @click="term = ''"
           >
