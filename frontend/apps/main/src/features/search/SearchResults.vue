@@ -8,7 +8,13 @@
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent v-for="type in TYPES" :key="type" :value="type" class="mt-0">
+      <TabsContent
+        v-for="type in TYPES"
+        :key="type"
+        :value="type"
+        class="mt-0"
+        :class="{ 'pb-4': results[type].total_pages <= 1 }"
+      >
         <div class="bg-background rounded-md border overflow-hidden">
           <div v-if="results[type].results.length === 0" class="p-8 text-center text-muted-foreground">
             <div class="text-lg font-medium mb-2">{{ t('globals.messages.noResultsFound') }}</div>
