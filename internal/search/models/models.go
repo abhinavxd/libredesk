@@ -71,6 +71,7 @@ type MessageResult struct {
 	CreatedAt                   time.Time   `db:"created_at" json:"created_at"`
 	Type                        string      `db:"type" json:"type"`
 	Private                     bool        `db:"private" json:"private"`
+	TextContent                 string      `db:"text_content" json:"text_content"`
 	Snippet                     null.String `db:"snippet" json:"snippet"`
 	Sender                      Sender      `db:"sender" json:"sender"`
 	ConversationCreatedAt       time.Time   `db:"conversation_created_at" json:"conversation_created_at"`

@@ -34,6 +34,7 @@ func TestBuildConversationQueryPrioritizesExactReference(t *testing.T) {
 		models.ReadScope{},
 		conversationResultOrder,
 		nil,
+		maxPageSize,
 	)
 	if err != nil {
 		t.Fatalf("building query: %v", err)
@@ -46,6 +47,18 @@ func TestBuildConversationQueryPrioritizesExactReference(t *testing.T) {
 	}
 	if got := args[len(args)-1]; got != maxPageSize {
 		t.Fatalf("offset = %v, want %d", got, maxPageSize)
+	}
+}
+
+func TestFirstPageSearchKeepsLegacyLimits(t *testing.T) {
+	conversationQuery := normalizeQuery(models.Query{PageSize: 500}, maxConversationFirstPageSize)
+	if conversationQuery.PageSize != 500 {
+		t.Fatalf("conversation page size = %d, want 500", conversationQuery.PageSize)
+	}
+
+	messageQuery := normalizeQuery(models.Query{PageSize: 100}, maxMessageFirstPageSize)
+	if messageQuery.PageSize != maxMessageFirstPageSize {
+		t.Fatalf("message page size = %d, want %d", messageQuery.PageSize, maxMessageFirstPageSize)
 	}
 }
 
@@ -110,6 +123,14 @@ func TestConversationSearchFieldsAndRanking(t *testing.T) {
 		t.Fatalf("subject or name matched: total %d, results %d", total, len(results))
 	}
 
+	messages, messageTotal, err := manager.Messages(models.Query{Term: "ordinary", Page: 1, PageSize: 10}, scope)
+	if err != nil {
+		t.Fatalf("searching messages: %v", err)
+	}
+	if messageTotal != 1 || len(messages) != 1 || messages[0].TextContent != "ordinary message" {
+		t.Fatalf("message search returned total %d, results %+v", messageTotal, messages)
+	}
+
 	for _, term := range []string{"%%%", "___", "%_%"} {
 		results, total, err = manager.Conversations(models.Query{Term: term, Page: 1, PageSize: 10}, scope)
 		if err != nil {
@@ -119,7 +140,7 @@ func TestConversationSearchFieldsAndRanking(t *testing.T) {
 			t.Fatalf("conversation search for %q returned total %d, results %d", term, total, len(results))
 		}
 
-		messages, messageTotal, err := manager.Messages(models.Query{Term: term, Page: 1, PageSize: 10}, scope)
+		messages, messageTotal, err = manager.Messages(models.Query{Term: term, Page: 1, PageSize: 10}, scope)
 		if err != nil {
 			t.Fatalf("searching messages for %q: %v", term, err)
 		}

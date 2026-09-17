@@ -16,11 +16,56 @@ import (
 const (
 	minSearchQueryLength = 3
 
-	maxContactSearchLimit = 15
+	maxConversationSearchLimit = 1000
+	maxMessageSearchLimit      = 30
+	maxContactSearchLimit      = 15
 )
 
-// handleSearchConversations searches conversations by term with optional list filters, paginated.
 func handleSearchConversations(r *fastglue.Request) error {
+	app, user, term, err := searchTerm(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	scope, err := readScope(app, user.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	results, err := app.search.ConversationFirstPage(term, scope, searchLimit(r, maxConversationSearchLimit))
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(results)
+}
+
+func handleSearchMessages(r *fastglue.Request) error {
+	app, user, term, err := searchTerm(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	scope, err := readScope(app, user.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	results, err := app.search.MessageFirstPage(term, scope, searchLimit(r, maxMessageSearchLimit))
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(results)
+}
+
+func handleSearchContacts(r *fastglue.Request) error {
+	app, _, term, err := searchTerm(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	results, err := app.search.Contacts(term, searchLimit(r, maxContactSearchLimit))
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(results)
+}
+
+func handlePaginatedSearchConversations(r *fastglue.Request) error {
 	app, user, q, err := searchInputs(r)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -36,8 +81,7 @@ func handleSearchConversations(r *fastglue.Request) error {
 	return r.SendEnvelope(pageResults(results, total, q))
 }
 
-// handleSearchMessages searches messages by term with optional list filters, paginated.
-func handleSearchMessages(r *fastglue.Request) error {
+func handlePaginatedSearchMessages(r *fastglue.Request) error {
 	app, user, q, err := searchInputs(r)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -53,29 +97,10 @@ func handleSearchMessages(r *fastglue.Request) error {
 	return r.SendEnvelope(pageResults(results, total, q))
 }
 
-// handleSearchContacts searches contacts based on the query.
-func handleSearchContacts(r *fastglue.Request) error {
-	app, _, q, err := searchInputs(r)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	limit, err := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("limit")))
-	if err != nil || limit < 1 || limit > maxContactSearchLimit {
-		limit = maxContactSearchLimit
-	}
-	results, err := app.search.Contacts(q.Term, limit)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	return r.SendEnvelope(results)
-}
-
 func searchInputs(r *fastglue.Request) (*App, amodels.User, smodels.Query, error) {
-	app := r.Context.(*App)
-	user, _ := r.RequestCtx.UserValue("user").(amodels.User)
-	term := string(r.RequestCtx.QueryArgs().Peek("query"))
-	if len(term) < minSearchQueryLength {
-		return app, user, smodels.Query{}, envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minSearchQueryLength)), nil)
+	app, user, term, err := searchTerm(r)
+	if err != nil {
+		return app, user, smodels.Query{}, err
 	}
 	page, pageSize := getPagination(r)
 	query := searchmanager.NormalizeQuery(smodels.Query{
@@ -85,6 +110,24 @@ func searchInputs(r *fastglue.Request) (*App, amodels.User, smodels.Query, error
 		PageSize: pageSize,
 	})
 	return app, user, query, nil
+}
+
+func searchTerm(r *fastglue.Request) (*App, amodels.User, string, error) {
+	app := r.Context.(*App)
+	user, _ := r.RequestCtx.UserValue("user").(amodels.User)
+	term := string(r.RequestCtx.QueryArgs().Peek("query"))
+	if len(term) < minSearchQueryLength {
+		return app, user, "", envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minSearchQueryLength)), nil)
+	}
+	return app, user, term, nil
+}
+
+func searchLimit(r *fastglue.Request, max int) int {
+	limit, err := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("limit")))
+	if err != nil || limit < 1 || limit > max {
+		return max
+	}
+	return limit
 }
 
 func pageResults(results any, total int, q smodels.Query) envelope.PageResults {

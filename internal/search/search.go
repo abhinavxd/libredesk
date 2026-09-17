@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	maxPageSize = 100
+	maxPageSize                  = 100
+	maxConversationFirstPageSize = 1000
+	maxMessageFirstPageSize      = 30
 
 	conversationResultOrder = "(conversations.reference_number = $1) DESC, conversations.last_message_at DESC NULLS LAST"
 	messageResultOrder      = "conversation_messages.created_at DESC NULLS LAST"
@@ -75,7 +77,40 @@ func New(opts Opts) (*Manager, error) {
 
 // Conversations searches conversations the agent is allowed to read, returning the page and the total match count.
 func (s *Manager) Conversations(query models.Query, scope models.ReadScope) ([]models.ConversationResult, int, error) {
-	sql, args, err := s.buildQuery(s.q.SearchConversations, query, scope, conversationResultOrder, s.filterFields)
+	return s.searchConversations(query, scope, maxPageSize)
+}
+
+func (s *Manager) ConversationFirstPage(term string, scope models.ReadScope, limit int) ([]models.ConversationResult, error) {
+	results, _, err := s.searchConversations(models.Query{Term: term, Page: 1, PageSize: limit}, scope, maxConversationFirstPageSize)
+	return results, err
+}
+
+// Messages searches messages in conversations the agent is allowed to read, returning the page and the total match count.
+func (s *Manager) Messages(query models.Query, scope models.ReadScope) ([]models.MessageResult, int, error) {
+	return s.searchMessages(query, scope, maxPageSize)
+}
+
+func (s *Manager) MessageFirstPage(term string, scope models.ReadScope, limit int) ([]models.MessageResult, error) {
+	results, _, err := s.searchMessages(models.Query{Term: term, Page: 1, PageSize: limit}, scope, maxMessageFirstPageSize)
+	return results, err
+}
+
+// Contacts searches contacts based on the query
+func (s *Manager) Contacts(query string, limit int) ([]models.ContactResult, error) {
+	var results = make([]models.ContactResult, 0)
+	if err := s.q.SearchContacts.Select(&results, dbutil.ContainsPattern(query), limit); err != nil {
+		s.lo.Error("error searching contacts", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return results, nil
+}
+
+func NormalizeQuery(query models.Query) models.Query {
+	return normalizeQuery(query, maxPageSize)
+}
+
+func (s *Manager) searchConversations(query models.Query, scope models.ReadScope, pageSizeLimit int) ([]models.ConversationResult, int, error) {
+	sql, args, err := s.buildQuery(s.q.SearchConversations, query, scope, conversationResultOrder, s.filterFields, pageSizeLimit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -91,13 +126,12 @@ func (s *Manager) Conversations(query models.Query, scope models.ReadScope) ([]m
 	return results, total, nil
 }
 
-// Messages searches messages in conversations the agent is allowed to read, returning the page and the total match count.
-func (s *Manager) Messages(query models.Query, scope models.ReadScope) ([]models.MessageResult, int, error) {
+func (s *Manager) searchMessages(query models.Query, scope models.ReadScope, pageSizeLimit int) ([]models.MessageResult, int, error) {
 	fields := dbutil.AllowedFields{"conversation_messages": messageAllowedFields}
 	for model, f := range s.filterFields {
 		fields[model] = f
 	}
-	sql, args, err := s.buildQuery(s.q.SearchMessages, query, scope, messageResultOrder, fields)
+	sql, args, err := s.buildQuery(s.q.SearchMessages, query, scope, messageResultOrder, fields, pageSizeLimit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -113,22 +147,12 @@ func (s *Manager) Messages(query models.Query, scope models.ReadScope) ([]models
 	return results, total, nil
 }
 
-// Contacts searches contacts based on the query
-func (s *Manager) Contacts(query string, limit int) ([]models.ContactResult, error) {
-	var results = make([]models.ContactResult, 0)
-	if err := s.q.SearchContacts.Select(&results, dbutil.ContainsPattern(query), limit); err != nil {
-		s.lo.Error("error searching contacts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	return results, nil
-}
-
-func NormalizeQuery(query models.Query) models.Query {
+func normalizeQuery(query models.Query, pageSizeLimit int) models.Query {
 	if query.Page < 1 {
 		query.Page = 1
 	}
-	if query.PageSize < 1 || query.PageSize > maxPageSize {
-		query.PageSize = maxPageSize
+	if query.PageSize < 1 || query.PageSize > pageSizeLimit {
+		query.PageSize = pageSizeLimit
 	}
 	if query.Filters == "" {
 		query.Filters = "[]"
@@ -136,8 +160,8 @@ func NormalizeQuery(query models.Query) models.Query {
 	return query
 }
 
-func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadScope, orderBy string, fields dbutil.AllowedFields) (string, []any, error) {
-	query = NormalizeQuery(query)
+func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadScope, orderBy string, fields dbutil.AllowedFields, pageSizeLimit int) (string, []any, error) {
+	query = normalizeQuery(query, pageSizeLimit)
 	baseArgs := append([]any{query.Term}, scopeArgs(scope)...)
 	baseArgs = append(baseArgs, dbutil.ContainsPattern(query.Term))
 	sql, args, err := dbutil.BuildFilterQuery(base, baseArgs, query.Filters, fields, s.filterRenderers, s.filterLocation())

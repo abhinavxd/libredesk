@@ -61,6 +61,7 @@ SELECT
     conversation_messages.created_at,
     conversation_messages.type,
     conversation_messages.private,
+    LEFT(conversation_messages.text_content, 200) AS text_content,
     CASE WHEN POSITION(LOWER($1) IN LOWER(conversation_messages.text_content)) > 81 THEN '…' ELSE '' END
         || SUBSTRING(
             conversation_messages.text_content
