@@ -35,6 +35,24 @@ func TestEvaluateRuleIncomingTo(t *testing.T) {
 			want:       true,
 		},
 		{
+			name:       "contains ignores empty candidates",
+			recipients: []string{"support@example.com"},
+			rule:       models.RuleDetail{Operator: models.RuleOperatorContains, Value: ", missing.example,  ,"},
+			want:       false,
+		},
+		{
+			name:       "not contains ignores empty candidates",
+			recipients: []string{"support@example.com"},
+			rule:       models.RuleDetail{Operator: models.RuleOperatorNotContains, Value: ", missing.example,  ,"},
+			want:       true,
+		},
+		{
+			name:       "contains matches a repeated candidate around blanks",
+			recipients: []string{"support@example.com"},
+			rule:       models.RuleDetail{Operator: models.RuleOperatorContains, Value: ", @example.com,  , @example.com,"},
+			want:       true,
+		},
+		{
 			name:       "case sensitive match is respected",
 			recipients: []string{"foundation@zerya.dev"},
 			rule: models.RuleDetail{

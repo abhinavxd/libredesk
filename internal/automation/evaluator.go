@@ -333,6 +333,9 @@ func evaluateRecipientRule(recipients []string, rule models.RuleDetail) bool {
 			recipient = strings.Join(strings.Fields(recipient), " ")
 			for candidate := range strings.SplitSeq(ruleValue, ",") {
 				candidate = strings.Join(strings.Fields(candidate), " ")
+				if candidate == "" {
+					continue
+				}
 				if strings.Contains(recipient, candidate) {
 					matched = true
 					break
