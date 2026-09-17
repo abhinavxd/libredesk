@@ -9,7 +9,7 @@ WITH matched_conversations AS (
     SELECT conversations.id
     FROM users
     JOIN conversations ON conversations.contact_id = users.id
-    WHERE users.email ILIKE '%' || $1 || '%'
+    WHERE users.email ILIKE $10 ESCAPE '\'
 )
 SELECT
     COUNT(*) OVER() AS total,
@@ -97,7 +97,7 @@ LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
 LEFT JOIN conversation_statuses cs ON conversations.status_id = cs.id
 LEFT JOIN conversation_priorities cp ON conversations.priority_id = cp.id
 WHERE conversation_messages.type != 'activity'
-  AND conversation_messages.text_content ILIKE '%' || $1 || '%'
+  AND conversation_messages.text_content ILIKE $10 ESCAPE '\'
   AND $3
   AND (
        $4
@@ -118,5 +118,5 @@ SELECT
 FROM users
 WHERE type = 'contact'
 AND deleted_at IS NULL
-AND email ILIKE '%' || $1 || '%'
+AND email ILIKE $1 ESCAPE '\'
 LIMIT $2;

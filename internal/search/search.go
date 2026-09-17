@@ -116,7 +116,7 @@ func (s *Manager) Messages(query models.Query, scope models.ReadScope) ([]models
 // Contacts searches contacts based on the query
 func (s *Manager) Contacts(query string, limit int) ([]models.ContactResult, error) {
 	var results = make([]models.ContactResult, 0)
-	if err := s.q.SearchContacts.Select(&results, query, limit); err != nil {
+	if err := s.q.SearchContacts.Select(&results, dbutil.ContainsPattern(query), limit); err != nil {
 		s.lo.Error("error searching contacts", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -138,7 +138,9 @@ func NormalizeQuery(query models.Query) models.Query {
 
 func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadScope, orderBy string, fields dbutil.AllowedFields) (string, []any, error) {
 	query = NormalizeQuery(query)
-	sql, args, err := dbutil.BuildFilterQuery(base, append([]any{query.Term}, scopeArgs(scope)...), query.Filters, fields, s.filterRenderers, s.filterLocation())
+	baseArgs := append([]any{query.Term}, scopeArgs(scope)...)
+	baseArgs = append(baseArgs, dbutil.ContainsPattern(query.Term))
+	sql, args, err := dbutil.BuildFilterQuery(base, baseArgs, query.Filters, fields, s.filterRenderers, s.filterLocation())
 	if err != nil {
 		s.lo.Error("error building search query", "error", err)
 		return "", nil, envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
