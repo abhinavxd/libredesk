@@ -1061,12 +1061,15 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 }
 
 // initSearch inits search manager.
-func initSearch(db *sqlx.DB, i18n *i18n.I18n) *search.Manager {
+func initSearch(db *sqlx.DB, i18n *i18n.I18n, convo *conversation.Manager) *search.Manager {
 	lo := initLogger("search")
 	m, err := search.New(search.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:              db,
+		Lo:              lo,
+		I18n:            i18n,
+		FilterFields:    conversation.ListFilterAllowedFields,
+		FilterRenderers: conversation.ListFilterRenderers,
+		FilterLocation:  convo.FilterLocation,
 	})
 	if err != nil {
 		log.Fatalf("error initializing search manager: %v", err)

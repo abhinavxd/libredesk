@@ -415,7 +415,7 @@ FROM help_articles a
 JOIN article_collections c ON c.id = a.collection_id AND c.locale = a.locale AND c.id IN (SELECT id FROM published_collections)
 WHERE a.status = 'published' AND a.locale = $4
     AND (a.search_tsv @@ to_tsquery(help_article_search_config($4), NULLIF($5, ''))
-        OR a.title ILIKE '%' || $2 || '%' OR a.content ILIKE '%' || $2 || '%')
+        OR a.title ILIKE $2 ESCAPE '\' OR a.content ILIKE $2 ESCAPE '\')
 ORDER BY ts_rank(a.search_tsv, to_tsquery(help_article_search_config($4), NULLIF($5, '')), 2) DESC, a.view_count DESC, a.created_at DESC
 LIMIT $3;
 

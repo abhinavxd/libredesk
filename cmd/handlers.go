@@ -91,6 +91,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/messages/search", perm(handleSearchMessages, "messages:read"))
 	g.GET("/api/v1/contacts/search", perm(handleSearchContacts, "contacts:read"))
 
+	// New paginated search bar routes with better filter support and pagination.
+	g.GET("/api/v1/search/conversations", perm(handlePaginatedSearchConversations, "conversations:read"))
+	g.GET("/api/v1/search/messages", perm(handlePaginatedSearchMessages, "messages:read"))
+
 	// Views.
 	g.GET("/api/v1/views/me", perm(handleGetUserViews, "view:manage"))
 	g.POST("/api/v1/views/me", perm(handleCreateUserView, "view:manage"))

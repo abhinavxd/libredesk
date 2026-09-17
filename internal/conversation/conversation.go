@@ -70,13 +70,13 @@ const (
 	newReplyEmailDelay = 5 * time.Minute
 )
 
-var conversationFilterRenderers = dbutil.FieldRenderers{
+var ListFilterRenderers = dbutil.FieldRenderers{
 	"conversations": {
 		"tags": renderTagFilter,
 	},
 }
 
-var conversationListAllowedFields = dbutil.AllowedFields{
+var ListFilterAllowedFields = dbutil.AllowedFields{
 	"conversations":         conversationsAllowedFields,
 	"conversation_statuses": conversationStatusAllowedFields,
 	"users":                 usersAllowedFields,
@@ -1962,13 +1962,13 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		OrderBy:  orderBy,
 		Page:     page,
 		PageSize: pageSize,
-		Location: c.filterLocation(),
-	}, filtersJSON, conversationListAllowedFields, conversationFilterRenderers)
+		Location: c.FilterLocation(),
+	}, filtersJSON, ListFilterAllowedFields, ListFilterRenderers)
 }
 
 // ValidateListFilters structurally validates a conversation view's filters payload.
 func (c *Manager) ValidateListFilters(filtersJSON string) error {
-	err := dbutil.ValidateFilters(filtersJSON, conversationListAllowedFields, conversationFilterRenderers)
+	err := dbutil.ValidateFilters(filtersJSON, ListFilterAllowedFields, ListFilterRenderers)
 	if err == nil {
 		return nil
 	}
@@ -2258,7 +2258,7 @@ func (c *Manager) updateAssignee(uuid string, assigneeID int, assigneeType strin
 }
 
 // filterLocation returns the configured app timezone for resolving date filters. The builder normalizes invalid/empty values to UTC.
-func (c *Manager) filterLocation() string {
+func (c *Manager) FilterLocation() string {
 	b, err := c.settingsStore.Get("app.timezone")
 	if err != nil {
 		return ""

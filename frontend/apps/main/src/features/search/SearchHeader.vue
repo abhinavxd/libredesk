@@ -1,41 +1,13 @@
 <template>
-  <div>
-    <div class="flex items-center px-2 h-12">
-      <SidebarTrigger class="cursor-pointer" />
-      <Input
-        ref="inputRef"
-        v-model="model"
-        :placeholder="t('globals.terms.search')"
-        class="w-full border-none shadow-none focus:ring-0 focus:ring-offset-0"
-      />
-    </div>
-    <Separator />
+  <div class="flex items-center space-x-4 px-2 h-12 border-b shrink-0">
+    <SidebarTrigger class="cursor-pointer" />
+    <span class="text-xl font-semibold">{{ t('globals.terms.search') }}</span>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
-import { Separator } from '@shared-ui/components/ui/separator'
-import { Input } from '@shared-ui/components/ui/input'
 import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
 import { useI18n } from 'vue-i18n'
-const model = defineModel({
-  type: String,
-  default: '',
-  required: false
-})
-const { t } = useI18n()
-const inputRef = ref(null)
-onMounted(async () => {
-  await nextTick()
-  inputRef.value?.$el?.focus?.()
-})
-</script>
 
-<style scoped>
-.focus\:ring-0:focus {
-  --tw-ring-offset-shadow: none;
-  --tw-ring-shadow: none;
-  box-shadow: none;
-}
-</style>
+const { t } = useI18n()
+</script>

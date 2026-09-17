@@ -324,7 +324,7 @@ func main() {
 		authz:            initAuthz(i18n),
 		view:             initView(db, i18n),
 		report:           initReport(db, i18n),
-		search:           initSearch(db, i18n),
+		search:           initSearch(db, i18n, conversation),
 		role:             initRole(db, i18n),
 		tag:              initTag(db, i18n),
 		macro:            initMacro(db, i18n),
