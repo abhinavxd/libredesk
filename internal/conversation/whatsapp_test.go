@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/knadh/go-i18n"
 	"github.com/volatiletech/null/v9"
 )

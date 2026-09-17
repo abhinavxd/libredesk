@@ -28,7 +28,7 @@ Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live 
 - **Live chat widget**  
   Embed a real-time chat widget on your website. Replies go out from the same inbox your team already works in.
 - **WhatsApp**  
-  Connect a WhatsApp number through the Meta Cloud API. Agents reply from the same inbox, with approved templates for messages outside WhatsApp's 24-hour window.
+  Connect a WhatsApp number through the Meta Cloud API. Agents reply from the same inbox.
 - **Help center**  
   Publish a searchable knowledge base with collections, articles in multiple languages, and customize it however you want.  
 - **AI assistant**  

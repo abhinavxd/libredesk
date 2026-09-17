@@ -57,7 +57,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/view"
 	"github.com/abhinavxd/libredesk/internal/webhook"
 	whatsappapi "github.com/abhinavxd/libredesk/internal/whatsapp"
-	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp_template"
+	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp/template"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"

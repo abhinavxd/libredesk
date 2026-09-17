@@ -1,4 +1,4 @@
-package whatsapp_template
+package template
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/testdb"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
-	"github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	"github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"

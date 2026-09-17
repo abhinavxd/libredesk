@@ -39,7 +39,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/template"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
-	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
@@ -226,7 +226,6 @@ type webhookStore interface {
 	TriggerWebhook(webhookID int, event wmodels.WebhookEvent, data any)
 }
 
-// WhatsAppTemplateStore is an interface over internal/whatsapp_template to avoid a circular import.
 type WhatsAppTemplateStore interface {
 	GetByID(id int) (wtmodels.Template, error)
 	GetByName(inboxID int, name string) (wtmodels.Template, error)

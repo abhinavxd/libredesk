@@ -1,5 +1,4 @@
-// Package whatsapp_template manages WhatsApp templates stored locally and mirrored against Meta.
-package whatsapp_template
+package template
 
 import (
 	"cmp"
@@ -15,7 +14,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
-	"github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	"github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"

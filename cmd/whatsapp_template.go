@@ -9,7 +9,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
-	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

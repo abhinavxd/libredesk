@@ -18,7 +18,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

@@ -1,4 +1,4 @@
-package whatsapp_template
+package template
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
-	"github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	"github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/volatiletech/null/v9"
 )
 
