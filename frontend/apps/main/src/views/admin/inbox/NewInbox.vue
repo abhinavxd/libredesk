@@ -124,6 +124,8 @@ const submitForm = (values) => {
     prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
     config: {
       reply_to: values.reply_to,
+      product_name: values.product_name || '',
+      signature: values.signature || '',
       enable_plus_addressing: values.enable_plus_addressing,
       imap: [values.imap],
       smtp: [values.smtp]
