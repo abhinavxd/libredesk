@@ -10,11 +10,17 @@ describe('conversation reference suggestions', () => {
     expect(search).not.toHaveBeenCalled()
   })
 
-  it('maps a conversation result to a suggestion', async () => {
+  it('only maps an exact reference number match to a suggestion', async () => {
     const search = vi.fn().mockResolvedValue({
       data: {
         data: {
           results: [
+            {
+              uuid: 'email-match-conversation-uuid',
+              reference_number: '109',
+              subject: 'Reference appears in contact email',
+              status: 'Open'
+            },
             {
               uuid: 'conversation-uuid',
               reference_number: '108',
