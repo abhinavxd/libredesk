@@ -18,7 +18,7 @@
           class="shrink-0 text-muted-foreground"
           @click="emit('clearFilters')"
         >
-          <X class="mr-1 h-4 w-4" aria-hidden="true" />
+          <X class="h-4 w-4" aria-hidden="true" />
           {{ t('globals.messages.clearFilters') }}
         </Button>
       </div>
