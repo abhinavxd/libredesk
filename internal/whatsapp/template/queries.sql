@@ -2,9 +2,9 @@
 INSERT INTO whatsapp_templates (
     inbox_id, meta_template_id, name, language, category, status,
     header_type, header_content, body_content, footer_content,
-    buttons, sample_values, rejection_reason
+    buttons, sample_values, rejection_reason, component_types
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: update
@@ -18,6 +18,10 @@ SET name = $2,
     footer_content = $8,
     buttons = $9,
     sample_values = $10,
+    component_types = $11,
+    status = $12,
+    meta_template_id = $13,
+    rejection_reason = NULL,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
@@ -50,31 +54,31 @@ WHERE inbox_id = $1
 
 -- name: get-by-id
 SELECT id, created_at, updated_at, inbox_id, meta_template_id, name, language, category, status,
-       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason
+       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason, component_types
 FROM whatsapp_templates WHERE id = $1;
 
 -- name: get-by-inbox
 SELECT id, created_at, updated_at, inbox_id, meta_template_id, name, language, category, status,
-       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason
+       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason, component_types
 FROM whatsapp_templates WHERE inbox_id = $1 ORDER BY updated_at DESC;
 
 -- name: get-by-name-language
 SELECT id, created_at, updated_at, inbox_id, meta_template_id, name, language, category, status,
-       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason
+       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason, component_types
 FROM whatsapp_templates WHERE inbox_id = $1 AND name = $2 AND language = $3;
 
 -- name: get-by-name
 SELECT id, created_at, updated_at, inbox_id, meta_template_id, name, language, category, status,
-       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason
+       header_type, header_content, body_content, footer_content, buttons, sample_values, rejection_reason, component_types
 FROM whatsapp_templates WHERE inbox_id = $1 AND name = $2 LIMIT 1;
 
 -- name: upsert-from-meta
 INSERT INTO whatsapp_templates (
     inbox_id, meta_template_id, name, language, category, status,
     header_type, header_content, body_content, footer_content,
-    buttons, sample_values, rejection_reason
+    buttons, sample_values, rejection_reason, component_types
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 ON CONFLICT (inbox_id, name, language) DO UPDATE SET
     meta_template_id = EXCLUDED.meta_template_id,
     category = EXCLUDED.category,
@@ -85,6 +89,7 @@ ON CONFLICT (inbox_id, name, language) DO UPDATE SET
     footer_content = EXCLUDED.footer_content,
     buttons = EXCLUDED.buttons,
     rejection_reason = EXCLUDED.rejection_reason,
+    component_types = EXCLUDED.component_types,
     updated_at = CASE WHEN (
         whatsapp_templates.meta_template_id IS DISTINCT FROM EXCLUDED.meta_template_id OR
         whatsapp_templates.category IS DISTINCT FROM EXCLUDED.category OR
@@ -94,7 +99,8 @@ ON CONFLICT (inbox_id, name, language) DO UPDATE SET
         whatsapp_templates.body_content IS DISTINCT FROM EXCLUDED.body_content OR
         whatsapp_templates.footer_content IS DISTINCT FROM EXCLUDED.footer_content OR
         whatsapp_templates.buttons IS DISTINCT FROM EXCLUDED.buttons OR
-        whatsapp_templates.rejection_reason IS DISTINCT FROM EXCLUDED.rejection_reason
+        whatsapp_templates.rejection_reason IS DISTINCT FROM EXCLUDED.rejection_reason OR
+        whatsapp_templates.component_types IS DISTINCT FROM EXCLUDED.component_types
     ) THEN NOW() ELSE whatsapp_templates.updated_at END
 RETURNING *;
 

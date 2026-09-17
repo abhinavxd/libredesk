@@ -80,7 +80,7 @@
 
 <script setup>
 import { computed, h, onMounted, ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 import { Info, RefreshCw, Trash2 } from 'lucide-vue-next'
@@ -113,6 +113,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { useInboxStore } from '@main/stores/inbox'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
+import { canEditWhatsAppTemplate } from '@/features/conversation/whatsappTemplate.js'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -152,7 +153,25 @@ const columns = [
     header: () => h('div', t('globals.terms.name')),
     cell: ({ row }) => {
       const name = row.getValue('name')
-      const children = [h('span', { class: 'font-mono text-xs' }, name)]
+      const children = [
+        canEditWhatsAppTemplate(row.original)
+          ? h(
+              RouterLink,
+              {
+                to: { name: 'whatsapp-template-edit', params: { id: row.original.id } },
+                class: 'font-mono text-xs hover:underline'
+              },
+              () => name
+            )
+          : h(
+              'span',
+              {
+                class: 'font-mono text-xs',
+                title: t('admin.whatsappTemplates.error.editUnavailable')
+              },
+              name
+            )
+      ]
       if ((row.original.name || '').startsWith(RESERVED_NAME_PREFIX)) {
         children.push(
           h(Tooltip, null, {
@@ -214,6 +233,8 @@ const columns = [
         {
           variant: 'ghost',
           size: 'sm',
+          type: 'button',
+          'aria-label': t('globals.messages.delete'),
           onClick: () => confirmDelete(row.original.id)
         },
         () => h(Trash2, { class: 'size-4' })

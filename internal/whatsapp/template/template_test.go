@@ -140,31 +140,6 @@ func TestBuildSubmissionMediaHeaderHasNoExample(t *testing.T) {
 	}
 }
 
-func TestBuildEditDropsNameAndLanguage(t *testing.T) {
-	edit, err := buildEdit(models.Template{
-		Name:         "libredesk_csat_2",
-		Language:     "en_US",
-		Category:     "UTILITY",
-		BodyContent:  "Hi {{1}}",
-		SampleValues: json.RawMessage(`{"1":"Ravi"}`),
-	})
-	if err != nil {
-		t.Fatalf("buildEdit errored: %v", err)
-	}
-	raw, err := json.Marshal(edit)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	for _, field := range []string{`"name"`, `"language"`} {
-		if strings.Contains(string(raw), field) {
-			t.Fatalf("edit payload must not carry %s: %s", field, raw)
-		}
-	}
-	if len(edit.Components) == 0 {
-		t.Fatal("expected the edit to carry components")
-	}
-}
-
 func TestBuildSubmissionPositionalHeaderExample(t *testing.T) {
 	sub, err := buildSubmission(models.Template{
 		Name: "order_update", Language: "en_US", Category: "UTILITY",

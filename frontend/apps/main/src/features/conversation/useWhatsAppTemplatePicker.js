@@ -4,10 +4,12 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import api from '@main/api'
-import { extractPlaceholders, placeholderLabel } from './whatsappTemplate.js'
+import {
+  extractPlaceholders,
+  placeholderLabel,
+  supportsWhatsAppTemplateContent
+} from './whatsappTemplate.js'
 
-// Media-header templates need a media ID the dashboard can't supply, AUTHENTICATION templates need OTP button params, and libredesk_csat_* names are reserved for surveys.
-const SENDABLE_HEADER_TYPES = ['', 'NONE', 'TEXT']
 const RESERVED_NAME_PREFIX = 'libredesk_csat_'
 
 export function useWhatsAppTemplatePicker() {
@@ -21,9 +23,8 @@ export function useWhatsAppTemplatePicker() {
     templates.value.filter(
       (tmpl) =>
         tmpl.status === 'APPROVED' &&
-        tmpl.category !== 'AUTHENTICATION' &&
         !tmpl.name.startsWith(RESERVED_NAME_PREFIX) &&
-        SENDABLE_HEADER_TYPES.includes(tmpl.header_type || '')
+        supportsWhatsAppTemplateContent(tmpl)
     )
   )
 

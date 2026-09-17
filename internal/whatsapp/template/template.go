@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -140,7 +141,7 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 	if err := m.q.Insert.Get(&stored,
 		t.InboxID, t.MetaTemplateID, t.Name, t.Language, t.Category, t.Status,
 		t.HeaderType, t.HeaderContent, t.BodyContent, t.FooterContent,
-		t.Buttons, t.SampleValues, t.RejectionReason,
+		t.Buttons, t.SampleValues, t.RejectionReason, contentComponentTypes(t),
 	); err != nil {
 		m.lo.Error("error inserting whatsapp template", "error", err)
 		if dbutil.IsUniqueViolationError(err) {
@@ -173,7 +174,33 @@ func (m *Manager) EnsureReserved(ctx context.Context, desired models.Template) e
 		m.lo.Warn("skipping reserved template edit while pending meta review", "id", existing.ID, "name", existing.Name)
 		return nil
 	}
-	return m.editReserved(ctx, existing, desired)
+	_, err = m.editTemplate(ctx, existing, desired)
+	return err
+}
+
+func (m *Manager) Update(ctx context.Context, id int, desired models.Template) (models.Template, error) {
+	existing, err := m.GetByID(id)
+	if err != nil {
+		return models.Template{}, err
+	}
+	if desired.InboxID != existing.InboxID || desired.Name != existing.Name || desired.Language != existing.Language {
+		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.identityLocked"), nil)
+	}
+	var buttons []whatsapp.TemplateButton
+	if strings.HasPrefix(existing.Name, models.CSATTemplateNamePrefix) ||
+		!existing.SupportsTextContent() ||
+		!slices.Contains([]string{models.StatusApproved, models.StatusRejected, models.StatusPaused}, existing.Status) ||
+		json.Unmarshal(existing.Buttons, &buttons) != nil || len(buttons) > 3 {
+		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.editUnavailable"), nil)
+	}
+	if existing.Status == models.StatusApproved && !strings.EqualFold(existing.Category, desired.Category) {
+		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.categoryLocked"), nil)
+	}
+	desired.ComponentTypes = contentComponentTypes(desired)
+	if !desired.SupportsTextContent() {
+		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.editUnavailable"), nil)
+	}
+	return m.editTemplate(ctx, existing, desired)
 }
 
 // submitNewToMeta submits a freshly stored template to Meta and records the returned id or the rejection reason.
@@ -204,40 +231,38 @@ func (m *Manager) submitNewToMeta(ctx context.Context, stored models.Template) m
 	return stored
 }
 
-// editReserved persists new content for an existing template and pushes it to Meta in place, re-submitting fresh when it was never registered.
-func (m *Manager) editReserved(ctx context.Context, existing, desired models.Template) error {
-	updated, err := m.updateContent(existing.ID, desired)
-	if err != nil {
-		return err
-	}
+func (m *Manager) editTemplate(ctx context.Context, existing, desired models.Template) (models.Template, error) {
 	if m.client == nil || m.resolver == nil {
-		return nil
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	acc, err := m.resolver.WhatsAppAccount(existing.InboxID)
+	if err != nil {
+		m.lo.Error("error resolving whatsapp account for template edit", "inbox_id", existing.InboxID, "error", err)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	submission, err := buildSubmission(desired)
+	if err != nil {
+		return models.Template{}, envelope.NewError(envelope.InputError, err.Error(), nil)
+	}
+	desired.MetaTemplateID = existing.MetaTemplateID
 	if !existing.MetaTemplateID.Valid || existing.MetaTemplateID.String == "" {
-		m.submitNewToMeta(ctx, updated)
-		return nil
+		metaID, submitErr := m.client.SubmitTemplate(ctx, acc, submission)
+		if submitErr != nil {
+			return models.Template{}, envelope.NewError(envelope.InputError, submitErrReason(submitErr), nil)
+		}
+		desired.MetaTemplateID = null.StringFrom(metaID)
+	} else {
+		edit := whatsapp.TemplateEdit{Components: submission.Components, ParameterFormat: submission.ParameterFormat}
+		if !strings.EqualFold(existing.Category, desired.Category) {
+			edit.Category = submission.Category
+		}
+		if err := m.client.EditTemplate(ctx, acc, existing.MetaTemplateID.String, edit); err != nil {
+			m.lo.Error("error editing template on meta", "id", existing.ID, "error", err)
+			return models.Template{}, envelope.NewError(envelope.InputError, submitErrReason(err), nil)
+		}
 	}
-	acc, err := m.resolver.WhatsAppAccount(updated.InboxID)
-	if err != nil {
-		m.lo.Error("error resolving whatsapp account for template edit", "inbox_id", updated.InboxID, "error", err)
-		m.markRejected(updated, "could not resolve WhatsApp account for submission")
-		return nil
-	}
-	edit, err := buildEdit(updated)
-	if err != nil {
-		m.lo.Error("error building template edit", "id", updated.ID, "error", err)
-		m.markRejected(updated, "could not build template edit: "+err.Error())
-		return nil
-	}
-	if err := m.client.EditTemplate(ctx, acc, existing.MetaTemplateID.String, edit); err != nil {
-		m.lo.Error("error editing template on meta", "id", updated.ID, "error", err)
-		m.markRejected(updated, submitErrReason(err))
-		return nil
-	}
-	if _, err := m.q.UpdateStatus.Exec(updated.ID, models.StatusPending, ""); err != nil {
-		m.lo.Error("error persisting template pending status", "id", updated.ID, "error", err)
-	}
-	return nil
+	desired.Status = models.StatusPending
+	return m.updateContent(existing.ID, desired)
 }
 
 func (m *Manager) updateContent(id int, t models.Template) (models.Template, error) {
@@ -252,7 +277,7 @@ func (m *Manager) updateContent(id int, t models.Template) (models.Template, err
 	var updated models.Template
 	if err := m.q.Update.Get(&updated,
 		id, t.Name, t.Language, t.Category, t.HeaderType, t.HeaderContent,
-		t.BodyContent, t.FooterContent, buttons, sample,
+		t.BodyContent, t.FooterContent, buttons, sample, contentComponentTypes(t), t.Status, t.MetaTemplateID,
 	); err != nil {
 		m.lo.Error("error updating whatsapp template", "id", id, "error", err)
 		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -269,7 +294,6 @@ func (m *Manager) markRejected(t models.Template, reason string) models.Template
 	return t
 }
 
-// Delete removes the template locally and on Meta (best-effort).
 func (m *Manager) Delete(ctx context.Context, id int) error {
 	t, err := m.GetByID(id)
 	if err != nil {
@@ -279,11 +303,18 @@ func (m *Manager) Delete(ctx context.Context, id int) error {
 		return envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.reserved"), nil)
 	}
 	// Without a Meta template ID nothing was registered; deleting by name alone would take out every language variant sharing it.
-	if m.client != nil && m.resolver != nil && t.MetaTemplateID.Valid && t.MetaTemplateID.String != "" {
-		if acc, err := m.resolver.WhatsAppAccount(t.InboxID); err == nil {
-			if err := m.client.DeleteTemplate(ctx, acc, t.Name, t.MetaTemplateID.String); err != nil {
-				m.lo.Error("error deleting template on meta", "id", id, "name", t.Name, "error", err)
-			}
+	if t.MetaTemplateID.Valid && t.MetaTemplateID.String != "" {
+		if m.client == nil || m.resolver == nil {
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		acc, err := m.resolver.WhatsAppAccount(t.InboxID)
+		if err != nil {
+			m.lo.Error("error resolving whatsapp account for template delete", "inbox_id", t.InboxID, "error", err)
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		if err := m.client.DeleteTemplate(ctx, acc, t.Name, t.MetaTemplateID.String); err != nil {
+			m.lo.Error("error deleting template on meta", "id", id, "name", t.Name, "error", err)
+			return envelope.NewError(envelope.InputError, submitErrReason(err), nil)
 		}
 	}
 	if _, err := m.q.Delete.Exec(id); err != nil {
@@ -316,7 +347,7 @@ func (m *Manager) SyncFromMeta(ctx context.Context, inboxID int) (int, error) {
 		if err := m.q.UpsertFromMeta.Get(&stored,
 			row.InboxID, row.MetaTemplateID, row.Name, row.Language, row.Category, row.Status,
 			row.HeaderType, row.HeaderContent, row.BodyContent, row.FooterContent,
-			row.Buttons, row.SampleValues, row.RejectionReason,
+			row.Buttons, row.SampleValues, row.RejectionReason, row.ComponentTypes,
 		); err != nil {
 			m.lo.Error("error upserting template from meta", "name", mt.Name, "error", err)
 			continue
@@ -383,6 +414,7 @@ func metaToRow(inboxID int, mt whatsapp.MetaTemplate) models.Template {
 		Status:         strings.ToUpper(mt.Status),
 	}
 	for _, c := range mt.Components {
+		row.ComponentTypes = append(row.ComponentTypes, strings.ToUpper(c.Type))
 		switch strings.ToUpper(c.Type) {
 		case "HEADER":
 			if c.Format != "" {
@@ -413,6 +445,20 @@ func metaToRow(inboxID int, mt whatsapp.MetaTemplate) models.Template {
 		row.SampleValues = json.RawMessage(`{}`)
 	}
 	return row
+}
+
+func contentComponentTypes(t models.Template) pq.StringArray {
+	types := pq.StringArray{"BODY"}
+	if t.HeaderType.Valid && t.HeaderType.String != "" && !strings.EqualFold(t.HeaderType.String, "NONE") {
+		types = append(types, "HEADER")
+	}
+	if t.FooterContent.Valid && t.FooterContent.String != "" {
+		types = append(types, "FOOTER")
+	}
+	if len(t.Buttons) > 0 && string(t.Buttons) != "[]" {
+		types = append(types, "BUTTONS")
+	}
+	return types
 }
 
 func buildSubmission(t models.Template) (whatsapp.TemplateSubmission, error) {
@@ -489,19 +535,6 @@ func buildSubmission(t models.Template) (whatsapp.TemplateSubmission, error) {
 	}
 
 	return sub, nil
-}
-
-// buildEdit reuses the submission components but drops name/language, which Meta does not allow changing on edit.
-func buildEdit(t models.Template) (whatsapp.TemplateEdit, error) {
-	sub, err := buildSubmission(t)
-	if err != nil {
-		return whatsapp.TemplateEdit{}, err
-	}
-	return whatsapp.TemplateEdit{
-		Category:        sub.Category,
-		ParameterFormat: sub.ParameterFormat,
-		Components:      sub.Components,
-	}, nil
 }
 
 func reservedContentChanged(existing, desired models.Template) bool {

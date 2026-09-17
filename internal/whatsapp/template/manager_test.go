@@ -346,8 +346,7 @@ func TestDeleteRejectsReservedTemplate(t *testing.T) {
 	}
 }
 
-// Meta failing the delete must not leave the row behind in libredesk.
-func TestDeleteContinuesWhenMetaFails(t *testing.T) {
+func TestDeletePreservesTemplateWhenMetaFails(t *testing.T) {
 	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			w.WriteHeader(400)
@@ -363,11 +362,57 @@ func TestDeleteContinuesWhenMetaFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if err := m.Delete(context.Background(), created.ID); err != nil {
-		t.Fatalf("delete: %v", err)
+	if err := m.Delete(t.Context(), created.ID); err == nil {
+		t.Fatal("expected Meta's deletion error")
+	}
+	if _, err := m.GetByID(created.ID); err != nil {
+		t.Fatalf("template must survive: %v", err)
+	}
+}
+
+func TestDeletePreservesTemplateWithoutAccount(t *testing.T) {
+	for _, missing := range []string{"resolver error", "resolver", "client"} {
+		t.Run(missing, func(t *testing.T) {
+			m, _ := testManager(t, metaOK("unavailable"))
+			created, err := m.Create(t.Context(), models.Template{
+				InboxID: seedInbox(t, m), Name: "delete_no_account", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch missing {
+			case "resolver error":
+				m.resolver = failingResolver{}
+			case "resolver":
+				m.resolver = nil
+			case "client":
+				m.client = nil
+			}
+			if err := m.Delete(t.Context(), created.ID); err == nil {
+				t.Fatal("expected account error")
+			}
+			if _, err := m.GetByID(created.ID); err != nil {
+				t.Fatalf("template must survive: %v", err)
+			}
+		})
+	}
+}
+
+func TestDeleteLocalTemplateWithoutMeta(t *testing.T) {
+	m, _ := testManager(t, nil)
+	m.client = nil
+	m.resolver = nil
+	created, err := m.Create(t.Context(), models.Template{
+		InboxID: seedInbox(t, m), Name: "local_delete", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Delete(t.Context(), created.ID); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := m.GetByID(created.ID); err == nil {
-		t.Fatal("expected the row to be gone")
+		t.Fatal("local template must be deleted")
 	}
 }
 
@@ -663,12 +708,12 @@ func TestEnsureReservedEditFailures(t *testing.T) {
 			t.Fatalf("approve: %v", err)
 		}
 		desired.BodyContent = "Rate us again"
-		if err := m.EnsureReserved(context.Background(), desired); err != nil {
-			t.Fatalf("ensure: %v", err)
+		if err := m.EnsureReserved(t.Context(), desired); err == nil {
+			t.Fatal("expected an edit error")
 		}
 		stored, _ := m.GetByName(inboxID, name)
-		if stored.Status != models.StatusRejected || stored.RejectionReason.String != "Edit refused" {
-			t.Fatalf("expected the refusal to be recorded: %+v", stored)
+		if stored.Status != models.StatusApproved || stored.BodyContent != "Rate us" {
+			t.Fatalf("saved template must remain unchanged: %+v", stored)
 		}
 	})
 
@@ -688,12 +733,12 @@ func TestEnsureReservedEditFailures(t *testing.T) {
 		}
 		m.resolver = failingResolver{}
 		desired.BodyContent = "Rate us again"
-		if err := m.EnsureReserved(context.Background(), desired); err != nil {
-			t.Fatalf("ensure: %v", err)
+		if err := m.EnsureReserved(t.Context(), desired); err == nil {
+			t.Fatal("expected an edit error")
 		}
 		stored, _ := m.GetByName(inboxID, name)
-		if stored.Status != models.StatusRejected {
-			t.Fatalf("expected a rejected row: %+v", stored)
+		if stored.Status != models.StatusApproved || stored.BodyContent != "Rate us" {
+			t.Fatalf("saved template must remain unchanged: %+v", stored)
 		}
 	})
 
@@ -713,16 +758,16 @@ func TestEnsureReservedEditFailures(t *testing.T) {
 		}
 		// A body placeholder with no sample value cannot be submitted.
 		desired.BodyContent = "Rate us {{name}}"
-		if err := m.EnsureReserved(context.Background(), desired); err != nil {
-			t.Fatalf("ensure: %v", err)
+		if err := m.EnsureReserved(t.Context(), desired); err == nil {
+			t.Fatal("expected an edit error")
 		}
 		stored, _ := m.GetByName(inboxID, name)
-		if stored.Status != models.StatusRejected || !strings.Contains(stored.RejectionReason.String, "could not build") {
-			t.Fatalf("expected a build failure to be recorded: %+v", stored)
+		if stored.Status != models.StatusApproved || stored.BodyContent != "Rate us" {
+			t.Fatalf("saved template must remain unchanged: %+v", stored)
 		}
 	})
 
-	t.Run("without a meta client the row is still updated", func(t *testing.T) {
+	t.Run("without a meta client the row is unchanged", func(t *testing.T) {
 		m, _ := testManager(t, metaOK("CSATH"))
 		inboxID := seedInbox(t, m)
 		name := models.CSATTemplateName(inboxID)
@@ -738,12 +783,12 @@ func TestEnsureReservedEditFailures(t *testing.T) {
 		}
 		m.client = nil
 		desired.BodyContent = "Rate us offline"
-		if err := m.EnsureReserved(context.Background(), desired); err != nil {
-			t.Fatalf("ensure: %v", err)
+		if err := m.EnsureReserved(t.Context(), desired); err == nil {
+			t.Fatal("expected an edit error")
 		}
 		stored, _ := m.GetByName(inboxID, name)
-		if stored.BodyContent != "Rate us offline" {
-			t.Fatalf("expected the local copy to be updated: %+v", stored)
+		if stored.Status != models.StatusApproved || stored.BodyContent != "Rate us" {
+			t.Fatalf("saved template must remain unchanged: %+v", stored)
 		}
 	})
 }

@@ -144,7 +144,31 @@ func handleCreateWhatsAppTemplate(r *fastglue.Request) error {
 	return r.SendEnvelope(created)
 }
 
-// handleDeleteWhatsAppTemplate removes a template locally and on Meta.
+func handleUpdateWhatsAppTemplate(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	if whatsAppTemplateUnavailable(r, app) {
+		return nil
+	}
+	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	if err != nil || id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid id", nil, envelope.InputError)
+	}
+	var t wtmodels.Template
+	if err := r.Decode(&t, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid request", nil, envelope.InputError)
+	}
+	if t.InboxID <= 0 || t.Name == "" || t.Language == "" || t.Category == "" || t.BodyContent == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "inbox_id, name, language, category, body_content are required", nil, envelope.InputError)
+	}
+	ctx, cancel := context.WithTimeout(r.RequestCtx, whatsappChannel.MetaCallTimeout)
+	defer cancel()
+	updated, err := app.whatsappTemplate.Update(ctx, id, t)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(updated)
+}
+
 func handleDeleteWhatsAppTemplate(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	if whatsAppTemplateUnavailable(r, app) {

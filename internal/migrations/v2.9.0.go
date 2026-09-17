@@ -71,6 +71,7 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			buttons JSONB DEFAULT '[]'::jsonb NOT NULL,
 			sample_values JSONB DEFAULT '{}'::jsonb NOT NULL,
 			rejection_reason TEXT NULL,
+			component_types TEXT[] NULL,
 			CONSTRAINT constraint_whatsapp_templates_on_name CHECK (length(name) <= 512),
 			CONSTRAINT constraint_whatsapp_templates_on_language CHECK (length(language) <= 20),
 			CONSTRAINT constraint_whatsapp_templates_on_category CHECK (length(category) <= 32),
@@ -78,6 +79,11 @@ func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			CONSTRAINT constraint_whatsapp_templates_on_header_type CHECK (length(header_type) <= 32)
 		);
 	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`ALTER TABLE whatsapp_templates ADD COLUMN IF NOT EXISTS component_types TEXT[] NULL;`)
 	if err != nil {
 		return err
 	}

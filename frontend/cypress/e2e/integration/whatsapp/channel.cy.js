@@ -479,6 +479,27 @@ describe('WhatsApp channel', () => {
     cy.api('PUT', `/api/v1/inboxes/${inboxID}/toggle`).its('status').should('eq', 200)
   })
 
+  it('rejects carousel sends before queuing a message', () => {
+    const carouselName = `qa_carousel_${stamp}`
+    cy.task('metaMock:putTemplate', {
+      id: `CAROUSEL-${stamp}`, name: carouselName, language: 'en_US', category: 'MARKETING', status: 'APPROVED',
+      components: [{ type: 'BODY', text: 'Carousel offer' }, { type: 'CAROUSEL', cards: [] }]
+    })
+    cy.api('POST', `/api/v1/whatsapp/templates/sync?inbox_id=${inboxID}`)
+    cy.api('GET', `/api/v1/whatsapp/templates?inbox_id=${inboxID}`).then(({ body }) => {
+      const carousel = body.data.find((template) => template.name === carouselName)
+      expect(carousel.component_types).to.deep.eq(['BODY', 'CAROUSEL'])
+      cy.api('POST', `/api/v1/conversations/${conversationUUID}/messages`, {
+        message: '', sender_type: 'agent', whatsapp_template_id: carousel.id, whatsapp_template_params: {}
+      }, { failOnStatusCode: false }).then(({ status, body }) => {
+        expect(status).to.eq(400)
+        expect(body.message).to.contain('content Libredesk cannot send')
+      })
+    })
+    cy.waMetaCalls((request) => request.body?.template?.name === carouselName).should('have.length', 0)
+    messages().then((list) => expect(list.some((message) => message.content?.includes('Carousel offer'))).to.eq(false))
+  })
+
   after(() => {
     if (!inboxID) return
     cy.login()

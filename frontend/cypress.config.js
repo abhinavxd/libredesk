@@ -18,6 +18,10 @@ export default defineConfig({
         'metaMock:requests': control.requests,
         'metaMock:failSend': control.failSend,
         'metaMock:failValidate': control.failValidate,
+        'metaMock:failTemplateEdit': control.failTemplateEdit,
+        'metaMock:failTemplateDelete': control.failTemplateDelete,
+        'metaMock:putTemplate': control.putTemplate,
+        'metaMock:setTemplateStatus': control.setTemplateStatus,
         'metaMock:putMedia': control.putMedia,
         'metaMock:sign': control.sign
       })

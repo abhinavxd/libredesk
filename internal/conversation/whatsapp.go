@@ -287,6 +287,9 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		if t.HeaderType.Valid && !slices.Contains(sendableTemplateHeaderTypes, strings.ToUpper(t.HeaderType.String)) {
 			return content, envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.templateHeaderUnsupported", "type", strings.ToUpper(t.HeaderType.String)), nil)
 		}
+		if !t.SupportsTextContent() {
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.templateUnsupported"), nil)
+		}
 		send.TemplateName = t.Name
 		send.TemplateLanguage = t.Language
 		send.TemplateParams = templateParams
