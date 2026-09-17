@@ -66,6 +66,13 @@ export const adminNavItems = [
         icon: 'NotebookText'
       },
       {
+        titleKey: 'admin.ai.editorPrompts',
+        href: '/admin/ai/editor-prompts',
+        permission: 'ai:manage',
+        isTitleKeyPlural: true,
+        icon: 'WandSparkles'
+      },
+      {
         titleKey: 'admin.ai.suggestions',
         href: '/admin/ai/suggestions',
         permission: 'ai:manage',
@@ -258,6 +265,12 @@ export const accountNavItems = [
     titleKey: 'globals.terms.profile',
     href: '/account/profile',
     icon: 'CircleUser'
+  },
+  {
+    titleKey: 'globals.terms.notification',
+    href: '/account/notifications',
+    isTitleKeyPlural: true,
+    icon: 'Bell'
   }
 ]
 

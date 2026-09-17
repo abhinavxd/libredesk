@@ -91,6 +91,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/messages/search", perm(handleSearchMessages, "messages:read"))
 	g.GET("/api/v1/contacts/search", perm(handleSearchContacts, "contacts:read"))
 
+	// New paginated search bar routes with better filter support and pagination.
+	g.GET("/api/v1/search/conversations", perm(handlePaginatedSearchConversations, "conversations:read"))
+	g.GET("/api/v1/search/messages", perm(handlePaginatedSearchMessages, "messages:read"))
+
 	// Views.
 	g.GET("/api/v1/views/me", perm(handleGetUserViews, "view:manage"))
 	g.POST("/api/v1/views/me", perm(handleCreateUserView, "view:manage"))
@@ -152,6 +156,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Contacts.
 	g.GET("/api/v1/contacts", perm(handleGetContacts, "contacts:read_all"))
+	g.POST("/api/v1/contacts", perm(handleCreateContact, "contacts:write"))
 	g.GET("/api/v1/contacts/{id}", perm(handleGetContact, "contacts:read"))
 	g.PUT("/api/v1/contacts/{id}", perm(handleUpdateContact, "contacts:write"))
 	g.PUT("/api/v1/contacts/{id}/block", perm(handleBlockContact, "contacts:block"))
@@ -252,6 +257,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// AI completions.
 	g.GET("/api/v1/ai/prompts", auth(handleGetAIPrompts))
+	g.GET("/api/v1/ai/prompts/{id}", perm(handleGetAIPrompt, "ai:manage"))
+	g.POST("/api/v1/ai/prompts", perm(handleCreateAIPrompt, "ai:manage"))
+	g.PUT("/api/v1/ai/prompts/{id}", perm(handleUpdateAIPrompt, "ai:manage"))
+	g.DELETE("/api/v1/ai/prompts/{id}", perm(handleDeleteAIPrompt, "ai:manage"))
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
 
 	// AI provider config (completion / embedding).
@@ -349,6 +358,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/notifications/read-all", auth(handleMarkAllNotificationsAsRead))
 	g.DELETE("/api/v1/notifications/{id}", auth(handleDeleteNotification))
 	g.DELETE("/api/v1/notifications", auth(handleDeleteAllNotifications))
+	g.GET("/api/v1/notifications/preferences", auth(handleGetNotificationPreferences))
+	g.PUT("/api/v1/notifications/preferences", auth(handleUpdateNotificationPreferences))
+	g.POST("/api/v1/notifications/push-subscriptions", auth(handleCreatePushSubscription))
+	g.DELETE("/api/v1/notifications/push-subscriptions", auth(handleDeletePushSubscription))
 
 	// WebSocket.
 	g.GET("/ws", auth(func(r *fastglue.Request) error {
@@ -401,6 +414,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/assets/{all:*}", serveFrontendStaticFiles)
 	g.GET("/widget/assets/{all:*}", serveWidgetStaticFiles)
 	g.GET("/images/{all:*}", serveFrontendStaticFiles)
+	g.GET("/manifest.webmanifest", serveManifest)
+	g.GET("/sw.js", serveServiceWorker)
 	g.GET("/static/public/{all:*}", serveStaticFiles)
 
 	// Public pages.
@@ -517,6 +532,27 @@ func serveFrontendStaticFiles(r *fastglue.Request) error {
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
 	r.RequestCtx.Response.SetBodyRaw(body)
+	return nil
+}
+
+func serveManifest(r *fastglue.Request) error {
+	return serveMainFrontendFile(r, "manifest.webmanifest", "application/manifest+json", "no-cache")
+}
+
+func serveServiceWorker(r *fastglue.Request) error {
+	r.RequestCtx.Response.Header.Set("Service-Worker-Allowed", "/")
+	return serveMainFrontendFile(r, "sw.js", "application/javascript", "no-cache")
+}
+
+func serveMainFrontendFile(r *fastglue.Request, name, contentType, cacheControl string) error {
+	app := r.Context.(*App)
+	file, err := app.fs.Get(filepath.Join(frontendDir, name))
+	if err != nil {
+		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
+	}
+	r.RequestCtx.Response.Header.Set("Content-Type", contentType)
+	r.RequestCtx.Response.Header.Set("Cache-Control", cacheControl)
+	r.RequestCtx.SetBody(file.ReadBytes())
 	return nil
 }
 

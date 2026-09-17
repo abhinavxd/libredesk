@@ -549,6 +549,16 @@ WHERE conversation_id =
     SELECT id FROM conversations WHERE uuid = $1
 );
 
+-- name: get-conversation-participant-agents
+SELECT users.id, users.first_name, users.last_name, users.email
+FROM conversation_participants
+INNER JOIN users ON users.id = conversation_participants.user_id
+WHERE conversation_participants.conversation_id = (SELECT id FROM conversations WHERE uuid = $1)
+  AND users.type = 'agent'
+  AND users.email != 'System'
+  AND users.enabled
+  AND users.deleted_at IS NULL;
+
 -- name: insert-conversation-participant
 INSERT INTO conversation_participants
 (user_id, conversation_id)

@@ -71,8 +71,6 @@ var (
 	// slugRe matches the charset stringutil.GenerateSlug emits; anything else breaks /hc/ URLs.
 	slugRe = regexp.MustCompile(fmt.Sprintf(`^[a-z0-9_-]{1,%d}$`, maxSlugLen))
 
-	ilikeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
-
 	youtubeEmbedRe = regexp.MustCompile(`^https://(www\.)?(youtube\.com|youtube-nocookie\.com)/embed/[\w-]+`)
 
 	articleButtonClassRe = regexp.MustCompile(`^hc-button$`)
@@ -943,8 +941,7 @@ func (m *Manager) SearchPublishedArticles(helpCenterSlug, query, locale string, 
 	}
 	query = truncateRunes(query, maxSearchQueryLen)
 	tsQuery := prefixTSQuery(query)
-	query = ilikeEscaper.Replace(query)
-	if err := m.q.SearchPublishedArticles.Select(&articles, helpCenterSlug, query, limit, locale, tsQuery); err != nil {
+	if err := m.q.SearchPublishedArticles.Select(&articles, helpCenterSlug, dbutil.ContainsPattern(query), limit, locale, tsQuery); err != nil {
 		m.lo.Error("error searching published articles", "error", err, "help_center_slug", helpCenterSlug)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

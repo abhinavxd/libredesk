@@ -128,6 +128,8 @@ type App struct {
 	activityLog      *activitylog.Manager
 	notifier         *notifier.Service
 	userNotification *notifier.UserNotificationManager
+	notificationPref *notifier.PreferenceManager
+	pushNotification *notifier.PushManager
 	customAttribute  *customAttribute.Manager
 	report           *report.Manager
 	webhook          *webhook.Manager
@@ -251,7 +253,10 @@ func main() {
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
 		userNotification            = initUserNotification(db, i18n)
-		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub, ko.Bool("notification.email.enabled"))
+		notificationPreference      = initNotificationPreference(db, i18n)
+		pushNotification            = initPushNotification(db, settings, i18n)
+		notificationEmailQueue      = initNotificationEmailQueue(db, notifier)
+		notifDispatcher             = initNotifDispatcher(userNotification, notificationPreference, pushNotification, notificationEmailQueue, wsHub, ko.Bool("notification.email.enabled"))
 		automation                  = initAutomationEngine(db, i18n)
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
@@ -287,6 +292,10 @@ func main() {
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
 	go helpCenter.RunSearchLogCleaner(ctx)
+	if ko.Bool("notification.email.enabled") {
+		go notificationEmailQueue.Run(ctx)
+	}
+	go pushNotification.Run(ctx)
 	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
 	go ai.Run(ctx)
 
@@ -317,7 +326,7 @@ func main() {
 		authz:            initAuthz(i18n),
 		view:             initView(db, i18n),
 		report:           initReport(db, i18n),
-		search:           initSearch(db, i18n),
+		search:           initSearch(db, i18n, conversation),
 		role:             initRole(db, i18n),
 		tag:              initTag(db, i18n),
 		macro:            initMacro(db, i18n),
@@ -332,6 +341,8 @@ func main() {
 		redis:            rdb,
 		fc:               initFastCache(rdb),
 		userNotification: userNotification,
+		notificationPref: notificationPreference,
+		pushNotification: pushNotification,
 		wsHub:            wsHub,
 	}
 	app.consts.Store(constants)

@@ -86,9 +86,15 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 	}
 
 	if err := app.csat.UpdateResponse(uuid, rating, feedback, metaJSON); err != nil {
+		// Surface only known, user-safe messages; never leak raw driver errors
+		// (e.g. a malformed UUID triggers a Postgres syntax error string).
+		msg := app.i18n.T("globals.messages.somethingWentWrong")
+		if e, ok := err.(envelope.Error); ok {
+			msg = e.Error()
+		}
 		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": err.Error(),
+				"ErrorMessage": msg,
 			},
 		})
 	}
@@ -152,10 +158,7 @@ func handleSubmitCSATResponse(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid UUID", nil, envelope.InputError)
 	}
 
-	// Trim feedback if it exceeds max length.
-	if len(req.Feedback) > maxCsatFeedbackLength {
-		req.Feedback = req.Feedback[:maxCsatFeedbackLength]
-	}
+	req.Feedback = truncateFeedback(req.Feedback)
 
 	// Update CSAT response
 	if err := app.csat.UpdateResponse(uuid, req.Rating, req.Feedback, nil); err != nil {
@@ -187,9 +190,7 @@ func validateCSATForm(r *fastglue.Request) (int, string, json.RawMessage, string
 		return 0, "", nil, "csat.pleaseFillRequired"
 	}
 
-	if len(feedback) > maxCsatFeedbackLength {
-		feedback = feedback[:maxCsatFeedbackLength]
-	}
+	feedback = truncateFeedback(feedback)
 
 	// Collect extra form fields into meta, skipping the known fields.
 	meta := make(map[string]string)
@@ -219,4 +220,15 @@ func validateCSATForm(r *fastglue.Request) (int, string, json.RawMessage, string
 	}
 
 	return rating, feedback, metaJSON, ""
+}
+
+func truncateFeedback(s string) string {
+	if len(s) <= maxCsatFeedbackLength {
+		return s
+	}
+	r := []rune(s)
+	if len(r) <= maxCsatFeedbackLength {
+		return s
+	}
+	return string(r[:maxCsatFeedbackLength])
 }

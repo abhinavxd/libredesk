@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"mime/multipart"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -22,6 +23,23 @@ type createContactNoteReq struct {
 
 type blockContactReq struct {
 	Enabled bool `json:"enabled"`
+}
+
+func handleCreateContact(r *fastglue.Request) error {
+	var app = r.Context.(*App)
+
+	contact, _, err := contactFromForm(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := app.user.CreateContact(&contact); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	created, err := app.user.GetContactOrVisitor(contact.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(created)
 }
 
 // handleGetContacts returns a list of contacts from the database.
@@ -81,75 +99,9 @@ func handleUpdateContact(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	form, err := r.RequestCtx.MultipartForm()
+	contactToUpdate, form, err := contactFromForm(r)
 	if err != nil {
-		app.lo.Error("error parsing form data", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
-	}
-
-	// Parse form data
-	firstName := ""
-	if v, ok := form.Value["first_name"]; ok && len(v) > 0 {
-		firstName = string(v[0])
-	}
-	lastName := ""
-	if v, ok := form.Value["last_name"]; ok && len(v) > 0 {
-		lastName = string(v[0])
-	}
-	email := ""
-	if v, ok := form.Value["email"]; ok && len(v) > 0 {
-		email = strings.TrimSpace(string(v[0]))
-	}
-	phoneNumber := ""
-	if v, ok := form.Value["phone_number"]; ok && len(v) > 0 {
-		phoneNumber = string(v[0])
-	}
-	phoneNumberCountryCode := ""
-	if v, ok := form.Value["phone_number_country_code"]; ok && len(v) > 0 {
-		phoneNumberCountryCode = string(v[0])
-	}
-	country := ""
-	if v, ok := form.Value["country"]; ok && len(v) > 0 {
-		country = string(v[0])
-	}
-	avatarURL := ""
-	if v, ok := form.Value["avatar_url"]; ok && len(v) > 0 {
-		avatarURL = string(v[0])
-	}
-
-	// Set nulls to empty strings.
-	if avatarURL == "null" {
-		avatarURL = ""
-	}
-	if phoneNumberCountryCode == "null" {
-		phoneNumberCountryCode = ""
-	}
-	if phoneNumber == "null" {
-		phoneNumber = ""
-	}
-	if country == "null" {
-		country = ""
-	}
-
-	// Validate mandatory fields.
-	if email == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "email"), nil, envelope.InputError)
-	}
-	if !stringutil.ValidEmail(email) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidEmail"), nil, envelope.InputError)
-	}
-	if firstName == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "first_name"), nil, envelope.InputError)
-	}
-
-	contactToUpdate := models.User{
-		FirstName:              firstName,
-		LastName:               lastName,
-		Email:                  null.StringFrom(email),
-		AvatarURL:              null.NewString(avatarURL, avatarURL != ""),
-		PhoneNumber:            null.NewString(phoneNumber, phoneNumber != ""),
-		PhoneNumberCountryCode: null.NewString(phoneNumberCountryCode, phoneNumberCountryCode != ""),
-		Country:                null.NewString(country, country != ""),
+		return sendErrorEnvelope(r, err)
 	}
 
 	if err := app.user.UpdateContact(id, contactToUpdate); err != nil {
@@ -157,7 +109,7 @@ func handleUpdateContact(r *fastglue.Request) error {
 	}
 
 	// Delete avatar?
-	if avatarURL == "" && contact.AvatarURL.Valid {
+	if !contactToUpdate.AvatarURL.Valid && contact.AvatarURL.Valid {
 		fileName := filepath.Base(contact.AvatarURL.String)
 		app.media.Delete(fileName)
 		contact.AvatarURL.Valid = false
@@ -165,8 +117,7 @@ func handleUpdateContact(r *fastglue.Request) error {
 	}
 
 	// Upload avatar?
-	files, ok := form.File["files"]
-	if ok && len(files) > 0 {
+	if files := form.File["files"]; len(files) > 0 {
 		if err := uploadUserAvatar(r, contact, files); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -362,4 +313,52 @@ func handleBlockContact(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(contact)
+}
+
+func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) {
+	var app = r.Context.(*App)
+
+	form, err := r.RequestCtx.MultipartForm()
+	if err != nil {
+		app.lo.Error("error parsing form data", "error", err)
+		return models.User{}, nil, envelope.NewError(envelope.GeneralError, app.i18n.T("errors.parsingRequest"), nil)
+	}
+
+	value := func(key string) string {
+		v := ""
+		if vals := form.Value[key]; len(vals) > 0 {
+			v = strings.TrimSpace(vals[0])
+		}
+		// The edit page sends cleared fields as the string "null".
+		if v == "null" {
+			return ""
+		}
+		return v
+	}
+	optional := func(key string) null.String {
+		v := value(key)
+		return null.NewString(v, v != "")
+	}
+
+	email := value("email")
+	if email == "" {
+		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "email"), nil)
+	}
+	if !stringutil.ValidEmail(email) {
+		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+	}
+	firstName := value("first_name")
+	if firstName == "" {
+		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "first_name"), nil)
+	}
+
+	return models.User{
+		FirstName:              firstName,
+		LastName:               value("last_name"),
+		Email:                  null.StringFrom(email),
+		AvatarURL:              optional("avatar_url"),
+		PhoneNumber:            optional("phone_number"),
+		PhoneNumberCountryCode: optional("phone_number_country_code"),
+		Country:                optional("country"),
+	}, form, nil
 }

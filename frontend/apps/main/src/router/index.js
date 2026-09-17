@@ -173,6 +173,13 @@ const routes = [
             name: 'profile',
             component: () => import('@main/views/account/profile/ProfileEditView.vue'),
             meta: { titleKey: 'account.editProfile' }
+          },
+          {
+            path: 'notifications',
+            name: 'account-notifications',
+            component: () =>
+              import('@main/views/account/notifications/NotificationPreferences.vue'),
+            meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
           }
         ]
       },
@@ -235,6 +242,12 @@ const routes = [
             name: 'ai-snippets',
             component: () => import('@main/views/admin/ai/AISnippets.vue'),
             meta: { titleKey: 'admin.ai.snippets', titleCount: 2 }
+          },
+          {
+            path: 'ai/editor-prompts',
+            name: 'ai-editor-prompts',
+            component: () => import('@main/views/admin/ai/AIEditorPrompts.vue'),
+            meta: { titleKey: 'admin.ai.editorPrompts', titleCount: 2 }
           },
           {
             path: 'ai/suggestions',
