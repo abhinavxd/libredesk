@@ -27,7 +27,6 @@
             v-if="term"
             type="button"
             class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
-            :aria-label="$t('globals.messages.clear')"
             @click="term = ''"
           >
             <X class="w-4 h-4" aria-hidden="true" />
@@ -95,7 +94,12 @@ import api from '@main/api'
 const MIN_SEARCH_LENGTH = 3
 const DEBOUNCE_DELAY = 300
 const DEFAULT_PER_PAGE = 30
+const DEFAULT_SORT = 'newest'
 const TABS = ['conversations', 'messages']
+const SORTS_BY_TAB = {
+  conversations: ['newest', 'oldest', 'started_first', 'started_last'],
+  messages: ['newest', 'oldest']
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -116,8 +120,14 @@ const emptyCursorHistory = () => ({
 const inputRef = ref(null)
 const term = ref(String(route.query.q || ''))
 const filters = ref(filtersFromQuery(route.query))
-const activeTab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'conversations')
-const sorts = ref({ conversations: 'newest', messages: 'newest' })
+const initialTab = TABS.includes(route.query.tab) ? route.query.tab : 'conversations'
+const initialSort = String(route.query.sort || '')
+const activeTab = ref(initialTab)
+const sorts = ref({
+  conversations: DEFAULT_SORT,
+  messages: DEFAULT_SORT,
+  [initialTab]: SORTS_BY_TAB[initialTab].includes(initialSort) ? initialSort : DEFAULT_SORT
+})
 const tabSelectedByUser = ref(TABS.includes(route.query.tab))
 const results = ref(emptyResults())
 const loading = ref(false)
@@ -224,6 +234,7 @@ const changeSort = ({ type, sort }) => {
   if (sorts.value[type] === sort) return
   sorts.value = { ...sorts.value, [type]: sort }
   cursorsByPage[type] = new Map([[1, '']])
+  syncRoute()
   fetchPage(type, 1, results.value[type].per_page)
 }
 
@@ -237,6 +248,9 @@ const syncRoute = () => {
   if (term.value) query.q = term.value
   if (tabSelectedByUser.value || activeTab.value !== 'conversations') {
     query.tab = activeTab.value
+  }
+  if (sorts.value[activeTab.value] !== DEFAULT_SORT) {
+    query.sort = sorts.value[activeTab.value]
   }
   router.replace({ query })
 }

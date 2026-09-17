@@ -4,10 +4,7 @@
       class="flex items-center justify-between gap-4 rounded-md border border-border px-4 py-3 shadow-sm"
     >
       <Select :model-value="perPage" @update:model-value="handlePerPageChange">
-        <SelectTrigger
-          class="h-10 w-[70px] sm:h-8"
-          :aria-label="t('globals.messages.resultsPerPage')"
-        >
+        <SelectTrigger class="h-10 w-[70px] sm:h-8">
           <SelectValue :placeholder="String(perPage)" />
         </SelectTrigger>
         <SelectContent>
@@ -23,7 +20,6 @@
           variant="ghost"
           size="sm"
           :class="STEP_BUTTON_CLASS"
-          :aria-label="t('globals.messages.previousPage')"
           :disabled="page <= 1"
           @click="goToPage(page - 1)"
         >
@@ -34,7 +30,6 @@
           variant="ghost"
           size="sm"
           :class="STEP_BUTTON_CLASS"
-          :aria-label="t('globals.messages.nextPage')"
           :disabled="!hasMore"
           @click="goToPage(page + 1)"
         >
@@ -49,7 +44,6 @@
 const STEP_BUTTON_CLASS = 'h-10 w-10 p-0 sm:h-8 sm:w-8'
 
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   Select,
@@ -67,8 +61,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['change'])
-
-const { t } = useI18n()
 
 function goToPage(page) {
   if (page < 1 || (page > props.page && !props.hasMore)) return
