@@ -1,9 +1,9 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useEmitter } from '../composables/useEmitter'
-import { EMITTER_EVENTS } from '../constants/emitterEvents'
-import api from '../api'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
+import api from '@main/api'
 
 export const useInboxStore = defineStore('inbox', () => {
   const inboxes = ref([])
@@ -14,6 +14,10 @@ export const useInboxStore = defineStore('inbox', () => {
   })))
   const emailOptions = computed(() => inboxes.value
     .filter(inb => inb.channel === 'email')
+    .map(inb => ({ label: inb.name, value: String(inb.id) }))
+  )
+  const whatsappOptions = computed(() => inboxes.value
+    .filter(inb => inb.channel === 'whatsapp')
     .map(inb => ({ label: inb.name, value: String(inb.id) }))
   )
   const fetchInboxes = async (force = false) => {
@@ -32,6 +36,7 @@ export const useInboxStore = defineStore('inbox', () => {
     inboxes,
     options,
     emailOptions,
+    whatsappOptions,
     fetchInboxes,
   }
 })

@@ -378,6 +378,18 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", rateLimit(widgetAuth(handleChatSendMessage), "widget"))
 	g.POST("/api/v1/widget/media/upload", rateLimit(widgetAuth(handleWidgetMediaUpload), "widget"))
 
+	// WhatsApp.
+	g.GET("/webhooks/whatsapp/{inbox_id}", rateLimit(handleWhatsAppWebhookVerify, "public"))
+	g.POST("/webhooks/whatsapp/{inbox_id}", handleWhatsAppWebhookEvent)
+
+	// WhatsApp templates.
+	g.GET("/api/v1/whatsapp/templates", auth(handleListWhatsAppTemplates))
+	g.GET("/api/v1/whatsapp/templates/{id}", perm(handleGetWhatsAppTemplate, "inboxes:manage"))
+	g.POST("/api/v1/whatsapp/templates", perm(handleCreateWhatsAppTemplate, "inboxes:manage"))
+	g.PUT("/api/v1/whatsapp/templates/{id}", perm(handleUpdateWhatsAppTemplate, "inboxes:manage"))
+	g.DELETE("/api/v1/whatsapp/templates/{id}", perm(handleDeleteWhatsAppTemplate, "inboxes:manage"))
+	g.POST("/api/v1/whatsapp/templates/sync", perm(handleSyncWhatsAppTemplates, "inboxes:manage"))
+
 	// getAndHead registers both methods: uptime checkers and link validators probe with HEAD.
 	getAndHead := func(path string, h fastglue.FastRequestHandler) {
 		g.GET(path, h)
@@ -640,8 +652,10 @@ func getOptionalPagination(r *fastglue.Request) (page, pageSize int) {
 func sendErrorEnvelope(r *fastglue.Request, err error) error {
 	e, ok := err.(envelope.Error)
 	if !ok {
+		app := r.Context.(*App)
+		app.lo.Error("non-envelope error reached sendErrorEnvelope", "path", string(r.RequestCtx.Path()), "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError,
-			"Error interface conversion failed", nil, fastglue.ErrorType(envelope.GeneralError))
+			app.i18n.T("globals.messages.somethingWentWrong"), nil, fastglue.ErrorType(envelope.GeneralError))
 	}
 	return r.SendErrorEnvelope(e.Code, e.Error(), e.Data, fastglue.ErrorType(e.ErrorType))
 }

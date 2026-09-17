@@ -441,7 +441,8 @@ export const useConversationStore = defineStore('conversation', () => {
     const msgData = messages.data
     const inboxEmail = conv?.inbox_mail
 
-    if (conv?.inbox_channel === 'livechat') {
+    // Recipients only exist for email conversations.
+    if (conv && conv.inbox_channel !== 'email') {
       currentTo.value = []
       currentCC.value = []
       currentBCC.value = []
@@ -967,9 +968,11 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  let pendingMessageSeq = 0
+
   function addPendingMessage (conversationUUID, content, isPrivate, author, attachments = [], textContent = '', meta = {}) {
     const pendingMessage = {
-      uuid: `pending-${Date.now()}`,
+      uuid: `pending-${Date.now()}-${++pendingMessageSeq}`,
       type: 'outgoing',
       status: 'pending',
       content,

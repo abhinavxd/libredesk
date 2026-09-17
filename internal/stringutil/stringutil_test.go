@@ -5,6 +5,33 @@ import (
 	"time"
 )
 
+func TestWhatsAppPhoneForDialCode(t *testing.T) {
+	tests := []struct {
+		name        string
+		phone       string
+		dialCode    string
+		want        string
+		wantMatches bool
+	}{
+		{"national", "98765 43210", "91", "919876543210", true},
+		{"international plus", "+1 (555) 000-1111", "1", "15550001111", true},
+		{"international double zero", "0091 98765 43210", "91", "919876543210", true},
+		{"national starts with dial code", "9198765432", "91", "919198765432", true},
+		{"international mismatch", "+1 555 000 1111", "91", "", false},
+		{"empty", "", "91", "", true},
+		{"punctuation", "+ - ", "91", "", true},
+		{"missing dial code", "9876543210", "", "", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, matches := WhatsAppPhoneForDialCode(tc.phone, tc.dialCode)
+			if got != tc.want || matches != tc.wantMatches {
+				t.Fatalf("got (%q, %v), want (%q, %v)", got, matches, tc.want, tc.wantMatches)
+			}
+		})
+	}
+}
+
 func TestRemoveItemByValue(t *testing.T) {
 	tests := []struct {
 		name     string

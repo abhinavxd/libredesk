@@ -8,6 +8,28 @@ import (
 	"github.com/lib/pq"
 )
 
+func TestV2_9_0TemplateComponentsMigration(t *testing.T) {
+	db := testutil.NewDB(t, "migration_v2_9_0_templates")
+	query := `SELECT data_type || ':' || is_nullable || ':' || COALESCE(column_default, '') FROM information_schema.columns WHERE table_name = 'whatsapp_templates' AND column_name = 'component_types'`
+	var expected string
+	if err := db.Get(&expected, query); err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`ALTER TABLE whatsapp_templates DROP COLUMN component_types`)
+	for range 2 {
+		if err := V2_9_0(db, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var actual string
+	if err := db.Get(&actual, query); err != nil {
+		t.Fatal(err)
+	}
+	if actual != expected {
+		t.Fatalf("migration column = %q, schema column = %q", actual, expected)
+	}
+}
+
 func TestV2_9_0PrivateNotePermissionMigration(t *testing.T) {
 	db := testutil.NewDB(t, "migration_v2_9_0")
 

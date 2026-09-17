@@ -8,7 +8,7 @@
           :disabled="templateType !== 'email_outgoing'"
         >
           {{
-            $t('template.new')
+            $t('globals.messages.newTemplate')
           }}
         </Button>
       </div>

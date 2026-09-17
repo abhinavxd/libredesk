@@ -16,7 +16,7 @@
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger class="w-full">
-              <SelectValue :placeholder="$t('admin.conversationStatus.category.placeholder')" />
+              <SelectValue :placeholder="$t('globals.messages.selectCategory')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>

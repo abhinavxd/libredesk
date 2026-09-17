@@ -28,6 +28,7 @@ import (
 const (
 	ChannelEmail    = "email"
 	ChannelLiveChat = "livechat"
+	ChannelWhatsApp = "whatsapp"
 )
 
 var (
@@ -256,7 +257,7 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 	}
 
 	var createdInbox imodels.Inbox
-	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.Enabled, inbox.CSATEnabled, inbox.PromptTagsOnReply, inbox.Secret, inbox.LinkedEmailInboxID, inbox.FromNameTemplate); err != nil {
+	if err := m.queries.InsertInbox.Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.Enabled, inbox.CSATEnabled, inbox.PromptTagsOnReply, inbox.ReopenWindowHours, inbox.Secret, inbox.LinkedEmailInboxID, inbox.FromNameTemplate); err != nil {
 		m.lo.Error("error creating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -421,6 +422,12 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			}
 			inbox.Secret = null.StringFrom(encryptedSecret)
 		}
+	case ChannelWhatsApp:
+		merged, err := m.MergeWhatsAppSecrets(current.Config, inbox.Config)
+		if err != nil {
+			return imodels.Inbox{}, err
+		}
+		inbox.Config = merged
 	}
 
 	// Encrypt sensitive fields before updating
@@ -432,7 +439,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 
 	// Update the inbox in the DB.
 	var updatedInbox imodels.Inbox
-	if err := m.queries.Update.Get(&updatedInbox, id, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.PromptTagsOnReply, inbox.Enabled, inbox.Secret, inbox.LinkedEmailInboxID, inbox.FromNameTemplate); err != nil {
+	if err := m.queries.Update.Get(&updatedInbox, id, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.PromptTagsOnReply, inbox.ReopenWindowHours, inbox.Enabled, inbox.Secret, inbox.LinkedEmailInboxID, inbox.FromNameTemplate); err != nil {
 		m.lo.Error("error updating inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -449,6 +456,36 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	m.decryptInboxSecret(&updatedInbox)
 
 	return updatedInbox, nil
+}
+
+// MergeWhatsAppSecrets restores masked or empty secret fields in an update config from the currently stored config.
+func (m *Manager) MergeWhatsAppSecrets(current, update json.RawMessage) (json.RawMessage, error) {
+	var currentCfg, updateCfg map[string]any
+	if err := json.Unmarshal(current, &currentCfg); err != nil {
+		m.lo.Error("error unmarshalling current whatsapp config", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if len(update) == 0 {
+		return nil, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "{globals.terms.config}"), nil)
+	}
+	if err := json.Unmarshal(update, &updateCfg); err != nil {
+		m.lo.Error("error unmarshalling whatsapp update config", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token"} {
+		val, _ := updateCfg[fieldName].(string)
+		if val == "" || strings.Contains(val, stringutil.PasswordDummy) {
+			if existing, ok := currentCfg[fieldName].(string); ok {
+				updateCfg[fieldName] = existing
+			}
+		}
+	}
+	merged, err := json.Marshal(updateCfg)
+	if err != nil {
+		m.lo.Error("error marshalling whatsapp merged config", "error", err)
+		return nil, err
+	}
+	return merged, nil
 }
 
 // Toggle toggles the status of an inbox in the DB.
@@ -653,6 +690,16 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
+	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token"} {
+		if value, ok := cfg[fieldName].(string); ok && value != "" && !crypto.IsEncrypted(value) {
+			encrypted, err := crypto.Encrypt(value, m.encryptionKey)
+			if err != nil {
+				return nil, fmt.Errorf("encrypting whatsapp %s: %w", fieldName, err)
+			}
+			cfg[fieldName] = encrypted
+		}
+	}
+
 	encrypted, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling encrypted config: %w", err)
@@ -716,6 +763,18 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 				}
 				oauthMap[fieldName] = decrypted
 			}
+		}
+	}
+
+	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token"} {
+		if value, ok := cfg[fieldName].(string); ok && crypto.IsEncrypted(value) {
+			decrypted, err := crypto.Decrypt(value, m.encryptionKey)
+			if err != nil {
+				m.lo.Error("error decrypting whatsapp credential, clearing field", "field", fieldName, "error", err)
+				cfg[fieldName] = ""
+				continue
+			}
+			cfg[fieldName] = decrypted
 		}
 	}
 

@@ -193,7 +193,7 @@
           >
             <FormField v-slot="{ componentField }" name="theme.header.heading">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.headerText') }}</FormLabel>
+                <FormLabel>{{ t('globals.terms.headerText') }}</FormLabel>
                 <FormControl>
                   <Input type="text" v-bind="componentField" />
                 </FormControl>
