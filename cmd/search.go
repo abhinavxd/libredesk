@@ -21,6 +21,13 @@ const (
 	maxContactSearchLimit      = 15
 )
 
+type searchPageResults struct {
+	Results    any    `json:"results"`
+	PerPage    int    `json:"per_page"`
+	HasMore    bool   `json:"has_more"`
+	NextCursor string `json:"next_cursor"`
+}
+
 func handleSearchConversations(r *fastglue.Request) error {
 	app, user, term, err := searchTerm(r)
 	if err != nil {
@@ -74,11 +81,16 @@ func handlePaginatedSearchConversations(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	results, total, err := app.search.Conversations(q, scope)
+	results, hasMore, nextCursor, err := app.search.Conversations(q, scope)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(pageResults(results, total, q))
+	return r.SendEnvelope(searchPageResults{
+		Results:    results,
+		PerPage:    q.PageSize,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	})
 }
 
 func handlePaginatedSearchMessages(r *fastglue.Request) error {
@@ -90,11 +102,16 @@ func handlePaginatedSearchMessages(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	results, total, err := app.search.Messages(q, scope)
+	results, hasMore, nextCursor, err := app.search.Messages(q, scope)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(pageResults(results, total, q))
+	return r.SendEnvelope(searchPageResults{
+		Results:    results,
+		PerPage:    q.PageSize,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	})
 }
 
 func searchInputs(r *fastglue.Request) (*App, amodels.User, smodels.Query, error) {
@@ -102,11 +119,12 @@ func searchInputs(r *fastglue.Request) (*App, amodels.User, smodels.Query, error
 	if err != nil {
 		return app, user, smodels.Query{}, err
 	}
-	page, pageSize := getPagination(r)
+	_, pageSize := getPagination(r)
 	query := searchmanager.NormalizeQuery(smodels.Query{
 		Term:     term,
 		Filters:  string(r.RequestCtx.QueryArgs().Peek("filters")),
-		Page:     page,
+		Cursor:   string(r.RequestCtx.QueryArgs().Peek("cursor")),
+		Sort:     smodels.Sort(r.RequestCtx.QueryArgs().Peek("sort")),
 		PageSize: pageSize,
 	})
 	return app, user, query, nil
@@ -128,16 +146,6 @@ func searchLimit(r *fastglue.Request, max int) int {
 		return max
 	}
 	return limit
-}
-
-func pageResults(results any, total int, q smodels.Query) envelope.PageResults {
-	return envelope.PageResults{
-		Results:    results,
-		Total:      total,
-		PerPage:    q.PageSize,
-		TotalPages: (total + q.PageSize - 1) / q.PageSize,
-		Page:       q.Page,
-	}
 }
 
 func readScope(app *App, agentID int) (smodels.ReadScope, error) {

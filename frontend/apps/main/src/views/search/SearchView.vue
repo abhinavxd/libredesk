@@ -36,7 +36,7 @@
 
         <SearchFilters :filters="filters" @update:filters="filters = $event" />
 
-        <div v-if="loading && totalResults === 0" class="flex justify-center items-center h-64">
+        <div v-if="loading && resultCount === 0" class="flex justify-center items-center h-64">
           <Spinner :absolute="false" />
         </div>
         <div v-else-if="error" class="py-16 text-center space-y-4">
@@ -48,10 +48,12 @@
           :results="results"
           :term="term"
           :active-tab="activeTab"
+          :sorts="sorts"
           :show-clear-filters="hasActiveFilters(filters)"
           :aria-busy="loading"
           :class="{ 'pointer-events-none opacity-60': loading }"
           @update:active-tab="selectTab"
+          @change-sort="changeSort"
           @change-page="changePage"
           @clear-filters="filters = emptyFilters()"
         />
@@ -100,17 +102,22 @@ const router = useRouter()
 
 const emptyPage = () => ({
   results: [],
-  total: 0,
   page: 1,
   per_page: DEFAULT_PER_PAGE,
-  total_pages: 0
+  has_more: false,
+  next_cursor: ''
 })
 const emptyResults = () => ({ conversations: emptyPage(), messages: emptyPage() })
+const emptyCursorHistory = () => ({
+  conversations: new Map([[1, '']]),
+  messages: new Map([[1, '']])
+})
 
 const inputRef = ref(null)
 const term = ref(String(route.query.q || ''))
 const filters = ref(filtersFromQuery(route.query))
 const activeTab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'conversations')
+const sorts = ref({ conversations: 'newest', messages: 'newest' })
 const tabSelectedByUser = ref(TABS.includes(route.query.tab))
 const results = ref(emptyResults())
 const loading = ref(false)
@@ -118,13 +125,15 @@ const error = ref(null)
 const searchPerformed = ref(false)
 let debounceTimer = null
 let searchRequestId = 0
+let cursorsByPage = emptyCursorHistory()
 
-const totalResults = computed(
-  () => results.value.conversations.total + results.value.messages.total
+const resultCount = computed(
+  () => results.value.conversations.results.length + results.value.messages.results.length
 )
 
-const searchParams = (page, perPage) => {
-  const params = { query: term.value, page, page_size: perPage }
+const searchParams = (type, perPage, cursor = '') => {
+  const params = { query: term.value, page_size: perPage, sort: sorts.value[type] }
+  if (cursor) params.cursor = cursor
   const filtersJSON = toFiltersJSON(filters.value)
   if (filtersJSON) params.filters = filtersJSON
   return params
@@ -138,6 +147,7 @@ const fetchers = {
 const reset = () => {
   searchRequestId++
   results.value = emptyResults()
+  cursorsByPage = emptyCursorHistory()
   searchPerformed.value = false
   loading.value = false
   error.value = null
@@ -155,13 +165,21 @@ const search = async () => {
   const requestId = ++searchRequestId
   try {
     const perPage = Object.fromEntries(TABS.map((type) => [type, results.value[type].per_page]))
-    const pages = await Promise.all(
-      TABS.map((type) => fetchers[type](searchParams(1, perPage[type])))
+    const responses = await Promise.all(
+      TABS.map((type) => fetchers[type](searchParams(type, perPage[type])))
     )
     if (requestId !== searchRequestId) return
-    results.value = Object.fromEntries(TABS.map((type, i) => [type, pages[i].data.data]))
-    if (!tabSelectedByUser.value && results.value[activeTab.value].total === 0) {
-      const populatedTab = TABS.find((type) => results.value[type].total > 0)
+    cursorsByPage = emptyCursorHistory()
+    results.value = Object.fromEntries(
+      TABS.map((type, i) => [type, { ...responses[i].data.data, page: 1 }])
+    )
+    for (const type of TABS) {
+      if (results.value[type].has_more) {
+        cursorsByPage[type].set(2, results.value[type].next_cursor)
+      }
+    }
+    if (!tabSelectedByUser.value && results.value[activeTab.value].results.length === 0) {
+      const populatedTab = TABS.find((type) => results.value[type].results.length > 0)
       if (populatedTab) activeTab.value = populatedTab
     }
   } catch (err) {
@@ -173,13 +191,25 @@ const search = async () => {
 }
 
 const fetchPage = async (type, page, perPage) => {
+  if (perPage !== results.value[type].per_page) {
+    cursorsByPage[type] = new Map([[1, '']])
+  }
+  const cursor = cursorsByPage[type].get(page)
+  if (cursor === undefined) return
+
   loading.value = true
   error.value = null
   const requestId = ++searchRequestId
   try {
-    const response = await fetchers[type](searchParams(page, perPage))
+    const response = await fetchers[type](searchParams(type, perPage, cursor))
     if (requestId !== searchRequestId) return
-    results.value[type] = response.data.data
+    results.value[type] = { ...response.data.data, page }
+    if (response.data.data.has_more) {
+      cursorsByPage[type].set(page + 1, response.data.data.next_cursor)
+    }
+    for (const knownPage of cursorsByPage[type].keys()) {
+      if (knownPage > page + 1) cursorsByPage[type].delete(knownPage)
+    }
   } catch (err) {
     if (requestId !== searchRequestId) return
     error.value = handleHTTPError(err).message
@@ -189,6 +219,13 @@ const fetchPage = async (type, page, perPage) => {
 }
 
 const changePage = ({ type, page, perPage }) => fetchPage(type, page, perPage)
+
+const changeSort = ({ type, sort }) => {
+  if (sorts.value[type] === sort) return
+  sorts.value = { ...sorts.value, [type]: sort }
+  cursorsByPage[type] = new Map([[1, '']])
+  fetchPage(type, 1, results.value[type].per_page)
+}
 
 const selectTab = (tab) => {
   tabSelectedByUser.value = true

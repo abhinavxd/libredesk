@@ -1494,7 +1494,7 @@
   "role.select": "Select roles",
   "search.adjustSearchTerms": "Try adjusting your search terms or filters.",
   "search.minQueryLength": "Please enter at least {length} characters to search.",
-  "search.searchBy": "Search by reference number, contact email or message text",
+  "search.searchBy": "Search by reference number, contact email address or messages in conversations.",
   "setup.completeYourSetup": "Complete your setup",
   "setup.createFirstInbox": "Create your first inbox",
   "setup.inviteTeammates": "Invite teammates",

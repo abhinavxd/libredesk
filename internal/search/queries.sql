@@ -12,7 +12,8 @@ WITH matched_conversations AS (
     WHERE users.email ILIKE $10 ESCAPE '\'
 )
 SELECT
-    COUNT(*) OVER() AS total,
+    conversations.id,
+    conversations.reference_number = $1 AS reference_match,
     conversations.created_at,
     conversations.uuid,
     conversations.reference_number,
@@ -56,7 +57,7 @@ WHERE conversations.id IN (SELECT id FROM matched_conversations)
 
 -- name: search-messages
 SELECT
-    COUNT(*) OVER() AS total,
+    conversation_messages.id,
     conversation_messages.uuid,
     conversation_messages.created_at,
     conversation_messages.type,

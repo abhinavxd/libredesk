@@ -7,6 +7,15 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+const (
+	SortNewest       Sort = "newest"
+	SortOldest       Sort = "oldest"
+	SortStartedFirst Sort = "started_first"
+	SortStartedLast  Sort = "started_last"
+)
+
+type Sort string
+
 // ReadScope carries an agent's conversation read permissions for filtering search results.
 type ReadScope struct {
 	UserID         int
@@ -19,11 +28,11 @@ type ReadScope struct {
 	ReadUnassigned bool
 }
 
-// Query is a search term plus the list filters and page the caller wants applied.
 type Query struct {
 	Term     string
 	Filters  string
-	Page     int
+	Cursor   string
+	Sort     Sort
 	PageSize int
 }
 
@@ -46,7 +55,8 @@ type Sender struct {
 }
 
 type ConversationResult struct {
-	Total           int            `db:"total" json:"-"`
+	ID              int            `db:"id" json:"-"`
+	ReferenceMatch  bool           `db:"reference_match" json:"-"`
 	CreatedAt       time.Time      `db:"created_at" json:"created_at"`
 	UUID            string         `db:"uuid" json:"uuid"`
 	ReferenceNumber string         `db:"reference_number" json:"reference_number"`
@@ -66,7 +76,7 @@ type ConversationResult struct {
 }
 
 type MessageResult struct {
-	Total                       int         `db:"total" json:"-"`
+	ID                          int         `db:"id" json:"-"`
 	UUID                        string      `db:"uuid" json:"uuid"`
 	CreatedAt                   time.Time   `db:"created_at" json:"created_at"`
 	Type                        string      `db:"type" json:"type"`
