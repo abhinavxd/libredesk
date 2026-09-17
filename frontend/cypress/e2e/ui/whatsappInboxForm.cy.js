@@ -6,7 +6,7 @@ const newPath = '/admin/inboxes/new'
 
 const openNewForm = () => {
   cy.visit(newPath)
-  cy.contains('Create a WhatsApp inbox').click()
+  cy.contains('h3', /^WhatsApp$/).click()
 }
 
 describe('WhatsApp inbox form', () => {
