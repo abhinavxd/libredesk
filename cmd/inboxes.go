@@ -350,6 +350,16 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	// Validate transport.
+	if cfg.Transport != "" && cfg.Transport != imodels.TransportSMTPIMAP && cfg.Transport != imodels.TransportHTTPAPI {
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	// HTTP API transport (e.g. Resend) has its own validation and skips SMTP/IMAP/OAuth entirely.
+	if cfg.IsHTTPAPITransport() {
+		return validateHTTPAPIEmailConfig(app, cfg)
+	}
+
 	// Validate auth_type.
 	if cfg.AuthType != "" && cfg.AuthType != imodels.AuthTypePassword && cfg.AuthType != imodels.AuthTypeOAuth2 {
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -406,6 +416,27 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 	return nil
 }
 
+// validateHTTPAPIEmailConfig validates the email inbox configuration when using the http_api
+// transport. An empty api_key is always a misconfiguration (unlike an SMTP password, which is
+// valid for unauthenticated relays). On edit the frontend resubmits the masked api_key rather
+// than blanking it, so a non-empty check here doesn't block credential preservation; the
+// masked value is recognised and preserved in Manager.Update. webhook_secret stays optional -
+// it's only needed to receive inbound mail.
+func validateHTTPAPIEmailConfig(app *App, cfg imodels.Config) error {
+	if cfg.HTTPAPI == nil {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "http_api"), nil)
+	}
+	switch cfg.HTTPAPI.Provider {
+	case imodels.HTTPAPIProviderResend:
+	default:
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if cfg.HTTPAPI.APIKey == "" {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "api_key"), nil)
+	}
+	return nil
+}
+
 // trimInboxFields trims whitespace from inbox fields and its email config if applicable.
 func trimInboxFields(inb *imodels.Inbox) error {
 	inb.Name = strings.TrimSpace(inb.Name)
@@ -452,5 +483,10 @@ func trimEmailConfig(cfg *imodels.Config) {
 		cfg.OAuth.Provider = strings.TrimSpace(cfg.OAuth.Provider)
 		cfg.OAuth.ClientID = strings.TrimSpace(cfg.OAuth.ClientID)
 		cfg.OAuth.TenantID = strings.TrimSpace(cfg.OAuth.TenantID)
+	}
+
+	// Trim HTTP API config. Secrets (api_key, webhook_secret) are intentionally NOT trimmed.
+	if cfg.HTTPAPI != nil {
+		cfg.HTTPAPI.Provider = strings.TrimSpace(cfg.HTTPAPI.Provider)
 	}
 }
