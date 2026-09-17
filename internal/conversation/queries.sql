@@ -1077,5 +1077,8 @@ UPDATE widget_campaign_deliveries
 SET conversation_uuid = $2, contact_id = $3, replied = TRUE, opened = TRUE, displayed = TRUE
 WHERE id = $1;
 
+-- name: revert-campaign-delivery
+UPDATE widget_campaign_deliveries SET conversation_uuid = NULL, replied = FALSE WHERE id = $1;
+
 -- name: assign-proactive-team
 UPDATE conversations SET assigned_team_id = NULLIF($2, 0) WHERE id = $1;

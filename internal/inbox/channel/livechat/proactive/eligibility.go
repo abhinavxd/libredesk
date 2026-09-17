@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var campaignOperators = []string{amodels.RuleOperatorContains, amodels.RuleOperatorNotContains, amodels.RuleOperatorEquals, amodels.RuleOperatorNotEqual, amodels.RuleOperatorSet, amodels.RuleOperatorNotSet, amodels.RuleOperatorGreaterThan, amodels.RuleOperatorLessThan, amodels.RuleOperatorStartsWith}
+
 func (c Campaign) Validate() error {
 	if _, err := uuid.Parse(c.ID); err != nil {
 		return fmt.Errorf("id")
@@ -47,7 +49,6 @@ func (c Campaign) Validate() error {
 	return ValidateConditions(c.Conditions)
 }
 
-// withinHours is a func so the business-hours lookup only runs for campaigns that pass every in-memory check.
 func (c Campaign) IneligibleReason(ctx Context, conditionsMatch bool, withinHours func() bool) string {
 	switch {
 	case !c.Enabled:
@@ -77,7 +78,7 @@ func ValidateConditions(group amodels.RuleGroup) error {
 		return fmt.Errorf("conditions")
 	}
 	for _, rule := range group.Rules {
-		if rule.FieldType != amodels.FieldTypeContactCustomAttribute || rule.Field == "" || len(rule.Value) > 2048 || !slices.Contains([]string{"contains", "not contains", "equals", "not equals", "set", "not set", "greater than", "less than", "starts with"}, rule.Operator) {
+		if rule.FieldType != amodels.FieldTypeContactCustomAttribute || rule.Field == "" || len(rule.Value) > 2048 || !slices.Contains(campaignOperators, rule.Operator) {
 			return fmt.Errorf("conditions")
 		}
 	}

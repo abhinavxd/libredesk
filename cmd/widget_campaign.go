@@ -65,7 +65,8 @@ func handleWidgetCampaign(r *fastglue.Request) error {
 		}
 		reason := campaign.IneligibleReason(ctx, app.automation.MatchesContact(campaign.Conditions, contact), within)
 		if hoursErr != nil {
-			return sendErrorEnvelope(r, hoursErr)
+			app.lo.Warn("skipping campaign with invalid business hours", "campaign_id", campaign.ID, "business_hours_id", campaign.BusinessHoursID)
+			continue
 		}
 		if reason != "" {
 			continue
@@ -74,7 +75,7 @@ func handleWidgetCampaign(r *fastglue.Request) error {
 		if err != nil {
 			continue
 		}
-		snapshot := proactive.Snapshot{Message: campaign.Message, Sender: strings.TrimSpace(sender.FirstName + " " + sender.LastName), Avatar: sender.AvatarURL.String, SenderID: sender.ID, TeamID: campaign.TeamID}
+		snapshot := proactive.Snapshot{Message: campaign.Message, Sender: strings.TrimSpace(sender.FullName()), Avatar: sender.AvatarURL.String, SenderID: sender.ID, TeamID: campaign.TeamID}
 		if campaign.SenderID == 0 {
 			snapshot.Sender = config.BrandName
 		}

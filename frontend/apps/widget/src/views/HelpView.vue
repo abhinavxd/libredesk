@@ -17,7 +17,6 @@ let mounted = true
 onUnmounted(() => {
   mounted = false
 })
-// Captured before each request so a login or logout mid-request discards only that response.
 const valid = (identity) => mounted && identity === help.identity
 const busy = ref(false)
 const error = ref('')

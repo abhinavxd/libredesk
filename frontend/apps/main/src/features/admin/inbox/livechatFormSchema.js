@@ -22,8 +22,16 @@ export const widgetConditionsSchema = z.object({
   logical_op: z.enum(['AND', 'OR']),
   rules: z.array(z.object({ field: z.string().min(1), field_type: z.literal('contact_custom_attribute'), operator: z.string().min(1), value: z.string(), case_sensitive_match: z.boolean() })).max(20)
 })
+export const newCampaignId = () => {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
 export const defaultCampaign = () => ({
-  id: crypto.randomUUID(), name: '', enabled: false, message: '', sender_id: 0, team_id: 0,
+  id: newCampaignId(), name: '', enabled: false, message: '', sender_id: 0, team_id: 0,
   audience: 'all', include_urls: [], exclude_urls: [], conditions: { logical_op: 'AND', rules: [] },
   event: '', delay_seconds: 10,
   business_hours_id: 0, business_hours: 'any', desktop: true, mobile: true,

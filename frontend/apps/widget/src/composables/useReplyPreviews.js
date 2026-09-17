@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from '@widget/store/user.js'
+import { getTextFromHTML } from '@shared-ui/utils/string.js'
 
 const parentOrigin = () => new URLSearchParams(window.location.search).get('parent_origin')
 
@@ -16,16 +17,15 @@ export function useReplyPreviews() {
     const element = document.querySelector('.libredesk-widget-app')
     if (!element) return
     const style = getComputedStyle(element)
-    const previews = chat.getConversations.filter(conversation => conversation.unread_message_count > 0 && conversation.last_message?.author?.type === 'agent').map(conversation => {
+    const previews = chat.getConversations.filter(conversation => conversation.unread_message_count > 0 && ['agent', 'ai_assistant'].includes(conversation.last_message?.author?.type)).map(conversation => {
       const message = conversation.last_message
       const author = message.author || {}
-      const parsed = new DOMParser().parseFromString(message.content || '', 'text/html')
       return {
         conversation: conversation.uuid,
         key: `${conversation.uuid}:${message.created_at}`,
         name: [author.first_name, author.last_name].filter(Boolean).join(' ') || widget.config.brand_name,
         avatar: author.avatar_url || '',
-        text: widget.config.previews?.content === 'generic' ? t('widget.newReply') : parsed.body.textContent.trim().slice(0, 240) || t('globals.terms.attachment'),
+        text: widget.config.previews?.content === 'generic' ? t('widget.newReply') : getTextFromHTML(message.content || '').slice(0, 240) || t('globals.terms.attachment'),
         image: widget.config.previews?.content === 'generic' ? '' : message.attachments?.find(attachment => attachment.content_type?.startsWith('image/'))?.thumbnail_url || '',
       }
     })

@@ -72,7 +72,7 @@ export const useChatStore = defineStore('chat', () => {
     const addMessageToConversation = (conversationUUID, message) => {
         messageCache.addMessage(conversationUUID, message)
         messageCacheVersion.value++ // Trigger reactivity
-        const shouldIncrementUnread = message.author?.type === 'agent'
+        const shouldIncrementUnread = ['agent', 'ai_assistant'].includes(message.author?.type)
         updateConversationListLastMessage(conversationUUID, message, shouldIncrementUnread)
     }
 

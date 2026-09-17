@@ -27,7 +27,7 @@
             this.EXPANDED_WIDTH = '750px';
             this.MOBILE_BREAKPOINT = 600;
             this.LAUNCHER_SIZE = 60;
-            this.MOBILE_LAUNCHER_SIZE = 50;
+            this.MOBILE_LAUNCHER_SIZE = 68;
             this.CAMPAIGN_POLL_MIN = 5;
             this.CAMPAIGN_POLL_MAX = 60;
 
@@ -219,8 +219,8 @@
                 position: fixed;
                 cursor: pointer;
                 z-index: 9999;
-                width: ${this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE}px;
-                height: ${this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE}px;
+                width: ${this.launcherSize()}px;
+                height: ${this.launcherSize()}px;
                 background-color: ${launcher.color || colors.primary};
                 border-radius: 50%;
                 display: flex;
@@ -333,18 +333,18 @@
 
         sendMobileState () {
             this.isMobile = window.innerWidth <= this.MOBILE_BREAKPOINT;
-            this.updateLauncherSize();
             this.postToIframe({
                 type: 'SET_MOBILE_STATE',
                 isMobile: this.isMobile
             });
+            if (this.toggleButton) {
+                this.toggleButton.style.width = this.launcherSize() + 'px';
+                this.toggleButton.style.height = this.launcherSize() + 'px';
+            }
         }
 
-        updateLauncherSize () {
-            if (!this.toggleButton) return;
-            const size = this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE;
-            this.toggleButton.style.width = size + 'px';
-            this.toggleButton.style.height = size + 'px';
+        launcherSize () {
+            return this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE;
         }
 
         getNormalIframeHeight () {
@@ -698,7 +698,7 @@
             const host = document.createElement('div');
             const side = this.widgetSettings.launcher.position === 'left' ? 'left' : 'right';
             const spacing = this.widgetSettings.launcher.spacing;
-            Object.assign(host.style, { position: 'fixed', zIndex: '9998', bottom: `${spacing.bottom + (this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE) + 12}px`, [side]: `${spacing.side}px`, width: `min(320px, calc(100vw - ${spacing.side * 2}px))` });
+            Object.assign(host.style, { position: 'fixed', zIndex: '9998', bottom: `${spacing.bottom + this.launcherSize() + 12}px`, [side]: `${spacing.side}px`, width: `min(320px, calc(100vw - ${spacing.side * 2}px))` });
             const root = host.attachShadow({ mode: 'open' });
             const style = document.createElement('style');
             style.textContent = ':host{font:14px/1.5 system-ui}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid;outline-offset:2px}.stack{display:flex;flex-direction:column;gap:8px}.card{display:flex;align-items:flex-start;border:1px solid;border-radius:12px;overflow:hidden}.open{display:flex;gap:10px;align-items:flex-start;flex:1;min-width:0;padding:12px;text-align:left;border:0;background:transparent}.name{font-weight:600;display:block}.text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.avatar{width:28px;height:28px;border-radius:50%;object-fit:cover}.image{max-width:64px;max-height:48px;object-fit:cover}.close{padding:8px;min-height:44px;min-width:44px;border:0;background:transparent}.all{align-self:flex-end;border:1px solid;border-radius:6px;padding:4px 8px}';
@@ -779,7 +779,6 @@
             if (this.campaignInterval) return;
             let last = performance.now();
             let elapsed = 0;
-            // Back off while nothing matches so a long visit doesn't poll the server every few seconds.
             let gap = this.CAMPAIGN_POLL_MIN;
             this.campaignInterval = setInterval(() => {
                 const now = performance.now();

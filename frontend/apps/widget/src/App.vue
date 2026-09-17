@@ -128,6 +128,7 @@ const setupParentMessageListeners = () => {
       if (event.data.jwt) {
         proactive.reset()
         help.reset()
+        if (widgetStore.currentView === 'help') widgetStore.navigateToHome()
         chatStore.drafts = {}
         chatStore.preChatDraft = {}
         chatStore.conversations = null
@@ -154,6 +155,7 @@ const setupParentMessageListeners = () => {
       chatStore.conversations = null
       chatStore.setCurrentConversation(null)
       help.reset()
+      if (widgetStore.currentView === 'help') widgetStore.navigateToHome()
       signalWidgetLoaded()
     } else if (event.data.type === 'CAMPAIGN_CONTEXT') {
       await proactive.next(event.data.context)

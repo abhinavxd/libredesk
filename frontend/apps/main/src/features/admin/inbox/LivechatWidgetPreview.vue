@@ -628,7 +628,6 @@ const homeItems = computed(() =>
 )
 
 const campaign = computed(() => props.config.preview_campaign || null)
-// Only one of the two can show, so collapse the window to reveal the invitation.
 watch(campaign, (value) => {
   if (value) open.value = false
 })

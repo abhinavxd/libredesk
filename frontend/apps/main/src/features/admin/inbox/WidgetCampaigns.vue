@@ -40,7 +40,7 @@ import {
 } from '@shared-ui/components/ui/collapsible'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import WidgetConditions from './WidgetConditions.vue'
-import { defaultCampaign } from './livechatFormSchema.js'
+import { defaultCampaign, newCampaignId } from './livechatFormSchema.js'
 import { handleHTTPError } from '@shared-ui/utils/http'
 import { ChevronRight, ChevronDown, Plus, CircleCheck, CircleSlash } from 'lucide-vue-next'
 
@@ -114,7 +114,7 @@ const add = (source) => {
   const item = source
     ? {
         ...JSON.parse(JSON.stringify(source)),
-        id: crypto.randomUUID(),
+        id: newCampaignId(),
         enabled: false,
         name: `${source.name} (${t('globals.terms.copy')})`
       }

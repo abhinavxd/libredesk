@@ -71,6 +71,9 @@ func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, conta
 			if err := m.DeleteConversation(uuid); err != nil {
 				m.lo.Error("error deleting proactive conversation after message insert failure", "conversation_uuid", uuid, "error", err)
 			}
+			if _, err := m.q.RevertCampaignDelivery.Exec(delivery.ID); err != nil {
+				m.lo.Error("error reverting campaign delivery after message insert failure", "delivery_id", delivery.ID, "error", err)
+			}
 			return "", err
 		}
 	}
