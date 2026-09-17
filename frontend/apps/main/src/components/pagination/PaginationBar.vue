@@ -8,7 +8,10 @@
           {{ t('globals.messages.pageNofTotal', { page, total: totalPages }) }}
         </span>
         <Select :model-value="perPage" @update:model-value="handlePerPageChange">
-          <SelectTrigger class="h-8 w-[70px]" :aria-label="t('globals.messages.resultsPerPage')">
+          <SelectTrigger
+            class="h-10 w-[70px] sm:h-8"
+            :aria-label="t('globals.messages.resultsPerPage')"
+          >
             <SelectValue :placeholder="String(perPage)" />
           </SelectTrigger>
           <SelectContent>
@@ -21,38 +24,41 @@
 
       <div class="flex items-center gap-1">
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
+          :class="EDGE_BUTTON_CLASS"
           :aria-label="t('globals.messages.firstPage')"
           :disabled="page <= 1"
           @click="goToPage(1)"
         >
-          <ChevronsLeft class="h-4 w-4" aria-hidden="true" />
+          <ChevronsLeft :class="PAGINATION_ICON_CLASS" aria-hidden="true" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
+          :class="STEP_BUTTON_CLASS"
           :aria-label="t('globals.messages.previousPage')"
           :disabled="page <= 1"
           @click="goToPage(page - 1)"
         >
-          <ChevronLeft class="h-4 w-4" aria-hidden="true" />
+          <ChevronLeft :class="PAGINATION_ICON_CLASS" aria-hidden="true" />
         </Button>
 
         <div class="flex items-center bg-muted rounded-lg p-1">
           <template v-for="pageNumber in visiblePages" :key="pageNumber">
             <span
               v-if="pageNumber === '...'"
-              class="flex items-center justify-center h-7 w-7 text-sm text-muted-foreground select-none"
+              class="flex h-10 w-10 items-center justify-center text-sm text-muted-foreground select-none sm:h-7 sm:w-7"
             >
               ...
             </span>
             <button
               v-else
+              type="button"
               @click="goToPage(pageNumber)"
-              class="h-7 min-w-7 px-2 rounded-md text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="h-10 min-w-10 px-2 rounded-md text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:h-7 sm:min-w-7"
               :class="
                 pageNumber === page
                   ? 'bg-background text-foreground shadow-sm'
@@ -65,24 +71,26 @@
         </div>
 
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
+          :class="STEP_BUTTON_CLASS"
           :aria-label="t('globals.messages.nextPage')"
           :disabled="page >= totalPages"
           @click="goToPage(page + 1)"
         >
-          <ChevronRight class="h-4 w-4" aria-hidden="true" />
+          <ChevronRight :class="PAGINATION_ICON_CLASS" aria-hidden="true" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
+          :class="EDGE_BUTTON_CLASS"
           :aria-label="t('globals.messages.lastPage')"
           :disabled="page >= totalPages"
           @click="goToPage(totalPages)"
         >
-          <ChevronsRight class="h-4 w-4" aria-hidden="true" />
+          <ChevronsRight :class="PAGINATION_ICON_CLASS" aria-hidden="true" />
         </Button>
       </div>
     </div>
@@ -102,6 +110,10 @@ import {
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { getVisiblePages } from '@main/utils/pagination'
+
+const EDGE_BUTTON_CLASS = 'hidden h-8 w-8 p-0 sm:inline-flex'
+const PAGINATION_ICON_CLASS = 'h-4 w-4'
+const STEP_BUTTON_CLASS = 'h-10 w-10 p-0 sm:h-8 sm:w-8'
 
 const props = defineProps({
   page: { type: Number, required: true },

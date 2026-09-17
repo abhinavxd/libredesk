@@ -27,12 +27,8 @@
         </time>
       </div>
 
-      <p
-        class="mt-1 text-base leading-snug truncate"
-        :class="subject ? 'font-medium text-foreground' : 'text-muted-foreground'"
-      >
-        <HighlightedText v-if="subject" :text="subject" :term="term" />
-        <template v-else>{{ t('globals.terms.noSubject') }}</template>
+      <p v-if="subject" class="mt-1 truncate text-base font-medium leading-snug text-foreground">
+        <HighlightedText :text="subject" :term="term" />
       </p>
 
       <p
@@ -42,19 +38,13 @@
       >
         <template v-if="!isConversation">
           <span class="text-foreground">{{ senderName }}</span>
-          <span v-if="item.private" class="mx-1.5 rounded-md bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
-            {{ t('globals.terms.privateNote') }}
-          </span>
-          <span v-else-if="item.type === 'outgoing'" class="mx-1.5 rounded-md border px-1.5 py-0.5 text-xs">
-            {{ t('globals.terms.reply') }}
-          </span>
-          <span v-else>: </span>
+          <span>: </span>
         </template>
         <HighlightedText :text="snippet" :term="term" />
       </p>
 
       <div
-        class="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground [&>*+*]:before:content-['·'] [&>*+*]:before:mr-2 [&>*+*]:before:text-muted-foreground/60"
+        class="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground"
       >
         <Badge v-if="status" variant="outline" class="font-normal">{{ status }}</Badge>
         <span v-if="item.priority" class="inline-flex items-center gap-1">
@@ -63,20 +53,28 @@
         </span>
         <span class="tabular-nums">#{{ referenceNumber }}</span>
         <span v-if="item.inbox_name" class="inline-flex items-center gap-1.5 min-w-0">
-          <component :is="item.inbox_channel === 'livechat' ? MessageSquare : Mail" class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <component
+            :is="item.inbox_channel === 'livechat' ? MessageSquare : Mail"
+            :class="METADATA_ICON_CLASS"
+            aria-hidden="true"
+          />
           <span class="truncate">{{ item.inbox_name }}</span>
         </span>
         <span class="inline-flex items-center gap-1.5 min-w-0">
-          <UserRound class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <UserRound :class="METADATA_ICON_CLASS" aria-hidden="true" />
           <span class="truncate">{{ assigneeName || t('globals.terms.unassigned') }}</span>
         </span>
         <span v-if="item.team_name" class="inline-flex items-center gap-1.5 min-w-0">
-          <UsersRound class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <UsersRound :class="METADATA_ICON_CLASS" aria-hidden="true" />
           <span class="truncate">{{ item.team_name }}</span>
         </span>
         <span v-if="item.tags?.length" class="inline-flex items-center gap-1.5 flex-wrap">
-          <Tag class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          <span v-for="tag in item.tags" :key="tag" class="rounded-md bg-secondary px-1.5 py-0.5 text-secondary-foreground">
+          <Tag :class="METADATA_ICON_CLASS" aria-hidden="true" />
+          <span
+            v-for="tag in item.tags"
+            :key="tag"
+            class="rounded-md bg-secondary px-1.5 py-0.5 text-secondary-foreground"
+          >
             {{ tag }}
           </span>
         </span>
@@ -96,6 +94,8 @@ import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import PriorityMarker from '@main/features/conversation/PriorityMarker.vue'
 import HighlightedText from './HighlightedText.vue'
 
+const METADATA_ICON_CLASS = 'w-3.5 h-3.5 shrink-0'
+
 const props = defineProps({
   item: { type: Object, required: true },
   type: { type: String, required: true },
@@ -108,13 +108,21 @@ const fullName = (person) => [person?.first_name, person?.last_name].filter(Bool
 const initials = (name) => (name || '?').substring(0, 2).toUpperCase()
 
 const isConversation = computed(() => props.type === 'conversations')
-const conversationUUID = computed(() => (isConversation.value ? props.item.uuid : props.item.conversation_uuid))
+const conversationUUID = computed(() =>
+  isConversation.value ? props.item.uuid : props.item.conversation_uuid
+)
 const referenceNumber = computed(() =>
   isConversation.value ? props.item.reference_number : props.item.conversation_reference_number
 )
-const status = computed(() => (isConversation.value ? props.item.status : props.item.conversation_status))
-const subject = computed(() => (isConversation.value ? props.item.subject : props.item.conversation_subject) || '')
-const snippet = computed(() => (isConversation.value ? props.item.last_message : props.item.snippet) || '')
+const status = computed(() =>
+  isConversation.value ? props.item.status : props.item.conversation_status
+)
+const subject = computed(
+  () => (isConversation.value ? props.item.subject : props.item.conversation_subject) || ''
+)
+const snippet = computed(
+  () => (isConversation.value ? props.item.last_message : props.item.snippet) || ''
+)
 const timestamp = computed(() =>
   isConversation.value ? props.item.last_message_at || props.item.created_at : props.item.created_at
 )

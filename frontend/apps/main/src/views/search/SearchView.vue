@@ -2,7 +2,7 @@
   <div class="flex flex-col h-screen">
     <SearchHeader />
     <div class="flex-1 overflow-y-auto">
-      <div class="max-w-6xl mx-auto px-4 pt-6 space-y-4">
+      <div class="mx-auto max-w-6xl space-y-4 px-4 py-6">
         <div class="relative">
           <SearchIcon
             class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none"
@@ -13,13 +13,21 @@
             v-model="term"
             :placeholder="$t('search.searchBy')"
             :aria-label="$t('globals.terms.search')"
-            class="h-12 pl-10 pr-10 text-base"
+            class="h-12 pl-10 pr-20 text-base"
+          />
+          <Spinner
+            v-if="loading"
+            size="sm"
+            variant="muted"
+            :absolute="false"
+            :center="false"
+            class="absolute right-10 top-1/2 -translate-y-1/2"
           />
           <button
             v-if="term"
             type="button"
             class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
-            :aria-label="$t('globals.terms.clear')"
+            :aria-label="$t('globals.messages.clear')"
             @click="term = ''"
           >
             <X class="w-4 h-4" aria-hidden="true" />
@@ -28,23 +36,24 @@
 
         <SearchFilters :filters="filters" @update:filters="filters = $event" />
 
-        <div v-if="loading" class="flex justify-center items-center h-64">
-          <Spinner />
+        <div v-if="loading && totalResults === 0" class="flex justify-center items-center h-64">
+          <Spinner :absolute="false" />
         </div>
         <div v-else-if="error" class="py-16 text-center space-y-4">
           <p class="text-destructive">{{ error }}</p>
-          <Button @click="search"> {{ $t('globals.terms.tryAgain') }} </Button>
-        </div>
-        <div v-else-if="searchPerformed && totalResults === 0" class="py-16 text-center space-y-1">
-          <p class="text-foreground font-medium">{{ $t('search.noResultsForQuery', { query: term }) }}</p>
-          <p class="text-sm text-muted-foreground">{{ $t('search.adjustSearchTerms') }}</p>
+          <Button type="button" @click="search"> {{ $t('globals.terms.tryAgain') }} </Button>
         </div>
         <SearchResults
           v-else-if="searchPerformed"
           :results="results"
           :term="term"
-          v-model:active-tab="activeTab"
+          :active-tab="activeTab"
+          :show-clear-filters="hasActiveFilters(filters)"
+          :aria-busy="loading"
+          :class="{ 'pointer-events-none opacity-60': loading }"
+          @update:active-tab="selectTab"
           @change-page="changePage"
+          @clear-filters="filters = emptyFilters()"
         />
         <p
           v-else-if="term.length > 0 && term.length < MIN_SEARCH_LENGTH"
@@ -52,9 +61,9 @@
         >
           {{ $t('search.minQueryLength', { length: MIN_SEARCH_LENGTH }) }}
         </p>
-        <div v-else class="py-16 text-center space-y-2">
-          <SearchIcon class="w-8 h-8 mx-auto text-muted-foreground/60" aria-hidden="true" />
-          <p class="text-sm text-muted-foreground max-w-md mx-auto">{{ $t('search.searchBy') }}</p>
+        <div v-else class="py-16 text-center text-muted-foreground">
+          <SearchIcon class="w-8 h-8 mx-auto mb-2 opacity-60" aria-hidden="true" />
+          <p class="text-sm">{{ $t('globals.messages.resultsAppearHere') }}</p>
         </div>
       </div>
     </div>
@@ -73,7 +82,9 @@ import SearchHeader from '@main/features/search/SearchHeader.vue'
 import SearchFilters from '@main/features/search/SearchFilters.vue'
 import SearchResults from '@main/features/search/SearchResults.vue'
 import {
+  emptyFilters,
   filtersFromQuery,
+  hasActiveFilters,
   queryFromFilters,
   toFiltersJSON
 } from '@main/features/search/searchFilters'
@@ -87,13 +98,20 @@ const TABS = ['conversations', 'messages']
 const route = useRoute()
 const router = useRouter()
 
-const emptyPage = () => ({ results: [], total: 0, page: 1, per_page: DEFAULT_PER_PAGE, total_pages: 0 })
+const emptyPage = () => ({
+  results: [],
+  total: 0,
+  page: 1,
+  per_page: DEFAULT_PER_PAGE,
+  total_pages: 0
+})
 const emptyResults = () => ({ conversations: emptyPage(), messages: emptyPage() })
 
 const inputRef = ref(null)
 const term = ref(String(route.query.q || ''))
 const filters = ref(filtersFromQuery(route.query))
 const activeTab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'conversations')
+const tabSelectedByUser = ref(TABS.includes(route.query.tab))
 const results = ref(emptyResults())
 const loading = ref(false)
 const error = ref(null)
@@ -101,7 +119,9 @@ const searchPerformed = ref(false)
 let debounceTimer = null
 let searchRequestId = 0
 
-const totalResults = computed(() => results.value.conversations.total + results.value.messages.total)
+const totalResults = computed(
+  () => results.value.conversations.total + results.value.messages.total
+)
 
 const searchParams = (page, perPage) => {
   const params = { query: term.value, page, page_size: perPage }
@@ -120,6 +140,7 @@ const reset = () => {
   results.value = emptyResults()
   searchPerformed.value = false
   loading.value = false
+  error.value = null
 }
 
 const search = async () => {
@@ -139,6 +160,10 @@ const search = async () => {
     )
     if (requestId !== searchRequestId) return
     results.value = Object.fromEntries(TABS.map((type, i) => [type, pages[i].data.data]))
+    if (!tabSelectedByUser.value && results.value[activeTab.value].total === 0) {
+      const populatedTab = TABS.find((type) => results.value[type].total > 0)
+      if (populatedTab) activeTab.value = populatedTab
+    }
   } catch (err) {
     if (requestId !== searchRequestId) return
     error.value = handleHTTPError(err).message
@@ -148,6 +173,8 @@ const search = async () => {
 }
 
 const fetchPage = async (type, page, perPage) => {
+  loading.value = true
+  error.value = null
   const requestId = ++searchRequestId
   try {
     const response = await fetchers[type](searchParams(page, perPage))
@@ -156,15 +183,24 @@ const fetchPage = async (type, page, perPage) => {
   } catch (err) {
     if (requestId !== searchRequestId) return
     error.value = handleHTTPError(err).message
+  } finally {
+    if (requestId === searchRequestId) loading.value = false
   }
 }
 
 const changePage = ({ type, page, perPage }) => fetchPage(type, page, perPage)
 
+const selectTab = (tab) => {
+  tabSelectedByUser.value = true
+  activeTab.value = tab
+}
+
 const syncRoute = () => {
   const query = { ...queryFromFilters(filters.value) }
   if (term.value) query.q = term.value
-  if (activeTab.value !== 'conversations') query.tab = activeTab.value
+  if (tabSelectedByUser.value || activeTab.value !== 'conversations') {
+    query.tab = activeTab.value
+  }
   router.replace({ query })
 }
 

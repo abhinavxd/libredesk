@@ -1,25 +1,39 @@
 <template>
   <div>
     <Tabs :model-value="activeTab" @update:model-value="emit('update:activeTab', $event)">
-      <TabsList class="mb-3">
-        <TabsTrigger v-for="type in TYPES" :key="type" :value="type" class="gap-1.5">
-          {{ t(tabLabelKeys[type], 2) }}
-          <span class="text-xs tabular-nums text-muted-foreground">{{ results[type].total }}</span>
-        </TabsTrigger>
-      </TabsList>
+      <div class="mb-3 flex items-center gap-2">
+        <TabsList>
+          <TabsTrigger v-for="type in TYPES" :key="type" :value="type" class="gap-1.5">
+            {{ t(tabLabelKeys[type], 2) }}
+            <span class="text-xs tabular-nums text-muted-foreground">{{
+              results[type].total
+            }}</span>
+          </TabsTrigger>
+        </TabsList>
+        <Button
+          v-if="showClearFilters"
+          type="button"
+          variant="ghost"
+          size="sm"
+          class="shrink-0 text-muted-foreground"
+          @click="emit('clearFilters')"
+        >
+          <X class="mr-1 h-4 w-4" aria-hidden="true" />
+          {{ t('globals.messages.clearFilters') }}
+        </Button>
+      </div>
 
-      <TabsContent
-        v-for="type in TYPES"
-        :key="type"
-        :value="type"
-        class="mt-0"
-        :class="{ 'pb-4': results[type].total_pages <= 1 }"
-      >
-        <div class="bg-background rounded-md border overflow-hidden">
-          <div v-if="results[type].results.length === 0" class="p-8 text-center text-muted-foreground">
-            <div class="text-lg font-medium mb-2">{{ t('globals.messages.noResultsFound') }}</div>
-            <div class="text-sm">{{ t('search.adjustSearchTerms') }}</div>
-          </div>
+      <TabsContent v-for="type in TYPES" :key="type" :value="type" class="mt-0">
+        <div
+          class="overflow-hidden rounded-md border bg-background"
+          :class="{ 'border-dashed': results[type].results.length === 0 }"
+        >
+          <p
+            v-if="results[type].results.length === 0"
+            class="p-8 text-center text-sm text-muted-foreground"
+          >
+            {{ t('globals.messages.noResultsFound') }}
+          </p>
           <div v-else class="divide-y divide-border">
             <SearchResultItem
               v-for="item in results[type].results"
@@ -43,7 +57,9 @@
 </template>
 
 <script setup>
+import { X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { Button } from '@shared-ui/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import PaginationBar from '@main/components/pagination/PaginationBar.vue'
 import SearchResultItem from './SearchResultItem.vue'
@@ -57,9 +73,10 @@ const tabLabelKeys = {
 defineProps({
   results: { type: Object, required: true },
   term: { type: String, default: '' },
-  activeTab: { type: String, required: true }
+  activeTab: { type: String, required: true },
+  showClearFilters: { type: Boolean, default: false }
 })
-const emit = defineEmits(['update:activeTab', 'changePage'])
+const emit = defineEmits(['update:activeTab', 'changePage', 'clearFilters'])
 
 const { t } = useI18n()
 </script>
