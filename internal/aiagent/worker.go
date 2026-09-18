@@ -277,14 +277,8 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	m.lo.Debug("ai agent running", "conversation_uuid", conv.UUID, "history_messages", len(history), "turns", turns)
 
-	// A JWT livechat contact is trusted by login; everyone else (email channel, anonymous visitor)
-	// is trusted only within an OTP verification window. Read live so mid-turn verification counts.
-	verified := func() bool {
-		if conv.InboxChannel != channelEmail && conv.Contact.Type == umodels.UserTypeContact {
-			return true
-		}
-		return m.isConversationVerified(conv.UUID, conv.Contact.Email.String)
-	}
+	// Read live so mid-turn verification counts.
+	verified := func() bool { return m.isContactVerified(conv) }
 	// Snapshot for the run-start registration decisions (one Redis read); tctx still gets the live
 	// closure so mid-turn verification is picked up per tool call.
 	runVerified := verified()
@@ -349,14 +343,11 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	if err != nil {
 		m.lo.Error("error running ai agent", "conversation_uuid", conv.UUID, "error", err)
-		if !outcome.handedOff {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+		reason := m.i18n.T("ai.agent.handoffError")
+		if outcome.handedOff {
+			reason = outcome.handoffReason
 		}
-		return
-	}
-	// The assistant escalated; the handoff tool already reassigned and noted it.
-	if outcome.handedOff {
-		m.lo.Debug("ai agent handed off", "conversation_uuid", conv.UUID)
+		m.handoff(conv, assistant, reason)
 		return
 	}
 	// The model's text answer is the reply to the customer. Handoff and resolve are separate tool actions.
@@ -385,6 +376,14 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
 			return
 		}
+	}
+	if outcome.handedOff {
+		m.lo.Debug("ai agent handed off", "conversation_uuid", conv.UUID)
+		if m.requestHandoffForm(conv, assistant) {
+			return
+		}
+		m.handoff(conv, assistant, outcome.handoffReason)
+		return
 	}
 	if outcome.resolved && (answer != "" || turns > 0) {
 		m.resolve(conv, assistant)

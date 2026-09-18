@@ -60,6 +60,11 @@ type snippetImportReq struct {
 	URL string `json:"url"`
 }
 
+type aiToolReq struct {
+	aimodels.Tool
+	RequiresAgentApproval *bool `json:"requires_agent_approval"`
+}
+
 // handleAICompletion runs a stored prompt over the supplied content (reply-box actions).
 func handleAICompletion(r *fastglue.Request) error {
 	var (
@@ -214,12 +219,14 @@ func handleGetAITool(r *fastglue.Request) error {
 func handleCreateAITool(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req aimodels.Tool
+		req aiToolReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	tool, err := app.ai.CreateTool(req)
+	toolInput := req.Tool
+	toolInput.RequiresAgentApproval = req.RequiresAgentApproval == nil || *req.RequiresAgentApproval
+	tool, err := app.ai.CreateTool(toolInput)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -229,7 +236,7 @@ func handleCreateAITool(r *fastglue.Request) error {
 func handleUpdateAITool(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req aimodels.Tool
+		req aiToolReq
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
@@ -238,7 +245,17 @@ func handleUpdateAITool(r *fastglue.Request) error {
 	if err := r.Decode(&req, "json"); err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	tool, err := app.ai.UpdateTool(id, req)
+	toolInput := req.Tool
+	if req.RequiresAgentApproval == nil {
+		existing, err := app.ai.GetTool(id)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		toolInput.RequiresAgentApproval = existing.RequiresAgentApproval
+	} else {
+		toolInput.RequiresAgentApproval = *req.RequiresAgentApproval
+	}
+	tool, err := app.ai.UpdateTool(id, toolInput)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -352,14 +369,30 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		}
 		transcript = conversationTranscript(app, req.ConversationUUID)
 	}
-	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, ai.ToolContext{}, generateReplyTools(app, user, conv))
+	toolIDs := []int(nil)
+	tctx := ai.ToolContext{}
+	scope := ai.AgentRunScope{AgentID: auser.ID, Surface: aimodels.ToolInvocationReply}
+	if conv != nil {
+		toolIDs, err = app.ai.GetEnabledGenerateReplyToolIDs()
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		tctx = agentToolContext(conv)
+		scope.ConversationID = conv.ID
+		scope.ConversationUUID = conv.UUID
+		app.ai.ClearPendingAgentRuns(scope)
+	}
+	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, tctx, generateReplyTools(app, user, conv), toolIDs, scope)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if strings.TrimSpace(resp) == "" {
+	if resp.Status == aimodels.AgentRunCompleted && strings.TrimSpace(resp.Content) == "" {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
 	}
-	return r.SendEnvelope(stringutil.Markdown2HTML(resp))
+	if resp.Status == aimodels.AgentRunCompleted {
+		resp.Content = stringutil.Markdown2HTML(resp.Content)
+	}
+	return r.SendEnvelope(resp)
 }
 
 // handleAISummarizeConversation summarizes a conversation and posts the summary as the requesting agent's private note.
@@ -466,22 +499,46 @@ func handleAICopilot(r *fastglue.Request) error {
 	}
 	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: req.Message})
 
-	convoContext := conversationTranscript(app, req.ConversationUUID)
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, ai.ToolContext{}, copilotTools(app, user, conv), persona)
+	scope := ai.AgentRunScope{AgentID: auser.ID, ConversationID: conv.ID, ConversationUUID: conv.UUID, Surface: aimodels.ToolInvocationCopilot, UserMessage: req.Message}
+	app.ai.ClearPendingAgentRuns(scope)
+	toolIDs, err := app.ai.GetEnabledCopilotToolIDs()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if strings.TrimSpace(resp) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
-	}
-	// Persist the exchange only after a successful reply, so a failed or empty call leaves no orphaned turn.
-	if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleUser, req.Message); err != nil {
+	convoContext := conversationTranscript(app, req.ConversationUUID)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, agentToolContext(conv), copilotTools(app, user, conv), persona, toolIDs, scope)
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleAssistant, resp); err != nil {
-		app.lo.Error("error saving copilot reply", "error", err)
+	if resp.Status == aimodels.AgentRunCompleted && strings.TrimSpace(resp.Content) == "" {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
 	}
-	return r.SendEnvelope(stringutil.Markdown2HTML(resp))
+	if resp.Status == aimodels.AgentRunCompleted {
+		if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleUser, req.Message); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleAssistant, resp.Content); err != nil {
+			app.lo.Error("error saving copilot reply", "error", err)
+		}
+		resp.Content = stringutil.Markdown2HTML(resp.Content)
+	}
+	return r.SendEnvelope(resp)
+}
+
+func handleApproveAIToolRun(r *fastglue.Request) error {
+	resp, err := decideAIToolRun(r, true)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(resp)
+}
+
+func handleDeclineAIToolRun(r *fastglue.Request) error {
+	resp, err := decideAIToolRun(r, false)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(resp)
 }
 
 // handleGetCopilotMessages returns the requesting agent's persisted copilot chat for a conversation.
@@ -506,6 +563,13 @@ func handleGetCopilotMessages(r *fastglue.Request) error {
 			msgs[i].Content = stringutil.Markdown2HTML(msgs[i].Content)
 		}
 	}
+	scope := ai.AgentRunScope{AgentID: auser.ID, ConversationID: conv.ID, ConversationUUID: conv.UUID, Surface: aimodels.ToolInvocationCopilot}
+	if userMessage, approval := app.ai.PendingAgentApproval(scope); approval != nil {
+		if userMessage != "" {
+			msgs = append(msgs, aimodels.CopilotMessage{Role: aimodels.RoleUser, Content: userMessage})
+		}
+		msgs = append(msgs, aimodels.CopilotMessage{Role: aimodels.RoleApproval, Approval: approval})
+	}
 	return r.SendEnvelope(msgs)
 }
 
@@ -524,6 +588,7 @@ func handleClearCopilotMessages(r *fastglue.Request) error {
 	if err := app.ai.ClearCopilotMessages(conv.ID, auser.ID); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	app.ai.ClearPendingAgentRuns(ai.AgentRunScope{AgentID: auser.ID, ConversationID: conv.ID, ConversationUUID: conv.UUID, Surface: aimodels.ToolInvocationCopilot})
 	return r.SendEnvelope(true)
 }
 
@@ -547,4 +612,55 @@ func conversationTranscript(app *App, uuid string) string {
 		return ""
 	}
 	return cmodels.Transcript(msgs, maxTranscriptMessages)
+}
+
+func decideAIToolRun(r *fastglue.Request, approved bool) (aimodels.AgentRunResult, error) {
+	app := r.Context.(*App)
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	runID := r.RequestCtx.UserValue("id").(string)
+	scope, err := app.ai.PendingAgentRunScope(runID, auser.ID)
+	if err != nil {
+		return aimodels.AgentRunResult{}, err
+	}
+	if scope.ConversationUUID != "" {
+		conv, err := enforceAIConversationAccess(r, scope.ConversationUUID)
+		if err != nil {
+			return aimodels.AgentRunResult{}, err
+		}
+		if conv.ID != scope.ConversationID {
+			return aimodels.AgentRunResult{}, envelope.NewError(envelope.PermissionError, app.i18n.T("ai.toolApprovalUnavailable"), nil)
+		}
+	}
+	resp, resumedScope, err := app.ai.ResumeAgentRun(r.RequestCtx, runID, auser.ID, approved)
+	if err != nil {
+		return aimodels.AgentRunResult{}, err
+	}
+	if resp.Status == aimodels.AgentRunCompleted && strings.TrimSpace(resp.Content) == "" {
+		return aimodels.AgentRunResult{}, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil)
+	}
+	if resp.Status == aimodels.AgentRunCompleted {
+		if resumedScope.Surface == aimodels.ToolInvocationCopilot {
+			if err := app.ai.SaveCopilotMessage(resumedScope.ConversationID, auser.ID, aimodels.RoleUser, resumedScope.UserMessage); err != nil {
+				app.lo.Error("error saving copilot message", "error", err)
+			} else if err := app.ai.SaveCopilotMessage(resumedScope.ConversationID, auser.ID, aimodels.RoleAssistant, resp.Content); err != nil {
+				app.lo.Error("error saving copilot reply", "error", err)
+			}
+		}
+		resp.Content = stringutil.Markdown2HTML(resp.Content)
+	}
+	return resp, nil
+}
+
+func agentToolContext(conv *cmodels.Conversation) ai.ToolContext {
+	return ai.ToolContext{
+		ContactID:         conv.Contact.ID,
+		ContactExternalID: conv.Contact.ExternalUserID.String,
+		ContactType:       conv.Contact.Type,
+		ConversationUUID:  conv.UUID,
+		InboxID:           conv.InboxID,
+		ContactEmail:      func() string { return conv.Contact.Email.String },
+		// The agent picked this conversation and reviews the call before it runs, so the customer's
+		// own OTP state does not gate an agent-initiated lookup.
+		Verified: func() bool { return true },
+	}
 }

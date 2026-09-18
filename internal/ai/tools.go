@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/crypto"
@@ -175,6 +176,12 @@ func (t *httpTool) Parameters() types.JSONText {
 	return t.tool.Parameters
 }
 
+func (t *httpTool) approvalRequired() bool { return t.tool.RequiresAgentApproval }
+
+func (t *httpTool) toolID() int { return t.tool.ID }
+
+func (t *httpTool) toolUpdatedAt() time.Time { return t.tool.UpdatedAt }
+
 func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	if t.tool.RequiresVerification && !t.tctx.verified() {
 		t.lo.Debug("custom tool blocked, contact not verified", "tool", t.tool.Name)
@@ -260,7 +267,6 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	if t.tctx.InboxID != 0 {
 		req.Header.Set("X-Libredesk-Inbox-Id", strconv.Itoa(t.tctx.InboxID))
 	}
-
 	resp, err := t.client.Do(req)
 	if err != nil {
 		t.lo.Error("error calling custom tool", "tool", t.tool.Name, "error", err)

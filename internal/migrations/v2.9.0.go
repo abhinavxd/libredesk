@@ -20,6 +20,15 @@ var notificationTypesV2_9_0 = []string{
 }
 
 func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+	if _, err := db.Exec(`ALTER TABLE ai_tools ADD COLUMN IF NOT EXISTS copilot_enabled BOOLEAN NOT NULL DEFAULT false;`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE ai_tools ADD COLUMN IF NOT EXISTS generate_reply_enabled BOOLEAN NOT NULL DEFAULT false;`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE ai_tools ADD COLUMN IF NOT EXISTS requires_agent_approval BOOLEAN NOT NULL DEFAULT true;`); err != nil {
+		return err
+	}
 	if _, err := db.Exec(`
 		UPDATE roles
 		SET permissions = array_append(permissions, 'messages:write_private')

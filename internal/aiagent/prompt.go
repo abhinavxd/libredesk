@@ -40,9 +40,9 @@ const handoffToolLine = "- hand_off_to_human: transfer the conversation to a hum
 
 const defaultLanguageLine = "Reply in the same language as the customer's last message."
 
-const cannotAnswerWithHandoff = `If you cannot answer from the knowledge base: tell the customer you could not help with that and offer to connect them with a human. Only call hand_off_to_human once the customer asks for a human or accepts your offer, or if they are clearly stuck or frustrated. Do not tell the customer they have been transferred unless you have used the tool.`
+const cannotAnswerWithHandoff = `If you cannot answer from the knowledge base: tell the customer you could not help with that and offer to connect them with a human. A tool that fails or returns an error is handled the same way: tell the customer you could not complete the request and offer a human. Only call hand_off_to_human once the customer asks for a human or accepts your offer, or if they are clearly stuck or frustrated. Do not tell the customer they have been transferred unless you have used the tool.`
 
-const cannotAnswerNoHandoff = `If you cannot answer from the knowledge base: tell the customer you could not help with that. There is no human agent to transfer to - never offer to connect them with a human, transfer the conversation, or promise that someone will follow up.`
+const cannotAnswerNoHandoff = `If you cannot answer from the knowledge base, or a tool fails or returns an error: tell the customer you could not help with that. There is no human agent to transfer to - never offer to connect them with a human, transfer the conversation, or promise that someone will follow up.`
 
 // noContactIdentityNote is a trusted, data-free system-prompt line for when nothing identifies the contact.
 const noContactIdentityNote = "You do not have any identifying details for this customer yet. If you need to identify them for a request, ask."

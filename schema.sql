@@ -777,6 +777,9 @@ CREATE TABLE ai_tools (
 	parameters JSONB NOT NULL DEFAULT '{}',
 	enabled BOOLEAN NOT NULL DEFAULT true,
 	requires_verification BOOLEAN NOT NULL DEFAULT true,
+	copilot_enabled BOOLEAN NOT NULL DEFAULT false,
+	generate_reply_enabled BOOLEAN NOT NULL DEFAULT false,
+	requires_agent_approval BOOLEAN NOT NULL DEFAULT true,
 	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64)
 );
 
