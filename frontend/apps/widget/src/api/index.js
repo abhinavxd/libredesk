@@ -4,9 +4,10 @@ let _sessionToken = ''
 let _visitorToken = ''
 
 function postToParent(data) {
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage(data, '*')
-  }
+  if (!window.parent || window.parent === window) return
+  const target = new URLSearchParams(window.location.search).get('parent_origin')
+  if (!target || target === 'null') return
+  window.parent.postMessage(data, target)
 }
 
 function getInboxIDFromQuery() {

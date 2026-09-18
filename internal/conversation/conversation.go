@@ -312,7 +312,6 @@ type queries struct {
 	LockCampaignDelivery     *sqlx.Stmt `query:"lock-campaign-delivery"`
 	CompleteCampaignDelivery *sqlx.Stmt `query:"complete-campaign-delivery"`
 	AssignProactiveTeam      *sqlx.Stmt `query:"assign-proactive-team"`
-	RevertCampaignDelivery   *sqlx.Stmt `query:"revert-campaign-delivery"`
 	// Conversation queries.
 	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
 	GetConversation                     *sqlx.Stmt `query:"get-conversation"`

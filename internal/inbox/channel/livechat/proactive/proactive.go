@@ -123,7 +123,7 @@ func Suppression(c Campaign, ctx Context, history []Delivery, cooldownHours int)
 			}
 			continue
 		}
-		if ctx.Now.Sub(d.CreatedAt) < time.Duration(max(1, cooldownHours))*time.Hour {
+		if cooldownHours > 0 && ctx.Now.Sub(d.CreatedAt) < time.Duration(cooldownHours)*time.Hour {
 			return "cooldown"
 		}
 	}

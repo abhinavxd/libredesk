@@ -269,7 +269,7 @@ describe('Livechat Inbox Form Schema', () => {
             repeat_hours: 0
           }
         ],
-        campaign_cooldown_hours: 0
+        campaign_cooldown_hours: -1
       })
     )
     expect(result.success).toBe(false)
@@ -277,7 +277,7 @@ describe('Livechat Inbox Form Schema', () => {
       'widget.campaignUrlLimit {}',
       'validation.minmaxNumber {"min":0,"max":86400}',
       'validation.minmaxNumber {"min":1,"max":8760}',
-      'validation.minmaxNumber {"min":1,"max":8760}'
+      'validation.minmaxNumber {"min":0,"max":8760}'
     ])
   })
 

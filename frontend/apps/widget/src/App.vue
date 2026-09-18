@@ -134,6 +134,7 @@ const setupParentMessageListeners = () => {
         if (widgetStore.currentView === 'help') widgetStore.navigateToHome()
         chatStore.drafts = {}
         chatStore.preChatDraft = {}
+        chatStore.handoffDraft = {}
         chatStore.conversations = null
         chatStore.setCurrentConversation(null)
         try {
@@ -154,6 +155,7 @@ const setupParentMessageListeners = () => {
       proactive.reset()
       chatStore.drafts = {}
       chatStore.preChatDraft = {}
+      chatStore.handoffDraft = {}
       userStore.clearSessionToken()
       chatStore.conversations = null
       chatStore.setCurrentConversation(null)

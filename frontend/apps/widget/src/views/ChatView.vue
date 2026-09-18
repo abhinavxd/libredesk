@@ -140,6 +140,7 @@ const submitHandoffForm = async ({ formData, message }) => {
       ...message,
       meta: { ...message.meta, handoff_form_pending: false }
     })
+    chatStore.handoffDraft = {}
   } catch (error) {
     errorMessage.value = handleHTTPError(error).message
   } finally {

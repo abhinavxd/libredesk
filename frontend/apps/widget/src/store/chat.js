@@ -11,6 +11,7 @@ export const useChatStore = defineStore('chat', () => {
   const previewUnreadUUID = ref(null)
   const drafts = ref({})
   const preChatDraft = ref({})
+  const handoffDraft = ref({})
   let typingTimeout = null
   const isTyping = ref(false)
   const currentConversation = ref({})
@@ -266,6 +267,7 @@ export const useChatStore = defineStore('chat', () => {
   return {
     drafts,
     preChatDraft,
+    handoffDraft,
     previewUnreadUUID,
     messageCache,
     isTyping,

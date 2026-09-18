@@ -119,9 +119,9 @@ const campaignSectionError = (field) =>
 const cooldownError = computed(() => {
   if (!props.showErrors) return ''
   const value = Number(props.cooldown)
-  return Number.isInteger(value) && value >= 1 && value <= 8760
+  return Number.isInteger(value) && value >= 0 && value <= 8760
     ? ''
-    : t('validation.minmaxNumber', { min: 1, max: 8760 })
+    : t('validation.minmaxNumber', { min: 0, max: 8760 })
 })
 
 const audienceLabel = (item) => t(AUDIENCE_TRANSLATION_KEYS[item.audience])
@@ -273,7 +273,7 @@ onMounted(async () => {
         <Input
           id="campaign-cooldown"
           type="number"
-          min="1"
+          min="0"
           max="8760"
           :model-value="cooldown"
           @update:model-value="emit('update:cooldown', Number($event))"

@@ -50,6 +50,22 @@ func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, conta
 	if _, err := tx.Stmtx(m.q.AssignProactiveTeam).Exec(id, snapshot.TeamID); err != nil {
 		return models.Message{}, m.proactiveError(err)
 	}
+	invitationMeta, _ := json.Marshal(map[string]any{"proactive_sender": snapshot.Sender, "campaign_id": delivery.CampaignID})
+	messages := []models.Message{
+		{Type: models.MessageOutgoing, Status: models.MessageStatusSent, SenderID: snapshot.SenderID, SenderType: models.SenderTypeAgent, Content: snapshot.Message, Meta: invitationMeta},
+		{Type: models.MessageIncoming, Status: models.MessageStatusReceived, SenderID: contactID, SenderType: models.SenderTypeContact, Content: reply},
+	}
+	inlineUUIDs := make([][]string, len(messages))
+	for i := range messages {
+		messages[i].ConversationID = id
+		messages[i].ConversationUUID = uuid
+		messages[i].ContentType = models.ContentTypeText
+		uuids, err := m.InsertMessageTx(tx, &messages[i])
+		if err != nil {
+			return models.Message{}, err
+		}
+		inlineUUIDs[i] = uuids
+	}
 	if _, err := tx.Stmtx(m.q.CompleteCampaignDelivery).Exec(delivery.ID, uuid, contactID); err != nil {
 		return models.Message{}, m.proactiveError(err)
 	}
@@ -59,24 +75,8 @@ func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, conta
 	if item, err := m.GetConversationListItem(uuid); err == nil {
 		m.BroadcastNewConversation(&item)
 	}
-	invitationMeta, _ := json.Marshal(map[string]any{"proactive_sender": snapshot.Sender, "campaign_id": delivery.CampaignID})
-	messages := []models.Message{
-		{Type: models.MessageOutgoing, Status: models.MessageStatusSent, SenderID: snapshot.SenderID, SenderType: models.SenderTypeAgent, Content: snapshot.Message, Meta: invitationMeta},
-		{Type: models.MessageIncoming, Status: models.MessageStatusReceived, SenderID: contactID, SenderType: models.SenderTypeContact, Content: reply},
-	}
 	for i := range messages {
-		messages[i].ConversationID = id
-		messages[i].ConversationUUID = uuid
-		messages[i].ContentType = models.ContentTypeText
-		if err := m.InsertMessage(&messages[i]); err != nil {
-			if err := m.DeleteConversation(uuid); err != nil {
-				m.lo.Error("error deleting proactive conversation after message insert failure", "conversation_uuid", uuid, "error", err)
-			}
-			if _, err := m.q.RevertCampaignDelivery.Exec(delivery.ID); err != nil {
-				m.lo.Error("error reverting campaign delivery after message insert failure", "delivery_id", delivery.ID, "error", err)
-			}
-			return models.Message{}, err
-		}
+		m.AfterMessageInsert(&messages[i], inlineUUIDs[i])
 	}
 	return messages[1], nil
 }

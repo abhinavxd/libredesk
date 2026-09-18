@@ -340,7 +340,8 @@ const showForm = computed(() => preChatFormEnabled.value && sortedFields.value.l
 const formSchema = computed(() => toTypedSchema(createPreChatFormSchema(t, sortedFields.value)))
 
 // Generate initial values dynamically
-const savedFields = { ...chat.preChatDraft.fields }
+const draft = props.handoffMode ? chat.handoffDraft : chat.preChatDraft
+const savedFields = { ...draft.fields }
 const initialValues = computed(() => {
   const values = {}
   sortedFields.value.forEach((field) => {
@@ -364,7 +365,7 @@ const { handleSubmit, values } = useForm({
 watch(
   values,
   (fields) => {
-    chat.preChatDraft.fields = { ...fields }
+    draft.fields = { ...fields }
   },
   { deep: true }
 )
