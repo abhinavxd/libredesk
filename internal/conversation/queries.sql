@@ -929,7 +929,7 @@ WHERE m.conversation_id = (
 AND ($2::boolean IS NULL OR m.private = $2)
 AND ($3::text[] IS NULL OR m.type::text = ANY($3))
 AND (m.meta IS NULL OR NOT COALESCE((m.meta->>'continuity_email')::boolean, false))
-ORDER BY m.created_at DESC %s
+ORDER BY m.created_at DESC, m.id DESC %s
 
 -- name: insert-message
 WITH conversation_id AS (

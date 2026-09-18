@@ -21,6 +21,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	realip "github.com/ferluci/fast-realip"
@@ -260,7 +261,7 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 		"Data": map[string]interface{}{
 			"Title":       helpCenter.PageTitle,
 			"LandingHero": true,
-			"HelpCenter":  helpCenterTemplateData(app, helpCenter, locale),
+			"HelpCenter":  helpCenterTemplateData(app, r, helpCenter, locale),
 			"Tree":        tree.Tree,
 			"Popular":     popular,
 		},
@@ -629,7 +630,7 @@ func handleShowHelpCenterHome(r *fastglue.Request) error {
 		theme           = helpCenterTheme(tree.HelpCenter)
 		metaDescription = firstNonEmpty(tree.HelpCenter.MetaDescription, theme.Header.Heading)
 	)
-	data := helpCenterTemplateData(app, tree.HelpCenter, locale)
+	data := helpCenterTemplateData(app, r, tree.HelpCenter, locale)
 	return renderHelpCenterPage(r, hcPageName(helpCenter, "help-center"), map[string]interface{}{
 		"L": localeI18n(app, locale),
 		"Data": map[string]interface{}{
@@ -683,7 +684,7 @@ func handleShowHelpCenterCollection(r *fastglue.Request) error {
 		root    = helpCenterBaseURL(app, helpCenter)
 		pathFor = func(l string) string { return collectionPath(helpCenter, l, collection.Slug) }
 	)
-	data := helpCenterTemplateData(app, helpCenter, locale)
+	data := helpCenterTemplateData(app, r, helpCenter, locale)
 	return renderHelpCenterPage(r, hcPageName(helpCenter, "help-collection"), map[string]interface{}{
 		"L": localeI18n(app, locale),
 		"Data": map[string]interface{}{
@@ -765,7 +766,7 @@ func handleShowHelpCenterArticle(r *fastglue.Request) error {
 		metaTitle       = firstNonEmpty(article.MetaTitle, fmt.Sprintf("%s - %s", article.Title, helpCenter.Name))
 		ogImage         = absoluteURL(root, publicAssetPaths(app, firstNonEmpty(article.MetaImageURL, helpCenterTheme(helpCenter).LogoURL)))
 	)
-	data := helpCenterTemplateData(app, helpCenter, locale)
+	data := helpCenterTemplateData(app, r, helpCenter, locale)
 	return renderHelpCenterPage(r, hcPageName(helpCenter, "help-article"), map[string]interface{}{
 		"L": localeI18n(app, locale),
 		"Data": map[string]interface{}{
@@ -788,6 +789,7 @@ func handleShowHelpCenterArticle(r *fastglue.Request) error {
 			"Tree":             sidebarTree(app, helpCenter, locale),
 			"ActiveCollection": collection.Slug,
 			"ActiveArticle":    article.Slug,
+			"NoIndex":          isEmbedRequest(r),
 			"Content":          template.HTML(publicAssetPaths(app, stringutil.DeferOffscreenImages(article.Content))),
 		},
 	})
@@ -821,7 +823,7 @@ func handleHelpCenterSearch(r *fastglue.Request) error {
 		}
 	}
 	var (
-		data    = helpCenterTemplateData(app, helpCenter, locale)
+		data    = helpCenterTemplateData(app, r, helpCenter, locale)
 		lcl     = localeI18n(app, locale)
 		pathFor = func(l string) string { return searchPath(helpCenter, l) }
 	)
@@ -1171,14 +1173,21 @@ func cacheHCPage(h fastglue.FastRequestHandler, noIndex bool) fastglue.FastReque
 			}
 			r.RequestCtx.Response.Header.Set("X-Cache", status)
 			r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
-			r.RequestCtx.Response.Header.Set("X-Frame-Options", "SAMEORIGIN")
+			if !isEmbedRequest(r) {
+				r.RequestCtx.Response.Header.Set("X-Frame-Options", "SAMEORIGIN")
+			}
 			r.RequestCtx.Response.Header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-			if noIndex || isMarkdownRequest(r) {
+			if noIndex || isEmbedRequest(r) || isMarkdownRequest(r) {
 				r.RequestCtx.Response.Header.Set("X-Robots-Tag", noIndexHeader)
 			}
 		}
 		return err
 	}
+}
+
+// isEmbedRequest reports whether the page is framed by the chat widget.
+func isEmbedRequest(r *fastglue.Request) bool {
+	return string(r.RequestCtx.QueryArgs().Peek("embed")) == "1"
 }
 
 func isMarkdownRequest(r *fastglue.Request) bool {
@@ -1696,7 +1705,7 @@ func sidebarTree(app *App, hc hcmodels.HelpCenter, locale string) []hcmodels.Tre
 }
 
 // helpCenterTemplateData shapes a help center row for the public templates.
-func helpCenterTemplateData(app *App, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
+func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
 	theme := helpCenterTheme(hc)
 	theme.Favicon = publicAssetPaths(app, theme.Favicon)
 	theme.Header.BackgroundImage = publicAssetPaths(app, theme.Header.BackgroundImage)
@@ -1728,7 +1737,21 @@ func helpCenterTemplateData(app *App, hc hcmodels.HelpCenter, locale string) map
 		"AnnouncementHTML":  template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text)),
 		"CustomCSS":         template.CSS(hc.CustomCSS),
 		"CustomJS":          template.JS(hc.CustomJS),
+		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
+		"WidgetRootURL":     helpCenterRootURL(app),
+		"Embed":             isEmbedRequest(r),
 	}
+}
+
+func livechatWidgetInboxUUID(app *App, hc hcmodels.HelpCenter) string {
+	if !hc.LivechatInboxID.Valid {
+		return ""
+	}
+	inb, err := app.inbox.GetDBRecord(hc.LivechatInboxID.Int)
+	if err != nil || !inb.Enabled || inb.Channel != livechat.ChannelLiveChat {
+		return ""
+	}
+	return inb.UUID
 }
 
 // announcementKey keys the dismissal on help center and content, so an edited announcement reappears for visitors who dismissed the old one.
@@ -1806,7 +1829,7 @@ func renderHelpCenterStatusPage(r *fastglue.Request, hc *hcmodels.HelpCenter, st
 		if !ok {
 			locale = helpCenter.DefaultLocale
 		}
-		data := helpCenterTemplateData(app, helpCenter, locale)
+		data := helpCenterTemplateData(app, r, helpCenter, locale)
 		lcl := localeI18n(app, locale)
 		r.RequestCtx.Response.Header.Set("X-Robots-Tag", noIndexHeader)
 		rerr := app.tmpl.RenderWebPage(r.RequestCtx, hcPageName(helpCenter, "help-notfound"), map[string]interface{}{
@@ -1850,6 +1873,15 @@ func validateHelpCenter(app *App, req *helpcenter.HelpCenterRequest) error {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`page_title`"), nil)
 	}
 	req.Theme = json.RawMessage(publicAssetPaths(app, string(req.Theme)))
+	if req.LivechatInboxID.Valid {
+		inb, err := app.inbox.GetDBRecord(req.LivechatInboxID.Int)
+		if err != nil {
+			return err
+		}
+		if inb.Channel != livechat.ChannelLiveChat {
+			return envelope.NewError(envelope.InputError, app.i18n.T("helpCenter.invalidLivechatInbox"), nil)
+		}
+	}
 	return nil
 }
 
@@ -1988,7 +2020,7 @@ func renderHelpCenterArticlePreview(r *fastglue.Request, helpCenter hcmodels.Hel
 		"Data": map[string]interface{}{
 			"Title":         article.Title,
 			"ModifiedTime":  article.UpdatedAt.Format(time.RFC3339),
-			"HelpCenter":    helpCenterTemplateData(app, helpCenter, locale),
+			"HelpCenter":    helpCenterTemplateData(app, r, helpCenter, locale),
 			"Article":       article,
 			"AuthorInitial": authorInitial(article),
 			"Collection":    collection,

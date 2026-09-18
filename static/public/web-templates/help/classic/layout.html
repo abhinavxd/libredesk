@@ -1,4 +1,6 @@
-{{ define "classic-header" }}
+{{ define "classic-header" }}{{ if .Data.HelpCenter.Embed }}{{ template "hc-embed-open" . }}{{ else }}{{ template "classic-site-header" . }}{{ end }}{{ end }}
+
+{{ define "classic-site-header" }}
 {{ template "hc-head" . }}
 <body>
     <a class="hc-skip-link" href="#hc-main">{{ .L.T "helpCenter.skipToContent" }}</a>
@@ -34,7 +36,9 @@
     <main id="hc-main" tabindex="-1">
 {{ end }}
 
-{{ define "classic-footer" }}
+{{ define "classic-footer" }}{{ if .Data.HelpCenter.Embed }}{{ template "hc-embed-close" . }}{{ else }}{{ template "classic-site-footer" . }}{{ end }}{{ end }}
+
+{{ define "classic-site-footer" }}
     </main>
     <footer class="hc-footer">
         <div class="hc-footer-inner">

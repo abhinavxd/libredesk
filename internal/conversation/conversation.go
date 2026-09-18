@@ -535,6 +535,7 @@ func (c *Manager) GetContactUnreadPreviewMessages(contactID, inboxID, limit int)
 		}
 		author.Email = null.String{}
 		previews = append(previews, models.ChatMessage{
+			ID:               message.ID,
 			UUID:             message.UUID,
 			Status:           message.Status,
 			ConversationUUID: message.ConversationUUID,
@@ -2133,6 +2134,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 			author.Email = null.String{}
 
 			chatMessages = append(chatMessages, models.ChatMessage{
+				ID:               msg.ID,
 				UUID:             msg.UUID,
 				Status:           msg.Status,
 				CreatedAt:        msg.CreatedAt,

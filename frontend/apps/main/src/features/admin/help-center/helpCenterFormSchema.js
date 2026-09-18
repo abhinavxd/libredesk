@@ -96,6 +96,7 @@ const createBaseSchema = (t) => {
         t('helpCenter.invalidCustomDomain')
       )
       .optional(),
+    livechat_inbox_id: z.string().optional(),
     custom_css: z.string().optional(),
     custom_js: z.string().optional(),
     default_locale: z

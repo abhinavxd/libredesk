@@ -142,12 +142,6 @@ const searchHelp = (q, locale) =>
   http.get('/api/v1/widget/chat/help/search', { params: { q, locale } })
 const getHelpArticle = (slug, locale) =>
   http.get(`/api/v1/widget/chat/help/articles/${encodeURIComponent(slug)}`, { params: { locale } })
-const sendHelpFeedback = (helpSlug, slug, locale, helpful) =>
-  http.post(
-    `/api/v1/public/help-centers/${encodeURIComponent(helpSlug)}/articles/${encodeURIComponent(slug)}/feedback`,
-    { helpful },
-    { params: { locale } }
-  )
 const sendChatMessage = (uuid, data) =>
   http.post(`/api/v1/widget/chat/conversations/${uuid}/message`, data)
 const submitHandoffForm = (uuid, formData) =>
@@ -190,7 +184,6 @@ export default {
   getHelp,
   searchHelp,
   getHelpArticle,
-  sendHelpFeedback,
   sendChatMessage,
   submitHandoffForm,
   closeChatConversation,

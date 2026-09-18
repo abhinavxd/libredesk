@@ -89,3 +89,82 @@
     {{ range . }}{{ if .Avatar }}<img class="hc-avatar" src="{{ .Avatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial" aria-hidden="true">{{ printf "%.1s" .Name }}</span>{{ end }}{{ end }}
 </span>
 {{ end }}
+
+{{ define "hc-embed-open" }}
+{{ template "hc-head" . }}
+<body class="hc-embed{{ if eq .Data.HelpCenter.Template "docs" }} hcd{{ end }}">
+    <main id="hc-main">
+{{ end }}
+
+{{ define "hc-embed-close" }}
+    </main>
+    {{ if gt (len .Data.LocaleLinks) 1 }}
+    <div class="hc-embed-langs">
+        <label for="hc-embed-lang">{{ .L.T "globals.terms.language" }}</label>
+        <select id="hc-embed-lang">
+            {{ range .Data.LocaleLinks }}<option value="{{ .Path }}"{{ if eq .Locale $.Data.HelpCenter.CurrentLocale }} selected{{ end }}>{{ .Locale }}</option>{{ end }}
+        </select>
+    </div>
+    {{ end }}
+    <a class="hc-embed-open" data-hc-embed-exit href="{{ .Data.HelpCenter.BaseURL }}{{ if .Data.CanonicalPath }}{{ .Data.CanonicalPath }}{{ else }}{{ .Data.HelpCenter.BasePath }}{{ end }}" target="_blank" rel="noopener noreferrer">
+        {{ .L.T "widget.openInHelpCenter" }}
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+    </a>
+    <script>
+    (function () {
+        var embedded = function (href) {
+            var url = new URL(href, location.href);
+            url.searchParams.set('embed', '1');
+            return url.href;
+        };
+
+        var select = document.getElementById('hc-embed-lang');
+        if (select) select.addEventListener('change', function () { location.href = embedded(select.value); });
+
+        // Navigating to a page without embed=1 would show the full site inside the widget panel.
+        var keepEmbedded = function () {
+            document.querySelectorAll('a[href]:not([data-hc-embed-exit])').forEach(function (link) {
+                var href = link.getAttribute('href');
+                if (!href || href.charAt(0) === '#' || /^[a-z]+:/i.test(href) && !/^https?:/i.test(href)) return;
+                var url = new URL(link.href, location.href);
+                if (url.origin !== location.origin) {
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    return;
+                }
+                if (url.searchParams.get('embed') !== '1') link.href = embedded(link.href);
+            });
+        };
+        keepEmbedded();
+        new MutationObserver(keepEmbedded).observe(document.body, { childList: true, subtree: true });
+
+        var last = 0;
+        var report = function () {
+            var height = Math.ceil(document.body.getBoundingClientRect().height);
+            if (height === last) return;
+            last = height;
+            parent.postMessage({ source: 'libredesk-hc-embed', type: 'height', height: height }, '*');
+        };
+        parent.postMessage({ source: 'libredesk-hc-embed', type: 'loaded' }, '*');
+        new ResizeObserver(report).observe(document.body);
+        report();
+    })();
+    </script>
+    {{ if .Data.HelpCenter.CustomJS }}<script>{{ .Data.HelpCenter.CustomJS }}</script>{{ end }}
+</body>
+</html>
+{{ end }}
+
+{{ define "hc-livechat-widget" }}
+{{ if .Data.HelpCenter.WidgetInboxUUID }}
+<script>
+(function () {
+    window.LibredeskSettings = { baseURL: {{ .Data.HelpCenter.WidgetRootURL }}, inboxID: {{ .Data.HelpCenter.WidgetInboxUUID }} };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = {{ .Data.HelpCenter.WidgetRootURL }} + '/widget.js';
+    document.head.appendChild(s);
+})();
+</script>
+{{ end }}
+{{ end }}

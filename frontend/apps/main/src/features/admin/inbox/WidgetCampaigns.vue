@@ -494,7 +494,6 @@ onMounted(async () => {
               id="campaign-sender"
               :model-value="campaign.sender_id === 0 ? 'brand' : String(campaign.sender_id)"
               :prepend-items="[{ value: 'brand', label: t('widget.brandBot') }]"
-              exclude-ai-assistants
               @update:model-value="update('sender_id', $event === 'brand' ? 0 : Number($event))"
             />
           </div>

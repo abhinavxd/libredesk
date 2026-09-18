@@ -1,4 +1,6 @@
-{{ define "docs-header" }}
+{{ define "docs-header" }}{{ if .Data.HelpCenter.Embed }}{{ template "hc-embed-open" . }}{{ else }}{{ template "docs-site-header" . }}{{ end }}{{ end }}
+
+{{ define "docs-site-header" }}
 {{ template "hc-head" . }}
 <body class="hcd">
     <a class="hc-skip-link" href="#hc-main">{{ .L.T "helpCenter.skipToContent" }}</a>
@@ -85,7 +87,9 @@
 </div>
 {{ end }}
 
-{{ define "docs-footer" }}
+{{ define "docs-footer" }}{{ if .Data.HelpCenter.Embed }}{{ template "hc-embed-close" . }}{{ else }}{{ template "docs-site-footer" . }}{{ end }}{{ end }}
+
+{{ define "docs-site-footer" }}
         </main>
     </div>
     <footer class="hcd-footer">

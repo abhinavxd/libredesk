@@ -40,6 +40,31 @@
             </FormItem>
           </FormField>
 
+          <FormField v-slot="{ componentField }" name="livechat_inbox_id">
+            <FormItem>
+              <FormLabel>{{ t('helpCenter.livechatInbox') }}</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="t('placeholders.selectInbox')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{{ t('globals.terms.none') }}</SelectItem>
+                    <SelectItem
+                      v-for="option in inboxStore.livechatOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormDescription>{{ t('helpCenter.livechatInboxHint') }}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
           <FormField v-slot="{ componentField }" name="page_title">
             <FormItem>
               <FormLabel>{{ t('helpCenter.pageTitle') }}</FormLabel>
@@ -659,6 +684,7 @@ import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import CollapsibleSection from './CollapsibleSection.vue'
 import LinkListField from './LinkListField.vue'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
+import { useInboxStore } from '@/stores/inbox'
 import { createHelpCenterFormSchema } from './helpCenterFormSchema.js'
 import api from '@/api'
 import { useI18n } from 'vue-i18n'
@@ -699,6 +725,7 @@ const props = defineProps({
 const emit = defineEmits(['cancel', 'change'])
 
 const { t } = useI18n()
+const inboxStore = useInboxStore()
 
 const submitLabel = computed(() =>
   props.helpCenter ? t('globals.messages.update') : t('globals.messages.create')
@@ -719,6 +746,7 @@ const toFormValues = (hc) => ({
   slug: hc?.slug || '',
   template: hc?.template === 'docs' ? 'docs' : 'classic',
   custom_domain: hc?.custom_domain || '',
+  livechat_inbox_id: hc?.livechat_inbox_id ? String(hc.livechat_inbox_id) : 'none',
   page_title: hc?.page_title || '',
   meta_description: hc?.meta_description || '',
   custom_css: hc?.custom_css || '',
@@ -839,6 +867,10 @@ const toPayload = (values) => {
   const payload = JSON.parse(JSON.stringify(values))
   const allowed = cleanLocales(payload.allowed_locales)
   payload.allowed_locales = allowed.length ? allowed : ['en']
+  payload.livechat_inbox_id =
+    payload.livechat_inbox_id && payload.livechat_inbox_id !== 'none'
+      ? Number(payload.livechat_inbox_id)
+      : null
   if (payload.theme?.layout) {
     payload.theme.layout.columns = Number(payload.theme.layout.columns) || 2
   }

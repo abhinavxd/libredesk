@@ -685,6 +685,7 @@ CREATE TABLE help_centers (
 	theme JSONB NOT NULL DEFAULT '{}',
 	custom_domain TEXT NOT NULL DEFAULT '',
 	template TEXT NOT NULL DEFAULT 'classic',
+	livechat_inbox_id INTEGER NULL REFERENCES inboxes(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_help_centers_on_template CHECK (template IN ('docs', 'classic'))
 );
 

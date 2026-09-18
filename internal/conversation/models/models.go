@@ -103,6 +103,7 @@ type ChatConversation struct {
 }
 
 type ChatMessage struct {
+	ID               int                    `json:"id"`
 	UUID             string                 `json:"uuid"`
 	Status           string                 `json:"status"`
 	ConversationUUID string                 `json:"conversation_uuid"`

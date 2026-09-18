@@ -1,66 +1,49 @@
 <script setup>
-import { computed, ref, onUnmounted } from 'vue'
-import articleCSS from '@public-static/article-content.css?raw'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-const props = defineProps({ article: { type: Object, required: true }, helpSlug: { type: String, required: true }, dark: Boolean })
-const emit = defineEmits(['article'])
-const frame = ref(null)
-const height = ref('0px')
-let observer = null
-const documentHTML = computed(() => {
-  const doc = document.implementation.createHTMLDocument(props.article.title)
-  const policy = doc.createElement('meta')
-  policy.httpEquiv = 'Content-Security-Policy'
-  policy.content = "default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; font-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
-  doc.head.append(policy)
-  const style = doc.createElement('style')
-  style.textContent = `${articleCSS}\nbody{margin:0;padding:16px;font:14px/1.6 system-ui;overflow-wrap:anywhere}html{overflow:hidden}img{max-width:100%}a{color:inherit}table{display:block;overflow:auto}.hc-prose pre{background:var(--hc-accent-tint);color:inherit}.hc-callout{background:var(--hc-accent-tint);color:inherit}`
-  doc.head.append(style)
-  doc.body.className = 'hc-prose'
-  doc.body.innerHTML = props.article.content
-  for (const element of doc.querySelectorAll('script,iframe,object,embed,form,base,meta,link,style')) {
-    if (!doc.head.contains(element)) element.remove()
-  }
-  for (const element of doc.body.querySelectorAll('*')) {
-    for (const attr of [...element.attributes]) {
-      if (attr.name.startsWith('on') || attr.name === 'srcdoc') element.removeAttribute(attr.name)
-    }
-    for (const attr of ['href', 'src']) {
-      const value = element.getAttribute(attr)
-      if (!value || value.startsWith('#')) continue
-      let url
-      try { url = new URL(value, window.location.origin) } catch { element.removeAttribute(attr); continue }
-      if (!['https:', 'http:', 'mailto:'].includes(url.protocol)) element.removeAttribute(attr)
-      else element.setAttribute(attr, url.href)
-    }
-  }
-  return '<!doctype html>' + doc.documentElement.outerHTML
+const props = defineProps({
+  article: { type: Object, required: true },
+  baseUrl: { type: String, required: true }
 })
-const loaded = () => {
-  const doc = frame.value.contentDocument
-  if (!doc) return
-  const theme = getComputedStyle(frame.value)
-  doc.body.style.color = theme.color
-  doc.body.style.background = theme.backgroundColor
-  observer?.disconnect()
-  observer = new ResizeObserver(() => { height.value = `${doc.documentElement.scrollHeight}px` })
-  observer.observe(doc.body)
-  for (const [target, source] of Object.entries({ '--hc-border': '--border', '--hc-accent': '--primary', '--hc-accent-ink': '--primary', '--hc-accent-tint': '--muted', '--hc-muted': '--muted-foreground' })) {
-    doc.documentElement.style.setProperty(target, `hsl(${theme.getPropertyValue(source)})`)
+
+const height = ref('100%')
+
+const src = computed(
+  () =>
+    `${props.baseUrl}/${encodeURIComponent(props.article.locale)}/articles/${encodeURIComponent(props.article.slug)}?embed=1`
+)
+
+const frameOrigin = computed(() => {
+  try {
+    return new URL(props.baseUrl, window.location.origin).origin
+  } catch {
+    return ''
   }
-  doc.addEventListener('click', event => {
-    const link = event.target.closest('a[href]')
-    if (!link || link.getAttribute('href').startsWith('#')) return
-    event.preventDefault()
-    const url = new URL(link.href)
-    const match = url.pathname.match(/^\/hc\/([^/]+)\/([^/]+)\/articles\/([^/]+)$/)
-    if (url.origin === window.location.origin && match?.[1] === props.helpSlug) emit('article', { slug: decodeURIComponent(match[3]), locale: decodeURIComponent(match[2]) })
-    else window.open(url.href, '_blank', 'noopener,noreferrer')
-  })
+})
+
+const frame = ref(null)
+
+const onMessage = (event) => {
+  if (event.origin !== frameOrigin.value || event.data?.source !== 'libredesk-hc-embed') return
+  if (event.data.type === 'loaded') {
+    height.value = '100%'
+    frame.value?.parentElement?.scrollTo({ top: 0 })
+  } else if (event.data.type === 'height' && Number.isFinite(event.data.height)) {
+    height.value = `${event.data.height}px`
+  }
 }
-onUnmounted(() => observer?.disconnect())
+
+onMounted(() => window.addEventListener('message', onMessage))
+onUnmounted(() => window.removeEventListener('message', onMessage))
 </script>
 
 <template>
-  <iframe ref="frame" :key="`${article.id}-${dark}`" :title="article.title" :srcdoc="documentHTML" sandbox="allow-same-origin" scrolling="no" class="block w-full border-0 bg-background text-foreground" :style="{ height }" @load="loaded" />
+  <iframe
+    ref="frame"
+    :key="src"
+    :src="src"
+    :title="article.title"
+    class="block w-full border-0"
+    :style="{ height }"
+  />
 </template>

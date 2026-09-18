@@ -3,6 +3,8 @@ package models
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/volatiletech/null/v9"
 )
 
 const (
@@ -29,6 +31,7 @@ type HelpCenter struct {
 	Theme           json.RawMessage `db:"theme" json:"theme"`
 	CustomDomain    string          `db:"custom_domain" json:"custom_domain"`
 	Template        string          `db:"template" json:"template"`
+	LivechatInboxID null.Int        `db:"livechat_inbox_id" json:"livechat_inbox_id"`
 }
 
 // Theme holds the customizable branding for a help center's public pages.

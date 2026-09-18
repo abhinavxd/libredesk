@@ -27,8 +27,8 @@
             this.EXPANDED_WIDTH = '750px';
             this.MOBILE_BREAKPOINT = 600;
             this.LAUNCHER_SIZE = 60;
-            this.MOBILE_LAUNCHER_SIZE = 68;
-            this.CAMPAIGN_POLL_MIN = 5;
+            this.MOBILE_LAUNCHER_SIZE = 60;
+            this.CAMPAIGN_POLL_MIN = 2;
             this.CAMPAIGN_POLL_MAX = 60;
 
             this.config = config;

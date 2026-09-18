@@ -12,7 +12,7 @@
       </Button>
       <ChatTitle />
     </div>
-    <div class="flex items-center gap-2 ml-auto">
+    <div class="flex items-center gap-2 ml-auto" :class="{ 'mr-12': widgetStore.isMobileFullScreen }">
       <DropdownMenu v-if="!widgetStore.isMobileFullScreen || canDownloadTranscript">
         <DropdownMenuTrigger as-child>
           <Button type="button" variant="ghost" size="sm" :aria-label="$t('globals.terms.more')">

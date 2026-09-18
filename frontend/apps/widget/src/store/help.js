@@ -16,8 +16,6 @@ export const useHelpStore = defineStore('help', () => {
   const collectionPath = ref([])
   const navigationHistory = ref([])
   const article = ref(null)
-  const feedback = ref({})
-  const feedbackPending = ref({})
   const scrollTop = ref(0)
   const pendingArticle = ref(null)
   const focusSearch = ref(false)
@@ -49,23 +47,8 @@ export const useHelpStore = defineStore('help', () => {
     query.value = ''
     results.value = null
     article.value = null
-    feedback.value = {}
-    feedbackPending.value = {}
     collectionPath.value = []
     navigationHistory.value = []
-  }
-  const vote = async (helpful) => {
-    const target = article.value
-    if (!target || feedback.value[target.id] !== undefined || feedbackPending.value[target.id])
-      return
-    const currentIdentity = identity.value
-    feedbackPending.value[target.id] = true
-    try {
-      await api.sendHelpFeedback(data.value.slug, target.slug, target.locale, helpful)
-      if (identity.value === currentIdentity) feedback.value[target.id] = helpful
-    } finally {
-      if (identity.value === currentIdentity) delete feedbackPending.value[target.id]
-    }
   }
   const load = async (locale) => {
     const request = ++generation
@@ -91,9 +74,6 @@ export const useHelpStore = defineStore('help', () => {
     focusSearch,
     expandArticles,
     setExpandArticles,
-    feedback,
-    feedbackPending,
-    vote,
     navigationHistory,
     pendingArticle,
     identity,

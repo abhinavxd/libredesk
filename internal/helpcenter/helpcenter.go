@@ -23,6 +23,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/microcosm-cc/bluemonday"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -107,6 +108,7 @@ type HelpCenterRequest struct {
 	Theme           json.RawMessage `json:"theme"`
 	CustomDomain    string          `json:"custom_domain"`
 	Template        string          `json:"template"`
+	LivechatInboxID null.Int        `json:"livechat_inbox_id"`
 }
 
 type CollectionRequest struct {
@@ -292,7 +294,7 @@ func (m *Manager) CreateHelpCenter(req HelpCenterRequest) (models.HelpCenter, er
 	if err := m.validateCustomDomain(req.CustomDomain, 0); err != nil {
 		return hc, err
 	}
-	if err := m.q.InsertHelpCenter.Get(&hc, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template); err != nil {
+	if err := m.q.InsertHelpCenter.Get(&hc, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template, req.LivechatInboxID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return hc, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}
@@ -322,6 +324,7 @@ func (m *Manager) DraftHelpCenter(id int, req HelpCenterRequest) (models.HelpCen
 	hc.Theme = req.Theme
 	hc.CustomDomain = req.CustomDomain
 	hc.Template = req.Template
+	hc.LivechatInboxID = req.LivechatInboxID
 	return hc, nil
 }
 
@@ -347,7 +350,7 @@ func (m *Manager) UpdateHelpCenter(id int, req HelpCenterRequest) (models.HelpCe
 	if err := m.validateCustomDomain(req.CustomDomain, id); err != nil {
 		return hc, err
 	}
-	if err := m.q.UpdateHelpCenter.Get(&hc, id, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template); err != nil {
+	if err := m.q.UpdateHelpCenter.Get(&hc, id, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template, req.LivechatInboxID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return hc, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}

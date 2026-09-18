@@ -1,32 +1,32 @@
 -- name: get-all-help-centers
-SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template
+SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template, livechat_inbox_id
 FROM help_centers
 ORDER BY created_at DESC;
 
 -- name: get-active-help-centers
-SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template
+SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template, livechat_inbox_id
 FROM help_centers
 WHERE is_active = true
 ORDER BY created_at DESC;
 
 -- name: get-help-center-by-id
-SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template
+SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template, livechat_inbox_id
 FROM help_centers
 WHERE id = $1;
 
 -- name: get-help-center-by-slug
-SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template
+SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template, livechat_inbox_id
 FROM help_centers
 WHERE slug = $1 AND is_active = true;
 
 -- name: insert-help-center
-INSERT INTO help_centers (name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, theme, custom_domain, template)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO help_centers (name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, theme, custom_domain, template, livechat_inbox_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: update-help-center
 UPDATE help_centers
-SET name = $2, slug = $3, page_title = $4, meta_description = $5, custom_css = $6, custom_js = $7, default_locale = $8, allowed_locales = $9, theme = $10, custom_domain = $11, template = $12, updated_at = NOW()
+SET name = $2, slug = $3, page_title = $4, meta_description = $5, custom_css = $6, custom_js = $7, default_locale = $8, allowed_locales = $9, theme = $10, custom_domain = $11, template = $12, livechat_inbox_id = $13, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 

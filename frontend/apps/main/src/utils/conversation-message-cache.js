@@ -46,7 +46,7 @@ export default class MessageCache {
 
     getAllPagesMessages (convId) {
         return this._allMessages(convId)
-            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || (a.id || 0) - (b.id || 0))
     }
 
     getLatestMessage (convId, type = [], excludePrivate = false, excludeAutomated = false) {
@@ -56,7 +56,7 @@ export default class MessageCache {
             if (excludeAutomated && msg.meta?.is_automated) return false
             return true
         })
-        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || (b.id || 0) - (a.id || 0))
         return filtered.length ? filtered[0] : null
     }
 
