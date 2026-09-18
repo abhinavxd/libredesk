@@ -1006,7 +1006,7 @@ CREATE TABLE widget_campaign_deliveries (
     inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
     browser_key UUID NOT NULL,
     session_key UUID NOT NULL,
-    contact_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    contact_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
     snapshot JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     displayed BOOLEAN NOT NULL DEFAULT FALSE,
