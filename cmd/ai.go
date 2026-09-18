@@ -370,16 +370,19 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		transcript = conversationTranscript(app, req.ConversationUUID)
 	}
 	toolIDs := []int(nil)
-	tctx := ai.ToolContext{Verified: func() bool { return true }}
+	tctx := ai.ToolContext{}
 	scope := ai.AgentRunScope{AgentID: auser.ID, Surface: aimodels.ToolInvocationReply}
 	if conv != nil {
 		toolIDs, err = app.ai.GetEnabledGenerateReplyToolIDs()
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		tctx = agentToolContext(conv)
+		tctx = agentToolContext(app, conv)
 		scope.ConversationID = conv.ID
 		scope.ConversationUUID = conv.UUID
+		// The draft surface keeps no history, so a reload leaves the agent no way to answer an
+		// earlier request; the newest one replaces it.
+		app.ai.ClearPendingAgentRuns(scope)
 	}
 	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, tctx, generateReplyTools(app, user, conv), toolIDs, scope)
 	if err != nil {
@@ -504,7 +507,7 @@ func handleAICopilot(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	convoContext := conversationTranscript(app, req.ConversationUUID)
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, agentToolContext(conv), copilotTools(app, user, conv), persona, toolIDs, scope)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, agentToolContext(app, conv), copilotTools(app, user, conv), persona, toolIDs, scope)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -649,7 +652,7 @@ func decideAIToolRun(r *fastglue.Request, approved bool) (aimodels.AgentRunResul
 	return resp, nil
 }
 
-func agentToolContext(conv *cmodels.Conversation) ai.ToolContext {
+func agentToolContext(app *App, conv *cmodels.Conversation) ai.ToolContext {
 	return ai.ToolContext{
 		ContactID:         conv.Contact.ID,
 		ContactExternalID: conv.Contact.ExternalUserID.String,
@@ -657,6 +660,6 @@ func agentToolContext(conv *cmodels.Conversation) ai.ToolContext {
 		ConversationUUID:  conv.UUID,
 		InboxID:           conv.InboxID,
 		ContactEmail:      func() string { return conv.Contact.Email.String },
-		Verified:          func() bool { return true },
+		Verified:          func() bool { return app.aiAgent.IsContactVerified(*conv) },
 	}
 }

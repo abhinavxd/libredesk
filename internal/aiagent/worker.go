@@ -273,14 +273,8 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	m.lo.Debug("ai agent running", "conversation_uuid", conv.UUID, "history_messages", len(history), "turns", turns)
 
-	// A JWT livechat contact is trusted by login; everyone else (email channel, anonymous visitor)
-	// is trusted only within an OTP verification window. Read live so mid-turn verification counts.
-	verified := func() bool {
-		if conv.InboxChannel != channelEmail && conv.Contact.Type == umodels.UserTypeContact {
-			return true
-		}
-		return m.isConversationVerified(conv.UUID, conv.Contact.Email.String)
-	}
+	// Read live so mid-turn verification counts.
+	verified := func() bool { return m.IsContactVerified(conv) }
 	// Snapshot for the run-start registration decisions (one Redis read); tctx still gets the live
 	// closure so mid-turn verification is picked up per tool call.
 	runVerified := verified()
