@@ -53,6 +53,7 @@ func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imode
 			if err != nil {
 				return sendErrorEnvelope(r, err)
 			}
+			visitor = true
 		}
 		if err := canReply(r, conversation); err != nil {
 			return sendErrorEnvelope(r, err)
@@ -67,6 +68,7 @@ func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imode
 			if err != nil {
 				return sendErrorEnvelope(r, err)
 			}
+			visitor = true
 		} else {
 			attrs = saveContactAttrsAndCollectConvoAttrs(app, contact.ID, nil, req.FormData, config)
 		}
