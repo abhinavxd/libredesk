@@ -1,6 +1,31 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestValidateQuickReplies(t *testing.T) {
+	app := newValidatorTestApp(t)
+	tests := []struct {
+		name    string
+		replies []string
+		wantErr bool
+	}{
+		{name: "unicode limit", replies: []string{strings.Repeat("界", 120)}},
+		{name: "unicode over limit", replies: []string{strings.Repeat("界", 121)}, wantErr: true},
+		{name: "blank", replies: []string{"  "}, wantErr: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateQuickReplies(app, tc.replies)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("got error %v, want error %v", err, tc.wantErr)
+			}
+		})
+	}
+}
 
 func TestValidateLiveChatSessionDuration(t *testing.T) {
 	app := newValidatorTestApp(t)

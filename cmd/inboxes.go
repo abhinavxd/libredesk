@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/httputil"
@@ -360,7 +361,10 @@ func validateQuickReplies(app *App, replies []string) error {
 		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.livechat.quickReplies.limit"), nil)
 	}
 	for _, reply := range replies {
-		if strings.TrimSpace(reply) == "" || len(reply) > 120 {
+		if strings.TrimSpace(reply) == "" {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "quick reply"), nil)
+		}
+		if utf8.RuneCountInString(reply) > 120 {
 			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.maxLength", "max", "120"), nil)
 		}
 	}
