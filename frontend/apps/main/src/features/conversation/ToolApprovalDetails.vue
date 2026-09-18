@@ -11,7 +11,7 @@
       </i18n-t>
     </p>
     <div class="space-y-1">
-      <p class="text-xs font-medium text-foreground">{{ $t('ai.toolApprovalArguments') }}</p>
+      <p class="text-xs font-medium text-foreground">{{ $t('globals.terms.arguments') }}</p>
       <pre
         class="max-h-60 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs text-foreground [overflow-wrap:anywhere]"
         >{{ formattedArguments }}</pre

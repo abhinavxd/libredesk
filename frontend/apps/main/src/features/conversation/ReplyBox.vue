@@ -16,10 +16,10 @@
           :disabled="isGenerating"
           @click="resolveGenerateToolApproval(false)"
         >
-          {{ $t('ai.toolApprovalDecline') }}
+          {{ $t('globals.messages.decline') }}
         </Button>
         <Button type="button" :disabled="isGenerating" @click="resolveGenerateToolApproval(true)">
-          {{ $t('ai.toolApprovalApprove') }}
+          {{ $t('globals.messages.approveAndRun') }}
         </Button>
       </AlertDialogFooter>
     </AlertDialogContent>

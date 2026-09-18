@@ -97,7 +97,7 @@
                 :disabled="isThinking"
                 @click="resolveToolApproval(msg.approval, false)"
               >
-                {{ $t('ai.toolApprovalDecline') }}
+                {{ $t('globals.messages.decline') }}
               </Button>
               <Button
                 type="button"
@@ -105,7 +105,7 @@
                 :disabled="isThinking"
                 @click="resolveToolApproval(msg.approval, true)"
               >
-                {{ $t('ai.toolApprovalApprove') }}
+                {{ $t('globals.messages.approveAndRun') }}
               </Button>
             </div>
           </div>
