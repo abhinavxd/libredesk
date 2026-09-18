@@ -124,6 +124,33 @@ func TestAgentToolDecisionIsFinalWhenFollowUpFails(t *testing.T) {
 	}
 }
 
+func TestSecondRunInSameScopeIsRejectedWhileOneAwaitsApproval(t *testing.T) {
+	m := newTestManager(t)
+	tool := &approvalTestTool{}
+	scope := AgentRunScope{AgentID: 7, ConversationID: 9, ConversationUUID: "conversation-1", Surface: models.ToolInvocationCopilot}
+	newRun := func() *pendingAgentRun {
+		return &pendingAgentRun{
+			Scope: scope,
+			Client: &approvalTestProvider{responses: []models.ChatCompletionResult{
+				{ToolCalls: []models.ToolCall{{ID: "call-1", Type: "function", Function: models.ToolCallFunction{Name: tool.Name(), Arguments: `{}`}}}},
+			}},
+			Registry:  map[string]Tool{tool.Name(): tool},
+			MaxSteps:  5,
+			Approvals: true,
+		}
+	}
+
+	if _, err := m.continueAgentRun(t.Context(), newRun()); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	if _, err := m.continueAgentRun(t.Context(), newRun()); err == nil {
+		t.Fatal("expected the second run in the same scope to be rejected")
+	}
+	if len(m.pendingRuns) != 1 {
+		t.Fatalf("expected one pending run, got %d", len(m.pendingRuns))
+	}
+}
+
 func (t *approvalTestTool) approvalRequired() bool { return true }
 
 func (t *approvalTestTool) toolID() int { return 1 }

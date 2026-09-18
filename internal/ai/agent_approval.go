@@ -118,7 +118,11 @@ func (m *Manager) ClearPendingAgentRuns(scope AgentRunScope) {
 }
 
 func (m *Manager) continueAgentRun(ctx context.Context, run *pendingAgentRun) (models.AgentRunResult, error) {
-	if result := m.processAgentToolCalls(ctx, run); result != nil {
+	result, err := m.processAgentToolCalls(ctx, run)
+	if err != nil {
+		return models.AgentRunResult{}, err
+	}
+	if result != nil {
 		return *result, nil
 	}
 	for run.Step < run.MaxSteps {
@@ -136,7 +140,11 @@ func (m *Manager) continueAgentRun(ctx context.Context, run *pendingAgentRun) (m
 		run.ToolCalls = res.ToolCalls
 		run.NextToolCall = 0
 		run.Step++
-		if result := m.processAgentToolCalls(ctx, run); result != nil {
+		result, err := m.processAgentToolCalls(ctx, run)
+		if err != nil {
+			return models.AgentRunResult{}, err
+		}
+		if result != nil {
 			return *result, nil
 		}
 	}
@@ -153,7 +161,7 @@ func (m *Manager) continueAgentRun(ctx context.Context, run *pendingAgentRun) (m
 	return completedAgentRun(res.Content), nil
 }
 
-func (m *Manager) processAgentToolCalls(ctx context.Context, run *pendingAgentRun) *models.AgentRunResult {
+func (m *Manager) processAgentToolCalls(ctx context.Context, run *pendingAgentRun) (*models.AgentRunResult, error) {
 	for run.NextToolCall < len(run.ToolCalls) {
 		toolCall := run.ToolCalls[run.NextToolCall]
 		if run.Approvals {
@@ -163,15 +171,17 @@ func (m *Manager) processAgentToolCalls(ctx context.Context, run *pendingAgentRu
 				run.ToolUpdatedAt = customTool.toolUpdatedAt()
 				run.CreatedAt = time.Now()
 				run.ExpiresAt = run.CreatedAt.Add(pendingAgentRunTTL)
-				m.storeAgentRun(run)
-				return &models.AgentRunResult{Status: models.AgentRunApprovalRequired, Approval: agentRunApproval(run)}
+				if err := m.storeAgentRun(run); err != nil {
+					return nil, err
+				}
+				return &models.AgentRunResult{Status: models.AgentRunApprovalRequired, Approval: agentRunApproval(run)}, nil
 			}
 		}
 		m.appendToolResult(run, toolCall, m.executeToolCall(ctx, run.Registry, toolCall))
 		run.NextToolCall++
 	}
 	run.ToolCalls = nil
-	return nil
+	return nil, nil
 }
 
 func (m *Manager) appendToolResult(run *pendingAgentRun, toolCall models.ToolCall, result string) {
@@ -183,11 +193,19 @@ func (m *Manager) appendToolResult(run *pendingAgentRun, toolCall models.ToolCal
 	})
 }
 
-func (m *Manager) storeAgentRun(run *pendingAgentRun) {
+// storeAgentRun admits one pending run per scope, so two requests racing on the same
+// conversation and surface cannot both park a tool call the agent could approve twice.
+func (m *Manager) storeAgentRun(run *pendingAgentRun) error {
 	m.pendingRunMu.Lock()
 	defer m.pendingRunMu.Unlock()
 	m.deleteExpiredAgentRunsLocked(time.Now())
+	for _, pending := range m.pendingRuns {
+		if sameAgentRunScope(pending.Scope, run.Scope) {
+			return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.toolApprovalPending"), nil)
+		}
+	}
 	m.pendingRuns[run.ID] = run
+	return nil
 }
 
 func (m *Manager) claimAgentRun(runID string, agentID int) (*pendingAgentRun, error) {

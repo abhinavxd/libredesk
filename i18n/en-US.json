@@ -602,7 +602,7 @@
   "ai.noTagsConfigured": "No tags exist yet. Tag suggestions need an existing tag list to choose from. Ask an admin to create tags first.",
   "ai.tagSuggestEmptyConversation": "There are no messages to suggest tags from yet.",
   "ai.toolApprovalExpired": "This tool request is no longer available. Run the AI action again to create a new request.",
-  "ai.toolApprovalPending": "A tool request is waiting for approval. Approve or decline it before sending another Copilot message.",
+  "ai.toolApprovalPending": "A tool request is waiting for approval. The AI cannot run again until it is reviewed. Approve or decline the pending request first.",
   "ai.toolApprovalUnavailable": "This tool request cannot be approved for this conversation. Run the AI action again to create a new request.",
   "ai.toolChangedBeforeApproval": "This tool changed after approval was requested and was not run. Run the AI action again to review the current tool.",
   "ai.toolApprovalTitle": "Review tool request",

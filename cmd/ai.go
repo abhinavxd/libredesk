@@ -499,9 +499,6 @@ func handleAICopilot(r *fastglue.Request) error {
 	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: req.Message})
 
 	scope := ai.AgentRunScope{AgentID: auser.ID, ConversationID: conv.ID, ConversationUUID: conv.UUID, Surface: aimodels.ToolInvocationCopilot, UserMessage: req.Message}
-	if _, approval := app.ai.PendingAgentApproval(scope); approval != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.ConflictError, app.i18n.T("ai.toolApprovalPending"), nil))
-	}
 	toolIDs, err := app.ai.GetEnabledCopilotToolIDs()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
