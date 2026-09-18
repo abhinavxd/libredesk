@@ -53,6 +53,14 @@ const widgetStore = useWidgetStore()
 const { resolveBusinessHours, getBusinessHoursStatus } = useBusinessHours()
 const { t } = useI18n()
 
+const isAgentOnline = (status) => status === 'online' || status === 'away'
+
+const displayStatus = (status) => {
+  if (isAgentOnline(status)) return 'online'
+  if (status?.startsWith('away')) return 'away'
+  return status
+}
+
 const businessHoursStatus = computed(() => {
   const config = widgetStore.config
 
@@ -93,7 +101,7 @@ const businessHoursStatus = computed(() => {
 
   // Within business hours: show expectation message when agent is not online.
   const assignee = chatStore.currentConversation?.assignee
-  if (assignee?.availability_status !== 'online' && withinHoursMessage) {
+  if (!isAgentOnline(assignee?.availability_status) && withinHoursMessage) {
     return withinHoursMessage
   }
   return null
@@ -118,7 +126,7 @@ const chatTitle = computed(() => {
       name: assignee.first_name,
       avatarUrl: assignee.avatar_url || '',
       avatarFallback: assignee.first_name.charAt(0).toUpperCase(),
-      availability_status: assignee.availability_status?.startsWith('away') ? 'away' : assignee.availability_status,
+      availability_status: displayStatus(assignee.availability_status),
       expectation: assignee.expectation || '',
       hasAssignee: true
     }

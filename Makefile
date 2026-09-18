@@ -30,10 +30,7 @@ install-deps: $(STUFFBIN)
 
 # Build the frontend for production (both apps).
 .PHONY: frontend-build
-frontend-build: install-deps
-	@echo "→ Building frontend for production - main app & widget..."
-	@export VITE_APP_VERSION="${VERSION}" && cd ${FRONTEND_DIR} && pnpm build:main
-	@export VITE_APP_VERSION="${VERSION}" && cd ${FRONTEND_DIR} && pnpm build:widget
+frontend-build: frontend-build-main frontend-build-widget
 
 # Build only the main frontend app.
 .PHONY: frontend-build-main
@@ -81,13 +78,14 @@ run-frontend-widget:
 .PHONY: build-backend
 build-backend: $(STUFFBIN)
 	@echo "→ Building backend..."
-	@CGO_ENABLED=0 go build -a \
+	@CGO_ENABLED=0 go build \
 		-ldflags="-X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}' -s -w" \
 		-o ${BIN} cmd/*.go
 
 # Main build target: builds both frontend and backend, then stuffs static assets into the binary.
 .PHONY: build
-build: frontend-build build-backend stuff
+build: frontend-build build-backend
+	@$(MAKE) --no-print-directory stuff
 	@echo "→ Build successful. Current version: $(VERSION)"
 
 # Stuff static assets into the binary using stuffbin.
