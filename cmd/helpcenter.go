@@ -745,13 +745,22 @@ func handleShowHelpCenterArticle(r *fastglue.Request) error {
 	if err != nil {
 		related = nil
 	}
-	translated, err := app.helpcenter.GetPublishedArticleLocales(slug, article.Slug)
+	translations, err := app.helpcenter.GetPublishedArticleTranslations(slug, article.ID)
 	if err != nil {
-		translated = []string{locale}
+		translations = nil
+	}
+	translated := make([]string, 0, len(translations)+1)
+	slugByLocale := map[string]string{locale: article.Slug}
+	for _, t := range translations {
+		translated = append(translated, t.Locale)
+		slugByLocale[t.Locale] = t.Slug
+	}
+	if !slices.Contains(translated, locale) {
+		translated = append(translated, locale)
 	}
 	var (
 		root            = helpCenterBaseURL(app, helpCenter)
-		pathFor         = func(l string) string { return articlePath(helpCenter, l, article.Slug) }
+		pathFor         = func(l string) string { return articlePath(helpCenter, l, slugByLocale[l]) }
 		metaDescription = firstNonEmpty(article.MetaDescription, article.Excerpt)
 		metaTitle       = firstNonEmpty(article.MetaTitle, fmt.Sprintf("%s - %s", article.Title, helpCenter.Name))
 		ogImage         = absoluteURL(root, publicAssetPaths(app, firstNonEmpty(article.MetaImageURL, helpCenterTheme(helpCenter).LogoURL)))

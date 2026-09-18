@@ -25,17 +25,14 @@
         />
 
         <!-- Messages -->
-        <TransitionGroup
-          tag="div"
-          enter-active-class="animate-slide-in"
-          class="flex flex-col gap-4"
-        >
+        <TransitionGroup tag="div" enter-active-class="animate-slide-in" class="flex flex-col">
           <div
-            v-for="message in chatStore.getCurrentConversationMessages"
+            v-for="{ message, groupWithPrev, groupWithNext } in messageRows"
             :key="message.uuid"
             :data-message-uuid="message.uuid"
             :class="[
               'flex flex-col',
+              groupWithPrev ? 'mt-1' : 'mt-4 first:mt-0',
               message.author.type === 'contact' || message.author.type === 'visitor'
                 ? 'items-end'
                 : 'items-start'
@@ -116,7 +113,10 @@
               @select="emit('suggested-reply', $event)"
             />
 
-            <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
+            <div
+              v-if="!groupWithNext"
+              class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2"
+            >
               <span v-if="message.author.type === 'agent'">
                 {{ message.author.first_name }} {{ message.author.last_name }}
                 •
@@ -227,6 +227,24 @@ const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useSti
 const config = computed(() => widgetStore.config)
 const isTyping = computed(() => chatStore.isTyping)
 const isLoadingConversation = computed(() => chatStore.isLoadingConversation)
+const GROUP_WINDOW_MS = 60_000
+const canGroup = (a, b) => {
+  if (!a || !b) return false
+  if (a.meta?.is_csat || b.meta?.is_csat) return false
+  if (a.status === 'failed' || b.status === 'failed') return false
+  if (!a.author?.id || a.author.id !== b.author?.id) return false
+  const aBucket = Math.floor(new Date(a.created_at).getTime() / GROUP_WINDOW_MS)
+  const bBucket = Math.floor(new Date(b.created_at).getTime() / GROUP_WINDOW_MS)
+  return aBucket === bBucket
+}
+const messageRows = computed(() => {
+  const messages = chatStore.getCurrentConversationMessages
+  return messages.map((message, index) => ({
+    message,
+    groupWithPrev: canGroup(messages[index - 1], message),
+    groupWithNext: canGroup(message, messages[index + 1])
+  }))
+})
 const suggestedReplyMessageUUID = computed(() => {
   const lastMessage = chatStore.getCurrentConversationLastMessage
   if (

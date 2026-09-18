@@ -373,21 +373,6 @@ WHERE a.translation_group_id = (SELECT translation_group_id FROM help_articles W
     AND a.status = 'published'
 ORDER BY a.locale;
 
--- name: get-published-article-locales
-WITH RECURSIVE published_collections AS (
-    SELECT c.id FROM article_collections c
-    JOIN help_centers h ON h.id = c.help_center_id
-    WHERE h.slug = $1 AND c.parent_id IS NULL AND c.is_published = true
-    UNION
-    SELECT c.id FROM article_collections c
-    JOIN published_collections p ON c.parent_id = p.id
-    WHERE c.is_published = true
-)
-SELECT DISTINCT a.locale
-FROM help_articles a
-JOIN article_collections c ON c.id = a.collection_id AND c.locale = a.locale AND c.id IN (SELECT id FROM published_collections)
-WHERE a.slug = $2 AND a.status = 'published';
-
 -- name: get-published-collection-locales
 WITH RECURSIVE published_collections AS (
     SELECT c.id FROM article_collections c

@@ -1676,7 +1676,7 @@
   "widget.campaignLimitReached": "You have reached the limit of 50 proactive messages. Delete one to add another.",
   "widget.campaignPriorityHint": "Messages are checked from top to bottom. The first matching message is shown.",
   "widget.campaignSender": "Sender",
-  "widget.campaignsHint": "Invite people to chat. A conversation starts only after they reply.",
+  "widget.campaignsHint": "Show a message on matching pages before the chat is opened. A conversation is created only when someone replies to it.",
   "widget.campaignStats": "Proactive message results",
   "widget.campaignUrlLimit": "Add up to 20 page patterns.",
   "widget.conversationClosed": "This conversation has been closed",

@@ -198,7 +198,6 @@ type queries struct {
 	GetPublicTreeData                *sqlx.Stmt `query:"get-public-tree-data"`
 	GetPublishedArticleBySlug        *sqlx.Stmt `query:"get-published-article-by-slug"`
 	GetPublishedArticleTranslations  *sqlx.Stmt `query:"get-published-article-translations"`
-	GetPublishedArticleLocales       *sqlx.Stmt `query:"get-published-article-locales"`
 	GetPublishedCollectionLocales    *sqlx.Stmt `query:"get-published-collection-locales"`
 	GetPublishedArticles             *sqlx.Stmt `query:"get-published-articles"`
 	GetPublishedArticlesByCollection *sqlx.Stmt `query:"get-published-articles-by-collection"`
@@ -950,16 +949,6 @@ func (m *Manager) GetPublishedArticlesByCollection(collectionID, excludeArticleI
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return articles, nil
-}
-
-// GetPublishedArticleLocales returns the locales a published article with the given slug exists in.
-func (m *Manager) GetPublishedArticleLocales(helpCenterSlug, articleSlug string) ([]string, error) {
-	var locales = make([]string, 0)
-	if err := m.q.GetPublishedArticleLocales.Select(&locales, helpCenterSlug, articleSlug); err != nil {
-		m.lo.Error("error fetching article locales", "error", err, "help_center_slug", helpCenterSlug, "article_slug", articleSlug)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	return locales, nil
 }
 
 // GetPublishedCollectionLocales returns the locales a published collection with the given slug exists in.

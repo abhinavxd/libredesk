@@ -135,8 +135,10 @@
                   @update:model-value="selectTranslationLocale"
                 >
                   <SelectTrigger class="w-full">
-                    <Plus class="mr-2 size-4" aria-hidden="true" />
-                    <SelectValue :placeholder="t('helpCenter.addTranslation')" />
+                    <div class="flex items-center gap-2">
+                      <Plus class="size-4" aria-hidden="true" />
+                      <SelectValue :placeholder="t('helpCenter.addTranslation')" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem v-for="locale in missingLocales" :key="locale" :value="locale">
