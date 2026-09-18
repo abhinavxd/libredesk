@@ -189,7 +189,17 @@ func campaignWithinHours(app *App, c proactive.Campaign, now time.Time, loc *tim
 		return false, nil
 	}
 	clock := local.Format("15:04")
-	return clock >= day.Open && clock < day.Close, nil
+	return withinWorkingHours(clock, day), nil
+}
+
+func withinWorkingHours(clock string, day bhmodels.WorkingHours) bool {
+	if day.Open == day.Close {
+		return false
+	}
+	if day.Open < day.Close {
+		return clock >= day.Open && clock < day.Close
+	}
+	return clock >= day.Open || clock < day.Close
 }
 
 func campaignSender(app *App, id int) (umodels.User, error) {
