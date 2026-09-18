@@ -1,10 +1,12 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import articleCSS from '@public-static/article-content.css?raw'
 
 const props = defineProps({ article: { type: Object, required: true }, helpSlug: { type: String, required: true }, dark: Boolean })
 const emit = defineEmits(['article'])
 const frame = ref(null)
+const height = ref('0px')
+let observer = null
 const documentHTML = computed(() => {
   const doc = document.implementation.createHTMLDocument(props.article.title)
   const policy = doc.createElement('meta')
@@ -12,7 +14,7 @@ const documentHTML = computed(() => {
   policy.content = "default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; font-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
   doc.head.append(policy)
   const style = doc.createElement('style')
-  style.textContent = `${articleCSS}\nbody{margin:0;padding:16px;font:14px/1.6 system-ui;overflow-wrap:anywhere}img{max-width:100%}a{color:inherit}table{display:block;overflow:auto}.hc-prose pre{background:var(--hc-accent-tint);color:inherit}.hc-callout{background:var(--hc-accent-tint);color:inherit}`
+  style.textContent = `${articleCSS}\nbody{margin:0;padding:16px;font:14px/1.6 system-ui;overflow-wrap:anywhere}html{overflow:hidden}img{max-width:100%}a{color:inherit}table{display:block;overflow:auto}.hc-prose pre{background:var(--hc-accent-tint);color:inherit}.hc-callout{background:var(--hc-accent-tint);color:inherit}`
   doc.head.append(style)
   doc.body.className = 'hc-prose'
   doc.body.innerHTML = props.article.content
@@ -40,6 +42,9 @@ const loaded = () => {
   const theme = getComputedStyle(frame.value)
   doc.body.style.color = theme.color
   doc.body.style.background = theme.backgroundColor
+  observer?.disconnect()
+  observer = new ResizeObserver(() => { height.value = `${doc.documentElement.scrollHeight}px` })
+  observer.observe(doc.body)
   for (const [target, source] of Object.entries({ '--hc-border': '--border', '--hc-accent': '--primary', '--hc-accent-ink': '--primary', '--hc-accent-tint': '--muted', '--hc-muted': '--muted-foreground' })) {
     doc.documentElement.style.setProperty(target, `hsl(${theme.getPropertyValue(source)})`)
   }
@@ -53,8 +58,9 @@ const loaded = () => {
     else window.open(url.href, '_blank', 'noopener,noreferrer')
   })
 }
+onUnmounted(() => observer?.disconnect())
 </script>
 
 <template>
-  <iframe ref="frame" :key="`${article.id}-${dark}`" :title="article.title" :srcdoc="documentHTML" sandbox="allow-same-origin" class="w-full flex-1 min-h-0 border-0 bg-background text-foreground" @load="loaded" />
+  <iframe ref="frame" :key="`${article.id}-${dark}`" :title="article.title" :srcdoc="documentHTML" sandbox="allow-same-origin" scrolling="no" class="block w-full border-0 bg-background text-foreground" :style="{ height }" @load="loaded" />
 </template>

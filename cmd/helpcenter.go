@@ -138,6 +138,11 @@ type localeLink struct {
 	Path   string
 }
 
+type helpArticleResponse struct {
+	hcmodels.Article
+	Translations []hcmodels.ArticleTranslation `json:"translations"`
+}
+
 type previewTOCItem struct {
 	ID    string
 	Title string
@@ -445,7 +450,11 @@ func handleGetArticle(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(article)
+	translations, err := app.helpcenter.GetArticleTranslations(id)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(helpArticleResponse{Article: article, Translations: translations})
 }
 
 // handleCreateArticle creates a new article.

@@ -5,28 +5,28 @@
     >
       <div class="flex flex-col">
         <HomeHeader :config="config">
-          <!-- Primary action renders on the gradient so it flows into the header. -->
           <RecentConversationCard
             v-if="mostRecentConversation"
             :conversation="mostRecentConversation"
           />
           <div v-else-if="canStartConversation">
-            <Button @click="startConversation" class="w-full flex items-center justify-center">
+            <Button
+              size="lg"
+              class="w-full rounded-xl font-semibold shadow-md"
+              @click="startConversation"
+            >
               {{ startButtonText }}
-              <ArrowRight size="16" />
+              <ArrowRight size="16" aria-hidden="true" />
             </Button>
           </div>
         </HomeHeader>
 
-        <!-- Home Apps (announcements + external links) sit on the normal background. -->
-        <div v-if="homeItems.length" class="flex flex-col gap-3 p-4 bg-background">
-          <div class="space-y-3">
-            <template v-for="(item, index) in homeItems" :key="index">
-              <HomeHelp v-if="item.type === 'help'" />
-              <AnnouncementCard v-else-if="item.type === 'announcement'" :announcement="item" />
-              <HomeExternalLink v-else-if="item.type === 'external_link'" :link="item" />
-            </template>
-          </div>
+        <div v-if="homeItems.length" class="space-y-3 bg-background px-4 pt-1 pb-5">
+          <template v-for="(item, index) in homeItems" :key="index">
+            <HomeHelp v-if="item.type === 'help'" />
+            <AnnouncementCard v-else-if="item.type === 'announcement'" :announcement="item" />
+            <HomeExternalLink v-else-if="item.type === 'external_link'" :link="item" />
+          </template>
         </div>
       </div>
     </div>

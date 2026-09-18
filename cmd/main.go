@@ -26,9 +26,9 @@ import (
 	"github.com/abhinavxd/libredesk/internal/colorlog"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/sla"
@@ -261,7 +261,7 @@ func main() {
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
-		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings, user, notifier, rdb)
+		aiAgent                     = initAIAgent(db, i18n, ai, conversation, inbox, media, settings, user, notifier, rdb)
 		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)

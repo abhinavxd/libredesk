@@ -33,6 +33,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	"github.com/abhinavxd/libredesk/internal/media"
@@ -42,7 +43,6 @@ import (
 	notificationchannels "github.com/abhinavxd/libredesk/internal/notification/channels"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/role"
@@ -1046,7 +1046,7 @@ func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleInde
 }
 
 // initAIAgent inits the autonomous AI agent manager.
-func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
+func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, inboxManager *inbox.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
 	m, err := aiagent.New(aiagent.Opts{
 		DB:                 db,
 		Lo:                 initLogger("ai_agent"),
@@ -1054,7 +1054,7 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 		QueueSize:          cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
 		MaxSteps:           min(max(cmp.Or(ko.Int("ai_agent.max_steps"), 6), 1), 20),
 		MaxHistoryMessages: min(max(cmp.Or(ko.Int("ai_agent.max_history_messages"), 30), 5), 100),
-	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
+	}, aiManager, convo, inboxManager, mediaManager, settingManager, userManager, notifierService, rdb)
 	if err != nil {
 		log.Fatalf("error initializing AI agent manager: %v", err)
 	}

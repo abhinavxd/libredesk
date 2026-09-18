@@ -212,6 +212,9 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 		if err := json.Unmarshal(inbox.Config, &config); err != nil {
 			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
 		}
+		if err := validateLiveChatSessionDuration(app, config.SessionDuration); err != nil {
+			return err
+		}
 		if err := validateWidgetFeatures(app, config); err != nil {
 			return err
 		}
@@ -255,6 +258,12 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			}
 		}
 
+		for _, replies := range [][]string{config.QuickReplies, config.Visitors.QuickReplies, config.Users.QuickReplies} {
+			if err := validateQuickReplies(app, replies); err != nil {
+				return err
+			}
+		}
+
 		// Validate colors.
 		hexColorRegex := regexp.MustCompile(`^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`)
 		if config.Colors.Primary == "" {
@@ -275,12 +284,11 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
 		}
 
-		// Validate home apps.
 		for _, ha := range config.HomeApps {
 			if ha.URL != "" && !httputil.IsValidHTTPURL(ha.URL) {
 				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
 			}
-			if ha.Type == livechat.HomeAppAnnouncement && ha.ImageURL != "" && !httputil.IsValidHTTPURL(ha.ImageURL) {
+			if ha.ImageURL != "" && !httputil.IsValidHTTPURL(ha.ImageURL) {
 				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
 			}
 		}
@@ -343,6 +351,32 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 		if err := validateEmailConfig(app, inbox.Config); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateQuickReplies(app *App, replies []string) error {
+	if len(replies) > 6 {
+		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.livechat.quickReplies.limit"), nil)
+	}
+	for _, reply := range replies {
+		if strings.TrimSpace(reply) == "" || len(reply) > 120 {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.maxLength", "max", "120"), nil)
+		}
+	}
+	return nil
+}
+
+func validateLiveChatSessionDuration(app *App, value string) error {
+	if value == "" {
+		return nil
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidDuration"), nil)
+	}
+	if duration < time.Hour {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.minDuration", "name", "session_duration", "min", "1h"), nil)
 	}
 	return nil
 }

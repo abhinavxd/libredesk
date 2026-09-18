@@ -2,6 +2,11 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '@widget/api/index.js'
 
+const EXPAND_KEY = 'libredesk-help-expand'
+const readExpandArticles = () => {
+  try { return localStorage.getItem(EXPAND_KEY) !== 'false' } catch { return true }
+}
+
 export const useHelpStore = defineStore('help', () => {
   const data = ref(null)
   const loading = ref(false)
@@ -15,6 +20,8 @@ export const useHelpStore = defineStore('help', () => {
   const feedbackPending = ref({})
   const scrollTop = ref(0)
   const pendingArticle = ref(null)
+  const focusSearch = ref(false)
+  const expandArticles = ref(readExpandArticles())
   const identity = ref(0)
   let generation = 0
   const articles = computed(() => {
@@ -36,6 +43,7 @@ export const useHelpStore = defineStore('help', () => {
     loading.value = false
     scrollTop.value = 0
     pendingArticle.value = null
+    focusSearch.value = false
     data.value = null
     failed.value = false
     query.value = ''
@@ -75,7 +83,14 @@ export const useHelpStore = defineStore('help', () => {
       if (request === generation) loading.value = false
     }
   }
+  const setExpandArticles = (value) => {
+    expandArticles.value = value
+    try { localStorage.setItem(EXPAND_KEY, String(value)) } catch { /* storage blocked */ }
+  }
   return {
+    focusSearch,
+    expandArticles,
+    setExpandArticles,
     feedback,
     feedbackPending,
     vote,

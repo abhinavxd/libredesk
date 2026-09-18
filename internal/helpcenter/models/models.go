@@ -116,33 +116,43 @@ type Collection struct {
 }
 
 type Article struct {
-	ID              int       `db:"id" json:"id"`
-	CreatedAt       time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt       time.Time `db:"updated_at" json:"updated_at"`
-	CollectionID    int       `db:"collection_id" json:"collection_id"`
-	AuthorID        *int64    `db:"author_id" json:"author_id"`
-	AuthorName      *string   `db:"author_name" json:"author_name"`
-	AuthorAvatar    *string   `db:"author_avatar" json:"author_avatar"`
-	CreatedBy       *int64    `db:"created_by" json:"created_by"`
-	CreatedByName   *string   `db:"created_by_name" json:"created_by_name"`
-	Slug            string    `db:"slug" json:"slug"`
-	Locale          string    `db:"locale" json:"locale"`
-	Title           string    `db:"title" json:"title"`
-	Content         string    `db:"content" json:"content"`
-	Excerpt         string    `db:"excerpt" json:"excerpt"`
-	MetaTitle       string    `db:"meta_title" json:"meta_title"`
-	MetaDescription string    `db:"meta_description" json:"meta_description"`
-	MetaImageURL    string    `db:"meta_image_url" json:"meta_image_url"`
-	SortOrder       int       `db:"sort_order" json:"sort_order"`
-	Status          string    `db:"status" json:"status"`
-	ViewCount       int       `db:"view_count" json:"view_count"`
-	AIEnabled       bool      `db:"ai_enabled" json:"ai_enabled"`
+	ID                 int       `db:"id" json:"id"`
+	CreatedAt          time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt          time.Time `db:"updated_at" json:"updated_at"`
+	CollectionID       int       `db:"collection_id" json:"collection_id"`
+	AuthorID           *int64    `db:"author_id" json:"author_id"`
+	TranslationGroupID string    `db:"translation_group_id" json:"-"`
+	AuthorName         *string   `db:"author_name" json:"author_name"`
+	AuthorAvatar       *string   `db:"author_avatar" json:"author_avatar"`
+	CreatedBy          *int64    `db:"created_by" json:"created_by"`
+	CreatedByName      *string   `db:"created_by_name" json:"created_by_name"`
+	Slug               string    `db:"slug" json:"slug"`
+	Locale             string    `db:"locale" json:"locale"`
+	Title              string    `db:"title" json:"title"`
+	Content            string    `db:"content" json:"content"`
+	Excerpt            string    `db:"excerpt" json:"excerpt"`
+	MetaTitle          string    `db:"meta_title" json:"meta_title"`
+	MetaDescription    string    `db:"meta_description" json:"meta_description"`
+	MetaImageURL       string    `db:"meta_image_url" json:"meta_image_url"`
+	SortOrder          int       `db:"sort_order" json:"sort_order"`
+	Status             string    `db:"status" json:"status"`
+	ViewCount          int       `db:"view_count" json:"view_count"`
+	AIEnabled          bool      `db:"ai_enabled" json:"ai_enabled"`
 	// EmbeddedFingerprint is internal AI-index state; mapped so RETURNING * scans in
 	// safe-mode transactions don't fail, but never exposed in API responses.
 	EmbeddedFingerprint string `db:"embedded_fingerprint" json:"-"`
 	SearchTSV           string `db:"search_tsv" json:"-"`
-	HelpfulCount    int    `db:"helpful_count" json:"helpful_count"`
-	NotHelpfulCount int    `db:"not_helpful_count" json:"not_helpful_count"`
+	HelpfulCount        int    `db:"helpful_count" json:"helpful_count"`
+	NotHelpfulCount     int    `db:"not_helpful_count" json:"not_helpful_count"`
+}
+
+type ArticleTranslation struct {
+	ID           int    `db:"id" json:"id"`
+	CollectionID int    `db:"collection_id" json:"collection_id"`
+	Locale       string `db:"locale" json:"locale"`
+	Slug         string `db:"slug" json:"slug"`
+	Title        string `db:"title" json:"title"`
+	Status       string `db:"status" json:"status"`
 }
 
 // NavLink is a single header navigation link on the public help center pages.

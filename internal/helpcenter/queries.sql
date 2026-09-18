@@ -133,7 +133,7 @@ DELETE FROM article_collections
 WHERE id = $1;
 
 -- name: get-article-by-id
-SELECT a.id, a.created_at, a.updated_at, a.collection_id, a.author_id, a.created_by, a.slug, a.locale, a.title, a.content,
+SELECT a.id, a.created_at, a.updated_at, a.collection_id, a.author_id, a.created_by, a.translation_group_id, a.slug, a.locale, a.title, a.content,
     a.excerpt, a.meta_title, a.meta_description, a.meta_image_url, a.sort_order, a.status, a.view_count, a.ai_enabled,
     TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS author_name,
     TRIM(cu.first_name || ' ' || COALESCE(cu.last_name, '')) AS created_by_name,
@@ -144,17 +144,29 @@ LEFT JOIN users u ON u.id = a.author_id
 LEFT JOIN users cu ON cu.id = a.created_by
 WHERE a.id = $1;
 
+-- name: get-article-translations
+SELECT a.id, a.collection_id, a.locale, a.slug, a.title, a.status
+FROM help_articles a
+WHERE a.translation_group_id = (SELECT translation_group_id FROM help_articles WHERE id = $1)
+ORDER BY a.locale;
+
 -- name: insert-article
-INSERT INTO help_articles (collection_id, author_id, created_by, slug, locale, title, content, excerpt, meta_title, meta_description, meta_image_url, sort_order, status, ai_enabled)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING *;
+INSERT INTO help_articles (collection_id, author_id, created_by, slug, locale, title, content, excerpt, meta_title, meta_description, meta_image_url, sort_order, status, ai_enabled, translation_group_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE(NULLIF($15, '')::UUID, gen_random_uuid()))
+RETURNING id, created_at, updated_at, collection_id, author_id, created_by,
+    translation_group_id, slug, locale, title, content, excerpt, meta_title,
+    meta_description, meta_image_url, sort_order, status, view_count,
+    ai_enabled, embedded_fingerprint, search_tsv;
 
 -- name: update-article
 UPDATE help_articles
 SET collection_id = COALESCE($9, collection_id), slug = $2, locale = $3, title = $4, content = $5, sort_order = $6, status = $7, ai_enabled = $8,
     excerpt = $10, meta_title = $11, meta_description = $12, meta_image_url = $13, author_id = $14, updated_at = NOW()
 WHERE id = $1
-RETURNING *;
+RETURNING id, created_at, updated_at, collection_id, author_id, created_by,
+    translation_group_id, slug, locale, title, content, excerpt, meta_title,
+    meta_description, meta_image_url, sort_order, status, view_count,
+    ai_enabled, embedded_fingerprint, search_tsv;
 
 -- name: user-is-author-assignable
 SELECT EXISTS(
@@ -343,6 +355,23 @@ LEFT JOIN users u ON u.id = a.author_id
 WHERE a.slug = $2 AND a.status = 'published' AND ($3 = '' OR a.locale = $3)
 ORDER BY c.sort_order, a.sort_order, a.id
 LIMIT 1;
+
+-- name: get-published-article-translations
+WITH RECURSIVE published_collections AS (
+    SELECT c.id FROM article_collections c
+    JOIN help_centers h ON h.id = c.help_center_id
+    WHERE h.slug = $1 AND c.parent_id IS NULL AND c.is_published = true
+    UNION
+    SELECT c.id FROM article_collections c
+    JOIN published_collections p ON c.parent_id = p.id
+    WHERE c.is_published = true
+)
+SELECT a.id, a.collection_id, a.locale, a.slug, a.title, a.status
+FROM help_articles a
+JOIN article_collections c ON c.id = a.collection_id AND c.locale = a.locale AND c.id IN (SELECT id FROM published_collections)
+WHERE a.translation_group_id = (SELECT translation_group_id FROM help_articles WHERE id = $2)
+    AND a.status = 'published'
+ORDER BY a.locale;
 
 -- name: get-published-article-locales
 WITH RECURSIVE published_collections AS (

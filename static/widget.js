@@ -20,7 +20,7 @@
                 throw new Error('inboxID is required');
             }
 
-            this.IFRAME_BORDER_RADIUS = '16px';
+            this.IFRAME_BORDER_RADIUS = '20px';
             this.IFRAME_BOX_SHADOW = '0 1px 6px rgba(9, 14, 21, 0.5), 0 4px 32px rgba(9, 14, 21, 0.65)';
             this.IFRAME_WIDTH = '400px';
             this.IFRAME_HEIGHT = '700px';
@@ -226,7 +226,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                box-shadow: 0 1px 4px rgba(9, 14, 21, 0.45), 0 3px 18px rgba(9, 14, 21, 0.55);
+                box-shadow: 0 3px 8px rgba(9, 14, 21, 0.45), 0 14px 40px rgba(9, 14, 21, 0.55);
                 transition: transform 0.3s ease;
             `;
 
@@ -698,10 +698,12 @@
             const host = document.createElement('div');
             const side = this.widgetSettings.launcher.position === 'left' ? 'left' : 'right';
             const spacing = this.widgetSettings.launcher.spacing;
-            Object.assign(host.style, { position: 'fixed', zIndex: '9998', bottom: `${spacing.bottom + this.launcherSize() + 12}px`, [side]: `${spacing.side}px`, width: `min(320px, calc(100vw - ${spacing.side * 2}px))` });
+            Object.assign(host.style, { position: 'fixed', zIndex: '9998', bottom: `${spacing.bottom + this.launcherSize() + 12}px`, [side]: `${spacing.side}px`, width: `min(340px, calc(100vw - ${spacing.side * 2}px))` });
+            host.style.setProperty('--align', side === 'left' ? 'flex-start' : 'flex-end');
+            host.style.setProperty('--muted', data.theme.muted || data.theme.foreground);
             const root = host.attachShadow({ mode: 'open' });
             const style = document.createElement('style');
-            style.textContent = ':host{font:14px/1.5 system-ui}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid;outline-offset:2px}.stack{display:flex;flex-direction:column;gap:8px}.card{display:flex;align-items:flex-start;border:1px solid;border-radius:12px;overflow:hidden}.open{display:flex;gap:10px;align-items:flex-start;flex:1;min-width:0;padding:12px;text-align:left;border:0;background:transparent}.name{font-weight:600;display:block}.text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.avatar{width:28px;height:28px;border-radius:50%;object-fit:cover}.image{max-width:64px;max-height:48px;object-fit:cover}.close{padding:8px;min-height:44px;min-width:44px;border:0;background:transparent}.all{align-self:flex-end;border:1px solid;border-radius:6px;padding:4px 8px}';
+            style.textContent = ':host{font:14px/1.45 system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}button{font:inherit;color:inherit;cursor:pointer;border:0;background:transparent;padding:0}button:focus-visible{outline:2px solid;outline-offset:2px}.stack{display:flex;flex-direction:column;gap:10px;align-items:var(--align)}.card{position:relative;display:flex;max-width:100%;border-radius:18px;box-shadow:0 1px 3px rgba(9,14,21,.12),0 8px 28px rgba(9,14,21,.16);animation:rise .22s ease-out}.open{display:flex;gap:10px;align-items:flex-start;min-width:0;padding:12px 14px;text-align:left;border-radius:inherit}.body{display:flex;flex-direction:column;min-width:0;gap:2px}.name{font-size:12px;line-height:1.3;color:var(--muted)}.text{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;white-space:pre-line}.avatar{flex:none;width:32px;height:32px;border-radius:50%;object-fit:cover}.image{margin-top:6px;max-width:160px;max-height:96px;border-radius:10px;object-fit:cover}.close{position:absolute;top:-8px;inset-inline-end:-8px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;color:var(--muted);box-shadow:0 1px 3px rgba(9,14,21,.18);opacity:0;transition:opacity .15s}.card:hover .close,.card:focus-within .close{opacity:1}@media(hover:none){.close{opacity:1}}.all{font-size:12px;color:var(--muted);padding:4px 6px;border-radius:6px}.all:hover{text-decoration:underline}@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.card{animation:none}}';
             root.append(style);
             const stack = document.createElement('div');
             stack.className = 'stack';
@@ -724,7 +726,7 @@
             for (const item of previews) {
                 const card = document.createElement('div');
                 card.className = 'card';
-                Object.assign(card.style, { background: data.theme.background, color: data.theme.foreground, borderColor: data.theme.border });
+                Object.assign(card.style, { background: data.theme.background, color: data.theme.foreground });
                 const open = document.createElement('button');
                 open.type = 'button';
                 open.className = 'open';
@@ -739,6 +741,7 @@
                 const avatar = safeImage(item.avatar, 'avatar');
                 if (avatar) open.append(avatar);
                 const body = document.createElement('span');
+                body.className = 'body';
                 const name = document.createElement('span');
                 name.className = 'name';
                 name.textContent = item.name;
@@ -754,6 +757,7 @@
                 close.className = 'close';
                 close.textContent = '×';
                 close.setAttribute('aria-label', data.labels.dismiss);
+                Object.assign(close.style, { background: data.theme.background, border: `1px solid ${data.theme.border}` });
                 close.addEventListener('click', () => { this.dismissPreview(item.key); this.toggleButton.focus(); });
                 card.append(open, close);
                 stack.append(card);
@@ -766,7 +770,6 @@
                 all.type = 'button';
                 all.className = 'all';
                 all.textContent = data.labels.dismissAll;
-                Object.assign(all.style, { background: data.theme.background, color: data.theme.foreground, borderColor: data.theme.border });
                 all.addEventListener('click', () => { for (const item of previews) this.dismissPreview(item.key); this.toggleButton.focus(); });
                 stack.append(all);
             }

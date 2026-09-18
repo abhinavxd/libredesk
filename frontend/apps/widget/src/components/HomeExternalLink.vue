@@ -1,12 +1,18 @@
 <template>
   <a :href="link.url" target="_blank" rel="noopener noreferrer" class="block no-underline">
-    <Card class="hover:bg-accent transition-colors cursor-pointer rounded-md">
+    <Card
+      class="rounded-xl border-border/80 transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
+    >
       <CardContent class="p-4">
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-foreground font-medium">
+        <div class="flex items-center gap-3">
+          <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <img v-if="link.image_url" :src="link.image_url" alt="" class="size-5 object-contain" />
+            <Globe2 v-else size="16" class="text-muted-foreground" aria-hidden="true" />
+          </span>
+          <span class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground">
             {{ link.text }}
           </span>
-          <ExternalLink size="18" class="text-muted-foreground" />
+          <ExternalLink size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
         </div>
       </CardContent>
     </Card>
@@ -15,7 +21,7 @@
 
 <script setup>
 import { Card, CardContent } from '@shared-ui/components/ui/card'
-import { ExternalLink } from 'lucide-vue-next'
+import { ExternalLink, Globe2 } from 'lucide-vue-next'
 
 defineProps({
   link: {

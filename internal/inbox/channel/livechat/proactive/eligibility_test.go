@@ -92,3 +92,22 @@ func TestEligibilityGates(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestCampaignValidateRequiresTargetDevice(t *testing.T) {
+	campaign := Campaign{
+		ID:            "8a3660e6-e29b-461c-924f-314c7576f75a",
+		Name:          "Pricing invitation",
+		Message:       "Need help choosing a plan?",
+		Audience:      "all",
+		BusinessHours: "any",
+		Repeat:        "once",
+		RepeatHours:   24,
+	}
+	if err := campaign.Validate(); err == nil || err.Error() != "device" {
+		t.Fatalf("got %v, want device validation error", err)
+	}
+	campaign.Desktop = true
+	if err := campaign.Validate(); err != nil {
+		t.Fatalf("valid desktop campaign: %v", err)
+	}
+}

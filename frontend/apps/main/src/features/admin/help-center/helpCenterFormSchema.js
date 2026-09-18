@@ -64,15 +64,18 @@ const createBaseSchema = (t) => {
   return z.object({
     name: z
       .string()
+      .trim()
       .min(1, t('globals.messages.required'))
       .refine(withinLength(MAX_NAME), t('globals.messages.maxLength', { max: MAX_NAME })),
     slug: z
       .string()
+      .trim()
       .min(1, t('globals.messages.required'))
       .max(200, t('helpCenter.invalidSlug'))
       .regex(/^[a-z0-9_-]+$/, t('helpCenter.invalidSlug')),
     page_title: z
       .string()
+      .trim()
       .min(1, t('globals.messages.required'))
       .refine(
         withinLength(MAX_PAGE_TITLE),

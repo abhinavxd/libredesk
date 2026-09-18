@@ -1,5 +1,12 @@
 <template>
   <div class="border-t focus:ring-0 focus:outline-none">
+    <ReplyButtons
+      v-if="quickReplies.length"
+      :replies="quickReplies"
+      :disabled="isSending"
+      class="px-2 pt-2"
+      @select="sendQuickReply"
+    />
     <!-- Message Input -->
     <div class="p-2">
       <!-- Unified Input Container -->
@@ -14,7 +21,8 @@
             :placeholder="$t('globals.terms.typeMessage')"
             :disabled="isSending"
             maxlength="10000"
-            class="w-full max-h-32 resize-none border-0 bg-transparent focus:ring-0 focus:outline-none focus-visible:ring-0 p-0 shadow-none" style="min-height:20px;height:20px"
+            class="w-full max-h-32 resize-none border-0 bg-transparent focus:ring-0 focus:outline-none focus-visible:ring-0 p-0 shadow-none"
+            style="min-height: 20px; height: 20px"
             ref="messageInput"
           ></Textarea>
         </div>
@@ -34,13 +42,14 @@
 
           <!-- Send Button -->
           <Button
+            type="button"
             @click="sendMessage"
             :aria-label="$t('globals.messages.send')"
             size="sm"
             class="h-9 w-9 p-0 rounded-full disabled:opacity-50 disabled:cursor-not-allowed border-0"
             :disabled="!newMessage.trim() || isUploading || isSending"
           >
-            <ArrowUp class="w-4 h-4" />
+            <ArrowUp class="w-4 h-4" aria-hidden="true" />
           </Button>
         </div>
       </div>
@@ -52,6 +61,7 @@
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { ArrowUp } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
+import ReplyButtons from './ReplyButtons.vue'
 import { Textarea } from '@shared-ui/components/ui/textarea'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
@@ -69,22 +79,38 @@ const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const messageInput = ref(null)
-const draftKey = computed(() => chatStore.currentConversation?.uuid || proactive.pending?.id || 'new')
-const newMessage = computed({ get: () => chatStore.drafts[draftKey.value] || '', set: value => { chatStore.drafts[draftKey.value] = value } })
+const draftKey = computed(
+  () => chatStore.currentConversation?.uuid || proactive.pending?.id || 'new'
+)
+const newMessage = computed({
+  get: () => chatStore.drafts[draftKey.value] || '',
+  set: (value) => {
+    chatStore.drafts[draftKey.value] = value
+  }
+})
 const isUploading = ref(false)
 const isSending = ref(false)
 const config = computed(() => widgetStore.config)
+const quickReplies = computed(() => {
+  if (chatStore.currentConversation?.uuid) return []
+  const audience = userStore.isVisitor ? config.value.visitors : config.value.users
+  return audience?.quick_replies ?? config.value.quick_replies ?? []
+})
 
-const getTextareaEl = () => messageInput.value?.$el?.querySelector?.('textarea') || messageInput.value?.$el
+const getTextareaEl = () =>
+  messageInput.value?.$el?.querySelector?.('textarea') || messageInput.value?.$el
 
 const focusTextarea = () => {
   nextTick(() => getTextareaEl()?.focus())
 }
 
 onMounted(focusTextarea)
-watch(() => widgetStore.isOpen, (open) => {
-  if (open) focusTextarea()
-})
+watch(
+  () => widgetStore.isOpen,
+  (open) => {
+    if (open) focusTextarea()
+  }
+)
 
 // Setup typing indicator
 const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
@@ -95,7 +121,14 @@ const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
 
 const initChatConversation = async (messageText) => {
   const resp = await api.initChatConversation({ message: messageText, ...proactive.replyPayload() })
-  const { conversation, session_token, user, messages, business_hours_id, working_hours_utc_offset } = resp.data.data
+  const {
+    conversation,
+    session_token,
+    user,
+    messages,
+    business_hours_id,
+    working_hours_utc_offset
+  } = resp.data.data
   conversation.business_hours_id = business_hours_id
   conversation.working_hours_utc_offset = working_hours_utc_offset
 
@@ -177,6 +210,13 @@ const sendMessage = async () => {
   }
 }
 
+const sendQuickReply = (reply) => {
+  newMessage.value = reply
+  sendMessage()
+}
+
+defineExpose({ sendQuickReply })
+
 // Handle typing events
 const handleTyping = () => {
   startTyping()
@@ -220,7 +260,10 @@ const handleFileUpload = async (files) => {
       chatStore.replaceMessage(chatStore.currentConversation.uuid, tempMessageID, resp.data.data)
     }
     if (resp.data.data) {
-      chatStore.updateConversationListLastMessage(chatStore.currentConversation.uuid, resp.data.data)
+      chatStore.updateConversationListLastMessage(
+        chatStore.currentConversation.uuid,
+        resp.data.data
+      )
     }
   } catch (error) {
     // Remove failed upload message

@@ -19,124 +19,139 @@
           :noticeText="config.notice_banner.text"
         />
 
-        <!-- Messages -->
-        <TransitionGroup tag="div" enter-active-class="animate-slide-in" class="flex flex-col gap-4">
-        <div
-          v-for="message in chatStore.getCurrentConversationMessages"
-          :key="message.uuid"
-          :data-message-uuid="message.uuid"
-          :class="[
-            'flex flex-col',
-            message.author.type === 'contact' || message.author.type === 'visitor'
-              ? 'items-end'
-              : 'items-start'
-          ]"
-        >
-          <!-- CSAT Message Bubble -->
-          <CSATMessageBubble
-            v-if="message.meta?.is_csat"
-            :message="message"
-            @submitted="handleCSATSubmitted"
-          />
+        <ProactiveMessage
+          v-if="proactive.pending && !chatStore.currentConversation?.uuid"
+          :pending="proactive.pending"
+        />
 
-          <!-- Regular Message Bubble -->
+        <!-- Messages -->
+        <TransitionGroup
+          tag="div"
+          enter-active-class="animate-slide-in"
+          class="flex flex-col gap-4"
+        >
           <div
-            v-else
+            v-for="message in chatStore.getCurrentConversationMessages"
+            :key="message.uuid"
+            :data-message-uuid="message.uuid"
             :class="[
-              'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words transition-all duration-200',
+              'flex flex-col',
               message.author.type === 'contact' || message.author.type === 'visitor'
-                ? [
-                    'text-primary-foreground',
-                    message.status === 'sending' || message.status === 'uploading'
-                      ? 'bg-primary/60'
-                      : message.status === 'failed'
-                        ? 'bg-destructive/60'
-                        : 'bg-primary'
-                  ]
-                : 'bg-muted text-foreground',
-              {
-                'show-quoted-text': isQuotedTextVisible(message.uuid),
-                'hide-quoted-text': !isQuotedTextVisible(message.uuid)
-              }
+                ? 'items-end'
+                : 'items-start'
             ]"
           >
-            <!-- Message content -->
-            <span v-if="message.content_type === 'text'" class="whitespace-pre-wrap">{{
-              message.content
-            }}</span>
-            <Letter
-              v-else
-              :html="message.content"
-              :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-              :allowed-css-properties="extendedCssProperties"
-              class="native-html"
+            <CSATMessageBubble
+              v-if="message.meta?.is_csat"
+              :message="message"
+              @submitted="handleCSATSubmitted"
             />
+
             <div
-              v-if="containsQuoteMarkers(message.content)"
-              @click="toggleQuote(message.uuid)"
-              @keydown.enter.prevent="toggleQuote(message.uuid)"
-              @keydown.space.prevent="toggleQuote(message.uuid)"
-              tabindex="0"
-              role="button"
-              :aria-expanded="isQuotedTextVisible(message.uuid)"
+              v-else
               :class="[
-                'text-xs cursor-pointer px-2 py-1 w-max rounded-md transition-all mt-1',
+                'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words transition-all duration-200',
                 message.author.type === 'contact' || message.author.type === 'visitor'
-                  ? 'text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-primary'
+                  ? [
+                      'text-primary-foreground',
+                      message.status === 'sending' || message.status === 'uploading'
+                        ? 'bg-primary/60'
+                        : message.status === 'failed'
+                          ? 'bg-destructive/60'
+                          : 'bg-primary'
+                    ]
+                  : 'bg-muted text-foreground',
+                {
+                  'show-quoted-text': isQuotedTextVisible(message.uuid),
+                  'hide-quoted-text': !isQuotedTextVisible(message.uuid)
+                }
               ]"
             >
-              {{
-                isQuotedTextVisible(message.uuid)
-                  ? t('conversation.hideQuotedText')
-                  : t('conversation.showQuotedText')
-              }}
-            </div>
-            <!-- Show attachments if available -->
-            <MessageAttachment class="mt-1" :attachments="message.attachments" />
-          </div>
-
-          <!-- Message metadata -->
-          <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
-            <!-- Agent name and time for agent messages -->
-            <span v-if="message.author.type === 'agent'">
-              {{ message.author.first_name }} {{ message.author.last_name }}
-              •
-              {{ getMessageTime(message.created_at) }}
-            </span>
-
-            <!-- Delivery status for user messages -->
-            <span
-              v-else-if="message.author.type === 'contact' || message.author.type === 'visitor'"
-              class="flex items-center gap-1"
-            >
-              <span
-                v-if="message.status === 'sending' || message.status === 'uploading'"
-                class="flex items-center gap-1"
+              <span v-if="message.content_type === 'text'" class="whitespace-pre-wrap">{{
+                message.content
+              }}</span>
+              <Letter
+                v-else
+                :html="message.content"
+                :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+                :allowed-css-properties="extendedCssProperties"
+                class="native-html"
+              />
+              <div
+                v-if="containsQuoteMarkers(message.content)"
+                @click="toggleQuote(message.uuid)"
+                @keydown.enter.prevent="toggleQuote(message.uuid)"
+                @keydown.space.prevent="toggleQuote(message.uuid)"
+                tabindex="0"
+                role="button"
+                :aria-expanded="isQuotedTextVisible(message.uuid)"
+                :class="[
+                  'text-xs cursor-pointer px-2 py-1 w-max rounded-md transition-all mt-1',
+                  message.author.type === 'contact' || message.author.type === 'visitor'
+                    ? 'text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-primary'
+                ]"
               >
-                <div
-                  class="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"
-                ></div>
-                <span v-if="message.status === 'sending'">
-                  {{ $t('globals.messages.sending') }}
-                </span>
-                <span v-if="message.status === 'uploading'">
-                  {{ $t('globals.messages.uploading') }}
-                </span>
-              </span>
-              <span v-else>
+                {{
+                  isQuotedTextVisible(message.uuid)
+                    ? t('conversation.hideQuotedText')
+                    : t('conversation.showQuotedText')
+                }}
+              </div>
+              <MessageAttachment class="mt-1" :attachments="message.attachments" />
+
+              <PreChatForm
+                v-if="message.uuid === pendingHandoffMessageUUID"
+                handoff-mode
+                :is-submitting="props.handoffFormSubmitting"
+                class="mt-3 border-t border-border pt-3"
+                @submit="emit('handoff-form-submit', { ...$event, message })"
+              />
+            </div>
+
+            <ReplyButtons
+              v-if="message.uuid === suggestedReplyMessageUUID"
+              :replies="message.meta.suggested_replies"
+              class="mt-2 max-w-[85%]"
+              @select="emit('suggested-reply', $event)"
+            />
+
+            <div class="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
+              <span v-if="message.author.type === 'agent'">
+                {{ message.author.first_name }} {{ message.author.last_name }}
+                •
                 {{ getMessageTime(message.created_at) }}
               </span>
-            </span>
+
+              <span
+                v-else-if="message.author.type === 'contact' || message.author.type === 'visitor'"
+                class="flex items-center gap-1"
+              >
+                <span
+                  v-if="message.status === 'sending' || message.status === 'uploading'"
+                  class="flex items-center gap-1"
+                >
+                  <div
+                    class="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"
+                  ></div>
+                  <span v-if="message.status === 'sending'">
+                    {{ $t('globals.messages.sending') }}
+                  </span>
+                  <span v-if="message.status === 'uploading'">
+                    {{ $t('globals.messages.uploading') }}
+                  </span>
+                </span>
+                <span v-else>
+                  {{ getMessageTime(message.created_at) }}
+                </span>
+              </span>
+            </div>
           </div>
-        </div>
         </TransitionGroup>
 
         <!-- Typing Indicator -->
         <div v-if="isTyping" class="flex flex-col items-start">
-          <div
-            class="max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 bg-muted text-foreground"
-          >
+          <div class="max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 bg-muted text-foreground">
             <TypingIndicator />
           </div>
         </div>
@@ -163,9 +178,13 @@ import { Letter } from 'vue-letter'
 import { allowedCssProperties } from 'lettersanitizer'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import ChatIntro from './ChatIntro.vue'
+import ProactiveMessage from './ProactiveMessage.vue'
+import { useProactiveStore } from '@widget/store/proactive.js'
 import NoticeBanner from './NoticeBanner.vue'
 import MessageAttachment from './MessageAttachment.vue'
 import CSATMessageBubble from './CSATMessageBubble.vue'
+import PreChatForm from './PreChatForm.vue'
+import ReplyButtons from './ReplyButtons.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
@@ -177,11 +196,17 @@ const props = defineProps({
   showPreChatForm: {
     type: Boolean,
     default: false
+  },
+  handoffFormSubmitting: {
+    type: Boolean,
+    default: false
   }
 })
+const emit = defineEmits(['suggested-reply', 'handoff-form-submit'])
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
+const proactive = useProactiveStore()
 const messagesContainer = ref(null)
 const contentEl = ref(null)
 const unreadMessages = ref(0)
@@ -189,13 +214,34 @@ const currentConversationUUID = ref('')
 const quotedTextState = ref({})
 const { t } = useI18n()
 
-const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(messagesContainer, contentEl, {
-  onArriveBottom: () => { unreadMessages.value = 0 }
-})
+const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(
+  messagesContainer,
+  contentEl,
+  {
+    onArriveBottom: () => {
+      unreadMessages.value = 0
+    }
+  }
+)
 
 const config = computed(() => widgetStore.config)
 const isTyping = computed(() => chatStore.isTyping)
 const isLoadingConversation = computed(() => chatStore.isLoadingConversation)
+const suggestedReplyMessageUUID = computed(() => {
+  const lastMessage = chatStore.getCurrentConversationLastMessage
+  if (
+    lastMessage?.author?.type === 'ai_assistant' &&
+    Array.isArray(lastMessage.meta?.suggested_replies) &&
+    lastMessage.meta.suggested_replies.length > 0
+  ) {
+    return lastMessage.uuid
+  }
+  return ''
+})
+const pendingHandoffMessageUUID = computed(() => {
+  const lastMessage = chatStore.getCurrentConversationLastMessage
+  return lastMessage?.meta?.handoff_form_pending ? lastMessage.uuid : ''
+})
 
 const getMessageTime = (timestamp) => {
   return useRelativeTime(new Date(timestamp)).value
@@ -268,7 +314,11 @@ watch(
       const target = id && contentEl.value?.querySelector(`[data-message-uuid="${id}"]`)
       if (target) {
         hasUserScrolled.value = true
-        scrollToOffset(target.getBoundingClientRect().top - messagesContainer.value.getBoundingClientRect().top + messagesContainer.value.scrollTop)
+        scrollToOffset(
+          target.getBoundingClientRect().top -
+            messagesContainer.value.getBoundingClientRect().top +
+            messagesContainer.value.scrollTop
+        )
         chatStore.previewUnreadUUID = null
       } else scrollToBottom()
     })
@@ -290,8 +340,7 @@ watch(
     }
     if (!oldLen || !widgetStore.isOpen) return
     if (newLen <= oldLen) return
-    const messages = chatStore.getCurrentConversationMessages
-    const newMessage = messages[messages.length - 1]
+    const newMessage = chatStore.getCurrentConversationLastMessage
     const isOwnMessage =
       newMessage.author?.type === 'contact' || newMessage.author?.type === 'visitor'
 

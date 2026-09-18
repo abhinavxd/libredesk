@@ -395,6 +395,58 @@ LEFT JOIN users lis ON c.last_interaction_sender_id = lis.id
 WHERE c.uuid = $1
   AND inb.deleted_at IS NULL;
 
+-- name: get-contact-unread-preview-messages
+SELECT
+    m.id,
+    m.created_at,
+    m.status,
+    m.type,
+    m.content,
+    m.text_content,
+    m.content_type,
+    m.conversation_id,
+    m.uuid,
+    m.private,
+    m.sender_id,
+    m.sender_type,
+    m.meta,
+    c.uuid AS conversation_uuid,
+    u.id AS "author.id",
+    u.first_name AS "author.first_name",
+    u.last_name AS "author.last_name",
+    u.email AS "author.email",
+    u.avatar_url AS "author.avatar_url",
+    u.availability_status AS "author.availability_status",
+    u.type AS "author.type",
+    u.last_active_at AS "author.last_active_at",
+    COALESCE(
+      (SELECT json_agg(
+        json_build_object(
+          'name', filename,
+          'content_type', content_type,
+          'uuid', uuid,
+          'size', size,
+          'content_id', content_id,
+          'disposition', disposition
+        ) ORDER BY filename
+      ) FROM media
+      WHERE model_type = 'messages' AND model_id = m.id),
+    '[]'::json) AS attachments
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+JOIN inboxes inb ON inb.id = c.inbox_id
+JOIN users u ON u.id = m.sender_id
+WHERE c.contact_id = $1
+  AND c.inbox_id = $2
+  AND inb.deleted_at IS NULL
+  AND m.created_at > COALESCE(c.contact_last_seen_at, c.created_at)
+  AND m.type = 'outgoing'
+  AND m.private = false
+  AND u.type IN ('agent', 'ai_assistant')
+  AND (m.meta IS NULL OR NOT COALESCE((m.meta->>'continuity_email')::boolean, false))
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $3;
+
 -- name: get-contact-chat-conversations
 SELECT
     COALESCE((SELECT json_agg(json_build_object('name', media.filename, 'content_type', media.content_type, 'uuid', media.uuid, 'size', media.size, 'content_id', media.content_id, 'disposition', media.disposition))

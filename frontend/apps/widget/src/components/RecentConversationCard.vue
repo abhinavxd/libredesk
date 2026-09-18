@@ -2,13 +2,15 @@
   <div class="space-y-3">
     <Card
       @click="continueConversation"
-      class="hover:bg-accent transition-colors cursor-pointer rounded-md"
+      class="cursor-pointer rounded-xl border-border/70 bg-card/95 shadow-lg transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-xl"
     >
       <CardContent class="p-4">
         <div class="flex items-start justify-between">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-2">
-              <div class="text-sm font-medium">{{ $t('globals.messages.continueConversation') }}</div>
+              <div class="text-sm font-medium">
+                {{ $t('globals.messages.continueConversation') }}
+              </div>
             </div>
             <div class="flex gap-2 items-start">
               <div class="text-sm text-foreground line-clamp-2 flex-1 min-w-0">

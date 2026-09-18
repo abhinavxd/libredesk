@@ -26,6 +26,26 @@ CREATE TABLE IF NOT EXISTS widget_campaign_deliveries (
 CREATE INDEX IF NOT EXISTS idx_widget_campaign_browser ON widget_campaign_deliveries(inbox_id, browser_key, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_widget_campaign_contact ON widget_campaign_deliveries(inbox_id, contact_id, created_at DESC) WHERE contact_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_widget_campaign_stats ON widget_campaign_deliveries(inbox_id, campaign_id, created_at);
+
+ALTER TABLE help_articles ADD COLUMN IF NOT EXISTS translation_group_id UUID;
+WITH article_groups AS MATERIALIZED (
+    SELECT c.help_center_id, a.slug,
+        COALESCE(MIN(a.translation_group_id::TEXT)::UUID, gen_random_uuid()) AS group_id
+    FROM help_articles a
+    JOIN article_collections c ON c.id = a.collection_id
+    GROUP BY c.help_center_id, a.slug
+    HAVING COUNT(*) = COUNT(DISTINCT a.locale)
+)
+UPDATE help_articles a
+SET translation_group_id = g.group_id
+FROM article_collections c
+JOIN article_groups g ON g.help_center_id = c.help_center_id
+WHERE a.collection_id = c.id AND a.slug = g.slug AND a.translation_group_id IS NULL;
+UPDATE help_articles SET translation_group_id = gen_random_uuid() WHERE translation_group_id IS NULL;
+ALTER TABLE help_articles ALTER COLUMN translation_group_id SET DEFAULT gen_random_uuid();
+ALTER TABLE help_articles ALTER COLUMN translation_group_id SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS index_unique_help_articles_on_translation_group_locale
+    ON help_articles(translation_group_id, locale);
 `)
 	return err
 }

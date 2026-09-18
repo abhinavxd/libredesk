@@ -74,7 +74,10 @@ const fetchInitialConversations = async () => {
       await chatStore.loadConversation(chatStore.getConversations[0].uuid)
     } catch { /* non-blocking */ }
   }
-  if (widgetStore.config?.direct_to_conversation && success) {
+  const audience = userStore.isVisitor ? widgetStore.config?.visitors : widgetStore.config?.users
+  const directToConversation =
+    audience?.direct_to_conversation ?? widgetStore.config?.direct_to_conversation
+  if (directToConversation && success) {
     widgetStore.navigateToChat()
   }
 }

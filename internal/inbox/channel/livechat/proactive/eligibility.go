@@ -35,6 +35,9 @@ func (c Campaign) Validate() error {
 	if c.SenderID < 0 || c.TeamID < 0 || c.BusinessHoursID < 0 || (c.BusinessHours != "any" && c.BusinessHoursID == 0) {
 		return fmt.Errorf("sender, team or business hours")
 	}
+	if !c.Desktop && !c.Mobile {
+		return fmt.Errorf("device")
+	}
 	if c.DelaySeconds < 0 || c.DelaySeconds > 86400 || c.RepeatHours < 1 || c.RepeatHours > 8760 {
 		return fmt.Errorf("delay or repeat interval")
 	}

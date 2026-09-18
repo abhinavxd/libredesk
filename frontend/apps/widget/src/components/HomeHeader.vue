@@ -1,29 +1,27 @@
 <template>
   <div class="relative" :style="headerStyle">
-    <div class="p-8">
-      <!-- Logo -->
+    <div class="p-7">
       <img
         v-if="config.logo_url"
         :src="config.logo_url"
         :alt="config.brand_name"
-        class="max-h-8 max-w-full"
+        class="max-h-7 max-w-full"
       />
-      <!-- Greeting and introduction -->
-      <div class="mt-24 font-bold text-4xl" :class="textColorClass">
-        <h2 class="break-all">{{ parsedGreeting }}</h2>
-        <p class="mt-2 font-semibold" :class="subTextColorClass">
+      <div class="mt-20" :class="textColorClass">
+        <h2 class="text-4xl font-bold leading-none tracking-tight break-words">
+          {{ parsedGreeting }}
+        </h2>
+        <p class="mt-3 max-w-80 text-2xl font-medium leading-tight" :class="subTextColorClass">
           {{ parsedIntroduction }}
         </p>
       </div>
     </div>
-    <!-- Primary action area sits on the gradient so it doesn't cut off visually. -->
-    <div class="relative z-10 px-4 pb-4">
+    <div class="relative z-10 px-4 pb-5">
       <slot />
     </div>
-    <!-- Fade overlay: masks the gradient's bottom into bg-background for a seamless transition. -->
     <div
       v-if="config.home_screen?.background?.type"
-      class="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
+      class="absolute bottom-0 left-0 right-0 h-20 pointer-events-none"
       :style="fadeStyle"
     ></div>
   </div>
@@ -93,5 +91,8 @@ const subTextColorClass = computed(() => {
   return 'text-muted-foreground'
 })
 
-const fadeStyle = { background: 'linear-gradient(to bottom, transparent, hsl(var(--background)))' }
+const fadeStyle = {
+  background:
+    'linear-gradient(to bottom, transparent 0%, hsl(var(--background) / 0.08) 20%, hsl(var(--background) / 0.32) 45%, hsl(var(--background) / 0.72) 72%, hsl(var(--background)) 100%)'
+}
 </script>

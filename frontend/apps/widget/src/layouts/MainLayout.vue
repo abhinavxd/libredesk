@@ -3,8 +3,12 @@
     <div class="absolute top-2 right-2 z-20">
       <CloseWidgetButton />
     </div>
-    <Tabs :modelValue="widgetStore.currentView" @update:modelValue="handleTabChange" class="flex flex-col h-full">
-      <div class="flex-1 min-h-0">
+    <Tabs
+      :modelValue="widgetStore.currentView"
+      @update:modelValue="handleTabChange"
+      class="flex flex-col h-full"
+    >
+      <main class="flex-1 min-h-0">
         <TabsContent value="home" class="h-full mt-0">
           <HomeView />
         </TabsContent>
@@ -13,18 +17,21 @@
           <ChatView v-else />
         </TabsContent>
         <TabsContent value="help" class="h-full mt-0"><HelpView /></TabsContent>
-      </div>
-      <TabsList v-if="!widgetStore.isChatView" class="flex h-auto bg-background border-t rounded-none p-0">
+      </main>
+      <TabsList
+        v-if="!widgetStore.isChatView"
+        class="flex h-auto bg-background border-t rounded-none p-0"
+      >
         <TabsTrigger value="home" class="nav-tab">
-          <House class="w-5 h-5" />
+          <House class="w-5 h-5" aria-hidden="true" />
           <span class="text-xs font-medium">{{ $t('globals.terms.home') }}</span>
         </TabsTrigger>
         <TabsTrigger value="messages" class="nav-tab">
-          <MessagesSquare class="w-5 h-5" />
+          <MessagesSquare class="w-5 h-5" aria-hidden="true" />
           <span class="text-xs font-medium">{{ $t('globals.terms.message', 2) }}</span>
         </TabsTrigger>
         <TabsTrigger v-if="help.available && help.data.audience.tab" value="help" class="nav-tab">
-          <CircleQuestionMark class="w-5 h-5" />
+          <CircleQuestionMark class="w-5 h-5" aria-hidden="true" />
           <span class="text-xs font-medium">{{ $t('globals.terms.help') }}</span>
         </TabsTrigger>
       </TabsList>
@@ -41,8 +48,6 @@
           Powered by <span class="font-medium">libredesk</span>
         </a>
       </div>
-
-      <!-- Network Connection Banner -->
       <ConnectionBanner />
     </Tabs>
   </div>

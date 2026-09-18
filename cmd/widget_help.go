@@ -52,7 +52,8 @@ func handleWidgetHelp(r *fastglue.Request) error {
 	config, _ := getWidgetConfig(r)
 	return r.SendEnvelope(map[string]any{
 		"slug": helpCenter.Slug, "name": helpCenter.Name, "locale": locale,
-		"tree": tree.Tree, "popular": popular, "audience": audience,
+		"url":  helpCenterBaseURL(app, helpCenter) + helpCenterPathPrefix(helpCenter),
+		"tree": tree.Tree, "popular": popular, "audience": audience, "locales": helpCenterLocales(helpCenter),
 		"featured_ids": config.Help.FeaturedIDs,
 	})
 }
@@ -97,8 +98,12 @@ func handleWidgetHelpArticle(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	hideArticleAuthor(helpCenterTheme(helpCenter), &article)
+	translations, err := app.helpcenter.GetPublishedArticleTranslations(helpCenter.Slug, article.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	app.helpcenter.IncrementArticleViewCount(article.ID)
-	return r.SendEnvelope(article)
+	return r.SendEnvelope(helpArticleResponse{Article: article, Translations: translations})
 }
 
 func widgetHelpCenter(r *fastglue.Request) (hcmodels.HelpCenter, livechat.HelpAudience, error) {

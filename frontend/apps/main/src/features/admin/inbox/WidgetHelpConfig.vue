@@ -61,7 +61,7 @@ const unusedArticles = computed(() =>
         :model-value="String(modelValue.help_center_id || 0)"
         @update:model-value="selectHelpCenter"
       >
-        <SelectTrigger id="widget-help-center"><SelectValue /></SelectTrigger>
+        <SelectTrigger id="widget-help-center" class="max-w-md"><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem value="0">{{ t('globals.terms.none') }}</SelectItem>
           <SelectItem

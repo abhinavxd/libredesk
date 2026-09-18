@@ -18,7 +18,8 @@
             <div class="flex items-center p-2 border-b border-border gap-3 shrink-0">
               <button
                 type="button"
-                class="flex items-center justify-center size-8 rounded-md hover:bg-accent text-foreground"
+                :aria-label="$t('globals.messages.back')"
+                :class="BACK_BUTTON_CLASS"
                 @click="view = 'messages'"
               >
                 <ArrowLeft :size="18" />
@@ -52,11 +53,8 @@
             <!-- Pre-chat form -->
             <template v-if="showPrechat && !openedExisting">
               <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-                <div
-                  v-if="config.prechat_form?.title"
-                  class="text-xl text-foreground mb-2 text-center"
-                >
-                  {{ config.prechat_form.title }}
+                <div v-if="prechatConfig.title" class="text-xl text-foreground mb-2 text-center">
+                  {{ prechatConfig.title }}
                 </div>
                 <div v-for="field in prechatFields" :key="field.key" class="space-y-2">
                   <div v-if="field.type === 'checkbox'" class="flex items-start gap-3">
@@ -132,6 +130,17 @@
                     <p class="text-sm text-secondary-foreground">{{ config.notice_banner.text }}</p>
                   </div>
                 </div>
+                <div
+                  v-if="!openedExisting && quickReplies.length"
+                  class="flex flex-wrap justify-end gap-2 mt-auto"
+                >
+                  <span
+                    v-for="reply in quickReplies"
+                    :key="reply"
+                    class="rounded-full border border-primary text-primary px-3 py-1.5 text-sm"
+                    >{{ reply }}</span
+                  >
+                </div>
                 <template v-if="openedExisting">
                   <div
                     v-for="m in sampleMessages"
@@ -194,10 +203,8 @@
             </div>
           </template>
 
-          <!-- Home + Messages (share the bottom nav) -->
           <template v-else>
             <div class="flex-1 min-h-0 relative">
-              <!-- Home -->
               <div v-if="view === 'home'" class="h-full overflow-y-auto flex flex-col">
                 <div class="relative" :style="headerStyle">
                   <div class="p-6">
@@ -207,44 +214,52 @@
                       :alt="config.brand_name"
                       class="max-h-7 max-w-full"
                     />
-                    <div class="mt-16 font-bold text-3xl leading-tight" :class="textColorClass">
-                      <h2 class="break-words">{{ parsedGreeting }}</h2>
-                      <p class="mt-1 font-semibold" :class="subTextColorClass">
+                    <div class="mt-16" :class="textColorClass">
+                      <h2 class="text-3xl font-bold leading-none tracking-tight break-words">
+                        {{ parsedGreeting }}
+                      </h2>
+                      <p
+                        class="mt-2 max-w-64 text-xl font-medium leading-tight"
+                        :class="subTextColorClass"
+                      >
                         {{ parsedIntroduction }}
                       </p>
                     </div>
                   </div>
-                  <div v-if="canStartConversation" class="relative z-10 px-4 pb-4">
+                  <div v-if="canStartConversation" class="relative z-10 px-4 pb-5">
                     <Button
                       type="button"
-                      class="w-full flex items-center justify-center gap-1"
+                      size="lg"
+                      class="w-full rounded-xl font-semibold shadow-md"
                       @click="startNew"
                     >
                       {{ startButtonText }}
-                      <ArrowRight :size="16" />
+                      <ArrowRight :size="16" aria-hidden="true" />
                     </Button>
                   </div>
                   <div
                     v-if="showFade"
-                    class="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
+                    class="absolute bottom-0 left-0 right-0 h-20 pointer-events-none"
                     :style="fadeStyle"
                   ></div>
                 </div>
 
-                <div v-if="homeItems.length" class="flex flex-col gap-3 p-4 bg-background">
+                <div
+                  v-if="homeItems.length"
+                  class="flex flex-col gap-3 bg-background px-4 pt-1 pb-5"
+                >
                   <template v-for="(item, index) in homeItems" :key="index">
-                    <!-- Mirrors the widget's HomeHelp card. -->
                     <section
                       v-if="item.type === 'help'"
-                      class="border rounded-lg p-3 space-y-2 bg-card"
+                      class="space-y-2 rounded-xl border border-border/80 bg-card p-2 shadow-sm"
                     >
                       <Button
                         type="button"
                         variant="outline"
-                        class="w-full justify-start"
+                        class="h-10 w-full justify-start rounded-lg"
                         @click="view = 'help'"
                       >
-                        <Search class="size-4" />
+                        <Search class="size-4" aria-hidden="true" />
                         {{ $t('widget.searchArticles') }}
                       </Button>
                       <Button
@@ -255,13 +270,13 @@
                         class="w-full h-auto justify-start text-left whitespace-normal"
                         @click="view = 'help'"
                       >
-                        <FileText class="size-4 shrink-0" />
+                        <FileText class="size-4 shrink-0" aria-hidden="true" />
                         {{ article.title }}
                       </Button>
                     </section>
                     <Card
                       v-else-if="item.type === 'announcement'"
-                      class="overflow-hidden rounded-md hover:bg-accent transition-colors"
+                      class="overflow-hidden rounded-xl border-border/80 transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
                     >
                       <img
                         v-if="item.image_url"
@@ -269,22 +284,49 @@
                         :alt="item.title"
                         class="w-full h-auto"
                       />
-                      <CardContent class="p-3 text-sm">
-                        <div class="font-bold">
+                      <CardContent class="p-4 text-sm">
+                        <div class="font-semibold leading-snug">
                           {{ item.title || $t('globals.terms.announcement') }}
                         </div>
-                        <div v-if="item.description" class="text-muted-foreground mt-1">
+                        <div
+                          v-if="item.description"
+                          class="mt-1 text-muted-foreground leading-relaxed"
+                        >
                           {{ item.description }}
                         </div>
                       </CardContent>
                     </Card>
-                    <Card v-else class="rounded-md hover:bg-accent transition-colors">
+                    <Card
+                      v-else
+                      class="rounded-xl border-border/80 transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
+                    >
                       <CardContent class="p-4">
-                        <div class="flex justify-between items-center">
-                          <span class="text-sm text-primary font-medium">{{
-                            item.text || item.url
-                          }}</span>
-                          <ExternalLink :size="18" class="text-muted-foreground" />
+                        <div class="flex items-center gap-3">
+                          <span
+                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted"
+                          >
+                            <img
+                              v-if="item.image_url"
+                              :src="item.image_url"
+                              alt=""
+                              class="size-5 object-contain"
+                            />
+                            <Globe2
+                              v-else
+                              :size="16"
+                              class="text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                          </span>
+                          <span
+                            class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground"
+                            >{{ item.text || item.url }}</span
+                          >
+                          <ExternalLink
+                            :size="15"
+                            class="shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
                         </div>
                       </CardContent>
                     </Card>
@@ -298,7 +340,8 @@
                   <button
                     v-if="helpCollection"
                     type="button"
-                    class="flex items-center justify-center size-8 rounded-md hover:bg-accent text-foreground"
+                    :aria-label="$t('globals.messages.back')"
+                    :class="BACK_BUTTON_CLASS"
                     @click="helpPath.pop()"
                   >
                     <ArrowLeft :size="16" />
@@ -307,8 +350,8 @@
                 </header>
                 <div class="flex gap-2 p-3 border-b border-border shrink-0">
                   <Input :placeholder="$t('widget.searchArticles')" readonly />
-                  <Button type="button" variant="outline">
-                    <Search class="size-4" />
+                  <Button type="button" variant="outline" :aria-label="$t('widget.searchArticles')">
+                    <Search class="size-4" aria-hidden="true" />
                   </Button>
                 </div>
                 <div class="flex-1 min-h-0 overflow-y-auto">
@@ -335,8 +378,9 @@
                   </h3>
                 </div>
                 <div class="flex-1 overflow-y-auto pb-20">
-                  <div
-                    class="p-4 border-b border-border hover:bg-accent/50 cursor-pointer transition-colors"
+                  <button
+                    type="button"
+                    class="w-full p-4 border-b border-border hover:bg-accent/50 cursor-pointer transition-colors text-left"
                     @click="openExisting"
                   >
                     <div class="flex items-center gap-3">
@@ -355,7 +399,7 @@
                       </div>
                       <ChevronRight class="w-4 h-4 text-muted-foreground shrink-0" />
                     </div>
-                  </div>
+                  </button>
                 </div>
                 <div v-if="canStartFromMessages" class="absolute bottom-0 inset-x-0">
                   <div
@@ -368,34 +412,39 @@
               </div>
             </div>
 
-            <!-- Bottom nav -->
             <div class="flex border-t border-border bg-background shrink-0">
               <button
                 type="button"
-                class="flex flex-col items-center justify-center gap-1 w-full py-4"
-                :class="view === 'home' ? 'text-primary' : 'text-muted-foreground'"
+                :class="[
+                  PREVIEW_NAV_TAB_CLASS,
+                  view === 'home' ? 'text-primary' : 'text-muted-foreground'
+                ]"
                 @click="view = 'home'"
               >
-                <House class="w-5 h-5" />
+                <House class="w-5 h-5" aria-hidden="true" />
                 <span class="text-xs font-medium">{{ $t('globals.terms.home') }}</span>
               </button>
               <button
                 type="button"
-                class="flex flex-col items-center justify-center gap-1 w-full py-4"
-                :class="view === 'messages' ? 'text-primary' : 'text-muted-foreground'"
+                :class="[
+                  PREVIEW_NAV_TAB_CLASS,
+                  view === 'messages' ? 'text-primary' : 'text-muted-foreground'
+                ]"
                 @click="view = 'messages'"
               >
-                <MessagesSquare class="w-5 h-5" />
+                <MessagesSquare class="w-5 h-5" aria-hidden="true" />
                 <span class="text-xs font-medium">{{ $t('globals.terms.message', 2) }}</span>
               </button>
               <button
                 v-if="showHelpTab"
                 type="button"
-                class="flex flex-col items-center justify-center gap-1 w-full py-4"
-                :class="view === 'help' ? 'text-primary' : 'text-muted-foreground'"
+                :class="[
+                  PREVIEW_NAV_TAB_CLASS,
+                  view === 'help' ? 'text-primary' : 'text-muted-foreground'
+                ]"
                 @click="view = 'help'"
               >
-                <CircleQuestionMark class="w-5 h-5" />
+                <CircleQuestionMark class="w-5 h-5" aria-hidden="true" />
                 <span class="text-xs font-medium">{{ $t('globals.terms.help') }}</span>
               </button>
             </div>
@@ -431,17 +480,27 @@
     <!-- Launcher -->
     <button
       type="button"
+      :aria-label="open ? $t('globals.messages.closeChat') : $t('widget.openChat')"
       class="absolute flex items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105"
       :style="launcherStyle"
       @click="open = !open"
     >
-      <ChevronDown v-if="open" :size="26" :style="{ color: launcherIconColor }" />
+      <ChevronDown
+        v-if="open"
+        :size="26"
+        :style="{ color: launcherIconColor }"
+        aria-hidden="true"
+      />
       <img v-else :src="launcherLogo" alt="" class="w-full h-full rounded-full object-cover" />
     </button>
   </div>
 </template>
 
 <script setup>
+const BACK_BUTTON_CLASS =
+  'flex items-center justify-center size-8 rounded-md hover:bg-accent text-foreground'
+const PREVIEW_NAV_TAB_CLASS = 'flex w-full flex-col items-center justify-center gap-1 py-4'
+
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
@@ -456,6 +515,7 @@ import {
   ArrowLeft,
   ArrowUp,
   ExternalLink,
+  Globe2,
   ChevronDown,
   ChevronRight,
   AlertTriangle,
@@ -566,7 +626,10 @@ const showFade = computed(
     Boolean(props.config.home_screen?.background?.type) &&
     Boolean(props.config.home_screen?.fade_background)
 )
-const fadeStyle = { background: 'linear-gradient(to bottom, transparent, hsl(var(--background)))' }
+const fadeStyle = {
+  background:
+    'linear-gradient(to bottom, transparent 0%, hsl(var(--background) / 0.08) 20%, hsl(var(--background) / 0.32) 45%, hsl(var(--background) / 0.72) 72%, hsl(var(--background)) 100%)'
+}
 
 const userTypeConfig = computed(() => props.config[props.userType] || {})
 
@@ -632,14 +695,32 @@ watch(campaign, (value) => {
   if (value) open.value = false
 })
 const campaignText = computed(() => campaign.value?.message.slice(0, SNIPPET_LENGTH) || '')
+const quickReplies = computed(() => {
+  const replies = userTypeConfig.value.quick_replies ?? props.config.quick_replies
+  if (Array.isArray(replies)) return replies
+  return typeof replies === 'string'
+    ? replies
+        .split('\n')
+        .map((reply) => reply.trim())
+        .filter(Boolean)
+    : []
+})
 
+const prechatConfig = computed(() => {
+  const shared = props.config.prechat_form || {}
+  const audience = shared[props.userType]
+  return audience && typeof audience === 'object' ? audience : shared
+})
 const prechatFields = computed(() =>
-  (props.config.prechat_form?.fields || [])
+  (prechatConfig.value.fields || [])
     .filter((f) => f.enabled)
     .sort((a, b) => (a.order || 0) - (b.order || 0))
 )
 const showPrechat = computed(
-  () => Boolean(props.config.prechat_form?.enabled) && prechatFields.value.length > 0
+  () =>
+    Boolean(props.config.prechat_form?.enabled) &&
+    (prechatConfig.value.enabled ?? true) &&
+    prechatFields.value.length > 0
 )
 
 const onLeft = computed(() => props.config.launcher?.position === 'left')

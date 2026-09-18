@@ -715,6 +715,7 @@ CREATE TABLE help_articles (
 	collection_id INTEGER NOT NULL REFERENCES article_collections(id) ON DELETE CASCADE,
 	author_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
 	created_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	translation_group_id UUID NOT NULL DEFAULT gen_random_uuid(),
 	slug TEXT NOT NULL,
 	locale TEXT NOT NULL DEFAULT 'en',
 	title TEXT NOT NULL,
@@ -737,6 +738,7 @@ CREATE TABLE help_articles (
 	CONSTRAINT constraint_help_articles_on_status CHECK (status IN ('draft', 'published'))
 );
 CREATE UNIQUE INDEX index_unique_help_articles_on_collection_slug_locale ON help_articles(collection_id, slug, locale);
+CREATE UNIQUE INDEX index_unique_help_articles_on_translation_group_locale ON help_articles(translation_group_id, locale);
 CREATE INDEX index_help_articles_on_collection_id ON help_articles(collection_id);
 CREATE INDEX index_help_articles_on_author_id ON help_articles(author_id);
 CREATE INDEX index_help_articles_on_title_trgm ON help_articles USING gin (title gin_trgm_ops);
