@@ -186,10 +186,7 @@
       >
         <Textarea
           v-model="input"
-          :placeholder="
-            hasPendingApproval ? $t('ai.toolApprovalPendingInput') : $t('copilot.placeholder')
-          "
-          :disabled="hasPendingApproval"
+          :placeholder="$t('copilot.placeholder')"
           rows="2"
           class="min-h-[44px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           @keydown.enter.exact.prevent="send"
@@ -253,7 +250,6 @@ const input = ref('')
 const thinkingByUUID = ref({})
 const isHydrating = ref(true)
 const isThinking = computed(() => !!thinkingByUUID.value[conversationStore.current?.uuid || ''])
-const hasPendingApproval = computed(() => messages.value.some((message) => !!message.approval))
 const scrollRef = ref(null)
 
 // Persona selection is global per agent (a stored assistant whose instructions Copilot borrows for
@@ -309,10 +305,14 @@ const hydrate = async (uuid) => {
     return
   }
   const rev = revision(uuid)
+  let staleHydrate = false
   isHydrating.value = true
   try {
     const resp = await api.getCopilotMessages(uuid)
-    if (rev !== revision(uuid) || copilotStore.getMessages(uuid).length > 0) return
+    if (rev !== revision(uuid) || copilotStore.getMessages(uuid).length > 0) {
+      staleHydrate = true
+      return
+    }
     const loaded = (resp.data.data || []).map((m) => ({
       role: m.role,
       content: m.content,
@@ -325,7 +325,7 @@ const hydrate = async (uuid) => {
   } catch {
     // Non-fatal: the panel still works without history.
   } finally {
-    isHydrating.value = false
+    if (!staleHydrate) isHydrating.value = false
   }
 }
 
@@ -345,13 +345,13 @@ const scrollToBottom = async () => {
 
 const send = async (preset) => {
   const text = (typeof preset === 'string' ? preset : input.value).trim()
-  if (!text || isThinking.value || hasPendingApproval.value) return
+  if (!text || isThinking.value) return
 
   const uuid = conversationStore.current?.uuid || ''
   if (!uuid) return
   const rev = revision(uuid)
   copilotStore.setMessages(uuid, [
-    ...copilotStore.getMessages(uuid),
+    ...copilotStore.getMessages(uuid).filter((message) => !message.approval),
     { role: 'user', content: text }
   ])
   input.value = ''
@@ -407,7 +407,7 @@ const resolveToolApproval = async (approval, approved) => {
         .map((message) => (message.approval?.run_id === approval.run_id ? replacement : message))
     )
   } catch (error) {
-    if ([404, 409].includes(error?.response?.status)) {
+    if ([403, 404, 409].includes(error?.response?.status)) {
       copilotStore.setMessages(
         uuid,
         copilotStore

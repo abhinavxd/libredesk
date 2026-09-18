@@ -89,9 +89,9 @@ func otpSendsKey(convUUID, email string) string {
 
 func otpConvSendsKey(convUUID string) string { return otpSendsKeyPrefix + convUUID }
 
-// IsContactVerified reports whether the customer on this conversation has proven their identity: a
+// isContactVerified reports whether the customer on this conversation has proven their identity: a
 // JWT livechat contact is trusted by login, everyone else only within an OTP verification window.
-func (m *Manager) IsContactVerified(conv cmodels.Conversation) bool {
+func (m *Manager) isContactVerified(conv cmodels.Conversation) bool {
 	if conv.InboxChannel != channelEmail && conv.Contact.Type == umodels.UserTypeContact {
 		return true
 	}

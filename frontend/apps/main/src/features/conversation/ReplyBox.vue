@@ -350,7 +350,7 @@ const resolveGenerateToolApproval = async (approved) => {
     pendingToolConversationUUID.value = ''
     htmlContent.value = result.content || ''
   } catch (error) {
-    if ([404, 409].includes(error?.response?.status)) {
+    if ([403, 404, 409].includes(error?.response?.status)) {
       pendingToolApproval.value = null
       pendingToolConversationUUID.value = ''
     }

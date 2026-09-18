@@ -380,8 +380,6 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		tctx = agentToolContext(conv)
 		scope.ConversationID = conv.ID
 		scope.ConversationUUID = conv.UUID
-		// The draft surface keeps no history, so a reload leaves the agent no way to answer an
-		// earlier request; the newest one replaces it.
 		app.ai.ClearPendingAgentRuns(scope)
 	}
 	resp, err := app.ai.GenerateReply(r.RequestCtx, transcript, req.Instruction, tctx, generateReplyTools(app, user, conv), toolIDs, scope)
@@ -502,6 +500,7 @@ func handleAICopilot(r *fastglue.Request) error {
 	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: req.Message})
 
 	scope := ai.AgentRunScope{AgentID: auser.ID, ConversationID: conv.ID, ConversationUUID: conv.UUID, Surface: aimodels.ToolInvocationCopilot, UserMessage: req.Message}
+	app.ai.ClearPendingAgentRuns(scope)
 	toolIDs, err := app.ai.GetEnabledCopilotToolIDs()
 	if err != nil {
 		return sendErrorEnvelope(r, err)

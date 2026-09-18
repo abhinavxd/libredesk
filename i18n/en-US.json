@@ -608,7 +608,6 @@
   "ai.toolApprovalDescription": "The AI wants to run {tool}. Review the arguments before allowing it.",
   "ai.toolRanResponseFailed": "The tool request finished, but the AI could not complete its response. Check the external system before running it again.",
   "ai.toolDeclinedResponseFailed": "The tool was declined, but the AI could not complete its response. Run the AI action again if you still need a reply.",
-  "ai.toolApprovalPendingInput": "Approve or decline the pending tool request first",
   "auth.backToLogin": "Back to login",
   "auth.checkEmailForReset": "Check your email for the password reset link.",
   "auth.confirmPassword": "Confirm password",
