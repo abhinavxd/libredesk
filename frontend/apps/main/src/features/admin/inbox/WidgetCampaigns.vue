@@ -154,7 +154,14 @@ watch(
 const update = (key, value) => {
   emit(
     'update:modelValue',
-    props.modelValue.map((item) => (item.id === selected.value ? { ...item, [key]: value } : item))
+    props.modelValue.map((item) => {
+      if (item.id !== selected.value) return item
+      const next = { ...item, [key]: value }
+      if (key === 'repeat' && value !== 'interval' && !(next.repeat_hours >= 1)) {
+        next.repeat_hours = defaultCampaign().repeat_hours
+      }
+      return next
+    })
   )
 }
 

@@ -68,6 +68,9 @@ func handleWidgetHelpSearch(r *fastglue.Request) error {
 		return r.SendEnvelope([]hcmodels.Article{})
 	}
 	query := strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("q")))
+	if query == "" {
+		return r.SendEnvelope([]hcmodels.Article{})
+	}
 	articles, err := app.helpcenter.SearchPublishedArticles(helpCenter.Slug, query, resolveQueryLocale(r, helpCenter), publicSearchLimit)
 	if err != nil {
 		return sendErrorEnvelope(r, err)

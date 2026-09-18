@@ -616,6 +616,7 @@ func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 	if !config.PreChatForm.Enabled || !config.PreChatForm.HandoffOnly {
 		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("ai.agent.handoffFormUnavailable"), nil, envelope.ConflictError)
 	}
+	config.PreChatForm.Fields, _ = filterPreChatFormFields(config.PreChatForm.Fields, app)
 	if err := validateRequiredFormFields(req.FormData, config, app); err != nil {
 		return sendErrorEnvelope(r, err)
 	}

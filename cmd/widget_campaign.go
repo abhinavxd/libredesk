@@ -144,11 +144,15 @@ func handleCampaignStats(r *fastglue.Request) error {
 	if err != nil || id <= 0 {
 		return sendErrorEnvelope(r, campaignInputError(app))
 	}
-	from, err := time.Parse(time.DateOnly, string(r.RequestCtx.QueryArgs().Peek("from")))
+	loc, err := time.LoadLocation(app.setting.GetAppTimezone())
 	if err != nil {
 		return sendErrorEnvelope(r, campaignInputError(app))
 	}
-	to, err := time.Parse(time.DateOnly, string(r.RequestCtx.QueryArgs().Peek("to")))
+	from, err := time.ParseInLocation(time.DateOnly, string(r.RequestCtx.QueryArgs().Peek("from")), loc)
+	if err != nil {
+		return sendErrorEnvelope(r, campaignInputError(app))
+	}
+	to, err := time.ParseInLocation(time.DateOnly, string(r.RequestCtx.QueryArgs().Peek("to")), loc)
 	if err != nil || to.Before(from) {
 		return sendErrorEnvelope(r, campaignInputError(app))
 	}

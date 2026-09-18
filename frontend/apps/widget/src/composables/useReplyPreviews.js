@@ -59,7 +59,7 @@ export function useReplyPreviews() {
           }
         })
       const target = parentOrigin()
-      if (!target) return
+      if (!target || target === 'null') return
       window.parent.postMessage(
         {
           type: 'REPLY_PREVIEWS',

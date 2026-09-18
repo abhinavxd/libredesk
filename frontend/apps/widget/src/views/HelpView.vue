@@ -60,7 +60,6 @@ const retry = () => {
   help.load(locale.value)
 }
 const search = async () => {
-  if (busy.value) return
   const query = help.query.trim()
   if (!query) {
     help.results = null
@@ -74,10 +73,7 @@ const search = async () => {
     if (!valid(identity) || help.query.trim() !== query) return
     help.results = response.data.data || []
   } catch {
-    if (valid(identity) && help.query.trim() === query) {
-      error.value = t('widget.helpLoadError')
-      help.failed = true
-    }
+    if (valid(identity) && help.query.trim() === query) error.value = t('widget.helpLoadError')
   } finally {
     busy.value = false
   }

@@ -311,6 +311,7 @@ watch(
     hasUserScrolled.value = false
     nextTick(() => {
       const id = chatStore.previewUnreadUUID
+      chatStore.previewUnreadUUID = null
       const target = id && contentEl.value?.querySelector(`[data-message-uuid="${id}"]`)
       if (target) {
         hasUserScrolled.value = true
@@ -319,7 +320,6 @@ watch(
             messagesContainer.value.getBoundingClientRect().top +
             messagesContainer.value.scrollTop
         )
-        chatStore.previewUnreadUUID = null
       } else scrollToBottom()
     })
     if (widgetStore.isOpen && !chatStore.isLoadingConversation) {

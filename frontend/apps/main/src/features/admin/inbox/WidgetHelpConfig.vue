@@ -76,10 +76,11 @@ const unusedArticles = computed(() =>
       </Select>
     </div>
 
+    <p v-if="failed" role="alert" class="text-sm text-destructive">
+      {{ t('widget.helpLoadError') }}
+    </p>
+
     <template v-if="modelValue.help_center_id">
-      <p v-if="failed" role="alert" class="text-sm text-destructive">
-        {{ t('widget.helpLoadError') }}
-      </p>
 
       <div class="space-y-4">
         <h4 class="text-base font-semibold text-foreground">{{ t('widget.helpPlacement') }}</h4>

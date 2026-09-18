@@ -15,7 +15,14 @@ watch(
   },
   { immediate: true, deep: true }
 )
-const update = () => emit('update:modelValue', JSON.parse(JSON.stringify(group.value)))
+const update = () => {
+  const value = JSON.parse(JSON.stringify(group.value))
+  value.rules = value.rules.map((rule) => ({
+    ...rule,
+    value: Array.isArray(rule.value) ? rule.value.join(',') : rule.value
+  }))
+  emit('update:modelValue', value)
+}
 const add = () => {
   group.value.rules.push({
     field: '',

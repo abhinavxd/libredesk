@@ -168,12 +168,12 @@ export const createCampaignSchema = (t) =>
       audience: z.enum(['all', 'visitors', 'users']),
       include_urls: z
         .array(z.string().max(2048))
-        .max(20, t('widget.campaignUrlLimit'))
-        .transform((items) => items.map((item) => item.trim()).filter(Boolean)),
+        .transform((items) => items.map((item) => item.trim()).filter(Boolean))
+        .refine((items) => items.length <= 20, t('widget.campaignUrlLimit')),
       exclude_urls: z
         .array(z.string().max(2048))
-        .max(20, t('widget.campaignUrlLimit'))
-        .transform((items) => items.map((item) => item.trim()).filter(Boolean)),
+        .transform((items) => items.map((item) => item.trim()).filter(Boolean))
+        .refine((items) => items.length <= 20, t('widget.campaignUrlLimit')),
       conditions: createWidgetConditionsSchema(t),
       event: z.string().max(128),
       delay_seconds: rangeInteger(t, 0, 86400),

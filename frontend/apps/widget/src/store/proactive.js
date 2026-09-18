@@ -1,13 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import api from '@widget/api/index.js'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
 
-const parentOrigin = () => new URLSearchParams(window.location.search).get('parent_origin')
 const postToParent = message => {
-  const target = parentOrigin()
-  if (target) window.parent.postMessage(message, target)
+  const target = new URLSearchParams(window.location.search).get('parent_origin')
+  if (target && target !== 'null') window.parent.postMessage(message, target)
 }
 
 export const useProactiveStore = defineStore('proactive', () => {
@@ -60,6 +59,7 @@ export const useProactiveStore = defineStore('proactive', () => {
     }
     try { await api.campaignEvent({ delivery_id: id, browser_key: browserKey, event: name }) } catch { return false }
   }
+  watch(() => widget.isOpen, open => { if (!open) abandon() })
   const replyPayload = () => pending.value ? { delivery_id: pending.value.id, browser_key: browserKey } : {}
   const replied = () => { pending.value = null; invitation.value = null; postToParent({ type: 'CLEAR_CAMPAIGN' }) }
   return { setSessionKey, setBrowserKey, invitation, pending, next, event, reset, abandon, replyPayload, replied }
