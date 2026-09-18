@@ -130,6 +130,7 @@ const sendSuggestedReply = (reply) => {
 }
 
 const submitHandoffForm = async ({ formData, message }) => {
+  if (isSubmittingHandoffForm.value) return
   isSubmittingHandoffForm.value = true
   errorMessage.value = ''
   try {
