@@ -694,7 +694,7 @@ const campaign = computed(() => props.config.preview_campaign || null)
 watch(campaign, (value) => {
   if (value) open.value = false
 })
-const campaignText = computed(() => campaign.value?.message.slice(0, SNIPPET_LENGTH) || '')
+const campaignText = computed(() => campaign.value?.message?.slice(0, SNIPPET_LENGTH) || '')
 const quickReplies = computed(() => {
   const replies = userTypeConfig.value.quick_replies ?? props.config.quick_replies
   if (Array.isArray(replies)) return replies
