@@ -61,7 +61,8 @@ const retry = () => {
 }
 const search = async () => {
   if (busy.value) return
-  if (!help.query.trim()) {
+  const query = help.query.trim()
+  if (!query) {
     help.results = null
     return
   }
@@ -69,11 +70,11 @@ const search = async () => {
   error.value = ''
   const identity = help.identity
   try {
-    const response = await api.searchHelp(help.query.trim(), help.data.locale)
-    if (!valid(identity)) return
+    const response = await api.searchHelp(query, help.data.locale)
+    if (!valid(identity) || help.query.trim() !== query) return
     help.results = response.data.data || []
   } catch {
-    if (valid(identity)) {
+    if (valid(identity) && help.query.trim() === query) {
       error.value = t('widget.helpLoadError')
       help.failed = true
     }
