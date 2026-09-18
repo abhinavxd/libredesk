@@ -374,7 +374,7 @@ SELECT
      FROM (
          SELECT 1 FROM conversation_messages unread
          WHERE unread.conversation_id = c.id
-           AND unread.created_at > c.contact_last_seen_at
+           AND unread.created_at > COALESCE(c.contact_last_seen_at, c.created_at)
            AND unread.type = 'outgoing'
            AND unread.private = false
          LIMIT 10
@@ -470,7 +470,7 @@ SELECT
      FROM (
          SELECT 1 FROM conversation_messages unread
          WHERE unread.conversation_id = c.id
-           AND unread.created_at > c.contact_last_seen_at
+           AND unread.created_at > COALESCE(c.contact_last_seen_at, c.created_at)
            AND unread.type = 'outgoing'
            AND unread.private = false
          LIMIT 10
