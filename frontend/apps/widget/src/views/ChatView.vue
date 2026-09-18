@@ -133,9 +133,10 @@ const submitHandoffForm = async ({ formData, message }) => {
   if (isSubmittingHandoffForm.value) return
   isSubmittingHandoffForm.value = true
   errorMessage.value = ''
+  const uuid = chatStore.currentConversation.uuid
   try {
-    await api.submitHandoffForm(chatStore.currentConversation.uuid, formData)
-    chatStore.replaceMessage(chatStore.currentConversation.uuid, message.uuid, {
+    await api.submitHandoffForm(uuid, formData)
+    chatStore.replaceMessage(uuid, message.uuid, {
       ...message,
       meta: { ...message.meta, handoff_form_pending: false }
     })

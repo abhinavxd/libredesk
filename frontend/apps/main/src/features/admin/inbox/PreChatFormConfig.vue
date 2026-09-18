@@ -28,8 +28,8 @@
 
       <div class="mt-4 space-y-6">
         <SwitchField
-          :title="$t('admin.inbox.livechat.prechatForm.enabled')"
-          :description="$t('admin.inbox.livechat.prechatForm.enabled.description')"
+          :title="$t('admin.inbox.livechat.prechatForm.audienceEnabled')"
+          :description="$t('admin.inbox.livechat.prechatForm.audienceEnabled.description')"
           :checked="audienceConfig.enabled"
           @update:checked="audienceConfig.enabled = $event"
         />

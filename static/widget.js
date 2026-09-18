@@ -653,6 +653,8 @@
         }
 
         dismissPreview (key) {
+            clearTimeout(this.previewTimers.get(key));
+            this.previewTimers.delete(key);
             if (this.campaignData?.id === key) {
                 this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'dismissed', id: key });
                 this.campaignData = null;

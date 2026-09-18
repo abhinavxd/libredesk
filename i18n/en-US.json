@@ -387,6 +387,8 @@
   "admin.inbox.livechat.prechatForm.availableFields": "Available custom attributes",
   "admin.inbox.livechat.prechatForm.enabled": "Enable pre-chat form",
   "admin.inbox.livechat.prechatForm.enabled.description": "Show a form to collect information before chat starts",
+  "admin.inbox.livechat.prechatForm.audienceEnabled": "Show form to this audience",
+  "admin.inbox.livechat.prechatForm.audienceEnabled.description": "Ask the selected audience to fill this form",
   "admin.inbox.livechat.prechatForm.fields": "Form fields",
   "admin.inbox.livechat.prechatForm.handoffOnly": "Show only during AI handoff",
   "admin.inbox.livechat.prechatForm.handoffOnly.description": "Skip this form when a chat starts. Show it when the AI needs to transfer the conversation to a human.",
