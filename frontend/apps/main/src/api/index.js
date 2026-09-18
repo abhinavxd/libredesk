@@ -517,6 +517,10 @@ const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data, {
 const aiSummarizeConversation = (data) => http.post('/api/v1/ai/summarize', data, { timeout: AI_TIMEOUT })
 const aiSuggestTags = (data) => http.post('/api/v1/ai/suggest-tags', data, { timeout: AI_TIMEOUT })
 const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data, { timeout: AI_TIMEOUT })
+const approveAIToolRun = (id) =>
+  http.post(`/api/v1/ai/tool-runs/${id}/approve`, {}, { timeout: AI_TIMEOUT })
+const declineAIToolRun = (id) =>
+  http.post(`/api/v1/ai/tool-runs/${id}/decline`, {}, { timeout: AI_TIMEOUT })
 const getCopilotMessages = (conversationUUID) =>
   http.get('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
 const clearCopilotMessages = (conversationUUID) =>
@@ -818,6 +822,8 @@ export default {
   aiSummarizeConversation,
   aiSuggestTags,
   aiCopilot,
+  approveAIToolRun,
+  declineAIToolRun,
   getCopilotMessages,
   clearCopilotMessages,
   searchConversations,

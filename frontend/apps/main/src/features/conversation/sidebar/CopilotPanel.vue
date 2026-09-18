@@ -9,7 +9,9 @@
         :model-value="selectedAssistantId"
         @update:model-value="persistAssistant"
       >
-        <SelectTrigger class="h-8 w-auto gap-1.5 border-0 shadow-none text-muted-foreground focus:ring-0">
+        <SelectTrigger
+          class="h-8 w-auto gap-1.5 border-0 shadow-none text-muted-foreground focus:ring-0"
+        >
           <SelectValue :placeholder="COPILOT_NAME" />
         </SelectTrigger>
         <SelectContent>
@@ -75,6 +77,51 @@
           :class="msg.isUser ? 'items-end' : 'items-start'"
         >
           <div
+            v-if="msg.approval"
+            class="w-full space-y-3 rounded-lg border border-border bg-card p-3 text-card-foreground"
+            role="group"
+            aria-live="polite"
+            :aria-label="$t('ai.toolApprovalTitle')"
+          >
+            <div class="space-y-1">
+              <p class="text-sm font-medium">{{ $t('ai.toolApprovalTitle') }}</p>
+              <p class="text-xs text-muted-foreground">
+                <i18n-t keypath="ai.toolApprovalDescription" scope="global">
+                  <template #tool
+                    ><code class="inline-flex items-center rounded-md border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground">{{ msg.approval.tool_name }}</code></template
+                  >
+                </i18n-t>
+              </p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-xs font-medium">{{ $t('ai.toolApprovalArguments') }}</p>
+              <pre
+                class="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2 text-xs [overflow-wrap:anywhere]"
+                >{{ formatToolArguments(msg.approval.arguments) }}</pre
+              >
+            </div>
+            <div class="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                :disabled="isThinking"
+                @click="resolveToolApproval(msg.approval, false)"
+              >
+                {{ $t('ai.toolApprovalDecline') }}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                :disabled="isThinking"
+                @click="resolveToolApproval(msg.approval, true)"
+              >
+                {{ $t('ai.toolApprovalApprove') }}
+              </Button>
+            </div>
+          </div>
+          <div
+            v-else
             class="rounded-lg px-3 py-2 text-sm [overflow-wrap:anywhere]"
             :class="
               msg.isUser
@@ -85,7 +132,7 @@
             <Letter v-if="!msg.isUser" :html="msg.content" class="native-html" />
             <template v-else>{{ msg.content }}</template>
           </div>
-          <div v-if="!msg.isUser && msg.content" class="flex gap-0.5">
+          <div v-if="!msg.isUser && !msg.approval && msg.content" class="flex gap-0.5">
             <Tooltip>
               <TooltipTrigger as-child>
                 <Button
@@ -150,7 +197,10 @@
       >
         <Textarea
           v-model="input"
-          :placeholder="$t('copilot.placeholder')"
+          :placeholder="
+            hasPendingApproval ? $t('ai.toolApprovalPendingInput') : $t('copilot.placeholder')
+          "
+          :disabled="hasPendingApproval"
           rows="2"
           class="min-h-[44px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           @keydown.enter.exact.prevent="send"
@@ -198,10 +248,7 @@ const { t } = useI18n()
 const canSendReply = computed(() => userStore.can(perms.MESSAGES_WRITE))
 const canSendPrivateNote = computed(() => userStore.can(perms.MESSAGES_WRITE_PRIVATE))
 
-const presets = computed(() => [
-  t('copilot.preset.summarize'),
-  t('copilot.preset.customerAsking')
-])
+const presets = computed(() => [t('copilot.preset.summarize'), t('copilot.preset.customerAsking')])
 
 // Chat history lives in the store keyed by conversation uuid so it survives tab
 // switches (this panel unmounts) and never leaks across conversations.
@@ -215,6 +262,7 @@ const input = ref('')
 // block the panel after the agent switches to another.
 const thinkingByUUID = ref({})
 const isThinking = computed(() => !!thinkingByUUID.value[conversationStore.current?.uuid || ''])
+const hasPendingApproval = computed(() => messages.value.some((message) => !!message.approval))
 const scrollRef = ref(null)
 
 // Persona selection is global per agent (a stored assistant whose instructions Copilot borrows for
@@ -269,7 +317,11 @@ const hydrate = async (uuid) => {
   try {
     const resp = await api.getCopilotMessages(uuid)
     if (rev !== revision(uuid) || copilotStore.getMessages(uuid).length > 0) return
-    const loaded = (resp.data.data || []).map((m) => ({ role: m.role, content: m.content }))
+    const loaded = (resp.data.data || []).map((m) => ({
+      role: m.role,
+      content: m.content,
+      approval: m.approval
+    }))
     if (loaded.length) {
       copilotStore.setMessages(uuid, loaded)
       await scrollToBottom()
@@ -295,12 +347,15 @@ const scrollToBottom = async () => {
 
 const send = async (preset) => {
   const text = (typeof preset === 'string' ? preset : input.value).trim()
-  if (!text || isThinking.value) return
+  if (!text || isThinking.value || hasPendingApproval.value) return
 
   const uuid = conversationStore.current?.uuid || ''
   if (!uuid) return
   const rev = revision(uuid)
-  copilotStore.setMessages(uuid, [...copilotStore.getMessages(uuid), { role: 'user', content: text }])
+  copilotStore.setMessages(uuid, [
+    ...copilotStore.getMessages(uuid),
+    { role: 'user', content: text }
+  ])
   input.value = ''
   thinkingByUUID.value[uuid] = true
   await scrollToBottom()
@@ -310,10 +365,12 @@ const send = async (preset) => {
     if (selectedAssistantId.value > 0) payload.assistant_id = selectedAssistantId.value
     const resp = await api.aiCopilot(payload)
     if (rev !== revision(uuid)) return
-    copilotStore.setMessages(uuid, [
-      ...copilotStore.getMessages(uuid),
-      { role: 'assistant', content: resp.data.data || '' }
-    ])
+    const result = resp.data.data
+    const message =
+      result.status === 'approval_required'
+        ? { role: 'approval', approval: result.approval }
+        : { role: 'assistant', content: result.content || '' }
+    copilotStore.setMessages(uuid, [...copilotStore.getMessages(uuid), message])
   } catch (error) {
     // A rejected persona (deleted or disabled since selection) comes back as an input error; fall back
     // to the default Copilot so the next send works.
@@ -327,6 +384,54 @@ const send = async (preset) => {
   } finally {
     delete thinkingByUUID.value[uuid]
     await scrollToBottom()
+  }
+}
+
+const resolveToolApproval = async (approval, approved) => {
+  const uuid = conversationStore.current?.uuid || ''
+  if (!uuid || isThinking.value) return
+  const rev = revision(uuid)
+  thinkingByUUID.value[uuid] = true
+  try {
+    const resp = approved
+      ? await api.approveAIToolRun(approval.run_id)
+      : await api.declineAIToolRun(approval.run_id)
+    if (rev !== revision(uuid)) return
+    const result = resp.data.data
+    const replacement =
+      result.status === 'approval_required'
+        ? { role: 'approval', approval: result.approval }
+        : { role: 'assistant', content: result.content || '' }
+    copilotStore.setMessages(
+      uuid,
+      copilotStore
+        .getMessages(uuid)
+        .map((message) => (message.approval?.run_id === approval.run_id ? replacement : message))
+    )
+  } catch (error) {
+    if ([404, 409].includes(error?.response?.status)) {
+      copilotStore.setMessages(
+        uuid,
+        copilotStore
+          .getMessages(uuid)
+          .filter((message) => message.approval?.run_id !== approval.run_id)
+      )
+    }
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    delete thinkingByUUID.value[uuid]
+    await scrollToBottom()
+  }
+}
+
+const formatToolArguments = (argumentsText) => {
+  try {
+    return JSON.stringify(JSON.parse(argumentsText), null, 2)
+  } catch {
+    return argumentsText
   }
 }
 

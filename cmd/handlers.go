@@ -282,6 +282,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/ai/summarize", perm(handleAISummarizeConversation, "messages:write_private"))
 	g.POST("/api/v1/ai/suggest-tags", auth(handleAISuggestTags))
 	g.POST("/api/v1/ai/copilot", auth(handleAICopilot))
+	g.POST("/api/v1/ai/tool-runs/{id}/approve", auth(handleApproveAIToolRun))
+	g.POST("/api/v1/ai/tool-runs/{id}/decline", auth(handleDeclineAIToolRun))
 	g.GET("/api/v1/ai/copilot/messages", auth(handleGetCopilotMessages))
 	g.DELETE("/api/v1/ai/copilot/messages", auth(handleClearCopilotMessages))
 

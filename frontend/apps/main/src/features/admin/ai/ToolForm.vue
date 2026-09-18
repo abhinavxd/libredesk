@@ -31,7 +31,11 @@
         <FormItem class="md:col-span-2">
           <FormLabel>{{ t('globals.terms.url') }}</FormLabel>
           <FormControl>
-            <Input type="text" placeholder="https://api.example.com/orders/lookup" v-bind="componentField" />
+            <Input
+              type="text"
+              placeholder="https://api.example.com/orders/lookup"
+              v-bind="componentField"
+            />
           </FormControl>
           <FormMessage />
         </FormItem>
@@ -119,6 +123,44 @@
       </FormItem>
     </FormField>
 
+    <div class="space-y-5 rounded-lg border border-border p-4">
+      <div>
+        <h3 class="text-sm font-medium text-foreground">{{ t('admin.ai.tool.agentAccess') }}</h3>
+      </div>
+
+      <FormField v-slot="{ componentField, handleChange }" name="copilot_enabled">
+        <FormItem>
+          <SwitchField
+            :title="t('admin.ai.tool.availableInCopilot')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField, handleChange }" name="generate_reply_enabled">
+        <FormItem>
+          <SwitchField
+            :title="t('admin.ai.tool.availableInGenerateReply')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField, handleChange }" name="requires_agent_approval">
+        <FormItem>
+          <SwitchField
+            :title="t('admin.ai.tool.requireAgentApproval')"
+            :description="t('admin.ai.tool.requireAgentApprovalHint')"
+            :checked="componentField.modelValue"
+            :disabled="!hasAgentSurface"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
+    </div>
+
     <div class="flex justify-end mt-10">
       <Button type="submit" :isLoading="formLoading">
         {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
@@ -156,7 +198,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
@@ -233,7 +275,10 @@ const form = useForm({
         }),
       parameters: z.string().optional(),
       enabled: z.boolean().optional(),
-      requires_verification: z.boolean().default(true)
+      requires_verification: z.boolean(),
+      copilot_enabled: z.boolean(),
+      generate_reply_enabled: z.boolean(),
+      requires_agent_approval: z.boolean()
     })
   ),
   initialValues: {
@@ -244,10 +289,16 @@ const form = useForm({
     headers: [],
     parameters: '',
     enabled: true,
-    requires_verification: true
+    requires_verification: true,
+    copilot_enabled: false,
+    generate_reply_enabled: false,
+    requires_agent_approval: true
   }
 })
 
+const hasAgentSurface = computed(
+  () => form.values.copilot_enabled || form.values.generate_reply_enabled
+)
 const insertParametersExample = () => {
   form.setFieldValue('parameters', parametersPlaceholder, false)
 }
@@ -286,7 +337,10 @@ watch(
             ? JSON.stringify(values.parameters, null, 2)
             : '',
         enabled: values.enabled ?? true,
-        requires_verification: values.requires_verification ?? true
+        requires_verification: values.requires_verification ?? true,
+        copilot_enabled: values.copilot_enabled ?? false,
+        generate_reply_enabled: values.generate_reply_enabled ?? false,
+        requires_agent_approval: values.requires_agent_approval ?? true
       },
       false
     )
@@ -319,6 +373,9 @@ const onSubmit = form.handleSubmit(async (values) => {
       method: values.method || 'POST',
       enabled: !!values.enabled,
       requires_verification: values.requires_verification !== false,
+      copilot_enabled: !!values.copilot_enabled,
+      generate_reply_enabled: !!values.generate_reply_enabled,
+      requires_agent_approval: values.requires_agent_approval !== false,
       auth: { headers },
       parameters
     })
