@@ -17,7 +17,7 @@
         </Select>
       </div>
 
-      <div class="flex items-center gap-1">
+      <nav class="flex items-center gap-1" :aria-label="t('globals.terms.pagination')">
         <Button
           type="button"
           variant="ghost"
@@ -27,7 +27,7 @@
           :disabled="page <= 1"
           @click="goToPage(1)"
         >
-          <ChevronsLeft class="h-4 w-4" />
+          <ChevronsLeft class="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
           type="button"
@@ -38,13 +38,14 @@
           :disabled="page <= 1"
           @click="goToPage(page - 1)"
         >
-          <ChevronLeft class="h-4 w-4" />
+          <ChevronLeft class="h-4 w-4" aria-hidden="true" />
         </Button>
 
         <div class="flex items-center bg-muted rounded-lg p-1">
           <template v-for="pageNumber in visiblePages" :key="pageNumber">
             <span
               v-if="pageNumber === '...'"
+              aria-hidden="true"
               class="flex items-center justify-center h-7 w-7 text-sm text-muted-foreground select-none"
             >
               ...
@@ -76,7 +77,7 @@
           :disabled="page >= totalPages"
           @click="goToPage(page + 1)"
         >
-          <ChevronRight class="h-4 w-4" />
+          <ChevronRight class="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
           type="button"
@@ -87,9 +88,9 @@
           :disabled="page >= totalPages"
           @click="goToPage(totalPages)"
         >
-          <ChevronsRight class="h-4 w-4" />
+          <ChevronsRight class="h-4 w-4" aria-hidden="true" />
         </Button>
-      </div>
+      </nav>
     </div>
   </div>
 </template>

@@ -1100,6 +1100,7 @@
   "globals.terms.overdue": "Overdue",
   "globals.terms.overview": "Overview",
   "globals.terms.page": "Page | Pages",
+  "globals.terms.pagination": "Pagination",
   "globals.terms.participant": "Participant | Participants",
   "globals.terms.password": "Password | Passwords",
   "globals.terms.paused": "Paused",
