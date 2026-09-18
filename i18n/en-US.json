@@ -192,7 +192,7 @@
   "admin.ai.tool.availableInCopilot": "Available in Copilot",
   "admin.ai.tool.availableInGenerateReply": "Available in Generate Reply",
   "admin.ai.tool.requireAgentApproval": "Require agent approval",
-  "admin.ai.tool.requireAgentApprovalHint": "The tool pauses before it runs. The agent must review its arguments and approve or decline it.",
+  "admin.ai.tool.requireAgentApprovalHint": "The tool pauses before it runs. The agent must review its arguments and approve or decline it. Keep this on for tools that change data. Read-only lookups can run without it.",
   "admin.ai.snippet.new": "New snippet",
   "admin.ai.snippet.edit": "Edit snippet",
   "admin.ai.snippet.deleteConfirmation": "This will permanently delete the snippet.",
