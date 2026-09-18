@@ -9,7 +9,9 @@
         :model-value="selectedAssistantId"
         @update:model-value="persistAssistant"
       >
-        <SelectTrigger class="h-8 w-auto gap-1.5 border-0 shadow-none text-muted-foreground focus:ring-0">
+        <SelectTrigger
+          class="h-8 w-auto gap-1.5 border-0 shadow-none text-muted-foreground focus:ring-0"
+        >
           <SelectValue :placeholder="COPILOT_NAME" />
         </SelectTrigger>
         <SelectContent>
@@ -31,8 +33,12 @@
       </Button>
     </div>
     <div ref="scrollRef" class="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div v-if="isHydrating" class="h-full flex items-center justify-center text-muted-foreground">
+        <DotLoader />
+        <span class="sr-only">{{ $t('globals.terms.loading') }}</span>
+      </div>
       <div
-        v-if="messages.length === 0"
+        v-else-if="messages.length === 0"
         class="h-full flex flex-col items-center justify-center gap-4 text-center px-4"
       >
         <div class="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -75,6 +81,36 @@
           :class="msg.isUser ? 'items-end' : 'items-start'"
         >
           <div
+            v-if="msg.approval"
+            class="w-full space-y-3 rounded-lg border border-border bg-card p-3 text-card-foreground"
+            role="group"
+            aria-live="polite"
+            :aria-label="$t('ai.toolApprovalTitle')"
+          >
+            <p class="text-sm font-medium">{{ $t('ai.toolApprovalTitle') }}</p>
+            <ToolApprovalDetails :approval="msg.approval" />
+            <div class="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                :disabled="isThinking"
+                @click="resolveToolApproval(msg.approval, false)"
+              >
+                {{ $t('globals.messages.decline') }}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                :disabled="isThinking"
+                @click="resolveToolApproval(msg.approval, true)"
+              >
+                {{ $t('globals.messages.approveAndRun') }}
+              </Button>
+            </div>
+          </div>
+          <div
+            v-else
             class="rounded-lg px-3 py-2 text-sm [overflow-wrap:anywhere]"
             :class="
               msg.isUser
@@ -85,7 +121,7 @@
             <Letter v-if="!msg.isUser" :html="msg.content" class="native-html" />
             <template v-else>{{ msg.content }}</template>
           </div>
-          <div v-if="!msg.isUser && msg.content" class="flex gap-0.5">
+          <div v-if="!msg.isUser && !msg.approval && msg.content" class="flex gap-0.5">
             <Tooltip>
               <TooltipTrigger as-child>
                 <Button
@@ -163,6 +199,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
+import ToolApprovalDetails from '@/features/conversation/ToolApprovalDetails.vue'
 import {
   Select,
   SelectContent,
@@ -198,10 +235,7 @@ const { t } = useI18n()
 const canSendReply = computed(() => userStore.can(perms.MESSAGES_WRITE))
 const canSendPrivateNote = computed(() => userStore.can(perms.MESSAGES_WRITE_PRIVATE))
 
-const presets = computed(() => [
-  t('copilot.preset.summarize'),
-  t('copilot.preset.customerAsking')
-])
+const presets = computed(() => [t('copilot.preset.summarize'), t('copilot.preset.customerAsking')])
 
 // Chat history lives in the store keyed by conversation uuid so it survives tab
 // switches (this panel unmounts) and never leaks across conversations.
@@ -214,6 +248,7 @@ const input = ref('')
 // Thinking state is per conversation so an in-flight send for one conversation does not show or
 // block the panel after the agent switches to another.
 const thinkingByUUID = ref({})
+const isHydrating = ref(true)
 const isThinking = computed(() => !!thinkingByUUID.value[conversationStore.current?.uuid || ''])
 const scrollRef = ref(null)
 
@@ -264,18 +299,33 @@ const clearChat = async () => {
 // Load the persisted chat from the server when a conversation opens, so a refresh
 // does not lose it. Skip if the store already has messages for it (a live session).
 const hydrate = async (uuid) => {
-  if (!uuid || copilotStore.getMessages(uuid).length > 0) return
+  if (!uuid) return
+  if (copilotStore.getMessages(uuid).length > 0) {
+    isHydrating.value = false
+    return
+  }
   const rev = revision(uuid)
+  let staleHydrate = false
+  isHydrating.value = true
   try {
     const resp = await api.getCopilotMessages(uuid)
-    if (rev !== revision(uuid) || copilotStore.getMessages(uuid).length > 0) return
-    const loaded = (resp.data.data || []).map((m) => ({ role: m.role, content: m.content }))
+    if (rev !== revision(uuid) || copilotStore.getMessages(uuid).length > 0) {
+      staleHydrate = true
+      return
+    }
+    const loaded = (resp.data.data || []).map((m) => ({
+      role: m.role,
+      content: m.content,
+      approval: m.approval
+    }))
     if (loaded.length) {
       copilotStore.setMessages(uuid, loaded)
       await scrollToBottom()
     }
   } catch {
     // Non-fatal: the panel still works without history.
+  } finally {
+    if (!staleHydrate) isHydrating.value = false
   }
 }
 
@@ -300,7 +350,10 @@ const send = async (preset) => {
   const uuid = conversationStore.current?.uuid || ''
   if (!uuid) return
   const rev = revision(uuid)
-  copilotStore.setMessages(uuid, [...copilotStore.getMessages(uuid), { role: 'user', content: text }])
+  copilotStore.setMessages(uuid, [
+    ...copilotStore.getMessages(uuid).filter((message) => !message.approval),
+    { role: 'user', content: text }
+  ])
   input.value = ''
   thinkingByUUID.value[uuid] = true
   await scrollToBottom()
@@ -310,15 +363,57 @@ const send = async (preset) => {
     if (selectedAssistantId.value > 0) payload.assistant_id = selectedAssistantId.value
     const resp = await api.aiCopilot(payload)
     if (rev !== revision(uuid)) return
-    copilotStore.setMessages(uuid, [
-      ...copilotStore.getMessages(uuid),
-      { role: 'assistant', content: resp.data.data || '' }
-    ])
+    const result = resp.data.data
+    const message =
+      result.status === 'approval_required'
+        ? { role: 'approval', approval: result.approval }
+        : { role: 'assistant', content: result.content || '' }
+    copilotStore.setMessages(uuid, [...copilotStore.getMessages(uuid), message])
   } catch (error) {
     // A rejected persona (deleted or disabled since selection) comes back as an input error; fall back
     // to the default Copilot so the next send works.
     if (error?.response?.data?.error?.type === 'InputException' && selectedAssistantId.value > 0) {
       persistAssistant(0)
+    }
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    delete thinkingByUUID.value[uuid]
+    await scrollToBottom()
+  }
+}
+
+const resolveToolApproval = async (approval, approved) => {
+  const uuid = conversationStore.current?.uuid || ''
+  if (!uuid || isThinking.value) return
+  const rev = revision(uuid)
+  thinkingByUUID.value[uuid] = true
+  try {
+    const resp = approved
+      ? await api.approveAIToolRun(approval.run_id)
+      : await api.declineAIToolRun(approval.run_id)
+    if (rev !== revision(uuid)) return
+    const result = resp.data.data
+    const replacement =
+      result.status === 'approval_required'
+        ? { role: 'approval', approval: result.approval }
+        : { role: 'assistant', content: result.content || '' }
+    copilotStore.setMessages(
+      uuid,
+      copilotStore
+        .getMessages(uuid)
+        .map((message) => (message.approval?.run_id === approval.run_id ? replacement : message))
+    )
+  } catch (error) {
+    if ([403, 404, 409].includes(error?.response?.status)) {
+      copilotStore.setMessages(
+        uuid,
+        copilotStore
+          .getMessages(uuid)
+          .filter((message) => message.approval?.run_id !== approval.run_id)
+      )
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
