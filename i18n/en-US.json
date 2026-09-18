@@ -182,7 +182,7 @@
   "admin.ai.tool.deleteConfirmation": "This will permanently delete the tool.",
   "admin.ai.tool.reservedName": "This name is reserved for a built-in tool. Choose a different name.",
   "admin.ai.tool.requireVerification": "Require verified contact",
-  "admin.ai.tool.requireVerificationHint": "The assistant verifies the customer's identity by emailing them a one-time code before this tool can run.",
+  "admin.ai.tool.requireVerificationHint": "The assistant emails the customer a one-time code and runs this tool only after they enter it. Copilot and Generate Reply run it without the code, since a human agent asks for it there.",
   "admin.ai.tool.turnOffVerificationTitle": "Turn off customer authentication?",
   "admin.ai.tool.turnOffVerificationBody": "With verification on, Libredesk emails the customer a one-time code and runs this tool only after they enter it. Turning it off lets anyone in the chat trigger the tool.",
   "admin.ai.tool.turnOffVerificationEndpoint": "If the tool accesses sensitive data or performs actions, your endpoint must authenticate the customer itself. Every request carries an X-Libredesk-Contact-Verified header.",

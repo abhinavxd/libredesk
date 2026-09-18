@@ -5,21 +5,8 @@
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t('ai.toolApprovalTitle') }}</AlertDialogTitle>
-        <AlertDialogDescription as="div" class="space-y-3">
-          <p>
-            <i18n-t keypath="ai.toolApprovalDescription" scope="global">
-              <template #tool
-                ><code class="inline-flex items-center rounded-md border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground">{{ pendingToolApproval?.tool_name }}</code></template
-              >
-            </i18n-t>
-          </p>
-          <div class="space-y-1 text-foreground">
-            <p class="text-xs font-medium">{{ $t('ai.toolApprovalArguments') }}</p>
-            <pre
-              class="max-h-60 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs [overflow-wrap:anywhere]"
-              >{{ formatToolArguments(pendingToolApproval?.arguments) }}</pre
-            >
-          </div>
+        <AlertDialogDescription as="div">
+          <ToolApprovalDetails v-if="pendingToolApproval" :approval="pendingToolApproval" />
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
@@ -212,6 +199,7 @@ import {
 } from '@shared-ui/components/ui/alert-dialog'
 import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
 import { Button } from '@shared-ui/components/ui/button'
+import ToolApprovalDetails from '@/features/conversation/ToolApprovalDetails.vue'
 import { Pencil, Paperclip } from 'lucide-vue-next'
 import { useVisualViewportHeight } from '@main/composables/useVisualViewportHeight'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
@@ -372,14 +360,6 @@ const resolveGenerateToolApproval = async (approved) => {
     })
   } finally {
     isGenerating.value = false
-  }
-}
-
-const formatToolArguments = (argumentsText) => {
-  try {
-    return JSON.stringify(JSON.parse(argumentsText), null, 2)
-  } catch {
-    return argumentsText || ''
   }
 }
 

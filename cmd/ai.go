@@ -377,7 +377,7 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		tctx = agentToolContext(app, conv)
+		tctx = agentToolContext(conv)
 		scope.ConversationID = conv.ID
 		scope.ConversationUUID = conv.UUID
 		// The draft surface keeps no history, so a reload leaves the agent no way to answer an
@@ -507,7 +507,7 @@ func handleAICopilot(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	convoContext := conversationTranscript(app, req.ConversationUUID)
-	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, agentToolContext(app, conv), copilotTools(app, user, conv), persona, toolIDs, scope)
+	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, agentToolContext(conv), copilotTools(app, user, conv), persona, toolIDs, scope)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -652,7 +652,7 @@ func decideAIToolRun(r *fastglue.Request, approved bool) (aimodels.AgentRunResul
 	return resp, nil
 }
 
-func agentToolContext(app *App, conv *cmodels.Conversation) ai.ToolContext {
+func agentToolContext(conv *cmodels.Conversation) ai.ToolContext {
 	return ai.ToolContext{
 		ContactID:         conv.Contact.ID,
 		ContactExternalID: conv.Contact.ExternalUserID.String,
@@ -660,6 +660,8 @@ func agentToolContext(app *App, conv *cmodels.Conversation) ai.ToolContext {
 		ConversationUUID:  conv.UUID,
 		InboxID:           conv.InboxID,
 		ContactEmail:      func() string { return conv.Contact.Email.String },
-		Verified:          func() bool { return app.aiAgent.IsContactVerified(*conv) },
+		// The agent picked this conversation and reviews the call before it runs, so the customer's
+		// own OTP state does not gate an agent-initiated lookup.
+		Verified: func() bool { return true },
 	}
 }

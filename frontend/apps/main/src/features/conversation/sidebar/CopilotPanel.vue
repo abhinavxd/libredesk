@@ -33,8 +33,12 @@
       </Button>
     </div>
     <div ref="scrollRef" class="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div v-if="isHydrating" class="h-full flex items-center justify-center text-muted-foreground">
+        <DotLoader />
+        <span class="sr-only">{{ $t('globals.terms.loading') }}</span>
+      </div>
       <div
-        v-if="messages.length === 0"
+        v-else-if="messages.length === 0"
         class="h-full flex flex-col items-center justify-center gap-4 text-center px-4"
       >
         <div class="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -83,23 +87,8 @@
             aria-live="polite"
             :aria-label="$t('ai.toolApprovalTitle')"
           >
-            <div class="space-y-1">
-              <p class="text-sm font-medium">{{ $t('ai.toolApprovalTitle') }}</p>
-              <p class="text-xs text-muted-foreground">
-                <i18n-t keypath="ai.toolApprovalDescription" scope="global">
-                  <template #tool
-                    ><code class="inline-flex items-center rounded-md border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground">{{ msg.approval.tool_name }}</code></template
-                  >
-                </i18n-t>
-              </p>
-            </div>
-            <div class="space-y-1">
-              <p class="text-xs font-medium">{{ $t('ai.toolApprovalArguments') }}</p>
-              <pre
-                class="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2 text-xs [overflow-wrap:anywhere]"
-                >{{ formatToolArguments(msg.approval.arguments) }}</pre
-              >
-            </div>
+            <p class="text-sm font-medium">{{ $t('ai.toolApprovalTitle') }}</p>
+            <ToolApprovalDetails :approval="msg.approval" />
             <div class="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
@@ -213,6 +202,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
+import ToolApprovalDetails from '@/features/conversation/ToolApprovalDetails.vue'
 import {
   Select,
   SelectContent,
@@ -261,6 +251,7 @@ const input = ref('')
 // Thinking state is per conversation so an in-flight send for one conversation does not show or
 // block the panel after the agent switches to another.
 const thinkingByUUID = ref({})
+const isHydrating = ref(true)
 const isThinking = computed(() => !!thinkingByUUID.value[conversationStore.current?.uuid || ''])
 const hasPendingApproval = computed(() => messages.value.some((message) => !!message.approval))
 const scrollRef = ref(null)
@@ -312,8 +303,13 @@ const clearChat = async () => {
 // Load the persisted chat from the server when a conversation opens, so a refresh
 // does not lose it. Skip if the store already has messages for it (a live session).
 const hydrate = async (uuid) => {
-  if (!uuid || copilotStore.getMessages(uuid).length > 0) return
+  if (!uuid) return
+  if (copilotStore.getMessages(uuid).length > 0) {
+    isHydrating.value = false
+    return
+  }
   const rev = revision(uuid)
+  isHydrating.value = true
   try {
     const resp = await api.getCopilotMessages(uuid)
     if (rev !== revision(uuid) || copilotStore.getMessages(uuid).length > 0) return
@@ -328,6 +324,8 @@ const hydrate = async (uuid) => {
     }
   } catch {
     // Non-fatal: the panel still works without history.
+  } finally {
+    isHydrating.value = false
   }
 }
 
@@ -424,14 +422,6 @@ const resolveToolApproval = async (approval, approved) => {
   } finally {
     delete thinkingByUUID.value[uuid]
     await scrollToBottom()
-  }
-}
-
-const formatToolArguments = (argumentsText) => {
-  try {
-    return JSON.stringify(JSON.parse(argumentsText), null, 2)
-  } catch {
-    return argumentsText
   }
 }
 
