@@ -56,6 +56,32 @@
             <div v-else-if="row.message.type === 'activity'">
               <ActivityMessageBubble :message="row.message" />
             </div>
+
+            <!-- Agent Read Receipts (seen_by) -->
+            <div
+              v-if="row.seenBy && row.seenBy.length > 0"
+              class="flex items-center justify-end -space-x-1.5 hover:space-x-0.5 mt-1 pr-1 transition-all duration-150"
+            >
+              <TooltipProvider
+                v-for="agent in row.seenBy"
+                :key="agent.user_id"
+                :delay-duration="150"
+              >
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Avatar class="w-4 h-4 rounded-full border border-background ring-1 ring-border/60 hover:ring-primary hover:z-10 transition-all cursor-default flex-shrink-0">
+                      <AvatarImage :src="agent.avatar_url" :alt="getAgentFullName(agent)" />
+                      <AvatarFallback class="text-[8px] font-semibold bg-secondary text-secondary-foreground">
+                        {{ getAgentInitials(agent) }}
+                      </AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" class="text-xs">
+                    <p>{{ formatSeenByTooltip(agent, t) }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </TransitionGroup>
       </div>
@@ -98,6 +124,10 @@ import AssignSelfNudge from './AssignSelfNudge.vue'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { useBulkActionPermissions } from '@main/composables/useBulkActionPermissions'
+import { useI18n } from 'vue-i18n'
+import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
+import { computeLastSeenMessageMap, getAgentFullName, getAgentInitials, formatSeenByTooltip } from '@main/utils/seenBy'
 import MessagesSkeleton from './MessagesSkeleton.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { useStickyScroll } from '@shared-ui/composables'
@@ -261,8 +291,17 @@ const loadMore = async () => {
   thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
 }
 
+const { t } = useI18n()
+
+const lastSeenMap = computed(() => {
+  const messages = conversationStore.conversationMessages
+  const seenByList = conversationStore.current?.seen_by || []
+  return computeLastSeenMessageMap(messages, seenByList, userStore.userID)
+})
+
 const messageRows = computed(() => {
   const messages = conversationStore.conversationMessages
+  const seenMap = lastSeenMap.value
   return messages.map((message, index) => {
     const groupWithPrev = canGroup(messages[index - 1], message)
     const groupWithNext = canGroup(message, messages[index + 1])
@@ -270,6 +309,7 @@ const messageRows = computed(() => {
       message,
       groupWithPrev,
       groupWithNext,
+      seenBy: seenMap.get(message.uuid) || [],
       spacingClass: getSpacingClass(index, groupWithPrev),
       showDaySeparator:
         index === 0 ||
