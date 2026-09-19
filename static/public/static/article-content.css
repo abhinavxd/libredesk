@@ -142,3 +142,23 @@ details.hc-details[open] > summary.hc-details-summary::before { transform: rotat
 [dir="rtl"] details.hc-details[open] > summary.hc-details-summary::before { transform: rotate(90deg); }
 details.hc-details[open] > summary.hc-details-summary { margin-bottom: .35rem; }
 details.hc-details > .hc-details-content > :last-child { margin-bottom: 0; }
+
+.hc-embed-open {
+    display: flex; align-items: center; justify-content: center; gap: .4rem;
+    padding: 1rem; font-size: .8rem; color: var(--hc-muted);
+    border-top: 1px solid var(--hc-border); text-decoration: none;
+}
+.hc-embed-open:hover { color: var(--hc-ink); text-decoration: none; }
+
+.hc-embed-langs {
+    display: flex; align-items: center; justify-content: center; gap: .5rem;
+    padding: .75rem 1rem; border-top: 1px solid var(--hc-border);
+    font-size: .8rem; color: var(--hc-muted);
+}
+.hc-embed-langs select {
+    padding: .3rem .5rem; border: 1px solid var(--hc-border); border-radius: 6px;
+    background: transparent; color: var(--hc-ink); font: inherit;
+}
+
+/* The widget sizes the frame to this height, so a stretched body would keep it at the tallest page. */
+body.hc-embed { min-height: 0; }

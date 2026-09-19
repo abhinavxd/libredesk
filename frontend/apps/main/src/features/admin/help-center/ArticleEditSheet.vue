@@ -5,11 +5,20 @@
         <div class="flex items-center justify-between p-6 border-b bg-card/50">
           <div>
             <SheetTitle>
-              {{ article ? t('helpCenter.editArticle') : t('helpCenter.newArticle') }}
+              {{
+                translationSource
+                  ? t('helpCenter.addTranslation')
+                  : article
+                    ? t('helpCenter.editArticle')
+                    : t('helpCenter.newArticle')
+              }}
             </SheetTitle>
-            <SheetDescription v-if="article" class="mt-1">
+            <SheetDescription v-if="translationSource" class="mt-1">
+              {{ t('helpCenter.translationOf', { title: translationSource.title }) }}
+            </SheetDescription>
+            <SheetDescription v-if="loadedArticle" class="mt-1">
               {{ t('globals.terms.lastUpdated') }}:
-              {{ format(new Date(article.updated_at), 'PPpp') }}
+              {{ formatDate(loadedArticle.updated_at) }}
             </SheetDescription>
           </div>
         </div>
@@ -89,6 +98,67 @@
                 </div>
               </div>
 
+              <div v-if="loadedArticle && helpCenterLocales.length > 1" class="space-y-3">
+                <h3 class="font-medium text-sm text-muted-foreground">
+                  {{ t('globals.terms.language', 2) }}
+                </h3>
+
+                <div class="overflow-hidden rounded-md border bg-card">
+                  <button
+                    v-for="locale in translatedLocales"
+                    :key="locale"
+                    type="button"
+                    class="flex w-full items-center gap-3 border-b px-3 py-2.5 text-left text-sm last:border-b-0 disabled:cursor-default can-hover:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    :class="{ 'font-medium': locale === loadedArticle.locale }"
+                    :disabled="locale === loadedArticle.locale"
+                    :aria-current="locale === loadedArticle.locale ? 'page' : undefined"
+                    @click="selectTranslationLocale(locale)"
+                  >
+                    <span class="min-w-0 flex-1 truncate">{{ languageName(locale) }}</span>
+                    <span class="text-xs uppercase text-muted-foreground">{{ locale }}</span>
+                    <Check
+                      v-if="locale === loadedArticle.locale"
+                      class="size-4 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <ChevronRight
+                      v-else-if="translationByLocale.has(locale)"
+                      class="size-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </div>
+
+                <Select
+                  v-if="missingLocales.length"
+                  :model-value="''"
+                  @update:model-value="selectTranslationLocale"
+                >
+                  <SelectTrigger class="w-full">
+                    <div class="flex items-center gap-2">
+                      <Plus class="size-4" aria-hidden="true" />
+                      <SelectValue :placeholder="t('helpCenter.addTranslation')" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="locale in missingLocales" :key="locale" :value="locale">
+                      {{ languageName(locale) }} ({{ locale }})
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  v-else
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="w-full"
+                  @click="emit('manage-languages')"
+                >
+                  <Plus class="mr-2 size-4" aria-hidden="true" />
+                  {{ t('helpCenter.addTranslation') }}
+                </Button>
+              </div>
+
               <div class="space-y-3">
                 <h3 class="font-medium text-sm text-muted-foreground">
                   {{ t('globals.terms.status') }}
@@ -122,6 +192,21 @@
                 <p v-if="localeCollections.length === 0" class="text-sm text-muted-foreground">
                   {{ t('helpCenter.noCollectionsInLanguage') }}
                 </p>
+                <Button
+                  v-if="localeCollections.length === 0 && translationSource"
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  @click="
+                    emit('create-translation-collection', {
+                      article: translationSource,
+                      locale: form.values.locale
+                    })
+                  "
+                >
+                  <Plus class="mr-2 size-4" aria-hidden="true" />
+                  {{ t('helpCenter.newCollection') }}
+                </Button>
 
                 <FormField v-slot="{ componentField }" name="collection_id">
                   <FormItem>
@@ -183,7 +268,7 @@
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem v-for="loc in helpCenterLocales" :key="loc" :value="loc">
+                          <SelectItem v-for="loc in selectableLocales" :key="loc" :value="loc">
                             {{ loc }}
                           </SelectItem>
                         </SelectContent>
@@ -256,26 +341,35 @@
                 </FormField>
               </div>
 
-              <div v-if="article" class="space-y-3 text-sm border-t pt-4">
+              <div v-if="loadedArticle" class="space-y-3 text-sm border-t pt-4">
                 <div v-if="loadedArticle?.created_by_name" class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('helpCenter.createdBy') }}</span>
                   <span>{{ loadedArticle.created_by_name }}</span>
                 </div>
-                <div v-if="loadedArticle?.helpful_count !== undefined" class="flex justify-between py-1">
+                <div
+                  v-if="loadedArticle?.helpful_count !== undefined"
+                  class="flex justify-between py-1"
+                >
                   <span class="text-muted-foreground">{{ t('globals.terms.feedback') }}</span>
-                  <span>👍 {{ loadedArticle.helpful_count }} · 👎 {{ loadedArticle.not_helpful_count }}</span>
+                  <span
+                    >👍 {{ loadedArticle.helpful_count }} · 👎
+                    {{ loadedArticle.not_helpful_count }}</span
+                  >
                 </div>
                 <div class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('globals.terms.createdAt') }}</span>
-                  <span>{{ format(new Date(article.created_at), 'PPpp') }}</span>
+                  <span>{{ formatDate(loadedArticle.created_at) }}</span>
                 </div>
                 <div class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('globals.terms.updatedAt') }}</span>
-                  <span>{{ format(new Date(article.updated_at), 'PPpp') }}</span>
+                  <span>{{ formatDate(loadedArticle.updated_at) }}</span>
                 </div>
-                <div v-if="article.view_count !== undefined" class="flex justify-between py-1">
+                <div
+                  v-if="loadedArticle.view_count !== undefined"
+                  class="flex justify-between py-1"
+                >
                   <span class="text-muted-foreground">{{ t('globals.terms.view', 2) }}</span>
-                  <span>{{ article.view_count.toLocaleString() }}</span>
+                  <span>{{ loadedArticle.view_count.toLocaleString() }}</span>
                 </div>
               </div>
             </div>
@@ -321,9 +415,10 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUserStore } from '@/stores/user'
-import { format } from 'date-fns'
+import { format, isValid } from 'date-fns'
+import { Check, ChevronRight, Plus } from 'lucide-vue-next'
 
-const { t } = useI18n()
+const { t, locale: uiLocale } = useI18n()
 
 const props = defineProps({
   isOpen: {
@@ -354,6 +449,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  translationSource: {
+    type: Object,
+    default: null
+  },
   submitForm: {
     type: Function,
     required: true
@@ -364,10 +463,16 @@ const props = defineProps({
   }
 })
 
-defineEmits(['update:open', 'cancel'])
+const emit = defineEmits([
+  'update:open',
+  'cancel',
+  'create-translation',
+  'create-translation-collection',
+  'open-translation',
+  'manage-languages'
+])
 const emitter = useEmitter()
 const userStore = useUserStore()
-
 
 const isLoadingArticle = ref(false)
 const availableCollections = ref([])
@@ -382,6 +487,50 @@ const submitLabel = computed(() =>
   props.article ? t('globals.messages.update') : t('globals.messages.create')
 )
 
+const linkedLocales = computed(
+  () =>
+    new Set(
+      (loadedArticle.value?.translations || props.translationSource?.translations || []).map(
+        ({ locale }) => locale
+      )
+    )
+)
+const selectableLocales = computed(() => {
+  if (props.translationSource) {
+    return props.helpCenterLocales.filter((locale) => !linkedLocales.value.has(locale))
+  }
+  if (props.article) {
+    return props.helpCenterLocales.filter(
+      (locale) => locale === loadedArticle.value?.locale || !linkedLocales.value.has(locale)
+    )
+  }
+  return props.helpCenterLocales
+})
+const translationByLocale = computed(
+  () =>
+    new Map(
+      (loadedArticle.value?.translations || []).map((translation) => [
+        translation.locale,
+        translation
+      ])
+    )
+)
+const translatedLocales = computed(() =>
+  props.helpCenterLocales.filter((locale) => translationByLocale.value.has(locale))
+)
+const missingLocales = computed(() =>
+  props.helpCenterLocales.filter((locale) => !translationByLocale.value.has(locale))
+)
+const languageDisplayNames = computed(
+  () => new Intl.DisplayNames([uiLocale.value], { type: 'language' })
+)
+
+const languageName = (locale) => languageDisplayNames.value.of(locale) || locale
+const formatDate = (value) => {
+  const date = new Date(value)
+  return isValid(date) ? format(date, 'PPpp') : '-'
+}
+
 const toFormValues = () => {
   const article = loadedArticle.value || props.article
   return {
@@ -392,7 +541,12 @@ const toFormValues = () => {
     sort_order: article?.sort_order || 0,
     ai_enabled: article?.ai_enabled || false,
     author_id: String(article?.author_id || (props.article ? '' : userStore.userID) || ''),
-    locale: article?.locale || props.defaultLocale || props.helpCenterLocales?.[0] || 'en',
+    locale:
+      article?.locale ||
+      props.translationSource?.locale ||
+      props.defaultLocale ||
+      selectableLocales.value[0] ||
+      'en',
     excerpt: article?.excerpt || '',
     meta_title: article?.meta_title || '',
     meta_description: article?.meta_description || '',
@@ -442,7 +596,7 @@ const metaDescriptionPlaceholder = computed(() => (form.values.excerpt || '').tr
 // can't fill the form after another article was opened.
 let loadSeq = 0
 watch(
-  () => [props.article, props.collectionId, props.isOpen],
+  () => [props.article, props.collectionId, props.translationSource, props.isOpen],
   async () => {
     if (!props.isOpen) return
     const seq = ++loadSeq
@@ -486,11 +640,31 @@ const fetchArticle = async () => {
   }
 }
 
+const selectTranslationLocale = (locale) => {
+  if (form.meta.value.dirty) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t(
+        translationByLocale.value.has(locale)
+          ? 'helpCenter.saveBeforeSwitchingTranslation'
+          : 'helpCenter.saveBeforeTranslation'
+      )
+    })
+    return
+  }
+  const translation = translationByLocale.value.get(locale)
+  if (translation) {
+    emit('open-translation', translation)
+    return
+  }
+  emit('create-translation', { article: loadedArticle.value, locale })
+}
+
 const onSubmit = form.handleSubmit(async (values) => {
   props.submitForm({
     ...values,
     content: highlightCodeBlocks(values.content),
-    author_id: values.author_id ? Number(values.author_id) : null
+    author_id: values.author_id ? Number(values.author_id) : null,
+    translation_of_id: props.translationSource?.id || undefined
   })
 })
 </script>

@@ -188,6 +188,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Inboxes.
 	g.GET("/api/v1/inboxes", auth(handleGetInboxes))
+	g.GET("/api/v1/inboxes/{id}/campaign-stats", perm(handleCampaignStats, "inboxes:manage"))
 	g.GET("/api/v1/inboxes/{id}", perm(handleGetInbox, "inboxes:manage"))
 	g.POST("/api/v1/inboxes", perm(handleCreateInbox, "inboxes:manage"))
 	g.PUT("/api/v1/inboxes/{id}/toggle", perm(handleToggleInbox, "inboxes:manage"))
@@ -375,13 +376,20 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Widget APIs.
 	g.GET("/api/v1/widget/chat/settings/launcher", rateLimit(validateWidgetInbox(handleGetChatLauncherSettings), "widget"))
 	g.GET("/api/v1/widget/chat/settings", rateLimit(validateWidgetInbox(handleGetChatSettings), "widget"))
+	g.POST("/api/v1/widget/chat/campaigns/next", rateLimit(optionalWidgetAuth(handleWidgetCampaign), "widget"))
+	g.POST("/api/v1/widget/chat/campaigns/event", rateLimit(optionalWidgetAuth(handleWidgetCampaignEvent), "widget"))
+	g.GET("/api/v1/widget/chat/help", rateLimit(optionalWidgetAuth(handleWidgetHelp), "widget"))
+	g.GET("/api/v1/widget/chat/help/search", rateLimit(optionalWidgetAuth(handleWidgetHelpSearch), "widget"))
+	g.GET("/api/v1/widget/chat/help/articles/{article_slug}", rateLimit(optionalWidgetAuth(handleWidgetHelpArticle), "widget"))
 	g.POST("/api/v1/widget/chat/auth/exchange", rateLimit(validateWidgetInbox(handleAuthExchange), "widget"))
 	g.GET("/api/v1/widget/chat/auth/me", rateLimit(widgetAuth(handleWidgetAuthMe), "widget"))
 	g.POST("/api/v1/widget/chat/conversations/init", rateLimit(widgetAuth(handleChatInit), "widget"))
 	g.GET("/api/v1/widget/chat/conversations", rateLimit(widgetAuth(handleGetConversations), "widget"))
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/update-last-seen", rateLimit(widgetAuth(handleChatUpdateLastSeen), "widget"))
 	g.GET("/api/v1/widget/chat/conversations/{uuid}", rateLimit(widgetAuth(handleChatGetConversation), "widget"))
+	g.GET("/api/v1/widget/chat/conversations/{uuid}/transcript", rateLimit(widgetAuth(handleWidgetTranscript), "widget"))
 	g.POST("/api/v1/widget/chat/conversations/{uuid}/message", rateLimit(widgetAuth(handleChatSendMessage), "widget"))
+	g.POST("/api/v1/widget/chat/conversations/{uuid}/handoff-form", rateLimit(widgetAuth(handleChatSubmitHandoffForm), "widget"))
 	g.POST("/api/v1/widget/media/upload", rateLimit(widgetAuth(handleWidgetMediaUpload), "widget"))
 
 	// getAndHead registers both methods: uptime checkers and link validators probe with HEAD.

@@ -309,6 +309,9 @@ func New(
 }
 
 type queries struct {
+	LockCampaignDelivery     *sqlx.Stmt `query:"lock-campaign-delivery"`
+	CompleteCampaignDelivery *sqlx.Stmt `query:"complete-campaign-delivery"`
+	AssignProactiveTeam      *sqlx.Stmt `query:"assign-proactive-team"`
 	// Conversation queries.
 	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
 	GetConversation                     *sqlx.Stmt `query:"get-conversation"`
@@ -359,6 +362,7 @@ type queries struct {
 	// Message queries.
 	GetMessage                         *sqlx.Stmt `query:"get-message"`
 	GetMessages                        string     `query:"get-messages"`
+	GetContactUnreadPreviewMessages    *sqlx.Stmt `query:"get-contact-unread-preview-messages"`
 	GetOutgoingPendingMessages         *sqlx.Stmt `query:"get-outgoing-pending-messages"`
 	GetMessageSourceIDs                *sqlx.Stmt `query:"get-message-source-ids"`
 	GetConversationUUIDFromMessageUUID *sqlx.Stmt `query:"get-conversation-uuid-from-message-uuid"`
@@ -508,8 +512,42 @@ func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.
 			c.SignAvatarURL(&conversations[i].Assignee.AvatarURL)
 		}
 		c.SignAvatarURL(&conversations[i].LastChatMessage.Author.AvatarURL)
+		c.SignAttachmentURLs(conversations[i].LastChatMessage.Attachments)
 	}
 	return conversations, nil
+}
+
+func (c *Manager) GetContactUnreadPreviewMessages(contactID, inboxID, limit int) ([]models.ChatMessage, error) {
+	var messages []models.Message
+	if err := c.q.GetContactUnreadPreviewMessages.Select(&messages, contactID, inboxID, limit); err != nil {
+		c.lo.Error("error fetching unread preview messages", "contact_id", contactID, "inbox_id", inboxID, "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	previews := make([]models.ChatMessage, 0, len(messages))
+	for _, message := range messages {
+		c.SignAvatarURL(&message.Author.AvatarURL)
+		c.SignAttachmentURLs(message.Attachments)
+		author := message.Author
+		if sender := proactiveSender(message.Meta); sender != "" {
+			author.FirstName = sender
+			author.LastName = ""
+		}
+		author.Email = null.String{}
+		previews = append(previews, models.ChatMessage{
+			ID:               message.ID,
+			UUID:             message.UUID,
+			Status:           message.Status,
+			ConversationUUID: message.ConversationUUID,
+			CreatedAt:        message.CreatedAt,
+			Content:          message.Content,
+			TextContent:      message.TextContent,
+			Author:           author,
+			Attachments:      message.Attachments,
+			Meta:             message.Meta,
+		})
+	}
+	return previews, nil
 }
 
 // GetChatConversation retrieves a single chat conversation by UUID
@@ -526,6 +564,7 @@ func (c *Manager) GetChatConversation(conversationUUID string) (models.ChatConve
 		c.SignAvatarURL(&conversation.Assignee.AvatarURL)
 	}
 	c.SignAvatarURL(&conversation.LastChatMessage.Author.AvatarURL)
+	c.SignAttachmentURLs(conversation.LastChatMessage.Attachments)
 	return conversation, nil
 }
 
@@ -2088,9 +2127,14 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 
 			// Strip agent email from widget responses.
 			author := msg.Author
+			if sender := proactiveSender(msg.Meta); sender != "" {
+				author.FirstName = sender
+				author.LastName = ""
+			}
 			author.Email = null.String{}
 
 			chatMessages = append(chatMessages, models.ChatMessage{
+				ID:               msg.ID,
 				UUID:             msg.UUID,
 				Status:           msg.Status,
 				CreatedAt:        msg.CreatedAt,

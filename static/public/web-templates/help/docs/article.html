@@ -1,7 +1,7 @@
 {{ define "docs-help-article" }}
 {{ template "docs-header" . }}
 
-{{ template "docs-breadcrumb" (map "L" .L "Data" .Data "Collection" .Data.Collection "Current" .Data.Article.Title) }}
+{{ if not .Data.HelpCenter.Embed }}{{ template "docs-breadcrumb" (map "L" .L "Data" .Data "Collection" .Data.Collection "Current" .Data.Article.Title) }}{{ end }}
 
 <article class="hc-article hcd-article">
     <h1>{{ .Data.Article.Title }}</h1>

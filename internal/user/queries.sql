@@ -62,6 +62,7 @@ SELECT
     u.api_key_last_used_at,
     u.external_user_id,
     u.api_secret,
+    u.custom_attributes,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -420,7 +421,10 @@ UPDATE users SET type = 'contact', updated_at = now()
 WHERE id = $1 AND type = 'visitor';
 
 -- name: merge-visitor-to-contact
-WITH transfer_conversations AS (
+WITH transfer_campaigns AS (
+    UPDATE widget_campaign_deliveries SET contact_id = $2 WHERE contact_id = $1
+    RETURNING id
+), transfer_conversations AS (
     UPDATE conversations
     SET contact_id = $2, updated_at = now()
     WHERE contact_id = $1

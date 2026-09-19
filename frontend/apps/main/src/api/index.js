@@ -632,7 +632,10 @@ const updateNotificationPreferences = (data) => http.put('/api/v1/notifications/
 const createPushSubscription = (data) => http.post('/api/v1/notifications/push-subscriptions', data)
 const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/push-subscriptions', { data: { endpoint } })
 
+const getCampaignStats = (id, params) => http.get(`/api/v1/inboxes/${id}/campaign-stats`, { params })
+
 export default {
+ getCampaignStats,
   login,
   deleteUser,
   importAgents,

@@ -8,6 +8,8 @@
         }}</TabsTrigger>
         <TabsTrigger value="messages">{{ $t('admin.inbox.livechat.tabs.messages') }}</TabsTrigger>
         <TabsTrigger value="features">{{ $t('globals.terms.features') }}</TabsTrigger>
+        <TabsTrigger value="campaigns">{{ $t('widget.proactiveMessages') }}</TabsTrigger>
+        <TabsTrigger value="help">{{ $t('globals.terms.helpCenter', 1) }}</TabsTrigger>
         <TabsTrigger value="prechat">{{ $t('admin.inbox.livechat.tabs.prechat') }}</TabsTrigger>
         <TabsTrigger value="users">{{ $t('globals.terms.users') }}</TabsTrigger>
         <TabsTrigger value="security">{{ $t('globals.terms.security') }}</TabsTrigger>
@@ -81,7 +83,9 @@
               <FormControl>
                 <Input type="url" placeholder="https://example.com" v-bind="componentField" />
               </FormControl>
-              <FormDescription>{{ $t('admin.inbox.livechat.websiteUrl.description') }}</FormDescription>
+              <FormDescription>{{
+                $t('admin.inbox.livechat.websiteUrl.description')
+              }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
@@ -96,8 +100,14 @@
                       <SelectValue :placeholder="$t('admin.general.language.placeholder')" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="auto">{{ $t('admin.inbox.livechat.language.auto') }}</SelectItem>
-                      <SelectItem v-for="lang in availableLanguages" :key="lang.code" :value="lang.code">
+                      <SelectItem value="auto">{{
+                        $t('admin.inbox.livechat.language.auto')
+                      }}</SelectItem>
+                      <SelectItem
+                        v-for="lang in availableLanguages"
+                        :key="lang.code"
+                        :value="lang.code"
+                      >
                         {{ lang.name }}
                       </SelectItem>
                     </SelectContent>
@@ -106,7 +116,11 @@
               </FormItem>
             </FormField>
 
-            <FormField v-if="form.values.config?.language === 'auto'" v-slot="{ componentField }" name="config.fallback_language">
+            <FormField
+              v-if="form.values.config?.language === 'auto'"
+              v-slot="{ componentField }"
+              name="config.fallback_language"
+            >
               <FormItem>
                 <FormLabel>{{ $t('admin.inbox.livechat.fallbackLanguage') }}</FormLabel>
                 <FormControl>
@@ -115,13 +129,19 @@
                       <SelectValue :placeholder="$t('admin.general.language.placeholder')" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem v-for="lang in availableLanguages" :key="lang.code" :value="lang.code">
+                      <SelectItem
+                        v-for="lang in availableLanguages"
+                        :key="lang.code"
+                        :value="lang.code"
+                      >
                         {{ lang.name }}
                       </SelectItem>
                     </SelectContent>
                   </Select>
                 </FormControl>
-                <FormDescription>{{ $t('admin.inbox.livechat.fallbackLanguage.description') }}</FormDescription>
+                <FormDescription>{{
+                  $t('admin.inbox.livechat.fallbackLanguage.description')
+                }}</FormDescription>
               </FormItem>
             </FormField>
           </div>
@@ -133,9 +153,7 @@
                 <FormControl>
                   <Select v-bind="componentField">
                     <SelectTrigger>
-                      <SelectValue
-                        :placeholder="$t('placeholders.selectInbox')"
-                      />
+                      <SelectValue :placeholder="$t('placeholders.selectInbox')" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
@@ -152,41 +170,61 @@
             </FormField>
 
             <template v-if="form.values.linked_email_inbox_id">
-            <FormField v-slot="{ componentField }" name="config.continuity.offline_threshold">
-              <FormItem>
-                <FormLabel>{{ $t('admin.inbox.livechat.continuity.offlineThreshold') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" placeholder="10m" v-bind="componentField" />
-                </FormControl>
-                <FormDescription>{{ $t('admin.inbox.livechat.continuity.offlineThreshold.description') }}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </FormField>
+              <FormField v-slot="{ componentField }" name="config.continuity.offline_threshold">
+                <FormItem>
+                  <FormLabel>{{
+                    $t('admin.inbox.livechat.continuity.offlineThreshold')
+                  }}</FormLabel>
+                  <FormControl>
+                    <Input type="text" placeholder="10m" v-bind="componentField" />
+                  </FormControl>
+                  <FormDescription>{{
+                    $t('admin.inbox.livechat.continuity.offlineThreshold.description')
+                  }}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
 
-            <FormField v-slot="{ componentField }" name="config.continuity.max_messages_per_email">
-              <FormItem>
-                <FormLabel>{{ $t('admin.inbox.livechat.continuity.maxMessagesPerEmail') }}</FormLabel>
-                <FormControl>
-                  <Input type="number" :min="1" :max="100" placeholder="10" v-bind="componentField" />
-                </FormControl>
-                <FormDescription>{{ $t('admin.inbox.livechat.continuity.maxMessagesPerEmail.description') }}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </FormField>
+              <FormField
+                v-slot="{ componentField }"
+                name="config.continuity.max_messages_per_email"
+              >
+                <FormItem>
+                  <FormLabel>{{
+                    $t('admin.inbox.livechat.continuity.maxMessagesPerEmail')
+                  }}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      :min="1"
+                      :max="100"
+                      placeholder="10"
+                      v-bind="componentField"
+                    />
+                  </FormControl>
+                  <FormDescription>{{
+                    $t('admin.inbox.livechat.continuity.maxMessagesPerEmail.description')
+                  }}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
 
-            <FormField v-slot="{ componentField }" name="config.continuity.min_email_interval">
-              <FormItem>
-                <FormLabel>{{ $t('admin.inbox.livechat.continuity.minEmailInterval') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" placeholder="15m" v-bind="componentField" />
-                </FormControl>
-                <FormDescription>{{ $t('admin.inbox.livechat.continuity.minEmailInterval.description') }}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </FormField>
+              <FormField v-slot="{ componentField }" name="config.continuity.min_email_interval">
+                <FormItem>
+                  <FormLabel>{{
+                    $t('admin.inbox.livechat.continuity.minEmailInterval')
+                  }}</FormLabel>
+                  <FormControl>
+                    <Input type="text" placeholder="15m" v-bind="componentField" />
+                  </FormControl>
+                  <FormDescription>{{
+                    $t('admin.inbox.livechat.continuity.minEmailInterval.description')
+                  }}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
             </template>
           </div>
-
         </div>
 
         <!-- Appearance Tab -->
@@ -229,7 +267,9 @@
 
           <!-- Colors -->
           <div class="space-y-4">
-            <h4 class="text-base font-semibold text-foreground">{{ $t('admin.inbox.livechat.colors') }}</h4>
+            <h4 class="text-base font-semibold text-foreground">
+              {{ $t('admin.inbox.livechat.colors') }}
+            </h4>
             <div class="grid grid-cols-2 gap-4">
               <FormField v-slot="{ componentField }" name="config.colors.primary">
                 <FormItem>
@@ -238,7 +278,10 @@
                     <Input type="color" v-bind="componentField" />
                   </FormControl>
                   <FormMessage />
-                  <p v-if="lowPrimaryContrast" class="text-sm text-destructive flex items-start gap-1.5">
+                  <p
+                    v-if="lowPrimaryContrast"
+                    class="text-sm text-destructive flex items-start gap-1.5"
+                  >
                     <TriangleAlert class="size-4 shrink-0 mt-0.5" />
                     <span>{{ $t('admin.inbox.livechat.colors.primary.contrastWarning') }}</span>
                   </p>
@@ -249,7 +292,9 @@
 
           <!-- Home Screen -->
           <div class="space-y-4">
-            <h4 class="text-base font-semibold text-foreground">{{ $t('globals.terms.homeScreen') }}</h4>
+            <h4 class="text-base font-semibold text-foreground">
+              {{ $t('globals.terms.homeScreen') }}
+            </h4>
 
             <FormField v-slot="{ componentField }" name="config.home_screen.header_text_color">
               <FormItem>
@@ -266,10 +311,17 @@
                     </div>
                   </RadioGroup>
                 </FormControl>
-                <FormDescription>{{ $t('admin.inbox.livechat.homeScreen.headerTextColor.description') }}</FormDescription>
-                <p v-if="lowHeaderContrast" class="text-sm text-destructive flex items-start gap-1.5">
+                <FormDescription>{{
+                  $t('admin.inbox.livechat.homeScreen.headerTextColor.description')
+                }}</FormDescription>
+                <p
+                  v-if="lowHeaderContrast"
+                  class="text-sm text-destructive flex items-start gap-1.5"
+                >
                   <TriangleAlert class="size-4 shrink-0 mt-0.5" />
-                  <span>{{ $t('admin.inbox.livechat.homeScreen.headerTextColor.contrastWarning') }}</span>
+                  <span>{{
+                    $t('admin.inbox.livechat.homeScreen.headerTextColor.contrastWarning')
+                  }}</span>
                 </p>
               </FormItem>
             </FormField>
@@ -278,7 +330,11 @@
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.background') }}</FormLabel>
                 <FormControl>
-                  <RadioGroup v-bind="componentField" @update:model-value="onBackgroundTypeChange" class="flex gap-4">
+                  <RadioGroup
+                    v-bind="componentField"
+                    @update:model-value="onBackgroundTypeChange"
+                    class="flex gap-4"
+                  >
                     <div class="flex items-center space-x-2">
                       <RadioGroupItem id="bg-solid" value="solid" />
                       <Label for="bg-solid">{{ $t('globals.terms.solid') }}</Label>
@@ -296,8 +352,15 @@
               </FormItem>
             </FormField>
 
-            <div v-if="form.values.config?.home_screen?.background?.type === 'solid'" class="grid grid-cols-2 gap-4">
-              <FormField v-slot="{ componentField }" name="config.home_screen.background.color" keep-value>
+            <div
+              v-if="form.values.config?.home_screen?.background?.type === 'solid'"
+              class="grid grid-cols-2 gap-4"
+            >
+              <FormField
+                v-slot="{ componentField }"
+                name="config.home_screen.background.color"
+                keep-value
+              >
                 <FormItem>
                   <FormLabel>{{ $t('globals.messages.backgroundColor') }}</FormLabel>
                   <FormControl>
@@ -308,8 +371,15 @@
               </FormField>
             </div>
 
-            <div v-if="form.values.config?.home_screen?.background?.type === 'gradient'" class="grid grid-cols-2 gap-4">
-              <FormField v-slot="{ componentField }" name="config.home_screen.background.gradient_start" keep-value>
+            <div
+              v-if="form.values.config?.home_screen?.background?.type === 'gradient'"
+              class="grid grid-cols-2 gap-4"
+            >
+              <FormField
+                v-slot="{ componentField }"
+                name="config.home_screen.background.gradient_start"
+                keep-value
+              >
                 <FormItem>
                   <FormLabel>{{ $t('globals.messages.gradientStart') }}</FormLabel>
                   <FormControl>
@@ -318,7 +388,11 @@
                   <FormMessage />
                 </FormItem>
               </FormField>
-              <FormField v-slot="{ componentField }" name="config.home_screen.background.gradient_end" keep-value>
+              <FormField
+                v-slot="{ componentField }"
+                name="config.home_screen.background.gradient_end"
+                keep-value
+              >
                 <FormItem>
                   <FormLabel>{{ $t('globals.messages.gradientEnd') }}</FormLabel>
                   <FormControl>
@@ -329,17 +403,29 @@
               </FormField>
             </div>
 
-            <FormField v-if="form.values.config?.home_screen?.background?.type === 'image'" v-slot="{ componentField }" name="config.home_screen.background.image_url" keep-value>
+            <FormField
+              v-if="form.values.config?.home_screen?.background?.type === 'image'"
+              v-slot="{ componentField }"
+              name="config.home_screen.background.image_url"
+              keep-value
+            >
               <FormItem>
                 <FormLabel>{{ $t('globals.messages.backgroundImageUrl') }}</FormLabel>
                 <FormControl>
-                  <Input type="url" placeholder="https://example.com/background.jpg" v-bind="componentField" />
+                  <Input
+                    type="url"
+                    placeholder="https://example.com/background.jpg"
+                    v-bind="componentField"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             </FormField>
 
-            <FormField v-slot="{ componentField, handleChange }" name="config.home_screen.fade_background">
+            <FormField
+              v-slot="{ componentField, handleChange }"
+              name="config.home_screen.fade_background"
+            >
               <FormItem>
                 <SwitchField
                   :title="$t('admin.inbox.livechat.homeScreen.fadeBackground')"
@@ -351,14 +437,22 @@
             </FormField>
           </div>
 
-          <!-- Home Screen Apps -->
           <div class="space-y-4">
-            <h4 class="text-base font-semibold text-foreground">{{ $t('globals.terms.homeScreenApp', 2) }}</h4>
+            <h4 class="text-base font-semibold text-foreground">
+              {{ $t('globals.terms.homeScreenApp', 2) }}
+            </h4>
 
             <FormField name="config.home_apps">
               <FormItem>
                 <div class="space-y-3">
-                  <Draggable v-model="homeApps" item-key="index" :animation="200" handle=".drag-handle" class="space-y-3" @change="updateHomeApps">
+                  <Draggable
+                    v-model="homeApps"
+                    item-key="index"
+                    :animation="200"
+                    handle=".drag-handle"
+                    class="space-y-3"
+                    @change="updateHomeApps"
+                  >
                     <template #item="{ element: item, index }">
                       <div class="flex items-start gap-2 p-3 border rounded-md">
                         <div class="drag-handle cursor-move text-muted-foreground pt-2">
@@ -366,24 +460,66 @@
                         </div>
                         <div class="flex-1">
                           <div class="text-xs text-muted-foreground mb-2">
-                            {{ item.type === 'announcement' ? $t('globals.terms.announcement') : $t('admin.inbox.livechat.externalLinks') }}
+                            {{ homeAppLabel(item.type) }}
                           </div>
-                          <!-- Announcement fields -->
-                          <div v-if="item.type === 'announcement'" class="flex flex-col gap-2">
-                            <Input v-model="item.title" :placeholder="$t('globals.terms.title')" @change="updateHomeApps" />
-                            <Textarea v-model="item.description" :placeholder="$t('globals.terms.description')" rows="6" @change="updateHomeApps" />
+                          <p v-if="item.type === 'help'" class="text-sm text-muted-foreground">
+                            {{ $t('widget.helpHomeAppHint') }}
+                          </p>
+                          <div v-else-if="item.type === 'announcement'" class="flex flex-col gap-2">
+                            <Input
+                              v-model="item.title"
+                              :placeholder="$t('globals.terms.title')"
+                              @change="updateHomeApps"
+                            />
+                            <Textarea
+                              v-model="item.description"
+                              :placeholder="$t('globals.terms.description')"
+                              rows="6"
+                              @change="updateHomeApps"
+                            />
                             <div class="grid grid-cols-2 gap-2">
-                              <Input v-model="item.image_url" type="url" :placeholder="$t('globals.messages.coverImageUrl')" @change="updateHomeApps" />
-                              <Input v-model="item.url" type="url" :placeholder="$t('globals.messages.linkUrl')" @change="updateHomeApps" />
+                              <Input
+                                v-model="item.image_url"
+                                type="url"
+                                :placeholder="$t('globals.messages.coverImageUrl')"
+                                @change="updateHomeApps"
+                              />
+                              <Input
+                                v-model="item.url"
+                                type="url"
+                                :placeholder="$t('globals.messages.linkUrl')"
+                                @change="updateHomeApps"
+                              />
                             </div>
                           </div>
-                          <!-- External link fields -->
-                          <div v-else class="grid grid-cols-2 gap-2">
-                            <Input v-model="item.text" :placeholder="$t('placeholders.linkText')" @change="updateHomeApps" />
-                            <Input v-model="item.url" placeholder="https://example.com" @change="updateHomeApps" />
+                          <div
+                            v-else-if="item.type === 'external_link'"
+                            class="grid grid-cols-3 gap-2"
+                          >
+                            <Input
+                              v-model="item.text"
+                              :placeholder="$t('placeholders.linkText')"
+                              @change="updateHomeApps"
+                            />
+                            <Input
+                              v-model="item.url"
+                              placeholder="https://example.com"
+                              @change="updateHomeApps"
+                            />
+                            <Input
+                              v-model="item.image_url"
+                              type="url"
+                              :placeholder="$t('globals.terms.logoUrl')"
+                              @change="updateHomeApps"
+                            />
                           </div>
                         </div>
-                        <Button type="button" variant="ghost" size="sm" @click="removeHomeApp(index)">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          @click="removeHomeApp(index)"
+                        >
                           <X class="w-4 h-4" />
                         </Button>
                       </div>
@@ -391,16 +527,45 @@
                   </Draggable>
 
                   <div class="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" @click="addHomeApp('announcement')">
-                      <Plus class="w-4 h-4"/>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      @click="addHomeApp('announcement')"
+                    >
+                      <Plus class="w-4 h-4" />
                       {{ $t('globals.messages.addAnnouncement') }}
                     </Button>
-                    <Button type="button" variant="outline" size="sm" @click="addHomeApp('external_link')">
-                      <Plus class="w-4 h-4"/>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      @click="addHomeApp('external_link')"
+                    >
+                      <Plus class="w-4 h-4" />
                       {{ $t('globals.messages.addExternalLink') }}
                     </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      :disabled="!form.values.config.help?.help_center_id || hasHelpHomeApp"
+                      @click="addHomeApp('help')"
+                    >
+                      <Plus class="w-4 h-4" />
+                      {{ $t('widget.addHelpHomeApp') }}
+                    </Button>
                   </div>
-                  <p v-if="showHomeAppsError && incompleteHomeApps" class="text-sm text-destructive flex items-start gap-1.5">
+                  <p
+                    v-if="!form.values.config.help?.help_center_id"
+                    class="text-xs text-muted-foreground"
+                  >
+                    {{ $t('widget.helpHomeAppRequiresCenter') }}
+                  </p>
+                  <p
+                    v-if="showHomeAppsError && incompleteHomeApps"
+                    class="text-sm text-destructive flex items-start gap-1.5"
+                  >
                     <TriangleAlert class="size-4 shrink-0 mt-0.5" />
                     <span>{{ $t('admin.inbox.livechat.homeApps.incomplete') }}</span>
                   </p>
@@ -412,7 +577,9 @@
 
           <!-- Launcher Configuration -->
           <div class="space-y-4">
-            <h4 class="text-base font-semibold text-foreground">{{ $t('admin.inbox.livechat.launcher') }}</h4>
+            <h4 class="text-base font-semibold text-foreground">
+              {{ $t('admin.inbox.livechat.launcher') }}
+            </h4>
 
             <div class="grid grid-cols-2 gap-4">
               <FormField v-slot="{ componentField }" name="config.launcher.position">
@@ -469,7 +636,13 @@
                 <FormItem>
                   <FormLabel>{{ $t('admin.inbox.livechat.launcher.spacing.side') }}</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="20" min="0" max="200" v-bind="componentField" />
+                    <Input
+                      type="number"
+                      placeholder="20"
+                      min="0"
+                      max="200"
+                      v-bind="componentField"
+                    />
                   </FormControl>
                   <FormDescription>{{
                     $t('admin.inbox.livechat.launcher.spacing.side.description')
@@ -482,7 +655,13 @@
                 <FormItem>
                   <FormLabel>{{ $t('admin.inbox.livechat.launcher.spacing.bottom') }}</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="20" min="0" max="200" v-bind="componentField" />
+                    <Input
+                      type="number"
+                      placeholder="20"
+                      min="0"
+                      max="200"
+                      v-bind="componentField"
+                    />
                   </FormControl>
                   <FormDescription>{{
                     $t('admin.inbox.livechat.launcher.spacing.bottom.description')
@@ -517,7 +696,11 @@
             <FormItem>
               <FormLabel>{{ $t('admin.inbox.livechat.introductionMessage') }}</FormLabel>
               <FormControl>
-                <Textarea v-bind="componentField" :placeholder="$t('placeholders.introductionMessage')" rows="2" />
+                <Textarea
+                  v-bind="componentField"
+                  :placeholder="$t('placeholders.introductionMessage')"
+                  rows="2"
+                />
               </FormControl>
               <FormDescription>{{
                 $t('admin.inbox.livechat.greetingMessage.variables')
@@ -608,7 +791,9 @@
               <FormItem>
                 <SwitchField
                   :title="$t('admin.inbox.livechat.showOfficeHoursAfterAssignment')"
-                  :description="$t('admin.inbox.livechat.showOfficeHoursAfterAssignment.description')"
+                  :description="
+                    $t('admin.inbox.livechat.showOfficeHoursAfterAssignment.description')
+                  "
                   :checked="componentField.modelValue"
                   :disabled="!form.values.config.show_office_hours_in_chat"
                   @update:checked="handleChange"
@@ -636,7 +821,57 @@
 
           <!-- Chat Features -->
           <div class="space-y-4">
-            <h4 class="text-base font-semibold text-foreground">{{ $t('globals.terms.features') }}</h4>
+            <h4 class="text-base font-semibold">{{ $t('widget.replyPreviews') }}</h4>
+            <FormField
+              v-for="device in ['desktop', 'mobile']"
+              :key="device"
+              v-slot="{ componentField, handleChange }"
+              :name="`config.previews.${device}`"
+            >
+              <FormItem
+                ><SwitchField
+                  :title="$t(`globals.terms.${device}`)"
+                  :checked="componentField.modelValue"
+                  @update:checked="handleChange"
+              /></FormItem>
+            </FormField>
+            <FormField v-slot="{ componentField }" name="config.previews.content">
+              <FormItem
+                ><FormLabel>{{ $t('widget.previewContent') }}</FormLabel
+                ><Select v-bind="componentField"
+                  ><SelectTrigger><SelectValue /></SelectTrigger
+                  ><SelectContent
+                    ><SelectItem value="message">{{ $t('widget.messagePreview') }}</SelectItem
+                    ><SelectItem value="generic">{{
+                      $t('widget.genericNotice')
+                    }}</SelectItem></SelectContent
+                  ></Select
+                ><FormMessage
+              /></FormItem>
+            </FormField>
+            <FormField
+              v-slot="{ value, handleChange, meta }"
+              name="config.previews.auto_hide_seconds"
+            >
+              <FormItem
+                ><FormLabel>{{ $t('widget.autoHideSeconds') }}</FormLabel
+                ><FormControl
+                  ><Input
+                    type="number"
+                    min="0"
+                    max="300"
+                    :model-value="value"
+                    @update:model-value="
+                      (value) => handleChange(Number(value), meta.validated)
+                    " /></FormControl
+                ><FormMessage
+              /></FormItem>
+            </FormField>
+          </div>
+          <div class="space-y-4">
+            <h4 class="text-base font-semibold text-foreground">
+              {{ $t('globals.terms.features') }}
+            </h4>
 
             <div class="space-y-3">
               <FormField
@@ -666,12 +901,11 @@
 
               <FormField
                 v-slot="{ componentField, handleChange }"
-                name="config.direct_to_conversation"
+                name="config.features.transcript"
               >
                 <FormItem>
                   <SwitchField
-                    :title="$t('admin.inbox.livechat.directToConversation')"
-                    :description="$t('admin.inbox.livechat.directToConversation.description')"
+                    :title="$t('conversation.downloadTranscript')"
                     :checked="componentField.modelValue"
                     @update:checked="handleChange"
                   />
@@ -679,6 +913,38 @@
               </FormField>
             </div>
           </div>
+        </div>
+
+        <!-- Proactive messages Tab -->
+        <div v-show="activeTab === 'campaigns'" class="space-y-3">
+          <WidgetCampaigns
+            ref="campaignsRef"
+            :model-value="form.values.config.campaigns || []"
+            :inbox-id="initialValues.id || 0"
+            :cooldown="form.values.config.campaign_cooldown_hours ?? 24"
+            :show-errors="showCampaignErrors"
+            @update:model-value="updateCampaigns"
+            @update:cooldown="updateCampaignCooldown"
+            @update:preview="previewCampaign = $event"
+          />
+        </div>
+
+        <!-- Help Tab -->
+        <div v-show="activeTab === 'help'" class="space-y-3">
+          <WidgetHelpConfig
+            :model-value="form.values.config.help"
+            :centers="helpCenters"
+            :articles="helpArticles"
+            :failed="helpFailed"
+            @update:model-value="form.setFieldValue('config.help', $event, false)"
+          />
+          <p
+            v-if="Object.keys(form.errors.value).some((key) => key.startsWith('config.help'))"
+            role="alert"
+            class="text-sm text-destructive"
+          >
+            {{ $t('validation.invalidValue') }}
+          </p>
         </div>
 
         <!-- Security Tab -->
@@ -694,7 +960,10 @@
                   $t('admin.inbox.livechat.secretKey.description')
                 }}</FormDescription>
                 <FormMessage />
-                <p v-if="weakSecret" class="!mt-2 text-muted-foreground text-xs flex items-start gap-1.5">
+                <p
+                  v-if="weakSecret"
+                  class="!mt-2 text-muted-foreground text-xs flex items-start gap-1.5"
+                >
                   <TriangleAlert class="size-4 shrink-0 mt-0.5" />
                   <span>{{ $t('admin.inbox.livechat.secretKey.weak') }}</span>
                 </p>
@@ -707,7 +976,9 @@
                 <FormControl>
                   <Input type="text" placeholder="10h" v-bind="componentField" />
                 </FormControl>
-                <FormDescription>{{ $t('admin.inbox.livechat.sessionDuration.description') }}</FormDescription>
+                <FormDescription>{{
+                  $t('admin.inbox.livechat.sessionDuration.description')
+                }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
@@ -779,9 +1050,43 @@
                       $t('admin.inbox.livechat.startConversationButtonText')
                     }}</FormLabel>
                     <FormControl>
-                      <Input v-bind="componentField" :placeholder="$t('placeholders.startConversation')" />
+                      <Input
+                        v-bind="componentField"
+                        :placeholder="$t('placeholders.startConversation')"
+                      />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="config.visitors.quick_replies">
+                  <FormItem>
+                    <FormLabel>{{ $t('admin.inbox.livechat.quickReplies') }}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        v-bind="componentField"
+                        :placeholder="$t('admin.inbox.livechat.quickReplies.placeholder')"
+                        rows="3"
+                      />
+                    </FormControl>
+                    <FormDescription>{{
+                      $t('admin.inbox.livechat.quickReplies.description')
+                    }}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+
+                <FormField
+                  v-slot="{ componentField, handleChange }"
+                  name="config.visitors.direct_to_conversation"
+                >
+                  <FormItem>
+                    <SwitchField
+                      :title="$t('admin.inbox.livechat.directToConversation')"
+                      :description="$t('admin.inbox.livechat.directToConversation.description')"
+                      :checked="componentField.modelValue"
+                      @update:checked="handleChange"
+                    />
                   </FormItem>
                 </FormField>
 
@@ -792,7 +1097,9 @@
                   <FormItem>
                     <SwitchField
                       :title="$t('admin.inbox.livechat.allowStartConversation')"
-                      :description="$t('admin.inbox.livechat.allowStartConversation.visitors.description')"
+                      :description="
+                        $t('admin.inbox.livechat.allowStartConversation.visitors.description')
+                      "
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
@@ -806,7 +1113,9 @@
                   <FormItem>
                     <SwitchField
                       :title="$t('admin.inbox.livechat.preventMultipleConversations')"
-                      :description="$t('admin.inbox.livechat.preventMultipleConversations.visitors.description')"
+                      :description="
+                        $t('admin.inbox.livechat.preventMultipleConversations.visitors.description')
+                      "
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
@@ -820,7 +1129,9 @@
                   <FormItem>
                     <SwitchField
                       :title="$t('admin.inbox.livechat.preventReplyToClosedConversation')"
-                      :description="$t('admin.inbox.livechat.preventReplyToClosedConversation.description')"
+                      :description="
+                        $t('admin.inbox.livechat.preventReplyToClosedConversation.description')
+                      "
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
@@ -839,9 +1150,43 @@
                       $t('admin.inbox.livechat.startConversationButtonText')
                     }}</FormLabel>
                     <FormControl>
-                      <Input v-bind="componentField" :placeholder="$t('placeholders.startConversation')" />
+                      <Input
+                        v-bind="componentField"
+                        :placeholder="$t('placeholders.startConversation')"
+                      />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="config.users.quick_replies">
+                  <FormItem>
+                    <FormLabel>{{ $t('admin.inbox.livechat.quickReplies') }}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        v-bind="componentField"
+                        :placeholder="$t('admin.inbox.livechat.quickReplies.placeholder')"
+                        rows="3"
+                      />
+                    </FormControl>
+                    <FormDescription>{{
+                      $t('admin.inbox.livechat.quickReplies.description')
+                    }}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+
+                <FormField
+                  v-slot="{ componentField, handleChange }"
+                  name="config.users.direct_to_conversation"
+                >
+                  <FormItem>
+                    <SwitchField
+                      :title="$t('admin.inbox.livechat.directToConversation')"
+                      :description="$t('admin.inbox.livechat.directToConversation.description')"
+                      :checked="componentField.modelValue"
+                      @update:checked="handleChange"
+                    />
                   </FormItem>
                 </FormField>
 
@@ -852,7 +1197,9 @@
                   <FormItem>
                     <SwitchField
                       :title="$t('admin.inbox.livechat.allowStartConversation')"
-                      :description="$t('admin.inbox.livechat.allowStartConversation.users.description')"
+                      :description="
+                        $t('admin.inbox.livechat.allowStartConversation.users.description')
+                      "
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
@@ -866,7 +1213,9 @@
                   <FormItem>
                     <SwitchField
                       :title="$t('admin.inbox.livechat.preventMultipleConversations')"
-                      :description="$t('admin.inbox.livechat.preventMultipleConversations.users.description')"
+                      :description="
+                        $t('admin.inbox.livechat.preventMultipleConversations.users.description')
+                      "
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
@@ -880,7 +1229,9 @@
                   <FormItem>
                     <SwitchField
                       :title="$t('admin.inbox.livechat.preventReplyToClosedConversation')"
-                      :description="$t('admin.inbox.livechat.preventReplyToClosedConversation.description')"
+                      :description="
+                        $t('admin.inbox.livechat.preventReplyToClosedConversation.description')
+                      "
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
@@ -939,10 +1290,7 @@
                 language="html"
                 :readOnly="true"
               />
-              <CopyButton
-                :text="authenticatedIntegrationSnippet"
-                class="absolute top-3 right-3"
-              />
+              <CopyButton :text="authenticatedIntegrationSnippet" class="absolute top-3 right-3" />
             </div>
 
             <p class="text-sm text-destructive flex items-center gap-1.5">
@@ -977,11 +1325,21 @@
 </template>
 
 <script setup>
-import { watch, computed, ref, inject, onMounted, onBeforeUnmount } from 'vue'
+import { watch, computed, ref, inject, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { createFormSchema } from './livechatFormSchema.js'
+import {
+  createFormSchema,
+  defaultWidgetHelp,
+  defaultWidgetPreviews,
+  normalizeAudienceConfig,
+  normalizePrechatConfig
+} from './livechatFormSchema.js'
+import WidgetHelpConfig from './WidgetHelpConfig.vue'
+import { useHelpCenterArticles } from './useHelpCenterArticles.js'
+import WidgetCampaigns from './WidgetCampaigns.vue'
 import { useInboxStore } from '@/stores/inbox'
+import api from '@/api'
 import {
   FormControl,
   FormField,
@@ -1007,6 +1365,7 @@ import { Label } from '@shared-ui/components/ui/label'
 import { Plus, X, TriangleAlert, GripVertical, Lightbulb } from 'lucide-vue-next'
 import Draggable from 'vuedraggable'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import PreChatFormConfig, { getDefaultPrechatFields } from './PreChatFormConfig.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import { useEmitter } from '@/composables/useEmitter'
@@ -1023,10 +1382,27 @@ const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
 const WIDGET_BG = { light: '#ffffff', dark: '#1a1a1e' }
 const DEFAULT_GRADIENT_START = '#2563eb'
 const DEFAULT_GRADIENT_END = '#1e40af'
+const MASKED_SECRET = '••••••••••'
+
+const TABS = [
+  'general',
+  'appearance',
+  'messages',
+  'features',
+  'campaigns',
+  'help',
+  'prechat',
+  'users',
+  'security',
+  'installation'
+]
 
 // Maps a field path prefix to its tab, so a failed submit jumps to the tab holding the error.
 // Ordered: specific prefixes before the general-tab fallbacks.
 const FIELD_TAB = [
+  ['config.help', 'help'],
+  ['config.previews', 'features'],
+  ['config.campaign', 'campaigns'],
   ['config.home_screen', 'appearance'],
   ['config.colors', 'appearance'],
   ['config.launcher', 'appearance'],
@@ -1036,6 +1412,7 @@ const FIELD_TAB = [
   ['config.greeting_message', 'messages'],
   ['config.introduction_message', 'messages'],
   ['config.chat_introduction', 'messages'],
+  ['config.quick_replies', 'messages'],
   ['config.chat_reply_expectation_message', 'features'],
   ['config.features', 'features'],
   ['config.prechat_form', 'prechat'],
@@ -1049,7 +1426,7 @@ const FIELD_TAB = [
   ['config.brand_name', 'general'],
   ['config.website_url', 'general'],
   ['config.language', 'general'],
-  ['name', 'general'],
+  ['name', 'general']
 ]
 
 const props = defineProps({
@@ -1080,13 +1457,27 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
-const activeTab = ref('general')
+const route = useRoute()
+const router = useRouter()
+const activeTab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'general')
+watch(activeTab, (tab) => router.replace({ query: { ...route.query, tab } }))
 const selectedUserTab = ref('visitors')
 const homeApps = ref([])
 const prechatConfig = ref({
   enabled: false,
+  handoff_only: false,
   title: '',
-  fields: getDefaultPrechatFields()
+  fields: getDefaultPrechatFields(),
+  visitors: {
+    enabled: true,
+    title: '',
+    fields: getDefaultPrechatFields()
+  },
+  users: {
+    enabled: true,
+    title: '',
+    fields: getDefaultPrechatFields()
+  }
 })
 
 const inboxStore = useInboxStore()
@@ -1163,6 +1554,10 @@ const form = useForm({
     prompt_tags_on_reply: false,
     linked_email_inbox_id: null,
     config: {
+      help: defaultWidgetHelp(),
+      previews: defaultWidgetPreviews(),
+      campaigns: [],
+      campaign_cooldown_hours: 24,
       brand_name: '',
       website_url: '',
       dark_mode: false,
@@ -1182,6 +1577,7 @@ const form = useForm({
       greeting_message: 'Hello {{.FirstName | there}}',
       introduction_message: 'How can we help?',
       chat_introduction: 'Ask us anything, or share your feedback.',
+      quick_replies: '',
       show_office_hours_in_chat: false,
       show_office_hours_after_assignment: false,
       chat_reply_expectation_message: 'We typically reply in 5 minutes.',
@@ -1204,6 +1600,7 @@ const form = useForm({
         fade_background: false
       },
       features: {
+        transcript: props.isNewForm,
         file_upload: true,
         emoji: true
       },
@@ -1221,25 +1618,43 @@ const form = useForm({
         start_conversation_button_text: 'Start conversation',
         allow_start_conversation: true,
         prevent_multiple_conversations: false,
-        prevent_reply_to_closed_conversation: false
+        prevent_reply_to_closed_conversation: false,
+        quick_replies: '',
+        direct_to_conversation: false
       },
       users: {
         start_conversation_button_text: 'Start conversation',
         allow_start_conversation: true,
         prevent_multiple_conversations: false,
-        prevent_reply_to_closed_conversation: false
+        prevent_reply_to_closed_conversation: false,
+        quick_replies: '',
+        direct_to_conversation: false
       },
       prechat_form: {
         enabled: false,
+        handoff_only: false,
         title: '',
-        fields: getDefaultPrechatFields()
+        fields: getDefaultPrechatFields(),
+        visitors: {
+          enabled: true,
+          title: '',
+          fields: getDefaultPrechatFields()
+        },
+        users: {
+          enabled: true,
+          title: '',
+          fields: getDefaultPrechatFields()
+        }
       }
     }
   }
 })
 
 const submitLabel = computed(() => {
-  return props.submitLabel || (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+  return (
+    props.submitLabel ||
+    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+  )
 })
 
 const lowHeaderContrast = computed(() => {
@@ -1249,8 +1664,7 @@ const lowHeaderContrast = computed(() => {
   const textColor = hs.header_text_color === 'black' ? '#000000' : '#ffffff'
   const pageBg = form.values.config?.dark_mode ? WIDGET_BG.dark : WIDGET_BG.light
   // An empty/unset color renders the widget's page background, so measure against that.
-  const isLow = (bg) =>
-    HEX_COLOR.test(bg) && contrastRatio(textColor, bg) < MIN_CONTRAST
+  const isLow = (bg) => HEX_COLOR.test(bg) && contrastRatio(textColor, bg) < MIN_CONTRAST
 
   switch (hs.background.type) {
     case 'solid':
@@ -1275,13 +1689,36 @@ const lowPrimaryContrast = computed(() => {
 // minimum would force rotating existing secrets and break live integrations.
 const weakSecret = computed(() => {
   const s = form.values.secret
-  return typeof s === 'string' && s.length > 0 && s.length < 32
+  return typeof s === 'string' && s !== MASKED_SECRET && s.length > 0 && s.length < 32
 })
+
+const helpCenters = ref([])
+const helpCenterID = computed(() => form.values.config?.help?.help_center_id || 0)
+const {
+  tree: helpTree,
+  articles: helpArticles,
+  failed: helpFailed
+} = useHelpCenterArticles(helpCenterID)
+
+// The campaign the admin is editing, mirrored in the preview as an invitation card.
+const previewCampaign = ref(null)
+const campaignsRef = ref(null)
+const showCampaignErrors = ref(false)
+const hasCampaignErrors = computed(() =>
+  Object.keys(form.errors.value).some((field) => field.startsWith('config.campaign'))
+)
+const updateCampaigns = (campaigns) =>
+  form.setFieldValue('config.campaigns', campaigns, hasCampaignErrors.value)
+const updateCampaignCooldown = (hours) =>
+  form.setFieldValue('config.campaign_cooldown_hours', hours, hasCampaignErrors.value)
 
 // home_apps in form.values only syncs on change events, so pull the live ref for the preview.
 const previewConfig = computed(() => ({
   ...form.values.config,
-  home_apps: homeApps.value
+  home_apps: homeApps.value,
+  help_tree: helpTree.value,
+  help_articles: helpArticles.value,
+  preview_campaign: activeTab.value === 'campaigns' ? previewCampaign.value : null
 }))
 
 // InboxView renders the preview in the help rail; feed it this form's live config while mounted.
@@ -1312,12 +1749,29 @@ const onBackgroundTypeChange = (type) => {
 
 const addHomeApp = (type) => {
   if (type === 'announcement') {
-    homeApps.value.push({ type: 'announcement', title: '', description: '', image_url: '', url: '' })
+    homeApps.value.push({
+      type: 'announcement',
+      title: '',
+      description: '',
+      image_url: '',
+      url: ''
+    })
+  } else if (type === 'help') {
+    homeApps.value.push({ type: 'help' })
   } else {
-    homeApps.value.push({ type: 'external_link', text: '', url: '' })
+    homeApps.value.push({ type: 'external_link', text: '', url: '', image_url: '' })
   }
   updateHomeApps()
 }
+
+const HOME_APP_LABELS = {
+  announcement: 'globals.terms.announcement',
+  external_link: 'admin.inbox.livechat.externalLinks',
+  help: 'globals.terms.helpCenter'
+}
+const homeAppLabel = (type) => t(HOME_APP_LABELS[type], 1)
+
+const hasHelpHomeApp = computed(() => homeApps.value.some((item) => item.type === 'help'))
 
 const removeHomeApp = (index) => {
   homeApps.value.splice(index, 1)
@@ -1329,69 +1783,98 @@ const updateHomeApps = () => {
   form.setFieldValue('config.home_apps', homeApps.value)
 }
 
-const isHomeAppEmpty = (item) =>
-  item.type === 'announcement'
+const isHomeAppEmpty = (item) => {
+  if (item.type === 'help') return false
+  return item.type === 'announcement'
     ? !item.title && !item.description && !item.image_url && !item.url
-    : !item.text && !item.url
+    : !item.text && !item.url && !item.image_url
+}
 
-const isHomeAppComplete = (item) =>
-  item.type === 'announcement'
+const isHomeAppComplete = (item) => {
+  if (item.type === 'help') return true
+  return item.type === 'announcement'
     ? Boolean(item.title && item.image_url && item.url)
     : Boolean(item.text && item.url)
+}
 
-// A row with some data but missing required fields, so submit is blocked instead of
-// silently dropping what the user typed. Fully empty rows are dropped on submit.
 const incompleteHomeApps = computed(() =>
   homeApps.value.some((item) => !isHomeAppEmpty(item) && !isHomeAppComplete(item))
 )
 
-// Only surface the incomplete warning after a save attempt, not while the user is still typing.
 const showHomeAppsError = ref(false)
 
 const textareaToLines = (value) =>
-  typeof value === 'string' ? value.split('\n').map((line) => line.trim()).filter(Boolean) : []
+  typeof value === 'string'
+    ? value
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : []
 
-onMounted(() => {
+onMounted(async () => {
   inboxStore.fetchInboxes()
   appSettingsStore.fetchPublicConfig()
+  try {
+    helpCenters.value = (await api.getHelpCenters()).data.data || []
+  } catch {
+    helpFailed.value = true
+  }
 })
 
-const onSubmit = form.handleSubmit(async (values) => {
-  values.config.trusted_domains = textareaToLines(values.config.trusted_domains)
-  values.config.blocked_ips = textareaToLines(values.config.blocked_ips)
+const onSubmit = form.handleSubmit(
+  async (values) => {
+    showCampaignErrors.value = false
+    values.config.trusted_domains = textareaToLines(values.config.trusted_domains)
+    values.config.quick_replies = textareaToLines(values.config.quick_replies)
+    values.config.visitors.quick_replies = textareaToLines(values.config.visitors.quick_replies)
+    values.config.users.quick_replies = textareaToLines(values.config.users.quick_replies)
+    values.config.blocked_ips = textareaToLines(values.config.blocked_ips)
 
-  // Block on partially-filled home apps so typed data isn't silently discarded;
-  // drop only fully empty rows.
-  if (incompleteHomeApps.value) {
-    showHomeAppsError.value = true
-    activeTab.value = 'appearance'
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: t('admin.inbox.livechat.homeApps.incomplete')
-    })
-    return
+    // Reject partially filled rows to avoid silently discarding typed values.
+    if (incompleteHomeApps.value) {
+      showHomeAppsError.value = true
+      activeTab.value = 'appearance'
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: t('admin.inbox.livechat.homeApps.incomplete')
+      })
+      return
+    }
+    values.config.home_apps = homeApps.value.filter((item) => !isHomeAppEmpty(item))
+
+    if (!values.linked_email_inbox_id) {
+      values.linked_email_inbox_id = null
+      values.config.continuity = {}
+    }
+
+    const pc = JSON.parse(JSON.stringify(prechatConfig.value))
+    for (const audience of ['visitors', 'users']) {
+      const audienceConfig = pc[audience]
+      if (
+        audienceConfig.enabled &&
+        audienceConfig.fields?.length > 0 &&
+        !audienceConfig.fields.some((field) => field.enabled)
+      ) {
+        audienceConfig.enabled = false
+      }
+    }
+    pc.title = pc.visitors.title
+    pc.fields = pc.visitors.fields
+    values.config.prechat_form = pc
+
+    await props.submitForm(values)
+  },
+  ({ errors }) => {
+    const firstKey = Object.keys(errors)[0]
+    if (!firstKey) return
+    const match = FIELD_TAB.find(([prefix]) => firstKey === prefix || firstKey.startsWith(prefix))
+    if (match) activeTab.value = match[1]
+    if (firstKey.startsWith('config.campaign')) {
+      showCampaignErrors.value = true
+      nextTick(() => campaignsRef.value?.showInvalidField(firstKey))
+    }
   }
-  values.config.home_apps = homeApps.value.filter((item) => !isHomeAppEmpty(item))
-
-  if (!values.linked_email_inbox_id) {
-    values.linked_email_inbox_id = null
-    values.config.continuity = {}
-  }
-
-  // Treat an enabled prechat form with no enabled fields as disabled.
-  const pc = { ...prechatConfig.value }
-  if (pc.enabled && pc.fields?.length > 0 && !pc.fields.some((f) => f.enabled)) {
-    pc.enabled = false
-  }
-  values.config.prechat_form = pc
-
-  await props.submitForm(values)
-}, ({ errors }) => {
-  const firstKey = Object.keys(errors)[0]
-  if (!firstKey) return
-  const match = FIELD_TAB.find(([prefix]) => firstKey === prefix || firstKey.startsWith(prefix))
-  if (match) activeTab.value = match[1]
-})
+)
 
 watch(
   () => props.initialValues,
@@ -1404,6 +1887,17 @@ watch(
       newValues.config.trusted_domains = newValues.config.trusted_domains.join('\n')
     }
 
+    if (Array.isArray(newValues.config?.quick_replies)) {
+      newValues.config.quick_replies = newValues.config.quick_replies.join('\n')
+    }
+
+    const audienceConfigs = Object.fromEntries(
+      ['visitors', 'users'].map((audience) => [
+        audience,
+        normalizeAudienceConfig(newValues.config, audience)
+      ])
+    )
+
     if (Array.isArray(newValues.config?.blocked_ips)) {
       newValues.config.blocked_ips = newValues.config.blocked_ips.join('\n')
     }
@@ -1413,23 +1907,44 @@ watch(
       homeApps.value = newValues.config.home_apps.map((app) => ({ ...app }))
     }
 
-    if (newValues.config?.prechat_form) {
-      const pc = JSON.parse(JSON.stringify(newValues.config.prechat_form))
-      if (!pc.fields || pc.fields.length === 0) {
-        pc.fields = getDefaultPrechatFields()
-      } else {
-        // Backfill default fields (e.g. phone) missing from inboxes saved before the field existed.
-        const existingKeys = new Set(pc.fields.map((field) => field.key))
-        let nextOrder = pc.fields.reduce((max, field) => Math.max(max, field.order || 0), 0)
+    let pc = newValues.config?.prechat_form
+    if (pc) {
+      pc = normalizePrechatConfig(pc)
+      for (const audience of ['visitors', 'users']) {
+        const existingFields = pc[audience].fields
+        if (existingFields.length === 0) {
+          pc[audience].fields = getDefaultPrechatFields()
+          continue
+        }
+        const existingKeys = new Set(existingFields.map((field) => field.key))
+        let nextOrder = existingFields.reduce((max, field) => Math.max(max, field.order || 0), 0)
         const missing = getDefaultPrechatFields()
           .filter((field) => !existingKeys.has(field.key))
           .map((field) => ({ ...field, order: ++nextOrder }))
-        pc.fields = [...pc.fields, ...missing]
+        pc[audience].fields = [...existingFields, ...missing]
       }
       prechatConfig.value = pc
     }
 
-    form.setValues(newValues, false)
+    form.setValues(
+      {
+        ...newValues,
+        config: {
+          ...newValues.config,
+          ...audienceConfigs,
+          prechat_form: pc,
+          campaigns: newValues.config?.campaigns || [],
+          campaign_cooldown_hours: newValues.config?.campaign_cooldown_hours || 24,
+          help: newValues.config?.help || defaultWidgetHelp(),
+          previews: newValues.config?.previews || defaultWidgetPreviews(),
+          features: {
+            ...newValues.config?.features,
+            transcript: newValues.config?.features?.transcript ?? false
+          }
+        }
+      },
+      false
+    )
   },
   { deep: true, immediate: true }
 )

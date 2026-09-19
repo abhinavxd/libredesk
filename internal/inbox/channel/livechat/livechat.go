@@ -11,6 +11,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -25,6 +26,7 @@ const (
 
 	HomeAppAnnouncement = "announcement"
 	HomeAppExternalLink = "external_link"
+	HomeAppHelp         = "help"
 )
 
 type PreChatFormField struct {
@@ -46,21 +48,71 @@ type ContinuityConfig struct {
 	MinEmailInterval    string `json:"min_email_interval"`
 }
 
+type HomeApp struct {
+	Type        string `json:"type"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	ImageURL    string `json:"image_url,omitempty"`
+	URL         string `json:"url"`
+	Text        string `json:"text,omitempty"`
+}
+
+type HelpAudience struct {
+	Tab bool `json:"tab"`
+}
+
+type HelpConfig struct {
+	HelpCenterID int          `json:"help_center_id"`
+	Visitors     HelpAudience `json:"visitors"`
+	Users        HelpAudience `json:"users"`
+	FeaturedIDs  []int        `json:"featured_ids"`
+}
+
+type PreviewConfig struct {
+	Desktop         bool   `json:"desktop"`
+	Mobile          bool   `json:"mobile"`
+	Content         string `json:"content"`
+	AutoHideSeconds int    `json:"auto_hide_seconds"`
+}
+
+type AudienceConfig struct {
+	AllowStartConversation           bool     `json:"allow_start_conversation"`
+	PreventMultipleConversations     bool     `json:"prevent_multiple_conversations"`
+	PreventReplyToClosedConversation bool     `json:"prevent_reply_to_closed_conversation"`
+	StartConversationButtonText      string   `json:"start_conversation_button_text"`
+	QuickReplies                     []string `json:"quick_replies"`
+	DirectToConversation             *bool    `json:"direct_to_conversation,omitempty"`
+}
+
+type AudiencePreChatFormConfig struct {
+	Enabled *bool              `json:"enabled,omitempty"`
+	Title   *string            `json:"title,omitempty"`
+	Fields  []PreChatFormField `json:"fields"`
+}
+
+type PreChatFormConfig struct {
+	Enabled     bool                       `json:"enabled"`
+	HandoffOnly bool                       `json:"handoff_only"`
+	Title       string                     `json:"title"`
+	Fields      []PreChatFormField         `json:"fields"`
+	Visitors    *AudiencePreChatFormConfig `json:"visitors,omitempty"`
+	Users       *AudiencePreChatFormConfig `json:"users,omitempty"`
+}
+
 // Config holds the live chat inbox configuration.
 type Config struct {
-	BrandName        string `json:"brand_name"`
-	WebsiteURL       string `json:"website_url"`
-	DarkMode         bool   `json:"dark_mode"`
-	ShowPoweredBy    bool   `json:"show_powered_by"`
-	Language         string `json:"language"`
-	FallbackLanguage string `json:"fallback_language"`
-	Users            struct {
-		AllowStartConversation           bool   `json:"allow_start_conversation"`
-		PreventMultipleConversations     bool   `json:"prevent_multiple_conversations"`
-		PreventReplyToClosedConversation bool   `json:"prevent_reply_to_closed_conversation"`
-		StartConversationButtonText      string `json:"start_conversation_button_text"`
-	} `json:"users"`
-	Colors struct {
+	Campaigns             []proactive.Campaign `json:"campaigns"`
+	CampaignCooldownHours int                  `json:"campaign_cooldown_hours"`
+	Help                  HelpConfig           `json:"help"`
+	Previews              PreviewConfig        `json:"previews"`
+	BrandName             string               `json:"brand_name"`
+	WebsiteURL            string               `json:"website_url"`
+	DarkMode              bool                 `json:"dark_mode"`
+	ShowPoweredBy         bool                 `json:"show_powered_by"`
+	Language              string               `json:"language"`
+	FallbackLanguage      string               `json:"fallback_language"`
+	Users                 AudienceConfig       `json:"users"`
+	Colors                struct {
 		Primary string `json:"primary"`
 	} `json:"colors"`
 	HomeScreen struct {
@@ -77,6 +129,7 @@ type Config struct {
 	Features struct {
 		Emoji      bool `json:"emoji"`
 		FileUpload bool `json:"file_upload"`
+		Transcript bool `json:"transcript"`
 	} `json:"features"`
 	Launcher struct {
 		Spacing struct {
@@ -87,41 +140,26 @@ type Config struct {
 		Position string `json:"position"`
 		Color    string `json:"color"`
 	} `json:"launcher"`
-	LogoURL  string `json:"logo_url"`
-	Visitors struct {
-		AllowStartConversation           bool   `json:"allow_start_conversation"`
-		PreventMultipleConversations     bool   `json:"prevent_multiple_conversations"`
-		PreventReplyToClosedConversation bool   `json:"prevent_reply_to_closed_conversation"`
-		StartConversationButtonText      string `json:"start_conversation_button_text"`
-	} `json:"visitors"`
+	LogoURL      string         `json:"logo_url"`
+	Visitors     AudienceConfig `json:"visitors"`
 	NoticeBanner struct {
 		Text    string `json:"text"`
 		Enabled bool   `json:"enabled"`
 	} `json:"notice_banner"`
-	HomeApps []struct {
-		Type        string `json:"type"`
-		Title       string `json:"title,omitempty"`
-		Description string `json:"description,omitempty"`
-		ImageURL    string `json:"image_url,omitempty"`
-		URL         string `json:"url"`
-		Text        string `json:"text,omitempty"`
-	} `json:"home_apps"`
-	TrustedDomains                 []string         `json:"trusted_domains"`
-	BlockedIPs                     []string         `json:"blocked_ips"`
-	DirectToConversation           bool             `json:"direct_to_conversation"`
-	GreetingMessage                string           `json:"greeting_message"`
-	ChatIntroduction               string           `json:"chat_introduction"`
-	IntroductionMessage            string           `json:"introduction_message"`
-	Continuity                     ContinuityConfig `json:"continuity"`
-	ShowOfficeHoursInChat          bool             `json:"show_office_hours_in_chat"`
-	ShowOfficeHoursAfterAssignment bool             `json:"show_office_hours_after_assignment"`
-	ChatReplyExpectationMessage    string           `json:"chat_reply_expectation_message"`
-	SessionDuration                string           `json:"session_duration"`
-	PreChatForm                    struct {
-		Enabled bool               `json:"enabled"`
-		Title   string             `json:"title"`
-		Fields  []PreChatFormField `json:"fields"`
-	} `json:"prechat_form"`
+	HomeApps                       []HomeApp         `json:"home_apps"`
+	TrustedDomains                 []string          `json:"trusted_domains"`
+	BlockedIPs                     []string          `json:"blocked_ips"`
+	DirectToConversation           bool              `json:"direct_to_conversation"`
+	GreetingMessage                string            `json:"greeting_message"`
+	ChatIntroduction               string            `json:"chat_introduction"`
+	QuickReplies                   []string          `json:"quick_replies"`
+	IntroductionMessage            string            `json:"introduction_message"`
+	Continuity                     ContinuityConfig  `json:"continuity"`
+	ShowOfficeHoursInChat          bool              `json:"show_office_hours_in_chat"`
+	ShowOfficeHoursAfterAssignment bool              `json:"show_office_hours_after_assignment"`
+	ChatReplyExpectationMessage    string            `json:"chat_reply_expectation_message"`
+	SessionDuration                string            `json:"session_duration"`
+	PreChatForm                    PreChatFormConfig `json:"prechat_form"`
 }
 
 // Client represents a connected chat client
@@ -183,6 +221,28 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*LiveC
 		clients:       make(map[string][]*Client),
 	}
 	return lc, nil
+}
+
+func (c Config) ResolvePreChatForm(isVisitor bool) Config {
+	audience := c.PreChatForm.Users
+	if isVisitor {
+		audience = c.PreChatForm.Visitors
+	}
+	c.PreChatForm.Visitors = nil
+	c.PreChatForm.Users = nil
+	if audience == nil {
+		return c
+	}
+	if audience.Enabled != nil {
+		c.PreChatForm.Enabled = c.PreChatForm.Enabled && *audience.Enabled
+	}
+	if audience.Title != nil {
+		c.PreChatForm.Title = *audience.Title
+	}
+	if audience.Fields != nil {
+		c.PreChatForm.Fields = audience.Fields
+	}
+	return c
 }
 
 // Identifier returns the unique identifier of the inbox which is the database ID.
