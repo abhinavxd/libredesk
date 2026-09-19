@@ -27,6 +27,8 @@
             this.EXPANDED_WIDTH = '750px';
             this.MOBILE_BREAKPOINT = 600;
             this.LAUNCHER_SIZE = 60;
+            this.LAUNCHER_HOVER_SCALE = 1.08;
+            this.LAUNCHER_OPEN_SCALE = 0.9;
             this.MOBILE_LAUNCHER_SIZE = 60;
             this.CAMPAIGN_POLL_MIN = 2;
             this.CAMPAIGN_POLL_MAX = 60;
@@ -34,6 +36,7 @@
             this.config = config;
             this.iframe = null;
             this.toggleButton = null;
+            this.isLauncherHovered = false;
             this.widgetButtonWrapper = null;
             this.unreadBadge = null;
             this.isChatVisible = false;
@@ -226,8 +229,8 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                box-shadow: 0 3px 8px rgba(9, 14, 21, 0.45), 0 14px 40px rgba(9, 14, 21, 0.55);
-                transition: transform 0.3s ease;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 10px 28px rgba(0, 0, 0, 0.14);
+                transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             `;
 
             this.iconContainer = document.createElement('div');
@@ -474,6 +477,14 @@
 
         setupEventListeners () {
             this.toggleButton.addEventListener('click', () => this.toggle());
+            this.toggleButton.addEventListener('mouseenter', () => {
+                this.isLauncherHovered = true;
+                this.applyLauncherScale();
+            });
+            this.toggleButton.addEventListener('mouseleave', () => {
+                this.isLauncherHovered = false;
+                this.applyLauncherScale();
+            });
             window.addEventListener('message', this._boundHandleMessage);
         }
 
@@ -542,7 +553,7 @@
             this.applyIframeLayout();
             this.updateLauncherVisibility();
 
-            this.toggleButton.style.transform = 'scale(0.9)';
+            this.applyLauncherScale();
             this.unreadBadge.style.display = 'none';
 
             if (this.defaultIcon) this.defaultIcon.style.display = 'none';
@@ -559,7 +570,7 @@
             this.iframe.style.display = 'none';
             this.isChatVisible = false;
             this.renderPreviews();
-            this.toggleButton.style.transform = 'scale(1)';
+            this.applyLauncherScale();
             this.updateLauncherVisibility();
 
             if (this.defaultIcon) this.defaultIcon.style.display = 'block';
@@ -573,6 +584,13 @@
             this.postToIframe({ type: 'WIDGET_CLOSED' });
 
             if (this._onHideCallback) this._onHideCallback();
+        }
+
+        applyLauncherScale () {
+            if (!this.toggleButton) return;
+            const base = this.isChatVisible ? this.LAUNCHER_OPEN_SCALE : 1;
+            const scale = this.isLauncherHovered ? base * this.LAUNCHER_HOVER_SCALE : base;
+            this.toggleButton.style.transform = `scale(${scale})`;
         }
 
         updateUnreadCount (count) {

@@ -113,6 +113,7 @@ const back = async () => {
 onMounted(async () => {
   if (!help.data && !help.loading) await help.load(locale.value)
   if (scroller.value) scroller.value.scrollTop = help.scrollTop
+  if (help.article && help.expandArticles && !widget.isMobileFullScreen) widget.expandWidget()
   if (help.pendingArticle && mounted) {
     const article = help.pendingArticle
     help.pendingArticle = null
