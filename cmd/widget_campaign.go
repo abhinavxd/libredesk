@@ -214,13 +214,13 @@ func campaignSender(app *App, id int) (umodels.User, error) {
 }
 
 func earliestCampaignDelay(campaigns []proactive.Campaign) int {
-	delay := 0
+	delay, found := 0, false
 	for _, campaign := range campaigns {
 		if !campaign.Enabled {
 			continue
 		}
-		if delay == 0 || campaign.DelaySeconds < delay {
-			delay = campaign.DelaySeconds
+		if !found || campaign.DelaySeconds < delay {
+			delay, found = campaign.DelaySeconds, true
 		}
 	}
 	return delay

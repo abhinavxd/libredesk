@@ -337,7 +337,7 @@ watch(
           container.getBoundingClientRect().top +
           container.scrollTop
         : 0
-      if (target && offset > 0 && container.scrollHeight - container.clientHeight - offset > 1) {
+      if (target && offset >= 0 && container.scrollHeight - container.clientHeight - offset > 1) {
         hasUserScrolled.value = true
         scrollToOffset(offset)
       } else scrollToBottom()
