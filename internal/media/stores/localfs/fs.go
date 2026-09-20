@@ -135,3 +135,7 @@ func getDir(dir string) string {
 	}
 	return dir
 }
+
+func (c *Client) Open(name string) (io.ReadCloser, error) {
+	return os.Open(filepath.Join(getDir(c.opts.UploadPath), filepath.Base(name)))
+}

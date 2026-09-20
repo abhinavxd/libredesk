@@ -13,10 +13,10 @@
         >
           <template v-if="isImage">
             <img
-              :src="attachment.thumbnail_url || getThumbFilepath(attachment.url)"
+              :src="thumbnailURL"
               :alt="attachment.name"
               class="w-full h-full object-cover"
-              @error="fallbackToOriginal($event, attachment.url)"
+              @error="fallbackToOriginal($event, mediaURL)"
             />
             <div
               class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent transition-opacity pointer-events-none can-hover:opacity-0 can-hover:group-hover:opacity-100"
@@ -26,7 +26,7 @@
                 <p class="text-[10px] opacity-90">{{ formatBytes(attachment.size) }}</p>
               </div>
               <DownloadLink
-                :url="attachment.url"
+                :url="mediaURL"
                 class="text-white hover:text-white hover:bg-white/15 shrink-0 pointer-events-auto -mr-0.5"
               />
             </div>
@@ -46,7 +46,7 @@
 
           <DownloadLink
             v-if="!isImage"
-            :url="attachment.url"
+            :url="mediaURL"
             class="absolute top-1.5 right-1.5 transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100"
           />
         </div>
@@ -55,7 +55,7 @@
         <p class="text-xs font-medium truncate mb-2" :title="attachment.name">
           {{ attachment.name }}
         </p>
-        <audio :src="attachment.url" controls autoplay preload="auto" class="w-full h-8" />
+        <audio :src="mediaURL" controls autoplay preload="none" class="w-full h-8" />
       </PopoverContent>
     </Popover>
   </div>
@@ -63,6 +63,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { localMediaURL, isPreviewImage, isPreviewAudio } from '@shared-ui/utils/resourceURL'
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 import DownloadLink from '@/components/DownloadLink.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
@@ -86,14 +87,16 @@ const showAudio = ref(false)
 const shortName = (name) => (name || '').substring(0, 40)
 
 const fallbackToOriginal = (event, originalUrl) => {
-  if (event.target.dataset.originalFallback) return
+  if (!originalUrl || event.target.dataset.originalFallback) return
   event.target.dataset.originalFallback = 'true'
   event.target.src = originalUrl
 }
 
-const isImage = computed(() => (props.attachment.content_type || '').startsWith('image/'))
+const mediaURL = computed(() => localMediaURL(props.attachment.url))
+const thumbnailURL = computed(() => localMediaURL(props.attachment.thumbnail_url) || getThumbFilepath(mediaURL.value))
+const isImage = computed(() => !!mediaURL.value && isPreviewImage(props.attachment.content_type))
 
-const isAudio = computed(() => (props.attachment.content_type || '').startsWith('audio/'))
+const isAudio = computed(() => !!mediaURL.value && isPreviewAudio(props.attachment.content_type))
 
 const ext = computed(() => {
   const parts = (props.attachment.name || '').split('.')
@@ -123,12 +126,13 @@ const iconColor = computed(() => {
 })
 
 const onClick = () => {
+  if (!mediaURL.value) return
   if (isImage.value) {
     emit('preview', props.attachment)
   } else if (isAudio.value) {
     showAudio.value = true
   } else {
-    window.open(props.attachment.url, '_blank', 'noopener,noreferrer')
+    window.open(mediaURL.value, '_blank', 'noopener,noreferrer')
   }
 }
 </script>

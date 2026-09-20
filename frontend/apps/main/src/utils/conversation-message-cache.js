@@ -61,11 +61,17 @@ export default class MessageCache {
     }
 
     updateMessage (convId, msgId, updates) {
-        this._updateMessageBy(convId, msgId, msg => Object.assign(msg, updates))
+        this._updateMessageBy(convId, msgId, msg => {
+            const contentChanged = ['content', 'text_content', 'content_type'].some(
+                field => Object.hasOwn(updates, field) && updates[field] !== msg[field]
+            )
+            if (contentChanged && !Object.hasOwn(updates, 'display')) delete msg.display
+            Object.assign(msg, updates)
+        })
     }
 
     updateMessageField (convId, msgId, field, value) {
-        this._updateMessageBy(convId, msgId, msg => { msg[field] = value })
+        this.updateMessage(convId, msgId, { [field]: value })
     }
 
     removeMessage (convId, msgId) {

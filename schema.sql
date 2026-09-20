@@ -206,6 +206,13 @@ CREATE UNIQUE INDEX index_unique_users_on_email_when_no_ext_id_contact
 	ON users (email)
 	WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL;
 
+DROP TABLE IF EXISTS user_image_permissions CASCADE;
+CREATE TABLE user_image_permissions (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    senders TEXT[] NOT NULL DEFAULT '{}'::text[],
+    CHECK (cardinality(senders) <= 100)
+);
+
 DROP TABLE IF EXISTS user_roles CASCADE;
 CREATE TABLE user_roles (
 	id SERIAL PRIMARY KEY,
@@ -436,6 +443,18 @@ CREATE TABLE media (
 );
 CREATE INDEX index_media_on_model_type_and_model_id ON media(model_type, model_id);
 CREATE INDEX index_media_on_content_id ON media(content_id);
+
+DROP TABLE IF EXISTS message_image_permissions;
+CREATE TABLE message_image_permissions (
+ user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+ message_id BIGINT REFERENCES conversation_messages(id) ON DELETE CASCADE,
+ content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+ PRIMARY KEY (user_id, message_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS index_media_resource_image_source
+ ON media (model_id, content_id) WHERE model_type = 'resource_images';
+CREATE UNIQUE INDEX IF NOT EXISTS index_media_resource_avatar_source
+ ON media (model_id, content_id) WHERE model_type = 'resource_avatars';
 
 DROP TABLE IF EXISTS oidc CASCADE;
 CREATE TABLE oidc (
@@ -1020,6 +1039,7 @@ VALUES
 INSERT INTO settings ("key", value)
 VALUES
     ('app.lang', '"en-US"'::jsonb),
+    ('security.resource_policy', '{"mode":"load_on_receipt","allowed_domains":[]}'::jsonb),
     ('app.root_url', '"http://localhost:9000"'::jsonb),
     ('app.logo_url', '""'::jsonb),
     ('app.site_name', '"libredesk"'::jsonb),

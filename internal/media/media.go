@@ -45,6 +45,7 @@ type Store interface {
 	Delete(name string) error
 	GetURL(name, disposition, fileName string) string
 	GetBlob(name string) ([]byte, error)
+	Open(name string) (io.ReadCloser, error)
 	Name() string
 	// SignedURLValidator returns a validator function if the store supports signed URLs.
 	// Returns nil if the store doesn't use signed URLs (e.g., S3 handles validation itself).
@@ -59,20 +60,24 @@ type SignedURLStore interface {
 }
 
 type Manager struct {
-	store   Store
-	lo      *logf.Logger
-	i18n    *i18n.I18n
-	rootURL func() string
-	queries queries
+	store      Store
+	lo         *logf.Logger
+	i18n       *i18n.I18n
+	rootURL    func() string
+	signingKey string
+	urlExpiry  time.Duration
+	queries    queries
 }
 
 // Opts provides options for configuring the Manager.
 type Opts struct {
-	Store   Store
-	Lo      *logf.Logger
-	DB      *sqlx.DB
-	I18n    *i18n.I18n
-	RootURL func() string
+	Store      Store
+	Lo         *logf.Logger
+	DB         *sqlx.DB
+	I18n       *i18n.I18n
+	RootURL    func() string
+	SigningKey string
+	URLExpiry  time.Duration
 }
 
 // New initializes and returns a new Manager instance for handling media operations.
@@ -82,16 +87,20 @@ func New(opt Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		store:   opt.Store,
-		lo:      opt.Lo,
-		i18n:    opt.I18n,
-		rootURL: opt.RootURL,
-		queries: q,
+		store:      opt.Store,
+		lo:         opt.Lo,
+		i18n:       opt.I18n,
+		rootURL:    opt.RootURL,
+		signingKey: opt.SigningKey,
+		urlExpiry:  opt.URLExpiry,
+		queries:    q,
 	}, nil
 }
 
 // queries holds the prepared SQL statements.
 type queries struct {
+	GetUnlinkedResourceAvatars  *sqlx.Stmt `query:"get-unlinked-resource-avatars"`
+	GetUnlinkedResourceImages   *sqlx.Stmt `query:"get-unlinked-resource-images"`
 	Insert                      *sqlx.Stmt `query:"insert-media"`
 	Get                         *sqlx.Stmt `query:"get-media"`
 	GetByUUID                   *sqlx.Stmt `query:"get-media-by-uuid"`
@@ -260,6 +269,9 @@ func (m *Manager) GetBlob(name string) ([]byte, error) {
 
 // GetURL returns the URL for accessing a media file by its name.
 func (m *Manager) GetURL(uuid, contentType, fileName string) string {
+	if m.signingKey != "" {
+		return m.GetSignedURL(uuid)
+	}
 	// Keep some content types inline. SVG excluded.
 	disposition := "attachment"
 	if contentType != "image/svg+xml" &&
@@ -272,12 +284,18 @@ func (m *Manager) GetURL(uuid, contentType, fileName string) string {
 }
 
 func (m *Manager) GetURLForDownload(uuid, fileName string) string {
+	if m.signingKey != "" {
+		return m.GetSignedURL(uuid) + "&download=1"
+	}
 	return m.store.GetURL(uuid, "attachment", fileName)
 }
 
 // GetSignedURL generates a signed URL for secure media access if the store supports it.
 // Returns a regular URL if the store doesn't support signed URLs.
 func (m *Manager) GetSignedURL(name string) string {
+	if m.signingKey != "" {
+		return m.signedMediaURL(name)
+	}
 	if signedStore, ok := m.store.(SignedURLStore); ok {
 		return signedStore.GetSignedURL(name)
 	}
@@ -287,7 +305,7 @@ func (m *Manager) GetSignedURL(name string) string {
 
 // GetThumbnailURL returns the URL for an image thumbnail.
 func (m *Manager) GetThumbnailURL(uuid string) string {
-	if m.store.Name() == "fs" {
+	if m.signingKey != "" || m.store.Name() == "fs" {
 		// FS validates thumbnail requests with the original UUID signature.
 		u, err := url.Parse(m.GetSignedURL(uuid))
 		if err == nil {
@@ -305,6 +323,9 @@ func (m *Manager) GetThumbnailURL(uuid string) string {
 // SignedURLValidator returns the store's signature validator if available.
 // Returns nil if the store doesn't support signed URL validation.
 func (m *Manager) SignedURLValidator() func(name, sig string, exp int64) bool {
+	if m.signingKey != "" {
+		return m.validateMediaSignature
+	}
 	return m.store.SignedURLValidator()
 }
 
@@ -378,7 +399,7 @@ func (m *Manager) DeleteUnlinkedMedia(ctx context.Context) {
 
 // deleteUnlinked runs all unlinked-media sweeps.
 func (m *Manager) deleteUnlinked() {
-	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedHelpArticleMedia} {
+	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedHelpArticleMedia, m.queries.GetUnlinkedResourceImages, m.queries.GetUnlinkedResourceAvatars} {
 		if err := m.deleteUnlinkedRows(stmt); err != nil {
 			m.lo.Error("error deleting unlinked media", "error", err)
 		}
@@ -400,7 +421,7 @@ func (m *Manager) deleteUnlinkedRows(stmt *sqlx.Stmt) error {
 		}
 
 		// If it's an image, also delete the `thumb_uuid` image from store.
-		if strings.HasPrefix(mm.ContentType, "image/") {
+		if mm.Model.String != models.ModelResourceImages && mm.Model.String != models.ModelResourceAvatars && strings.HasPrefix(mm.ContentType, "image/") {
 			thumbUUID := image.ThumbPrefix + mm.UUID
 			if err := m.Delete(thumbUUID); err != nil {
 				m.lo.Error("error deleting thumbnail for unlinked media", "media_id", mm.ID, "thumb_uuid", thumbUUID, "error", err)

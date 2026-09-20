@@ -78,6 +78,27 @@
       </div>
     </div>
 
+    <Transition
+      enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
+      enter-from-class="-translate-y-2 opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+    >
+      <section
+        v-if="imagePermissionMessages.length"
+        :key="conversationStore.current?.uuid"
+        :aria-label="t('conversation.imagePermissions')"
+        class="w-full shrink-0 max-h-[40%] overflow-y-auto border-b bg-muted divide-y"
+      >
+        <MessageImagePermissions
+          v-for="message in imagePermissionMessages"
+          :key="message.uuid"
+          :message="message"
+          :show-timestamp="imagePermissionMessages.length > 1"
+          @updated="conversationStore.updateImagePermissions"
+        />
+      </section>
+    </Transition>
+
     <!-- Messages & reply box -->
     <div class="flex flex-col flex-grow overflow-hidden">
       <MessageList class="flex-1 overflow-y-auto" />
@@ -104,6 +125,7 @@ import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
+import MessageImagePermissions from './message/MessageImagePermissions.vue'
 import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@main/constants/emitterEvents.js'
 import { useCommandPalette } from '@/features/command/useCommandPalette'
 import { SNOOZE_COMMAND } from '@/features/command/providers/useConversationCommands'
@@ -122,6 +144,11 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const isMobile = useIsMobile()
+const imagePermissionMessages = computed(() =>
+  conversationStore.conversationMessages.filter(message =>
+    message.display?.blocked_images > 0 || message.display?.sender_trusted
+  )
+)
 const canCompose = computed(
   () => userStore.can(perms.MESSAGES_WRITE) || userStore.can(perms.MESSAGES_WRITE_PRIVATE)
 )

@@ -36,7 +36,7 @@ const CustomTable = Table.extend({
       ...this.parent?.(),
       style: {
         default: tableStyle,
-        parseHTML: (element) => (element.getAttribute('style') || '') + '; ' + tableStyle
+        parseHTML: () => tableStyle
       }
     }
   }
@@ -48,7 +48,7 @@ const CustomTableCell = TableCell.extend({
       ...this.parent?.(),
       style: {
         default: tableCellStyle,
-        parseHTML: (element) => (element.getAttribute('style') || '') + '; ' + tableCellStyle
+        parseHTML: () => tableCellStyle
       }
     }
   }
@@ -60,7 +60,7 @@ const CustomTableHeader = TableHeader.extend({
       ...this.parent?.(),
       style: {
         default: tableHeaderStyle,
-        parseHTML: (element) => (element.getAttribute('style') || '') + '; ' + tableHeaderStyle
+        parseHTML: () => tableHeaderStyle
       }
     }
   }
@@ -120,6 +120,7 @@ const CustomMention = Mention.extend({
 const sharedExtensions = ({
   getPlaceholder,
   imageInline = false,
+  restrictResources = false,
   headingLevels,
   starterKit = {}
 }) => [
@@ -130,6 +131,7 @@ const sharedExtensions = ({
   Underline,
   ResizableImage.configure({
     inline: imageInline,
+    restrictResources,
     HTMLAttributes: { class: 'inline-image', style: 'max-width: 100%; height: auto;' },
     allowBase64: false
   }),
@@ -139,7 +141,7 @@ const sharedExtensions = ({
 
 export function buildConversationExtensions({ getPlaceholder }) {
   return [
-    ...sharedExtensions({ getPlaceholder }),
+    ...sharedExtensions({ getPlaceholder, restrictResources: true }),
     CustomMention.configure({
       HTMLAttributes: { class: 'ld-mention' },
       suggestion: mentionSuggestion

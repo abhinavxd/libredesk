@@ -1,5 +1,6 @@
 <script setup>
 import { AvatarImage } from 'radix-vue'
+import { avatarURL } from '@shared-ui/utils/resourceURL'
 
 const props = defineProps({
   src: { type: String, required: false, default: '' },
@@ -9,5 +10,5 @@ const props = defineProps({
 </script>
 
 <template>
-  <AvatarImage v-bind="props" class="h-full w-full object-cover" />
+  <AvatarImage v-bind="props" :src="avatarURL(props.src)" class="h-full w-full object-cover" />
 </template>

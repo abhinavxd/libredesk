@@ -7,6 +7,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/lib/pq"
@@ -100,6 +101,8 @@ type ChatConversation struct {
 }
 
 type ChatMessage struct {
+	Display          resourcepolicy.Display `json:"display"`
+	ContentType      string                 `json:"content_type"`
 	UUID             string                 `json:"uuid"`
 	Status           string                 `json:"status"`
 	ConversationUUID string                 `json:"conversation_uuid"`
@@ -342,6 +345,8 @@ type Message struct {
 	MessageReceiverID int                    `db:"message_receiver_id" json:"-"`
 	Media             []mmodels.Media        `json:"-"`
 	Author            MessageAuthor          `db:"author" json:"author"`
+
+	Display *resourcepolicy.Display `db:"-" json:"display,omitempty"`
 }
 
 // IsContinuityMessage returns true if the message is a continuity email.

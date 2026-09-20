@@ -99,25 +99,24 @@
               :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
             >
               <div
-                v-if="message.content_type === 'text'"
+                v-if="message.content_type === 'text' || message.meta?.is_csat"
                 class="mb-1 native-html whitespace-pre-wrap"
                 :class="{ 'mb-3': message.attachments.length > 0 }"
               >
-                {{ sanitizedContent }}
+                {{ messageText }}
               </div>
               <div
                 v-else
-                ref="messageContentEl"
-                @click="onMessageContentClick"
                 :class="{
                   'email-light-canvas': !isOutgoing && convStore.current?.inbox_channel === 'email'
                 }"
               >
-                <Letter
-                  :html="sanitizedContent"
-                  :allowedSchemas="allowedSchemas"
-                  :rewriteExternalLinks="rewriteMessageLink"
-                  :allowed-css-properties="extendedCssProperties"
+                <SafeMessageContent
+                  :message="message"
+                  :show-blocked-notice="false"
+                  :show-quoted-text="isOutgoing || showQuotedText"
+                  @image-click="onImageClick"
+                  @resize="measureExpandable"
                   class="mb-1 native-html break-words"
                   :class="{ 'mb-3': message.attachments.length > 0 }"
                 />
@@ -275,7 +274,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, nextTick } from 'vue'
+import { computed, ref, onMounted, nextTick, watch } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
@@ -301,16 +300,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/u
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
-import { Letter } from 'vue-letter'
-import { allowedCssProperties } from 'lettersanitizer'
+import SafeMessageContent from '@shared-ui/components/SafeMessageContent.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import BubbleAttachmentPreview from '@main/features/conversation/message/attachment/BubbleAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '@main/api'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
-
-const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 
 const COLLAPSE_THRESHOLD_PX = 400
 
@@ -328,11 +324,6 @@ onMounted(async () => {
   await nextTick()
   measureExpandable()
 
-  // Email HTML images change height after initial paint - re-measure on load.
-  const imgs = contentWrapperEl.value?.querySelectorAll?.('img') ?? []
-  imgs.forEach((img) => {
-    if (!img.complete) img.addEventListener('load', measureExpandable, { once: true })
-  })
 })
 
 const props = defineProps({
@@ -393,15 +384,7 @@ const avatarFallback = computed(() => {
   return firstName.toUpperCase().substring(0, 2)
 })
 
-const allowedSchemas = ['cid', 'https', 'http', 'mailto']
-
-// vue-letter skips its own href schema check once a rewrite hook is set.
-const rewriteMessageLink = (href) => {
-  if (href.startsWith('/') && !href.startsWith('//')) return `${window.location.origin}${href}`
-  return allowedSchemas.includes(href.toLowerCase().split(':')[0]) ? href : ''
-}
-
-const sanitizedContent = computed(() => {
+const messageText = computed(() => {
   if (props.message.meta?.is_csat) {
     return t('globals.messages.pleaseRateConversation')
   }
@@ -413,6 +396,7 @@ const nonInlineAttachments = computed(() =>
 )
 
 const bubbleClasses = computed(() => ({
+  '!w-full': props.message.content_type !== 'text' && typeof props.message.display?.html === 'string',
   'bg-private': isOutgoing.value && props.message.private,
   'bg-secondary border border-border': isOutgoing.value && !props.message.private,
   'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
@@ -448,47 +432,30 @@ const retryMessage = (msg) => {
 
 const showQuotedText = ref(false)
 const hasQuotedContent = computed(
-  () => !isOutgoing.value && containsQuoteMarkers(sanitizedContent.value)
+  () => !isOutgoing.value && containsQuoteMarkers(props.message.display?.html)
 )
 const toggleQuote = () => {
   showQuotedText.value = !showQuotedText.value
 }
 
-// Enumerate from rendered DOM (not HTML source) to inherit vue-letter's
-// sanitization and dodge regex parsing of attributes containing '>'.
-const messageContentEl = ref(null)
 const inlineLightboxOpen = ref(false)
 const inlineLightboxIndex = ref(0)
 const inlineImages = ref([])
 
-// Re-walk on click instead of caching - cheaper than watching sanitizedContent
-// and always reflects what the user actually sees.
-const refreshInlineImages = () => {
-  const root = messageContentEl.value
-  if (!root) {
+watch(
+  () => [props.message.uuid, props.message.content, props.message.display?.html],
+  async () => {
+    inlineLightboxOpen.value = false
     inlineImages.value = []
-    return
+    showQuotedText.value = false
+    await nextTick()
+    measureExpandable()
   }
-  inlineImages.value = Array.from(root.querySelectorAll('img'))
-    .map((el) => ({ url: el.getAttribute('src'), name: el.getAttribute('alt') || '' }))
-    .filter((img) => img.url)
-}
+)
 
-const onMessageContentClick = (event) => {
-  // closest('img') so clicks on <a><img></a> wrappers still resolve.
-  const img = event.target?.closest?.('img')
-  if (!img || !messageContentEl.value?.contains(img)) return
-
-  // Suppress anchor navigation so the lightbox can take over.
-  const wrappingAnchor = img.closest('a')
-  if (wrappingAnchor && messageContentEl.value.contains(wrappingAnchor)) {
-    event.preventDefault()
-  }
-
-  refreshInlineImages()
-  const src = img.getAttribute('src')
-  const idx = inlineImages.value.findIndex((entry) => entry.url === src)
-  inlineLightboxIndex.value = idx >= 0 ? idx : 0
+const onImageClick = ({ images, index }) => {
+  inlineImages.value = images
+  inlineLightboxIndex.value = index
   inlineLightboxOpen.value = true
 }
 
@@ -502,11 +469,3 @@ const showEnvelope = computed(() => {
   )
 })
 </script>
-
-<style scoped lang="scss">
-.native-html :deep(img) {
-  max-width: 100%;
-  height: auto;
-  cursor: zoom-in;
-}
-</style>

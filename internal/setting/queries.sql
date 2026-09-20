@@ -15,3 +15,7 @@ WHERE key LIKE $1 || '%';
 
 -- name: get
 SELECT value FROM settings WHERE key = $1;
+
+-- name: set-resource-policy
+INSERT INTO settings (key, value) VALUES ('security.resource_policy', $1::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();

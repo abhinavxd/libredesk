@@ -339,6 +339,10 @@ const updateAssigneeLastSeen = (uuid) => http.put(`/api/v1/conversations/${uuid}
 const markConversationAsUnread = (uuid) => http.put(`/api/v1/conversations/${uuid}/mark-unread`)
 const getConversationMessage = (cuuid, uuid) =>
   http.get(`/api/v1/conversations/${cuuid}/messages/${uuid}`)
+const allowMessageImages = (cuuid, uuid, scope) =>
+  http.post(`/api/v1/conversations/${cuuid}/messages/${uuid}/images/allow/${scope}`)
+const getResourcePolicy = () => http.get('/api/v1/settings/resource-policy')
+const updateResourcePolicy = (data) => http.put('/api/v1/settings/resource-policy', data)
 const retryMessage = (cuuid, uuid) =>
   http.put(`/api/v1/conversations/${cuuid}/messages/${uuid}/retry`)
 const deleteMessage = (cuuid, uuid) =>
@@ -684,6 +688,9 @@ export default {
   getOverviewMessageVolume,
   getOverviewTagDistribution,
   getConversationMessage,
+  allowMessageImages,
+  getResourcePolicy,
+  updateResourcePolicy,
   getConversationMessages,
   getConversationTranscript,
   getCurrentUser,

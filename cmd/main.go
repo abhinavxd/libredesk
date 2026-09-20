@@ -29,6 +29,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/macro"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/report"
+	"github.com/abhinavxd/libredesk/internal/resourceimage"
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -94,6 +95,7 @@ const (
 
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
+	resourceImages   *resourceimage.Store
 	ctx              context.Context
 	fs               stuffbin.FileSystem
 	consts           atomic.Value
@@ -243,6 +245,7 @@ func main() {
 		auth                        = initAuth(oidc, rdb, i18n, ssrfControl)
 		template                    = initTemplate(db, fs, constants, i18n)
 		media                       = initMedia(db, i18n, settings)
+		resourceImages              = resourceimage.NewStore(db, media, constants.UploadProvider)
 		inbox                       = initInbox(db, i18n)
 		team                        = initTeam(db, i18n)
 		businessHours               = initBusinessHours(db, i18n)
@@ -258,7 +261,7 @@ func main() {
 		automation                  = initAutomationEngine(db, i18n)
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
-		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
+		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher, resourceImages)
 		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings, user, notifier, rdb)
 		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
@@ -336,6 +339,7 @@ func main() {
 		contextLink:      initContextLink(db, i18n),
 		rateLimit:        rateLimiter,
 		redis:            rdb,
+		resourceImages:   resourceImages,
 		fc:               initFastCache(rdb),
 		userNotification: userNotification,
 		notificationPref: notificationPreference,

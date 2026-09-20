@@ -12,6 +12,7 @@ export const useMacroStore = defineStore('macroStore', () => {
     const searchLoading = ref(false)
     // Per-macro message content, fetched on demand (the search response carries none).
     const macroContents = ref({})
+    const macroDisplays = ref({})
     let contentFetches = {}
     const emitter = useEmitter()
     const userStore = useUserStore()
@@ -78,7 +79,10 @@ export const useMacroStore = defineStore('macroStore', () => {
             fetches[id] = api.getMacro(id)
                 .then(response => {
                     const content = response?.data?.data?.message_content || ''
-                    if (fetches === contentFetches) macroContents.value[id] = content
+                    if (fetches === contentFetches) {
+                        macroContents.value[id] = content
+                        macroDisplays.value[id] = response?.data?.data?.display
+                    }
                     return content
                 })
                 .finally(() => {
@@ -93,6 +97,7 @@ export const useMacroStore = defineStore('macroStore', () => {
         searchLoading.value = false
         searchResults.value = []
         macroContents.value = {}
+        macroDisplays.value = {}
         contentFetches = {}
     }
 
@@ -105,6 +110,7 @@ export const useMacroStore = defineStore('macroStore', () => {
         searchLoading,
         macroOptions,
         macroContents,
+        macroDisplays,
         currentView,
         searchMacros,
         fetchMacroContent,

@@ -1,9 +1,11 @@
 import { ref, watch, onUnmounted } from 'vue'
+import { prepareEditorContent, serializeEditorContent } from './prepareEditorContent'
 import { useEditor } from '@tiptap/vue-3'
 import { useInlineImageUpload } from '@main/composables/useInlineImageUpload'
 
 export function useTextEditor({
   extensions,
+  restrictResources = false,
   htmlContent,
   textContent,
   autoFocus = true,
@@ -21,6 +23,8 @@ export function useTextEditor({
   onBlur = () => {},
   onOtherFiles = () => {}
 }) {
+  const prepare = (content) => restrictResources ? prepareEditorContent(content) : content
+  const serialize = (content) => restrictResources ? serializeEditorContent(content) : content
   const isInternalUpdate = ref(false)
 
   const { handlePaste, handleDrop, insertImages } = useInlineImageUpload({
@@ -50,13 +54,14 @@ export function useTextEditor({
     extensions,
     autofocus: autoFocus,
     editable,
-    content: htmlContent.value,
+    content: prepare(htmlContent.value),
     editorProps: {
       attributes: { class: 'outline-none' },
       getSuggestions,
       enableMentions,
       getConversationSuggestions,
       conversationReferencesEnabled,
+      transformPastedHTML: prepare,
       handlePaste,
       handleDrop,
       handleKeyDown: (view, event) => {
@@ -83,7 +88,7 @@ export function useTextEditor({
     },
     onUpdate: ({ editor }) => {
       isInternalUpdate.value = true
-      htmlContent.value = editor.getHTML()
+      htmlContent.value = serialize(editor.getHTML())
       textContent.value = editor.getText()
       isInternalUpdate.value = false
       onUpdate()
@@ -94,8 +99,8 @@ export function useTextEditor({
   watch(
     htmlContent,
     (newContent) => {
-      if (!isInternalUpdate.value && editor.value && newContent !== editor.value.getHTML()) {
-        editor.value.commands.setContent(newContent || '', false)
+      if (!isInternalUpdate.value && editor.value && newContent !== serialize(editor.value.getHTML())) {
+        editor.value.commands.setContent(prepare(newContent || ''), false)
         textContent.value = editor.value.getText()
       }
     },
@@ -103,7 +108,7 @@ export function useTextEditor({
   )
 
   watch(insertContent, (val) => {
-    if (val) editor.value?.commands.insertContent(val)
+    if (val) editor.value?.commands.insertContent(prepare(val))
   })
 
   onUnmounted(() => {

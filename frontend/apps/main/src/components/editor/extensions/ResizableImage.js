@@ -1,18 +1,29 @@
 import Image from '@tiptap/extension-image'
+import { editorImageURL } from '../prepareEditorContent'
 import { getI18n } from '@main/i18n'
 
 // Styles for `.image-resizer`, `.image-resize-handle*`, `.image-size-toolbar`,
 // and `.image-upload-placeholder*` are in TextEditor.vue's global <style>
 // block because they need to apply inside the tiptap-rendered DOM.
 export const ResizableImage = Image.extend({
+  addOptions () {
+    return { ...this.parent?.(), restrictResources: false }
+  },
+  parseHTML () {
+    return [...(this.parent?.() || []), { tag: 'img[data-libredesk-image-src]' }]
+  },
   addAttributes () {
     return {
       ...this.parent?.(),
+      src: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-libredesk-image-src') || el.getAttribute('src')
+      },
       width: {
         default: null,
         parseHTML: (el) => el.getAttribute('width') || el.style.width?.replace('px', '') || null,
         renderHTML: (attrs) => {
-          if (!attrs.width) return {}
+          if (!/^[1-9][0-9]{0,3}$/.test(String(attrs.width))) return {}
           return { width: attrs.width, style: `width: ${attrs.width}px` }
         }
       },
@@ -44,6 +55,10 @@ export const ResizableImage = Image.extend({
     // saved drafts or sent messages.
     if (props.node.attrs.uploading) {
       return ['span', { 'data-upload-placeholder': '' }]
+    }
+    if (this.options.restrictResources) {
+      const { src, ...attributes } = props.HTMLAttributes
+      return ['img', { ...attributes, 'data-libredesk-image-src': src }]
     }
     return this.parent?.(props) ?? ['img', props.HTMLAttributes]
   },
@@ -181,10 +196,17 @@ export const ResizableImage = Image.extend({
       const applyState = (n) => {
         if (n.attrs.uploading) {
           wrapper.classList.add('uploading')
+          placeholder.style.display = 'block'
+          spinner.style.display = ''
           nameEl.textContent = n.attrs.uploadName || ''
         } else {
           wrapper.classList.remove('uploading')
-          img.src = n.attrs.src
+          const source = this.options.restrictResources ? editorImageURL(n.attrs.src) : n.attrs.src
+          if (source) img.src = source
+          else img.removeAttribute('src')
+          placeholder.style.display = source ? 'none' : 'block'
+          spinner.style.display = 'none'
+          nameEl.textContent = source ? '' : t('conversation.editorImageBlocked')
           img.alt = n.attrs.alt || ''
           img.title = n.attrs.title || ''
           img.style.width = n.attrs.width ? n.attrs.width + 'px' : ''

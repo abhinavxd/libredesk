@@ -44,6 +44,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/report"
+	"github.com/abhinavxd/libredesk/internal/resourceimage"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/setting"
@@ -302,6 +303,7 @@ func initConversations(
 	template *tmpl.Manager,
 	webhook *webhook.Manager,
 	dispatcher *notifier.Dispatcher,
+	resourceImages *resourceimage.Store,
 ) *conversation.Manager {
 	continuityConfig := &conversation.ContinuityConfig{}
 	if ko.Exists("conversation.continuity_scan_interval") {
@@ -309,6 +311,9 @@ func initConversations(
 	}
 
 	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, dispatcher, conversation.Opts{
+		CacheIncomingImages: func(ctx context.Context, id int, content string) error {
+			return resourceImages.Prefetch(ctx, id, content, settings.GetResourcePolicyTx)
+		},
 		DB:                       db,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
@@ -623,11 +628,13 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 	}
 
 	media, err := media.New(media.Opts{
-		Store:   store,
-		Lo:      lo,
-		DB:      db,
-		I18n:    i18n,
-		RootURL: rootURL,
+		Store:      store,
+		Lo:         lo,
+		DB:         db,
+		I18n:       i18n,
+		RootURL:    rootURL,
+		SigningKey: ko.MustString("app.encryption_key"),
+		URLExpiry:  cmp.Or(ko.Duration("upload.fs.expiry"), time.Hour),
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)

@@ -80,6 +80,7 @@ const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyp
 })
 
 const { editor, extractMentions, focus } = useTextEditor({
+  restrictResources: true,
   extensions: buildConversationExtensions({ getPlaceholder: () => props.placeholder }),
   htmlContent,
   textContent,

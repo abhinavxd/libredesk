@@ -36,10 +36,13 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Media - supports both authenticated access and signed URLs.
 	g.GET("/uploads/{uuid}", authOrSignedURL(handleServeMedia))
+	g.GET("/api/v1/resource-images/avatar", auth(rateLimit(handleResourceAvatar, "media")))
 	g.POST("/api/v1/media", auth(handleMediaUpload))
 
 	// Settings.
 	g.GET("/api/v1/settings/general", auth(handleGetGeneralSettings))
+	g.GET("/api/v1/settings/resource-policy", auth(handleGetResourcePolicy))
+	g.PUT("/api/v1/settings/resource-policy", perm(handleUpdateResourcePolicy, "general_settings:manage"))
 	g.PUT("/api/v1/settings/general", perm(clearsHCCache(handleUpdateGeneralSettings), "general_settings:manage"))
 	g.GET("/api/v1/settings/notifications/email", perm(handleGetEmailNotificationSettings, "notification_settings:manage"))
 	g.PUT("/api/v1/settings/notifications/email", perm(handleUpdateEmailNotificationSettings, "notification_settings:manage"))
@@ -73,6 +76,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/conversations/{uuid}/tags", perm(handleUpdateConversationtags, "conversations:update_tags"))
 	g.GET("/api/v1/conversations/{uuid}/page-visits", perm(handleGetContactPageVisits, "conversations:read"))
 	g.GET("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleGetMessage, "messages:read"))
+	g.GET("/api/v1/conversations/{cuuid}/messages/{uuid}/images/{image}", perm(rateLimit(handleResourceImage, "media"), "messages:read"))
+	g.POST("/api/v1/conversations/{cuuid}/messages/{uuid}/images/allow/{scope}", perm(handleAllowResourceImages, "messages:read"))
 	g.GET("/api/v1/conversations/{uuid}/messages", perm(handleGetMessages, "messages:read"))
 	g.GET("/api/v1/conversations/{uuid}/transcript", perm(handleDownloadConversationTranscript, "messages:read"))
 	g.POST("/api/v1/conversations/{cuuid}/messages", auth(handleSendMessage))

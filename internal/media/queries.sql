@@ -103,3 +103,15 @@ FROM media m
 LEFT JOIN conversation_messages cm ON cm.id = m.model_id AND m.model_type = 'messages'
 WHERE m.uuid = $1
   AND (COALESCE(m.model_id, 0) = 0 OR cm.conversation_id = $2);
+
+-- name: get-unlinked-resource-images
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+FROM media
+WHERE model_type = 'resource_images'
+ AND NOT EXISTS (SELECT 1 FROM conversation_messages cm WHERE cm.id = media.model_id);
+
+-- name: get-unlinked-resource-avatars
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+FROM media
+WHERE model_type = 'resource_avatars'
+ AND NOT EXISTS (SELECT 1 FROM users WHERE users.id = media.model_id);

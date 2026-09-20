@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/jmoiron/sqlx/types"
 )
 
@@ -134,6 +135,8 @@ type ToolApproval struct {
 }
 
 type AgentRunResult struct {
+	Display resourcepolicy.Display `db:"-" json:"display"`
+
 	Status   string        `json:"status"`
 	Content  string        `json:"content,omitempty"`
 	Approval *ToolApproval `json:"approval,omitempty"`
@@ -194,6 +197,8 @@ type ChatImage struct {
 
 // CopilotMessage is one persisted turn of an agent's copilot chat on a conversation.
 type CopilotMessage struct {
+	Display resourcepolicy.Display `db:"-" json:"display"`
+
 	Role     string        `db:"role" json:"role"`
 	Content  string        `db:"content" json:"content"`
 	Approval *ToolApproval `db:"-" json:"approval,omitempty"`

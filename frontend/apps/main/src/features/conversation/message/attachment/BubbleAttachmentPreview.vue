@@ -17,6 +17,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { isPreviewImage, localMediaURL } from '@shared-ui/utils/resourceURL'
 import BubbleAttachmentItem from '@/features/conversation/message/attachment/BubbleAttachmentItem.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 
@@ -24,7 +25,7 @@ const props = defineProps({
   attachments: { type: Array, required: true }
 })
 
-const isImage = (attachment) => (attachment.content_type || '').startsWith('image/')
+const isImage = (attachment) => isPreviewImage(attachment.content_type) && !!localMediaURL(attachment.url)
 
 const imageAttachments = computed(() =>
   (props.attachments || []).filter(isImage)

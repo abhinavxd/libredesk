@@ -118,7 +118,7 @@
                 : 'bg-muted text-foreground'
             "
           >
-            <Letter v-if="!msg.isUser" :html="msg.content" class="native-html" />
+            <SafeMessageContent v-if="!msg.isUser" :message="msg" class="native-html" />
             <template v-else>{{ msg.content }}</template>
           </div>
           <div v-if="!msg.isUser && !msg.approval && msg.content" class="flex gap-0.5">
@@ -209,7 +209,7 @@ import {
 } from '@shared-ui/components/ui/select'
 import { Textarea } from '@shared-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Letter } from 'vue-letter'
+import SafeMessageContent from '@shared-ui/components/SafeMessageContent.vue'
 import { DotLoader } from '@shared-ui/components/ui/loader'
 import { Eraser, Bot, Copy, Reply, StickyNote } from 'lucide-vue-next'
 import { useConversationStore } from '@/stores/conversation'
@@ -316,6 +316,7 @@ const hydrate = async (uuid) => {
     const loaded = (resp.data.data || []).map((m) => ({
       role: m.role,
       content: m.content,
+      display: m.display,
       approval: m.approval
     }))
     if (loaded.length) {
@@ -367,7 +368,7 @@ const send = async (preset) => {
     const message =
       result.status === 'approval_required'
         ? { role: 'approval', approval: result.approval }
-        : { role: 'assistant', content: result.content || '' }
+        : { role: 'assistant', content: result.content || '', display: result.display }
     copilotStore.setMessages(uuid, [...copilotStore.getMessages(uuid), message])
   } catch (error) {
     // A rejected persona (deleted or disabled since selection) comes back as an input error; fall back
@@ -399,7 +400,7 @@ const resolveToolApproval = async (approval, approved) => {
     const replacement =
       result.status === 'approval_required'
         ? { role: 'approval', approval: result.approval }
-        : { role: 'assistant', content: result.content || '' }
+        : { role: 'assistant', content: result.content || '', display: result.display }
     copilotStore.setMessages(
       uuid,
       copilotStore

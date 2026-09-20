@@ -22,6 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
@@ -694,6 +695,8 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 	author.Email = null.String{}
 
 	return r.SendEnvelope(cmodels.ChatMessage{
+		Display:          resourcepolicy.PrepareContent(message.Content, message.ContentType),
+		ContentType:      message.ContentType,
 		UUID:             message.UUID,
 		CreatedAt:        message.CreatedAt,
 		Content:          message.Content,

@@ -35,6 +35,7 @@
 </template>
 
 <script setup>
+import { localMediaURL, isPreviewImage } from '@shared-ui/utils/resourceURL';
 import { File } from 'lucide-vue-next';
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file';
 defineProps({
@@ -45,26 +46,28 @@ defineProps({
 })
 
 const isImage = (attachment) => {
-  return attachment.content_type && attachment.content_type.startsWith('image/')
+  return isPreviewImage(attachment.content_type) && !!localMediaURL(attachment.url)
 }
 
 const getThumbnailUrl = (attachment) => {
   if (!isImage(attachment)) return attachment.url
-  return attachment.thumbnail_url || getThumbFilepath(attachment.url)
+  return localMediaURL(attachment.thumbnail_url) || getThumbFilepath(localMediaURL(attachment.url))
 }
 
 const fallbackToOriginal = (event, originalUrl) => {
   if (event.target.dataset.originalFallback) return
   event.target.dataset.originalFallback = 'true'
-  event.target.src = originalUrl
+  event.target.src = localMediaURL(originalUrl)
 }
 
 const openImage = (url) => {
-  window.open(url, '_blank', 'noopener,noreferrer')
+  if (!localMediaURL(url)) return
+  window.open(localMediaURL(url), '_blank', 'noopener,noreferrer')
 }
 
 const downloadFile = (attachment) => {
-  window.open(attachment.url, '_blank', 'noopener,noreferrer')
+  if (!localMediaURL(attachment.url)) return
+  window.open(localMediaURL(attachment.url), '_blank', 'noopener,noreferrer')
 }
 
 const truncateFileName = (name) => {
