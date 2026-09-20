@@ -8,6 +8,7 @@ import (
 func TestDecodeResourcePolicy(t *testing.T) {
 	for _, body := range []string{
 		`{"mode":"block_all","allowed_domains":[]}`,
+		`{"max_cache_bytes":1024}`,
 		`{"mode":"load_on_receipt","allowed_domains":[]}`,
 		`{"mode":"allowlist","allowed_domains":["IMAGES.example.com"]}`,
 	} {
@@ -35,13 +36,20 @@ func TestDecodeResourceCacheBudget(t *testing.T) {
 		body string
 		want int64
 	}{
-		{`{"mode":"load_on_receipt"}`, 10 << 30},
+		{`{"mode":"load_on_receipt"}`, 0},
 		{`{"mode":"allowlist","max_cache_bytes":10737418240}`, 10 << 30},
 		{`{"mode":"block_all","max_cache_bytes":536870912}`, 1 << 29},
 	} {
 		cfg, err := decodeResourcePolicy([]byte(tc.body))
-		if err != nil || cfg.MaxCacheBytes != tc.want {
-			t.Fatalf("budget decoded as %d, %v", cfg.MaxCacheBytes, err)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tc.want == 0 {
+			if cfg.MaxCacheBytes != nil {
+				t.Fatal("omitted cache size must stay omitted")
+			}
+		} else if cfg.MaxCacheBytes == nil || *cfg.MaxCacheBytes != tc.want {
+			t.Fatalf("unexpected budget: %+v", cfg)
 		}
 	}
 	for _, value := range []string{"0", "-1", "1.5", "9007199254740992", `"10"`} {

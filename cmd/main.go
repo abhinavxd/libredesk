@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -55,6 +56,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/webhook"
 	"github.com/abhinavxd/libredesk/internal/ws"
+	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -209,6 +211,7 @@ func main() {
 	// Load app settings from DB into the Koanf instance.
 	settings := initSettings(db)
 	loadSettings(settings)
+	loadResourceLimits(settings)
 
 	validateConfig(ko)
 
@@ -267,6 +270,22 @@ func main() {
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
 	)
+
+	media.SetStorageFullNotifier(func() {
+		data, err := json.Marshal(wsmodels.Message{
+			Type: wsmodels.MessageTypeSystemToast,
+			Data: map[string]string{
+				"variant":     "destructive",
+				"message_key": "media.storageFull",
+				"description": "Durable media storage is full. New uploads are temporarily disabled.",
+			},
+		})
+		if err != nil {
+			lo.Error("error marshalling storage-full toast", "error", err)
+			return
+		}
+		wsHub.BroadcastMessage(wsmodels.BroadcastMessage{Data: data})
+	})
 
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)

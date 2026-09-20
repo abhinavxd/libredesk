@@ -392,7 +392,7 @@ const messageText = computed(() => {
 })
 
 const nonInlineAttachments = computed(() =>
-  props.message.attachments.filter((attachment) => attachment.disposition !== 'inline')
+  props.message.attachments.filter((attachment) => attachment.unavailable || attachment.disposition !== 'inline')
 )
 
 const bubbleClasses = computed(() => ({

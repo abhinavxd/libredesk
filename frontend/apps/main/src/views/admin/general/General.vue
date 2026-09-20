@@ -7,7 +7,7 @@
           :initial-values="initialValues"
           :available-languages="availableLanguages"
         />
-        <ResourcePolicyForm />
+        <ResourcePolicyForm :show-cache-size="false" />
       </LoadingOverlay>
     </template>
     <template #help>

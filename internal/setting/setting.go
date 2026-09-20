@@ -37,11 +37,13 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	Get               *sqlx.Stmt `query:"get"`
-	GetAll            *sqlx.Stmt `query:"get-all"`
-	Update            *sqlx.Stmt `query:"update"`
-	GetByPrefix       *sqlx.Stmt `query:"get-by-prefix"`
-	SetResourcePolicy *sqlx.Stmt `query:"set-resource-policy"`
+	Get                  *sqlx.Stmt `query:"get"`
+	GetAll               *sqlx.Stmt `query:"get-all"`
+	Update               *sqlx.Stmt `query:"update"`
+	GetByPrefix          *sqlx.Stmt `query:"get-by-prefix"`
+	UpdateResourcePolicy *sqlx.Stmt `query:"update-resource-policy"`
+	SetResourcePolicy    *sqlx.Stmt `query:"set-resource-policy"`
+	SetResourceLimits    *sqlx.Stmt `query:"set-resource-limits"`
 }
 
 // New creates and returns a new instance of the Manager.

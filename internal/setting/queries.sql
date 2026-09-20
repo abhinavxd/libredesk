@@ -19,3 +19,13 @@ SELECT value FROM settings WHERE key = $1;
 -- name: set-resource-policy
 INSERT INTO settings (key, value) VALUES ('security.resource_policy', $1::jsonb)
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+
+-- name: set-resource-limits
+INSERT INTO settings (key, value) VALUES ('system.resource_limits', $1::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+
+-- name: update-resource-policy
+INSERT INTO settings (key, value) VALUES ('security.resource_policy', $1::jsonb || $2::jsonb)
+ON CONFLICT (key) DO UPDATE
+SET value = settings.value || $2::jsonb, updated_at = now()
+RETURNING value;

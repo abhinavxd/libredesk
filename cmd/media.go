@@ -74,6 +74,10 @@ func handleMediaUpload(r *fastglue.Request) error {
 		linkedModel = model[0]
 	}
 
+	if linkedModel == mmodels.ModelResourceImages || linkedModel == mmodels.ModelResourceAvatars {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid upload model", nil, envelope.InputError)
+	}
+
 	// Only agents who manage the help center may upload publicly served media.
 	if mmodels.IsPublicModel(linkedModel) {
 		auser := r.RequestCtx.UserValue("user").(amodels.User)
@@ -118,56 +122,35 @@ func handleMediaUpload(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileTypeNotAllowed"), nil, envelope.InputError)
 	}
 
-	// Delete files on any error.
-	var uuid = uuid.New()
-	thumbName := image.ThumbPrefix + uuid.String()
-	defer func() {
-		if cleanUp {
-			app.media.Delete(uuid.String())
-			app.media.Delete(thumbName)
-		}
-	}()
-
-	// Generate and upload thumbnail and store image dimensions in the media meta.
-	var meta = []byte("{}")
+	// Prepare the thumbnail in memory, but reserve durable capacity before
+	// writing either the original or its thumbnail to storage.
+	var prepared preparedImageUpload
+	meta := []byte("{}")
 	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
-		prepared, err := prepareImageUpload(file)
+		prepared, err = prepareImageUpload(file)
 		if err != nil {
-			cleanUp = true
-			app.lo.Error("error getting image dimensions", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
-		}
-		if prepared.thumbnailErr != nil {
-			app.lo.Error("error creating thumb image", "error", prepared.thumbnailErr)
-		} else {
-			// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
-			uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
-			if err != nil {
-				cleanUp = true
-				return sendErrorEnvelope(r, err)
-			}
-			thumbName = uploadedThumb
 		}
 		meta = prepared.meta
 	}
-
-	// Reset ptr.
-	file.Seek(0, 0)
-
-	// Override content type after upload (in case it was detected incorrectly).
-	_, srcContentType, err = app.media.Upload(uuid.String(), srcContentType, file)
+	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, "", null.NewString(linkedModel, linkedModel != ""), null.Int{}, file, int(srcFileSize), disposition, meta, !mmodels.IsPublicModel(linkedModel))
 	if err != nil {
-		cleanUp = true
-		app.lo.Error("error uploading file", "error", err)
 		return sendErrorEnvelope(r, err)
 	}
-
-	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel))
-	if err != nil {
-		cleanUp = true
-		app.lo.Error("error inserting metadata into database", "error", err)
-		return sendErrorEnvelope(r, err)
+	thumbName := image.ThumbPrefix + media.UUID
+	defer func() {
+		if cleanUp {
+			app.media.Delete(media.UUID)
+			app.media.Delete(thumbName)
+		}
+	}()
+	if prepared.thumbnailErr != nil {
+		app.lo.Error("error creating thumb image", "error", prepared.thumbnailErr)
+	} else if prepared.thumbnail != nil {
+		if _, _, err := app.media.Upload(thumbName, media.ContentType, prepared.thumbnail); err != nil {
+			cleanUp = true
+			return sendErrorEnvelope(r, err)
+		}
 	}
 	return r.SendEnvelope(media)
 }

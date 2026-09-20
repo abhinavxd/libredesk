@@ -46,3 +46,29 @@ func (m *Manager) SetResourcePolicy(cfg resourcepolicy.Config) error {
 	_, err = m.q.SetResourcePolicy.Exec(raw)
 	return err
 }
+
+// UpdateResourcePolicy merges the supplied fields under PostgreSQL's row lock.
+// Concurrent editors of privacy and cache size cannot overwrite one another.
+func (m *Manager) UpdateResourcePolicy(update resourcepolicy.Update) (resourcepolicy.Config, error) {
+	update, err := resourcepolicy.NormalizeUpdate(update)
+	if err != nil {
+		return resourcepolicy.Blocked(), err
+	}
+	patch, err := json.Marshal(update)
+	if err != nil {
+		return resourcepolicy.Blocked(), err
+	}
+	defaults, err := json.Marshal(resourcepolicy.Default())
+	if err != nil {
+		return resourcepolicy.Blocked(), err
+	}
+	var raw types.JSONText
+	if err := m.q.UpdateResourcePolicy.Get(&raw, defaults, patch); err != nil {
+		return resourcepolicy.Blocked(), err
+	}
+	cfg := resourcepolicy.Default()
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return resourcepolicy.Blocked(), err
+	}
+	return resourcepolicy.Normalize(cfg)
+}

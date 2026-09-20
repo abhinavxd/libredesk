@@ -44,6 +44,11 @@ local_login_enabled = true
 # File upload provider to use, either `fs` or `s3`.
 [upload]
 provider = "fs"
+# Maximum logical size of durable uploads and email attachments in bytes.
+# External image cache storage is separate and has its own rolling limit.
+# Set to 0 for unlimited durable storage.
+# Environment override: LIBREDESK_UPLOAD__MAX_STORAGE_BYTES
+max_storage_bytes = 0
 
 # Filesystem provider.
 [upload.fs]
@@ -106,6 +111,11 @@ db = 0
 outgoing_queue_workers = 10
 # Number of workers processing incoming message queue
 incoming_queue_workers = 10
+# Maximum raw IMAP message size to download and parse, in bytes (100 MiB). Messages
+# larger than this are skipped before their bodies are fetched. Set to 0 to
+# disable the guard (not recommended for small-memory containers).
+# Environment override: LIBREDESK_MESSAGE__MAX_INCOMING_MESSAGE_SIZE
+max_incoming_message_size = 104857600
 # How often to scan for outgoing messages to process, keep it low to process messages quickly.
 message_outgoing_scan_interval = "50ms"
 # Maximum number of messages that can be queued for incoming processing

@@ -1,6 +1,20 @@
 <template>
   <div class="flex items-center group text-left">
-    <Popover :open="showAudio" @update:open="showAudio = $event">
+    <div
+      v-if="attachment.unavailable"
+      class="w-36 min-h-28 rounded-md border bg-muted/40 p-3 text-center"
+      :title="t('media.attachmentUnavailableStorageFull')"
+    >
+      <File class="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+      <p class="truncate text-xs font-medium" :title="attachment.name">
+        {{ shortName(attachment.name) }}
+      </p>
+      <p class="text-xs text-muted-foreground">{{ formatBytes(attachment.size) }}</p>
+      <p class="mt-1 text-xs font-medium text-destructive">
+        {{ t('media.attachmentUnavailable') }}
+      </p>
+    </div>
+    <Popover v-else :open="showAudio" @update:open="showAudio = $event">
       <PopoverTrigger as-child>
         <div
           class="relative w-36 h-28 rounded-md border overflow-hidden cursor-pointer transition-colors"
@@ -63,6 +77,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { localMediaURL, isPreviewImage, isPreviewAudio } from '@shared-ui/utils/resourceURL'
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 import DownloadLink from '@/components/DownloadLink.vue'
@@ -82,6 +97,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['preview'])
 
+const { t } = useI18n()
 const showAudio = ref(false)
 
 const shortName = (name) => (name || '').substring(0, 40)
@@ -93,7 +109,9 @@ const fallbackToOriginal = (event, originalUrl) => {
 }
 
 const mediaURL = computed(() => localMediaURL(props.attachment.url))
-const thumbnailURL = computed(() => localMediaURL(props.attachment.thumbnail_url) || getThumbFilepath(mediaURL.value))
+const thumbnailURL = computed(
+  () => localMediaURL(props.attachment.thumbnail_url) || getThumbFilepath(mediaURL.value)
+)
 const isImage = computed(() => !!mediaURL.value && isPreviewImage(props.attachment.content_type))
 
 const isAudio = computed(() => !!mediaURL.value && isPreviewAudio(props.attachment.content_type))

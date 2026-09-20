@@ -582,6 +582,10 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 		err   error
 		lo    = initLogger("media")
 	)
+	maxStorageBytes := liveResourceLimits.snapshot().MaxStorageBytes
+	if maxStorageBytes < 0 {
+		log.Fatalf("upload.max_storage_bytes must be zero or a positive number of bytes")
+	}
 	rootURL := func() string {
 		u, err := settings.GetAppRootURL()
 		if err != nil {
@@ -628,13 +632,14 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 	}
 
 	media, err := media.New(media.Opts{
-		Store:      store,
-		Lo:         lo,
-		DB:         db,
-		I18n:       i18n,
-		RootURL:    rootURL,
-		SigningKey: ko.MustString("app.encryption_key"),
-		URLExpiry:  cmp.Or(ko.Duration("upload.fs.expiry"), time.Hour),
+		Store:           store,
+		Lo:              lo,
+		DB:              db,
+		I18n:            i18n,
+		RootURL:         rootURL,
+		SigningKey:      ko.MustString("app.encryption_key"),
+		URLExpiry:       cmp.Or(ko.Duration("upload.fs.expiry"), time.Hour),
+		MaxStorageBytes: maxStorageBytes,
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)
@@ -729,6 +734,8 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		log.Printf("WARNING: No `from` email address set for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
 	}
 
+	maxIncomingMessageSize := liveResourceLimits.snapshot().MaxIncomingMessageSize
+
 	// Callback to persist refreshed tokens in DB.
 	tokenRefreshCallback := func(inboxID int, updatedConfig imodels.Config) error {
 		// Marshal updated config to JSON
@@ -749,11 +756,12 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 	}
 
 	inbox, err := email.New(msgStore, usrStore, email.Opts{
-		ID:                   inboxRecord.ID,
-		Name:                 inboxRecord.Name,
-		Config:               config,
-		Lo:                   initLogger("email_inbox"),
-		TokenRefreshCallback: tokenRefreshCallback,
+		ID:                     inboxRecord.ID,
+		Name:                   inboxRecord.Name,
+		Config:                 config,
+		MaxIncomingMessageSize: maxIncomingMessageSize,
+		Lo:                     initLogger("email_inbox"),
+		TokenRefreshCallback:   tokenRefreshCallback,
 	})
 
 	if err != nil {

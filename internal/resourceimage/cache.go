@@ -19,6 +19,16 @@ type cacheUsage struct {
 	Deleting int64 `db:"deleting"`
 }
 
+// Usage returns the current logical image-cache usage, including pending
+// deletions that still occupy storage.
+func (s *Store) Usage() (int64, error) {
+	var usage cacheUsage
+	if err := s.db.Get(&usage, cacheUsageSQL); err != nil {
+		return 0, err
+	}
+	return usage.Bytes, nil
+}
+
 const cacheUsageSQL = `SELECT
  COALESCE((SELECT SUM(size) FROM media WHERE model_type IN ('resource_images', 'resource_avatars')), 0)
  + COALESCE(SUM(size), 0) AS bytes,

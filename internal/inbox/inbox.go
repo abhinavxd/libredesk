@@ -69,6 +69,12 @@ type Inbox interface {
 	Channel() string
 }
 
+// IncomingMessageSizeSetter is implemented by inbox channels that can apply
+// the global raw incoming-message limit without being restarted.
+type IncomingMessageSizeSetter interface {
+	SetMaxIncomingMessageSize(int64)
+}
+
 // MessageStore defines methods for storing and processing messages.
 type MessageStore interface {
 	MessageExists(string) (bool, error)
@@ -145,6 +151,18 @@ func (m *Manager) SetMessageStore(store MessageStore) {
 // SetUserStore sets the user store for the manager.
 func (m *Manager) SetUserStore(store UserStore) {
 	m.usrStore = store
+}
+
+// SetIncomingMessageSizeLimit applies the global email safety ceiling to all
+// currently initialized email inboxes.
+func (m *Manager) SetIncomingMessageSizeLimit(limit int64) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, current := range m.inboxes {
+		if setter, ok := current.(IncomingMessageSizeSetter); ok {
+			setter.SetMaxIncomingMessageSize(limit)
+		}
+	}
 }
 
 // Register registers the inbox with the manager.

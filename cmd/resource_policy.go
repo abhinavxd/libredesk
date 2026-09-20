@@ -24,11 +24,12 @@ func handleGetResourcePolicy(r *fastglue.Request) error {
 
 func handleUpdateResourcePolicy(r *fastglue.Request) error {
 	app := r.Context.(*App)
-	cfg, err := decodeResourcePolicy(r.RequestCtx.PostBody())
+	update, err := decodeResourcePolicy(r.RequestCtx.PostBody())
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, err.Error(), nil, envelope.InputError)
 	}
-	if err := app.setting.SetResourcePolicy(cfg); err != nil {
+	cfg, err := app.setting.UpdateResourcePolicy(update)
+	if err != nil {
 		app.lo.Error("error saving resource policy", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Unable to save resource policy", nil, envelope.GeneralError)
 	}
@@ -36,18 +37,18 @@ func handleUpdateResourcePolicy(r *fastglue.Request) error {
 	return r.SendEnvelope(cfg)
 }
 
-func decodeResourcePolicy(body []byte) (resourcepolicy.Config, error) {
+func decodeResourcePolicy(body []byte) (resourcepolicy.Update, error) {
 	if len(body) > 32768 {
-		return resourcepolicy.Blocked(), fmt.Errorf("resource policy exceeds 32 KiB")
+		return resourcepolicy.Update{}, fmt.Errorf("resource policy exceeds 32 KiB")
 	}
-	cfg := resourcepolicy.Config{MaxCacheBytes: resourcepolicy.DefaultMaxCacheBytes}
+	var cfg resourcepolicy.Update
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&cfg); err != nil {
-		return resourcepolicy.Blocked(), fmt.Errorf("invalid resource policy JSON")
+		return resourcepolicy.Update{}, fmt.Errorf("invalid resource policy JSON")
 	}
 	if err := decoder.Decode(new(any)); err != io.EOF {
-		return resourcepolicy.Blocked(), fmt.Errorf("invalid resource policy JSON")
+		return resourcepolicy.Update{}, fmt.Errorf("invalid resource policy JSON")
 	}
-	return resourcepolicy.Normalize(cfg)
+	return resourcepolicy.NormalizeUpdate(cfg)
 }

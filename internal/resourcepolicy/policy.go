@@ -24,6 +24,37 @@ type Config struct {
 	AllowedDomains []string `json:"allowed_domains"`
 }
 
+// Update contains only the fields an editor owns; omitted fields are preserved.
+type Update struct {
+	MaxCacheBytes  *int64    `json:"max_cache_bytes,omitempty"`
+	Mode           *string   `json:"mode,omitempty"`
+	AllowedDomains *[]string `json:"allowed_domains,omitempty"`
+}
+
+func NormalizeUpdate(update Update) (Update, error) {
+	if update.MaxCacheBytes == nil && update.Mode == nil && update.AllowedDomains == nil {
+		return Update{}, fmt.Errorf("at least one policy field is required")
+	}
+	cfg := Default()
+	if update.MaxCacheBytes != nil {
+		cfg.MaxCacheBytes = *update.MaxCacheBytes
+	}
+	if update.Mode != nil {
+		cfg.Mode = *update.Mode
+	}
+	if update.AllowedDomains != nil {
+		cfg.AllowedDomains = *update.AllowedDomains
+	}
+	cfg, err := Normalize(cfg)
+	if err != nil {
+		return Update{}, err
+	}
+	if update.AllowedDomains != nil {
+		update.AllowedDomains = &cfg.AllowedDomains
+	}
+	return update, nil
+}
+
 type Policy struct {
 	mode  string
 	hosts map[string]struct{}

@@ -61,11 +61,11 @@ func createTestConversation(opts ...func(*cmodels.Conversation)) cmodels.Convers
 			LastName:  "User",
 		},
 	}
-	
+
 	for _, opt := range opts {
 		opt(&conv)
 	}
-	
+
 	return conv
 }
 
@@ -108,7 +108,7 @@ func TestEvaluateGroup_AND_AllTrue(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "ApplyAction should be called once")
 	assert.Equal(t, models.ActionSetStatus, mockStore.appliedActions[0].Type)
 }
@@ -142,7 +142,7 @@ func TestEvaluateGroup_AND_ShortCircuit(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "ApplyAction should not be called when AND conditions fail")
 }
 
@@ -176,7 +176,7 @@ func TestEvaluateGroup_OR_OnlyOneTrue(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "ApplyAction should be called once for OR condition")
 }
 
@@ -217,7 +217,7 @@ func TestTwoGroups_AND_BothMustPass(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "ApplyAction should be called when both groups pass")
 }
 
@@ -254,7 +254,7 @@ func TestEmptyGroup_Skipped(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "ApplyAction should be called, empty group is skipped")
 }
 
@@ -302,7 +302,7 @@ func TestExecutionMode_FirstMatch(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Only first matching rule should execute in first_match mode")
 	assert.Equal(t, models.ActionSetStatus, mockStore.appliedActions[0].Type)
 }
@@ -351,7 +351,7 @@ func TestExecutionMode_All(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 2, mockStore.callCount, "All matching rules should execute in 'all' mode")
 }
 
@@ -386,7 +386,7 @@ func TestNullFields_SetNotSet(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Should handle null fields with set/not set operators")
 }
 
@@ -426,7 +426,7 @@ func TestCustomAttributes_StringComparison(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Custom attributes should be compared correctly")
 	assert.Equal(t, models.ActionSendCSAT, mockStore.appliedActions[0].Type)
 }
@@ -464,7 +464,7 @@ func TestCustomAttributes_MissingField(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "Missing custom attribute should fail the rule")
 }
 
@@ -497,7 +497,7 @@ func TestContainsOperator_MultipleValues(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Contains operator should match with comma-separated values")
 }
 
@@ -530,7 +530,7 @@ func TestNotContainsOperator(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Not contains operator should pass when values are not present")
 }
 
@@ -563,7 +563,7 @@ func TestNumericComparisons(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Greater than operator should work with numeric comparisons")
 }
 
@@ -611,7 +611,7 @@ func TestRealWorld_CSATAutomation(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "CSAT should be sent when status is resolved and client_id matches")
 	assert.Equal(t, models.ActionSendCSAT, mockStore.appliedActions[0].Type)
 }
@@ -647,7 +647,7 @@ func TestRealWorld_NewTicketAutomation(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 2, mockStore.callCount, "Both actions should be executed for new ticket")
 	assert.Equal(t, models.ActionSendPrivateNote, mockStore.appliedActions[0].Type)
 	assert.Equal(t, models.ActionSetSLA, mockStore.appliedActions[1].Type)
@@ -734,7 +734,7 @@ func TestCaseSensitivity_ContainsOperators(t *testing.T) {
 			}
 
 			engine.evalConversationRules(rules, conversation, nil)
-			
+
 			if tc.shouldMatch {
 				assert.Equal(t, 1, mockStore.callCount, "Expected action to be triggered")
 			} else {
@@ -779,7 +779,7 @@ func TestCaseSensitivity_Equals(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Case insensitive comparison should match")
 }
 
@@ -809,7 +809,7 @@ func TestInvalidOperator(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "Invalid operator should not trigger action")
 }
 
@@ -842,7 +842,7 @@ func TestContradictoryConditions(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "Contradictory conditions should never match")
 }
 
@@ -876,7 +876,7 @@ func TestTautologyCondition(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Tautology condition should always match")
 }
 
@@ -887,10 +887,10 @@ func TestCustomAttributeTypes(t *testing.T) {
 	engine := createTestEngine(mockStore)
 
 	customAttrs := map[string]interface{}{
-		"age":        25,          // int
-		"score":      98.5,        // float64
-		"is_premium": true,        // bool
-		"name":       "TestUser",  // string
+		"age":        25,         // int
+		"score":      98.5,       // float64
+		"is_premium": true,       // bool
+		"name":       "TestUser", // string
 	}
 	customJSON, _ := json.Marshal(customAttrs)
 
@@ -999,7 +999,7 @@ func TestHoursSinceFields_NullHandling(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "Should not trigger action when time field is null")
 }
 
@@ -1035,7 +1035,7 @@ func TestMultipleActions(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 4, mockStore.callCount, "All actions should be executed")
 	assert.Equal(t, models.ActionSetStatus, mockStore.appliedActions[0].Type)
 	assert.Equal(t, models.ActionSetPriority, mockStore.appliedActions[1].Type)
@@ -1100,26 +1100,26 @@ func TestContainsOperator_TextNormalization(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Contains should normalize whitespace and match")
 }
 
 // Test: Mock verification precision (The Mock Verifier's Gauntlet)
 func TestMockVerificationPrecision(t *testing.T) {
 	mockStore := new(mockConversationStore)
-	
+
 	expectedAction := models.RuleAction{
 		Type:  models.ActionReply,
 		Value: []string{"<p>Test reply automation!</p>"},
 	}
-	
+
 	conversation := createTestConversation(func(c *cmodels.Conversation) {
 		c.Contact.Email = null.StringFrom("libredesk.io@gmail.com")
 	})
-	
+
 	// Set up precise expectation
 	mockStore.On("ApplyAction", expectedAction, conversation, umodels.User{}).Return(nil).Once()
-	
+
 	engine := createTestEngine(mockStore)
 
 	rules := []models.Rule{
@@ -1132,14 +1132,14 @@ func TestMockVerificationPrecision(t *testing.T) {
 					},
 				},
 			},
-			Actions: []models.RuleAction{expectedAction},
+			Actions:       []models.RuleAction{expectedAction},
 			GroupOperator: models.OperatorOR,
 			ExecutionMode: models.ExecutionModeAll,
 		},
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	// This will verify the exact parameters were passed
 	mockStore.AssertExpectations(t)
 	assert.Equal(t, 1, mockStore.callCount, "Action should be called exactly once")
@@ -1705,6 +1705,22 @@ func TestAssignedTeamField(t *testing.T) {
 		Field: models.ConversationAssignedTeam, Operator: models.RuleOperatorNotSet, Value: "", FieldType: models.FieldTypeConversationField,
 	})
 	assert.Equal(t, 1, notSet, "invalid team ID should evaluate as not set")
+}
+
+func TestRecipientField(t *testing.T) {
+	conv := createTestConversation(func(c *cmodels.Conversation) {
+		c.LatestIncomingRecipient = "contact@antimuonstudios.com"
+	})
+
+	match := runSingleRule(t, conv, models.RuleDetail{
+		Field: models.ConversationRecipient, Operator: models.RuleOperatorEquals, Value: "contact@antimuonstudios.com", FieldType: models.FieldTypeConversationField,
+	})
+	assert.Equal(t, 1, match)
+
+	noMatch := runSingleRule(t, conv, models.RuleDetail{
+		Field: models.ConversationRecipient, Operator: models.RuleOperatorEquals, Value: "support@antimuonstudios.com", FieldType: models.FieldTypeConversationField,
+	})
+	assert.Equal(t, 0, noMatch)
 }
 
 func TestHoursSinceFirstAndLastReply(t *testing.T) {

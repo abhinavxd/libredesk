@@ -1,0 +1,6 @@
+allowBuilds:
+  '@parcel/watcher': true
+  cypress: true
+  esbuild: true
+  maplibre-gl: true
+  vue-demi: true

@@ -1,6 +1,7 @@
 package setting
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
@@ -57,4 +58,43 @@ func TestResourcePolicyPersistence(t *testing.T) {
 	}
 	db.Close()
 	assertBlocked(true)
+}
+
+func TestResourcePolicyIndependentUpdates(t *testing.T) {
+	db := testutil.NewDB(t, "resource_policy_updates")
+	m, err := New(Opts{DB: db})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exercise concurrent upserts as well as updates of an existing row.
+	db.MustExec("DELETE FROM settings WHERE key='security.resource_policy'")
+	for round := 0; round < 10; round++ {
+		mode := resourcepolicy.BlockAll
+		size := int64(1024 + round)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if _, err := m.UpdateResourcePolicy(resourcepolicy.Update{Mode: &mode}); err != nil {
+				t.Error(err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if _, err := m.UpdateResourcePolicy(resourcepolicy.Update{MaxCacheBytes: &size}); err != nil {
+				t.Error(err)
+			}
+		}()
+		wg.Wait()
+		cfg, err := m.GetResourcePolicy()
+		if err != nil || cfg.Mode != mode || cfg.MaxCacheBytes != size {
+			t.Fatalf("lost update: %+v %v", cfg, err)
+		}
+	}
+	domains := []string{"IMAGES.example.com"}
+	mode := resourcepolicy.Allowlist
+	cfg, err := m.UpdateResourcePolicy(resourcepolicy.Update{Mode: &mode, AllowedDomains: &domains})
+	if err != nil || cfg.MaxCacheBytes != 1033 || len(cfg.AllowedDomains) != 1 || cfg.AllowedDomains[0] != "images.example.com" {
+		t.Fatalf("privacy update changed budget: %+v %v", cfg, err)
+	}
 }
