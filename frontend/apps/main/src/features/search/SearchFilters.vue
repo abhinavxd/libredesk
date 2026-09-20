@@ -4,7 +4,7 @@
       <div :class="FILTER_CLASS">
         <SelectComboBox
           :model-value="filters.status"
-          :items="conversationStore.statusOptions"
+          :items="statusItems"
           :placeholder="t('globals.terms.status')"
           align="start"
           @update:model-value="set('status', $event)"
@@ -13,7 +13,7 @@
       <div :class="FILTER_CLASS">
         <SelectComboBox
           :model-value="filters.priority"
-          :items="conversationStore.priorityOptions"
+          :items="priorityItems"
           :placeholder="t('globals.terms.priority')"
           align="start"
           @update:model-value="set('priority', $event)"
@@ -91,6 +91,9 @@ import { UNASSIGNED } from './searchFilters'
 
 const FILTER_CLASS = 'flex-1 min-w-28'
 
+// The combobox matches the selected value by strict equality against a string.
+const asStringValues = (options) => options.map((option) => ({ ...option, value: String(option.value) }))
+
 const props = defineProps({
   filters: { type: Object, required: true }
 })
@@ -98,6 +101,8 @@ const emit = defineEmits(['update:filters'])
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
+const statusItems = computed(() => asStringValues(conversationStore.statusOptions))
+const priorityItems = computed(() => asStringValues(conversationStore.priorityOptions))
 const inboxStore = useInboxStore()
 const tagStore = useTagStore()
 

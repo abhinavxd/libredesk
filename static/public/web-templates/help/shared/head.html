@@ -34,7 +34,7 @@
     :root:not(.hc-dark) { {{ .Data.HelpCenter.ThemeCSS }} }</style>
     {{ if .Data.HelpCenter.CustomCSS }}<style>{{ .Data.HelpCenter.CustomCSS }}</style>{{ end }}
     {{ if .Data.JSONLD }}<script type="application/ld+json">{{ .Data.JSONLD }}</script>{{ end }}
-    {{ if not .Data.HelpCenter.HideThemeToggle }}<script>
+    {{ if and (not .Data.HelpCenter.HideThemeToggle) (not .Data.HelpCenter.Embed) }}<script>
     (function () {
         try {
             if (localStorage.getItem('libredesk-hc-theme') === 'dark') {

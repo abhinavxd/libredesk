@@ -174,7 +174,7 @@ const setupParentMessageListeners = () => {
       chatStore.conversations = null
       chatStore.setCurrentConversation(null)
       help.reset()
-      if (widgetStore.currentView === 'help') widgetStore.navigateToHome()
+      widgetStore.navigateToHome()
       signalWidgetLoaded()
     } else if (event.data.type === 'CAMPAIGN_CONTEXT') {
       await proactive.next(event.data.context)

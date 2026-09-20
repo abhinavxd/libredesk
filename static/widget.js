@@ -46,6 +46,7 @@
             this.previewData = null;
             this.previewHost = null;
             this.previewTimers = new Map();
+            this.hiddenPreviews = new Set();
             this.campaignData = null;
             this.campaignActiveSeconds = 0;
             this.campaignURL = location.href;
@@ -668,11 +669,18 @@
             this.previewData = null;
             this.campaignData = null;
             this.dismissedPreviews = [];
+            this.hiddenPreviews.clear();
             this.previewHost?.remove();
             this.previewHost = null;
             this.previewSignature = '';
             for (const timer of this.previewTimers.values()) clearTimeout(timer);
             this.previewTimers.clear();
+        }
+
+        hidePreview (key) {
+            this.previewTimers.delete(key);
+            this.hiddenPreviews.add(key);
+            this.renderPreviews();
         }
 
         dismissPreview (key) {
@@ -713,7 +721,7 @@
             const storageKey = `libredesk-previews-${this.config.inboxID}-${data.identity || 'visitor'}`;
             let dismissed = this.dismissedPreviews || [];
             try { dismissed = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch {}
-            const previews = data.previews.filter(item => !dismissed.includes(item.key)).slice(0, 3);
+            const previews = data.previews.filter(item => !dismissed.includes(item.key) && !this.hiddenPreviews.has(item.key)).slice(0, 3);
             const signature = JSON.stringify([previews, data.theme, data.labels, this.isMobile]);
             if (signature === this.previewSignature) return;
             this.previewSignature = signature;
@@ -787,7 +795,7 @@
                 card.append(open, close);
                 stack.append(card);
                 if (data.config.auto_hide_seconds > 0 && !this.previewTimers.has(item.key)) {
-                    this.previewTimers.set(item.key, setTimeout(() => this.dismissPreview(item.key), data.config.auto_hide_seconds * 1000));
+                    this.previewTimers.set(item.key, setTimeout(() => this.hidePreview(item.key), data.config.auto_hide_seconds * 1000));
                 }
             }
             if (previews.length > 1) {

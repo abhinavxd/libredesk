@@ -626,7 +626,12 @@ func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	name, email, phone, countryCode, err := validateFormData(app, req.FormData, config, nil)
+	// An identified contact's details come from the JWT, which resyncs them on every exchange, so the form only fills blanks.
+	var identified *umodels.User
+	if !getWidgetIsVisitor(r) {
+		identified = &contact
+	}
+	name, email, phone, countryCode, err := validateFormData(app, req.FormData, config, identified)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

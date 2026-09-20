@@ -10,7 +10,7 @@
             <a class="hc-brand" href="{{ .Data.HelpCenter.BasePath }}">
                 {{ if .Data.HelpCenter.LogoURL }}<img class="hc-logo-light" src="{{ .Data.HelpCenter.LogoURL }}" alt="{{ .Data.HelpCenter.Name }}" />{{ if .Data.HelpCenter.LogoURLDark }}<img class="hc-logo-dark" src="{{ .Data.HelpCenter.LogoURLDark }}" alt="{{ .Data.HelpCenter.Name }}" />{{ end }}{{ else }}<span class="hc-name">{{ .Data.HelpCenter.Name }}</span>{{ end }}
             </a>
-            {{ if or .Data.HelpCenter.NavLinks (gt (len .Data.HelpCenter.AvailableLocales) 1) }}
+            {{ if or .Data.HelpCenter.NavLinks (gt (len .Data.HelpCenter.AvailableLocales) 1) (not .Data.HelpCenter.HideThemeToggle) }}
             <button type="button" class="hc-nav-toggle" data-hc-nav-toggle aria-expanded="false" aria-controls="hc-nav-links" aria-label="{{ .L.T "globals.terms.menu" }}">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
             </button>

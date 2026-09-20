@@ -37,10 +37,12 @@ const selectHelpCenter = (value) =>
     featured_ids: []
   })
 
+const featuredIds = computed(() => props.modelValue.featured_ids || [])
+
 const titleOf = (id) => props.articles.find((article) => article.id === id)?.title
 
 const featured = computed({
-  get: () => props.modelValue.featured_ids.map((id) => ({ id, title: titleOf(id) })),
+  get: () => featuredIds.value.map((id) => ({ id, title: titleOf(id) })),
   set: (items) =>
     update(
       'featured_ids',
@@ -49,7 +51,7 @@ const featured = computed({
 })
 
 const unusedArticles = computed(() =>
-  props.articles.filter((article) => !props.modelValue.featured_ids.includes(article.id))
+  props.articles.filter((article) => !featuredIds.value.includes(article.id))
 )
 </script>
 
@@ -96,7 +98,7 @@ const unusedArticles = computed(() =>
             </p>
             <SwitchField
               :title="t('widget.showHelpTab')"
-              :checked="modelValue[audience].tab"
+              :checked="modelValue[audience]?.tab"
               @update:checked="updateAudience(audience, 'tab', $event)"
             />
           </div>
@@ -136,7 +138,7 @@ const unusedArticles = computed(() =>
                 @click="
                   update(
                     'featured_ids',
-                    modelValue.featured_ids.filter((_, i) => i !== index)
+                    featuredIds.filter((_, i) => i !== index)
                   )
                 "
               >
@@ -147,9 +149,9 @@ const unusedArticles = computed(() =>
         </Draggable>
 
         <Select
-          :disabled="modelValue.featured_ids.length >= MAX_FEATURED || !unusedArticles.length"
+          :disabled="featuredIds.length >= MAX_FEATURED || !unusedArticles.length"
           model-value=""
-          @update:model-value="update('featured_ids', [...modelValue.featured_ids, Number($event)])"
+          @update:model-value="update('featured_ids', [...featuredIds, Number($event)])"
         >
           <SelectTrigger class="max-w-md">
             <SelectValue :placeholder="t('widget.selectArticle')" />

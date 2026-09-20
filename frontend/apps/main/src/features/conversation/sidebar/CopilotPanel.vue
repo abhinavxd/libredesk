@@ -299,7 +299,10 @@ const clearChat = async () => {
 // Load the persisted chat from the server when a conversation opens, so a refresh
 // does not lose it. Skip if the store already has messages for it (a live session).
 const hydrate = async (uuid) => {
-  if (!uuid) return
+  if (!uuid) {
+    isHydrating.value = false
+    return
+  }
   if (copilotStore.getMessages(uuid).length > 0) {
     isHydrating.value = false
     return

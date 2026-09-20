@@ -145,6 +145,7 @@ watch(
       (item) => String(item.value) === String(campaign.value.sender_id)
     )
     emit('update:preview', {
+      id: campaign.value.id,
       sender: senderName(campaign.value.sender_id),
       avatar: agent?.avatar_url || '',
       message: campaign.value.message
