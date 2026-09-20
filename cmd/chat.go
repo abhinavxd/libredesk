@@ -97,6 +97,7 @@ type handoffFormReq struct {
 type chatSettingsResponse struct {
 	Campaigns    *struct{} `json:"campaigns,omitempty"`
 	HasCampaigns bool      `json:"has_campaigns"`
+	CampaignDelaySeconds int `json:"campaign_delay_seconds"`
 	livechat.Config
 	// Hide server-side fields from the public widget response.
 	TrustedDomains         *struct{}                     `json:"trusted_domains,omitempty"`
@@ -149,9 +150,10 @@ func handleGetChatSettings(r *fastglue.Request) error {
 	}
 
 	response := chatSettingsResponse{
-		Config:           config,
-		HasCampaigns:     slices.ContainsFunc(config.Campaigns, func(c proactive.Campaign) bool { return c.Enabled }),
-		CustomAttributes: customAttributes,
+		Config:               config,
+		HasCampaigns:         slices.ContainsFunc(config.Campaigns, func(c proactive.Campaign) bool { return c.Enabled }),
+		CampaignDelaySeconds: earliestCampaignDelay(config.Campaigns),
+		CustomAttributes:     customAttributes,
 	}
 
 	// Get business hours data if office hours feature is enabled.

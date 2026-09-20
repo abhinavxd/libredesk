@@ -30,6 +30,8 @@ describe('Live chat inbox form', () => {
   let inboxId
 
   beforeEach(() => {
+    // radix-vue's select focuses a node that is already gone in headless runs.
+    Cypress.on('uncaught:exception', (err) => !err.message.includes("reading 'focus'"))
     cy.viewport(1280, 800)
     cy.login()
   })

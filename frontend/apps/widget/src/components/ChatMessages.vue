@@ -330,14 +330,16 @@ watch(
     nextTick(() => {
       const id = chatStore.previewUnreadUUID
       chatStore.previewUnreadUUID = null
+      const container = messagesContainer.value
       const target = id && contentEl.value?.querySelector(`[data-message-uuid="${id}"]`)
-      if (target) {
+      const offset = target
+        ? target.getBoundingClientRect().top -
+          container.getBoundingClientRect().top +
+          container.scrollTop
+        : 0
+      if (target && offset > 0 && container.scrollHeight - container.clientHeight - offset > 1) {
         hasUserScrolled.value = true
-        scrollToOffset(
-          target.getBoundingClientRect().top -
-            messagesContainer.value.getBoundingClientRect().top +
-            messagesContainer.value.scrollTop
-        )
+        scrollToOffset(offset)
       } else scrollToBottom()
     })
     if (widgetStore.isOpen && !chatStore.isLoadingConversation) {

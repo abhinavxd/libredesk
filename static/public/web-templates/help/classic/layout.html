@@ -75,6 +75,7 @@
     </script>
     <script src="/static/public/static/help-center-search.js?v={{ AssetVer }}" defer></script>
     {{ if .Data.HelpCenter.CustomJS }}<script>{{ .Data.HelpCenter.CustomJS }}</script>{{ end }}
+    {{ template "hc-livechat-widget" . }}
 </body>
 </html>
 {{ end }}

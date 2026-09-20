@@ -1,7 +1,7 @@
 <template>
   <a :href="announcement.url" target="_blank" rel="noopener noreferrer" class="block no-underline">
     <Card
-      class="overflow-hidden rounded-xl border-border/80 transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
+      class="overflow-hidden rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
     >
       <img :src="announcement.image_url" :alt="announcement.title" class="w-full h-auto" />
       <CardContent class="p-4 text-sm">

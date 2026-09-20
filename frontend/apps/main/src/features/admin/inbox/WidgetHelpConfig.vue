@@ -88,6 +88,7 @@ const unusedArticles = computed(() =>
           <div
             v-for="audience in AUDIENCES"
             :key="audience"
+            :data-help-audience="audience"
             class="space-y-4 border rounded-md p-4"
           >
             <p class="text-sm font-medium text-foreground">
@@ -104,7 +105,7 @@ const unusedArticles = computed(() =>
         <p class="text-sm text-muted-foreground">{{ t('widget.helpOnHomeHint') }}</p>
       </div>
 
-      <div class="space-y-4">
+      <div data-featured-articles class="space-y-4">
         <h4 class="text-base font-semibold text-foreground">{{ t('widget.featuredArticles') }}</h4>
         <p class="text-sm text-muted-foreground">{{ t('widget.featuredArticlesHint') }}</p>
 
@@ -151,7 +152,7 @@ const unusedArticles = computed(() =>
           @update:model-value="update('featured_ids', [...modelValue.featured_ids, Number($event)])"
         >
           <SelectTrigger class="max-w-md">
-            <SelectValue :placeholder="t('widget.addArticle')" />
+            <SelectValue :placeholder="t('widget.selectArticle')" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem

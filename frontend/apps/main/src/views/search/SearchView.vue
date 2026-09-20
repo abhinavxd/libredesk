@@ -1,45 +1,21 @@
 <template>
   <div class="flex flex-col h-screen">
     <SearchHeader />
-    <div class="flex-1 overflow-y-auto">
+    <div ref="scrollRef" class="flex-1 overflow-y-auto">
       <div class="mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <div class="relative">
-          <SearchIcon
-            class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none"
-            aria-hidden="true"
-          />
-          <Input
-            ref="inputRef"
-            v-model="term"
-            :placeholder="$t('search.searchBy')"
-            :aria-label="$t('globals.terms.search')"
-            class="h-12 pl-10 pr-20 text-base"
-          />
-          <Spinner
-            v-if="loading"
-            size="sm"
-            variant="muted"
-            :absolute="false"
-            :center="false"
-            class="absolute right-10 top-1/2 -translate-y-1/2"
-          />
-          <button
-            v-if="term"
-            type="button"
-            :aria-label="$t('globals.messages.clearSearch')"
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
-            @click="term = ''"
-          >
-            <X class="w-4 h-4" aria-hidden="true" />
-          </button>
-        </div>
+        <SearchInput
+          ref="inputRef"
+          v-model="term"
+          :placeholder="$t('search.searchBy')"
+          :aria-label="$t('globals.terms.search')"
+          :clear-label="$t('globals.messages.clearSearch')"
+          input-class="h-12 text-base"
+          :loading="loading"
+        />
 
         <SearchFilters :filters="filters" @update:filters="filters = $event" />
 
-        <div v-if="loading && resultCount === 0" class="flex justify-center items-center h-64">
-          <Spinner :absolute="false" />
-        </div>
-        <div v-else-if="error" class="py-16 text-center space-y-4">
+        <div v-if="error" class="py-16 text-center space-y-4">
           <p class="text-destructive">{{ error }}</p>
           <Button type="button" @click="search"> {{ $t('globals.terms.tryAgain') }} </Button>
         </div>
@@ -76,10 +52,9 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { Search as SearchIcon, X } from 'lucide-vue-next'
+import { Search as SearchIcon } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
-import { Input } from '@shared-ui/components/ui/input'
-import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
+import SearchInput from '@shared-ui/components/SearchInput.vue'
 import SearchHeader from '@main/features/search/SearchHeader.vue'
 import SearchFilters from '@main/features/search/SearchFilters.vue'
 import SearchResults from '@main/features/search/SearchResults.vue'
@@ -201,6 +176,8 @@ const search = async () => {
   }
 }
 
+const scrollRef = ref(null)
+
 const fetchPage = async (type, page, perPage) => {
   if (perPage !== results.value[type].per_page) {
     cursorsByPage[type] = new Map([[1, '']])
@@ -229,7 +206,10 @@ const fetchPage = async (type, page, perPage) => {
   }
 }
 
-const changePage = ({ type, page, perPage }) => fetchPage(type, page, perPage)
+const changePage = async ({ type, page, perPage }) => {
+  await fetchPage(type, page, perPage)
+  scrollRef.value?.scrollTo({ top: 0 })
+}
 
 const changeSort = ({ type, sort }) => {
   if (sorts.value[type] === sort) return
@@ -280,7 +260,7 @@ watch(activeTab, syncRoute)
 
 if (term.value.length >= MIN_SEARCH_LENGTH) search()
 
-onMounted(() => inputRef.value?.$el?.focus?.())
+onMounted(() => inputRef.value?.input?.$el?.focus?.())
 
 onBeforeUnmount(() => {
   clearTimeout(debounceTimer)

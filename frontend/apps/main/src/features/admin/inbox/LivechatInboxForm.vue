@@ -494,7 +494,7 @@
                           </div>
                           <div
                             v-else-if="item.type === 'external_link'"
-                            class="grid grid-cols-3 gap-2"
+                            class="grid grid-cols-2 gap-2"
                           >
                             <Input
                               v-model="item.text"
@@ -504,12 +504,6 @@
                             <Input
                               v-model="item.url"
                               placeholder="https://example.com"
-                              @change="updateHomeApps"
-                            />
-                            <Input
-                              v-model="item.image_url"
-                              type="url"
-                              :placeholder="$t('globals.terms.logoUrl')"
                               @change="updateHomeApps"
                             />
                           </div>
@@ -921,6 +915,7 @@
             ref="campaignsRef"
             :model-value="form.values.config.campaigns || []"
             :inbox-id="initialValues.id || 0"
+            :brand-name="form.values.config.brand_name || ''"
             :cooldown="form.values.config.campaign_cooldown_hours ?? 24"
             :show-errors="showCampaignErrors"
             @update:model-value="updateCampaigns"
@@ -1759,7 +1754,7 @@ const addHomeApp = (type) => {
   } else if (type === 'help') {
     homeApps.value.push({ type: 'help' })
   } else {
-    homeApps.value.push({ type: 'external_link', text: '', url: '', image_url: '' })
+    homeApps.value.push({ type: 'external_link', text: '', url: '' })
   }
   updateHomeApps()
 }
@@ -1787,7 +1782,7 @@ const isHomeAppEmpty = (item) => {
   if (item.type === 'help') return false
   return item.type === 'announcement'
     ? !item.title && !item.description && !item.image_url && !item.url
-    : !item.text && !item.url && !item.image_url
+    : !item.text && !item.url
 }
 
 const isHomeAppComplete = (item) => {
@@ -1907,24 +1902,21 @@ watch(
       homeApps.value = newValues.config.home_apps.map((app) => ({ ...app }))
     }
 
-    let pc = newValues.config?.prechat_form
-    if (pc) {
-      pc = normalizePrechatConfig(pc)
-      for (const audience of ['visitors', 'users']) {
-        const existingFields = pc[audience].fields
-        if (existingFields.length === 0) {
-          pc[audience].fields = getDefaultPrechatFields()
-          continue
-        }
-        const existingKeys = new Set(existingFields.map((field) => field.key))
-        let nextOrder = existingFields.reduce((max, field) => Math.max(max, field.order || 0), 0)
-        const missing = getDefaultPrechatFields()
-          .filter((field) => !existingKeys.has(field.key))
-          .map((field) => ({ ...field, order: ++nextOrder }))
-        pc[audience].fields = [...existingFields, ...missing]
+    const pc = normalizePrechatConfig(newValues.config?.prechat_form)
+    for (const audience of ['visitors', 'users']) {
+      const existingFields = pc[audience].fields
+      if (existingFields.length === 0) {
+        pc[audience].fields = getDefaultPrechatFields()
+        continue
       }
-      prechatConfig.value = pc
+      const existingKeys = new Set(existingFields.map((field) => field.key))
+      let nextOrder = existingFields.reduce((max, field) => Math.max(max, field.order || 0), 0)
+      const missing = getDefaultPrechatFields()
+        .filter((field) => !existingKeys.has(field.key))
+        .map((field) => ({ ...field, order: ++nextOrder }))
+      pc[audience].fields = [...existingFields, ...missing]
     }
+    prechatConfig.value = pc
 
     form.setValues(
       {

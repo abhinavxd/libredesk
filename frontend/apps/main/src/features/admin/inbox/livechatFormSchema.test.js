@@ -359,6 +359,19 @@ describe('Livechat Inbox Form Schema', () => {
     expect(config.users).toEqual({ enabled: false, title: 'What is the issue?', fields: [] })
   })
 
+  test('an inbox saved without a prechat form still parses', () => {
+    const config = normalizePrechatConfig(undefined)
+
+    expect(config.enabled).toBe(false)
+    expect(config.fields).toEqual([])
+    expect(() =>
+      schema.parse({
+        ...validForm,
+        config: { ...validForm.config, prechat_form: config }
+      })
+    ).not.toThrow()
+  })
+
   test('campaign priority follows saved array order', () => {
     const campaigns = [{ id: 'first' }, { id: 'second' }, { id: 'third' }]
     expect(moveCampaign(campaigns, 2, -1).map(({ id }) => id)).toEqual(['first', 'third', 'second'])

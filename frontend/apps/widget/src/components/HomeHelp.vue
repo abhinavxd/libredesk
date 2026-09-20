@@ -23,11 +23,11 @@ const open = (article) => {
     <Button
       type="button"
       variant="outline"
-      class="h-10 w-full justify-start rounded-lg"
+      class="h-10 w-full justify-between px-2"
       @click="open()"
     >
-      <Search class="size-4" aria-hidden="true" />
       {{ $t('widget.searchArticles') }}
+      <Search class="size-4" aria-hidden="true" />
     </Button>
     <Button
       v-for="article in help.featured"

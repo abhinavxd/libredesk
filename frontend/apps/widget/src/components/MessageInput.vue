@@ -1,16 +1,17 @@
 <template>
-  <div class="border-t focus:ring-0 focus:outline-none">
+  <div class="focus:ring-0 focus:outline-none">
     <ReplyButtons
       v-if="quickReplies.length"
       :replies="quickReplies"
       :disabled="isSending"
-      class="px-2 pt-2"
+      align="end"
+      class="px-2 pb-2"
       @select="sendQuickReply"
     />
     <!-- Message Input -->
-    <div class="p-2">
+    <div class="p-2 border-t">
       <!-- Unified Input Container -->
-      <div class="border border-input rounded-lg bg-background focus-within:border-secondary">
+      <div class="border border-input rounded-md bg-background focus-within:border-secondary">
         <!-- Textarea Container -->
         <div class="p-2">
           <Textarea

@@ -72,7 +72,7 @@ const AUDIENCE_TRANSLATION_KEYS = {
 const SELECT_FIELDS = [
   {
     key: 'audience',
-    labelKey: 'widget.campaign.audience',
+    labelKey: 'globals.terms.audience',
     values: ['all', 'visitors', 'users']
   }
 ]
@@ -81,6 +81,7 @@ const DEVICES = ['desktop', 'mobile']
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
   inboxId: { type: Number, default: 0 },
+  brandName: { type: String, default: '' },
   cooldown: { type: Number, default: 24 },
   showErrors: { type: Boolean, default: false }
 })
@@ -97,9 +98,10 @@ const pendingDelete = ref(null)
 const stats = ref([])
 const from = ref(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10))
 const to = ref(new Date().toISOString().slice(0, 10))
+const brandSenderName = computed(() => props.brandName.trim() || t('widget.brandBot'))
 const senderName = (id) => {
   const agent = usersStore.options.find((item) => String(item.value) === String(id))
-  return agent?.label || t('widget.brandBot')
+  return agent?.label || brandSenderName.value
 }
 
 const campaignErrors = computed(() => {
@@ -187,12 +189,14 @@ const add = (source) => {
   selected.value = item.id
 }
 
+// Radix clears pendingDelete as the dialog closes, so the id comes from the open editor.
 const remove = () => {
+  const id = selected.value
   emit(
     'update:modelValue',
-    props.modelValue.filter((item) => item.id !== pendingDelete.value)
+    props.modelValue.filter((item) => item.id !== id)
   )
-  if (selected.value === pendingDelete.value) selected.value = ''
+  selected.value = ''
   pendingDelete.value = null
 }
 
@@ -422,7 +426,7 @@ onMounted(async () => {
 
     <!-- Campaign editor -->
     <template v-else>
-      <div class="flex items-center justify-between gap-2">
+      <div data-campaign-editor class="flex items-center justify-between gap-2">
         <Button type="button" variant="ghost" size="sm" class="-ml-2" @click="selected = ''">
           <ChevronRight class="size-4 rotate-180" />
           {{ t('widget.backToCampaigns') }}
@@ -489,11 +493,11 @@ onMounted(async () => {
 
         <div class="grid sm:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <Label for="campaign-sender">{{ t('widget.campaignSender') }}</Label>
+            <Label for="campaign-sender">{{ t('globals.terms.sender') }}</Label>
             <SelectAgentCombobox
               id="campaign-sender"
               :model-value="campaign.sender_id === 0 ? 'brand' : String(campaign.sender_id)"
-              :prepend-items="[{ value: 'brand', label: t('widget.brandBot') }]"
+              :prepend-items="[{ value: 'brand', label: brandSenderName }]"
               @update:model-value="update('sender_id', $event === 'brand' ? 0 : Number($event))"
             />
           </div>
@@ -532,7 +536,7 @@ onMounted(async () => {
         </h4>
 
         <div data-campaign-devices class="space-y-3">
-          <p class="text-sm font-medium text-foreground">{{ t('widget.campaign.devices') }}</p>
+          <p class="text-sm font-medium text-foreground">{{ t('globals.terms.device', 2) }}</p>
           <SwitchField
             v-for="device in DEVICES"
             :key="device"

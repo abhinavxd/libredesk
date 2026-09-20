@@ -30,6 +30,9 @@ const onMessage = (event) => {
     frame.value?.parentElement?.scrollTo({ top: 0 })
   } else if (event.data.type === 'height' && Number.isFinite(event.data.height)) {
     height.value = `${event.data.height}px`
+  } else if (event.data.type === 'scroll' && Number.isFinite(event.data.top)) {
+    const scroller = frame.value?.parentElement
+    if (scroller) scroller.scrollTo({ top: frame.value.offsetTop + event.data.top, behavior: 'smooth' })
   }
 }
 

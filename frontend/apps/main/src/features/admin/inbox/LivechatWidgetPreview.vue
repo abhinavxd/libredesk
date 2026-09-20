@@ -4,13 +4,13 @@
     <transition name="ld-preview-window">
       <div
         v-if="open"
-        class="absolute top-4 left-3 right-3 mx-auto max-w-[360px]"
+        class="absolute top-4 inset-x-0 mx-auto max-w-[400px]"
         :style="{ bottom: windowBottom + 'px' }"
       >
         <div
-          class="libredesk-widget-preview flex flex-col h-full bg-background text-foreground rounded-2xl overflow-hidden shadow-2xl border border-border"
+          class="libredesk-widget-preview flex flex-col h-full bg-background text-foreground rounded-2xl overflow-hidden border border-border"
+          :style="[primaryStyle, { boxShadow: IFRAME_BOX_SHADOW }]"
           :class="isDark ? 'dark' : 'light'"
-          :style="primaryStyle"
         >
           <!-- Chat view -->
           <template v-if="view === 'chat'">
@@ -134,11 +134,14 @@
                   v-if="!openedExisting && quickReplies.length"
                   class="flex flex-wrap justify-end gap-2 mt-auto"
                 >
-                  <span
+                  <Button
                     v-for="reply in quickReplies"
                     :key="reply"
-                    class="rounded-full border border-primary text-primary px-3 py-1.5 text-sm"
-                    >{{ reply }}</span
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="h-auto max-w-full rounded-full py-1.5 text-left whitespace-normal shadow-md"
+                    >{{ reply }}</Button
                   >
                 </div>
                 <template v-if="openedExisting">
@@ -168,7 +171,7 @@
               <!-- Message input -->
               <div class="border-t border-border shrink-0">
                 <div class="p-2">
-                  <div class="border border-input rounded-lg bg-background">
+                  <div class="border border-input rounded-md bg-background">
                     <div class="p-2">
                       <textarea
                         :placeholder="$t('globals.terms.typeMessage')"
@@ -205,23 +208,30 @@
 
           <template v-else>
             <div class="flex-1 min-h-0 relative">
-              <div v-if="view === 'home'" class="h-full overflow-y-auto flex flex-col">
-                <div class="relative" :style="headerStyle">
-                  <div class="p-6">
+              <div v-if="view === 'home'" class="relative h-full bg-background">
+                <div
+                  class="pointer-events-none absolute inset-x-0 top-0"
+                  :style="[headerStyle, { height: `${headerHeight}px` }]"
+                >
+                  <div v-if="showFade" class="absolute inset-x-0 bottom-0 h-20" :style="fadeStyle"></div>
+                </div>
+                <div class="relative h-full overflow-y-auto">
+                <div ref="headerRef">
+                  <div class="px-7 pb-7 pt-7">
                     <img
                       v-if="config.logo_url"
                       :src="config.logo_url"
                       :alt="config.brand_name"
                       class="max-h-7 max-w-full"
                     />
-                    <div class="mt-16" :class="textColorClass">
-                      <h2 class="text-3xl font-bold leading-none tracking-tight break-words">
-                        {{ parsedGreeting }}
-                      </h2>
-                      <p
-                        class="mt-2 max-w-64 text-xl font-medium leading-tight"
+                    <div class="mt-20" :class="textColorClass">
+                      <h2
+                        class="text-3xl font-semibold leading-tight tracking-tight break-words"
                         :class="subTextColorClass"
                       >
+                        {{ parsedGreeting }}
+                      </h2>
+                      <p class="mt-2 text-3xl font-semibold leading-tight tracking-tight break-words">
                         {{ parsedIntroduction }}
                       </p>
                     </div>
@@ -230,53 +240,44 @@
                     <Button
                       type="button"
                       size="lg"
-                      class="w-full rounded-xl font-semibold shadow-md"
+                      class="w-full font-semibold shadow-md"
                       @click="startNew"
                     >
                       {{ startButtonText }}
                       <ArrowRight :size="16" aria-hidden="true" />
                     </Button>
                   </div>
-                  <div
-                    v-if="showFade"
-                    class="absolute bottom-0 left-0 right-0 h-20 pointer-events-none"
-                    :style="fadeStyle"
-                  ></div>
                 </div>
 
-                <div
-                  v-if="homeItems.length"
-                  class="flex flex-col gap-3 bg-background px-4 pt-1 pb-5"
-                >
+                <div v-if="homeItems.length" class="flex flex-col gap-3 px-4 pt-1 pb-5">
                   <template v-for="(item, index) in homeItems" :key="index">
                     <section
                       v-if="item.type === 'help'"
-                      class="space-y-2 rounded-xl border border-border/80 bg-card p-2 shadow-sm"
+                      class="space-y-1 rounded-xl border border-border/80 bg-card p-2 shadow-sm"
                     >
                       <Button
                         type="button"
                         variant="outline"
-                        class="h-10 w-full justify-start rounded-lg"
+                        class="h-10 w-full justify-between px-2"
                         @click="view = 'help'"
                       >
-                        <Search class="size-4" aria-hidden="true" />
                         {{ $t('widget.searchArticles') }}
+                        <Search class="size-4" aria-hidden="true" />
                       </Button>
                       <Button
                         v-for="article in featuredArticles"
                         :key="article.id"
                         type="button"
                         variant="ghost"
-                        class="w-full h-auto justify-start text-left whitespace-normal"
+                        class="w-full h-auto justify-start px-2 py-1.5 text-left whitespace-normal"
                         @click="view = 'help'"
                       >
-                        <FileText class="size-4 shrink-0" aria-hidden="true" />
                         {{ article.title }}
                       </Button>
                     </section>
                     <Card
                       v-else-if="item.type === 'announcement'"
-                      class="overflow-hidden rounded-xl border-border/80 transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
+                      class="overflow-hidden rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
                     >
                       <img
                         v-if="item.image_url"
@@ -298,39 +299,21 @@
                     </Card>
                     <Card
                       v-else
-                      class="rounded-xl border-border/80 transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
+                      class="rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
                     >
-                      <CardContent class="p-4">
-                        <div class="flex items-center gap-3">
-                          <span
-                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted"
-                          >
-                            <img
-                              v-if="item.image_url"
-                              :src="item.image_url"
-                              alt=""
-                              class="size-5 object-contain"
-                            />
-                            <Globe2
-                              v-else
-                              :size="16"
-                              class="text-muted-foreground"
-                              aria-hidden="true"
-                            />
-                          </span>
-                          <span
-                            class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground"
-                            >{{ item.text || item.url }}</span
-                          >
-                          <ExternalLink
-                            :size="15"
-                            class="shrink-0 text-muted-foreground"
-                            aria-hidden="true"
-                          />
-                        </div>
+                      <CardContent class="flex items-center gap-3 p-4">
+                        <span class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground"
+                          >{{ item.text || item.url }}</span
+                        >
+                        <ExternalLink
+                          :size="15"
+                          class="shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
                       </CardContent>
                     </Card>
                   </template>
+                </div>
                 </div>
               </div>
 
@@ -348,11 +331,12 @@
                   </button>
                   <h3 class="font-medium truncate">{{ $t('globals.terms.help') }}</h3>
                 </header>
-                <div class="flex gap-2 p-3 border-b border-border shrink-0">
-                  <Input :placeholder="$t('widget.searchArticles')" readonly />
-                  <Button type="button" variant="outline" :aria-label="$t('widget.searchArticles')">
-                    <Search class="size-4" aria-hidden="true" />
-                  </Button>
+                <div class="relative p-3 border-b border-border shrink-0">
+                  <Search
+                    class="absolute left-6 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input class="pl-10" :placeholder="$t('widget.searchArticles')" readonly />
                 </div>
                 <div class="flex-1 min-h-0 overflow-y-auto">
                   <p
@@ -480,8 +464,8 @@
     <!-- Launcher -->
     <button
       type="button"
-      :aria-label="open ? $t('globals.messages.closeChat') : $t('widget.openChat')"
-      class="absolute flex items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105"
+      :aria-label="open ? $t('globals.messages.closeChat') : $t('globals.messages.openChat')"
+      class="absolute flex items-center justify-center rounded-full transition-transform hover:scale-105"
       :style="launcherStyle"
       @click="open = !open"
     >
@@ -497,11 +481,15 @@
 </template>
 
 <script setup>
+const IFRAME_BOX_SHADOW = 'rgba(9, 14, 21, 0.9) 0px 5px 40px 0px'
+const LAUNCHER_DROP_SHADOW =
+  'drop-shadow(rgba(9, 14, 21, 0.54) 0px 1px 6px) drop-shadow(rgba(9, 14, 21, 0.9) 0px 2px 32px)'
 const BACK_BUTTON_CLASS =
   'flex items-center justify-center size-8 rounded-md hover:bg-accent text-foreground'
 const PREVIEW_NAV_TAB_CLASS = 'flex w-full flex-col items-center justify-center gap-1 py-4'
 
 import { computed, ref, watch } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardContent } from '@shared-ui/components/ui/card'
@@ -515,7 +503,6 @@ import {
   ArrowLeft,
   ArrowUp,
   ExternalLink,
-  Globe2,
   ChevronDown,
   ChevronRight,
   AlertTriangle,
@@ -523,7 +510,6 @@ import {
   Smile,
   Maximize2,
   Search,
-  FileText,
   X
 } from 'lucide-vue-next'
 import HelpCollectionList from '@shared-ui/components/HelpCollectionList.vue'
@@ -549,6 +535,9 @@ const props = defineProps({
 const { t } = useI18n()
 
 const open = ref(true)
+const headerRef = ref(null)
+const { height: headerHeight } = useElementSize(headerRef)
+
 const view = ref('home')
 // The preview can't send/receive, so a sample conversation stands in for a real one.
 const openedExisting = ref(false)
@@ -744,6 +733,7 @@ const campaignStyle = computed(() => ({
   width: `min(280px, calc(100% - ${clampedSide.value * 2}px))`
 }))
 const launcherStyle = computed(() => ({
+  filter: LAUNCHER_DROP_SHADOW,
   width: LAUNCHER_SIZE + 'px',
   height: LAUNCHER_SIZE + 'px',
   backgroundColor: launcherColor.value,

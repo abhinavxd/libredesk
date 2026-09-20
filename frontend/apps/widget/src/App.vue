@@ -64,7 +64,14 @@ onMounted(() => {
 
 const signalWidgetLoaded = async () => {
   if (widgetStore.config.help?.help_center_id) await help.load(locale.value)
-  window.parent.postMessage({ type: 'WIDGET_LOADED', campaigns: widgetStore.config.has_campaigns }, '*')
+  window.parent.postMessage(
+    {
+      type: 'WIDGET_LOADED',
+      campaigns: widgetStore.config.has_campaigns,
+      campaignDelay: widgetStore.config.campaign_delay_seconds || 0
+    },
+    '*'
+  )
 }
 
 const fetchInitialConversations = async () => {

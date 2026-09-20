@@ -1,13 +1,16 @@
 <script setup>
-import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, Search, Maximize2, Minimize2, FileQuestionMark } from 'lucide-vue-next'
+import { ArrowLeft, Maximize2, Minimize2, FileQuestionMark } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
-import { Input } from '@shared-ui/components/ui/input'
+import SearchInput from '@shared-ui/components/SearchInput.vue'
 import { useHelpStore } from '@widget/store/help.js'
 import { useWidgetStore } from '@widget/store/widget.js'
 import HelpCollectionList from '@shared-ui/components/HelpCollectionList.vue'
 import ArticleReader from '@widget/components/ArticleReader.vue'
+import CloseWidgetButton from '@widget/components/CloseWidgetButton.vue'
+import StartConversationButton from '@widget/components/StartConversationButton.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import api from '@widget/api/index.js'
 
@@ -20,6 +23,7 @@ onUnmounted(() => {
 })
 const valid = (identity) => mounted && identity === help.identity
 const busy = ref(false)
+const searching = ref(false)
 const error = ref('')
 const scroller = ref(null)
 const backButton = ref(null)
@@ -34,6 +38,18 @@ const toggleExpand = () => {
   widget.toggleExpand()
   help.setExpandArticles(widget.isExpanded)
 }
+const runSearch = useDebounceFn(() => search(), 300)
+watch(
+  () => help.query,
+  (query) => {
+    if (!query.trim()) {
+      help.results = null
+      return
+    }
+    runSearch()
+  }
+)
+
 const retry = () => {
   error.value = ''
   help.load(locale.value)
@@ -44,7 +60,7 @@ const search = async () => {
     help.results = null
     return
   }
-  busy.value = true
+  searching.value = true
   error.value = ''
   const identity = help.identity
   try {
@@ -54,7 +70,7 @@ const search = async () => {
   } catch {
     if (valid(identity) && help.query.trim() === query) error.value = t('widget.helpLoadError')
   } finally {
-    busy.value = false
+    searching.value = false
   }
 }
 const openArticle = async ({ id, slug, locale: articleLocale }) => {
@@ -122,7 +138,7 @@ onMounted(async () => {
   if (help.focusSearch && mounted) {
     help.focusSearch = false
     await nextTick()
-    requestAnimationFrame(() => searchInput.value?.$el?.focus())
+    requestAnimationFrame(() => searchInput.value?.input?.$el?.focus())
   }
 })
 </script>
@@ -156,6 +172,7 @@ onMounted(async () => {
         <Minimize2 v-if="widget.isExpanded" class="size-4" aria-hidden="true" />
         <Maximize2 v-else class="size-4" aria-hidden="true" />
       </Button>
+      <CloseWidgetButton class="absolute right-2 inset-y-0 my-auto" />
     </header>
     <div class="relative flex flex-col flex-1 min-h-0">
       <div
@@ -177,20 +194,14 @@ onMounted(async () => {
         </div>
       </template>
       <template v-else>
-        <form class="flex gap-2 p-3 border-b" @submit.prevent="search">
-          <Input
+        <form class="p-3 border-b" @submit.prevent="search">
+          <SearchInput
             ref="searchInput"
             v-model="help.query"
-            :aria-label="t('widget.searchArticles')"
             :placeholder="t('widget.searchArticles')"
+            :clear-label="t('globals.messages.clearSearch')"
+            :loading="searching"
           />
-          <Button
-            type="submit"
-            variant="outline"
-            :disabled="busy || !help.available"
-            :aria-label="t('globals.terms.search')"
-            ><Search class="size-4" aria-hidden="true"
-          /></Button>
         </form>
         <div
           ref="scroller"
@@ -211,7 +222,10 @@ onMounted(async () => {
             class="flex flex-col items-center justify-center px-4 py-12 text-center"
           >
             <FileQuestionMark class="w-10 h-10 text-muted-foreground mb-4" aria-hidden="true" />
-            <p class="text-sm text-muted-foreground">{{ t('widget.noArticles') }}</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t('widget.noResultsFor', { query: help.query.trim() }) }}
+            </p>
+            <StartConversationButton class="mt-4" />
           </div>
         </div>
       </template>

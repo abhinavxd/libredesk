@@ -21,7 +21,8 @@
             }
 
             this.IFRAME_BORDER_RADIUS = '20px';
-            this.IFRAME_BOX_SHADOW = '0 1px 6px rgba(9, 14, 21, 0.5), 0 4px 32px rgba(9, 14, 21, 0.65)';
+            this.IFRAME_BOX_SHADOW = 'rgba(9, 14, 21, 0.9) 0px 5px 40px 0px';
+            this.LAUNCHER_DROP_SHADOW = 'drop-shadow(rgba(9, 14, 21, 0.54) 0px 1px 6px) drop-shadow(rgba(9, 14, 21, 0.9) 0px 2px 32px)';
             this.IFRAME_WIDTH = '400px';
             this.IFRAME_HEIGHT = '700px';
             this.EXPANDED_WIDTH = '750px';
@@ -49,6 +50,7 @@
             this.campaignActiveSeconds = 0;
             this.campaignURL = location.href;
             this.campaignEvent = "";
+            this.campaignDelay = 0;
             this.campaignBrowserKey = this.getCookie(this.getCookieName('campaign')) || this.randomKey();
             this.setCookie(this.getCookieName('campaign'), this.campaignBrowserKey);
             this.campaignSessionKey = this.getCookie(this.getCookieName('campaign-session')) || this.randomKey();
@@ -229,7 +231,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 10px 28px rgba(0, 0, 0, 0.14);
+                filter: ${this.LAUNCHER_DROP_SHADOW};
                 transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             `;
 
@@ -449,7 +451,10 @@
                     break;
                 case 'WIDGET_LOADED':
                     this.handleWidgetLoaded();
-                    if (event.data.campaigns) this.startCampaignTracking();
+                    if (event.data.campaigns) {
+                        this.campaignDelay = Math.min(Math.max(Number(event.data.campaignDelay) || 0, 0), 86400);
+                        this.startCampaignTracking();
+                    }
                     break;
                 case 'EXPAND_WIDGET':
                     this.expandWidget();
@@ -802,7 +807,9 @@
             if (this.campaignInterval) return;
             let last = performance.now();
             let elapsed = 0;
-            let gap = this.CAMPAIGN_POLL_MIN;
+            let asked = false;
+            const firstGap = () => Math.max(this.CAMPAIGN_POLL_MIN, this.campaignDelay);
+            let gap = firstGap();
             this.campaignInterval = setInterval(() => {
                 const now = performance.now();
                 const delta = Math.min((now - last) / 1000, 2);
@@ -812,14 +819,16 @@
                     this.campaignActiveSeconds = 0;
                     this.campaignEvent = '';
                     elapsed = 0;
-                    gap = this.CAMPAIGN_POLL_MIN;
+                    asked = false;
+                    gap = firstGap();
                 }
                 if (document.hidden || this.isChatVisible || this.hideLauncher) return;
                 this.campaignActiveSeconds += delta;
                 elapsed += delta;
                 if (elapsed < gap || this.unreadCount > 0 || this.campaignData) return;
                 elapsed = 0;
-                gap = Math.min(gap * 2, this.CAMPAIGN_POLL_MAX);
+                gap = asked ? Math.min(gap * 2, this.CAMPAIGN_POLL_MAX) : this.CAMPAIGN_POLL_MIN;
+                asked = true;
                 this.postToIframe({ type: 'CAMPAIGN_CONTEXT', context: { url: location.href, mobile: this.isMobile, active_seconds: Math.floor(this.campaignActiveSeconds), event: this.campaignEvent } });
             }, 1000);
         }

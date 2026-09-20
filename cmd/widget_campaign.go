@@ -213,6 +213,19 @@ func campaignSender(app *App, id int) (umodels.User, error) {
 	return app.user.GetAgent(id, "")
 }
 
+func earliestCampaignDelay(campaigns []proactive.Campaign) int {
+	delay := 0
+	for _, campaign := range campaigns {
+		if !campaign.Enabled {
+			continue
+		}
+		if delay == 0 || campaign.DelaySeconds < delay {
+			delay = campaign.DelaySeconds
+		}
+	}
+	return delay
+}
+
 func validCampaignKey(key string) bool {
 	id, err := uuid.Parse(key)
 	return err == nil && id != uuid.Nil

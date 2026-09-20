@@ -138,6 +138,19 @@
         keepEmbedded();
         new MutationObserver(keepEmbedded).observe(document.body, { childList: true, subtree: true });
 
+        // The parent sizes this iframe to the document height, so the widget panel owns scrolling.
+        document.addEventListener('click', function (event) {
+            var link = event.target.closest('a[href^="#"]');
+            if (!link) return;
+            var id = decodeURIComponent(link.getAttribute('href').slice(1));
+            var target = id && document.getElementById(id);
+            if (!target) return;
+            event.preventDefault();
+            var top = target.getBoundingClientRect().top + window.scrollY;
+            parent.postMessage({ source: 'libredesk-hc-embed', type: 'scroll', top: Math.max(top - 12, 0) }, '*');
+            if (history.replaceState) history.replaceState(null, '', '#' + id);
+        });
+
         var last = 0;
         var report = function () {
             var height = Math.ceil(document.body.getBoundingClientRect().height);

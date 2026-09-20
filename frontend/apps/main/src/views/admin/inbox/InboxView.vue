@@ -1,5 +1,5 @@
 <template>
-  <AdminSplitLayout>
+  <AdminSplitLayout :fixed-help="!!livechatPreview">
     <template #content>
       <router-view />
     </template>

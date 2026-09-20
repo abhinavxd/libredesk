@@ -127,7 +127,7 @@
 
   <ArticleEditSheet
     :is-open="showArticleEditSheet"
-    @update:open="$event ? (showArticleEditSheet = true) : closeEditSheet()"
+    @update:open="$event ? (showArticleEditSheet = true) : closeArticleSheet()"
     :article="editingArticle"
     :collection-id="editingArticle?.collection_id || createArticleCollectionId"
     :help-center-id="parseInt(id)"
@@ -135,9 +135,10 @@
     :help-center-locales="helpCenter?.allowed_locales || ['en']"
     :default-locale="props.locale"
     :translation-source="translationSource"
+    :created-collection="createdCollection"
     :submit-form="handleArticleSave"
     :is-loading="isSubmittingArticle"
-    @cancel="closeEditSheet"
+    @cancel="closeArticleSheet"
     @create-translation="openCreateTranslation"
     @create-translation-collection="openCreateTranslationCollection"
     @open-translation="openTranslation"
@@ -146,7 +147,7 @@
 
   <CollectionEditSheet
     :is-open="showCollectionEditSheet"
-    @update:open="$event ? (showCollectionEditSheet = true) : closeEditSheet()"
+    @update:open="$event ? (showCollectionEditSheet = true) : closeCollectionSheet()"
     :collection="editingCollection"
     :help-center-id="parseInt(id)"
     :parent-id="createCollectionParentId"
@@ -154,7 +155,7 @@
     :default-locale="createCollectionLocale || props.locale"
     :submit-form="handleCollectionSave"
     :is-loading="isSubmittingCollection"
-    @cancel="closeEditSheet"
+    @cancel="closeCollectionSheet"
   />
 
   <Sheet :open="showInsights" @update:open="showInsights = $event">
@@ -332,7 +333,7 @@ const editingCollection = ref(null)
 const createCollectionParentId = ref(null)
 const createCollectionLocale = ref('')
 const createArticleCollectionId = ref(null)
-const pendingTranslation = ref(null)
+const createdCollection = ref(null)
 const deletingItem = ref(null)
 
 const breadcrumbLinks = computed(() => [
@@ -427,17 +428,26 @@ const openEditSheet = (item) => {
   }
 }
 
-const closeEditSheet = () => {
+const closeArticleSheet = () => {
   showArticleEditSheet.value = false
-  showCollectionEditSheet.value = false
   editingArticle.value = null
   translationSource.value = null
-  editingCollection.value = null
   selectedItem.value = null
+  createArticleCollectionId.value = null
+  createdCollection.value = null
+}
+
+const closeCollectionSheet = () => {
+  showCollectionEditSheet.value = false
+  editingCollection.value = null
   createCollectionParentId.value = null
   createCollectionLocale.value = ''
-  createArticleCollectionId.value = null
-  pendingTranslation.value = null
+}
+
+const closeEditSheet = () => {
+  closeArticleSheet()
+  closeCollectionSheet()
+  selectedItem.value = null
 }
 
 const visitSite = () => {
@@ -472,7 +482,6 @@ const toggleActive = async () => {
 }
 
 const openCreateCollectionModal = (parentId = null) => {
-  pendingTranslation.value = null
   editingCollection.value = null
   createCollectionParentId.value = typeof parentId === 'number' ? parentId : null
   createCollectionLocale.value = props.locale
@@ -482,7 +491,6 @@ const openCreateCollectionModal = (parentId = null) => {
 const handleCollectionSave = async (formData) => {
   isSubmittingCollection.value = true
   try {
-    const resumeTranslation = !editingCollection.value ? pendingTranslation.value : null
     let savedCollection = null
     if (editingCollection.value) {
       await api.updateCollection(props.id, editingCollection.value.id, formData)
@@ -493,11 +501,10 @@ const handleCollectionSave = async (formData) => {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })
-    closeEditSheet()
-    if (resumeTranslation) {
-      createArticleCollectionId.value = savedCollection.id
-      translationSource.value = resumeTranslation
-      showArticleEditSheet.value = true
+    const keepArticleDraft = savedCollection && showArticleEditSheet.value
+    closeCollectionSheet()
+    if (keepArticleDraft) {
+      createdCollection.value = savedCollection
       return
     }
     if (!followSavedLocale(formData.locale)) fetchTree({ silent: true })
@@ -541,11 +548,8 @@ const openCreateTranslation = ({ article, locale }) => {
   translationSource.value = { ...article, locale }
 }
 
-const openCreateTranslationCollection = ({ article, locale }) => {
-  pendingTranslation.value = { ...article, locale }
-  showArticleEditSheet.value = false
-  editingArticle.value = null
-  translationSource.value = null
+const openCreateTranslationCollection = ({ locale }) => {
+  createdCollection.value = null
   editingCollection.value = null
   createCollectionParentId.value = null
   createCollectionLocale.value = locale

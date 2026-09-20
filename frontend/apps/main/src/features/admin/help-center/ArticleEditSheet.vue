@@ -100,7 +100,7 @@
 
               <div v-if="loadedArticle && helpCenterLocales.length > 1" class="space-y-3">
                 <h3 class="font-medium text-sm text-muted-foreground">
-                  {{ t('globals.terms.language', 2) }}
+                  {{ t('helpCenter.translations') }}
                 </h3>
 
                 <div class="overflow-hidden rounded-md border bg-card">
@@ -198,10 +198,7 @@
                   variant="outline"
                   size="sm"
                   @click="
-                    emit('create-translation-collection', {
-                      article: translationSource,
-                      locale: form.values.locale
-                    })
+                    emit('create-translation-collection', { locale: form.values.locale })
                   "
                 >
                   <Plus class="mr-2 size-4" aria-hidden="true" />
@@ -453,6 +450,10 @@ const props = defineProps({
     type: Object,
     default: null
   },
+  createdCollection: {
+    type: Object,
+    default: null
+  },
   submitForm: {
     type: Function,
     required: true
@@ -612,6 +613,15 @@ watch(
     else titleInput.value?.$el?.focus()
   },
   { immediate: true }
+)
+
+watch(
+  () => props.createdCollection,
+  async (collection) => {
+    if (!collection || !props.isOpen) return
+    await fetchAvailableCollections()
+    form.setFieldValue('collection_id', String(collection.id), false)
+  }
 )
 
 const fetchAvailableCollections = async () => {

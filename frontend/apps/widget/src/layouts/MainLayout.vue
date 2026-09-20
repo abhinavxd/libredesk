@@ -1,7 +1,11 @@
 <template>
   <div class="flex flex-col h-full relative">
-    <div class="absolute top-2 right-2 z-20">
-      <CloseWidgetButton />
+    <div
+      v-if="widgetStore.currentView === 'home'"
+      class="absolute right-2 z-20"
+      :class="widgetStore.isMobileFullScreen ? 'top-[max(1rem,env(safe-area-inset-top))]' : 'top-2'"
+    >
+      <CloseWidgetButton :class="textColorClass" />
     </div>
     <Tabs
       :modelValue="widgetStore.currentView"
@@ -54,6 +58,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/ui/tabs'
 import HomeView from '@widget/views/HomeView.vue'
 import { House, MessagesSquare, CircleQuestionMark } from 'lucide-vue-next'
@@ -63,10 +68,12 @@ import ChatView from '@widget/views/ChatView.vue'
 import ConversationsView from '@widget/views/ConversationsView.vue'
 import ConnectionBanner from '@widget/components/ConnectionBanner.vue'
 import CloseWidgetButton from '@widget/components/CloseWidgetButton.vue'
+import { useHeaderTheme } from '@widget/composables/useHeaderTheme.js'
 import { useWidgetStore } from '@widget/store/widget.js'
 
 const widgetStore = useWidgetStore()
 const help = useHelpStore()
+const { textColorClass } = useHeaderTheme(computed(() => widgetStore.config))
 
 const handleTabChange = (value) => {
   if (value === 'home') {

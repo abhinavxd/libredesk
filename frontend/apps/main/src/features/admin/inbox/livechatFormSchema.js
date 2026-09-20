@@ -151,6 +151,8 @@ export const normalizePrechatConfig = (config = {}) => {
   }
   return {
     ...config,
+    enabled: config.enabled ?? false,
+    fields: config.fields ?? [],
     handoff_only: config.handoff_only ?? false,
     visitors: normalizeAudience(config.visitors),
     users: normalizeAudience(config.users)

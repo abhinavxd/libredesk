@@ -12,7 +12,7 @@
       </Button>
       <ChatTitle />
     </div>
-    <div class="flex items-center gap-2 ml-auto" :class="{ 'mr-12': widgetStore.isMobileFullScreen }">
+    <div class="flex items-center gap-2 ml-auto">
       <DropdownMenu v-if="!widgetStore.isMobileFullScreen || canDownloadTranscript">
         <DropdownMenuTrigger as-child>
           <Button type="button" variant="ghost" size="sm" :aria-label="$t('globals.terms.more')">
@@ -38,6 +38,7 @@
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <CloseWidgetButton />
     </div>
   </div>
 </template>
@@ -57,6 +58,7 @@ import api from '@widget/api/index.js'
 import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
 import { handleHTTPError } from '@shared-ui/utils/http'
 import ChatTitle from './ChatTitle.vue'
+import CloseWidgetButton from './CloseWidgetButton.vue'
 import { useWidgetStore } from '@widget/store/widget.js'
 
 const widgetStore = useWidgetStore()

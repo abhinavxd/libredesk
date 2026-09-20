@@ -69,7 +69,7 @@ export function useReplyPreviews() {
           labels: {
             dismiss: t('globals.terms.dismiss'),
             dismissAll: t('widget.dismissPreviews'),
-            open: t('widget.openConversation')
+            open: t('globals.messages.openConversation')
           },
           theme: {
             background: style.backgroundColor,

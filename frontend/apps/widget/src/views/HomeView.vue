@@ -1,47 +1,48 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="relative flex flex-col h-full bg-background">
     <div
-      class="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
+      class="pointer-events-none absolute inset-x-0 top-0"
+      :style="[backgroundStyle, { height: `${headerHeight}px` }]"
     >
-      <div class="flex flex-col">
-        <HomeHeader :config="config">
-          <RecentConversationCard
-            v-if="mostRecentConversation"
-            :conversation="mostRecentConversation"
-          />
-          <div v-else-if="canStartConversation">
-            <Button
-              size="lg"
-              class="w-full rounded-xl font-semibold shadow-md"
-              @click="startConversation"
-            >
-              {{ startButtonText }}
-              <ArrowRight size="16" aria-hidden="true" />
-            </Button>
-          </div>
-        </HomeHeader>
+      <div v-if="showFade" class="absolute inset-x-0 bottom-0 h-20" :style="fadeStyle"></div>
+    </div>
 
-        <div v-if="homeItems.length" class="space-y-3 bg-background px-4 pt-1 pb-5">
-          <template v-for="(item, index) in homeItems" :key="index">
-            <HomeHelp v-if="item.type === 'help'" />
-            <AnnouncementCard v-else-if="item.type === 'announcement'" :announcement="item" />
-            <HomeExternalLink v-else-if="item.type === 'external_link'" :link="item" />
-          </template>
-        </div>
+    <div
+      class="relative flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
+    >
+      <HomeHeader ref="headerRef" :config="config">
+        <RecentConversationCard
+          v-if="mostRecentConversation"
+          :conversation="mostRecentConversation"
+        />
+        <StartConversationButton
+          v-else
+          arrow
+          size="lg"
+          fallback-label="globals.messages.sendUsMessage"
+          class="w-full font-semibold shadow-md"
+        />
+      </HomeHeader>
+
+      <div v-if="homeItems.length" class="space-y-3 px-4 pt-1 pb-5">
+        <template v-for="(item, index) in homeItems" :key="index">
+          <HomeHelp v-if="item.type === 'help'" />
+          <AnnouncementCard v-else-if="item.type === 'announcement'" :announcement="item" />
+          <HomeExternalLink v-else-if="item.type === 'external_link'" :link="item" />
+        </template>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { ArrowRight } from 'lucide-vue-next'
-import { Button } from '@shared-ui/components/ui/button'
+import { computed, ref } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { useWidgetStore } from '@widget/store/widget.js'
+import { useHeaderTheme } from '@widget/composables/useHeaderTheme.js'
 import { useChatStore } from '@widget/store/chat.js'
-import { useUserStore } from '@widget/store/user.js'
-import { useI18n } from 'vue-i18n'
 import HomeHeader from '@widget/components/HomeHeader.vue'
+import StartConversationButton from '@widget/components/StartConversationButton.vue'
 import HomeExternalLink from '@widget/components/HomeExternalLink.vue'
 import AnnouncementCard from '@widget/components/AnnouncementCard.vue'
 import RecentConversationCard from '@widget/components/RecentConversationCard.vue'
@@ -50,9 +51,10 @@ import { useHelpStore } from '@widget/store/help.js'
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
-const userStore = useUserStore()
-const { t } = useI18n()
 const config = computed(() => widgetStore.config)
+const { backgroundStyle, showFade, fadeStyle } = useHeaderTheme(config)
+const headerRef = ref(null)
+const { height: headerHeight } = useElementSize(computed(() => headerRef.value?.$el))
 const help = useHelpStore()
 const homeItems = computed(() =>
   (config.value.home_apps || []).filter((item) => item.type !== 'help' || help.available)
@@ -65,22 +67,4 @@ const mostRecentConversation = computed(() => {
   return conversations[0]
 })
 
-const canStartConversation = computed(() => {
-  const userConfig = userStore.isVisitor ? config.value.visitors : config.value.users
-  // Mirrors the server check, else the button is offered and the send fails.
-  if (!userConfig?.allow_start_conversation) return false
-  return userConfig?.prevent_multiple_conversations !== true || !chatStore.hasConversations
-})
-
-const startButtonText = computed(() => {
-  const isVisitor = userStore.isVisitor
-  return isVisitor
-    ? config.value.visitors?.start_conversation_button_text || t('globals.messages.sendUsMessage')
-    : config.value.users?.start_conversation_button_text || t('globals.messages.sendUsMessage')
-})
-
-const startConversation = () => {
-  chatStore.setCurrentConversation(null)
-  widgetStore.navigateToChat()
-}
 </script>
