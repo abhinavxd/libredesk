@@ -63,7 +63,7 @@ func TestPolicyFailsClosed(t *testing.T) {
 }
 
 func TestNormalize(t *testing.T) {
-	cfg, err := Normalize(Config{Mode: Allowlist, AllowedDomains: []string{" IMAGES.Example.com ", "images.example.com", "a.example.com"}})
+	cfg, err := Normalize(Config{MaxCacheBytes: DefaultMaxCacheBytes, Mode: Allowlist, AllowedDomains: []string{" IMAGES.Example.com ", "images.example.com", "a.example.com"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +79,11 @@ func TestNormalize(t *testing.T) {
 		"bücher.example", "xn--.example", "exam\nple.com", strings.Repeat("a", 64) + ".example",
 		strings.Repeat("aaaa.", 51) + "com",
 	} {
-		if _, err := Normalize(Config{Mode: Allowlist, AllowedDomains: []string{host}}); err == nil {
+		if _, err := Normalize(Config{MaxCacheBytes: DefaultMaxCacheBytes, Mode: Allowlist, AllowedDomains: []string{host}}); err == nil {
 			t.Errorf("accepted invalid domain %q", host)
 		}
 	}
-	if _, err := Normalize(Config{Mode: Allowlist, AllowedDomains: make([]string, MaxDomains+1)}); err == nil {
+	if _, err := Normalize(Config{MaxCacheBytes: DefaultMaxCacheBytes, Mode: Allowlist, AllowedDomains: make([]string, MaxDomains+1)}); err == nil {
 		t.Fatal("accepted oversized allowlist")
 	}
 }

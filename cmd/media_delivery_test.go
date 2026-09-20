@@ -70,7 +70,7 @@ func TestAvatarGatewayRejectsBlockedAndUnconfiguredSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := &App{setting: settings, resourceImages: resourceimage.NewStore(db, nil, "fs"), lo: &lo}
+	app := &App{setting: settings, resourceImages: resourceimage.NewStore(db, nil, "fs", settings.GetResourcePolicyTx), lo: &lo}
 	request := func(source string) int {
 		r := &fastglue.Request{RequestCtx: &fasthttp.RequestCtx{}, Context: app}
 		r.RequestCtx.QueryArgs().Set("source", source)
@@ -85,7 +85,7 @@ func TestAvatarGatewayRejectsBlockedAndUnconfiguredSources(t *testing.T) {
 	if got := request("https://avatars.example/person"); got != 403 {
 		t.Fatalf("block_all returned %d", got)
 	}
-	if err := settings.SetResourcePolicy(resourcepolicy.Config{Mode: resourcepolicy.Allowlist}); err != nil {
+	if err := settings.SetResourcePolicy(resourcepolicy.Config{Mode: resourcepolicy.Allowlist, MaxCacheBytes: resourcepolicy.DefaultMaxCacheBytes}); err != nil {
 		t.Fatal(err)
 	}
 	if got := request("https://avatars.example/person"); got != 404 {

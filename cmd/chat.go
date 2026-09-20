@@ -695,7 +695,7 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 	author.Email = null.String{}
 
 	return r.SendEnvelope(cmodels.ChatMessage{
-		Display:          resourcepolicy.PrepareContent(message.Content, message.ContentType),
+		Display:          resourcepolicy.PrepareContentWithAttachments(message.Content, message.ContentType, message.Attachments),
 		ContentType:      message.ContentType,
 		UUID:             message.UUID,
 		CreatedAt:        message.CreatedAt,

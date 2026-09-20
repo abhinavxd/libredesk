@@ -8,8 +8,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/migrations"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/jmoiron/sqlx"
 )
@@ -73,23 +75,18 @@ func TestPersistentImagesAndPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 	media := &memoryMedia{blobs: make(map[string][]byte)}
-	first := NewStore(db, media, "fs")
-	second := NewStore(db, media, "fs")
+	first := NewStore(db, media, "fs", defaultCachePolicy)
 	var calls atomic.Int32
 	fetch := func(context.Context, string, func() error) ([]byte, error) {
 		calls.Add(1)
 		return []byte("saved PNG"), nil
 	}
-	first.fetch, second.fetch = fetch, fetch
+	first.fetch = fetch
 	ctx := context.Background()
 	results := make(chan error, 8)
-	for i := range 8 {
+	for range 8 {
 		go func() {
-			store := first
-			if i%2 == 0 {
-				store = second
-			}
-			body, err := store.Get(ctx, messageID, "source", "https://example.com/image", nil)
+			body, err := first.Get(ctx, messageID, "source", "https://example.com/image", nil)
 			if err == nil && string(body) != "saved PNG" {
 				err = errors.New("wrong stored content")
 			}
@@ -114,7 +111,7 @@ func TestPersistentImagesAndPermissions(t *testing.T) {
 	if err != nil || allowed {
 		t.Fatalf("transaction-bound message permission: %v, %v", allowed, err)
 	}
-	restarted := NewStore(db, media, "fs")
+	restarted := NewStore(db, media, "fs", defaultCachePolicy)
 	restarted.fetch = func(context.Context, string, func() error) ([]byte, error) {
 		t.Error("refetched persisted image")
 		return nil, errors.New("unexpected fetch")
@@ -175,7 +172,7 @@ func TestPersistentAvatarUsesOnlyConfiguredSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	media := &memoryMedia{blobs: make(map[string][]byte)}
-	store := NewStore(db, media, "fs")
+	store := NewStore(db, media, "fs", defaultCachePolicy)
 	calls := 0
 	store.fetch = func(context.Context, string, func() error) ([]byte, error) { calls++; return []byte("avatar"), nil }
 	ctx := context.Background()
@@ -188,7 +185,7 @@ func TestPersistentAvatarUsesOnlyConfiguredSource(t *testing.T) {
 	if _, err := store.GetAvatar(ctx, userID, "first", source, nil); err != nil {
 		t.Fatal(err)
 	}
-	restarted := NewStore(db, media, "fs")
+	restarted := NewStore(db, media, "fs", defaultCachePolicy)
 	restarted.fetch = store.fetch
 	if _, err := restarted.GetAvatar(ctx, userID, "first", source, nil); err != nil {
 		t.Fatal(err)
@@ -218,4 +215,160 @@ func TestPersistentAvatarUsesOnlyConfiguredSource(t *testing.T) {
 	if calls != 1 {
 		t.Fatal("removed avatar triggered a fetch")
 	}
+}
+
+// ioCheckedMedia runs a database operation inside each storage operation, so a
+// one-connection pool detects accidentally holding a transaction across I/O.
+type ioCheckedMedia struct {
+	memoryMedia
+	check func() error
+}
+
+func (m *ioCheckedMedia) Upload(name, kind string, body io.ReadSeeker) (string, string, error) {
+	if err := m.check(); err != nil {
+		return "", "", err
+	}
+	return m.memoryMedia.Upload(name, kind, body)
+}
+
+func (m *ioCheckedMedia) GetBlob(name string) ([]byte, error) {
+	if err := m.check(); err != nil {
+		return nil, err
+	}
+	return m.memoryMedia.GetBlob(name)
+}
+
+func TestImageIOReleasesDatabaseConnection(t *testing.T) {
+	db := testutil.NewDB(t, "resource_image_io")
+	db.SetMaxOpenConns(1)
+	const source = "https://avatars.example/person"
+	var userID int
+	if err := db.Get(&userID, "INSERT INTO users (type, email, first_name, avatar_url) VALUES ('contact', 'io@example.com', 'IO', $1) RETURNING id", source); err != nil {
+		t.Fatal(err)
+	}
+	check := func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		var n int
+		return db.GetContext(ctx, &n, "SELECT 1")
+	}
+	media := &ioCheckedMedia{memoryMedia: memoryMedia{blobs: make(map[string][]byte)}, check: check}
+	store := NewStore(db, media, "fs", defaultCachePolicy)
+	store.fetch = func(_ context.Context, _ string, authorize func() error) ([]byte, error) {
+		if err := check(); err != nil {
+			return nil, err
+		}
+		if err := authorize(); err != nil {
+			return nil, err
+		}
+		return []byte("avatar"), nil
+	}
+	for range 2 {
+		if _, err := store.GetAvatar(context.Background(), userID, "source", source, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Revocation during a cached read must still prevent delivery.
+	media.check = func() error {
+		_, err := db.Exec("UPDATE users SET avatar_url = NULL WHERE id = $1", userID)
+		return err
+	}
+	if _, err := store.GetAvatar(context.Background(), userID, "source", source, nil); err == nil {
+		t.Fatal("served revoked avatar after storage read")
+	}
+	// Changing the owner while uploading must prevent publication and remove the blob.
+	db.MustExec("UPDATE users SET avatar_url = $1 WHERE id = $2", source, userID)
+	if _, err := store.GetAvatar(context.Background(), userID, "other", source, nil); err == nil {
+		t.Fatal("published revoked avatar after upload")
+	}
+	var count int
+	if err := db.Get(&count, "SELECT count(*) FROM media WHERE model_type = 'resource_avatars'"); err != nil || count != 1 {
+		t.Fatalf("cache count: %d, %v", count, err)
+	}
+	if len(media.blobs) != 1 {
+		t.Fatalf("failed upload leaked a blob: %d", len(media.blobs))
+	}
+}
+
+func TestConcurrentStoresPublishOneImage(t *testing.T) {
+	db := testutil.NewDB(t, "resource_image_race")
+	const source = "https://avatars.example/person"
+	var userID int
+	if err := db.Get(&userID, "INSERT INTO users (type, email, first_name, avatar_url) VALUES ('contact', 'race@example.com', 'Race', $1) RETURNING id", source); err != nil {
+		t.Fatal(err)
+	}
+	media := &memoryMedia{blobs: make(map[string][]byte)}
+	started := make(chan struct{}, 2)
+	proceed := make(chan struct{})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	results := make(chan error, 2)
+	for range 2 {
+		store := NewStore(db, media, "fs", defaultCachePolicy)
+		store.fetch = func(ctx context.Context, _ string, authorize func() error) ([]byte, error) {
+			started <- struct{}{}
+			select {
+			case <-proceed:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			if err := authorize(); err != nil {
+				return nil, err
+			}
+			return []byte("avatar"), nil
+		}
+		go func() { _, err := store.GetAvatar(ctx, userID, "source", source, nil); results <- err }()
+	}
+	for range 2 {
+		select {
+		case <-started:
+		case <-ctx.Done():
+			t.Fatal("concurrent fetch did not start")
+		}
+	}
+	close(proceed)
+	for range 2 {
+		if err := <-results; err != nil {
+			t.Fatal(err)
+		}
+	}
+	var count int
+	if err := db.Get(&count, "SELECT count(*) FROM media WHERE model_type = 'resource_avatars'"); err != nil || count != 1 {
+		t.Fatalf("cache count: %d, %v", count, err)
+	}
+	if len(media.blobs) != 1 {
+		t.Fatalf("duplicate cache fill leaked blobs: %d", len(media.blobs))
+	}
+}
+
+func TestStorageAdmissionDoesNotBorrowConnections(t *testing.T) {
+	store := NewStore(nil, nil, "fs", defaultCachePolicy)
+	releases := make([]func(), 0, cap(store.slots))
+	for i := range cap(store.slots) {
+		release, err := store.acquire(context.Background(), string(rune('a'+i)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		releases = append(releases, release)
+	}
+	defer func() {
+		for _, release := range releases {
+			release()
+		}
+	}()
+	for _, key := range []string{"a", "new"} {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		_, err := store.acquire(ctx, key)
+		cancel()
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("waiting for %s: %v", key, err)
+		}
+	}
+	if len(store.active) != cap(store.slots) {
+		t.Fatal("canceled waiter left an active key")
+	}
+}
+
+func defaultCachePolicy(*sqlx.Tx) (resourcepolicy.Config, error) {
+	return resourcepolicy.Default(), nil
 }

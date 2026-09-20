@@ -69,9 +69,5 @@ func setMessageDisplay(msg *cmodels.Message, policy resourcepolicy.Policy, trust
 }
 
 func isDisplayImage(contentType string) bool {
-	switch contentType {
-	case "image/png", "image/jpeg", "image/gif", "image/webp", "image/avif":
-		return true
-	}
-	return false
+	return resourcepolicy.IsDisplayImage(contentType)
 }

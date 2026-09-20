@@ -1488,7 +1488,7 @@ func (m *Manager) broadcastMessageToWidgetClients(message *models.Message) {
 	m.SignAttachmentURLs(message.Attachments)
 	m.SignAvatarURL(&message.Author.AvatarURL)
 	liveChatInbox.BroadcastMessageToClients(message.ConversationUUID, conversation.ContactID, models.ChatMessage{
-		Display:          resourcepolicy.PrepareContent(message.Content, message.ContentType),
+		Display:          resourcepolicy.PrepareContentWithAttachments(message.Content, message.ContentType, message.Attachments),
 		ContentType:      message.ContentType,
 		UUID:             message.UUID,
 		Status:           message.Status,

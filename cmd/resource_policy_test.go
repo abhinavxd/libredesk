@@ -29,3 +29,24 @@ func TestDecodeResourcePolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestDecodeResourceCacheBudget(t *testing.T) {
+	for _, tc := range []struct {
+		body string
+		want int64
+	}{
+		{`{"mode":"load_on_receipt"}`, 10 << 30},
+		{`{"mode":"allowlist","max_cache_bytes":10737418240}`, 10 << 30},
+		{`{"mode":"block_all","max_cache_bytes":536870912}`, 1 << 29},
+	} {
+		cfg, err := decodeResourcePolicy([]byte(tc.body))
+		if err != nil || cfg.MaxCacheBytes != tc.want {
+			t.Fatalf("budget decoded as %d, %v", cfg.MaxCacheBytes, err)
+		}
+	}
+	for _, value := range []string{"0", "-1", "1.5", "9007199254740992", `"10"`} {
+		if _, err := decodeResourcePolicy([]byte(`{"mode":"load_on_receipt","max_cache_bytes":` + value + `}`)); err == nil {
+			t.Fatalf("accepted invalid budget %s", value)
+		}
+	}
+}

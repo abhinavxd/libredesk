@@ -456,6 +456,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS index_media_resource_image_source
 CREATE UNIQUE INDEX IF NOT EXISTS index_media_resource_avatar_source
  ON media (model_id, content_id) WHERE model_type = 'resource_avatars';
 
+DROP TABLE IF EXISTS resource_image_cache_pending;
+CREATE TABLE resource_image_cache_pending (
+ uuid UUID PRIMARY KEY,
+ size BIGINT NOT NULL CHECK (size >= 0),
+ state TEXT NOT NULL CHECK (state IN ('upload', 'delete')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS index_media_resource_cache_fifo
+ ON media (created_at, id) INCLUDE (uuid, size)
+ WHERE model_type IN ('resource_images', 'resource_avatars');
+
 DROP TABLE IF EXISTS oidc CASCADE;
 CREATE TABLE oidc (
 	id SERIAL PRIMARY KEY,

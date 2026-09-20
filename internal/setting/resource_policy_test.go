@@ -23,15 +23,15 @@ func TestResourcePolicyPersistence(t *testing.T) {
 		}
 	}
 	cfg, err := m.GetResourcePolicy()
-	if err != nil || cfg.Mode != resourcepolicy.LoadOnReceipt {
+	if err != nil || cfg.Mode != resourcepolicy.LoadOnReceipt || cfg.MaxCacheBytes != resourcepolicy.DefaultMaxCacheBytes {
 		t.Fatalf("unexpected installation default: %#v, %v", cfg, err)
 	}
 	db.MustExec(`DELETE FROM settings WHERE key = 'security.resource_policy'`)
 	cfg, err = m.GetResourcePolicy()
-	if err != nil || cfg.Mode != resourcepolicy.LoadOnReceipt {
+	if err != nil || cfg.Mode != resourcepolicy.LoadOnReceipt || cfg.MaxCacheBytes != resourcepolicy.DefaultMaxCacheBytes {
 		t.Fatalf("unexpected missing-setting default: %#v, %v", cfg, err)
 	}
-	cfg = resourcepolicy.Config{Mode: resourcepolicy.Allowlist, AllowedDomains: []string{" IMAGES.example.com "}}
+	cfg = resourcepolicy.Config{MaxCacheBytes: 2 << 30, Mode: resourcepolicy.Allowlist, AllowedDomains: []string{" IMAGES.example.com "}}
 	if err := m.SetResourcePolicy(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -39,14 +39,19 @@ func TestResourcePolicyPersistence(t *testing.T) {
 		t.Fatal("accepted invalid policy")
 	}
 	got, err := m.GetResourcePolicy()
-	if err != nil || got.Mode != resourcepolicy.Allowlist || len(got.AllowedDomains) != 1 || got.AllowedDomains[0] != "images.example.com" {
+	if err != nil || got.MaxCacheBytes != 2<<30 || got.Mode != resourcepolicy.Allowlist || len(got.AllowedDomains) != 1 || got.AllowedDomains[0] != "images.example.com" {
 		t.Fatalf("unexpected persisted policy: %#v, %v", got, err)
+	}
+	db.MustExec(`UPDATE settings SET value = '{"mode":"allowlist","allowed_domains":[]}'::jsonb WHERE key = 'security.resource_policy'`)
+	legacy, err := m.GetResourcePolicy()
+	if err != nil || legacy.Mode != resourcepolicy.Allowlist || legacy.MaxCacheBytes != 10<<30 {
+		t.Fatalf("legacy policy did not receive default budget: %#v, %v", legacy, err)
 	}
 	if err := m.SetResourcePolicy(resourcepolicy.Blocked()); err != nil {
 		t.Fatal(err)
 	}
 	assertBlocked(false)
-	for _, value := range []string{`null`, `{"mode":"invalid"}`, `{"mode":"allowlist","allowed_domains":["*"]}`} {
+	for _, value := range []string{`null`, `{"mode":"block_all","max_cache_bytes":0}`, `{"mode":"invalid"}`, `{"mode":"allowlist","allowed_domains":["*"]}`} {
 		db.MustExec(`UPDATE settings SET value = $1::jsonb WHERE key = 'security.resource_policy'`, value)
 		assertBlocked(true)
 	}

@@ -16,6 +16,11 @@
       <Textarea v-model="domains" :disabled="loading || saving" rows="5" placeholder="images.example.com" />
     </label>
     <p v-if="mode === 'allowlist'" class="text-sm text-muted-foreground">{{ t('admin.resourcePolicy.domainHint') }}</p>
+    <label class="block space-y-2">
+      <span>{{ t('admin.resourcePolicy.cacheSize') }}</span>
+      <Input v-model="cacheGiB" type="number" min="0.000000001" step="any" required :disabled="loading || saving" class="max-w-48" />
+    </label>
+    <p class="text-sm text-muted-foreground">{{ t('admin.resourcePolicy.cacheSizeHint') }}</p>
     <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
     <Button type="submit" :disabled="loading || saving || !loaded">{{ t('admin.resourcePolicy.save') }}</Button>
   </form>
@@ -25,6 +30,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
+import { Input } from '@shared-ui/components/ui/input'
 import { Textarea } from '@shared-ui/components/ui/textarea'
 import api from '@/api'
 import { useConversationStore } from '@/stores/conversation'
@@ -41,6 +47,8 @@ const modeDescription = computed(() => ({
   load_on_receipt: 'admin.resourcePolicy.loadOnReceiptHint'
 })[mode.value])
 const domains = ref('')
+const GiB = 2 ** 30
+const cacheGiB = ref(10)
 const loading = ref(true)
 const loaded = ref(false)
 const saving = ref(false)
@@ -51,6 +59,7 @@ onMounted(async () => {
     const response = await api.getResourcePolicy()
     mode.value = response.data.data.mode
     domains.value = response.data.data.allowed_domains.join('\n')
+    cacheGiB.value = (response.data.data.max_cache_bytes ?? 10 * GiB) / GiB
     loaded.value = true
   } catch {
     error.value = t('admin.resourcePolicy.loadFailed')
@@ -60,14 +69,21 @@ onMounted(async () => {
 })
 
 const save = async () => {
-  saving.value = true
   error.value = ''
+  const maxCacheBytes = Math.round(Number(cacheGiB.value) * GiB)
+  if (!Number.isSafeInteger(maxCacheBytes) || maxCacheBytes <= 0) {
+    error.value = t('admin.resourcePolicy.invalidCacheSize')
+    return
+  }
+  saving.value = true
   try {
     const response = await api.updateResourcePolicy({
       mode: mode.value,
+      max_cache_bytes: maxCacheBytes,
       allowed_domains: domains.value.split('\n').map(domain => domain.trim()).filter(Boolean)
     })
     domains.value = response.data.data.allowed_domains.join('\n')
+    cacheGiB.value = (response.data.data.max_cache_bytes ?? 10 * GiB) / GiB
     conversationStore.invalidateImageDisplays()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')

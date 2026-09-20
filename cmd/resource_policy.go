@@ -32,6 +32,7 @@ func handleUpdateResourcePolicy(r *fastglue.Request) error {
 		app.lo.Error("error saving resource policy", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Unable to save resource policy", nil, envelope.GeneralError)
 	}
+	app.resourceImages.RequestCleanup()
 	return r.SendEnvelope(cfg)
 }
 
@@ -39,7 +40,7 @@ func decodeResourcePolicy(body []byte) (resourcepolicy.Config, error) {
 	if len(body) > 32768 {
 		return resourcepolicy.Blocked(), fmt.Errorf("resource policy exceeds 32 KiB")
 	}
-	var cfg resourcepolicy.Config
+	cfg := resourcepolicy.Config{MaxCacheBytes: resourcepolicy.DefaultMaxCacheBytes}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&cfg); err != nil {

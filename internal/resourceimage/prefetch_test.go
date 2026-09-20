@@ -34,7 +34,7 @@ func TestPrefetchOnReceipt(t *testing.T) {
 		return id
 	}
 	media := &memoryMedia{blobs: make(map[string][]byte)}
-	store := NewStore(db, media, "fs")
+	store := NewStore(db, media, "fs", defaultCachePolicy)
 	var calls atomic.Int32
 	store.fetch = func(context.Context, string, func() error) ([]byte, error) {
 		calls.Add(1)
@@ -66,7 +66,7 @@ func TestPrefetchOnReceipt(t *testing.T) {
 	if calls.Load() != 2 {
 		t.Fatalf("expected two unique images fetched once, got %d", calls.Load())
 	}
-	restarted := NewStore(db, media, "fs")
+	restarted := NewStore(db, media, "fs", defaultCachePolicy)
 	restarted.fetch = func(context.Context, string, func() error) ([]byte, error) {
 		t.Error("refetched a persisted image")
 		return nil, ErrImage

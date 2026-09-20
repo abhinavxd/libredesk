@@ -230,7 +230,7 @@ func (lc *LiveChat) Send(message models.OutboundMessage) error {
 	messageData := map[string]any{
 		"type": "new_message",
 		"data": models.ChatMessage{
-			Display:          resourcepolicy.PrepareContent(message.Content, message.ContentType),
+			Display:          resourcepolicy.PrepareContentWithAttachments(message.Content, message.ContentType, message.Attachments),
 			ContentType:      message.ContentType,
 			UUID:             message.UUID,
 			ConversationUUID: message.ConversationUUID,

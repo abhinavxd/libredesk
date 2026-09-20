@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/abhinavxd/libredesk/internal/attachment"
 	"golang.org/x/net/html"
 )
 
@@ -161,5 +162,39 @@ func TestDisplayDoesNotResolveImagesInsideRemovedContent(t *testing.T) {
 				return ""
 			})
 		})
+	}
+}
+
+func TestContentWithAttachments(t *testing.T) {
+	const id = "12345678-1234-4234-9234-123456789abc"
+	const path = "/uploads/" + id
+	const signed = "https://desk.example" + path + "?sig=fresh&exp=123"
+	attachments := attachment.Attachments{{UUID: id, ContentID: "ldsk-" + id, URL: signed, ContentType: "image/png"}}
+	for _, source := range []string{"cid:ldsk-" + id, path, path + "?sig=expired", "https://desk.example" + path + "?sig=expired", signed} {
+		t.Run(source, func(t *testing.T) {
+			got := PrepareContentWithAttachments(`<p>Screenshot:</p><img src="`+source+`">`, "html", attachments)
+			if got.BlockedImages != 0 || strings.Count(got.HTML, "<img ") != 1 {
+				t.Fatalf("local image blocked: %#v", got)
+			}
+			assertDisplayResources(t, got.HTML, []string{signed})
+		})
+	}
+	for _, source := range []string{"https://tracker.example" + path, "//tracker.example" + path, "/uploads/unattached", "cid:unattached", "data:image/png;base64,abc"} {
+		got := PrepareContentWithAttachments(`<img src="`+source+`">`, "html", attachments)
+		if got.BlockedImages != 1 || strings.Contains(got.HTML, "<img") {
+			t.Fatalf("untrusted image accepted: %#v", got)
+		}
+	}
+	for _, kind := range []string{"image/svg+xml", "text/html"} {
+		unsafe := append(attachment.Attachments(nil), attachments...)
+		unsafe[0].ContentType = kind
+		got := PrepareContentWithAttachments(`<img src="cid:ldsk-`+id+`">`, "html", unsafe)
+		if got.BlockedImages != 1 {
+			t.Fatalf("active attachment accepted: %#v", got)
+		}
+	}
+	got := PrepareContentWithAttachments(`<img src="`+signed+`">`, "text", attachments)
+	if strings.Contains(got.HTML, "<img") || got.BlockedImages != 0 {
+		t.Fatalf("plain text interpreted as HTML: %#v", got)
 	}
 }

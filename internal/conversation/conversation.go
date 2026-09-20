@@ -2101,7 +2101,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 			author.Email = null.String{}
 
 			chatMessages = append(chatMessages, models.ChatMessage{
-				Display:          resourcepolicy.PrepareContent(msg.Content, msg.ContentType),
+				Display:          resourcepolicy.PrepareContentWithAttachments(msg.Content, msg.ContentType, msg.Attachments),
 				ContentType:      msg.ContentType,
 				UUID:             msg.UUID,
 				Status:           msg.Status,

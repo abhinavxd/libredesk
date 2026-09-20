@@ -10,13 +10,16 @@ import (
 )
 
 const (
-	BlockAll      = "block_all"
-	Allowlist     = "allowlist"
-	LoadOnReceipt = "load_on_receipt"
-	MaxDomains    = 100
+	BlockAll                   = "block_all"
+	Allowlist                  = "allowlist"
+	LoadOnReceipt              = "load_on_receipt"
+	MaxDomains                 = 100
+	DefaultMaxCacheBytes int64 = 10 << 30
+	MaxCacheBytes        int64 = (1 << 53) - 1 // Largest integer exactly representable by the settings UI.
 )
 
 type Config struct {
+	MaxCacheBytes  int64    `json:"max_cache_bytes"`
 	Mode           string   `json:"mode"`
 	AllowedDomains []string `json:"allowed_domains"`
 }
@@ -27,21 +30,24 @@ type Policy struct {
 }
 
 func Default() Config {
-	return Config{Mode: LoadOnReceipt, AllowedDomains: []string{}}
+	return Config{Mode: LoadOnReceipt, AllowedDomains: []string{}, MaxCacheBytes: DefaultMaxCacheBytes}
 }
 
 func Blocked() Config {
-	return Config{Mode: BlockAll, AllowedDomains: []string{}}
+	return Config{Mode: BlockAll, AllowedDomains: []string{}, MaxCacheBytes: DefaultMaxCacheBytes}
 }
 
 func Normalize(cfg Config) (Config, error) {
+	if cfg.MaxCacheBytes <= 0 || cfg.MaxCacheBytes > MaxCacheBytes {
+		return Blocked(), fmt.Errorf("maximum image cache size must be a positive whole number of bytes no greater than %d", MaxCacheBytes)
+	}
 	if cfg.Mode != BlockAll && cfg.Mode != Allowlist && cfg.Mode != LoadOnReceipt {
 		return Blocked(), fmt.Errorf("mode must be block_all, allowlist or load_on_receipt")
 	}
 	if len(cfg.AllowedDomains) > MaxDomains {
 		return Blocked(), fmt.Errorf("at most %d domains are allowed", MaxDomains)
 	}
-	out := Config{Mode: cfg.Mode, AllowedDomains: make([]string, 0, len(cfg.AllowedDomains))}
+	out := Config{MaxCacheBytes: cfg.MaxCacheBytes, Mode: cfg.Mode, AllowedDomains: make([]string, 0, len(cfg.AllowedDomains))}
 	for _, domain := range cfg.AllowedDomains {
 		host := strings.ToLower(strings.TrimSpace(domain))
 		if !validHost(host) {
@@ -55,6 +61,10 @@ func Normalize(cfg Config) (Config, error) {
 }
 
 func New(cfg Config) (Policy, error) {
+	// Callers constructing only a URL policy need not specify a storage budget.
+	if cfg.MaxCacheBytes == 0 {
+		cfg.MaxCacheBytes = DefaultMaxCacheBytes
+	}
 	cfg, err := Normalize(cfg)
 	if err != nil {
 		return Policy{}, err

@@ -27,7 +27,7 @@ func (m *Manager) GetResourcePolicyTx(tx *sqlx.Tx) (resourcepolicy.Config, error
 		}
 		return resourcepolicy.Blocked(), err
 	}
-	var cfg resourcepolicy.Config
+	cfg := resourcepolicy.Config{MaxCacheBytes: resourcepolicy.DefaultMaxCacheBytes}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return resourcepolicy.Blocked(), err
 	}
