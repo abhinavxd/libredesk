@@ -186,6 +186,30 @@
               </FormItem>
             </FormField>
 
+            <FormField v-slot="{ componentField }" name="theme.logo_url_dark">
+              <FormItem>
+                <FormLabel>{{ t('helpCenter.styling.darkLogoUrl') }}</FormLabel>
+                <FormControl>
+                  <Input type="text" v-bind="componentField" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+
+            <FormField v-slot="{ value, handleChange }" name="theme.hide_theme_toggle">
+              <FormItem class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <FormControl>
+                    <Checkbox :checked="!value" @update:checked="(v) => handleChange(!v)" />
+                  </FormControl>
+                  <FormLabel class="font-normal cursor-pointer">{{
+                    t('helpCenter.styling.showThemeToggle')
+                  }}</FormLabel>
+                </div>
+                <FormDescription>{{ t('helpCenter.styling.themeToggleHint') }}</FormDescription>
+              </FormItem>
+            </FormField>
+
             <FormField v-slot="{ componentField }" name="theme.color">
               <FormItem>
                 <FormLabel>{{ t('globals.terms.primaryColor') }}</FormLabel>
@@ -695,6 +719,8 @@ const FIELD_LOCATION = [
   ['theme.tagline', 'appearance', 'header'],
   ['theme.announcement', 'appearance', 'announcement'],
   ['theme.logo_url', 'appearance', 'brand'],
+  ['theme.logo_url_dark', 'appearance', 'brand'],
+  ['theme.hide_theme_toggle', 'appearance', 'brand'],
   ['theme.color', 'appearance', 'brand'],
   ['theme.favicon', 'appearance', 'brand'],
   ['theme.nav_links', 'general', ''],
@@ -757,6 +783,8 @@ const toFormValues = (hc) => ({
   theme: {
     color: hc?.theme?.color || '#1f93ff',
     logo_url: hc?.theme?.logo_url || '',
+    logo_url_dark: hc?.theme?.logo_url_dark || '',
+    hide_theme_toggle: !!hc?.theme?.hide_theme_toggle,
     nav_links: Array.isArray(hc?.theme?.nav_links) ? hc.theme.nav_links : [],
     favicon: hc?.theme?.favicon || '',
     tagline: hc?.theme?.tagline || '',

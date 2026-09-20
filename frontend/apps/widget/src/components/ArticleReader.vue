@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import { useWidgetStore } from '@widget/store/widget.js'
 
 const props = defineProps({
   article: { type: Object, required: true },
@@ -10,10 +11,12 @@ const props = defineProps({
 const height = ref('100%')
 const ready = ref(false)
 
-const src = computed(
-  () =>
-    `${props.baseUrl}/${encodeURIComponent(props.article.locale)}/articles/${encodeURIComponent(props.article.slug)}?embed=1`
-)
+const widgetStore = useWidgetStore()
+
+const src = computed(() => {
+  const path = `${props.baseUrl}/${encodeURIComponent(props.article.locale)}/articles/${encodeURIComponent(props.article.slug)}?embed=1`
+  return widgetStore.config.dark_mode ? `${path}&theme=dark` : path
+})
 
 const frameOrigin = computed(() => {
   try {
@@ -29,17 +32,28 @@ watch(src, () => {
   ready.value = false
 })
 
+const scroller = () => {
+  let element = frame.value?.parentElement
+  while (element && element.scrollHeight <= element.clientHeight) element = element.parentElement
+  return element
+}
+
 const onMessage = (event) => {
   if (event.origin !== frameOrigin.value || event.data?.source !== 'libredesk-hc-embed') return
   if (event.data.type === 'loaded') {
     ready.value = true
     height.value = '100%'
-    frame.value?.parentElement?.scrollTo({ top: 0 })
+    scroller()?.scrollTo({ top: 0 })
   } else if (event.data.type === 'height' && Number.isFinite(event.data.height)) {
     height.value = `${event.data.height}px`
   } else if (event.data.type === 'scroll' && Number.isFinite(event.data.top)) {
-    const scroller = frame.value?.parentElement
-    if (scroller) scroller.scrollTo({ top: frame.value.offsetTop + event.data.top, behavior: 'smooth' })
+    const element = scroller()
+    if (!element) return
+    const offset =
+      frame.value.getBoundingClientRect().top -
+      element.getBoundingClientRect().top +
+      element.scrollTop
+    element.scrollTo({ top: offset + event.data.top, behavior: 'smooth' })
   }
 }
 

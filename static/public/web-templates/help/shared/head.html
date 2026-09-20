@@ -1,6 +1,6 @@
 {{ define "hc-head" }}
 <!DOCTYPE html>
-<html lang="{{ if .Data.HelpCenter.CurrentLocale }}{{ .Data.HelpCenter.CurrentLocale }}{{ else if .Data.HelpCenter.DefaultLocale }}{{ .Data.HelpCenter.DefaultLocale }}{{ else }}en{{ end }}" dir="{{ .Data.HelpCenter.Dir }}">
+<html lang="{{ if .Data.HelpCenter.CurrentLocale }}{{ .Data.HelpCenter.CurrentLocale }}{{ else if .Data.HelpCenter.DefaultLocale }}{{ .Data.HelpCenter.DefaultLocale }}{{ else }}en{{ end }}" dir="{{ .Data.HelpCenter.Dir }}"{{ if .Data.HelpCenter.Dark }} class="hc-dark"{{ end }}>
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -30,8 +30,18 @@
     <link rel="stylesheet" href="/static/public/static/help-center-cards.css?v={{ AssetVer }}" />
     <link rel="stylesheet" href="/static/public/static/help-center-{{ .Data.HelpCenter.Template }}.css?v={{ AssetVer }}" />
     <link rel="stylesheet" href="/static/public/static/article-content.css?v={{ AssetVer }}" />
-    <style>:root { --hc-accent: {{ .Data.HelpCenter.Color }}; {{ .Data.HelpCenter.ThemeCSS }} }</style>
+    <style>:root { --hc-accent: {{ .Data.HelpCenter.Color }}; }
+    :root:not(.hc-dark) { {{ .Data.HelpCenter.ThemeCSS }} }</style>
     {{ if .Data.HelpCenter.CustomCSS }}<style>{{ .Data.HelpCenter.CustomCSS }}</style>{{ end }}
     {{ if .Data.JSONLD }}<script type="application/ld+json">{{ .Data.JSONLD }}</script>{{ end }}
+    {{ if not .Data.HelpCenter.HideThemeToggle }}<script>
+    (function () {
+        try {
+            if (localStorage.getItem('libredesk-hc-theme') === 'dark') {
+                document.documentElement.classList.add('hc-dark');
+            }
+        } catch (e) {}
+    })();
+    </script>{{ end }}
 </head>
 {{ end }}

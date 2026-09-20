@@ -117,6 +117,8 @@ const createBaseSchema = (t) => {
       .object({
         color: z.string().optional(),
         logo_url: optionalURL,
+        logo_url_dark: optionalURL,
+        hide_theme_toggle: z.boolean().optional(),
         nav_links: linkArray,
         favicon: optionalURL,
         tagline: z.string().optional(),

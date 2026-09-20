@@ -36,19 +36,21 @@ type HelpCenter struct {
 
 // Theme holds the customizable branding for a help center's public pages.
 type Theme struct {
-	Color        string            `json:"color"`
-	LogoURL      string            `json:"logo_url"`
-	NavLinks     []NavLink         `json:"nav_links"`
-	Favicon      string            `json:"favicon"`
-	Tagline      string            `json:"tagline"`
-	Header       HeaderTheme       `json:"header"`
-	Footer       FooterTheme       `json:"footer"`
-	FooterLinks  []NavLink         `json:"footer_links"`
-	SocialLinks  []SocialLink      `json:"social_links"`
-	Article      ArticleTheme      `json:"article"`
-	Layout       LayoutTheme       `json:"layout"`
-	Cards        CardTheme         `json:"cards"`
-	Announcement AnnouncementTheme `json:"announcement"`
+	Color           string            `json:"color"`
+	LogoURL         string            `json:"logo_url"`
+	LogoURLDark     string            `json:"logo_url_dark"`
+	HideThemeToggle bool              `json:"hide_theme_toggle"`
+	NavLinks        []NavLink         `json:"nav_links"`
+	Favicon         string            `json:"favicon"`
+	Tagline         string            `json:"tagline"`
+	Header          HeaderTheme       `json:"header"`
+	Footer          FooterTheme       `json:"footer"`
+	FooterLinks     []NavLink         `json:"footer_links"`
+	SocialLinks     []SocialLink      `json:"social_links"`
+	Article         ArticleTheme      `json:"article"`
+	Layout          LayoutTheme       `json:"layout"`
+	Cards           CardTheme         `json:"cards"`
+	Announcement    AnnouncementTheme `json:"announcement"`
 }
 
 // AnnouncementTheme is the dismissible banner shown above the header on every public page.

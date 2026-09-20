@@ -30,8 +30,17 @@
                 <SelectItem value="article">{{ t('helpCenter.styling.articlePage') }}</SelectItem>
               </SelectContent>
             </Select>
+            <Select v-model="previewTheme">
+              <SelectTrigger class="w-28 ml-auto">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">{{ t('globals.terms.light') }}</SelectItem>
+                <SelectItem value="dark">{{ t('globals.terms.dark') }}</SelectItem>
+              </SelectContent>
+            </Select>
             <Select v-model="previewDevice">
-              <SelectTrigger class="w-32 ml-auto">
+              <SelectTrigger class="w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -133,6 +142,7 @@ const origin = computed(() =>
 )
 const previewPage = ref('landing')
 const previewDevice = ref('desktop')
+const previewTheme = ref('light')
 const previewBox = ref(null)
 const previewTitle = computed(() => {
   const values = lastFormValues.value || helpCenter.value || {}
@@ -194,7 +204,7 @@ let previewRequest = 0
 const renderPreview = async (values) => {
   const request = ++previewRequest
   try {
-    const { data } = await api.previewHelpCenter(props.id, values, previewPage.value)
+    const { data } = await api.previewHelpCenter(props.id, values, previewPage.value, previewTheme.value)
     if (request === previewRequest && previewFrame.value) previewFrame.value.srcdoc = data
   } catch {
     // A half-filled form can fail validation while typing; the last good preview stays up.
@@ -207,9 +217,16 @@ const onFormChange = (values) => {
   previewTimer = setTimeout(() => renderPreview(values), 300)
 }
 
-watch(previewPage, () => {
+watch([previewPage, previewTheme], () => {
   if (lastFormValues.value) renderPreview(lastFormValues.value)
 })
+
+watch(
+  () => lastFormValues.value?.theme?.hide_theme_toggle,
+  (hidden) => {
+    if (hidden) previewTheme.value = 'light'
+  }
+)
 
 const handleSave = async (formData) => {
   isSubmitting.value = true

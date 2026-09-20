@@ -26,6 +26,13 @@
                 </div>
 {{ end }}
 
+{{ define "hc-theme-toggle" }}
+                <button type="button" class="hc-theme-btn" data-hc-theme aria-label="{{ .L.T "helpCenter.toggleTheme" }}">
+                    <svg class="hc-theme-sun" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4" stroke-linecap="round"/></svg>
+                    <svg class="hc-theme-moon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M17 11.3A7.5 7.5 0 0 1 8.7 3a7.5 7.5 0 1 0 8.3 8.3Z" stroke-linejoin="round"/></svg>
+                </button>
+{{ end }}
+
 {{ define "hc-search-icon" }}<svg{{ with . }} class="{{ . }}"{{ end }} viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="m18 18-4.5-4.5" stroke-linecap="round" /></svg>{{ end }}
 
 {{ define "hc-article-toc" }}
@@ -88,6 +95,20 @@
 <span class="hc-avatars">
     {{ range . }}{{ if .Avatar }}<img class="hc-avatar" src="{{ .Avatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial" aria-hidden="true">{{ printf "%.1s" .Name }}</span>{{ end }}{{ end }}
 </span>
+{{ end }}
+
+{{ define "hc-theme-script" }}
+<script>
+(function () {
+    var root = document.documentElement;
+    document.querySelectorAll('[data-hc-theme]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var dark = root.classList.toggle('hc-dark');
+            try { localStorage.setItem('libredesk-hc-theme', dark ? 'dark' : 'light'); } catch (e) {}
+        });
+    });
+})();
+</script>
 {{ end }}
 
 {{ define "hc-embed-open" }}

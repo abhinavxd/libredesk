@@ -162,3 +162,41 @@ details.hc-details > .hc-details-content > :last-child { margin-bottom: 0; }
 
 /* The widget sizes the frame to this height, so a stretched body would keep it at the tallest page. */
 body.hc-embed { min-height: 0; }
+
+.hc-dark {
+    --hc-accent-ink: color-mix(in srgb, var(--hc-accent), #ffffff 34%);
+    --hc-accent-tint: color-mix(in srgb, var(--hc-accent) 12%, #16181b);
+    --hc-accent-tint-2: color-mix(in srgb, var(--hc-accent) 20%, #16181b);
+    --hc-accent-line: color-mix(in srgb, var(--hc-accent) 30%, #16181b);
+    --hc-ink: #eceeed;
+    --hc-muted: #a3a8ae;
+    --hc-faint: #82878e;
+    --hc-border: #2c2e31;
+    --hc-bg: #1e1f1e;
+    --hc-page: #16181b;
+    --hcd-sidebar-bg: #1a1c1f;
+    --hc-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 1px 3px rgba(0, 0, 0, .5);
+    --hc-shadow-lift: 0 4px 12px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .55);
+    background: var(--hc-bg);
+    color: var(--hc-ink);
+}
+
+.hc-theme-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: .4rem; line-height: 0;
+    border: 1px solid var(--hc-border); border-radius: var(--hc-radius-sm);
+    background: var(--hc-bg); color: var(--hc-muted); cursor: pointer;
+    transition: color .15s, border-color .15s;
+}
+.hc-theme-btn:hover { color: var(--hc-ink); border-color: var(--hc-accent-line); }
+.hc-theme-btn svg { width: 1.05rem; height: 1.05rem; }
+.hc-theme-btn .hc-theme-moon { display: none; }
+.hc-dark .hc-theme-btn .hc-theme-sun { display: none; }
+.hc-dark .hc-theme-btn .hc-theme-moon { display: block; }
+
+.hc-brand .hc-logo-dark,
+.hcd-brand .hc-logo-dark { display: none; }
+.hc-dark .hc-brand .hc-logo-light,
+.hc-dark .hcd-brand .hc-logo-light { display: none; }
+.hc-dark .hc-brand .hc-logo-dark,
+.hc-dark .hcd-brand .hc-logo-dark { display: block; }

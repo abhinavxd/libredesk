@@ -1722,6 +1722,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"PageTitle":         hc.PageTitle,
 		"HeaderText":        theme.Header.Heading,
 		"LogoURL":           publicAssetPaths(app, theme.LogoURL),
+		"LogoURLDark":       publicAssetPaths(app, theme.LogoURLDark),
+		"HideThemeToggle":   theme.HideThemeToggle,
 		"Color":             theme.Color,
 		"DefaultLocale":     hc.DefaultLocale,
 		"CurrentLocale":     locale,
@@ -1740,6 +1742,7 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
 		"WidgetRootURL":     helpCenterRootURL(app),
 		"Embed":             isEmbedRequest(r),
+		"Dark":              string(r.RequestCtx.QueryArgs().Peek("theme")) == "dark",
 	}
 }
 
