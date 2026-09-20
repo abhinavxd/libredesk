@@ -133,9 +133,11 @@
     </a>
     <script>
     (function () {
+        var theme = new URLSearchParams(location.search).get('theme');
         var embedded = function (href) {
             var url = new URL(href, location.href);
             url.searchParams.set('embed', '1');
+            if (theme) url.searchParams.set('theme', theme);
             return url.href;
         };
 
@@ -153,7 +155,7 @@
                     link.rel = 'noopener noreferrer';
                     return;
                 }
-                if (url.searchParams.get('embed') !== '1') link.href = embedded(link.href);
+                if (url.searchParams.get('embed') !== '1' || (theme && url.searchParams.get('theme') !== theme)) link.href = embedded(link.href);
             });
         };
         keepEmbedded();

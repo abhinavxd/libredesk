@@ -98,13 +98,17 @@ describe('Help center article translations', () => {
     cy.visit(`${listPath}/${helpCenterId}/tree/fr`)
     cy.contains('button.tree-node-title', frArticleTitle).click()
 
-    sheet().contains('button', 'Unlink this article from translations').click()
+    sheet()
+      .contains('button', 'French')
+      .parent()
+      .find('button[aria-label="Unlink translation"]')
+      .click()
     cy.get('[role="alertdialog"]').contains('button', 'Unlink').click()
     cy.wait('@unlinkTranslation').its('response.statusCode').should('eq', 200)
 
     sheet().contains('French').should('exist')
     sheet().contains('button', 'Link an existing article').should('exist')
-    sheet().contains('button', 'Unlink this article from translations').should('not.exist')
+    sheet().find('button[aria-label="Unlink translation"]').should('not.exist')
     cy.api('GET', `/api/v1/collections/${frCollectionId}/articles/${frArticleId}`).then(
       ({ body }) => {
         expect(body.data.translations.map((t) => t.locale)).to.deep.eq(['fr'])

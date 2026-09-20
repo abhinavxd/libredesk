@@ -654,8 +654,12 @@ func handleRedirectHelpCenterHome(r *fastglue.Request) error {
 	if redirectHelpCenterCanonicalHost(r, helpCenter) {
 		return nil
 	}
+	uri := helpCenterHomePath(helpCenter, helpCenter.DefaultLocale)
+	if qs := r.RequestCtx.URI().QueryString(); len(qs) > 0 {
+		uri += "?" + string(qs)
+	}
 	// 302, not 301: the default locale is mutable and browsers cache permanent redirects.
-	redirectPath(r.RequestCtx, helpCenterHomePath(helpCenter, helpCenter.DefaultLocale), fasthttp.StatusFound)
+	redirectPath(r.RequestCtx, uri, fasthttp.StatusFound)
 	return nil
 }
 

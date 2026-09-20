@@ -919,6 +919,12 @@ func (m *Manager) LinkArticleTranslation(id, translationOfID int) (models.Articl
 		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.localeAlreadyTranslated"), nil)
 	}
 	if err := m.q.LinkArticleTranslation.Get(&article, id, source.TranslationGroupID); err != nil {
+		if err == sql.ErrNoRows {
+			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.articleAlreadyTranslated"), nil)
+		}
+		if dbutil.IsUniqueViolationError(err) {
+			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.localeAlreadyTranslated"), nil)
+		}
 		m.lo.Error("error linking article translation", "error", err, "id", id)
 		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

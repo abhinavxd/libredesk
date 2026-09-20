@@ -232,9 +232,13 @@ SELECT COUNT(*) FROM help_articles
 WHERE translation_group_id = $1 AND id != $2;
 
 -- name: link-article-translation
-UPDATE help_articles
+UPDATE help_articles a
 SET translation_group_id = $2::UUID, updated_at = NOW()
-WHERE id = $1
+WHERE a.id = $1
+    AND NOT EXISTS (
+        SELECT 1 FROM help_articles sibling
+        WHERE sibling.translation_group_id = a.translation_group_id AND sibling.id != a.id
+    )
 RETURNING *;
 
 -- name: unlink-article-translation
