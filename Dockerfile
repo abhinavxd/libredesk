@@ -1,8 +1,7 @@
 FROM alpine:3.18
 
 # Install necessary packages
-RUN apk --no-cache add ca-certificates tzdata \
-    && cat /etc/ssl/certs/ca-cert-*.pem > /etc/ssl/certs/ca-certificates.crt
+RUN apk --no-cache add ca-certificates tzdata
 
 # Set the working directory to /libredesk
 WORKDIR /libredesk
