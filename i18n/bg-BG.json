@@ -898,5 +898,8 @@
   "view.form.filter.selectAtLeastOne": "Изберете поне един филтър.",
   "view.form.filters.description": "Задайте един или повече филтри, за да персонализирате изгледа.",
   "view.form.name.description": "Въведете уникално име за изгледа.",
-  "view.form.name.length": "Името на изгледа трябва да е между 2 и 140 знака."
+  "view.form.name.length": "Името на изгледа трябва да е между 2 и 140 знака.",
+  "widget.conversationClosed": "Този разговор е затворен",
+  "widget.ipBlocked": "Достъпът е отказан",
+  "widget.prechatForm.startChat": "Започнете чат"
 }
