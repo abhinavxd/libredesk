@@ -26,8 +26,10 @@
                     {{ range .Data.HelpCenter.NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
                 </nav>
                 {{ end }}
-                {{ if gt (len .Data.HelpCenter.AvailableLocales) 1 }}{{ template "hc-lang-switcher" . }}{{ end }}
-                {{ if not .Data.HelpCenter.HideThemeToggle }}{{ template "hc-theme-toggle" . }}{{ end }}
+                <div class="hc-nav-actions">
+                    {{ if gt (len .Data.HelpCenter.AvailableLocales) 1 }}{{ template "hc-lang-switcher" . }}{{ end }}
+                    {{ if not .Data.HelpCenter.HideThemeToggle }}{{ template "hc-theme-toggle" . }}{{ end }}
+                </div>
             </div>
         </div>
     </header>

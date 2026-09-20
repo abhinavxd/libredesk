@@ -332,6 +332,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/articles/{id}", perm(clearsHCCache(handleUpdateArticle), "help_center:manage"))
 	g.PUT("/api/v1/articles/{id}/collection", perm(clearsHCCache(handleMoveArticle), "help_center:manage"))
 	g.PUT("/api/v1/articles/{id}/status", perm(clearsHCCache(handleUpdateArticleStatus), "help_center:manage"))
+	g.GET("/api/v1/help-centers/{id}/linkable-articles", perm(handleGetLinkableArticles, "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}/link-translation", perm(clearsHCCache(handleLinkArticleTranslation), "help_center:manage"))
+	g.PUT("/api/v1/articles/{id}/unlink-translation", perm(clearsHCCache(handleUnlinkArticleTranslation), "help_center:manage"))
 	g.GET("/api/v1/help-centers/{id}/insights", perm(handleGetHelpCenterInsights, "help_center:manage"))
 
 	// Public help center JSON API.

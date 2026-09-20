@@ -154,7 +154,7 @@ const unusedArticles = computed(() =>
           @update:model-value="update('featured_ids', [...featuredIds, Number($event)])"
         >
           <SelectTrigger class="max-w-md">
-            <SelectValue :placeholder="t('widget.selectArticle')" />
+            <SelectValue :placeholder="t('placeholders.selectArticle')" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem

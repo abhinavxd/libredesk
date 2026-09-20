@@ -160,6 +160,13 @@ type ArticleTranslation struct {
 	Status       string `db:"status" json:"status"`
 }
 
+type LinkableArticle struct {
+	ID             int    `db:"id" json:"id"`
+	Title          string `db:"title" json:"title"`
+	Locale         string `db:"locale" json:"locale"`
+	CollectionName string `db:"collection_name" json:"collection_name"`
+}
+
 // NavLink is a single header navigation link on the public help center pages.
 type NavLink struct {
 	Label string `json:"label"`

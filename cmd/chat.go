@@ -657,7 +657,7 @@ func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 		app.lo.Error("error completing AI handoff form", "conversation_uuid", conversation.UUID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("ai.agent.handoffFormUnavailable"), nil, envelope.ConflictError)
 	}
-	return r.SendEnvelope(map[string]bool{"handed_off": true})
+	return r.SendEnvelope(true)
 }
 
 // handleWidgetMediaUpload handles media uploads for the widget.

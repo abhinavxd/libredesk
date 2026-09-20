@@ -22,6 +22,8 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+const maxTranscriptDownloadMessages = 1000
+
 type assigneeChangeReq struct {
 	AssigneeID int `json:"assignee_id"`
 }
@@ -383,7 +385,7 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	}
 
 	private := false
-	messages, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, 0)
+	messages, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, maxTranscriptDownloadMessages)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

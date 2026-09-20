@@ -193,6 +193,11 @@ type queries struct {
 	MoveArticleToCollection       *sqlx.Stmt `query:"move-article-to-collection"`
 	UpdateArticleSortOrder        *sqlx.Stmt `query:"update-article-sort-order"`
 	UpdateArticleStatus           *sqlx.Stmt `query:"update-article-status"`
+	UnlinkArticleTranslation      *sqlx.Stmt `query:"unlink-article-translation"`
+	LinkArticleTranslation        *sqlx.Stmt `query:"link-article-translation"`
+	GetLinkableArticles           *sqlx.Stmt `query:"get-linkable-translation-articles"`
+	LocaleInTranslationGroup      *sqlx.Stmt `query:"article-locale-in-translation-group"`
+	CountTranslationSiblings      *sqlx.Stmt `query:"count-article-translation-siblings"`
 	DeleteArticle                 *sqlx.Stmt `query:"delete-article"`
 	UserIsAuthorAssignable        *sqlx.Stmt `query:"user-is-author-assignable"`
 
@@ -859,6 +864,77 @@ func (m *Manager) UpdateArticleStatus(id int, status string) (models.Article, er
 		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	m.reindexArticle(article.ID)
+	return article, nil
+}
+
+// GetLinkableArticles returns articles in the help center written in another locale and not yet part of a translation group.
+func (m *Manager) GetLinkableArticles(helpCenterID int, excludeLocale string) ([]models.LinkableArticle, error) {
+	var articles = make([]models.LinkableArticle, 0)
+	if err := m.q.GetLinkableArticles.Select(&articles, helpCenterID, excludeLocale); err != nil {
+		m.lo.Error("error fetching linkable articles", "error", err, "help_center_id", helpCenterID)
+		return articles, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return articles, nil
+}
+
+// LinkArticleTranslation moves an article into the translation group of another article.
+func (m *Manager) LinkArticleTranslation(id, translationOfID int) (models.Article, error) {
+	var article models.Article
+	if id == translationOfID {
+		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.cannotLinkArticleToItself"), nil)
+	}
+	source, err := m.GetArticleByID(translationOfID)
+	if err != nil {
+		return article, err
+	}
+	target, err := m.GetArticleByID(id)
+	if err != nil {
+		return article, err
+	}
+	sourceCollection, err := m.GetCollectionByID(source.CollectionID)
+	if err != nil {
+		return article, err
+	}
+	targetCollection, err := m.GetCollectionByID(target.CollectionID)
+	if err != nil {
+		return article, err
+	}
+	if sourceCollection.HelpCenterID != targetCollection.HelpCenterID {
+		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidCollection"), nil)
+	}
+	var siblings int
+	if err := m.q.CountTranslationSiblings.Get(&siblings, target.TranslationGroupID, target.ID); err != nil {
+		m.lo.Error("error counting translation siblings", "error", err, "id", id)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if siblings > 0 {
+		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.articleAlreadyTranslated"), nil)
+	}
+	var localeTaken bool
+	if err := m.q.LocaleInTranslationGroup.Get(&localeTaken, source.TranslationGroupID, target.Locale); err != nil {
+		m.lo.Error("error checking translation group locale", "error", err, "id", id)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if localeTaken {
+		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.localeAlreadyTranslated"), nil)
+	}
+	if err := m.q.LinkArticleTranslation.Get(&article, id, source.TranslationGroupID); err != nil {
+		m.lo.Error("error linking article translation", "error", err, "id", id)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return article, nil
+}
+
+// UnlinkArticleTranslation detaches an article from its translation group by giving it a group of its own.
+func (m *Manager) UnlinkArticleTranslation(id int) (models.Article, error) {
+	var article models.Article
+	if err := m.q.UnlinkArticleTranslation.Get(&article, id); err != nil {
+		if err == sql.ErrNoRows {
+			return article, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		m.lo.Error("error unlinking article translation", "error", err, "id", id)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
 	return article, nil
 }
 

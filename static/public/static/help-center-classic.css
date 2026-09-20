@@ -89,6 +89,7 @@ a:hover { text-decoration: underline; }
 .hc-nav-links { margin-left: auto; display: flex; gap: 1.4rem; flex-wrap: wrap; align-items: center; }
 .hc-nav-links a { color: var(--hc-header-text, var(--hc-muted)); font-size: .95rem; font-weight: 500; opacity: .92; }
 .hc-nav-links a:hover { opacity: 1; text-decoration: none; }
+.hc-nav-actions { display: flex; align-items: center; gap: .4rem; }
 .hc-nav-toggle { display: none; }
 
 /* Hero: the search box straddles the band's bottom edge. */
@@ -429,7 +430,8 @@ article.hc-article .hc-meta-byline { display: flex; align-items: center; gap: .6
     .hc-nav[data-nav-open] .hc-nav-links { display: flex; }
     .hc-nav-links a { padding: .55rem .6rem; border-radius: var(--hc-radius-sm); color: var(--hc-ink); }
     .hc-nav-links a:hover { background: var(--hc-accent-tint); color: var(--hc-accent-ink); }
-    .hc-lang { align-self: flex-start; padding: .3rem .6rem 0; }
+    .hc-nav-actions { padding: .3rem .6rem 0; }
+    .hc-lang { align-self: flex-start; }
     .hc-lang-menu { right: auto; left: 0; }
     .hc-hero { padding: 2.5rem 1.25rem 0; }
     .hc-hero h1 { margin-bottom: 1.4rem; }

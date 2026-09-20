@@ -9,7 +9,7 @@
         <div class="space-y-3">
           <div class="flex items-start justify-between gap-5">
             <div class="flex gap-5 flex-1 min-w-0">
-              <div class="w-56 shrink-0">
+              <div :class="fieldClass">
                 <!-- Type -->
                 <Select
                   v-model="action.type"
@@ -35,14 +35,14 @@
               <!-- Value -->
               <div
                 v-if="action.type && conversationActions[action.type]?.type === 'tag'"
-                class="flex-1 min-w-0"
+                class="flex-1 min-w-0 max-w-md"
               >
                 <SelectTagCombobox multiple v-model="action.value" />
               </div>
 
               <div
                 v-if="action.type && conversationActions[action.type]?.type === 'recipients'"
-                class="flex-1 min-w-0 space-y-3"
+                class="flex-1 min-w-0 max-w-md space-y-3"
               >
                 <SelectTag
                   :modelValue="action.recipients || []"
@@ -66,7 +66,7 @@
               </div>
 
               <div
-                class="flex-1 min-w-0"
+                :class="fieldClass"
                 v-if="action.type && conversationActions[action.type]?.type === 'select'"
               >
                 <SelectAgentCombobox
@@ -89,7 +89,7 @@
               </div>
 
               <div
-                class="flex gap-3 flex-1 min-w-0"
+                class="flex gap-3 flex-1 min-w-0 max-w-2xl"
                 v-if="action.type && conversationActions[action.type]?.type === 'webhook'"
               >
                 <div class="flex-1 min-w-0">
@@ -114,7 +114,7 @@
               </div>
 
               <div
-                class="flex-1 min-w-0"
+                :class="fieldClass"
                 v-if="action.type && conversationActions[action.type]?.type === 'text'"
               >
                 <Input
@@ -184,6 +184,8 @@ const props = defineProps({
     required: true
   }
 })
+
+const fieldClass = 'flex-1 min-w-0 max-w-xs'
 
 const { actions } = toRefs(props)
 const { t } = useI18n()

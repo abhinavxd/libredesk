@@ -580,6 +580,67 @@ func handleUpdateArticleStatus(r *fastglue.Request) error {
 	return r.SendEnvelope(article)
 }
 
+// handleGetLinkableArticles lists articles in the other locales that can still be linked as a translation.
+func handleGetLinkableArticles(r *fastglue.Request) error {
+	var (
+		app           = r.Context.(*App)
+		id, _         = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+		excludeLocale = strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("exclude_locale")))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	if excludeLocale == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`exclude_locale`"), nil, envelope.InputError)
+	}
+	articles, err := app.helpcenter.GetLinkableArticles(id, excludeLocale)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(articles)
+}
+
+// handleLinkArticleTranslation moves an existing article into this article's translation group.
+func handleLinkArticleTranslation(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req = struct {
+			TranslationOfID int `json:"translation_of_id"`
+		}{}
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	if req.TranslationOfID <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`translation_of_id`"), nil, envelope.InputError)
+	}
+	article, err := app.helpcenter.LinkArticleTranslation(id, req.TranslationOfID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(article)
+}
+
+// handleUnlinkArticleTranslation detaches an article from its translation group.
+func handleUnlinkArticleTranslation(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	article, err := app.helpcenter.UnlinkArticleTranslation(id)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(article)
+}
+
 // handleRedirectHelpCenterHome redirects bare /hc/{slug} to the default-locale home so the locale is always in the path.
 func handleRedirectHelpCenterHome(r *fastglue.Request) error {
 	var (
@@ -1187,7 +1248,7 @@ func cacheHCPage(h fastglue.FastRequestHandler, noIndex bool) fastglue.FastReque
 
 // isEmbedRequest reports whether the page is framed by the chat widget.
 func isEmbedRequest(r *fastglue.Request) bool {
-	return string(r.RequestCtx.QueryArgs().Peek("embed")) == "1"
+	return r.RequestCtx.QueryArgs().GetBool("embed")
 }
 
 func isMarkdownRequest(r *fastglue.Request) bool {

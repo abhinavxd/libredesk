@@ -560,6 +560,12 @@ const updateArticle = (id, data) => http.put(`/api/v1/articles/${id}`, data)
 const deleteArticle = (collectionId, id) =>
   http.delete(`/api/v1/collections/${collectionId}/articles/${id}`)
 const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data)
+const unlinkArticleTranslation = (id) => http.put(`/api/v1/articles/${id}/unlink-translation`)
+const linkArticleTranslation = (id, data) => http.put(`/api/v1/articles/${id}/link-translation`, data)
+const getLinkableArticles = (helpCenterId, excludeLocale) =>
+  http.get(`/api/v1/help-centers/${helpCenterId}/linkable-articles`, {
+    params: { exclude_locale: excludeLocale }
+  })
 const getHelpCenterInsights = (id) => http.get(`/api/v1/help-centers/${id}/insights`)
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
@@ -815,6 +821,9 @@ export default {
   updateArticle,
   deleteArticle,
   updateArticleStatus,
+  unlinkArticleTranslation,
+  linkArticleTranslation,
+  getLinkableArticles,
   getHelpCenterInsights,
   getAIFaqSuggestions,
   approveAIFaqSuggestion,

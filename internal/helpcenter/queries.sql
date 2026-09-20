@@ -209,6 +209,40 @@ SET status = $2, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 
+-- name: get-linkable-translation-articles
+SELECT a.id, a.title, a.locale, c.name AS collection_name
+FROM help_articles a
+JOIN article_collections c ON c.id = a.collection_id
+WHERE c.help_center_id = $1
+    AND a.locale != $2
+    AND NOT EXISTS (
+        SELECT 1 FROM help_articles sibling
+        WHERE sibling.translation_group_id = a.translation_group_id AND sibling.id != a.id
+    )
+ORDER BY a.locale, a.title;
+
+-- name: article-locale-in-translation-group
+SELECT EXISTS(
+    SELECT 1 FROM help_articles
+    WHERE translation_group_id = $1 AND locale = $2
+);
+
+-- name: count-article-translation-siblings
+SELECT COUNT(*) FROM help_articles
+WHERE translation_group_id = $1 AND id != $2;
+
+-- name: link-article-translation
+UPDATE help_articles
+SET translation_group_id = $2::UUID, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: unlink-article-translation
+UPDATE help_articles
+SET translation_group_id = gen_random_uuid(), updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
 -- name: delete-article
 DELETE FROM help_articles
 WHERE id = $1;
