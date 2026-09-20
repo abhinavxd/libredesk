@@ -538,6 +538,7 @@
         handleWidgetLoaded () {
             this.widgetLoaded = true;
             this.updateLauncherVisibility();
+            this.renderPreviews();
         }
 
         toggle () {
@@ -712,7 +713,7 @@
                 }] };
             }
             const enabled = data?.config?.[this.isMobile ? 'mobile' : 'desktop'];
-            if (!data || !enabled || this.isChatVisible || this.hideLauncher) {
+            if (!data || !enabled || !this.widgetLoaded || this.isChatVisible || this.hideLauncher) {
                 this.previewHost?.remove();
                 this.previewHost = null;
                 this.previewSignature = '';
