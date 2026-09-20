@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -30,6 +31,9 @@ var agentUpgrader = websocket.FastHTTPUpgrader{
 			return false
 		}
 		isLocalhost := u.Hostname() == "localhost"
+		if ip := net.ParseIP(u.Hostname()); ip != nil && ip.IsLoopback() {
+			isLocalhost = true
+		}
 		if u.Scheme != "https" && !isLocalhost {
 			return false
 		}
