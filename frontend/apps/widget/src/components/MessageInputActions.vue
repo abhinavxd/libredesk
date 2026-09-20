@@ -8,13 +8,14 @@
       @change="handleFileUpload"
       :accept="fileUploadEnabled ? '*/*' : ''"
       :disabled="!fileUploadEnabled"
+      multiple
     />
 
     <!-- File Upload Button -->
     <Button
       v-if="fileUploadEnabled && canUploadFiles"
       @click="triggerFileUpload"
-      :disabled="uploading || disabled"
+      :disabled="disabled"
       :aria-label="$t('globals.messages.attachFile')"
       variant="ghost"
       size="sm"
@@ -73,10 +74,6 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  uploading: {
-    type: Boolean,
-    default: false
-  },
   canUploadFiles: {
     type: Boolean,
     default: true
@@ -99,7 +96,7 @@ onClickOutside(emojiPickerRef, () => {
 })
 
 const triggerFileUpload = () => {
-  if (fileInput.value && props.fileUploadEnabled && !props.uploading) {
+  if (fileInput.value && props.fileUploadEnabled && !props.disabled) {
     fileInput.value.value = ''
     fileInput.value.click()
   }

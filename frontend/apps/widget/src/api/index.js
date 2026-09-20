@@ -147,12 +147,10 @@ const sendChatMessage = (uuid, data) =>
 const submitHandoffForm = (uuid, formData) =>
   http.post(`/api/v1/widget/chat/conversations/${uuid}/handoff-form`, { form_data: formData })
 const closeChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/close`)
-const uploadMedia = (conversationUUID, files) => {
+const uploadMedia = (conversationUUID, file) => {
   const formData = new FormData()
   formData.append('conversation_uuid', conversationUUID)
-  for (let i = 0; i < files.length; i++) {
-    formData.append('files', files[i])
-  }
+  formData.append('files', file)
   return http.post('/api/v1/widget/media/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000

@@ -12,6 +12,12 @@
     <div class="p-2 border-t">
       <!-- Unified Input Container -->
       <div class="border border-input rounded-md bg-background focus-within:border-secondary">
+        <MessageInputAttachmentPreview
+          v-if="mediaFiles.length || currentUploadingFiles.length"
+          :attachments="mediaFiles"
+          :uploadingFiles="currentUploadingFiles"
+          @delete="handleFileDelete"
+        />
         <!-- Textarea Container -->
         <div class="p-2">
           <Textarea
@@ -34,7 +40,6 @@
           <MessageInputActions
             :fileUploadEnabled="config.features?.file_upload || false"
             :emojiEnabled="config.features?.emoji || false"
-            :uploading="isUploading"
             :canUploadFiles="!!chatStore.currentConversation?.uuid"
             :disabled="isSending"
             @fileUpload="handleFileUpload"
@@ -48,7 +53,7 @@
             :aria-label="$t('globals.messages.send')"
             size="sm"
             class="h-9 w-9 p-0 rounded-full disabled:opacity-50 disabled:cursor-not-allowed border-0"
-            :disabled="!newMessage.trim() || isUploading || isSending"
+            :disabled="(!newMessage.trim() && !mediaFiles.length) || isUploading || isSending"
           >
             <ArrowUp class="w-4 h-4" aria-hidden="true" />
           </Button>
@@ -71,6 +76,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { sendWidgetTyping } from '@widget/websocket.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageInputActions from './MessageInputActions.vue'
+import MessageInputAttachmentPreview from './MessageInputAttachmentPreview.vue'
 import api, { saveSession } from '@widget/api/index.js'
 
 import { useProactiveStore } from '@widget/store/proactive.js'
@@ -89,7 +95,7 @@ const newMessage = computed({
     chatStore.drafts[draftKey.value] = value
   }
 })
-const isUploading = ref(false)
+let uploadSequence = 0
 const isSending = ref(false)
 const config = computed(() => widgetStore.config)
 const quickReplies = computed(() => {
@@ -97,6 +103,11 @@ const quickReplies = computed(() => {
   const audience = userStore.isVisitor ? config.value.visitors : config.value.users
   return audience?.quick_replies ?? config.value.quick_replies ?? []
 })
+const mediaFiles = computed(() => chatStore.attachmentDrafts[draftKey.value] || [])
+const currentUploadingFiles = computed(() =>
+  chatStore.uploadingFiles.filter((item) => item.conversationUUID === draftKey.value)
+)
+const isUploading = computed(() => currentUploadingFiles.value.length > 0)
 
 const getTextareaEl = () =>
   messageInput.value?.$el?.querySelector?.('textarea') || messageInput.value?.$el
@@ -146,64 +157,76 @@ const initChatConversation = async (messageText) => {
   proactive.replied()
 }
 
-const sendMessageToConversation = async (messageText, tempMessageID) => {
-  const messageResp = await api.sendChatMessage(chatStore.currentConversation.uuid, {
-    message: messageText
+const sendMessageToConversation = async (
+  conversationUUID,
+  messageText,
+  attachments,
+  tempMessageID
+) => {
+  const messageResp = await api.sendChatMessage(conversationUUID, {
+    message: messageText,
+    attachments: attachments.map((attachment) => attachment.id)
   })
 
   if (tempMessageID && messageResp.data.data) {
     chatStore.replaceMessage(
-      chatStore.currentConversation.uuid,
+      conversationUUID,
       tempMessageID,
       messageResp.data.data
     )
   }
   if (messageResp.data.data) {
     chatStore.updateConversationListLastMessage(
-      chatStore.currentConversation.uuid,
+      conversationUUID,
       messageResp.data.data
     )
   }
 }
 
 const sendMessage = async () => {
-  // Empty or already sending?
-  if (!newMessage.value.trim() || isSending.value) return
+  if ((!newMessage.value.trim() && !mediaFiles.value.length) || isUploading.value || isSending.value) {
+    return
+  }
 
   // Stop typing when sending message
   stopTyping()
 
   // Convert text to HTML.
   const messageText = newMessage.value.trim()
+  const attachments = [...mediaFiles.value]
+  const activeDraftKey = draftKey.value
+  const conversationUUID = chatStore.currentConversation?.uuid
 
   // Clear input field immediately
   newMessage.value = ''
 
   // Add pending message before API call so we can remove it on failure.
   let tempMessageID = null
-  if (chatStore.currentConversation?.uuid) {
+  if (conversationUUID) {
     tempMessageID = chatStore.addPendingMessage(
-      chatStore.currentConversation.uuid,
+      conversationUUID,
       messageText,
       userStore.isVisitor ? 'visitor' : 'contact',
-      userStore.userID
+      userStore.userID,
+      attachments
     )
   }
   try {
     isSending.value = true
-    if (!chatStore.currentConversation.uuid) {
+    if (!conversationUUID) {
       await initChatConversation(messageText)
     } else {
-      await sendMessageToConversation(messageText, tempMessageID)
+      await sendMessageToConversation(conversationUUID, messageText, attachments, tempMessageID)
     }
+    chatStore.attachmentDrafts = { ...chatStore.attachmentDrafts, [activeDraftKey]: [] }
     emit('error', '')
   } catch (error) {
     // Remove failed message if we have a temp ID.
     if (tempMessageID) {
-      chatStore.removeMessage(chatStore.currentConversation.uuid, tempMessageID)
+      chatStore.removeMessage(conversationUUID, tempMessageID)
     }
 
-    newMessage.value = messageText
+    chatStore.drafts[activeDraftKey] = messageText
     emit('error', handleHTTPError(error).message)
   } finally {
     isSending.value = false
@@ -231,49 +254,48 @@ const handleKeydown = (event) => {
   }
 }
 
-// File upload handler
 const handleFileUpload = async (files) => {
   if (!chatStore.currentConversation.uuid || files.length === 0) return
 
-  isUploading.value = true
+  const conversationUUID = chatStore.currentConversation.uuid
+  const selectedFiles = Array.from(files).map((file) => ({
+    file,
+    name: file.name,
+    size: file.size,
+    conversationUUID,
+    tempId: `${conversationUUID}-${Date.now()}-${uploadSequence++}`
+  }))
+  chatStore.uploadingFiles.push(...selectedFiles)
   emit('error', '')
 
-  // Create pending file message immediately
-  const fileNames = Array.from(files)
-    .map((f) => f.name)
-    .join(', ')
-
-  const trimmedFileNames =
-    fileNames.length > 40 ? fileNames.slice(0, 40).trimEnd() + '...' : fileNames
-  const pendingMessage = `${trimmedFileNames}`
-  const tempMessageID = chatStore.addPendingMessage(
-    chatStore.currentConversation.uuid,
-    pendingMessage,
-    userStore.isVisitor ? 'visitor' : 'contact',
-    userStore.userID,
-    Array.from(files)
+  await Promise.all(
+    selectedFiles.map(async (selectedFile) => {
+      try {
+        const resp = await api.uploadMedia(conversationUUID, selectedFile.file)
+        if (resp.data.data) {
+          chatStore.attachmentDrafts = {
+            ...chatStore.attachmentDrafts,
+            [conversationUUID]: [
+              ...(chatStore.attachmentDrafts[conversationUUID] || []),
+              resp.data.data
+            ]
+          }
+        }
+      } catch (error) {
+        emit('error', handleHTTPError(error).message)
+      } finally {
+        chatStore.uploadingFiles = chatStore.uploadingFiles.filter(
+          (item) => item.tempId !== selectedFile.tempId
+        )
+      }
+    })
   )
+}
 
-  try {
-    const resp = await api.uploadMedia(chatStore.currentConversation.uuid, files)
-
-    if (tempMessageID && resp.data.data) {
-      chatStore.replaceMessage(chatStore.currentConversation.uuid, tempMessageID, resp.data.data)
-    }
-    if (resp.data.data) {
-      chatStore.updateConversationListLastMessage(
-        chatStore.currentConversation.uuid,
-        resp.data.data
-      )
-    }
-  } catch (error) {
-    // Remove failed upload message
-    if (tempMessageID) {
-      chatStore.removeMessage(chatStore.currentConversation.uuid, tempMessageID)
-    }
-    emit('error', handleHTTPError(error).message)
-  } finally {
-    isUploading.value = false
+const handleFileDelete = (uuid) => {
+  chatStore.attachmentDrafts = {
+    ...chatStore.attachmentDrafts,
+    [draftKey.value]: mediaFiles.value.filter((attachment) => attachment.uuid !== uuid)
   }
 }
 
