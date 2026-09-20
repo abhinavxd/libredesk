@@ -151,9 +151,7 @@
 
         <!-- Typing Indicator -->
         <div v-if="isTyping" class="flex flex-col items-start">
-          <div class="max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 bg-muted text-foreground">
-            <TypingIndicator />
-          </div>
+          <TypingIndicator bubble />
         </div>
       </div>
     </div>
