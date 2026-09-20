@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 
 const props = defineProps({
   article: { type: Object, required: true },
@@ -7,6 +8,7 @@ const props = defineProps({
 })
 
 const height = ref('100%')
+const ready = ref(false)
 
 const src = computed(
   () =>
@@ -23,9 +25,14 @@ const frameOrigin = computed(() => {
 
 const frame = ref(null)
 
+watch(src, () => {
+  ready.value = false
+})
+
 const onMessage = (event) => {
   if (event.origin !== frameOrigin.value || event.data?.source !== 'libredesk-hc-embed') return
   if (event.data.type === 'loaded') {
+    ready.value = true
     height.value = '100%'
     frame.value?.parentElement?.scrollTo({ top: 0 })
   } else if (event.data.type === 'height' && Number.isFinite(event.data.height)) {
@@ -41,12 +48,21 @@ onUnmounted(() => window.removeEventListener('message', onMessage))
 </script>
 
 <template>
-  <iframe
-    ref="frame"
-    :key="src"
-    :src="src"
-    :title="article.title"
-    class="block w-full border-0"
-    :style="{ height }"
-  />
+  <div class="relative min-h-full">
+    <div
+      v-if="!ready"
+      class="absolute inset-0 flex items-center justify-center bg-background"
+      role="status"
+    >
+      <Spinner size="md" :absolute="false" :center="false" />
+    </div>
+    <iframe
+      ref="frame"
+      :key="src"
+      :src="src"
+      :title="article.title"
+      class="block w-full border-0"
+      :style="{ height }"
+    />
+  </div>
 </template>

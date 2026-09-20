@@ -57,6 +57,13 @@ const customColorStyle = computed(() => {
   return style
 })
 
+// Dropdowns and dialogs portal to document.body, outside the app wrapper.
+watch(
+  () => widgetStore.config.dark_mode,
+  (dark) => document.documentElement.classList.toggle('dark', !!dark),
+  { immediate: true }
+)
+
 onMounted(() => {
   setupParentMessageListeners()
   window.parent.postMessage({ type: 'VUE_APP_READY' }, '*')

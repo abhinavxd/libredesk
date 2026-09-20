@@ -180,7 +180,7 @@ onMounted(async () => {
         class="absolute inset-0 bg-background/80 backdrop-blur-sm z-10"
         role="status"
       >
-        <Spinner size="md" :text="t('globals.terms.loading')" absolute />
+        <Spinner size="md" absolute />
       </div>
       <div v-if="error || help.failed" role="alert" class="p-4 text-sm">
         <p>{{ error || t('widget.helpLoadError') }}</p>
