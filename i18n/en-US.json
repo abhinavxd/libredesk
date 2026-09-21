@@ -1677,6 +1677,7 @@
   "widget.campaign.outside": "Outside business hours",
   "widget.campaign.repeat": "Show again",
   "widget.campaign.repeat_hours": "Repeat after (hours)",
+  "widget.attachmentLimitReached": "You can attach up to {max} files.",
   "widget.campaign.replied": "Replied",
   "widget.campaign.section.audience": "Who sees it",
   "widget.campaign.section.placement": "Where and when",

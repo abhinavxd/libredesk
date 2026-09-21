@@ -39,6 +39,7 @@
           <!-- Message Input Actions (file upload + emoji) -->
           <MessageInputActions
             :fileUploadEnabled="config.features?.file_upload || false"
+            :fileUploadDisabled="isAttachmentLimitReached"
             :emojiEnabled="config.features?.emoji || false"
             :canUploadFiles="!!chatStore.currentConversation?.uuid"
             :disabled="isSending"
@@ -75,12 +76,14 @@ import { useUserStore } from '@widget/store/user.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { sendWidgetTyping } from '@widget/websocket.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
+import { useI18n } from 'vue-i18n'
 import MessageInputActions from './MessageInputActions.vue'
 import MessageInputAttachmentPreview from './MessageInputAttachmentPreview.vue'
 import api, { saveSession } from '@widget/api/index.js'
 
 import { useProactiveStore } from '@widget/store/proactive.js'
 const proactive = useProactiveStore()
+const { t } = useI18n()
 const emit = defineEmits(['error'])
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
@@ -108,6 +111,13 @@ const currentUploadingFiles = computed(() =>
   chatStore.uploadingFiles.filter((item) => item.conversationUUID === draftKey.value)
 )
 const isUploading = computed(() => currentUploadingFiles.value.length > 0)
+const MAX_STAGED_ATTACHMENTS = 5
+const stagedAttachmentCount = computed(
+  () => mediaFiles.value.length + currentUploadingFiles.value.length
+)
+const isAttachmentLimitReached = computed(
+  () => stagedAttachmentCount.value >= MAX_STAGED_ATTACHMENTS
+)
 
 const getTextareaEl = () =>
   messageInput.value?.$el?.querySelector?.('textarea') || messageInput.value?.$el
@@ -258,7 +268,15 @@ const handleFileUpload = async (files) => {
   if (!chatStore.currentConversation.uuid || files.length === 0) return
 
   const conversationUUID = chatStore.currentConversation.uuid
-  const selectedFiles = Array.from(files).map((file) => ({
+  const remainingSlots = Math.max(0, MAX_STAGED_ATTACHMENTS - stagedAttachmentCount.value)
+  const acceptedFiles = Array.from(files).slice(0, remainingSlots)
+  const limitExceeded = files.length > acceptedFiles.length
+  if (limitExceeded) {
+    emit('error', t('widget.attachmentLimitReached', { max: MAX_STAGED_ATTACHMENTS }))
+  }
+  if (acceptedFiles.length === 0) return
+
+  const selectedFiles = acceptedFiles.map((file) => ({
     file,
     name: file.name,
     size: file.size,
@@ -266,7 +284,7 @@ const handleFileUpload = async (files) => {
     tempId: `${conversationUUID}-${Date.now()}-${uploadSequence++}`
   }))
   chatStore.uploadingFiles.push(...selectedFiles)
-  emit('error', '')
+  if (!limitExceeded) emit('error', '')
 
   await Promise.all(
     selectedFiles.map(async (selectedFile) => {
