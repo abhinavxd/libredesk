@@ -169,7 +169,6 @@
                 });
                 this.setupMobileDetection();
                 this.setupEventListeners();
-                this.startPageTracking();
             } catch (error) {
                 console.error('Failed to initialize Libredesk Widget:', error);
             }
@@ -556,6 +555,7 @@
         }
 
         handleVueAppReady () {
+            this.startPageTracking();
             this.sendMobileState();
 
             var visitorToken = this.getCookie(this.getCookieName('visitor'));

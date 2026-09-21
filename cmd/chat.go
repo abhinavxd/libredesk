@@ -94,11 +94,21 @@ type handoffFormReq struct {
 	FormData map[string]any `json:"form_data"`
 }
 
+type widgetLauncherSettings struct {
+	livechat.LauncherLayout
+	livechat.BrandingLauncher
+}
+
 type chatSettingsResponse struct {
 	Campaigns            *struct{} `json:"campaigns,omitempty"`
 	HasCampaigns         bool      `json:"has_campaigns"`
 	CampaignDelaySeconds int       `json:"campaign_delay_seconds"`
 	livechat.Config
+	DarkMode   bool                   `json:"dark_mode"`
+	Colors     livechat.Colors        `json:"colors"`
+	HomeScreen livechat.HomeScreen    `json:"home_screen"`
+	Launcher   widgetLauncherSettings `json:"launcher"`
+	LogoURL    string                 `json:"logo_url"`
 	// Hide server-side fields from the public widget response.
 	TrustedDomains         *struct{}                     `json:"trusted_domains,omitempty"`
 	BlockedIPs             *struct{}                     `json:"blocked_ips,omitempty"`
@@ -125,14 +135,7 @@ func handleGetChatLauncherSettings(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, err.Error(), nil))
 	}
 
-	return r.SendEnvelope(map[string]any{
-		"theme":    config.Theme,
-		"launcher": config.Launcher,
-		"branding": map[string]any{
-			"light": launcherBranding(config.Branding.Light),
-			"dark":  launcherBranding(config.Branding.Dark),
-		},
-	})
+	return r.SendEnvelope(chatLauncherSettings(config))
 }
 
 // handleGetChatSettings returns the live chat settings for the widget
@@ -152,9 +155,15 @@ func handleGetChatSettings(r *fastglue.Request) error {
 	if config.PreChatForm.Enabled {
 		config, customAttributes = filterPreChatForms(config, app)
 	}
+	legacyBranding := legacyWidgetBranding(config)
 
 	response := chatSettingsResponse{
 		Config:               config,
+		DarkMode:             config.Theme == livechat.ThemeDark,
+		Colors:               legacyBranding.Colors,
+		HomeScreen:           legacyBranding.HomeScreen,
+		Launcher:             buildWidgetLauncherSettings(config, legacyBranding),
+		LogoURL:              legacyBranding.LogoURL,
 		HasCampaigns:         slices.ContainsFunc(config.Campaigns, func(c proactive.Campaign) bool { return c.Enabled }),
 		CampaignDelaySeconds: earliestCampaignDelay(config.Campaigns),
 		CustomAttributes:     customAttributes,
@@ -1469,5 +1478,32 @@ func launcherBranding(b livechat.Branding) map[string]any {
 	return map[string]any{
 		"colors":   b.Colors,
 		"launcher": b.Launcher,
+	}
+}
+
+func chatLauncherSettings(config livechat.Config) map[string]any {
+	legacyBranding := legacyWidgetBranding(config)
+	return map[string]any{
+		"theme":    config.Theme,
+		"colors":   legacyBranding.Colors,
+		"launcher": buildWidgetLauncherSettings(config, legacyBranding),
+		"branding": map[string]any{
+			"light": launcherBranding(config.Branding.Light),
+			"dark":  launcherBranding(config.Branding.Dark),
+		},
+	}
+}
+
+func legacyWidgetBranding(config livechat.Config) livechat.Branding {
+	if config.Theme == livechat.ThemeDark {
+		return config.Branding.Dark
+	}
+	return config.Branding.Light
+}
+
+func buildWidgetLauncherSettings(config livechat.Config, branding livechat.Branding) widgetLauncherSettings {
+	return widgetLauncherSettings{
+		LauncherLayout:   config.Launcher,
+		BrandingLauncher: branding.Launcher,
 	}
 }

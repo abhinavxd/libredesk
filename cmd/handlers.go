@@ -590,7 +590,9 @@ func serveWidgetJS(r *fastglue.Request) error {
 	app := r.Context.(*App)
 
 	r.RequestCtx.Response.Header.Set("Content-Type", "application/javascript")
-	r.RequestCtx.Response.Header.Set("Cache-Control", "no-cache")
+	r.RequestCtx.Response.Header.Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	r.RequestCtx.Response.Header.Set("Pragma", "no-cache")
+	r.RequestCtx.Response.Header.Set("Expires", "0")
 
 	file, err := app.fs.Get("static/widget.js")
 	if err != nil {

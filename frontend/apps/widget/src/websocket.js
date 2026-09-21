@@ -310,6 +310,14 @@ export class WidgetWebSocketClient {
     this.send(typingMessage)
   }
 
+  sendPageVisit (url, title) {
+    if (this.socket?.readyState !== WebSocket.OPEN) return
+    this.send({
+      type: 'page_visit',
+      data: { url, title }
+    })
+  }
+
   send (message) {
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message))
@@ -363,9 +371,5 @@ export const closeWidgetWebSocket = () => widgetWSClient?.close()
 export const skipInitialWsSync = () => { _syncOnFirstConnect = false }
 
 export function sendPageVisit (url, title) {
-  if (!widgetWSClient) return
-  widgetWSClient.send({
-    type: 'page_visit',
-    data: { url, title }
-  })
+  widgetWSClient?.sendPageVisit(url, title)
 }

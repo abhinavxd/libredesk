@@ -189,6 +189,9 @@ importers:
       cypress:
         specifier: ^15.15.0
         version: 15.15.0
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
       eslint:
         specifier: ^8.57.1
         version: 8.57.1

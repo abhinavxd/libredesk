@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
 
@@ -77,5 +78,87 @@ func TestValidateHandoffFormUsesSubmittedContactDetails(t *testing.T) {
 	}
 	if name != "QA Visitor" {
 		t.Fatalf("got name %q", name)
+	}
+}
+
+func TestChatLauncherSettingsKeepsLegacyFields(t *testing.T) {
+	config := livechat.Config{
+		Theme: livechat.ThemeDark,
+		Launcher: livechat.LauncherLayout{
+			Position:  "right",
+			Size:      64,
+			IconScale: 80,
+			Spacing:   livechat.LauncherSpacing{Side: 20, Bottom: 24},
+		},
+		Branding: livechat.BrandingSet{
+			Light: livechat.Branding{Colors: livechat.Colors{Primary: "#ffffff"}},
+			Dark: livechat.Branding{
+				Colors:   livechat.Colors{Primary: "#111111"},
+				Launcher: livechat.BrandingLauncher{LogoURL: "https://example.com/logo.png", Color: "#222222"},
+			},
+		},
+	}
+
+	encoded, err := json.Marshal(chatLauncherSettings(config))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Colors   livechat.Colors `json:"colors"`
+		Launcher struct {
+			Position  string `json:"position"`
+			Size      int    `json:"size"`
+			IconScale int    `json:"icon_scale"`
+			LogoURL   string `json:"logo_url"`
+			Color     string `json:"color"`
+		} `json:"launcher"`
+		Branding map[string]json.RawMessage `json:"branding"`
+	}
+	if err := json.Unmarshal(encoded, &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Colors.Primary != "#111111" {
+		t.Fatalf("legacy primary = %q", response.Colors.Primary)
+	}
+	if response.Launcher.Position != "right" || response.Launcher.Size != 64 || response.Launcher.IconScale != 80 {
+		t.Fatalf("legacy launcher layout = %+v", response.Launcher)
+	}
+	if response.Launcher.LogoURL != "https://example.com/logo.png" || response.Launcher.Color != "#222222" {
+		t.Fatalf("legacy launcher branding = %+v", response.Launcher)
+	}
+	if response.Branding["light"] == nil || response.Branding["dark"] == nil {
+		t.Fatalf("branding = %+v", response.Branding)
+	}
+
+	settingsResponse, err := json.Marshal(chatSettingsResponse{
+		Config:     config,
+		DarkMode:   true,
+		Colors:     config.Branding.Dark.Colors,
+		HomeScreen: config.Branding.Dark.HomeScreen,
+		Launcher:   buildWidgetLauncherSettings(config, config.Branding.Dark),
+		LogoURL:    config.Branding.Dark.LogoURL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fullSettings struct {
+		DarkMode   bool                   `json:"dark_mode"`
+		Colors     livechat.Colors        `json:"colors"`
+		HomeScreen livechat.HomeScreen    `json:"home_screen"`
+		Launcher   widgetLauncherSettings `json:"launcher"`
+		LogoURL    string                 `json:"logo_url"`
+		Branding   livechat.BrandingSet   `json:"branding"`
+	}
+	if err := json.Unmarshal(settingsResponse, &fullSettings); err != nil {
+		t.Fatal(err)
+	}
+	if !fullSettings.DarkMode || fullSettings.Colors.Primary != "#111111" {
+		t.Fatalf("legacy theme = %+v", fullSettings)
+	}
+	if fullSettings.Launcher.LogoURL != "https://example.com/logo.png" || fullSettings.Launcher.Size != 64 {
+		t.Fatalf("legacy launcher = %+v", fullSettings.Launcher)
+	}
+	if fullSettings.Branding.Dark.Colors.Primary != "#111111" {
+		t.Fatalf("new branding = %+v", fullSettings.Branding)
 	}
 }
