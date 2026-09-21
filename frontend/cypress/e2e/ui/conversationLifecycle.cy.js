@@ -43,7 +43,7 @@ describe('Conversation lifecycle', () => {
       .trigger('input')
 
   // The list column also renders a status dropdown; this one is the header badge.
-  const statusBadge = () => cy.get('div.bg-primary.rounded-md')
+  const statusBadge = () => cy.get('span.bg-primary.rounded-md')
 
   before(() => {
     cy.login()
