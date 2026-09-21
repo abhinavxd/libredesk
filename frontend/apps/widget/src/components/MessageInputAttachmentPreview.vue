@@ -3,30 +3,51 @@
     <div
       v-for="attachment in allAttachments"
       :key="attachment.uuid || attachment.tempId"
-      class="flex items-center gap-2 rounded-md border bg-background px-2 transition-colors duration-150 hover:bg-accent/50"
+      class="relative"
     >
-      <div class="flex items-center space-x-1 py-1">
-        <DotLoader v-if="attachment.loading" />
-        <Paperclip v-else :size="16" />
-        <div
-          class="max-w-[12rem] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-foreground"
-          :title="attachment.filename"
+      <div v-if="isImage(attachment)" class="group relative">
+        <img
+          :src="getThumbnailUrl(attachment)"
+          :alt="attachment.filename"
+          class="h-20 w-20 rounded-md border object-cover"
+          @error="fallbackToOriginal($event, attachment.url)"
+        />
+        <button
+          type="button"
+          class="absolute -right-1 -top-1 rounded-full border bg-background p-0.5 text-muted-foreground shadow-sm transition-colors hover:text-destructive focus:outline-none"
+          :aria-label="`${$t('globals.terms.remove')} ${attachment.filename}`"
+          @click.prevent="$emit('delete', attachment.uuid)"
         >
-          {{ getAttachmentName(attachment.filename) }}
-          <span class="ml-1 text-xs text-muted-foreground">
-            {{ formatBytes(attachment.size) }}
-          </span>
-        </div>
+          <X :size="14" />
+        </button>
       </div>
-      <button
-        v-if="!attachment.loading"
-        type="button"
-        class="rounded-md text-muted-foreground transition-colors duration-150 hover:text-destructive focus:outline-none"
-        :aria-label="`${$t('globals.terms.remove')} ${attachment.filename}`"
-        @click.prevent="$emit('delete', attachment.uuid)"
+      <div
+        v-else
+        class="flex items-center gap-2 rounded-md border bg-background px-2 transition-colors duration-150 hover:bg-accent/50"
       >
-        <X :size="14" />
-      </button>
+        <div class="flex items-center space-x-1 py-1">
+          <DotLoader v-if="attachment.loading" />
+          <Paperclip v-else :size="16" />
+          <div
+            class="max-w-[12rem] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-foreground"
+            :title="attachment.filename"
+          >
+            {{ getAttachmentName(attachment.filename) }}
+            <span class="ml-1 text-xs text-muted-foreground">
+              {{ formatBytes(attachment.size) }}
+            </span>
+          </div>
+        </div>
+        <button
+          v-if="!attachment.loading"
+          type="button"
+          class="rounded-md text-muted-foreground transition-colors duration-150 hover:text-destructive focus:outline-none"
+          :aria-label="`${$t('globals.terms.remove')} ${attachment.filename}`"
+          @click.prevent="$emit('delete', attachment.uuid)"
+        >
+          <X :size="14" />
+        </button>
+      </div>
     </div>
   </TransitionGroup>
 </template>
@@ -35,7 +56,7 @@
 import { computed } from 'vue'
 import { Paperclip, X } from 'lucide-vue-next'
 import { DotLoader } from '@shared-ui/components/ui/loader'
-import { formatBytes } from '@shared-ui/utils/file'
+import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 
 const props = defineProps({
   attachments: {
@@ -63,6 +84,17 @@ const allAttachments = computed(() => [
 const getAttachmentName = (name) => {
   if (!name) return ''
   return name.length > 20 ? `${name.substring(0, 17)}...` : name
+}
+
+const isImage = (attachment) => attachment.content_type?.startsWith('image/')
+
+const getThumbnailUrl = (attachment) =>
+  attachment.thumbnail_url || getThumbFilepath(attachment.url)
+
+const fallbackToOriginal = (event, originalUrl) => {
+  if (event.target.dataset.originalFallback) return
+  event.target.dataset.originalFallback = 'true'
+  event.target.src = originalUrl
 }
 </script>
 
