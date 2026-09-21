@@ -248,6 +248,14 @@ const showInvalidField = async (field) => {
 
 defineExpose({ showInvalidField })
 
+const visibleStats = computed(() =>
+  stats.value.filter(
+    (row) =>
+      props.modelValue.some((item) => item.id === row.campaign_id) ||
+      STAT_KEYS.some((key) => row[key] > 0)
+  )
+)
+
 const refreshStats = async () => {
   if (!props.inboxId) return
   try {
@@ -405,7 +413,7 @@ onMounted(async () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="row in stats" :key="row.campaign_id">
+              <TableRow v-for="row in visibleStats" :key="row.campaign_id">
                 <TableCell>
                   {{
                     modelValue.find((item) => item.id === row.campaign_id)?.name ||
@@ -416,7 +424,7 @@ onMounted(async () => {
                   {{ row[key] }}
                 </TableCell>
               </TableRow>
-              <TableRow v-if="!stats.length">
+              <TableRow v-if="!visibleStats.length">
                 <TableCell :colspan="STAT_KEYS.length + 1" class="text-muted-foreground">
                   {{ t('globals.messages.noResultsFound') }}
                 </TableCell>

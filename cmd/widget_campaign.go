@@ -241,7 +241,7 @@ func campaignInputError(app *App) error {
 }
 
 func validateWidgetFeatures(app *App, config livechat.Config) error {
-	if config.Help.HelpCenterID < 0 || len(config.Help.FeaturedIDs) > 10 || config.Previews.AutoHideSeconds < 0 || config.Previews.AutoHideSeconds > 300 || !slices.Contains([]string{"", "message", "generic"}, config.Previews.Content) || len(config.Campaigns) > 50 {
+	if config.Help.HelpCenterID < 0 || len(config.Help.FeaturedIDs) > 10 || len(config.Campaigns) > 50 {
 		return campaignInputError(app)
 	}
 	if _, err := parseCampaignCooldown(config.CampaignCooldown); err != nil {

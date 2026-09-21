@@ -13,13 +13,7 @@ export function useReplyPreviews() {
   const user = useUserStore()
   const { t } = useI18n()
   watch(
-    () => [
-      chat.getConversations,
-      user.userID,
-      widget.config.previews,
-      widget.isDark,
-      widget.isOpen
-    ],
+    () => [chat.getConversations, user.userID, widget.isDark, widget.isOpen],
     async () => {
       await nextTick()
       const element = document.querySelector('.libredesk-widget-app')
@@ -46,16 +40,12 @@ export function useReplyPreviews() {
               widget.config.brand_name,
             avatar: author.avatar_url || '',
             text:
-              widget.config.previews?.content === 'generic'
-                ? t('widget.newReply')
-                : getTextFromHTML(message.text_content || message.content || '').slice(0, 240) ||
-                  t('globals.terms.attachment'),
+              getTextFromHTML(message.text_content || message.content || '').slice(0, 240) ||
+              t('globals.terms.attachment'),
             image:
-              widget.config.previews?.content === 'generic'
-                ? ''
-                : message.attachments?.find((attachment) =>
-                    attachment.content_type?.startsWith('image/')
-                  )?.thumbnail_url || ''
+              message.attachments?.find((attachment) =>
+                attachment.content_type?.startsWith('image/')
+              )?.thumbnail_url || ''
           }
         })
       const target = parentOrigin()
@@ -65,7 +55,6 @@ export function useReplyPreviews() {
           type: 'REPLY_PREVIEWS',
           identity: String(user.userID || 'visitor'),
           previews,
-          config: { ...widget.config.previews },
           labels: {
             dismiss: t('globals.terms.dismiss'),
             dismissAll: t('widget.dismissPreviews'),

@@ -525,45 +525,27 @@
                     </FormField>
                   </div>
 
-                  <div class="grid grid-cols-2 gap-4">
-                    <FormField v-slot="{ componentField }" name="config.launcher.position">
-                      <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.livechat.launcher.position') }}</FormLabel>
-                        <FormControl>
-                          <Select v-bind="componentField">
-                            <SelectTrigger>
-                              <SelectValue :placeholder="$t('placeholders.selectPosition')" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="left">{{
-                                $t('admin.inbox.livechat.launcher.position.left')
-                              }}</SelectItem>
-                              <SelectItem value="right">{{
-                                $t('admin.inbox.livechat.launcher.position.right')
-                              }}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="config.launcher.size">
-                      <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.livechat.launcher.size') }}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="60"
-                            min="40"
-                            max="80"
-                            v-bind="componentField"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    </FormField>
-                  </div>
+                  <FormField v-slot="{ componentField }" name="config.launcher.position">
+                    <FormItem>
+                      <FormLabel>{{ $t('admin.inbox.livechat.launcher.position') }}</FormLabel>
+                      <FormControl>
+                        <Select v-bind="componentField">
+                          <SelectTrigger>
+                            <SelectValue :placeholder="$t('placeholders.selectPosition')" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="left">{{
+                              $t('admin.inbox.livechat.launcher.position.left')
+                            }}</SelectItem>
+                            <SelectItem value="right">{{
+                              $t('admin.inbox.livechat.launcher.position.right')
+                            }}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
 
                   <div class="grid grid-cols-3 gap-4">
                     <FormField v-slot="{ componentField }" name="config.launcher.icon_scale">
@@ -619,69 +601,6 @@
                         <FormDescription>{{
                           $t('admin.inbox.livechat.launcher.spacing.bottom.description')
                         }}</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    </FormField>
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="previews" data-section="previews">
-              <AccordionTrigger class="text-base">{{ $t('widget.replyPreviews') }}</AccordionTrigger>
-              <AccordionContent force-mount class="space-y-8 pt-2">
-                <div class="space-y-4">
-                  <FormField
-                    v-for="device in ['desktop', 'mobile']"
-                    :key="device"
-                    v-slot="{ componentField, handleChange }"
-                    :name="`config.previews.${device}`"
-                  >
-                    <FormItem>
-                      <SwitchField
-                        :title="$t(`globals.terms.${device}`)"
-                        :checked="componentField.modelValue"
-                        @update:checked="handleChange"
-                      />
-                    </FormItem>
-                  </FormField>
-
-                  <div class="grid grid-cols-2 gap-4">
-                    <FormField v-slot="{ componentField }" name="config.previews.content">
-                      <FormItem>
-                        <FormLabel>{{ $t('widget.previewContent') }}</FormLabel>
-                        <Select v-bind="componentField">
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="message">{{
-                              $t('widget.messagePreview')
-                            }}</SelectItem>
-                            <SelectItem value="generic">{{
-                              $t('widget.genericNotice')
-                            }}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    </FormField>
-
-                    <FormField
-                      v-slot="{ value, handleChange, meta }"
-                      name="config.previews.auto_hide_seconds"
-                    >
-                      <FormItem>
-                        <FormLabel>{{ $t('widget.autoHideSeconds') }}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            name="config.previews.auto_hide_seconds"
-                            min="0"
-                            max="300"
-                            :model-value="value"
-                            @update:model-value="
-                              (value) => handleChange(value === '' ? '' : Number(value), meta.validated)
-                            "
-                          />
-                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     </FormField>
@@ -1448,7 +1367,6 @@ import { toTypedSchema } from '@vee-validate/zod'
 import {
   createFormSchema,
   defaultWidgetHelp,
-  defaultWidgetPreviews,
   normalizeAudienceConfig,
   normalizePrechatConfig
 } from './livechatFormSchema.js'
@@ -1505,7 +1423,6 @@ const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
 const WIDGET_BG = { light: '#ffffff', dark: '#1a1a1e' }
 const DEFAULT_GRADIENT_START = '#2563eb'
 const DEFAULT_GRADIENT_END = '#1e40af'
-const DEFAULT_LAUNCHER_SIZE = 60
 const DEFAULT_LAUNCHER_ICON_SCALE = 100
 const MASKED_SECRET = '••••••••••'
 
@@ -1517,7 +1434,6 @@ const SECTION_TAB = {
   appearance: 'appearance',
   branding: 'appearance',
   launcher: 'appearance',
-  previews: 'appearance',
   messages: 'content',
   noticeBanner: 'content',
   homeApps: 'content',
@@ -1548,7 +1464,6 @@ const LEGACY_TAB_SECTION = {
 // Ordered: specific prefixes before the general-tab fallbacks.
 const FIELD_SECTION = [
   ['config.help', 'help'],
-  ['config.previews', 'previews'],
   ['config.campaign', 'campaigns'],
   ['config.branding', 'branding'],
   ['config.theme', 'appearance'],
@@ -1730,7 +1645,6 @@ const form = useForm({
     linked_email_inbox_id: null,
     config: {
       help: defaultWidgetHelp(),
-      previews: defaultWidgetPreviews(),
       campaigns: [],
       campaign_cooldown: '24h',
       brand_name: '',
@@ -1745,7 +1659,6 @@ const form = useForm({
       },
       launcher: {
         position: 'right',
-        size: DEFAULT_LAUNCHER_SIZE,
         icon_scale: DEFAULT_LAUNCHER_ICON_SCALE,
         spacing: {
           side: 20,
@@ -2132,7 +2045,6 @@ watch(
           campaigns: newValues.config?.campaigns || [],
           campaign_cooldown: newValues.config?.campaign_cooldown || '24h',
           help: newValues.config?.help || defaultWidgetHelp(),
-          previews: newValues.config?.previews || defaultWidgetPreviews(),
           features: {
             ...newValues.config?.features,
             transcript: newValues.config?.features?.transcript ?? false

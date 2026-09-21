@@ -115,12 +115,6 @@ export const defaultWidgetHelp = () => ({
   users: { tab: true },
   featured_ids: []
 })
-export const defaultWidgetPreviews = () => ({
-  desktop: true,
-  mobile: true,
-  content: 'message',
-  auto_hide_seconds: 0
-})
 export const createWidgetConditionsSchema = (t) =>
   z.object({
     logical_op: z.enum(['AND', 'OR']),
@@ -264,14 +258,6 @@ export const createFormSchema = (t) =>
           featured_ids: z.array(z.number().int().positive()).max(10)
         })
         .default(defaultWidgetHelp),
-      previews: z
-        .object({
-          desktop: z.boolean(),
-          mobile: z.boolean(),
-          content: z.enum(['message', 'generic']),
-          auto_hide_seconds: rangeInteger(t, 0, 300)
-        })
-        .default(defaultWidgetPreviews),
       brand_name: z.string().min(1, { message: t('globals.messages.required') }),
       website_url: optionalUrl(t),
       theme: z.enum(['system', 'light', 'dark']),
@@ -284,7 +270,6 @@ export const createFormSchema = (t) =>
       }),
       launcher: z.object({
         position: z.enum(['left', 'right']),
-        size: rangeInteger(t, 40, 80),
         icon_scale: rangeInteger(t, 40, 100),
         spacing: z.object({
           side: spacingNumber(t),
@@ -319,15 +304,9 @@ export const createFormSchema = (t) =>
       }),
       continuity: z
         .object({
-          offline_threshold: z
-            .string()
-            .min(1, { message: t('globals.messages.required') })
-            .refine(isGoDuration, { message: t('validation.invalidDuration') }),
-          max_messages_per_email: rangeNumber(t, 1, 100),
-          min_email_interval: z
-            .string()
-            .min(1, { message: t('globals.messages.required') })
-            .refine(isGoDuration, { message: t('validation.invalidDuration') })
+          offline_threshold: z.string().optional().or(z.literal('')),
+          max_messages_per_email: z.coerce.number().optional(),
+          min_email_interval: z.string().optional().or(z.literal(''))
         })
         .optional(),
       session_duration: z
@@ -379,3 +358,30 @@ export const createFormSchema = (t) =>
       })
     })
   })
+    .superRefine((values, ctx) => {
+      if (!values.linked_email_inbox_id) return
+      const continuity = values.config?.continuity ?? {}
+      for (const field of ['offline_threshold', 'min_email_interval']) {
+        if (!continuity[field]) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['config', 'continuity', field],
+            message: t('globals.messages.required')
+          })
+        } else if (!isGoDuration(continuity[field])) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['config', 'continuity', field],
+            message: t('validation.invalidDuration')
+          })
+        }
+      }
+      const max = Number(continuity.max_messages_per_email)
+      if (!Number.isFinite(max) || max < 1 || max > 100) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['config', 'continuity', 'max_messages_per_email'],
+          message: t('validation.minmaxNumber', { min: 1, max: 100 })
+        })
+      }
+    })

@@ -75,9 +75,6 @@ func TestUnmarshalFillsBrandingFromLegacyConfig(t *testing.T) {
 	if config.Theme != ThemeDark {
 		t.Fatalf("theme = %q, want %q", config.Theme, ThemeDark)
 	}
-	if config.Launcher.Size != DefaultLauncherSize {
-		t.Fatalf("launcher size = %d, want %d", config.Launcher.Size, DefaultLauncherSize)
-	}
 	if config.Launcher.Position != "right" || config.Launcher.Spacing.Side != 20 {
 		t.Fatalf("launcher layout = %+v", config.Launcher)
 	}
@@ -125,7 +122,7 @@ func TestUnmarshalKeepsExplicitBranding(t *testing.T) {
 	var config Config
 	if err := json.Unmarshal([]byte(`{
 		"theme":"system",
-		"launcher":{"position":"left","size":48,"spacing":{"side":10,"bottom":10}},
+		"launcher":{"position":"left","spacing":{"side":10,"bottom":10}},
 		"colors":{"primary":"#111111"},
 		"branding":{
 			"light":{"colors":{"primary":"#2563eb"}},
@@ -136,9 +133,6 @@ func TestUnmarshalKeepsExplicitBranding(t *testing.T) {
 	}
 	if config.Theme != ThemeSystem {
 		t.Fatalf("theme = %q, want %q", config.Theme, ThemeSystem)
-	}
-	if config.Launcher.Size != 48 {
-		t.Fatalf("launcher size = %d, want 48", config.Launcher.Size)
 	}
 	if config.Branding.Light.Colors.Primary != "#2563eb" || config.Branding.Dark.Colors.Primary != "#60a5fa" {
 		t.Fatalf("branding = %+v", config.Branding)

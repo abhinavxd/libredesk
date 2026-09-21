@@ -146,11 +146,6 @@ func handleGetChatSettings(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, err.Error(), nil))
 	}
-	if config.Previews.Content == "" {
-		config.Previews.Desktop = true
-		config.Previews.Mobile = true
-		config.Previews.Content = "message"
-	}
 	customAttributes := map[int]customAttributeWidget(nil)
 	if config.PreChatForm.Enabled {
 		config, customAttributes = filterPreChatForms(config, app)

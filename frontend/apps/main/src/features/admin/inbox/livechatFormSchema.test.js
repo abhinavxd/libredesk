@@ -27,7 +27,6 @@ const validConfig = {
   language: 'en',
   launcher: {
     position: 'right',
-    size: 60,
     icon_scale: 100,
     spacing: { side: 20, bottom: 20 }
   },
@@ -66,6 +65,10 @@ const validForm = {
 }
 
 const withConfig = (overrides) => ({ ...validForm, config: { ...validConfig, ...overrides } })
+const withContinuity = (continuity) => ({
+  ...withConfig({ continuity }),
+  linked_email_inbox_id: 3
+})
 const withBranding = (overrides, theme = 'light') =>
   withConfig({
     branding: {
@@ -98,13 +101,7 @@ const validCampaign = {
 
 describe('Livechat Inbox Form Schema', () => {
   test('valid minimal form', () => {
-    const parsed = schema.parse(validForm)
-    expect(parsed.config.previews).toEqual({
-      desktop: true,
-      mobile: true,
-      content: 'message',
-      auto_hide_seconds: 0
-    })
+    expect(() => schema.parse(validForm)).not.toThrow()
   })
 
   test('help tab preserves audience placement and featured article order', () => {
@@ -137,23 +134,6 @@ describe('Livechat Inbox Form Schema', () => {
             users: { tab: true },
             featured_ids: Array.from({ length: 11 }, (_, index) => index + 1)
           }
-        })
-      )
-    ).toThrow()
-  })
-
-  test('reply preview settings enforce the auto-hide range', () => {
-    expect(() =>
-      schema.parse(
-        withConfig({
-          previews: { desktop: true, mobile: false, content: 'generic', auto_hide_seconds: 300 }
-        })
-      )
-    ).not.toThrow()
-    expect(() =>
-      schema.parse(
-        withConfig({
-          previews: { desktop: true, mobile: true, content: 'message', auto_hide_seconds: 301 }
         })
       )
     ).toThrow()
@@ -469,30 +449,6 @@ describe('Livechat Inbox Form Schema', () => {
     expect(() => schema.parse(withConfig({ theme }))).not.toThrow()
   })
 
-  test('launcher size out of range', () => {
-    expect(() =>
-      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 39 } }))
-    ).toThrow()
-    expect(() =>
-      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 81 } }))
-    ).toThrow()
-  })
-
-  test('launcher size at boundaries', () => {
-    expect(() =>
-      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 40 } }))
-    ).not.toThrow()
-    expect(() =>
-      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 80 } }))
-    ).not.toThrow()
-  })
-
-  test('launcher size rejects a fraction', () => {
-    expect(() =>
-      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 60.5 } }))
-    ).toThrow()
-  })
-
   test('launcher icon scale out of range', () => {
     expect(() =>
       schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 39 } }))
@@ -509,11 +465,6 @@ describe('Livechat Inbox Form Schema', () => {
     expect(() =>
       schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 100 } }))
     ).not.toThrow()
-  })
-
-  test('launcher size coerced from string', () => {
-    const parsed = schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: '72' } }))
-    expect(parsed.config.launcher.size).toBe(72)
   })
 
   test('launcher position invalid', () => {
@@ -635,15 +586,38 @@ describe('Livechat Inbox Form Schema', () => {
     expect(() => schema.parse(validForm)).not.toThrow()
   })
 
-  test('continuity offline_threshold invalid duration', () => {
+  test('continuity blank when no email inbox is linked', () => {
     expect(() =>
       schema.parse(
         withConfig({
-          continuity: {
-            offline_threshold: '5 min',
-            max_messages_per_email: 10,
-            min_email_interval: '30m'
-          }
+          continuity: { offline_threshold: '', max_messages_per_email: 0, min_email_interval: '' }
+        })
+      )
+    ).not.toThrow()
+    expect(() => schema.parse(withConfig({ continuity: {} }))).not.toThrow()
+  })
+
+  test('continuity required when an email inbox is linked', () => {
+    expect(() => schema.parse(withContinuity({}))).toThrow()
+    expect(() =>
+      schema.parse(
+        withContinuity({ offline_threshold: '', max_messages_per_email: 10, min_email_interval: '30m' })
+      )
+    ).toThrow()
+    expect(() =>
+      schema.parse(
+        withContinuity({ offline_threshold: '5m', max_messages_per_email: 10, min_email_interval: '' })
+      )
+    ).toThrow()
+  })
+
+  test('continuity offline_threshold invalid duration', () => {
+    expect(() =>
+      schema.parse(
+        withContinuity({
+          offline_threshold: '5 min',
+          max_messages_per_email: 10,
+          min_email_interval: '30m'
         })
       )
     ).toThrow()
@@ -652,23 +626,15 @@ describe('Livechat Inbox Form Schema', () => {
   test('continuity max_messages_per_email out of range', () => {
     expect(() =>
       schema.parse(
-        withConfig({
-          continuity: {
-            offline_threshold: '5m',
-            max_messages_per_email: 0,
-            min_email_interval: '30m'
-          }
-        })
+        withContinuity({ offline_threshold: '5m', max_messages_per_email: 0, min_email_interval: '30m' })
       )
     ).toThrow()
     expect(() =>
       schema.parse(
-        withConfig({
-          continuity: {
-            offline_threshold: '5m',
-            max_messages_per_email: 101,
-            min_email_interval: '30m'
-          }
+        withContinuity({
+          offline_threshold: '5m',
+          max_messages_per_email: 101,
+          min_email_interval: '30m'
         })
       )
     ).toThrow()
@@ -677,23 +643,15 @@ describe('Livechat Inbox Form Schema', () => {
   test('continuity max_messages_per_email at boundaries', () => {
     expect(() =>
       schema.parse(
-        withConfig({
-          continuity: {
-            offline_threshold: '5m',
-            max_messages_per_email: 1,
-            min_email_interval: '30m'
-          }
-        })
+        withContinuity({ offline_threshold: '5m', max_messages_per_email: 1, min_email_interval: '30m' })
       )
     ).not.toThrow()
     expect(() =>
       schema.parse(
-        withConfig({
-          continuity: {
-            offline_threshold: '5m',
-            max_messages_per_email: 100,
-            min_email_interval: '30m'
-          }
+        withContinuity({
+          offline_threshold: '5m',
+          max_messages_per_email: 100,
+          min_email_interval: '30m'
         })
       )
     ).not.toThrow()

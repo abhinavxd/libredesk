@@ -310,11 +310,8 @@ const handleFieldChange = (value, ruleIndex) => {
 }
 
 const handleOperatorChange = (value, ruleIndex) => {
-  if (['contains', 'not contains'].includes(value)) {
-    ruleGroup.value.rules[ruleIndex].value = []
-  } else {
-    ruleGroup.value.rules[ruleIndex].value = ''
-  }
+  // Every operator stores its value as a comma separated string, multi-value ones included.
+  ruleGroup.value.rules[ruleIndex].value = ''
   ruleGroup.value.rules[ruleIndex].operator = value
   emitUpdate()
 }

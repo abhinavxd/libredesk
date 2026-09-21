@@ -217,12 +217,12 @@ describe('Live chat widget config applied end to end', () => {
     })
   })
 
-  it('renders the launcher at the configured size', () => {
-    cy.createLivechatInbox(withStart({ launcher: { size: 48 } })).then((inbox) => {
+  it('renders the launcher at its fixed size', () => {
+    cy.createLivechatInbox(withStart()).then((inbox) => {
       cy.visitWidgetHost(inbox.uuid)
       cy.widgetLauncher().then((el) => {
         const style = el[0].ownerDocument.defaultView.getComputedStyle(el[0])
-        expect(style.width, 'launcher size not applied').to.eq('48px')
+        expect(style.width, 'launcher size').to.eq('60px')
       })
     })
   })

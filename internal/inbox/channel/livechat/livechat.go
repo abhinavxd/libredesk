@@ -32,7 +32,6 @@ const (
 	ThemeLight  = "light"
 	ThemeDark   = "dark"
 
-	DefaultLauncherSize      = 60
 	DefaultLauncherIconScale = 100
 )
 
@@ -81,7 +80,6 @@ type LauncherSpacing struct {
 type LauncherLayout struct {
 	Spacing   LauncherSpacing `json:"spacing"`
 	Position  string          `json:"position"`
-	Size      int             `json:"size"`
 	IconScale int             `json:"icon_scale"`
 }
 
@@ -124,13 +122,6 @@ type HelpConfig struct {
 	FeaturedIDs  []int        `json:"featured_ids"`
 }
 
-type PreviewConfig struct {
-	Desktop         bool   `json:"desktop"`
-	Mobile          bool   `json:"mobile"`
-	Content         string `json:"content"`
-	AutoHideSeconds int    `json:"auto_hide_seconds"`
-}
-
 type AudienceConfig struct {
 	AllowStartConversation           bool     `json:"allow_start_conversation"`
 	PreventMultipleConversations     bool     `json:"prevent_multiple_conversations"`
@@ -160,7 +151,6 @@ type Config struct {
 	Campaigns        []proactive.Campaign `json:"campaigns"`
 	CampaignCooldown string               `json:"campaign_cooldown"`
 	Help             HelpConfig           `json:"help"`
-	Previews         PreviewConfig        `json:"previews"`
 	BrandName        string               `json:"brand_name"`
 	WebsiteURL       string               `json:"website_url"`
 	Theme            string               `json:"theme"`
@@ -257,8 +247,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*LiveC
 	return lc, nil
 }
 
-// UnmarshalJSON fills the branding set, theme and launcher size from the pre-branding
-// config layout when they are absent, so inboxes saved before the split keep rendering.
+// UnmarshalJSON fills missing branding and theme values from the old config layout.
 func (c *Config) UnmarshalJSON(data []byte) error {
 	type plain Config
 	var cfg plain
@@ -294,9 +283,6 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	if c.Theme == "" {
 		c.Theme = ThemeLight
-	}
-	if c.Launcher.Size == 0 {
-		c.Launcher.Size = DefaultLauncherSize
 	}
 	if c.Launcher.IconScale == 0 {
 		c.Launcher.IconScale = DefaultLauncherIconScale

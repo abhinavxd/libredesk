@@ -97,32 +97,25 @@ describe('Live chat theme and branding', () => {
     })
   })
 
-  it('rejects a launcher size and icon scale outside their range', () => {
+  it('rejects a launcher icon scale outside its range', () => {
     cy.visit(`${listPath}/${inboxId}/edit`)
     cy.openInboxSection('Launcher position')
 
-    cy.get('input[name="config.launcher.size"]').clear().type('120')
-    cy.get('button[type="submit"]').click()
-    cy.contains('40').should('exist')
-
-    cy.get('input[name="config.launcher.size"]').clear().type('64')
     cy.get('input[name="config.launcher.icon_scale"]').clear().type('10')
     cy.get('button[type="submit"]').click()
     cy.contains('40').should('exist')
   })
 
-  it('persists the launcher size and icon scale', () => {
+  it('persists the launcher icon scale', () => {
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     cy.visit(`${listPath}/${inboxId}/edit`)
     cy.openInboxSection('Launcher position')
-    cy.get('input[name="config.launcher.size"]').clear().type('72')
     cy.get('input[name="config.launcher.icon_scale"]').clear().type('60')
 
     cy.get('button[type="submit"]').click()
     cy.wait('@updateInbox').then(({ response }) => {
       expect(response.statusCode).to.eq(200)
-      expect(response.body.data.config.launcher.size, 'launcher size').to.eq(72)
       expect(response.body.data.config.launcher.icon_scale, 'icon scale').to.eq(60)
     })
   })

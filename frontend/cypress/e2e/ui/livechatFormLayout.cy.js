@@ -10,7 +10,7 @@ const TABS = ['General', 'Appearance', 'Content', 'Conversations', 'Setup']
 
 const SECTIONS = {
   General: ['General', 'Conversation continuity email inbox'],
-  Appearance: ['Theme', 'Branding', 'Launcher position', 'Reply previews'],
+  Appearance: ['Theme', 'Branding', 'Launcher position'],
   Content: ['Messages', 'Notice banner', 'Home screen apps', 'Help center', 'Proactive messages'],
   Conversations: ['Features', 'Office hours', 'Pre-chat form', 'Users'],
   Setup: ['Installation', 'Identity verification', 'JavaScript API', 'Security']
@@ -47,9 +47,6 @@ describe('Live chat inbox form layout', () => {
     cy.inboxSection('Notice banner').find('button[role="switch"]').click()
     cy.get('textarea[name="config.notice_banner.text"]').clear().type('Cypress layout notice')
 
-    cy.openInboxSection('Reply previews')
-    cy.get('input[name="config.previews.auto_hide_seconds"]').clear().type('30')
-
     cy.openInboxSection('Users')
     cy.get('textarea[name="config.visitors.quick_replies"]').clear().type('One\nTwo\nThree')
 
@@ -62,7 +59,6 @@ describe('Live chat inbox form layout', () => {
       inboxId = response.body.data.id
       const config = response.body.data.config
       expect(config.notice_banner.text, 'notice text').to.eq('Cypress layout notice')
-      expect(config.previews.auto_hide_seconds, 'auto hide').to.eq(30)
       expect(config.visitors.quick_replies, 'quick replies').to.deep.eq(['One', 'Two', 'Three'])
       expect(config.session_duration, 'session duration').to.eq('6h')
     })

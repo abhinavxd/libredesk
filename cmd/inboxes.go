@@ -22,8 +22,6 @@ import (
 var hexColorRegex = regexp.MustCompile(`^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`)
 
 const (
-	minLauncherSize      = 40
-	maxLauncherSize      = 80
 	minLauncherIconScale = 40
 	maxLauncherIconScale = 100
 )
@@ -312,10 +310,6 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 
 		// Validate launcher position.
 		if config.Launcher.Position != "left" && config.Launcher.Position != "right" {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
-		}
-
-		if config.Launcher.Size < minLauncherSize || config.Launcher.Size > maxLauncherSize {
 			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
 		}
 

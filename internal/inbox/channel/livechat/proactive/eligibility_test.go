@@ -111,3 +111,47 @@ func TestCampaignValidateRequiresTargetDevice(t *testing.T) {
 		t.Fatalf("valid desktop campaign: %v", err)
 	}
 }
+
+func TestCooldownAppliesToRepeatingCampaign(t *testing.T) {
+	now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
+	c := Campaign{ID: "a", Enabled: true, Repeat: "interval", RepeatHours: 1}
+	ctx := Context{Now: now, SessionKey: "session"}
+	history := []Delivery{{CampaignID: "a", Displayed: true, CreatedAt: now.Add(-2 * time.Hour), SessionKey: "session"}}
+	if got := Suppression(c, ctx, history, 24*time.Hour); got != "cooldown" {
+		t.Fatalf("got %q, want cooldown", got)
+	}
+	if got := Suppression(c, ctx, history, 90*time.Minute); got != "" {
+		t.Fatalf("past both the repeat interval and the cooldown: %q", got)
+	}
+	if got := Suppression(c, ctx, history, 0); got != "" {
+		t.Fatalf("no cooldown configured: %q", got)
+	}
+	history[0].CreatedAt = now.Add(-30 * time.Minute)
+	if got := Suppression(c, ctx, history, 0); got != "repeat" {
+		t.Fatalf("inside the repeat interval: %q", got)
+	}
+}
+
+func TestMatchesURLHostOnlyPattern(t *testing.T) {
+	tests := []struct {
+		pattern string
+		url     string
+		want    bool
+	}{
+		{"shop.example.com", "https://shop.example.com/", true},
+		{"shop.example.com", "https://shop.example.com", true},
+		{"shop.example.com", "https://shop.example.com/pricing/pro", true},
+		{"shop.example.com", "https://shop.example.com:8443/pricing", true},
+		{"shop.example.com", "https://other.example.com/pricing", false},
+		{"*.example.com", "https://shop.example.com/a/b", true},
+		{"*.example.com", "https://example.org/a", false},
+		{"shop.example.com/*", "https://shop.example.com/a", true},
+		{"shop.example.com/pricing", "https://shop.example.com/pricing", true},
+		{"/pricing", "https://shop.example.com/pricing", true},
+	}
+	for _, tt := range tests {
+		if got := matchesURL([]string{tt.pattern}, tt.url); got != tt.want {
+			t.Errorf("pattern %q against %q: got %v, want %v", tt.pattern, tt.url, got, tt.want)
+		}
+	}
+}

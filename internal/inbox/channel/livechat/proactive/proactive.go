@@ -121,7 +121,6 @@ func Suppression(c Campaign, ctx Context, history []Delivery, cooldown time.Dura
 			if d.Replied || c.Repeat == "once" || c.Repeat == "session" && d.SessionKey == ctx.SessionKey || c.Repeat == "interval" && ctx.Now.Sub(d.CreatedAt) < time.Duration(c.RepeatHours)*time.Hour {
 				return "repeat"
 			}
-			continue
 		}
 		if cooldown > 0 && ctx.Now.Sub(d.CreatedAt) < cooldown {
 			return "cooldown"

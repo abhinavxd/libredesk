@@ -86,7 +86,6 @@ func TestChatLauncherSettingsKeepsLegacyFields(t *testing.T) {
 		Theme: livechat.ThemeDark,
 		Launcher: livechat.LauncherLayout{
 			Position:  "right",
-			Size:      64,
 			IconScale: 80,
 			Spacing:   livechat.LauncherSpacing{Side: 20, Bottom: 24},
 		},
@@ -107,7 +106,6 @@ func TestChatLauncherSettingsKeepsLegacyFields(t *testing.T) {
 		Colors   livechat.Colors `json:"colors"`
 		Launcher struct {
 			Position  string `json:"position"`
-			Size      int    `json:"size"`
 			IconScale int    `json:"icon_scale"`
 			LogoURL   string `json:"logo_url"`
 			Color     string `json:"color"`
@@ -120,7 +118,7 @@ func TestChatLauncherSettingsKeepsLegacyFields(t *testing.T) {
 	if response.Colors.Primary != "#111111" {
 		t.Fatalf("legacy primary = %q", response.Colors.Primary)
 	}
-	if response.Launcher.Position != "right" || response.Launcher.Size != 64 || response.Launcher.IconScale != 80 {
+	if response.Launcher.Position != "right" || response.Launcher.IconScale != 80 {
 		t.Fatalf("legacy launcher layout = %+v", response.Launcher)
 	}
 	if response.Launcher.LogoURL != "https://example.com/logo.png" || response.Launcher.Color != "#222222" {
@@ -155,7 +153,7 @@ func TestChatLauncherSettingsKeepsLegacyFields(t *testing.T) {
 	if !fullSettings.DarkMode || fullSettings.Colors.Primary != "#111111" {
 		t.Fatalf("legacy theme = %+v", fullSettings)
 	}
-	if fullSettings.Launcher.LogoURL != "https://example.com/logo.png" || fullSettings.Launcher.Size != 64 {
+	if fullSettings.Launcher.LogoURL != "https://example.com/logo.png" {
 		t.Fatalf("legacy launcher = %+v", fullSettings.Launcher)
 	}
 	if fullSettings.Branding.Dark.Colors.Primary != "#111111" {

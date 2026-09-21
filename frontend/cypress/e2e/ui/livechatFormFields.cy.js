@@ -96,14 +96,9 @@ describe('Live chat inbox form: every field', () => {
     cy.get('select[name="config.launcher.position"]').siblings('button[role="combobox"]').click()
     cy.get('[role="option"]').contains('Left').click()
     cy.get('[role="option"]').should('not.exist')
-    cy.get('input[name="config.launcher.size"]').clear().type('72')
     cy.get('input[name="config.launcher.icon_scale"]').clear().type('80')
     cy.get('input[name="config.launcher.spacing.side"]').clear().type('30')
     cy.get('input[name="config.launcher.spacing.bottom"]').clear().type('40')
-
-    cy.openInboxSection('Reply previews')
-    cy.switchField('Mobile').click()
-    cy.get('input[name="config.previews.auto_hide_seconds"]').clear().type('45')
 
     cy.openInboxSection('Messages')
     cy.get('textarea[name="config.greeting_message"]').clear().type(created.greeting)
@@ -167,13 +162,9 @@ describe('Live chat inbox form: every field', () => {
       expect(c.branding.light.launcher.color, 'launcher color').to.eq(created.lightLauncher)
 
       expect(c.launcher.position, 'position').to.eq('left')
-      expect(c.launcher.size, 'size').to.eq(72)
       expect(c.launcher.icon_scale, 'icon scale').to.eq(80)
       expect(c.launcher.spacing.side, 'side spacing').to.eq(30)
       expect(c.launcher.spacing.bottom, 'bottom spacing').to.eq(40)
-
-      expect(c.previews.mobile, 'mobile previews').to.eq(false)
-      expect(c.previews.auto_hide_seconds, 'auto hide').to.eq(45)
 
       expect(c.greeting_message, 'greeting').to.eq(created.greeting)
       expect(c.introduction_message, 'introduction').to.eq(created.introduction)
@@ -231,14 +222,9 @@ describe('Live chat inbox form: every field', () => {
 
     cy.openInboxSection('Launcher position')
     cy.get('select[name="config.launcher.position"]').should('have.value', 'left')
-    cy.get('input[name="config.launcher.size"]').should('have.value', '72')
     cy.get('input[name="config.launcher.icon_scale"]').should('have.value', '80')
     cy.get('input[name="config.launcher.spacing.side"]').should('have.value', '30')
     cy.get('input[name="config.launcher.spacing.bottom"]').should('have.value', '40')
-
-    cy.openInboxSection('Reply previews')
-    cy.switchField('Mobile').should('have.attr', 'data-state', 'unchecked')
-    cy.get('input[name="config.previews.auto_hide_seconds"]').should('have.value', '45')
 
     cy.openInboxSection('Messages')
     cy.get('textarea[name="config.greeting_message"]').should('have.value', created.greeting)
@@ -305,14 +291,9 @@ describe('Live chat inbox form: every field', () => {
     cy.get('select[name="config.launcher.position"]').siblings('button[role="combobox"]').click()
     cy.get('[role="option"]').contains('Right').click()
     cy.get('[role="option"]').should('not.exist')
-    cy.get('input[name="config.launcher.size"]').clear().type('50')
     cy.get('input[name="config.launcher.icon_scale"]').clear().type('60')
     cy.get('input[name="config.launcher.spacing.side"]').clear().type('10')
     cy.get('input[name="config.launcher.spacing.bottom"]').clear().type('12')
-
-    cy.openInboxSection('Reply previews')
-    cy.switchField('Desktop').click()
-    cy.get('input[name="config.previews.auto_hide_seconds"]').clear().type('15')
 
     cy.openInboxSection('Messages')
     cy.get('textarea[name="config.greeting_message"]').clear().type(edited.greeting)
@@ -368,13 +349,9 @@ describe('Live chat inbox form: every field', () => {
       expect(c.branding.dark.colors.primary, 'dark primary kept').to.eq(created.darkPrimary)
 
       expect(c.launcher.position, 'position').to.eq('right')
-      expect(c.launcher.size, 'size').to.eq(50)
       expect(c.launcher.icon_scale, 'icon scale').to.eq(60)
       expect(c.launcher.spacing.side, 'side spacing').to.eq(10)
       expect(c.launcher.spacing.bottom, 'bottom spacing').to.eq(12)
-
-      expect(c.previews.desktop, 'desktop previews').to.eq(false)
-      expect(c.previews.auto_hide_seconds, 'auto hide').to.eq(15)
 
       expect(c.greeting_message, 'greeting').to.eq(edited.greeting)
       expect(c.introduction_message, 'introduction').to.eq(edited.introduction)
@@ -478,11 +455,6 @@ describe('Live chat inbox form: every field', () => {
     cy.get('input[name="config.continuity.max_messages_per_email"]').clear().type('7')
     cy.get('input[name="config.continuity.min_email_interval"]').clear().type('9m')
 
-    cy.openInboxSection('Reply previews')
-    cy.get('select[name="config.previews.content"]').siblings('button[role="combobox"]').click()
-    cy.get('[role="option"]').contains('Generic notification').click()
-    cy.get('[role="option"]').should('not.exist')
-
     cy.openInboxSection('Office hours')
     cy.switchField('Show office hours after team assignment').click()
 
@@ -506,7 +478,6 @@ describe('Live chat inbox form: every field', () => {
       expect(c.continuity.offline_threshold, 'offline threshold').to.eq('12m')
       expect(c.continuity.max_messages_per_email, 'max messages').to.eq(7)
       expect(c.continuity.min_email_interval, 'min interval').to.eq('9m')
-      expect(c.previews.content, 'preview content').to.eq('generic')
       expect(c.show_office_hours_after_assignment, 'office hours after assignment').to.eq(true)
       expect(c.visitors.allow_start_conversation, 'visitor start').to.eq(false)
       expect(c.visitors.prevent_reply_to_closed_conversation, 'visitor closed replies').to.eq(true)
@@ -521,10 +492,8 @@ describe('Live chat inbox form: every field', () => {
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     const cases = [
-      ['Launcher position', 'input[name="config.launcher.size"]', '120'],
       ['Launcher position', 'input[name="config.launcher.icon_scale"]', '5'],
       ['Launcher position', 'input[name="config.launcher.spacing.side"]', '900'],
-      ['Reply previews', 'input[name="config.previews.auto_hide_seconds"]', '999'],
       ['Security', 'input[name="config.session_duration"]', 'nope'],
       ['General', 'input[name="config.website_url"]', 'not-a-url']
     ]

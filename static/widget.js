@@ -27,11 +27,12 @@
             this.IFRAME_HEIGHT = '700px';
             this.EXPANDED_WIDTH = '750px';
             this.MOBILE_BREAKPOINT = 600;
-            this.DEFAULT_LAUNCHER_SIZE = 60;
+            this.LAUNCHER_SIZE = 60;
             this.LAUNCHER_IFRAME_GAP = 20;
             this.DEFAULT_LAUNCHER_ICON_SCALE = 100;
             this.LAUNCHER_HOVER_SCALE = 1.08;
             this.LAUNCHER_OPEN_SCALE = 0.9;
+            this.MOBILE_LAUNCHER_SIZE = 60;
             this.CAMPAIGN_POLL_MIN = 2;
             this.CAMPAIGN_POLL_MAX = 60;
 
@@ -46,8 +47,6 @@
             this.unreadCount = 0;
             this.previewData = null;
             this.previewHost = null;
-            this.previewTimers = new Map();
-            this.hiddenPreviews = new Set();
             this.campaignData = null;
             this.campaignActiveSeconds = 0;
             this.campaignURL = location.href;
@@ -345,7 +344,7 @@
         }
 
         launcherSize () {
-            return this.widgetSettings?.launcher?.size || this.DEFAULT_LAUNCHER_SIZE;
+            return this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE;
         }
 
         launcherIconScale () {
@@ -716,23 +715,12 @@
             this.previewData = null;
             this.campaignData = null;
             this.dismissedPreviews = [];
-            this.hiddenPreviews.clear();
             this.previewHost?.remove();
             this.previewHost = null;
             this.previewSignature = '';
-            for (const timer of this.previewTimers.values()) clearTimeout(timer);
-            this.previewTimers.clear();
-        }
-
-        hidePreview (key) {
-            this.previewTimers.delete(key);
-            this.hiddenPreviews.add(key);
-            this.renderPreviews();
         }
 
         dismissPreview (key) {
-            clearTimeout(this.previewTimers.get(key));
-            this.previewTimers.delete(key);
             if (this.campaignData?.id === key) {
                 this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'dismissed', id: key });
                 this.campaignData = null;
@@ -753,13 +741,12 @@
             const invitation = this.campaignData;
             if (invitation && this.unreadCount === 0 && data) {
                 const snapshot = invitation.snapshot;
-                data = { ...data, identity: 'campaign', config: { desktop: true, mobile: true, auto_hide_seconds: 0 }, previews: [{
+                data = { ...data, identity: 'campaign', previews: [{
                     key: invitation.id, campaign: true, name: snapshot.sender, avatar: snapshot.avatar,
                     text: snapshot.message.slice(0, 240),
                 }] };
             }
-            const enabled = data?.config?.[this.isMobile ? 'mobile' : 'desktop'];
-            if (!data || !enabled || !this.widgetLoaded || this.isChatVisible || this.hideLauncher) {
+            if (!data || !this.widgetLoaded || this.isChatVisible || this.hideLauncher) {
                 this.previewHost?.remove();
                 this.previewHost = null;
                 this.previewSignature = '';
@@ -768,8 +755,8 @@
             const storageKey = `libredesk-previews-${this.config.inboxID}-${data.identity || 'visitor'}`;
             let dismissed = this.dismissedPreviews || [];
             try { dismissed = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch {}
-            const previews = data.previews.filter(item => !dismissed.includes(item.key) && !this.hiddenPreviews.has(item.key)).slice(0, 3);
-            const signature = JSON.stringify([previews, data.theme, data.labels, this.isMobile]);
+            const previews = data.previews.filter(item => !dismissed.includes(item.key)).slice(0, 3);
+            const signature = JSON.stringify([previews, data.theme, data.labels]);
             if (signature === this.previewSignature) return;
             this.previewSignature = signature;
             this.previewHost?.remove();
@@ -841,9 +828,6 @@
                 close.addEventListener('click', () => { this.dismissPreview(item.key); this.toggleButton.focus(); });
                 card.append(open, close);
                 stack.append(card);
-                if (data.config.auto_hide_seconds > 0 && !this.previewTimers.has(item.key)) {
-                    this.previewTimers.set(item.key, setTimeout(() => this.hidePreview(item.key), data.config.auto_hide_seconds * 1000));
-                }
             }
             if (previews.length > 1) {
                 const all = document.createElement('button');
@@ -876,6 +860,8 @@
                     elapsed = 0;
                     asked = false;
                     gap = firstGap();
+                    if (this.campaignData) this.dropCampaign(this.campaignData.id);
+                    this.renderPreviews();
                 }
                 if (document.hidden || this.isChatVisible || this.hideLauncher) return;
                 this.campaignActiveSeconds += delta;

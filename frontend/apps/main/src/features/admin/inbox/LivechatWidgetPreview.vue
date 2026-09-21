@@ -533,11 +533,8 @@ import { renderTemplate } from '@shared-ui/utils/string'
 
 const DEFAULT_LAUNCHER_LOGO = '/static/public/launcher-logo.png'
 const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
-const DEFAULT_LAUNCHER_SIZE = 60
+const LAUNCHER_SIZE = 52
 const DEFAULT_LAUNCHER_ICON_SCALE = 100
-// The preview stage is smaller than a real page, so the launcher renders at 52px for the
-// default 60px setting and every other size is scaled by the same ratio.
-const LAUNCHER_PREVIEW_SCALE = 52 / 60
 const SNIPPET_LENGTH = 240
 
 const props = defineProps({
@@ -740,12 +737,7 @@ const onLeft = computed(() => props.config.launcher?.position === 'left')
 const clampSpacing = (value) => Math.min(Number(value) || 20, 40)
 const clampedSide = computed(() => clampSpacing(props.config.launcher?.spacing?.side))
 const clampedBottom = computed(() => clampSpacing(props.config.launcher?.spacing?.bottom))
-const launcherSize = computed(() =>
-  Math.round(
-    (Number(props.config.launcher?.size) || DEFAULT_LAUNCHER_SIZE) * LAUNCHER_PREVIEW_SCALE
-  )
-)
-const windowBottom = computed(() => clampedBottom.value + launcherSize.value + 12)
+const windowBottom = computed(() => clampedBottom.value + LAUNCHER_SIZE + 12)
 const launcherIconScale = computed(
   () => Number(props.config.launcher?.icon_scale) || DEFAULT_LAUNCHER_ICON_SCALE
 )
@@ -769,8 +761,8 @@ const campaignStyle = computed(() => ({
 }))
 const launcherStyle = computed(() => ({
   filter: LAUNCHER_DROP_SHADOW,
-  width: launcherSize.value + 'px',
-  height: launcherSize.value + 'px',
+  width: LAUNCHER_SIZE + 'px',
+  height: LAUNCHER_SIZE + 'px',
   backgroundColor: launcherColor.value,
   bottom: clampedBottom.value + 'px',
   [onLeft.value ? 'left' : 'right']: clampedSide.value + 'px'
