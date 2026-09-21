@@ -65,6 +65,12 @@ export function useGlobalShortcuts() {
     return true
   }
 
+  const toggleComposerMinimize = () => {
+    if (!conversationOpen()) return false
+    emitter.emit(EMITTER_EVENTS.REPLY_BOX_TOGGLE_MINIMIZE)
+    return true
+  }
+
   const toggleSelectCurrent = () => {
     if (!conversationOpen() || !canBulkAct.value) return false
     conversationStore.toggleSelect(conversationStore.current.uuid, false)
@@ -92,6 +98,7 @@ export function useGlobalShortcuts() {
     KeyA: openGroup('conv.assign-agent', perms.CONVERSATIONS_UPDATE_USER_ASSIGNEE),
     KeyR: compose('reply', perms.MESSAGES_WRITE),
     KeyN: compose('private_note', perms.MESSAGES_WRITE_PRIVATE),
+    KeyM: toggleComposerMinimize,
     KeyX: toggleSelectCurrent,
     KeyC: newConversation,
     KeyE: setStatus(CONVERSATION_DEFAULT_STATUSES.RESOLVED),

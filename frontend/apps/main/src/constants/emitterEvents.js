@@ -11,6 +11,7 @@ export const EMITTER_EVENTS = {
     OPEN_VIEW_FORM: 'open-view-form',
     REPLY_BOX_FOCUS: 'reply-box-focus',
     REPLY_BOX_SET_TYPE: 'reply-box-set-type',
+    REPLY_BOX_TOGGLE_MINIMIZE: 'reply-box-toggle-minimize',
     CONVERSATION_ACTION: 'conversation-action',
     CONTACT_ACTION: 'contact-action'
 }
