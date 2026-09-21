@@ -110,6 +110,10 @@ const props = defineProps({
   search: {
     type: Function,
     default: null
+  },
+  keepOpenOnSelect: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -172,6 +176,8 @@ const getLabel = (value) => {
 }
 
 const handleSelect = (event) => {
+  if (props.keepOpenOnSelect) event.preventDefault()
+
   const selectedValue = event.detail.value
   if (selectedValue) {
     tags.value = [...tags.value, selectedValue]
