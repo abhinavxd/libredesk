@@ -44,6 +44,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/report"
+	"github.com/abhinavxd/libredesk/internal/resourceimage"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/setting"
@@ -302,6 +303,7 @@ func initConversations(
 	template *tmpl.Manager,
 	webhook *webhook.Manager,
 	dispatcher *notifier.Dispatcher,
+	resourceImages *resourceimage.Store,
 ) *conversation.Manager {
 	continuityConfig := &conversation.ContinuityConfig{}
 	if ko.Exists("conversation.continuity_scan_interval") {
@@ -309,6 +311,9 @@ func initConversations(
 	}
 
 	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, dispatcher, conversation.Opts{
+		CacheIncomingImages: func(ctx context.Context, id int, content string) error {
+			return resourceImages.Prefetch(ctx, id, content, settings.GetResourcePolicyTx)
+		},
 		DB:                       db,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
@@ -577,6 +582,10 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 		err   error
 		lo    = initLogger("media")
 	)
+	maxStorageBytes := liveResourceLimits.snapshot().MaxStorageBytes
+	if maxStorageBytes < 0 {
+		log.Fatalf("upload.max_storage_bytes must be zero or a positive number of bytes")
+	}
 	rootURL := func() string {
 		u, err := settings.GetAppRootURL()
 		if err != nil {
@@ -623,11 +632,14 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 	}
 
 	media, err := media.New(media.Opts{
-		Store:   store,
-		Lo:      lo,
-		DB:      db,
-		I18n:    i18n,
-		RootURL: rootURL,
+		Store:           store,
+		Lo:              lo,
+		DB:              db,
+		I18n:            i18n,
+		RootURL:         rootURL,
+		SigningKey:      ko.MustString("app.encryption_key"),
+		URLExpiry:       cmp.Or(ko.Duration("upload.fs.expiry"), time.Hour),
+		MaxStorageBytes: maxStorageBytes,
 	})
 	if err != nil {
 		log.Fatalf("error initializing media: %v", err)
@@ -722,6 +734,8 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		log.Printf("WARNING: No `from` email address set for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
 	}
 
+	maxIncomingMessageSize := liveResourceLimits.snapshot().MaxIncomingMessageSize
+
 	// Callback to persist refreshed tokens in DB.
 	tokenRefreshCallback := func(inboxID int, updatedConfig imodels.Config) error {
 		// Marshal updated config to JSON
@@ -742,11 +756,12 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 	}
 
 	inbox, err := email.New(msgStore, usrStore, email.Opts{
-		ID:                   inboxRecord.ID,
-		Name:                 inboxRecord.Name,
-		Config:               config,
-		Lo:                   initLogger("email_inbox"),
-		TokenRefreshCallback: tokenRefreshCallback,
+		ID:                     inboxRecord.ID,
+		Name:                   inboxRecord.Name,
+		Config:                 config,
+		MaxIncomingMessageSize: maxIncomingMessageSize,
+		Lo:                     initLogger("email_inbox"),
+		TokenRefreshCallback:   tokenRefreshCallback,
 	})
 
 	if err != nil {

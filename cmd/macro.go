@@ -9,6 +9,7 @@ import (
 	autoModels "github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/macro/models"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -21,6 +22,7 @@ func handleGetMacros(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	for i, m := range macros {
+		macros[i].Display = (resourcepolicy.Policy{}).PrepareDisplay(m.MessageContent, nil)
 		if macros[i].Actions, err = decorateMacroActions(app, m.Actions); err != nil {
 			app.lo.Error("error decorating macro actions", "macro_id", m.ID, "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
@@ -99,6 +101,7 @@ func handleGetMacro(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	macro.Display = (resourcepolicy.Policy{}).PrepareDisplay(macro.MessageContent, nil)
 	return r.SendEnvelope(macro)
 }
 
@@ -122,6 +125,7 @@ func handleCreateMacro(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	createdMacro.Display = (resourcepolicy.Policy{}).PrepareDisplay(createdMacro.MessageContent, nil)
 	return r.SendEnvelope(createdMacro)
 }
 
@@ -151,6 +155,7 @@ func handleUpdateMacro(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	updatedMacro.Display = (resourcepolicy.Policy{}).PrepareDisplay(updatedMacro.MessageContent, nil)
 	return r.SendEnvelope(updatedMacro)
 }
 

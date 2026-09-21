@@ -197,6 +197,12 @@ const routes = [
             meta: { titleKey: 'globals.terms.general' }
           },
           {
+            path: 'resources',
+            name: 'system-resources',
+            component: () => import('@main/views/admin/resources/ResourceMonitor.vue'),
+            meta: { titleKey: 'admin.systemResources.title' }
+          },
+          {
             path: 'ai',
             redirect: { name: 'ai-providers' }
           },
@@ -683,9 +689,7 @@ router.beforeEach((to, from, next) => {
   const i18n = getI18n()
   const typeKey = typeof to.meta?.typeKey === 'function' ? to.meta.typeKey(to) : ''
   const titleKey = typeKey || to.meta?.titleKey
-  const pageTitle = titleKey && i18n
-    ? i18n.global.t(titleKey, to.meta?.titleCount || 1)
-    : ''
+  const pageTitle = titleKey && i18n ? i18n.global.t(titleKey, to.meta?.titleCount || 1) : ''
   document.title = `${pageTitle} - ${siteName}`
   next()
 })

@@ -9,7 +9,7 @@ const http = axios.create({
 // LLM calls can take 30-40s+, well past the default request timeout.
 const AI_TIMEOUT = 120000
 
-function getCSRFToken () {
+function getCSRFToken() {
   const name = 'csrf_token='
   const cookies = document.cookie.split(';')
   for (let i = 0; i < cookies.length; i++) {
@@ -23,7 +23,7 @@ function getCSRFToken () {
 
 // Route-scoped abort, opt-in via { abortOnRoute: true }. Default no-abort protects in-flight saves.
 let routeAbort = new AbortController()
-export function abortRouteScope () {
+export function abortRouteScope() {
   routeAbort.abort()
   routeAbort = new AbortController()
 }
@@ -135,6 +135,9 @@ const createOIDC = (data) =>
     }
   })
 const getConfig = () => http.get('/api/v1/config')
+const getResourceUsage = () => http.get('/api/v1/system/resource-usage')
+const getResourceLimits = () => http.get('/api/v1/system/resource-limits')
+const updateResourceLimits = (data) => http.put('/api/v1/system/resource-limits', data)
 const getAllOIDC = () => http.get('/api/v1/oidc')
 const getOIDC = (id) => http.get(`/api/v1/oidc/${id}`)
 const updateOIDC = (id, data) =>
@@ -151,11 +154,12 @@ const updateSettings = (key, data) =>
     }
   })
 const getSettings = (key) => http.get(`/api/v1/settings/${key}`)
-const login = (data) => http.post(`/api/v1/auth/login`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const login = (data) =>
+  http.post(`/api/v1/auth/login`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getAutomationRules = (type) =>
   http.get(`/api/v1/automations/rules`, {
     params: { type: type }
@@ -216,25 +220,28 @@ const updateContact = (id, data) =>
       'Content-Type': 'multipart/form-data'
     }
   })
-const blockContact = (id, data) => http.put(`/api/v1/contacts/${id}/block`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const blockContact = (id, data) =>
+  http.put(`/api/v1/contacts/${id}/block`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const deleteContact = (id) => http.delete(`/api/v1/contacts/${id}`)
 const exportContact = (id) => http.get(`/api/v1/contacts/${id}/export`, { responseType: 'blob' })
 const getTeam = (id) => http.get(`/api/v1/teams/${id}`)
 const getTeams = () => http.get('/api/v1/teams')
-const updateTeam = (id, data) => http.put(`/api/v1/teams/${id}`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const createTeam = (data) => http.post('/api/v1/teams', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const updateTeam = (id, data) =>
+  http.put(`/api/v1/teams/${id}`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const createTeam = (data) =>
+  http.post('/api/v1/teams', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getTeamsCompact = (params) => http.get('/api/v1/teams/compact', { params })
 const deleteTeam = (id) => http.delete(`/api/v1/teams/${id}`)
 const updateUser = (id, data) =>
@@ -255,21 +262,24 @@ const getUser = (id) => http.get(`/api/v1/agents/${id}`)
 const deleteUserAvatar = () => http.delete('/api/v1/agents/me/avatar')
 const getCurrentUser = () => http.get('/api/v1/agents/me')
 const getCurrentUserTeams = () => http.get('/api/v1/agents/me/teams')
-const updateCurrentUserAvailability = (data) => http.put('/api/v1/agents/me/availability', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const resetPassword = (data) => http.post('/api/v1/agents/reset-password', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-const setPassword = (data) => http.post('/api/v1/agents/set-password', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const updateCurrentUserAvailability = (data) =>
+  http.put('/api/v1/agents/me/availability', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const resetPassword = (data) =>
+  http.post('/api/v1/agents/reset-password', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+const setPassword = (data) =>
+  http.post('/api/v1/agents/set-password', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const deleteUser = (id) => http.delete(`/api/v1/agents/${id}`)
 const importAgents = (data) =>
   http.post('/api/v1/agents/import', data, {
@@ -292,11 +302,12 @@ const importTags = (data) =>
     }
   })
 const getTagImportStatus = () => http.get('/api/v1/tags/import/status')
-const upsertTags = (uuid, data) => http.post(`/api/v1/conversations/${uuid}/tags`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const upsertTags = (uuid, data) =>
+  http.post(`/api/v1/conversations/${uuid}/tags`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const updateAssignee = (uuid, assignee_type, data) =>
   http.put(`/api/v1/conversations/${uuid}/assignee/${assignee_type}`, data, {
     headers: {
@@ -339,6 +350,10 @@ const updateAssigneeLastSeen = (uuid) => http.put(`/api/v1/conversations/${uuid}
 const markConversationAsUnread = (uuid) => http.put(`/api/v1/conversations/${uuid}/mark-unread`)
 const getConversationMessage = (cuuid, uuid) =>
   http.get(`/api/v1/conversations/${cuuid}/messages/${uuid}`)
+const allowMessageImages = (cuuid, uuid, scope) =>
+  http.post(`/api/v1/conversations/${cuuid}/messages/${uuid}/images/allow/${scope}`)
+const getResourcePolicy = () => http.get('/api/v1/settings/resource-policy')
+const updateResourcePolicy = (data) => http.put('/api/v1/settings/resource-policy', data)
 const retryMessage = (cuuid, uuid) =>
   http.put(`/api/v1/conversations/${cuuid}/messages/${uuid}/retry`)
 const deleteMessage = (cuuid, uuid) =>
@@ -354,7 +369,8 @@ const sendMessage = (uuid, data) =>
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
-const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
+const getContactPageVisits = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
 const getMacrosCompact = (params) => http.get('/api/v1/macros/compact', { params })
 const searchMacros = (params) => http.get('/api/v1/macros/search', { params })
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
@@ -401,7 +417,8 @@ const getOverviewCounts = () => http.get('/api/v1/reports/overview/counts')
 const getOverviewCharts = (params) => http.get('/api/v1/reports/overview/charts', { params })
 const getOverviewSLA = (params) => http.get('/api/v1/reports/overview/sla', { params })
 const getOverviewCSAT = (params) => http.get('/api/v1/reports/overview/csat', { params })
-const getOverviewMessageVolume = (params) => http.get('/api/v1/reports/overview/messages', { params })
+const getOverviewMessageVolume = (params) =>
+  http.get('/api/v1/reports/overview/messages', { params })
 const getOverviewTagDistribution = (params) => http.get('/api/v1/reports/overview/tags', { params })
 const getLanguage = (lang) => http.get(`/api/v1/lang/${lang}`)
 const getAvailableLanguages = () => http.get('/api/v1/lang')
@@ -422,11 +439,15 @@ const updateInbox = (id, data) =>
   })
 const deleteInbox = (id) => http.delete(`/api/v1/inboxes/${id}`)
 const saveDraft = (uuid, type, data) =>
-  http.post(`/api/v1/conversations/${uuid}/draft`, { ...data, type }, {
-    headers: {
-      'Content-Type': 'application/json'
+  http.post(
+    `/api/v1/conversations/${uuid}/draft`,
+    { ...data, type },
+    {
+      headers: {
+        'Content-Type': 'application/json'
+      }
     }
-  })
+  )
 
 const getAllDrafts = () => http.get('/api/v1/drafts')
 
@@ -469,12 +490,13 @@ const getAIPrompt = (id) => http.get(`/api/v1/ai/prompts/${id}`)
 const createAIPrompt = (data) => http.post('/api/v1/ai/prompts', data)
 const updateAIPrompt = (id, data) => http.put(`/api/v1/ai/prompts/${id}`, data)
 const deleteAIPrompt = (id) => http.delete(`/api/v1/ai/prompts/${id}`)
-const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
-  timeout: AI_TIMEOUT,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const aiCompletion = (data) =>
+  http.post('/api/v1/ai/completion', data, {
+    timeout: AI_TIMEOUT,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getAIConfig = (type) => http.get(`/api/v1/ai/config/${type}`)
 const updateAIConfig = (type, data) => http.put(`/api/v1/ai/config/${type}`, data)
 const testAIConfig = (type, data) =>
@@ -513,8 +535,10 @@ const approveAIFaqSuggestion = (id, data) =>
 const rejectAIFaqSuggestion = (id) => http.post(`/api/v1/ai/faq-suggestions/${id}/reject`)
 const getAIFaqLearning = () => http.get('/api/v1/ai/faq-learning')
 const updateAIFaqLearning = (data) => http.put('/api/v1/ai/faq-learning', data)
-const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data, { timeout: AI_TIMEOUT })
-const aiSummarizeConversation = (data) => http.post('/api/v1/ai/summarize', data, { timeout: AI_TIMEOUT })
+const aiGenerateReply = (data) =>
+  http.post('/api/v1/ai/generate-reply', data, { timeout: AI_TIMEOUT })
+const aiSummarizeConversation = (data) =>
+  http.post('/api/v1/ai/summarize', data, { timeout: AI_TIMEOUT })
 const aiSuggestTags = (data) => http.post('/api/v1/ai/suggest-tags', data, { timeout: AI_TIMEOUT })
 const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data, { timeout: AI_TIMEOUT })
 const approveAIToolRun = (id) =>
@@ -539,7 +563,8 @@ const previewHelpCenter = (id, data, page) =>
   })
 const getHelpCenterTree = (id, locale) =>
   http.get(`/api/v1/help-centers/${id}/tree`, { params: locale ? { locale } : {} })
-const getCollections = (helpCenterId) => http.get(`/api/v1/help-centers/${helpCenterId}/collections`)
+const getCollections = (helpCenterId) =>
+  http.get(`/api/v1/help-centers/${helpCenterId}/collections`)
 const createCollection = (helpCenterId, data) =>
   http.post(`/api/v1/help-centers/${helpCenterId}/collections`, data)
 const updateCollection = (helpCenterId, id, data) =>
@@ -562,11 +587,12 @@ const deleteArticle = (collectionId, id) =>
 const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data)
 const getHelpCenterInsights = (id) => http.get(`/api/v1/help-centers/${id}/insights`)
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
-const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+const createContactNote = (id, data) =>
+  http.post(`/api/v1/contacts/${id}/notes`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const deleteContactNote = (id, noteId) => http.delete(`/api/v1/contacts/${id}/notes/${noteId}`)
 const getActivityLogs = (params) => http.get('/api/v1/activity-logs', { params })
 const getWebhooksCompact = () => http.get('/api/v1/webhooks/compact')
@@ -604,12 +630,16 @@ const getActiveContextLinks = () => http.get('/api/v1/context-links/active')
 const getContextLinkURL = (id, conversationUUID) =>
   http.get(`/api/v1/context-links/${id}/url`, { params: { conversation_uuid: conversationUUID } })
 
-const generateAPIKey = (id) => 
-  http.post(`/api/v1/agents/${id}/api-key`, {}, {
-    headers: {
-      'Content-Type': 'application/json'
+const generateAPIKey = (id) =>
+  http.post(
+    `/api/v1/agents/${id}/api-key`,
+    {},
+    {
+      headers: {
+        'Content-Type': 'application/json'
+      }
     }
-  })
+  )
 
 const revokeAPIKey = (id) => http.delete(`/api/v1/agents/${id}/api-key`)
 
@@ -630,7 +660,8 @@ const deleteAllNotifications = () => http.delete('/api/v1/notifications')
 const getNotificationPreferences = () => http.get('/api/v1/notifications/preferences')
 const updateNotificationPreferences = (data) => http.put('/api/v1/notifications/preferences', data)
 const createPushSubscription = (data) => http.post('/api/v1/notifications/push-subscriptions', data)
-const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/push-subscriptions', { data: { endpoint } })
+const deletePushSubscription = (endpoint) =>
+  http.delete('/api/v1/notifications/push-subscriptions', { data: { endpoint } })
 
 export default {
   login,
@@ -684,6 +715,9 @@ export default {
   getOverviewMessageVolume,
   getOverviewTagDistribution,
   getConversationMessage,
+  allowMessageImages,
+  getResourcePolicy,
+  updateResourcePolicy,
   getConversationMessages,
   getConversationTranscript,
   getCurrentUser,
@@ -729,6 +763,9 @@ export default {
   createOIDC,
   getAllOIDC,
   getConfig,
+  getResourceUsage,
+  getResourceLimits,
+  updateResourceLimits,
   getOIDC,
   updateOIDC,
   deleteOIDC,

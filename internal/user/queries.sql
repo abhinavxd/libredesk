@@ -524,3 +524,19 @@ SELECT jsonb_build_object(
         WHERE c.contact_id = $1
     )
 );
+
+-- name: get-image-senders
+SELECT to_json(COALESCE(p.senders, '{}'::text[])) FROM users u
+LEFT JOIN user_image_permissions p ON p.user_id = u.id
+WHERE u.id = $1 AND u.type = 'agent' AND u.deleted_at IS NULL;
+
+-- name: set-image-sender
+INSERT INTO user_image_permissions (user_id, senders)
+SELECT id, CASE WHEN $3::boolean THEN ARRAY[$2::text] ELSE '{}'::text[] END
+FROM users WHERE id = $1 AND type = 'agent' AND deleted_at IS NULL
+ON CONFLICT (user_id) DO UPDATE SET senders =
+CASE WHEN NOT $3::boolean THEN array_remove(user_image_permissions.senders, $2::text)
+WHEN $2::text = ANY(user_image_permissions.senders) THEN user_image_permissions.senders
+ELSE array_append(user_image_permissions.senders, $2::text) END
+WHERE NOT $3::boolean OR $2::text = ANY(user_image_permissions.senders)
+OR cardinality(user_image_permissions.senders) < 100;

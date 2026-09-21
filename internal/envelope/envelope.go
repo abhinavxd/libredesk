@@ -16,6 +16,7 @@ const (
 	ConflictError     = "ConflictException"
 	UnauthorizedError = "UnauthorizedException"
 	RateLimitError    = "RateLimitException"
+	StorageFullError  = "StorageFullException"
 )
 
 // Error is the error type used for all API errors.
@@ -67,6 +68,8 @@ func NewError(etype string, message string, data interface{}) error {
 		err.Code = fasthttp.StatusUnauthorized
 	case RateLimitError:
 		err.Code = fasthttp.StatusTooManyRequests
+	case StorageFullError:
+		err.Code = fasthttp.StatusInsufficientStorage
 	default:
 		err.Code = fasthttp.StatusInternalServerError
 		err.ErrorType = GeneralError

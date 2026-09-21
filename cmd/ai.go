@@ -10,6 +10,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -391,6 +392,7 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 	}
 	if resp.Status == aimodels.AgentRunCompleted {
 		resp.Content = stringutil.Markdown2HTML(resp.Content)
+		resp.Display = (resourcepolicy.Policy{}).PrepareDisplay(resp.Content, nil)
 	}
 	return r.SendEnvelope(resp)
 }
@@ -521,6 +523,7 @@ func handleAICopilot(r *fastglue.Request) error {
 			app.lo.Error("error saving copilot reply", "error", err)
 		}
 		resp.Content = stringutil.Markdown2HTML(resp.Content)
+		resp.Display = (resourcepolicy.Policy{}).PrepareDisplay(resp.Content, nil)
 	}
 	return r.SendEnvelope(resp)
 }
@@ -561,6 +564,7 @@ func handleGetCopilotMessages(r *fastglue.Request) error {
 	for i := range msgs {
 		if msgs[i].Role == aimodels.RoleAssistant {
 			msgs[i].Content = stringutil.Markdown2HTML(msgs[i].Content)
+			msgs[i].Display = (resourcepolicy.Policy{}).PrepareDisplay(msgs[i].Content, nil)
 		}
 	}
 	scope := ai.AgentRunScope{AgentID: auser.ID, ConversationID: conv.ID, ConversationUUID: conv.UUID, Surface: aimodels.ToolInvocationCopilot}
@@ -647,6 +651,7 @@ func decideAIToolRun(r *fastglue.Request, approved bool) (aimodels.AgentRunResul
 			}
 		}
 		resp.Content = stringutil.Markdown2HTML(resp.Content)
+		resp.Display = (resourcepolicy.Policy{}).PrepareDisplay(resp.Content, nil)
 	}
 	return resp, nil
 }

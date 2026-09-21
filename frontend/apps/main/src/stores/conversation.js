@@ -517,6 +517,21 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function invalidateImageDisplays () {
+    messages.data = new MessageCache()
+    staleConversationUUIDs.clear()
+    incrementMessageVersion()
+  }
+
+  async function updateImagePermissions (message, scope) {
+    if (scope === 'message') {
+      mergeMessageUpdate(message)
+      return
+    }
+    invalidateImageDisplays()
+    await fetchMessages(message.conversation_uuid)
+  }
+
   async function fetchMessages (uuid, fetchNextPage = false) {
     if (staleConversationUUIDs.has(uuid) && messages.data.hasConversation(uuid)) {
       try {
@@ -1260,6 +1275,8 @@ export const useConversationStore = defineStore('conversation', () => {
     fetchNextMessages,
     fetchNextConversations,
     mergeMessageUpdate,
+    invalidateImageDisplays,
+    updateImagePermissions,
     updateAssigneeLastSeen,
     markAsUnread,
     incrementUnread,

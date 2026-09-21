@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime"
 	"strings"
 	"time"
@@ -176,7 +177,8 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 
 	// Fetch envelope and headers needed for auto-reply detection.
 	fetchOptions := &imap.FetchOptions{
-		Envelope: true,
+		Envelope:   true,
+		RFC822Size: true,
 		BodySection: []*imap.FetchItemBodySection{
 			{
 				Specifier: imap.PartSpecifierHeader,
@@ -194,6 +196,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 	type msgData struct {
 		env                *imap.Envelope
 		seqNum             uint32
+		size               int64
 		autoReply          bool
 		isLoop             bool
 		extractedMessageID string
@@ -229,6 +232,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 
 		var (
 			env                *imap.Envelope
+			messageSize        int64
 			autoReply          bool
 			isLoop             bool
 			extractedMessageID string
@@ -271,6 +275,12 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			if ed, ok := item.(imapclient.FetchItemDataEnvelope); ok {
 				env = ed.Envelope
 			}
+
+			// RFC822.SIZE lets us reject an oversized message before fetching its
+			// body and asking the MIME parser to materialize its parts in memory.
+			if size, ok := item.(imapclient.FetchItemDataRFC822Size); ok {
+				messageSize = size.Size
+			}
 		}
 
 		// Skip if we couldn't get the envelope.
@@ -279,7 +289,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			continue
 		}
 
-		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID})
+		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, size: messageSize, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID})
 	}
 
 	// Now process each collected message.
@@ -289,6 +299,16 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
+		}
+
+		maxMessageSize := e.incomingMessageSizeLimit()
+		if shouldSkipMessage(msgData.size, maxMessageSize) {
+			e.lo.Warn("skipping oversized incoming email",
+				"message_id", msgData.env.MessageID,
+				"size_bytes", msgData.size,
+				"max_size_bytes", maxMessageSize,
+				"inbox_id", inboxID)
+			continue
 		}
 
 		// Skip if this is an auto-reply message.
@@ -446,8 +466,37 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 // processFullMessage processes the full message and enqueues it for inserting into the database.
 func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, incomingMsg models.IncomingMessage) error {
-	envelope, err := mimeParser.ReadEnvelope(item.Literal)
+	var body io.Reader = item.Literal
+	var limitedBody *io.LimitedReader
+	maxMessageSize := e.incomingMessageSizeLimit()
+	if maxMessageSize > 0 {
+		// RFC822.SIZE is the normal guard. This second ceiling protects us from
+		// servers that omit or misreport it while still draining the literal so
+		// the IMAP connection remains usable.
+		limitedBody = &io.LimitedReader{R: item.Literal, N: maxMessageSize + 1}
+		body = limitedBody
+	}
+	envelope, err := mimeParser.ReadEnvelope(body)
+	tooLarge := false
+	if limitedBody != nil {
+		// Ensure the parser cannot return successfully after only reading a
+		// prefix. The one-byte-over-limit probe is discarded, never retained.
+		_, _ = io.Copy(io.Discard, limitedBody)
+		tooLarge = limitedBody.N == 0
+		_, _ = io.Copy(io.Discard, item.Literal)
+	}
+	if tooLarge {
+		e.lo.Warn("incoming email exceeded configured size limit",
+			"message_id", incomingMsg.SourceID.String,
+			"max_size_bytes", maxMessageSize)
+		return fmt.Errorf("incoming email exceeds configured size limit of %d bytes", maxMessageSize)
+	}
 	if err != nil {
+		if limitedBody != nil {
+			e.lo.Warn("unable to parse incoming email within configured size limit",
+				"message_id", incomingMsg.SourceID.String,
+				"max_size_bytes", maxMessageSize)
+		}
 		e.lo.Error("error parsing email envelope", "error", err, "message_id", incomingMsg.SourceID.String)
 		return fmt.Errorf("parsing email envelope: %w", err)
 	}
@@ -517,6 +566,10 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		"other_parts", len(envelope.OtherParts))
 
 	return e.messageStore.EnqueueIncoming(incomingMsg)
+}
+
+func shouldSkipMessage(size, maxSize int64) bool {
+	return maxSize > 0 && size > maxSize
 }
 
 // collectAttachments builds the attachment list from an envelope's attachment, inline, and unclassified parts.

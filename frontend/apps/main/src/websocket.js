@@ -3,6 +3,9 @@ import { useNotificationStore } from './stores/notification'
 import { useUsersStore } from './stores/users'
 import { useConnectionStore } from './stores/connection'
 import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
+import { EMITTER_EVENTS } from './constants/emitterEvents.js'
+import { useEmitter } from './composables/useEmitter'
+import { getI18n } from './i18n'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
 
 export class WebSocketClient {
@@ -21,17 +24,18 @@ export class WebSocketClient {
     this.notificationStore = useNotificationStore()
     this.usersStore = useUsersStore()
     this.connectionStore = useConnectionStore()
+    this.emitter = useEmitter()
     this.messageQueue = []
     this.maxQueueSize = 50
     this.queueTimeoutMs = 30000
   }
 
-  init () {
+  init() {
     this.connect()
     this.setupNetworkListeners()
   }
 
-  connect () {
+  connect() {
     if (this.isReconnecting || this.manualClose) return
 
     if (this.socket) this.socket.close()
@@ -48,7 +52,7 @@ export class WebSocketClient {
     }
   }
 
-  handleOpen (event) {
+  handleOpen(event) {
     if (event.target !== this.socket) return
     console.log('WebSocket connected')
     const wasReconnect = this.reconnectAttempts > 0
@@ -62,14 +66,14 @@ export class WebSocketClient {
     this.flushMessageQueue()
     if (wasReconnect) {
       // RESUB!
-      const uuids = this.convStore.conversations.data?.map(c => c.uuid) || []
+      const uuids = this.convStore.conversations.data?.map((c) => c.uuid) || []
       this.subscribeListReplace(uuids)
       const openUUID = this.convStore.conversation.data?.uuid
       if (openUUID) this.subscribeToConversation(openUUID)
     }
   }
 
-  handleMessage (event) {
+  handleMessage(event) {
     if (event.target !== this.socket) return
     try {
       if (!event.data) return
@@ -94,7 +98,7 @@ export class WebSocketClient {
               uuid,
               last_message: data.data.preview,
               last_message_at: data.data.created_at,
-              last_message_sender: data.data.sender_type,
+              last_message_sender: data.data.sender_type
             })
           }
 
@@ -140,6 +144,18 @@ export class WebSocketClient {
         },
         [WS_EVENT.AGENT_AVAILABILITY_UPDATE]: () =>
           this.usersStore.setAvailability(data.data.agent_id, data.data.availability_status),
+        [WS_EVENT.SYSTEM_TOAST]: () => {
+          const message = data.data || {}
+          const translated = message.message_key ? getI18n().global.t(message.message_key) : ''
+          const description =
+            translated && translated !== message.message_key ? translated : message.description
+          if (description) {
+            this.emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+              variant: message.variant || 'info',
+              description
+            })
+          }
+        }
       }
 
       const handler = handlers[data.type]
@@ -153,13 +169,13 @@ export class WebSocketClient {
     }
   }
 
-  handleError (event) {
+  handleError(event) {
     if (event.target !== this.socket) return
     console.error('WebSocket error:', event)
     this.reconnect()
   }
 
-  handleClose (event) {
+  handleClose(event) {
     if (event.target !== this.socket) return
     this.clearPing()
     if (!this.manualClose) {
@@ -167,7 +183,7 @@ export class WebSocketClient {
     }
   }
 
-  reconnect () {
+  reconnect() {
     if (this.isReconnecting) return
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       this.connectionStore.setConnecting(false)
@@ -190,7 +206,7 @@ export class WebSocketClient {
     }, this.reconnectInterval)
   }
 
-  setupNetworkListeners () {
+  setupNetworkListeners() {
     window.addEventListener('online', () => {
       // Clear any pending reconnect attempts.
       if (this.reconnectTimer) {
@@ -215,7 +231,7 @@ export class WebSocketClient {
     })
   }
 
-  setupPing () {
+  setupPing() {
     this.clearPing()
     this.pingInterval = setInterval(() => {
       if (this.socket?.readyState === WebSocket.OPEN) {
@@ -233,14 +249,14 @@ export class WebSocketClient {
     }, 30000)
   }
 
-  clearPing () {
+  clearPing() {
     if (this.pingInterval) {
       clearInterval(this.pingInterval)
       this.pingInterval = null
     }
   }
 
-  send (message) {
+  send(message) {
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message))
     } else {
@@ -249,7 +265,7 @@ export class WebSocketClient {
     }
   }
 
-  queueMessage (message) {
+  queueMessage(message) {
     // Don't queue ephemeral message types.
     if (WS_EPHEMERAL_TYPES.includes(message.type)) {
       console.log('Skipping queue for ephemeral message type:', message.type)
@@ -258,14 +274,14 @@ export class WebSocketClient {
 
     // Remove expired messages from queue.
     const now = Date.now()
-    this.messageQueue = this.messageQueue.filter(item =>
-      now - item.timestamp < this.queueTimeoutMs
+    this.messageQueue = this.messageQueue.filter(
+      (item) => now - item.timestamp < this.queueTimeoutMs
     )
 
     // Remove all existing conversation subscriptions since only one is allowed.
     if (message.type === WS_EVENT.CONVERSATION_SUBSCRIBE) {
-      this.messageQueue = this.messageQueue.filter(item =>
-        item.type !== WS_EVENT.CONVERSATION_SUBSCRIBE
+      this.messageQueue = this.messageQueue.filter(
+        (item) => item.type !== WS_EVENT.CONVERSATION_SUBSCRIBE
       )
     }
 
@@ -282,13 +298,13 @@ export class WebSocketClient {
     })
   }
 
-  flushMessageQueue () {
+  flushMessageQueue() {
     if (this.messageQueue.length === 0) return
 
     // Remove expired messages before sending
     const now = Date.now()
-    this.messageQueue = this.messageQueue.filter(item =>
-      now - item.timestamp < this.queueTimeoutMs
+    this.messageQueue = this.messageQueue.filter(
+      (item) => now - item.timestamp < this.queueTimeoutMs
     )
 
     if (this.messageQueue.length === 0) return
@@ -302,7 +318,7 @@ export class WebSocketClient {
     }
   }
 
-  subscribeToConversation (conversationUUID) {
+  subscribeToConversation(conversationUUID) {
     if (!conversationUUID) return
 
     const subscribeMessage = {
@@ -315,11 +331,11 @@ export class WebSocketClient {
     this.send(subscribeMessage)
   }
 
-  subscribeListReplace (uuids) {
+  subscribeListReplace(uuids) {
     this.send({ type: WS_EVENT.LIST_SUBSCRIBE_REPLACE, data: { uuids: uuids || [] } })
   }
 
-  sendTypingIndicator (conversationUUID, isTyping, isPrivateMessage) {
+  sendTypingIndicator(conversationUUID, isTyping, isPrivateMessage) {
     if (!conversationUUID) return
 
     const typingMessage = {
@@ -327,14 +343,14 @@ export class WebSocketClient {
       data: {
         conversation_uuid: conversationUUID,
         is_typing: isTyping,
-        is_private_message: isPrivateMessage,
+        is_private_message: isPrivateMessage
       }
     }
 
     this.send(typingMessage)
   }
 
-  close () {
+  close() {
     this.manualClose = true
     this.clearPing()
     this.connectionStore.setConnecting(false)
@@ -347,7 +363,7 @@ export class WebSocketClient {
 
 let wsClient
 
-export function initWS () {
+export function initWS() {
   if (!wsClient) {
     wsClient = new WebSocketClient()
     wsClient.init()
@@ -355,8 +371,10 @@ export function initWS () {
   return wsClient
 }
 
-export const sendMessage = message => wsClient?.send(message)
-export const subscribeToConversation = conversationUUID => wsClient?.subscribeToConversation(conversationUUID)
-export const subscribeListReplace = uuids => wsClient?.subscribeListReplace(uuids)
-export const sendTypingIndicator = (conversationUUID, isTyping, isPrivateMessage) => wsClient?.sendTypingIndicator(conversationUUID, isTyping, isPrivateMessage)
+export const sendMessage = (message) => wsClient?.send(message)
+export const subscribeToConversation = (conversationUUID) =>
+  wsClient?.subscribeToConversation(conversationUUID)
+export const subscribeListReplace = (uuids) => wsClient?.subscribeListReplace(uuids)
+export const sendTypingIndicator = (conversationUUID, isTyping, isPrivateMessage) =>
+  wsClient?.sendTypingIndicator(conversationUUID, isTyping, isPrivateMessage)
 export const closeWebSocket = () => wsClient?.close()

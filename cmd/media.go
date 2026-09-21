@@ -74,6 +74,10 @@ func handleMediaUpload(r *fastglue.Request) error {
 		linkedModel = model[0]
 	}
 
+	if linkedModel == mmodels.ModelResourceImages || linkedModel == mmodels.ModelResourceAvatars {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid upload model", nil, envelope.InputError)
+	}
+
 	// Only agents who manage the help center may upload publicly served media.
 	if mmodels.IsPublicModel(linkedModel) {
 		auser := r.RequestCtx.UserValue("user").(amodels.User)
@@ -118,56 +122,35 @@ func handleMediaUpload(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileTypeNotAllowed"), nil, envelope.InputError)
 	}
 
-	// Delete files on any error.
-	var uuid = uuid.New()
-	thumbName := image.ThumbPrefix + uuid.String()
-	defer func() {
-		if cleanUp {
-			app.media.Delete(uuid.String())
-			app.media.Delete(thumbName)
-		}
-	}()
-
-	// Generate and upload thumbnail and store image dimensions in the media meta.
-	var meta = []byte("{}")
+	// Prepare the thumbnail in memory, but reserve durable capacity before
+	// writing either the original or its thumbnail to storage.
+	var prepared preparedImageUpload
+	meta := []byte("{}")
 	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
-		prepared, err := prepareImageUpload(file)
+		prepared, err = prepareImageUpload(file)
 		if err != nil {
-			cleanUp = true
-			app.lo.Error("error getting image dimensions", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
-		}
-		if prepared.thumbnailErr != nil {
-			app.lo.Error("error creating thumb image", "error", prepared.thumbnailErr)
-		} else {
-			// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
-			uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
-			if err != nil {
-				cleanUp = true
-				return sendErrorEnvelope(r, err)
-			}
-			thumbName = uploadedThumb
 		}
 		meta = prepared.meta
 	}
-
-	// Reset ptr.
-	file.Seek(0, 0)
-
-	// Override content type after upload (in case it was detected incorrectly).
-	_, srcContentType, err = app.media.Upload(uuid.String(), srcContentType, file)
+	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, "", null.NewString(linkedModel, linkedModel != ""), null.Int{}, file, int(srcFileSize), disposition, meta, !mmodels.IsPublicModel(linkedModel))
 	if err != nil {
-		cleanUp = true
-		app.lo.Error("error uploading file", "error", err)
 		return sendErrorEnvelope(r, err)
 	}
-
-	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel))
-	if err != nil {
-		cleanUp = true
-		app.lo.Error("error inserting metadata into database", "error", err)
-		return sendErrorEnvelope(r, err)
+	thumbName := image.ThumbPrefix + media.UUID
+	defer func() {
+		if cleanUp {
+			app.media.Delete(media.UUID)
+			app.media.Delete(thumbName)
+		}
+	}()
+	if prepared.thumbnailErr != nil {
+		app.lo.Error("error creating thumb image", "error", prepared.thumbnailErr)
+	} else if prepared.thumbnail != nil {
+		if _, _, err := app.media.Upload(thumbName, media.ContentType, prepared.thumbnail); err != nil {
+			cleanUp = true
+			return sendErrorEnvelope(r, err)
+		}
 	}
 	return r.SendEnvelope(media)
 }
@@ -250,40 +233,32 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		media = &m
 	}
 
+	if media.Model.String == mmodels.ModelResourceImages || media.Model.String == mmodels.ModelResourceAvatars {
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, "Image permission required", nil, envelope.PermissionError)
+	}
+
 	forceDownload := string(r.RequestCtx.QueryArgs().Peek("download")) == "1"
-
-	consts := app.consts.Load().(*constants)
-	switch consts.UploadProvider {
+	disposition := "attachment"
+	if !forceDownload && inlineMediaType(media.ContentType) {
+		disposition = "inline"
+	}
+	r.RequestCtx.Response.Header.Set("Content-Type", media.ContentType)
+	r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": media.Filename}))
+	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+	r.RequestCtx.Response.Header.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	r.RequestCtx.Response.Header.Set("Referrer-Policy", "no-referrer")
+	r.RequestCtx.Response.Header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, immutable", cacheVisibility(media.Private), int(mediaCacheTTL.Seconds())))
+	switch app.consts.Load().(*constants).UploadProvider {
 	case "fs":
-		disposition := "attachment"
-
-		// Inline images/videos/pdfs. SVG excluded.
-		if !forceDownload &&
-			media.ContentType != "image/svg+xml" &&
-			(strings.HasPrefix(media.ContentType, "image/") ||
-				strings.HasPrefix(media.ContentType, "video/") ||
-				media.ContentType == "application/pdf") {
-			disposition = "inline"
-		}
-
-		r.RequestCtx.Response.Header.Set("Content-Type", media.ContentType)
-		r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": media.Filename}))
-		r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
-		// Sandbox SVGs.
-		if media.ContentType == "image/svg+xml" {
-			r.RequestCtx.Response.Header.Set("Content-Security-Policy", "sandbox")
-		}
-		r.RequestCtx.Response.Header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, immutable", cacheVisibility(media.Private), int(mediaCacheTTL.Seconds())))
-
 		fasthttp.ServeFile(r.RequestCtx, filepath.Join(ko.String("upload.fs.upload_path"), uuid))
 	case "s3":
-		url := app.media.GetURL(uuid, media.ContentType, media.Filename)
-		if forceDownload {
-			url = app.media.GetURLForDownload(uuid, media.Filename)
+		body, err := app.media.Open(uuid)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
 		}
-		r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
-		r.RequestCtx.Redirect(url, http.StatusFound)
+		return streamStoredMedia(r, body, media.Size, strings.HasPrefix(uuid, image.ThumbPrefix))
 	}
+
 	return nil
 }
 
@@ -346,4 +321,45 @@ func prepareImageUpload(file io.ReadSeeker) (preparedImageUpload, error) {
 		return preparedImageUpload{}, err
 	}
 	return preparedImageUpload{thumbnail: thumbnail, meta: meta, thumbnailErr: thumbnailErr}, nil
+}
+
+func inlineMediaType(contentType string) bool {
+	if isDisplayImage(contentType) {
+		return true
+	}
+	switch contentType {
+	case "audio/mpeg", "audio/mp4", "audio/ogg", "audio/wav", "audio/x-wav", "audio/webm", "audio/flac", "video/mp4", "video/webm", "video/ogg":
+		return true
+	}
+	return false
+}
+
+type mediaRangeReader struct {
+	io.Reader
+	io.Closer
+}
+
+func streamStoredMedia(r *fastglue.Request, body io.ReadCloser, size int, thumbnail bool) error {
+	byteRange := r.RequestCtx.Request.Header.Peek("Range")
+	if len(byteRange) == 0 || size <= 0 || thumbnail || len(r.RequestCtx.Request.Header.Peek("If-Range")) > 0 {
+		r.RequestCtx.SetBodyStream(body, -1)
+		return nil
+	}
+	start, end, err := fasthttp.ParseByteRange(byteRange, size)
+	if err != nil || end < start {
+		body.Close()
+		r.RequestCtx.Response.Header.Set("Content-Range", fmt.Sprintf("bytes */%d", size))
+		r.RequestCtx.SetStatusCode(fasthttp.StatusRequestedRangeNotSatisfiable)
+		return nil
+	}
+	if _, err := io.CopyN(io.Discard, body, int64(start)); err != nil {
+		body.Close()
+		r.RequestCtx.SetStatusCode(fasthttp.StatusBadGateway)
+		return nil
+	}
+	r.RequestCtx.Response.Header.Set("Accept-Ranges", "bytes")
+	r.RequestCtx.Response.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, size))
+	r.RequestCtx.SetStatusCode(fasthttp.StatusPartialContent)
+	r.RequestCtx.SetBodyStream(&mediaRangeReader{Reader: io.LimitReader(body, int64(end-start+1)), Closer: body}, end-start+1)
+	return nil
 }

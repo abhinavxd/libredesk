@@ -76,6 +76,27 @@ func TestEmail_extractUUIDFromReplyAddress(t *testing.T) {
 	}
 }
 
+func TestShouldSkipMessage(t *testing.T) {
+	tests := []struct {
+		name    string
+		size    int64
+		maxSize int64
+		want    bool
+	}{
+		{name: "disabled", size: 200, maxSize: 0, want: false},
+		{name: "under limit", size: 99, maxSize: 100, want: false},
+		{name: "at limit", size: 100, maxSize: 100, want: false},
+		{name: "over limit", size: 101, maxSize: 100, want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldSkipMessage(tt.size, tt.maxSize); got != tt.want {
+				t.Fatalf("shouldSkipMessage(%d, %d) = %v, want %v", tt.size, tt.maxSize, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestGoIMAPMessageIDParsing shows how go-imap fails to parse malformed Message-IDs
 // and demonstrates the fallback solution.
 // go-imap uses mail.Header.MessageID() which strictly follows RFC 5322 and returns

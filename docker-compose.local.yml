@@ -1,0 +1,11 @@
+services:
+  app:
+    image: libredesk:pr-1
+    ports: !override
+      - "127.0.0.1:19001:9000"
+    volumes:
+      - ./libredesk:/libredesk/libredesk:ro
+  db:
+    ports: !reset []
+  redis:
+    ports: !reset []

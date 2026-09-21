@@ -21,7 +21,9 @@ export function downloadUrl (url) {
     if (!url) return url
     const match = url.match(UUID_V4_RE)
     if (!match) return url
-    return `/uploads/${match[0]}?download=1`
+    const parsed = new URL(url, window.location.origin)
+    parsed.searchParams.set('download', '1')
+    return parsed.pathname + parsed.search
 }
 
 export function downloadBlobResponse (response, filename) {

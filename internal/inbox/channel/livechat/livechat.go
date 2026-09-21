@@ -11,6 +11,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -229,6 +230,8 @@ func (lc *LiveChat) Send(message models.OutboundMessage) error {
 	messageData := map[string]any{
 		"type": "new_message",
 		"data": models.ChatMessage{
+			Display:          resourcepolicy.PrepareContentWithAttachments(message.Content, message.ContentType, message.Attachments),
+			ContentType:      message.ContentType,
 			UUID:             message.UUID,
 			ConversationUUID: message.ConversationUUID,
 			CreatedAt:        message.CreatedAt,

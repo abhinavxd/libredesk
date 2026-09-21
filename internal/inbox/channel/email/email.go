@@ -21,26 +21,42 @@ const (
 
 // Email represents the email inbox with multiple SMTP servers and IMAP clients.
 type Email struct {
-	id                   int
-	name                 string
-	smtpPools            []*smtppool.Pool
-	smtpPoolsMu          sync.RWMutex
-	smtpPoolsToken       string
-	smtpCfg              []models.SMTPConfig
-	imapCfg              []models.IMAPConfig
-	oauth                *models.OAuthConfig
-	oauthMu              sync.RWMutex
-	authType             string
-	headers              map[string]string
-	lo                   *logf.Logger
-	from                 string
-	fromNameTemplate     string
-	replyTo              string
-	enablePlusAddressing bool
-	messageStore         inbox.MessageStore
-	userStore            inbox.UserStore
-	wg                   sync.WaitGroup
-	tokenRefreshCallback TokenRefreshCallback
+	id                     int
+	name                   string
+	smtpPools              []*smtppool.Pool
+	smtpPoolsMu            sync.RWMutex
+	smtpPoolsToken         string
+	smtpCfg                []models.SMTPConfig
+	imapCfg                []models.IMAPConfig
+	oauth                  *models.OAuthConfig
+	oauthMu                sync.RWMutex
+	authType               string
+	headers                map[string]string
+	lo                     *logf.Logger
+	from                   string
+	fromNameTemplate       string
+	replyTo                string
+	enablePlusAddressing   bool
+	messageStore           inbox.MessageStore
+	maxIncomingMessageSize int64
+	messageSizeMu          sync.RWMutex
+	userStore              inbox.UserStore
+	wg                     sync.WaitGroup
+	tokenRefreshCallback   TokenRefreshCallback
+}
+
+// SetMaxIncomingMessageSize changes the raw-message ceiling for all future
+// fetches handled by this inbox. A zero value disables the guard.
+func (e *Email) SetMaxIncomingMessageSize(limit int64) {
+	e.messageSizeMu.Lock()
+	e.maxIncomingMessageSize = limit
+	e.messageSizeMu.Unlock()
+}
+
+func (e *Email) incomingMessageSizeLimit() int64 {
+	e.messageSizeMu.RLock()
+	defer e.messageSizeMu.RUnlock()
+	return e.maxIncomingMessageSize
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
@@ -49,12 +65,15 @@ type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
 
 // Opts holds the options required for the email inbox.
 type Opts struct {
-	ID                   int
-	Name                 string
-	Headers              map[string]string
-	Config               models.Config
-	Lo                   *logf.Logger
-	TokenRefreshCallback TokenRefreshCallback // Optional callback for token refresh
+	ID      int
+	Name    string
+	Headers map[string]string
+	Config  models.Config
+	// MaxIncomingMessageSize is the maximum raw IMAP message size to fetch and
+	// parse. A value of zero disables the guard.
+	MaxIncomingMessageSize int64
+	Lo                     *logf.Logger
+	TokenRefreshCallback   TokenRefreshCallback // Optional callback for token refresh
 }
 
 // New returns a new instance of the email inbox.
@@ -70,23 +89,24 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 	}
 
 	e := &Email{
-		id:                   opts.ID,
-		name:                 opts.Name,
-		headers:              opts.Headers,
-		from:                 opts.Config.From,
-		fromNameTemplate:     opts.Config.FromNameTemplate,
-		replyTo:              opts.Config.ReplyTo,
-		smtpCfg:              opts.Config.SMTP,
-		imapCfg:              opts.Config.IMAP,
-		lo:                   opts.Lo,
-		smtpPools:            pools,
-		smtpPoolsToken:       poolsToken,
-		messageStore:         store,
-		userStore:            userStore,
-		oauth:                opts.Config.OAuth,
-		authType:             opts.Config.AuthType,
-		enablePlusAddressing: opts.Config.EnablePlusAddressing,
-		tokenRefreshCallback: opts.TokenRefreshCallback,
+		id:                     opts.ID,
+		name:                   opts.Name,
+		headers:                opts.Headers,
+		from:                   opts.Config.From,
+		fromNameTemplate:       opts.Config.FromNameTemplate,
+		replyTo:                opts.Config.ReplyTo,
+		smtpCfg:                opts.Config.SMTP,
+		imapCfg:                opts.Config.IMAP,
+		lo:                     opts.Lo,
+		smtpPools:              pools,
+		smtpPoolsToken:         poolsToken,
+		messageStore:           store,
+		maxIncomingMessageSize: opts.MaxIncomingMessageSize,
+		userStore:              userStore,
+		oauth:                  opts.Config.OAuth,
+		authType:               opts.Config.AuthType,
+		enablePlusAddressing:   opts.Config.EnablePlusAddressing,
+		tokenRefreshCallback:   opts.TokenRefreshCallback,
 	}
 	return e, nil
 }

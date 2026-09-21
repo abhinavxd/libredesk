@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	rmodels "github.com/abhinavxd/libredesk/internal/role/models"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/lib/pq"
@@ -107,6 +108,8 @@ type ChatUser struct {
 }
 
 type Note struct {
+	Display resourcepolicy.Display `db:"-" json:"display"`
+
 	ID        int         `db:"id" json:"id"`
 	CreatedAt time.Time   `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time   `db:"updated_at" json:"updated_at"`

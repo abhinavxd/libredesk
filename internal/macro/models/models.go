@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/lib/pq"
 )
 
@@ -31,6 +32,8 @@ type MacroCompact struct {
 }
 
 type Macro struct {
+	Display resourcepolicy.Display `db:"-" json:"display"`
+
 	ID             int             `db:"id" json:"id"`
 	CreatedAt      time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt      time.Time       `db:"updated_at" json:"updated_at"`

@@ -9,6 +9,7 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
@@ -213,6 +214,9 @@ func handleGetContactNotes(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	for i := range notes {
+		notes[i].Display = (resourcepolicy.Policy{}).PrepareDisplay(notes[i].Note, nil)
+	}
 	return r.SendEnvelope(notes)
 }
 
@@ -238,6 +242,7 @@ func handleCreateContactNote(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	n.Display = (resourcepolicy.Policy{}).PrepareDisplay(n.Note, nil)
 	return r.SendEnvelope(n)
 }
 

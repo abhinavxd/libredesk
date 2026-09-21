@@ -199,6 +199,11 @@ export function useConversationFilters () {
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: iStore.options
+        },
+        recipient: {
+            label: t('globals.terms.email'),
+            type: FIELD_TYPE.TEXT,
+            operators: FIELD_OPERATORS.TEXT_AUTOMATION
         }
     }))
 

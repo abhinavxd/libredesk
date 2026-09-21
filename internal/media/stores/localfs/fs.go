@@ -50,6 +50,10 @@ func (c *Client) Put(filename string, cType string, src io.ReadSeeker) (string, 
 	if n, err := io.Copy(out, src); err != nil {
 		return "", fmt.Errorf("writing file %q after %d bytes: %w", filepath.Join(dir, filename), n, err)
 	}
+	// Close can report delayed write failures (including disk-full errors).
+	if err := out.Close(); err != nil {
+		return "", fmt.Errorf("closing uploaded file %q: %w", filename, err)
+	}
 	return filename, nil
 }
 
@@ -134,4 +138,8 @@ func getDir(dir string) string {
 		dir, _ = os.Getwd()
 	}
 	return dir
+}
+
+func (c *Client) Open(name string) (io.ReadCloser, error) {
+	return os.Open(filepath.Join(getDir(c.opts.UploadPath), filepath.Base(name)))
 }

@@ -9,9 +9,11 @@ import (
 
 const (
 	// TODO: pick these table names from their respective package/models/models.go
-	ModelMessages     = "messages"
-	ModelUser         = "users"
-	ModelHelpArticles = "help_articles"
+	ModelResourceAvatars = "resource_avatars"
+	ModelResourceImages  = "resource_images"
+	ModelMessages        = "messages"
+	ModelUser            = "users"
+	ModelHelpArticles    = "help_articles"
 
 	DispositionInline = "inline"
 )

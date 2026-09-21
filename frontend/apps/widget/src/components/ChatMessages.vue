@@ -63,15 +63,14 @@
             <span v-if="message.content_type === 'text'" class="whitespace-pre-wrap">{{
               message.content
             }}</span>
-            <Letter
+            <SafeMessageContent
               v-else
-              :html="message.content"
-              :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-              :allowed-css-properties="extendedCssProperties"
+              :message="message"
+              :show-quoted-text="isQuotedTextVisible(message.uuid)"
               class="native-html"
             />
             <div
-              v-if="containsQuoteMarkers(message.content)"
+              v-if="containsQuoteMarkers(message.display?.html || '')"
               @click="toggleQuote(message.uuid)"
               @keydown.enter.prevent="toggleQuote(message.uuid)"
               @keydown.space.prevent="toggleQuote(message.uuid)"
@@ -158,8 +157,7 @@ import { useWidgetStore } from '../store/widget.js'
 import { useChatStore } from '../store/chat.js'
 import { useRelativeTime } from '@widget/composables/useRelativeTime.js'
 import { useI18n } from 'vue-i18n'
-import { Letter } from 'vue-letter'
-import { allowedCssProperties } from 'lettersanitizer'
+import SafeMessageContent from '@shared-ui/components/SafeMessageContent.vue'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import ChatIntro from './ChatIntro.vue'
 import NoticeBanner from './NoticeBanner.vue'
@@ -170,7 +168,6 @@ import { Spinner } from '@shared-ui/components/ui/spinner'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
 import { useStickyScroll } from '@shared-ui/composables'
 
-const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 
 const props = defineProps({
   showPreChatForm: {

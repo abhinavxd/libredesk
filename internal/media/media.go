@@ -14,6 +14,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -32,6 +34,22 @@ import (
 // PublicURI is the app route that serves uploaded media.
 const PublicURI = "/uploads"
 
+const storageUsageSQL = `SELECT COALESCE(SUM(size) FILTER (
+ WHERE model_type IS NULL OR model_type NOT IN ('resource_images', 'resource_avatars')
+), 0) FROM media`
+
+const storageQuotaLockSQL = `SELECT pg_advisory_xact_lock(hashtextextended('libredesk:durable-media-quota', 0))`
+
+// StorageUsage is the logical durable-media usage tracked in the media table.
+// External resource images and avatars are excluded because they have their
+// own independently evictable cache budget.
+type StorageUsage struct {
+	UsedBytes    int64    `json:"used_bytes"`
+	LimitBytes   *int64   `json:"limit_bytes"`
+	UsagePercent *float64 `json:"usage_percent"`
+	LimitSource  string   `json:"limit_source"`
+}
+
 var (
 	//go:embed queries.sql
 	efs embed.FS
@@ -45,6 +63,7 @@ type Store interface {
 	Delete(name string) error
 	GetURL(name, disposition, fileName string) string
 	GetBlob(name string) ([]byte, error)
+	Open(name string) (io.ReadCloser, error)
 	Name() string
 	// SignedURLValidator returns a validator function if the store supports signed URLs.
 	// Returns nil if the store doesn't use signed URLs (e.g., S3 handles validation itself).
@@ -59,20 +78,31 @@ type SignedURLStore interface {
 }
 
 type Manager struct {
-	store   Store
-	lo      *logf.Logger
-	i18n    *i18n.I18n
-	rootURL func() string
-	queries queries
+	db                    *sqlx.DB
+	store                 Store
+	lo                    *logf.Logger
+	i18n                  *i18n.I18n
+	rootURL               func() string
+	signingKey            string
+	urlExpiry             time.Duration
+	queries               queries
+	maxStorageBytes       int64
+	maxStorageMu          sync.RWMutex
+	storageFullMu         sync.Mutex
+	lastStorageFullNotice time.Time
+	storageFullNotifier   func()
 }
 
 // Opts provides options for configuring the Manager.
 type Opts struct {
-	Store   Store
-	Lo      *logf.Logger
-	DB      *sqlx.DB
-	I18n    *i18n.I18n
-	RootURL func() string
+	Store           Store
+	Lo              *logf.Logger
+	DB              *sqlx.DB
+	I18n            *i18n.I18n
+	RootURL         func() string
+	SigningKey      string
+	URLExpiry       time.Duration
+	MaxStorageBytes int64
 }
 
 // New initializes and returns a new Manager instance for handling media operations.
@@ -82,16 +112,84 @@ func New(opt Opts) (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		store:   opt.Store,
-		lo:      opt.Lo,
-		i18n:    opt.I18n,
-		rootURL: opt.RootURL,
-		queries: q,
+		db:              opt.DB,
+		store:           opt.Store,
+		lo:              opt.Lo,
+		i18n:            opt.I18n,
+		rootURL:         opt.RootURL,
+		signingKey:      opt.SigningKey,
+		urlExpiry:       opt.URLExpiry,
+		queries:         q,
+		maxStorageBytes: opt.MaxStorageBytes,
 	}, nil
+}
+
+// SetStorageFullNotifier registers a throttled callback invoked when a durable
+// media write is rejected by the configured quota.
+func (m *Manager) SetStorageFullNotifier(notifier func()) {
+	m.storageFullMu.Lock()
+	defer m.storageFullMu.Unlock()
+	m.storageFullNotifier = notifier
+}
+
+func (m *Manager) notifyStorageFull() {
+	m.storageFullMu.Lock()
+	if m.storageFullNotifier == nil || time.Since(m.lastStorageFullNotice) < time.Minute {
+		m.storageFullMu.Unlock()
+		return
+	}
+	m.lastStorageFullNotice = time.Now()
+	notifier := m.storageFullNotifier
+	m.storageFullMu.Unlock()
+	notifier()
+}
+
+func (m *Manager) storageFullError() error {
+	message := "Durable media storage is full. New uploads are temporarily disabled."
+	if m.i18n != nil {
+		message = m.i18n.T("media.storageFull")
+	}
+	return envelope.NewError(envelope.StorageFullError, message, nil)
+}
+
+// SetMaxStorageBytes changes the durable-media quota for subsequent writes.
+// A zero value disables the application-level quota.
+func (m *Manager) SetMaxStorageBytes(limit int64) {
+	m.maxStorageMu.Lock()
+	m.maxStorageBytes = limit
+	m.maxStorageMu.Unlock()
+}
+
+func (m *Manager) mediaGenericError() error {
+	message := "Something went wrong."
+	if m.i18n != nil {
+		message = m.i18n.T("globals.messages.somethingWentWrong")
+	}
+	return envelope.NewError(envelope.GeneralError, message, nil)
+}
+
+// GetStorageUsage returns durable-media usage and the configured quota.
+func (m *Manager) GetStorageUsage() (StorageUsage, error) {
+	var used int64
+	if err := m.db.Get(&used, storageUsageSQL); err != nil {
+		return StorageUsage{}, err
+	}
+	usage := StorageUsage{UsedBytes: used, LimitSource: "application"}
+	m.maxStorageMu.RLock()
+	limit := m.maxStorageBytes
+	m.maxStorageMu.RUnlock()
+	if limit > 0 {
+		usage.LimitBytes = &limit
+		percentage := float64(used) * 100 / float64(limit)
+		usage.UsagePercent = &percentage
+	}
+	return usage, nil
 }
 
 // queries holds the prepared SQL statements.
 type queries struct {
+	GetUnlinkedResourceAvatars  *sqlx.Stmt `query:"get-unlinked-resource-avatars"`
+	GetUnlinkedResourceImages   *sqlx.Stmt `query:"get-unlinked-resource-images"`
 	Insert                      *sqlx.Stmt `query:"insert-media"`
 	Get                         *sqlx.Stmt `query:"get-media"`
 	GetByUUID                   *sqlx.Stmt `query:"get-media-by-uuid"`
@@ -107,25 +205,42 @@ type queries struct {
 	GetDraftInlineMedia         *sqlx.Stmt `query:"get-draft-inline-media"`
 }
 
-// UploadAndInsert uploads file on storage and inserts an entry in db.
+// UploadAndInsert reserves durable capacity in the media table before writing
+// any bytes. The short accounting transaction ends before storage I/O; pending
+// uploads count against the quota and abandoned rows use the unlinked-media sweep.
 func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (models.Media, error) {
-	var (
-		uuid = uuid.New()
-		err  error
-	)
-
-	// Override content type after upload (in case it was detected incorrectly).
-	_, contentType, err = m.Upload(uuid.String(), contentType, content)
+	if modelType.String == models.ModelResourceImages || modelType.String == models.ModelResourceAvatars {
+		return models.Media{}, fmt.Errorf("external images must use the image cache reservation path")
+	}
+	// Determine the actual size rather than trusting a caller-supplied estimate.
+	size, err := content.Seek(0, io.SeekEnd)
+	if err != nil || size < 0 || size > 1<<31-1 {
+		return models.Media{}, fmt.Errorf("unable to determine valid upload size")
+	}
+	if _, err := content.Seek(0, io.SeekStart); err != nil {
+		return models.Media{}, err
+	}
+	contentType, err = m.detectContentType(contentType, content)
 	if err != nil {
 		return models.Media{}, err
 	}
-
-	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private)
+	if !modelType.Valid || modelType.String == "" {
+		modelType = null.StringFrom(models.ModelMessages)
+	}
+	name := uuid.NewString()
+	reserved, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, name, modelID, int(size), meta, private)
 	if err != nil {
-		m.store.Delete(uuid.String())
 		return models.Media{}, err
 	}
-	return media, nil
+	if _, _, err := m.Upload(name, contentType, content); err != nil {
+		// Delete removes the row only once the blob has been removed. A failed
+		// cleanup remains accounted for and is retried by the existing sweep.
+		if cleanupErr := m.Delete(name); cleanupErr != nil {
+			m.lo.Error("error cleaning up failed durable upload", "uuid", name, "error", cleanupErr)
+		}
+		return models.Media{}, err
+	}
+	return reserved, nil
 }
 
 // Upload saves the media file to the storage backend - returns the generated filename and content type (after detection).
@@ -142,6 +257,15 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 
 	fName, err := m.store.Put(fileName, contentType, content)
 	if err != nil {
+		// Providers may leave a partial object when a write fails. Keep the
+		// original name: Put commonly returns an empty name on error.
+		if cleanupErr := m.store.Delete(fileName); cleanupErr != nil && !errors.Is(cleanupErr, os.ErrNotExist) {
+			m.lo.Error("error removing partial upload", "uuid", fileName, "error", cleanupErr)
+		}
+		if errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EDQUOT) {
+			m.notifyStorageFull()
+			return "", "", m.storageFullError()
+		}
 		m.lo.Error("error uploading media to store", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return "", "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUploadingFile"), nil)
 	}
@@ -151,7 +275,34 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 // Insert inserts media details into the database and returns the inserted media record.
 func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool) (models.Media, error) {
 	var id int
-	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
+	m.maxStorageMu.RLock()
+	maxStorageBytes := m.maxStorageBytes
+	m.maxStorageMu.RUnlock()
+	if maxStorageBytes > 0 {
+		tx, err := m.db.Beginx()
+		if err != nil {
+			return models.Media{}, m.mediaGenericError()
+		}
+		defer tx.Rollback()
+		if _, err := tx.Exec(storageQuotaLockSQL); err != nil {
+			return models.Media{}, m.mediaGenericError()
+		}
+		var used int64
+		if err := tx.Get(&used, storageUsageSQL); err != nil {
+			return models.Media{}, m.mediaGenericError()
+		}
+		if fileSize < 0 || used+int64(fileSize) > maxStorageBytes {
+			m.notifyStorageFull()
+			return models.Media{}, m.storageFullError()
+		}
+		if err := tx.Stmtx(m.queries.Insert).QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
+			m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
+			return models.Media{}, m.mediaGenericError()
+		}
+		if err := tx.Commit(); err != nil {
+			return models.Media{}, m.mediaGenericError()
+		}
+	} else if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
 		m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -260,6 +411,9 @@ func (m *Manager) GetBlob(name string) ([]byte, error) {
 
 // GetURL returns the URL for accessing a media file by its name.
 func (m *Manager) GetURL(uuid, contentType, fileName string) string {
+	if m.signingKey != "" {
+		return m.GetSignedURL(uuid)
+	}
 	// Keep some content types inline. SVG excluded.
 	disposition := "attachment"
 	if contentType != "image/svg+xml" &&
@@ -272,12 +426,18 @@ func (m *Manager) GetURL(uuid, contentType, fileName string) string {
 }
 
 func (m *Manager) GetURLForDownload(uuid, fileName string) string {
+	if m.signingKey != "" {
+		return m.GetSignedURL(uuid) + "&download=1"
+	}
 	return m.store.GetURL(uuid, "attachment", fileName)
 }
 
 // GetSignedURL generates a signed URL for secure media access if the store supports it.
 // Returns a regular URL if the store doesn't support signed URLs.
 func (m *Manager) GetSignedURL(name string) string {
+	if m.signingKey != "" {
+		return m.signedMediaURL(name)
+	}
 	if signedStore, ok := m.store.(SignedURLStore); ok {
 		return signedStore.GetSignedURL(name)
 	}
@@ -287,7 +447,7 @@ func (m *Manager) GetSignedURL(name string) string {
 
 // GetThumbnailURL returns the URL for an image thumbnail.
 func (m *Manager) GetThumbnailURL(uuid string) string {
-	if m.store.Name() == "fs" {
+	if m.signingKey != "" || m.store.Name() == "fs" {
 		// FS validates thumbnail requests with the original UUID signature.
 		u, err := url.Parse(m.GetSignedURL(uuid))
 		if err == nil {
@@ -305,6 +465,9 @@ func (m *Manager) GetThumbnailURL(uuid string) string {
 // SignedURLValidator returns the store's signature validator if available.
 // Returns nil if the store doesn't support signed URL validation.
 func (m *Manager) SignedURLValidator() func(name, sig string, exp int64) bool {
+	if m.signingKey != "" {
+		return m.validateMediaSignature
+	}
 	return m.store.SignedURLValidator()
 }
 
@@ -378,7 +541,7 @@ func (m *Manager) DeleteUnlinkedMedia(ctx context.Context) {
 
 // deleteUnlinked runs all unlinked-media sweeps.
 func (m *Manager) deleteUnlinked() {
-	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedHelpArticleMedia} {
+	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedHelpArticleMedia, m.queries.GetUnlinkedResourceImages, m.queries.GetUnlinkedResourceAvatars} {
 		if err := m.deleteUnlinkedRows(stmt); err != nil {
 			m.lo.Error("error deleting unlinked media", "error", err)
 		}
@@ -400,7 +563,7 @@ func (m *Manager) deleteUnlinkedRows(stmt *sqlx.Stmt) error {
 		}
 
 		// If it's an image, also delete the `thumb_uuid` image from store.
-		if strings.HasPrefix(mm.ContentType, "image/") {
+		if mm.Model.String != models.ModelResourceImages && mm.Model.String != models.ModelResourceAvatars && strings.HasPrefix(mm.ContentType, "image/") {
 			thumbUUID := image.ThumbPrefix + mm.UUID
 			if err := m.Delete(thumbUUID); err != nil {
 				m.lo.Error("error deleting thumbnail for unlinked media", "media_id", mm.ID, "thumb_uuid", thumbUUID, "error", err)

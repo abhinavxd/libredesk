@@ -18,6 +18,12 @@ export const adminNavItems = [
         icon: 'Settings'
       },
       {
+        titleKey: 'admin.systemResources.title',
+        href: '/admin/resources',
+        permission: 'general_settings:manage',
+        icon: 'Gauge'
+      },
+      {
         titleKey: 'globals.terms.businessHour',
         href: '/admin/business-hours',
         createRouteName: 'new-business-hours',

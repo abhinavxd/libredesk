@@ -7,6 +7,7 @@
           :initial-values="initialValues"
           :available-languages="availableLanguages"
         />
+        <ResourcePolicyForm :show-cache-size="false" />
       </LoadingOverlay>
     </template>
     <template #help>
@@ -18,6 +19,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
+import ResourcePolicyForm from '@/features/admin/general/ResourcePolicyForm.vue'
 import GeneralSettingForm from '@/features/admin/general/GeneralSettingForm.vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'

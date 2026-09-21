@@ -4,9 +4,13 @@
       v-for="attachment in attachments"
       :key="attachment.uuid"
       class="flex items-center cursor-pointer"
-    > 
+    >
+      <div v-if="attachment.unavailable" class="rounded-lg border p-2 cursor-default">
+        <p class="text-sm">{{ attachment.name }}</p>
+        <p class="text-xs text-muted-foreground">{{ t('media.attachmentUnavailable') }}</p>
+      </div>
       <!-- Image preview -->
-      <div v-if="isImage(attachment)" class="relative">
+      <div v-else-if="isImage(attachment)" class="relative">
         <img
           :src="getThumbnailUrl(attachment)"
           :alt="attachment.name"
@@ -23,7 +27,7 @@
         @click="downloadFile(attachment)"
       >
         <div class="flex-shrink-0">
-          <File class="text-muted-foreground" size="20"/>
+          <File class="text-muted-foreground" size="20" />
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium text-foreground">{{ truncateFileName(attachment.name) }}</p>
@@ -35,8 +39,11 @@
 </template>
 
 <script setup>
-import { File } from 'lucide-vue-next';
-import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file';
+import { localMediaURL, isPreviewImage } from '@shared-ui/utils/resourceURL'
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
+import { File } from 'lucide-vue-next'
+import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 defineProps({
   attachments: {
     type: Array,
@@ -45,26 +52,28 @@ defineProps({
 })
 
 const isImage = (attachment) => {
-  return attachment.content_type && attachment.content_type.startsWith('image/')
+  return isPreviewImage(attachment.content_type) && !!localMediaURL(attachment.url)
 }
 
 const getThumbnailUrl = (attachment) => {
   if (!isImage(attachment)) return attachment.url
-  return attachment.thumbnail_url || getThumbFilepath(attachment.url)
+  return localMediaURL(attachment.thumbnail_url) || getThumbFilepath(localMediaURL(attachment.url))
 }
 
 const fallbackToOriginal = (event, originalUrl) => {
   if (event.target.dataset.originalFallback) return
   event.target.dataset.originalFallback = 'true'
-  event.target.src = originalUrl
+  event.target.src = localMediaURL(originalUrl)
 }
 
 const openImage = (url) => {
-  window.open(url, '_blank', 'noopener,noreferrer')
+  if (!localMediaURL(url)) return
+  window.open(localMediaURL(url), '_blank', 'noopener,noreferrer')
 }
 
 const downloadFile = (attachment) => {
-  window.open(attachment.url, '_blank', 'noopener,noreferrer')
+  if (!localMediaURL(attachment.url)) return
+  window.open(localMediaURL(attachment.url), '_blank', 'noopener,noreferrer')
 }
 
 const truncateFileName = (name) => {

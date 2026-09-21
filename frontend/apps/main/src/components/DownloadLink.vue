@@ -1,6 +1,6 @@
 <template>
   <a
-    :href="downloadUrl(url)"
+    :href="downloadUrl(localMediaURL(url)) || undefined"
     :title="t('globals.terms.download')"
     :aria-label="t('globals.terms.download')"
     class="inline-flex items-center justify-center p-1 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
@@ -14,6 +14,7 @@
 import { Download } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { downloadUrl } from '@shared-ui/utils/file'
+import { localMediaURL } from '@shared-ui/utils/resourceURL'
 
 defineProps({
   url: { type: String, required: true },

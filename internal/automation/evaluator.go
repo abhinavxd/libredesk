@@ -151,6 +151,8 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 			}
 		case models.ConversationInbox:
 			valueToCompare = strconv.Itoa(conversation.InboxID)
+		case models.ConversationRecipient:
+			valueToCompare = conversation.LatestIncomingRecipient
 		case models.ConversationPreviousStatus, models.ConversationPreviousPriority,
 			models.ConversationPreviousAssignedUser, models.ConversationPreviousAssignedTeam:
 			// An absent key is not the same as an empty previous value.

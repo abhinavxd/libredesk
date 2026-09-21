@@ -65,14 +65,6 @@ func handleGetMessages(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	rootURL, _ := app.setting.GetAppRootURL()
-	for i := range messages {
-		total = messages[i].Total
-		app.conversation.SignAttachmentURLs(messages[i].Attachments)
-		resolveQuotedCIDs(app, &messages[i])
-		resolveAttachmentCIDs(&messages[i], rootURL)
-	}
-
 	// Process CSAT status for all messages (will only affect CSAT messages)
 	app.conversation.ProcessCSATStatus(messages)
 
@@ -83,6 +75,13 @@ func handleGetMessages(r *fastglue.Request) error {
 				messages[i].StripCSATUUID()
 			}
 		}
+	}
+
+	rootURL, _ := app.setting.GetAppRootURL()
+	policy := loadResourcePolicy(app)
+	for i := range messages {
+		total = messages[i].Total
+		prepareMessageDisplay(app, &messages[i], rootURL, policy, user.ID)
 	}
 
 	return r.SendEnvelope(envelope.PageResults{
@@ -133,9 +132,7 @@ func handleGetMessage(r *fastglue.Request) error {
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
-	app.conversation.SignAttachmentURLs(message.Attachments)
-	resolveQuotedCIDs(app, &message)
-	resolveAttachmentCIDs(&message, rootURL)
+	prepareMessageDisplay(app, &message, rootURL, loadResourcePolicy(app), user.ID)
 
 	return r.SendEnvelope(message)
 }
@@ -253,8 +250,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		resolveQuotedCIDs(app, &message)
-		resolveAttachmentCIDs(&message, rootURL)
+		prepareMessageDisplay(app, &message, rootURL, loadResourcePolicy(app), user.ID)
 		return r.SendEnvelope(message)
 	}
 
@@ -264,7 +260,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		resolveAttachmentCIDs(&message, rootURL)
+		prepareMessageDisplay(app, &message, rootURL, loadResourcePolicy(app), user.ID)
 		return r.SendEnvelope(message)
 	}
 
@@ -278,8 +274,7 @@ func handleSendMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	markAssignmentNotificationRead(app, conv, user)
-	resolveQuotedCIDs(app, &message)
-	resolveAttachmentCIDs(&message, rootURL)
+	prepareMessageDisplay(app, &message, rootURL, loadResourcePolicy(app), user.ID)
 	return r.SendEnvelope(message)
 }
 
@@ -298,16 +293,21 @@ func resolveAttachmentCIDs(msg *cmodels.Message, rootURL string) {
 }
 
 // resolveQuotedCIDs replaces cid: refs to media on other messages with signed URLs.
-func resolveQuotedCIDs(app *App, msg *cmodels.Message) {
+func resolveQuotedCIDs(app *App, msg *cmodels.Message) []string {
 	refs, err := app.conversation.GetInlineMediaRefs(msg)
 	if err != nil {
 		app.lo.Error("error fetching inline media refs", "conversation_uuid", msg.ConversationUUID, "error", err)
-		return
+		return nil
 	}
+	var trusted []string
 	for _, ref := range refs {
 		url := app.media.GetURL(ref.UUID, ref.ContentType, ref.Filename)
 		msg.Content = strings.ReplaceAll(msg.Content, "cid:"+ref.ContentID, url)
+		if isDisplayImage(ref.ContentType) {
+			trusted = append(trusted, url)
+		}
 	}
+	return trusted
 }
 
 // canCreateConversationMessage returns whether the user may create a message of the requested visibility.

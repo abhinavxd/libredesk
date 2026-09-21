@@ -78,6 +78,8 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
+	GetImageSenders               *sqlx.Stmt `query:"get-image-senders"`
+	SetImageSender                *sqlx.Stmt `query:"set-image-sender"`
 	GetUser                       *sqlx.Stmt `query:"get-user"`
 	GetNotes                      *sqlx.Stmt `query:"get-notes"`
 	GetNote                       *sqlx.Stmt `query:"get-note"`

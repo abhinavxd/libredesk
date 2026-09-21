@@ -23,10 +23,12 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
@@ -121,7 +123,7 @@ func (m *Manager) IncomingMessageWorker(ctx context.Context) {
 			if !ok {
 				return
 			}
-			if _, err := m.ProcessIncomingMessage(msg); err != nil {
+			if _, err := m.processIncomingMessage(ctx, msg); err != nil {
 				m.lo.Error("error processing incoming msg", "error", err)
 			}
 		}
@@ -405,6 +407,11 @@ func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 // SignAttachmentURLs adds access URLs for the original image and its thumbnail.
 func (m *Manager) SignAttachmentURLs(attachments attachment.Attachments) {
 	for i := range attachments {
+		if attachments[i].Unavailable {
+			attachments[i].URL = ""
+			attachments[i].ThumbnailURL = ""
+			continue
+		}
 		attachments[i].URL = m.mediaStore.GetURL(attachments[i].UUID, attachments[i].ContentType, attachments[i].Name)
 		if strings.HasPrefix(attachments[i].ContentType, "image/") {
 			attachments[i].ThumbnailURL = m.mediaStore.GetThumbnailURL(attachments[i].UUID)
@@ -580,6 +587,10 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 
 // InsertMessage inserts a message and attaches the media to the message.
 func (m *Manager) InsertMessage(message *models.Message) error {
+	return m.insertMessage(context.Background(), message)
+}
+
+func (m *Manager) insertMessage(ctx context.Context, message *models.Message) error {
 	if message.Private {
 		message.Status = models.MessageStatusSent
 	}
@@ -624,6 +635,12 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing message insert transaction", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	if m.cacheIncomingImages != nil && message.Type == models.MessageIncoming && message.ContentType == models.ContentTypeHTML && !message.Private {
+		if err := m.cacheIncomingImages(ctx, message.ID, message.Content); err != nil {
+			m.lo.Error("error caching incoming message images", "message_id", message.ID, "error", err)
+		}
 	}
 
 	// Add this user as a participant if not already present.
@@ -812,6 +829,10 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 // conversations, and creates a new conversation if necessary. It also
 // inserts the message, uploads any attachments, and queues the conversation evaluation of automation rules.
 func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Message, error) {
+	return m.processIncomingMessage(context.Background(), in)
+}
+
+func (m *Manager) processIncomingMessage(ctx context.Context, in models.IncomingMessage) (models.Message, error) {
 	// Return early if this message already exists (same source ID).
 	dupConvID, err := m.messageExistsBySourceID([]string{in.SourceID.String})
 	if err != nil && err != errConversationNotFound {
@@ -878,7 +899,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	}
 
 	// Insert message. On failure, delete the conversation if it was just created for this message.
-	if err = m.InsertMessage(&msg); err != nil {
+	if err = m.insertMessage(ctx, &msg); err != nil {
 		m.lo.Error("error inserting incoming message", "message_source_id", in.SourceID.String, "conversation_uuid", conversationUUID, "is_new", isNewConversation, "error", err)
 		if isNewConversation && conversationUUID != "" {
 			if delErr := m.DeleteConversation(conversationUUID); delErr != nil {
@@ -1171,6 +1192,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 		m.lo.Debug("uploading message attachment", "name", attachment.Name, "content_id", contentID, "size", attachment.Size, "content_type", attachment.ContentType, "disposition", attachment.Disposition)
 
 		// Upload and insert entry in media table.
+		attachment.ContentID = contentID
 		attachReader := bytes.NewReader(attachment.Content)
 		media, err := m.mediaStore.UploadAndInsert(
 			attachment.Name,
@@ -1183,9 +1205,18 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
-			true,          /** private **/
+			true,         /** private **/
 		)
 		if err != nil {
+			var storageError envelope.Error
+			if message.Type == models.MessageIncoming && message.Channel == inbox.ChannelEmail && errors.As(err, &storageError) && storageError.ErrorType == envelope.StorageFullError {
+				// Keep the email and any successfully stored attachments. Persist
+				// only a descriptor for the missing file, never its in-memory bytes.
+				if err := recordUnavailableAttachment(message, attachment); err != nil {
+					return err
+				}
+				continue
+			}
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
 			return fmt.Errorf("failed to upload media %s: %w", attachment.Name, err)
 		}
@@ -1201,6 +1232,36 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 		message.Media = append(message.Media, media)
 	}
 	return nil
+}
+
+// recordUnavailableAttachment preserves missing attachment metadata with the
+// message itself, so it survives reloads without consuming durable-media quota.
+func recordUnavailableAttachment(message *models.Message, original attachment.Attachment) error {
+	meta := map[string]json.RawMessage{}
+	if len(message.Meta) > 0 && string(message.Meta) != "null" {
+		if err := json.Unmarshal(message.Meta, &meta); err != nil {
+			return fmt.Errorf("reading message metadata: %w", err)
+		}
+	}
+	var missing attachment.Attachments
+	if raw := meta["unavailable_attachments"]; len(raw) > 0 {
+		if err := json.Unmarshal(raw, &missing); err != nil {
+			return err
+		}
+	}
+	missing = append(missing, attachment.Attachment{
+		UUID: uuid.NewString(), Name: original.Name, Size: original.Size,
+		ContentID: original.ContentID, ContentType: original.ContentType,
+		Disposition: original.Disposition, Unavailable: true,
+		UnavailableReason: "storage_full",
+	})
+	raw, err := json.Marshal(missing)
+	if err != nil {
+		return err
+	}
+	meta["unavailable_attachments"] = raw
+	message.Meta, err = json.Marshal(meta)
+	return err
 }
 
 // findOrCreateConversation finds or creates a conversation for the given incoming message.
@@ -1473,6 +1534,8 @@ func (m *Manager) broadcastMessageToWidgetClients(message *models.Message) {
 	m.SignAttachmentURLs(message.Attachments)
 	m.SignAvatarURL(&message.Author.AvatarURL)
 	liveChatInbox.BroadcastMessageToClients(message.ConversationUUID, conversation.ContactID, models.ChatMessage{
+		Display:          resourcepolicy.PrepareContentWithAttachments(message.Content, message.ContentType, message.Attachments),
+		ContentType:      message.ContentType,
 		UUID:             message.UUID,
 		Status:           message.Status,
 		ConversationUUID: message.ConversationUUID,

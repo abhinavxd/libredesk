@@ -13,6 +13,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import VueEasyLightbox from 'vue-easy-lightbox'
+import { localMediaURL } from '@shared-ui/utils/resourceURL'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -24,7 +25,7 @@ const emit = defineEmits(['update:modelValue'])
 const index = ref(0)
 
 const imgs = computed(() =>
-  props.images.map((img) => ({ src: img.url, title: img.name || '' }))
+  props.images.map((img) => ({ src: localMediaURL(img.url), title: img.name || '' }))
 )
 
 function clamp(n, min, max) {

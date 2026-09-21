@@ -26,10 +26,9 @@
               <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {{ $t('command.replyPreview') }}
               </p>
-              <Letter
+              <SafeMessageContent
                 :key="highlightedMacro?.value"
-                :html="replyContent"
-                :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+                :message="{ content: replyContent, display: macroStore.macroDisplays[highlightedMacro?.id] }"
                 class="native-html min-h-[120px] w-full overflow-auto rounded-lg border bg-background p-4 shadow-sm"
               />
             </div>
@@ -76,7 +75,7 @@ const CONTENT_PREVIEW_DELAY = 150
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDebounceFn } from '@vueuse/core'
-import { Letter } from 'vue-letter'
+import SafeMessageContent from '@shared-ui/components/SafeMessageContent.vue'
 import { Users, User, Pin, Rocket, Tags } from 'lucide-vue-next'
 import { CommandGroup, CommandItem } from '@shared-ui/components/ui/command'
 import { Spinner } from '@shared-ui/components/ui/spinner'

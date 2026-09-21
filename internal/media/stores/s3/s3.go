@@ -169,3 +169,7 @@ func (c *Client) Name() string {
 func (c *Client) SignedURLValidator() func(name, sig string, exp int64) bool {
 	return nil
 }
+
+func (c *Client) Open(name string) (io.ReadCloser, error) {
+	return c.s3.FileDownload(simples3.DownloadInput{Bucket: c.opts.Bucket, ObjectKey: c.makeBucketPath(filepath.Base(name))})
+}

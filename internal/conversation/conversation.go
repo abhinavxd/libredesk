@@ -12,6 +12,7 @@ import (
 	"html"
 	htmltemplate "html/template"
 	"io"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,6 +34,7 @@ import (
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
+	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
 	slaModels "github.com/abhinavxd/libredesk/internal/sla/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
@@ -89,6 +91,7 @@ type notificationDispatcher interface {
 
 // Manager handles the operations related to conversations
 type Manager struct {
+	cacheIncomingImages        func(context.Context, int, string) error
 	q                          queries
 	inboxStore                 inboxStore
 	userStore                  userStore
@@ -228,6 +231,7 @@ type ContinuityConfig struct {
 
 // Opts holds the options for creating a new Manager.
 type Opts struct {
+	CacheIncomingImages      func(context.Context, int, string) error
 	DB                       *sqlx.DB
 	Lo                       *logf.Logger
 	OutgoingMessageQueueSize int
@@ -280,6 +284,7 @@ func New(
 	}
 
 	c := &Manager{
+		cacheIncomingImages:        opts.CacheIncomingImages,
 		q:                          q,
 		wsHub:                      wsHub,
 		i18n:                       i18n,
@@ -535,7 +540,12 @@ func (c *Manager) SignAvatarURL(avatarURL *null.String) {
 		return
 	}
 	if strings.HasPrefix(avatarURL.String, "/uploads/") {
-		*avatarURL = null.StringFrom(c.mediaStore.GetSignedURL(strings.TrimPrefix(avatarURL.String, "/uploads/")))
+		parsed, err := url.Parse(avatarURL.String)
+		if err != nil {
+			*avatarURL = null.String{}
+			return
+		}
+		*avatarURL = null.StringFrom(c.mediaStore.GetSignedURL(strings.TrimPrefix(parsed.Path, "/uploads/")))
 	}
 }
 
@@ -2091,6 +2101,8 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 			author.Email = null.String{}
 
 			chatMessages = append(chatMessages, models.ChatMessage{
+				Display:          resourcepolicy.PrepareContentWithAttachments(msg.Content, msg.ContentType, msg.Attachments),
+				ContentType:      msg.ContentType,
 				UUID:             msg.UUID,
 				Status:           msg.Status,
 				CreatedAt:        msg.CreatedAt,

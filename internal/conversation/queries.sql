@@ -218,6 +218,7 @@ SELECT
    c.last_interaction_at,
    c.last_interaction_sender,
    c.custom_attributes,
+   COALESCE(latest_incoming.recipient, '') AS latest_incoming_recipient,
    (SELECT COALESCE(
        (SELECT json_agg(t.name)
        FROM tags t
@@ -254,6 +255,17 @@ SELECT
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
+LEFT JOIN LATERAL (
+    SELECT lower(address.value) AS recipient
+    FROM conversation_messages cm
+    CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(cm.meta->'to', '[]'::jsonb)) WITH ORDINALITY AS address(value, position)
+    WHERE cm.conversation_id = c.id
+      AND cm.sender_type = 'contact'
+      AND cm.type = 'incoming'
+      AND cm.private = FALSE
+    ORDER BY cm.created_at DESC, cm.id DESC, address.position
+    LIMIT 1
+) latest_incoming ON true
 LEFT JOIN LATERAL (
     SELECT rating, feedback, response_timestamp
     FROM csat_responses
@@ -805,7 +817,7 @@ SELECT
             ) ORDER BY media.filename
         ) FILTER (WHERE media.id IS NOT NULL),
         '[]'::json
-    ) AS attachments
+    )::jsonb || COALESCE(m.meta->'unavailable_attachments', '[]'::jsonb) AS attachments
 FROM conversation_messages m
 INNER JOIN conversations c ON c.id = m.conversation_id
 JOIN users u ON m.sender_id = u.id
@@ -854,7 +866,7 @@ SELECT
        ) ORDER BY filename
      ) FROM media
      WHERE model_type = 'messages' AND model_id = m.id),
-   '[]'::json) AS attachments
+   '[]'::json)::jsonb || COALESCE(m.meta->'unavailable_attachments', '[]'::jsonb) AS attachments
 FROM conversation_messages m
 JOIN users u ON m.sender_id = u.id
 WHERE m.conversation_id = (
