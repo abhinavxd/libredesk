@@ -27,10 +27,11 @@
             this.IFRAME_HEIGHT = '700px';
             this.EXPANDED_WIDTH = '750px';
             this.MOBILE_BREAKPOINT = 600;
-            this.LAUNCHER_SIZE = 60;
+            this.DEFAULT_LAUNCHER_SIZE = 60;
+            this.LAUNCHER_IFRAME_GAP = 20;
+            this.DEFAULT_LAUNCHER_ICON_SCALE = 100;
             this.LAUNCHER_HOVER_SCALE = 1.08;
             this.LAUNCHER_OPEN_SCALE = 0.9;
-            this.MOBILE_LAUNCHER_SIZE = 60;
             this.CAMPAIGN_POLL_MIN = 2;
             this.CAMPAIGN_POLL_MAX = 60;
 
@@ -161,6 +162,7 @@
                 }
                 this.createElements();
                 this.setLauncherPosition();
+                this.watchColorScheme();
                 this.widgetButtonWrapper.style.display = 'none';
                 this.iframe.addEventListener('load', () => {
                     this.sendMobileState();
@@ -217,8 +219,7 @@
         }
 
         createElements () {
-            const launcher = this.widgetSettings.launcher;
-            const colors = this.widgetSettings.colors;
+            const branding = this.branding();
 
             this.toggleButton = document.createElement('div');
             this.toggleButton.style.cssText = `
@@ -227,7 +228,7 @@
                 z-index: 9999;
                 width: ${this.launcherSize()}px;
                 height: ${this.launcherSize()}px;
-                background-color: ${launcher.color || colors.primary};
+                background-color: ${this.launcherColor()};
                 border-radius: 50%;
                 display: flex;
                 justify-content: center;
@@ -247,13 +248,8 @@
             `;
 
             this.defaultIcon = document.createElement('img');
-            this.defaultIcon.src = launcher.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
-            this.defaultIcon.style.cssText = `
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                object-fit: cover;
-            `;
+            this.defaultIcon.src = branding.launcher?.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
+            this.styleLauncherIcon();
             this.iconContainer.appendChild(this.defaultIcon);
 
             this.arrowIcon = document.createElement('div');
@@ -264,7 +260,7 @@
             svg.setAttribute('fill', 'none');
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', 'M7 10L12 15L17 10');
-            path.setAttribute('stroke', this.contrastColor(launcher.color || colors.primary));
+            path.setAttribute('stroke', this.contrastColor(this.launcherColor()));
             path.setAttribute('stroke-width', '2');
             path.setAttribute('stroke-linecap', 'round');
             path.setAttribute('stroke-linejoin', 'round');
@@ -350,12 +346,62 @@
         }
 
         launcherSize () {
-            return this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE;
+            return this.widgetSettings?.launcher?.size || this.DEFAULT_LAUNCHER_SIZE;
+        }
+
+        launcherIconScale () {
+            return this.widgetSettings?.launcher?.icon_scale || this.DEFAULT_LAUNCHER_ICON_SCALE;
+        }
+
+        styleLauncherIcon () {
+            if (!this.defaultIcon) return;
+            const scale = this.launcherIconScale();
+            const full = scale >= 100;
+            const style = this.defaultIcon.style;
+            style.width = `${scale}%`;
+            style.height = `${scale}%`;
+            style.borderRadius = full ? '50%' : '0';
+            style.objectFit = full ? 'cover' : 'contain';
+        }
+
+        prefersDark () {
+            return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        }
+
+        branding () {
+            const theme = this.widgetSettings.theme;
+            const isDark = theme === 'dark' || (theme === 'system' && this.prefersDark());
+            return this.widgetSettings.branding?.[isDark ? 'dark' : 'light'] || {};
+        }
+
+        launcherColor () {
+            const branding = this.branding();
+            return branding.launcher?.color || branding.colors?.primary || '#000000';
+        }
+
+        applyLauncherTheme () {
+            if (!this.toggleButton) return;
+            const branding = this.branding();
+            this.toggleButton.style.backgroundColor = this.launcherColor();
+            this.defaultIcon.src = branding.launcher?.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
+            this.styleLauncherIcon();
+            const path = this.arrowIcon.querySelector('path');
+            if (path) path.setAttribute('stroke', this.contrastColor(this.launcherColor()));
+        }
+
+        watchColorScheme () {
+            if (!window.matchMedia) return;
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                if (this.widgetSettings.theme === 'system') this.applyLauncherTheme();
+            });
+        }
+
+        iframeBottomOffset () {
+            return this.widgetSettings.launcher.spacing.bottom + this.launcherSize() + this.LAUNCHER_IFRAME_GAP;
         }
 
         getNormalIframeHeight () {
-            const bottom = this.widgetSettings.launcher.spacing.bottom;
-            return `min(${this.IFRAME_HEIGHT}, calc(100vh - ${bottom + 100}px))`;
+            return `min(${this.IFRAME_HEIGHT}, calc(100vh - ${this.iframeBottomOffset() + this.LAUNCHER_IFRAME_GAP}px))`;
         }
 
         sendPageInfo () {
@@ -406,7 +452,7 @@
             } else {
                 iframe.style.width = this.IFRAME_WIDTH;
                 iframe.style.height = this.getNormalIframeHeight();
-                iframe.style.bottom = `${spacing.bottom + 80}px`;
+                iframe.style.bottom = `${this.iframeBottomOffset()}px`;
             }
         }
 

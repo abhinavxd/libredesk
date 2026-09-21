@@ -1,6 +1,4 @@
 <script setup>
-const CAMPAIGN_ORDER_BUTTON_CLASS = 'size-6'
-
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
@@ -41,22 +39,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from '@shared-ui/components/ui/collapsible'
+import Draggable from 'vuedraggable'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
 import WidgetConditions from './WidgetConditions.vue'
-import {
-  createCampaignSchema,
-  defaultCampaign,
-  moveCampaign,
-  newCampaignId
-} from './livechatFormSchema.js'
+import { createCampaignSchema, defaultCampaign, newCampaignId } from './livechatFormSchema.js'
 import { handleHTTPError } from '@shared-ui/utils/http'
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronRight,
   ChevronDown,
+  GripVertical,
   Plus,
   CircleCheck,
   CircleSlash
@@ -160,7 +153,15 @@ const update = (key, value) => {
     props.modelValue.map((item) => {
       if (item.id !== selected.value) return item
       const next = { ...item, [key]: value }
-      if (key === 'repeat' && value !== 'interval' && !(Number.isInteger(next.repeat_hours) && next.repeat_hours >= 1 && next.repeat_hours <= 8760)) {
+      if (
+        key === 'repeat' &&
+        value !== 'interval' &&
+        !(
+          Number.isInteger(next.repeat_hours) &&
+          next.repeat_hours >= 1 &&
+          next.repeat_hours <= 8760
+        )
+      ) {
         next.repeat_hours = defaultCampaign().repeat_hours
       }
       return next
@@ -174,8 +175,10 @@ const toggleEnabled = (id, enabled) =>
     props.modelValue.map((item) => (item.id === id ? { ...item, enabled } : item))
   )
 
-const reorder = (index, offset) =>
-  emit('update:modelValue', moveCampaign(props.modelValue, index, offset))
+const orderedCampaigns = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value)
+})
 
 const add = (source) => {
   const item = source
@@ -295,65 +298,58 @@ onMounted(async () => {
           {{ t('widget.campaignPriorityHint') }}
         </p>
 
-        <div v-if="modelValue.length" class="space-y-2">
-          <div
-            v-for="(item, index) in modelValue"
-            :key="item.id"
-            class="flex items-center gap-3 border rounded-md hover:bg-accent/50 transition-colors"
-          >
-            <div v-if="modelValue.length > 1" class="ml-2 flex flex-col">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                :class="CAMPAIGN_ORDER_BUTTON_CLASS"
-                :disabled="index === 0"
-                :aria-label="t('globals.messages.moveUp')"
-                @click="reorder(index, -1)"
-              >
-                <ArrowUp class="size-3.5" aria-hidden="true" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                :class="CAMPAIGN_ORDER_BUTTON_CLASS"
-                :disabled="index === modelValue.length - 1"
-                :aria-label="t('globals.messages.moveDown')"
-                @click="reorder(index, 1)"
-              >
-                <ArrowDown class="size-3.5" aria-hidden="true" />
-              </Button>
-            </div>
-            <Switch
-              :class="modelValue.length > 1 ? '' : 'ml-3'"
-              :checked="item.enabled"
-              :aria-label="t('globals.terms.enabled')"
-              @update:checked="toggleEnabled(item.id, $event)"
-            />
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-3 text-left"
-              @click="selected = item.id"
+        <Draggable
+          v-if="modelValue.length"
+          v-model="orderedCampaigns"
+          item-key="id"
+          :animation="200"
+          handle=".drag-handle"
+          :force-fallback="true"
+          fallback-on-body
+          :fallback-tolerance="3"
+          ghost-class="drag-ghost"
+          class="space-y-2"
+        >
+          <template #item="{ element: item }">
+            <div
+              class="flex items-center gap-3 border rounded-md hover:bg-accent/50 transition-colors"
             >
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-foreground truncate">
-                    {{ item.name || t('widget.newCampaign') }}
-                  </span>
-                  <Badge variant="secondary" class="gap-1 shrink-0">
-                    <component :is="item.enabled ? CircleCheck : CircleSlash" class="size-3" />
-                    {{ item.enabled ? t('globals.terms.enabled') : t('globals.terms.paused') }}
-                  </Badge>
-                </div>
-                <p class="text-xs text-muted-foreground truncate mt-0.5">
-                  {{ audienceLabel(item) }} · {{ pagesLabel(item) }}
-                </p>
+              <div
+                v-if="modelValue.length > 1"
+                class="drag-handle ml-2 cursor-move text-muted-foreground"
+              >
+                <GripVertical class="size-4" aria-hidden="true" />
               </div>
-              <ChevronRight class="size-4 text-muted-foreground shrink-0" />
-            </button>
-          </div>
-        </div>
+              <Switch
+                :class="modelValue.length > 1 ? '' : 'ml-3'"
+                :checked="item.enabled"
+                :aria-label="t('globals.terms.enabled')"
+                @update:checked="toggleEnabled(item.id, $event)"
+              />
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-3 text-left"
+                @click="selected = item.id"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-foreground truncate">
+                      {{ item.name || t('widget.newCampaign') }}
+                    </span>
+                    <Badge variant="secondary" class="gap-1 shrink-0">
+                      <component :is="item.enabled ? CircleCheck : CircleSlash" class="size-3" />
+                      {{ item.enabled ? t('globals.terms.enabled') : t('globals.terms.paused') }}
+                    </Badge>
+                  </div>
+                  <p class="text-xs text-muted-foreground truncate mt-0.5">
+                    {{ audienceLabel(item) }} · {{ pagesLabel(item) }}
+                  </p>
+                </div>
+                <ChevronRight class="size-4 text-muted-foreground shrink-0" />
+              </button>
+            </div>
+          </template>
+        </Draggable>
 
         <Button
           type="button"
@@ -671,7 +667,7 @@ onMounted(async () => {
       <!-- Repeat -->
       <div class="space-y-4">
         <h4 class="text-base font-semibold text-foreground">
-          {{ t('widget.campaign.section.repeat') }}
+          {{ t('globals.terms.repeat') }}
         </h4>
 
         <div class="grid sm:grid-cols-2 gap-4">

@@ -27,6 +27,53 @@ const goDurationSeconds = (value) => {
   if (!match) return 0
   return Number(match[1] || 0) * 3600 + Number(match[2] || 0) * 60 + Number(match[3] || 0)
 }
+const branding = (t) =>
+  z.object({
+    colors: z.object({
+      primary: hexColor(t)
+    }),
+    logo_url: optionalUrl(t),
+    launcher: z.object({
+      logo_url: optionalUrl(t),
+      color: hexColor(t)
+    }),
+    home_screen: z.object({
+      header_text_color: z.enum(['black', 'white']),
+      background: z
+        .object({
+          type: z.enum(['solid', 'gradient', 'image']),
+          color: optionalHexColor(t),
+          gradient_start: optionalHexColor(t),
+          gradient_end: optionalHexColor(t),
+          image_url: optionalUrl(t)
+        })
+        .superRefine((bg, ctx) => {
+          // An empty solid color falls back to the page background, gradients and images render nothing.
+          if (bg.type === 'gradient') {
+            if (!bg.gradient_start)
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['gradient_start'],
+                message: t('globals.messages.required')
+              })
+            if (!bg.gradient_end)
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['gradient_end'],
+                message: t('globals.messages.required')
+              })
+          } else if (bg.type === 'image' && !bg.image_url) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['image_url'],
+              message: t('globals.messages.required')
+            })
+          }
+        }),
+      fade_background: z.boolean()
+    })
+  })
+
 const quickReplies = (t) =>
   z
     .string()
@@ -117,16 +164,6 @@ export const defaultCampaign = () => ({
   repeat: 'once',
   repeat_hours: 24
 })
-export const moveCampaign = (campaigns, index, offset) => {
-  const target = index + offset
-  if (index < 0 || index >= campaigns.length || target < 0 || target >= campaigns.length) {
-    return campaigns
-  }
-  const reordered = [...campaigns]
-  const [campaign] = reordered.splice(index, 1)
-  reordered.splice(target, 0, campaign)
-  return reordered
-}
 export const normalizeAudienceConfig = (config, audience) => {
   const audienceConfig = { ...config?.[audience] }
   const replies = audienceConfig.quick_replies
@@ -228,20 +265,23 @@ export const createFormSchema = (t) =>
           desktop: z.boolean(),
           mobile: z.boolean(),
           content: z.enum(['message', 'generic']),
-          auto_hide_seconds: z.number().int().min(0).max(300)
+          auto_hide_seconds: rangeInteger(t, 0, 300)
         })
         .default(defaultWidgetPreviews),
       brand_name: z.string().min(1, { message: t('globals.messages.required') }),
       website_url: optionalUrl(t),
-      dark_mode: z.boolean(),
+      theme: z.enum(['system', 'light', 'dark']),
       show_powered_by: z.boolean(),
       language: z.string().min(1, { message: t('globals.messages.required') }),
       fallback_language: z.string().optional(),
-      logo_url: optionalUrl(t),
+      branding: z.object({
+        light: branding(t),
+        dark: branding(t)
+      }),
       launcher: z.object({
         position: z.enum(['left', 'right']),
-        logo_url: optionalUrl(t),
-        color: hexColor(t),
+        size: rangeInteger(t, 40, 80),
+        icon_scale: rangeInteger(t, 40, 100),
         spacing: z.object({
           side: spacingNumber(t),
           bottom: spacingNumber(t)
@@ -268,44 +308,6 @@ export const createFormSchema = (t) =>
             })
           }
         }),
-      colors: z.object({
-        primary: hexColor(t)
-      }),
-      home_screen: z.object({
-        header_text_color: z.enum(['black', 'white']),
-        background: z
-          .object({
-            type: z.enum(['solid', 'gradient', 'image']),
-            color: optionalHexColor(t),
-            gradient_start: optionalHexColor(t),
-            gradient_end: optionalHexColor(t),
-            image_url: optionalUrl(t)
-          })
-          .superRefine((bg, ctx) => {
-            // Empty solid colors use the page background, but empty gradients and images render nothing.
-            if (bg.type === 'gradient') {
-              if (!bg.gradient_start)
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  path: ['gradient_start'],
-                  message: t('globals.messages.required')
-                })
-              if (!bg.gradient_end)
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  path: ['gradient_end'],
-                  message: t('globals.messages.required')
-                })
-            } else if (bg.type === 'image' && !bg.image_url) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['image_url'],
-                message: t('globals.messages.required')
-              })
-            }
-          }),
-        fade_background: z.boolean()
-      }),
       features: z.object({
         file_upload: z.boolean(),
         emoji: z.boolean(),

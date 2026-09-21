@@ -58,13 +58,18 @@
                   (field) => field.key || `field_${field.custom_attribute_id || 'unknown'}`
                 "
                 :animation="200"
+                handle=".drag-handle"
+                :force-fallback="true"
+                fallback-on-body
+                :fallback-tolerance="3"
+                ghost-class="drag-ghost"
                 class="space-y-3"
               >
                 <template #item="{ element: field, index }">
                   <div :key="field.key || `field-${index}`" class="border rounded-lg p-4 space-y-4">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center space-x-3">
-                        <div class="cursor-move text-muted-foreground">
+                        <div class="drag-handle cursor-move text-muted-foreground">
                           <GripVertical class="w-4 h-4" />
                         </div>
                         <div>

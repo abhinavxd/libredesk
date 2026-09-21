@@ -5,8 +5,8 @@
       :class="widgetStore.isMobileFullScreen ? 'pt-[max(3.5rem,env(safe-area-inset-top))]' : 'pt-7'"
     >
       <img
-        v-if="config.logo_url"
-        :src="config.logo_url"
+        v-if="widgetStore.branding?.logo_url"
+        :src="widgetStore.branding?.logo_url"
         :alt="config.brand_name"
         class="max-h-7 max-w-full"
       />
@@ -56,5 +56,5 @@ const parsedIntroduction = computed(() =>
   renderTemplate(props.config.introduction_message, userData.value)
 )
 
-const { textColorClass, subTextColorClass } = useHeaderTheme(computed(() => props.config))
+const { textColorClass, subTextColorClass } = useHeaderTheme()
 </script>

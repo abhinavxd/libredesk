@@ -52,7 +52,7 @@ import { useHelpStore } from '@widget/store/help.js'
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const config = computed(() => widgetStore.config)
-const { backgroundStyle, showFade, fadeStyle } = useHeaderTheme(config)
+const { backgroundStyle, showFade, fadeStyle } = useHeaderTheme()
 const headerRef = ref(null)
 const { height: headerHeight } = useElementSize(computed(() => headerRef.value?.$el))
 const help = useHelpStore()

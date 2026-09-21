@@ -5,7 +5,11 @@
     </div>
     <div
       class="rounded-md p-2 space-y-2 self-stretch text-sm text-foreground/70"
-      :class="fixedHelp ? 'hidden xl:block w-[432px] shrink-0' : 'hidden lg:block w-3/12'"
+      :class="
+        fixedHelp
+          ? 'hidden xl:block w-[432px] min-[1800px]:w-[820px] shrink-0'
+          : 'hidden lg:block w-3/12'
+      "
     >
       <slot name="help" />
     </div>

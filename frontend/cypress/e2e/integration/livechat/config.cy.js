@@ -11,7 +11,9 @@ describe('Live chat widget config applied end to end', () => {
     cy.createLivechatInbox(
       withStart({
         brand_name: 'Cypress Brand',
-        logo_url: `${Cypress.config('baseUrl')}/static/public/launcher-logo.png`,
+        branding: {
+          light: { logo_url: `${Cypress.config('baseUrl')}/static/public/launcher-logo.png` }
+        },
         greeting_message: 'Hello from Cypress',
         introduction_message: 'We reply fast'
       })
@@ -28,7 +30,12 @@ describe('Live chat widget config applied end to end', () => {
 
   it('applies the launcher color from config', () => {
     cy.createLivechatInbox(
-      withStart({ colors: { primary: '#ff0000' }, launcher: { color: '#00ff00', position: 'right', spacing: { side: 20, bottom: 20 } } })
+      withStart({
+        branding: {
+          light: { colors: { primary: '#ff0000' }, launcher: { color: '#00ff00' } }
+        },
+        launcher: { position: 'right', spacing: { side: 20, bottom: 20 } }
+      })
     ).then((inbox) => {
       cy.visitWidgetHost(inbox.uuid)
       cy.widgetLauncher().then((el) => {
@@ -172,19 +179,65 @@ describe('Live chat widget config applied end to end', () => {
   })
 
   it('applies dark mode', () => {
-    cy.createLivechatInbox(withStart({ dark_mode: true })).then((inbox) => {
+    cy.createLivechatInbox(withStart({ theme: 'dark' })).then((inbox) => {
       cy.openWidget(inbox)
       cy.widgetBody().find('.dark').should('exist')
+    })
+  })
+
+  it('follows the visitor color scheme when the theme is system', () => {
+    cy.createLivechatInbox(withStart({ theme: 'system' })).then((inbox) => {
+      cy.setColorScheme('dark')
+      cy.openWidget(inbox)
+      cy.widgetBody().find('.dark').should('exist')
+    })
+
+    cy.createLivechatInbox(withStart({ theme: 'system' })).then((inbox) => {
+      cy.setColorScheme('light')
+      cy.openWidget(inbox)
+      cy.widgetBody().find('.dark').should('not.exist')
+    })
+  })
+
+  it('paints each theme from its own branding half', () => {
+    cy.createLivechatInbox(
+      withStart({
+        theme: 'dark',
+        branding: {
+          light: { launcher: { color: '#ff0000' } },
+          dark: { launcher: { color: '#00ff00' } }
+        }
+      })
+    ).then((inbox) => {
+      cy.visitWidgetHost(inbox.uuid)
+      cy.widgetLauncher().then((el) => {
+        const style = el[0].ownerDocument.defaultView.getComputedStyle(el[0])
+        expect(style.backgroundColor, 'dark launcher color not applied').to.eq('rgb(0, 255, 0)')
+      })
+    })
+  })
+
+  it('renders the launcher at the configured size', () => {
+    cy.createLivechatInbox(withStart({ launcher: { size: 48 } })).then((inbox) => {
+      cy.visitWidgetHost(inbox.uuid)
+      cy.widgetLauncher().then((el) => {
+        const style = el[0].ownerDocument.defaultView.getComputedStyle(el[0])
+        expect(style.width, 'launcher size not applied').to.eq('48px')
+      })
     })
   })
 
   it('paints the home screen background from config', () => {
     cy.createLivechatInbox(
       withStart({
-        home_screen: {
-          header_text_color: 'light',
-          background: { type: 'gradient', gradient_start: '#112233', gradient_end: '#445566' },
-          fade_background: true
+        branding: {
+          light: {
+            home_screen: {
+              header_text_color: 'white',
+              background: { type: 'gradient', gradient_start: '#112233', gradient_end: '#445566' },
+              fade_background: true
+            }
+          }
         }
       })
     ).then((inbox) => {

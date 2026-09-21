@@ -116,6 +116,10 @@ const unusedArticles = computed(() =>
           item-key="id"
           :animation="200"
           handle=".drag-handle"
+          :force-fallback="true"
+          fallback-on-body
+          :fallback-tolerance="3"
+          ghost-class="drag-ghost"
           class="space-y-2"
         >
           <template #item="{ element: item, index }">

@@ -73,7 +73,7 @@ import { useWidgetStore } from '@widget/store/widget.js'
 
 const widgetStore = useWidgetStore()
 const help = useHelpStore()
-const { textColorClass } = useHeaderTheme(computed(() => widgetStore.config))
+const { textColorClass } = useHeaderTheme()
 
 const handleTabChange = (value) => {
   if (value === 'home') {

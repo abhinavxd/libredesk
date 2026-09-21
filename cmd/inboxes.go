@@ -19,6 +19,15 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+var hexColorRegex = regexp.MustCompile(`^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`)
+
+const (
+	minLauncherSize      = 40
+	maxLauncherSize      = 80
+	minLauncherIconScale = 40
+	maxLauncherIconScale = 100
+)
+
 // handleGetInboxes returns all inboxes
 func handleGetInboxes(r *fastglue.Request) error {
 	var app = r.Context.(*App)
@@ -44,6 +53,18 @@ func handleGetInbox(r *fastglue.Request) error {
 	inbox, err := app.inbox.GetDBRecord(id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+	if inbox.Channel == livechat.ChannelLiveChat {
+		var config livechat.Config
+		if err := json.Unmarshal(inbox.Config, &config); err != nil {
+			app.lo.Error("error parsing live chat config", "id", id, "error", err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
+		inbox.Config, err = json.Marshal(config)
+		if err != nil {
+			app.lo.Error("error encoding live chat config", "id", id, "error", err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
 	}
 	if err := inbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
@@ -265,17 +286,40 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			}
 		}
 
-		// Validate colors.
-		hexColorRegex := regexp.MustCompile(`^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`)
-		if config.Colors.Primary == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "primary color"), nil)
+		for _, branding := range []livechat.Branding{config.Branding.Light, config.Branding.Dark} {
+			if branding.Colors.Primary == "" {
+				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "primary color"), nil)
+			}
+			if !hexColorRegex.MatchString(branding.Colors.Primary) {
+				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidColor"), nil)
+			}
+			if branding.Launcher.Color != "" && !hexColorRegex.MatchString(branding.Launcher.Color) {
+				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidColor"), nil)
+			}
+			if branding.HomeScreen.Background.ImageURL != "" && !httputil.IsValidHTTPURL(branding.HomeScreen.Background.ImageURL) {
+				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
+			}
+			for _, u := range []string{branding.LogoURL, branding.Launcher.LogoURL} {
+				if u != "" && !httputil.IsValidHTTPURL(u) {
+					return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
+				}
+			}
 		}
-		if !hexColorRegex.MatchString(config.Colors.Primary) {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidColor"), nil)
+
+		if config.Theme != livechat.ThemeSystem && config.Theme != livechat.ThemeLight && config.Theme != livechat.ThemeDark {
+			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
 		}
 
 		// Validate launcher position.
 		if config.Launcher.Position != "left" && config.Launcher.Position != "right" {
+			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+		}
+
+		if config.Launcher.Size < minLauncherSize || config.Launcher.Size > maxLauncherSize {
+			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+		}
+
+		if config.Launcher.IconScale < minLauncherIconScale || config.Launcher.IconScale > maxLauncherIconScale {
 			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
 		}
 
@@ -294,16 +338,8 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			}
 		}
 
-		// Validate home screen background image URL.
-		if config.HomeScreen.Background.ImageURL != "" && !httputil.IsValidHTTPURL(config.HomeScreen.Background.ImageURL) {
+		if config.WebsiteURL != "" && !httputil.IsValidHTTPURL(config.WebsiteURL) {
 			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
-		}
-
-		// Validate URLs if set.
-		for _, u := range []string{config.LogoURL, config.Launcher.LogoURL, config.WebsiteURL} {
-			if u != "" && !httputil.IsValidHTTPURL(u) {
-				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
-			}
 		}
 
 		// Validate trusted domains.

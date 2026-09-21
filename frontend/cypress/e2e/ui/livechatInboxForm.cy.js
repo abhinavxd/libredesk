@@ -18,12 +18,10 @@ const listPath = '/admin/inboxes'
 
 const filterList = (text) => cy.get('input[placeholder="Search"]').clear().type(text)
 
-// Tab panels stay in the DOM and are only hidden, so a field is reachable when its tab is open.
-const openTab = (label) => cy.get('[role="tab"]').contains(label).click()
-
 const openNewForm = () => {
   cy.visit(newPath)
   cy.contains('Create a live chat inbox').click()
+  cy.openInboxSection('General')
 }
 
 describe('Live chat inbox form', () => {
@@ -45,7 +43,7 @@ describe('Live chat inbox form', () => {
     cy.get('input[name="config.brand_name"]').type(brandName)
     cy.get('input[name="config.website_url"]').type(websiteUrl)
 
-    openTab('Appearance')
+    cy.openInboxSection('Launcher position')
     cy.get('input[name="config.launcher.spacing.side"]').clear().type('35')
     cy.get('input[name="config.launcher.spacing.bottom"]').clear().type('45')
     cy.get('select[name="config.launcher.position"]')
@@ -53,11 +51,11 @@ describe('Live chat inbox form', () => {
       .click()
     cy.get('[role="option"]').contains('Left').click()
 
-    openTab('Messages')
+    cy.openInboxSection('Messages')
     cy.get('textarea[name="config.greeting_message"]').clear().type(greeting)
     cy.get('textarea[name="config.chat_introduction"]').clear().type(chatIntroduction)
 
-    openTab('Security')
+    cy.openInboxSection('Security')
     cy.get('input[name="secret"]').type(secret)
     cy.get('input[name="config.session_duration"]').clear().type('4h')
     cy.get('textarea[name="config.trusted_domains"]').type(trustedDomain)
@@ -77,21 +75,22 @@ describe('Live chat inbox form', () => {
     expect(inboxId, 'inbox from the create step').to.be.a('number')
 
     cy.visit(`${listPath}/${inboxId}/edit`)
+    cy.openInboxSection('General')
 
     cy.get('input[name="name"]').should('have.value', inboxName)
     cy.get('input[name="config.brand_name"]').should('have.value', brandName)
     cy.get('input[name="config.website_url"]').should('have.value', websiteUrl)
 
-    openTab('Appearance')
+    cy.openInboxSection('Launcher position')
     cy.get('input[name="config.launcher.spacing.side"]').should('have.value', '35')
     cy.get('input[name="config.launcher.spacing.bottom"]').should('have.value', '45')
     cy.get('select[name="config.launcher.position"]').should('have.value', 'left')
 
-    openTab('Messages')
+    cy.openInboxSection('Messages')
     cy.get('textarea[name="config.greeting_message"]').should('have.value', greeting)
     cy.get('textarea[name="config.chat_introduction"]').should('have.value', chatIntroduction)
 
-    openTab('Security')
+    cy.openInboxSection('Security')
     cy.get('input[name="config.session_duration"]').should('have.value', '4h')
     cy.get('textarea[name="config.trusted_domains"]').should('have.value', trustedDomain)
     // The signing secret comes back masked, never as the real value.
@@ -102,17 +101,19 @@ describe('Live chat inbox form', () => {
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     cy.visit(`${listPath}/${inboxId}/edit`)
+    cy.openInboxSection('General')
     cy.get('input[name="name"]').should('have.value', inboxName).clear().type(renamedInbox)
 
-    openTab('Messages')
+    cy.openInboxSection('Messages')
     cy.get('textarea[name="config.greeting_message"]').clear().type(`${greeting} v2`)
 
     cy.get('button[type="submit"]').click()
     cy.wait('@updateInbox').its('response.statusCode').should('eq', 200)
 
     cy.visit(`${listPath}/${inboxId}/edit`)
+    cy.openInboxSection('General')
     cy.get('input[name="name"]').should('have.value', renamedInbox)
-    openTab('Messages')
+    cy.openInboxSection('Messages')
     cy.get('textarea[name="config.greeting_message"]').should('have.value', `${greeting} v2`)
   })
 
@@ -135,13 +136,13 @@ describe('Live chat inbox form', () => {
     cy.get('input[name="config.brand_name"]').type(brandName)
     cy.get('input[name="config.website_url"]').type('not-a-url')
 
-    openTab('Security')
+    cy.openInboxSection('Security')
     cy.get('button[type="submit"]').click()
 
     cy.contains('Invalid URL').scrollIntoView().should('be.visible')
     // The offending field is on another tab, so the form has to switch back to it.
     cy.get('input[name="config.website_url"]').scrollIntoView().should('be.visible')
-    cy.get('[role="tab"][data-state="active"]').should('not.contain', 'Security')
+    cy.get('[role="tab"][data-state="active"]').should('not.contain', 'Setup')
     cy.get('@createInbox.all').should('have.length', 0)
   })
 
@@ -149,7 +150,7 @@ describe('Live chat inbox form', () => {
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     cy.visit(`${listPath}/${inboxId}/edit`)
-    openTab('Appearance')
+    cy.openInboxSection('Home screen apps')
     cy.contains('button', 'Add announcement').click()
     cy.get('input[placeholder="Title"]').type(homeAppTitle)
     cy.get('input[placeholder="Cover image URL"]').type('https://cypress.test/cover.png')
@@ -158,16 +159,18 @@ describe('Live chat inbox form', () => {
     cy.wait('@updateInbox').its('response.statusCode').should('eq', 200)
 
     cy.visit(`${listPath}/${inboxId}/edit`)
+    cy.openInboxSection('General')
     cy.get('input[name="config.brand_name"]').clear().type(editedBrandName)
-    openTab('Appearance')
+    cy.openInboxSection('Home screen apps')
     cy.get('input[placeholder="Title"]').clear().type(editedHomeAppTitle)
 
     cy.get('button[type="submit"]').click()
     cy.wait('@updateInbox').its('response.statusCode').should('eq', 200)
 
     cy.visit(`${listPath}/${inboxId}/edit`)
+    cy.openInboxSection('General')
     cy.get('input[name="config.brand_name"]').should('have.value', editedBrandName)
-    openTab('Appearance')
+    cy.openInboxSection('Home screen apps')
     cy.get('input[placeholder="Title"]').should('have.value', editedHomeAppTitle)
   })
 

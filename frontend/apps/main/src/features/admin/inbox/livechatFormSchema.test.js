@@ -2,7 +2,6 @@
 import { describe, test, expect } from 'vitest'
 import {
   createFormSchema,
-  moveCampaign,
   normalizeAudienceConfig,
   normalizePrechatConfig
 } from './livechatFormSchema'
@@ -10,25 +9,35 @@ import {
 const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
 const schema = createFormSchema(mockT)
 
+const validBranding = {
+  colors: { primary: '#2563eb' },
+  logo_url: '',
+  launcher: { logo_url: '', color: '#2563eb' },
+  home_screen: {
+    header_text_color: 'white',
+    background: { type: 'solid', color: '#2563eb' },
+    fade_background: true
+  }
+}
+
 const validConfig = {
   brand_name: 'Acme',
-  dark_mode: false,
+  theme: 'light',
   show_powered_by: true,
   language: 'en',
   launcher: {
     position: 'right',
-    color: '#2563eb',
+    size: 60,
+    icon_scale: 100,
     spacing: { side: 20, bottom: 20 }
   },
   chat_introduction: 'Ask us anything',
   show_office_hours_in_chat: true,
   show_office_hours_after_assignment: false,
   notice_banner: { enabled: false },
-  colors: { primary: '#2563eb' },
-  home_screen: {
-    header_text_color: 'white',
-    background: { type: 'solid', color: '#2563eb' },
-    fade_background: true
+  branding: {
+    light: validBranding,
+    dark: validBranding
   },
   features: { file_upload: true, emoji: true },
   session_duration: '720h',
@@ -57,6 +66,15 @@ const validForm = {
 }
 
 const withConfig = (overrides) => ({ ...validForm, config: { ...validConfig, ...overrides } })
+const withBranding = (overrides, theme = 'light') =>
+  withConfig({
+    branding: {
+      ...validConfig.branding,
+      [theme]: { ...validBranding, ...overrides }
+    }
+  })
+const withHomeScreen = (overrides, theme = 'light') =>
+  withBranding({ home_screen: { ...validBranding.home_screen, ...overrides } }, theme)
 const validCampaign = {
   id: '8a3660e6-e29b-461c-924f-314c7576f75a',
   name: 'Pricing invitation',
@@ -372,12 +390,6 @@ describe('Livechat Inbox Form Schema', () => {
     ).not.toThrow()
   })
 
-  test('campaign priority follows saved array order', () => {
-    const campaigns = [{ id: 'first' }, { id: 'second' }, { id: 'third' }]
-    expect(moveCampaign(campaigns, 2, -1).map(({ id }) => id)).toEqual(['first', 'third', 'second'])
-    expect(campaigns.map(({ id }) => id)).toEqual(['first', 'second', 'third'])
-  })
-
   test('name missing', () => {
     const { name, ...form } = validForm
     expect(() => schema.parse(form)).toThrow()
@@ -425,15 +437,74 @@ describe('Livechat Inbox Form Schema', () => {
   })
 
   test('primary color invalid hex', () => {
-    expect(() => schema.parse(withConfig({ colors: { primary: 'blue' } }))).toThrow()
+    expect(() => schema.parse(withBranding({ colors: { primary: 'blue' } }))).toThrow()
   })
 
   test('primary color three digit hex accepted', () => {
-    expect(() => schema.parse(withConfig({ colors: { primary: '#fff' } }))).not.toThrow()
+    expect(() => schema.parse(withBranding({ colors: { primary: '#fff' } }))).not.toThrow()
   })
 
   test('primary color eight digit hex rejected', () => {
-    expect(() => schema.parse(withConfig({ colors: { primary: '#ffffff00' } }))).toThrow()
+    expect(() => schema.parse(withBranding({ colors: { primary: '#ffffff00' } }))).toThrow()
+  })
+
+  test('dark primary color validated too', () => {
+    expect(() => schema.parse(withBranding({ colors: { primary: 'blue' } }, 'dark'))).toThrow()
+  })
+
+  test('theme invalid', () => {
+    expect(() => schema.parse(withConfig({ theme: 'auto' }))).toThrow()
+  })
+
+  test.each(['system', 'light', 'dark'])('theme accepts %s', (theme) => {
+    expect(() => schema.parse(withConfig({ theme }))).not.toThrow()
+  })
+
+  test('launcher size out of range', () => {
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 39 } }))
+    ).toThrow()
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 81 } }))
+    ).toThrow()
+  })
+
+  test('launcher size at boundaries', () => {
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 40 } }))
+    ).not.toThrow()
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 80 } }))
+    ).not.toThrow()
+  })
+
+  test('launcher size rejects a fraction', () => {
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: 60.5 } }))
+    ).toThrow()
+  })
+
+  test('launcher icon scale out of range', () => {
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 39 } }))
+    ).toThrow()
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 101 } }))
+    ).toThrow()
+  })
+
+  test('launcher icon scale at boundaries', () => {
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 40 } }))
+    ).not.toThrow()
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 100 } }))
+    ).not.toThrow()
+  })
+
+  test('launcher size coerced from string', () => {
+    const parsed = schema.parse(withConfig({ launcher: { ...validConfig.launcher, size: '72' } }))
+    expect(parsed.config.launcher.size).toBe(72)
   })
 
   test('launcher position invalid', () => {
@@ -496,76 +567,43 @@ describe('Livechat Inbox Form Schema', () => {
   })
 
   test('home screen header_text_color invalid', () => {
-    expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: { ...validConfig.home_screen, header_text_color: 'grey' }
-        })
-      )
-    ).toThrow()
+    expect(() => schema.parse(withHomeScreen({ header_text_color: 'grey' }))).toThrow()
   })
 
   test('solid background without a color accepted', () => {
-    expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: { ...validConfig.home_screen, background: { type: 'solid' } }
-        })
-      )
-    ).not.toThrow()
+    expect(() => schema.parse(withHomeScreen({ background: { type: 'solid' } }))).not.toThrow()
   })
 
   test('gradient background requires both stops', () => {
     expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: {
-            ...validConfig.home_screen,
-            background: { type: 'gradient', gradient_start: '#000000' }
-          }
-        })
-      )
+      schema.parse(withHomeScreen({ background: { type: 'gradient', gradient_start: '#000000' } }))
     ).toThrow()
     expect(() =>
       schema.parse(
-        withConfig({
-          home_screen: {
-            ...validConfig.home_screen,
-            background: { type: 'gradient', gradient_start: '#000000', gradient_end: '#ffffff' }
-          }
+        withHomeScreen({
+          background: { type: 'gradient', gradient_start: '#000000', gradient_end: '#ffffff' }
         })
       )
     ).not.toThrow()
   })
 
   test('image background requires an image url', () => {
+    expect(() => schema.parse(withHomeScreen({ background: { type: 'image' } }))).toThrow()
     expect(() =>
       schema.parse(
-        withConfig({
-          home_screen: { ...validConfig.home_screen, background: { type: 'image' } }
-        })
-      )
-    ).toThrow()
-    expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: {
-            ...validConfig.home_screen,
-            background: { type: 'image', image_url: 'https://cdn.example.com/bg.png' }
-          }
+        withHomeScreen({
+          background: { type: 'image', image_url: 'https://cdn.example.com/bg.png' }
         })
       )
     ).not.toThrow()
   })
 
   test('background type invalid', () => {
-    expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: { ...validConfig.home_screen, background: { type: 'video' } }
-        })
-      )
-    ).toThrow()
+    expect(() => schema.parse(withHomeScreen({ background: { type: 'video' } }))).toThrow()
+  })
+
+  test('dark background validated too', () => {
+    expect(() => schema.parse(withHomeScreen({ background: { type: 'image' } }, 'dark'))).toThrow()
   })
 
   test('session_duration invalid duration', () => {

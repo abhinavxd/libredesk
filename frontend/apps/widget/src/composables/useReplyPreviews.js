@@ -17,7 +17,7 @@ export function useReplyPreviews() {
       chat.getConversations,
       user.userID,
       widget.config.previews,
-      widget.config.dark_mode,
+      widget.isDark,
       widget.isOpen
     ],
     async () => {

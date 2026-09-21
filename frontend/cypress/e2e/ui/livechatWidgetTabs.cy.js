@@ -12,8 +12,6 @@ const collectionName = `Cypress Collection ${stamp}`
 const articleTitle = `Cypress Article ${stamp}`
 const listPath = '/admin/inboxes'
 
-const openTab = (label) => cy.get('[role="tab"]').contains(label).click()
-
 const selectOption = (trigger, option) => {
   cy.get(trigger).click()
   cy.get('[role="option"]').contains(option).click()
@@ -82,6 +80,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
 
     cy.visit('/admin/inboxes/new')
     cy.contains('Create a live chat inbox').click()
+    cy.openInboxSection('General')
     cy.get('input[name="name"]').type(inboxName)
     cy.get('input[name="config.brand_name"]').type(brandName)
     cy.get('button[type="submit"]').click()
@@ -108,6 +107,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
       cy.intercept('PUT', `**/api/v1/inboxes/${apiInboxId}`).as('updateApiInbox')
 
       editInbox(apiInboxId)
+      cy.openInboxSection('General')
       cy.get('input[name="config.website_url"]').type('https://cypress.test/api-inbox')
       cy.get('button[type="submit"]').click()
       cy.wait('@updateApiInbox').its('response.statusCode').should('eq', 200)
@@ -120,7 +120,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     cy.contains('button', 'Add proactive message').click()
 
     cy.get('#campaign-name').clear().type(campaignName)
@@ -136,7 +136,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.wait('@updateInbox').its('response.statusCode').should('eq', 200)
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     openCampaign(campaignName)
 
     cy.get('#campaign-name').should('have.value', campaignName)
@@ -155,7 +155,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     openCampaign(campaignName)
     cy.get('#campaign-message').clear()
 
@@ -169,7 +169,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     openCampaign(campaignName)
     cy.get('#campaign-repeat_hours').type('{selectall}9000')
 
@@ -183,7 +183,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     openCampaign(campaignName)
     cy.get('[data-campaign-devices] button[role="switch"]').each(($switch) => {
       cy.wrap($switch).click()
@@ -195,11 +195,11 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.get('@updateInbox.all').should('have.length', 0)
   })
 
-  it('persists the enabled toggle and the order of two proactive messages', () => {
+  it('persists the enabled toggle and the saved order of two proactive messages', () => {
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     cy.contains('button', 'Add proactive message').click()
     cy.get('#campaign-name').clear().type(secondCampaignName)
     cy.get('#campaign-message').clear().type(`Second message ${stamp}`)
@@ -209,7 +209,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.wait('@updateInbox').its('response.statusCode').should('eq', 200)
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     // A new proactive message starts paused, so one click enables it.
     cy.contains('button', campaignName)
       .parents('.border')
@@ -217,18 +217,12 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
       .find('button[role="switch"][aria-label="Enabled"]')
       .should('have.attr', 'data-state', 'unchecked')
       .click()
-    cy.contains('button', secondCampaignName)
-      .parents('.border')
-      .first()
-      .find('button[aria-label="Move up"]')
-      .click()
-
     cy.get('button[type="submit"]').click()
     cy.wait('@updateInbox').its('response.statusCode').should('eq', 200)
 
     cy.api('GET', `/api/v1/inboxes/${inboxId}`).then(({ body }) => {
       const campaigns = body.data.config.campaigns
-      expect(campaigns.map((item) => item.name)).to.deep.eq([secondCampaignName, campaignName])
+      expect(campaigns.map((item) => item.name)).to.deep.eq([campaignName, secondCampaignName])
       expect(campaigns.find((item) => item.name === campaignName).enabled).to.eq(true)
     })
   })
@@ -237,7 +231,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     openCampaign(secondCampaignName)
     cy.get('[data-campaign-editor]').contains('button', 'Delete').click()
     cy.get('[role="alertdialog"]').contains('button', 'Delete').click()
@@ -247,7 +241,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.wait('@updateInbox').its('response.statusCode').should('eq', 200)
 
     editInbox(inboxId)
-    openTab('Proactive messages')
+    cy.openInboxSection('Proactive messages')
     cy.contains(secondCampaignName).should('not.exist')
     cy.contains(campaignName).should('exist')
   })
@@ -256,7 +250,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Help center')
+    cy.openInboxSection('Help center')
     selectOption('#widget-help-center', hcName)
 
     cy.get('[data-help-audience="visitors"]').contains('Show Help tab').should('be.visible')
@@ -268,9 +262,9 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.wait('@updateInbox').its('response.statusCode').should('eq', 200)
 
     editInbox(inboxId)
-    openTab('Help center')
+    cy.openInboxSection('Help center')
     cy.get('#widget-help-center').should('contain', hcName)
-    cy.contains(articleTitle).should('be.visible')
+    cy.contains(articleTitle).scrollIntoView().should('be.visible')
 
     cy.api('GET', `/api/v1/inboxes/${inboxId}`).then(({ body }) => {
       const help = body.data.config.help
@@ -283,7 +277,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Help center')
+    cy.openInboxSection('Help center')
     cy.get('[data-featured-articles] button[aria-label="Remove"]').click()
     cy.get('[data-featured-articles] button[aria-label="Remove"]').should('not.exist')
 
@@ -299,7 +293,7 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     editInbox(inboxId)
-    openTab('Help center')
+    cy.openInboxSection('Help center')
     selectOption('#widget-help-center', 'None')
 
     cy.contains('Featured articles').should('not.exist')

@@ -27,7 +27,63 @@ const (
 	HomeAppAnnouncement = "announcement"
 	HomeAppExternalLink = "external_link"
 	HomeAppHelp         = "help"
+
+	ThemeSystem = "system"
+	ThemeLight  = "light"
+	ThemeDark   = "dark"
+
+	DefaultLauncherSize      = 60
+	DefaultLauncherIconScale = 100
 )
+
+type Colors struct {
+	Primary string `json:"primary"`
+}
+
+type Background struct {
+	Type          string `json:"type"`
+	Color         string `json:"color"`
+	GradientStart string `json:"gradient_start"`
+	GradientEnd   string `json:"gradient_end"`
+	ImageURL      string `json:"image_url"`
+}
+
+type HomeScreen struct {
+	HeaderTextColor string     `json:"header_text_color"`
+	Background      Background `json:"background"`
+	FadeBackground  bool       `json:"fade_background"`
+}
+
+type BrandingLauncher struct {
+	LogoURL string `json:"logo_url"`
+	Color   string `json:"color"`
+}
+
+// Branding is the appearance of the widget under one color scheme.
+type Branding struct {
+	Colors     Colors           `json:"colors"`
+	LogoURL    string           `json:"logo_url"`
+	Launcher   BrandingLauncher `json:"launcher"`
+	HomeScreen HomeScreen       `json:"home_screen"`
+}
+
+type BrandingSet struct {
+	Light Branding `json:"light"`
+	Dark  Branding `json:"dark"`
+}
+
+type LauncherSpacing struct {
+	Side   int `json:"side"`
+	Bottom int `json:"bottom"`
+}
+
+// LauncherLayout is the launcher geometry, which does not change with the color scheme.
+type LauncherLayout struct {
+	Spacing   LauncherSpacing `json:"spacing"`
+	Position  string          `json:"position"`
+	Size      int             `json:"size"`
+	IconScale int             `json:"icon_scale"`
+}
 
 type PreChatFormField struct {
 	Key               string `json:"key"`
@@ -107,40 +163,18 @@ type Config struct {
 	Previews              PreviewConfig        `json:"previews"`
 	BrandName             string               `json:"brand_name"`
 	WebsiteURL            string               `json:"website_url"`
-	DarkMode              bool                 `json:"dark_mode"`
+	Theme                 string               `json:"theme"`
 	ShowPoweredBy         bool                 `json:"show_powered_by"`
 	Language              string               `json:"language"`
 	FallbackLanguage      string               `json:"fallback_language"`
 	Users                 AudienceConfig       `json:"users"`
-	Colors                struct {
-		Primary string `json:"primary"`
-	} `json:"colors"`
-	HomeScreen struct {
-		HeaderTextColor string `json:"header_text_color"`
-		Background      struct {
-			Type          string `json:"type"`
-			Color         string `json:"color"`
-			GradientStart string `json:"gradient_start"`
-			GradientEnd   string `json:"gradient_end"`
-			ImageURL      string `json:"image_url"`
-		} `json:"background"`
-		FadeBackground bool `json:"fade_background"`
-	} `json:"home_screen"`
-	Features struct {
+	Branding              BrandingSet          `json:"branding"`
+	Features              struct {
 		Emoji      bool `json:"emoji"`
 		FileUpload bool `json:"file_upload"`
 		Transcript bool `json:"transcript"`
 	} `json:"features"`
-	Launcher struct {
-		Spacing struct {
-			Side   int `json:"side"`
-			Bottom int `json:"bottom"`
-		} `json:"spacing"`
-		LogoURL  string `json:"logo_url"`
-		Position string `json:"position"`
-		Color    string `json:"color"`
-	} `json:"launcher"`
-	LogoURL      string         `json:"logo_url"`
+	Launcher     LauncherLayout `json:"launcher"`
 	Visitors     AudienceConfig `json:"visitors"`
 	NoticeBanner struct {
 		Text    string `json:"text"`
@@ -221,6 +255,53 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*LiveC
 		clients:       make(map[string][]*Client),
 	}
 	return lc, nil
+}
+
+// UnmarshalJSON fills the branding set, theme and launcher size from the pre-branding
+// config layout when they are absent, so inboxes saved before the split keep rendering.
+func (c *Config) UnmarshalJSON(data []byte) error {
+	type plain Config
+	var cfg plain
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+	*c = Config(cfg)
+
+	var legacy struct {
+		Branding   *json.RawMessage `json:"branding"`
+		DarkMode   bool             `json:"dark_mode"`
+		Colors     Colors           `json:"colors"`
+		LogoURL    string           `json:"logo_url"`
+		HomeScreen HomeScreen       `json:"home_screen"`
+		Launcher   BrandingLauncher `json:"launcher"`
+	}
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return err
+	}
+
+	if legacy.Branding == nil {
+		branding := Branding{
+			Colors:     legacy.Colors,
+			LogoURL:    legacy.LogoURL,
+			Launcher:   legacy.Launcher,
+			HomeScreen: legacy.HomeScreen,
+		}
+		c.Branding.Light = branding
+		c.Branding.Dark = branding
+		if legacy.DarkMode {
+			c.Theme = ThemeDark
+		}
+	}
+	if c.Theme == "" {
+		c.Theme = ThemeLight
+	}
+	if c.Launcher.Size == 0 {
+		c.Launcher.Size = DefaultLauncherSize
+	}
+	if c.Launcher.IconScale == 0 {
+		c.Launcher.IconScale = DefaultLauncherIconScale
+	}
+	return nil
 }
 
 func (c Config) ResolvePreChatForm(isVisitor bool) Config {

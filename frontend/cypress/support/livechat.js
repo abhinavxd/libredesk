@@ -1,10 +1,22 @@
 const openSockets = []
 const createdInboxes = []
 
+const branding = (primary) => ({
+  colors: { primary },
+  logo_url: '',
+  launcher: { logo_url: '', color: primary },
+  home_screen: {
+    header_text_color: 'black',
+    background: { type: 'solid', color: '#ffffff' },
+    fade_background: false
+  }
+})
+
 const baseConfig = () => ({
   brand_name: 'Cypress',
-  colors: { primary: '#112233' },
-  launcher: { position: 'right', spacing: { side: 20, bottom: 20 } },
+  theme: 'light',
+  branding: { light: branding('#112233'), dark: branding('#112233') },
+  launcher: { position: 'right', size: 60, spacing: { side: 20, bottom: 20 } },
   session_duration: '4h',
   visitors: { allow_start_conversation: true },
   users: { allow_start_conversation: true }
@@ -209,6 +221,17 @@ async function signJWT (payload, secret) {
   return cy.window({ timeout: 20000 }).its('Libredesk.toggleButton', { timeout: 20000 })
 })
 
+// Emulation.setEmulatedMedia reaches the widget iframe too, which stubbing window.matchMedia cannot.
+Cypress.Commands.add('setColorScheme', (value) =>
+  cy.wrap(
+    Cypress.automation('remote:debugger:protocol', {
+      command: 'Emulation.setEmulatedMedia',
+      params: { features: [{ name: 'prefers-color-scheme', value }] }
+    }),
+    { log: false }
+  )
+)
+
 Cypress.Commands.add('widgetLauncher', () =>
   cy.window().its('Libredesk.toggleButton').then((el) => cy.wrap(el, { log: false }))
 )
@@ -334,3 +357,98 @@ Cypress.Commands.add('signWidgetJWT', (payload, secret) => {
     { log: false }
   )
 })
+
+// Only one section is open at a time, so reaching a field means opening its tab and section.
+const FORM_SECTION_TAB = {
+  General: 'General',
+  'Conversation continuity email inbox': 'General',
+  Theme: 'Appearance',
+  Branding: 'Appearance',
+  'Launcher position': 'Appearance',
+  'Reply previews': 'Appearance',
+  Messages: 'Content',
+  'Notice banner': 'Content',
+  'Home screen apps': 'Content',
+  'Help center': 'Content',
+  'Proactive messages': 'Content',
+  Features: 'Conversations',
+  'Office hours': 'Conversations',
+  'Pre-chat form': 'Conversations',
+  Users: 'Conversations',
+  Installation: 'Setup',
+  'Identity verification': 'Setup',
+  'JavaScript API': 'Setup',
+  Security: 'Setup'
+}
+
+const SECTION_ID = {
+  General: 'basics',
+  'Conversation continuity email inbox': 'continuity',
+  Theme: 'appearance',
+  Branding: 'branding',
+  'Launcher position': 'launcher',
+  'Reply previews': 'previews',
+  Messages: 'messages',
+  'Notice banner': 'noticeBanner',
+  'Home screen apps': 'homeApps',
+  'Help center': 'help',
+  'Proactive messages': 'campaigns',
+  Features: 'features',
+  'Office hours': 'officeHours',
+  'Pre-chat form': 'prechat',
+  Users: 'users',
+  Installation: 'installation',
+  'Identity verification': 'identity',
+  'JavaScript API': 'jsApi',
+  Security: 'security'
+}
+
+Cypress.Commands.add('inboxSection', (section) => cy.get(`[data-section="${SECTION_ID[section]}"]`))
+
+Cypress.Commands.add('openInboxSection', (section) => {
+  const tab = FORM_SECTION_TAB[section]
+  if (!tab) throw new Error(`unknown live chat form section: ${section}`)
+  // The admin sidebar also has collapsible buttons, so every lookup stays inside the form.
+  const trigger = () =>
+    cy.get('form').contains('button[aria-expanded]', new RegExp(`^\\s*${section}\\s*$`))
+
+  cy.get('form').contains('[role="tab"]', new RegExp(`^\\s*${tab}\\s*$`)).click()
+  trigger().then(($btn) => {
+    if ($btn.attr('aria-expanded') !== 'true') cy.wrap($btn).click()
+  })
+  trigger().should('have.attr', 'aria-expanded', 'true')
+})
+
+// Branding and launcher both carry this switch, only the open section's one is visible.
+Cypress.Commands.add('editBrandingTheme', (label) =>
+  cy.get('form').find('[role="tab"]').filter(':visible').contains(label).click()
+)
+
+Cypress.Commands.add('switchField', (title) =>
+  cy
+    .get('form')
+    .contains('p:visible', new RegExp(`^\\s*${title}\\s*$`))
+    .parent()
+    .find('button[role="switch"]')
+)
+
+// Switch labels and audience tabs repeat across sections, so these scope by section.
+Cypress.Commands.add('switchFieldIn', (section, title) =>
+  cy
+    .inboxSection(section)
+    .contains('p:visible', new RegExp(`^\\s*${title}\\s*$`))
+    .parent()
+    .find('button[role="switch"]')
+)
+
+Cypress.Commands.add('audienceSwitch', (audience, title) =>
+  cy
+    .get(`[data-audience="${audience}"]`)
+    .contains('p', new RegExp(`^\\s*${title}\\s*$`))
+    .parent()
+    .find('button[role="switch"]')
+)
+
+Cypress.Commands.add('audienceTab', (section, label) =>
+  cy.inboxSection(section).contains('[role="tab"]', new RegExp(`^\\s*${label}\\s*$`))
+)

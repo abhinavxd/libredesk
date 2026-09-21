@@ -95,9 +95,9 @@ type handoffFormReq struct {
 }
 
 type chatSettingsResponse struct {
-	Campaigns    *struct{} `json:"campaigns,omitempty"`
-	HasCampaigns bool      `json:"has_campaigns"`
-	CampaignDelaySeconds int `json:"campaign_delay_seconds"`
+	Campaigns            *struct{} `json:"campaigns,omitempty"`
+	HasCampaigns         bool      `json:"has_campaigns"`
+	CampaignDelaySeconds int       `json:"campaign_delay_seconds"`
 	livechat.Config
 	// Hide server-side fields from the public widget response.
 	TrustedDomains         *struct{}                     `json:"trusted_domains,omitempty"`
@@ -126,8 +126,12 @@ func handleGetChatLauncherSettings(r *fastglue.Request) error {
 	}
 
 	return r.SendEnvelope(map[string]any{
+		"theme":    config.Theme,
 		"launcher": config.Launcher,
-		"colors":   config.Colors,
+		"branding": map[string]any{
+			"light": launcherBranding(config.Branding.Light),
+			"dark":  launcherBranding(config.Branding.Dark),
+		},
 	})
 }
 
@@ -1459,4 +1463,11 @@ func canReply(r *fastglue.Request, conversation cmodels.Conversation) error {
 		return envelope.NewError(envelope.PermissionError, app.i18n.T("widget.conversationClosed"), nil)
 	}
 	return nil
+}
+
+func launcherBranding(b livechat.Branding) map[string]any {
+	return map[string]any{
+		"colors":   b.Colors,
+		"launcher": b.Launcher,
+	}
 }

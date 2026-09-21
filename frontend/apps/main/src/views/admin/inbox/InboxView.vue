@@ -8,20 +8,39 @@
       <!-- The livechat form writes its live config here so the preview replaces the help rail. -->
       <div v-if="livechatPreview" class="space-y-4 sticky top-2">
         <div class="space-y-2">
-          <div class="flex items-center justify-between gap-2">
-            <h4 class="text-sm font-medium text-foreground">
-              {{ $t('admin.inbox.livechat.preview') }}
-            </h4>
-            <Tabs v-model="previewUserType">
-              <TabsList class="h-8 p-0.5">
-                <TabsTrigger value="visitors" class="text-xs">
-                  {{ $t('admin.inbox.livechat.userSettings.visitors') }}
-                </TabsTrigger>
-                <TabsTrigger value="users" class="text-xs">
-                  {{ $t('globals.terms.users') }}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <div class="flex items-center justify-end gap-2">
+            <div class="flex items-center gap-2">
+              <Tabs v-model="previewUserType">
+                <TabsList class="h-8 p-0.5">
+                  <TabsTrigger value="visitors" class="text-xs">
+                    {{ $t('admin.inbox.livechat.userSettings.visitors') }}
+                  </TabsTrigger>
+                  <TabsTrigger value="users" class="text-xs">
+                    {{ $t('globals.terms.users') }}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Tabs v-model="previewTheme">
+                <TabsList class="h-8 p-0.5">
+                  <TabsTrigger
+                    value="light"
+                    class="px-2"
+                    data-preview-theme="light"
+                    :aria-label="$t('globals.terms.light')"
+                  >
+                    <Sun class="size-3.5" />
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="dark"
+                    class="px-2"
+                    data-preview-theme="dark"
+                    :aria-label="$t('globals.terms.dark')"
+                  >
+                    <Moon class="size-3.5" />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
           <LivechatWidgetPreview :config="livechatPreview" :user-type="previewUserType" />
         </div>
@@ -72,8 +91,11 @@ import { ref, provide } from 'vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import LivechatWidgetPreview from '@/features/admin/inbox/LivechatWidgetPreview.vue'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
+import { Sun, Moon } from 'lucide-vue-next'
 
 const previewUserType = ref('visitors')
+const previewTheme = ref('light')
 const livechatPreview = ref(null)
 provide('livechatPreview', livechatPreview)
+provide('livechatPreviewTheme', previewTheme)
 </script>

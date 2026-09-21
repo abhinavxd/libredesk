@@ -112,7 +112,7 @@
 
               <div v-if="loadedArticle && helpCenterLocales.length > 1" class="space-y-3">
                 <h3 class="font-medium text-sm text-muted-foreground">
-                  {{ t('helpCenter.translations') }}
+                  {{ t('globals.terms.translation', 2) }}
                 </h3>
                 <p class="text-sm text-muted-foreground">
                   {{ t('helpCenter.translationsHint') }}

@@ -1,7 +1,9 @@
 import { computed } from 'vue'
+import { useWidgetStore } from '@widget/store/widget.js'
 
-export function useHeaderTheme (config) {
-  const homeScreen = computed(() => config.value?.home_screen)
+export function useHeaderTheme () {
+  const widget = useWidgetStore()
+  const homeScreen = computed(() => widget.branding?.home_screen)
   const choice = computed(() => homeScreen.value?.header_text_color)
 
   const textColorClass = computed(() => {

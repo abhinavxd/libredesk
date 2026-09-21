@@ -1,7 +1,7 @@
 <template>
   <div
     class="libredesk-widget-app text-foreground bg-background"
-    :class="{ dark: widgetStore.config.dark_mode, mobile: widgetStore.isMobileFullScreen }"
+    :class="{ dark: widgetStore.isDark, mobile: widgetStore.isMobileFullScreen }"
     :style="customColorStyle"
     @click.once="initAudioContext"
     @touchstart.once="initAudioContext"
@@ -49,7 +49,7 @@ if (widgetConfig) {
 
 const customColorStyle = computed(() => {
   const style = {}
-  const colors = widgetStore.config.colors
+  const colors = widgetStore.branding?.colors
   if (colors?.primary) {
     style['--primary'] = hexToHSL(colors.primary)
     style['--primary-foreground'] = getContrastingHSL(colors.primary)
@@ -59,8 +59,8 @@ const customColorStyle = computed(() => {
 
 // Dropdowns and dialogs portal to document.body, outside the app wrapper.
 watch(
-  () => widgetStore.config.dark_mode,
-  (dark) => document.documentElement.classList.toggle('dark', !!dark),
+  () => widgetStore.isDark,
+  (dark) => document.documentElement.classList.toggle('dark', dark),
   { immediate: true }
 )
 
