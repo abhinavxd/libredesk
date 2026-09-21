@@ -151,6 +151,7 @@
 <script setup>
 import { ref, watch, computed, toRaw, nextTick, onMounted, onUnmounted } from 'vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { getTextFromHTML } from '@shared-ui/utils/string'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { useUserStore } from '@main/stores/user'
@@ -346,7 +347,8 @@ const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
 
-const draftPreview = computed(() => textContent.value.trim())
+// No editor is mounted while the composer is collapsed, so textContent is empty until it opens.
+const draftPreview = computed(() => textContent.value.trim() || getTextFromHTML(htmlContent.value))
 
 const isCollapsed = computed(() => isCramped.value || isMinimized.value)
 
