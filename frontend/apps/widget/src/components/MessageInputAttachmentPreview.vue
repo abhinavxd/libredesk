@@ -27,7 +27,7 @@
       >
         <div class="flex items-center space-x-1 py-1">
           <DotLoader v-if="attachment.loading" />
-          <Paperclip v-else :size="16" />
+          <File v-else :size="16" />
           <div
             class="max-w-[12rem] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-foreground"
             :title="attachment.filename"
@@ -54,7 +54,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Paperclip, X } from 'lucide-vue-next'
+import { File, X } from 'lucide-vue-next'
 import { DotLoader } from '@shared-ui/components/ui/loader'
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 
