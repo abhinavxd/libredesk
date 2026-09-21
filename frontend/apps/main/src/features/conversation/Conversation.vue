@@ -39,9 +39,11 @@
           <DropdownMenuTrigger>
             <div
               v-if="conversationStore.current?.status"
-              class="flex items-center space-x-1 cursor-pointer bg-primary px-3 py-3 xl:px-2 xl:py-1 rounded-md text-sm"
+              class="flex h-11 xl:h-8 items-center cursor-pointer"
             >
-              <span class="text-primary-foreground font-medium inline-block">
+              <span
+                class="rounded-md bg-primary px-2.5 py-1 text-xs xl:text-sm font-medium text-primary-foreground"
+              >
                 {{ conversationStore.current?.status }}
               </span>
             </div>
