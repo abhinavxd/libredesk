@@ -1,0 +1,109 @@
+name: Upstream release sync
+
+on:
+  schedule:
+    # GitHub Actions cannot receive release events from a different repository,
+    # so poll the upstream releases endpoint six times per day.
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-release-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPSTREAM_REPO: abhinavxd/libredesk
+  SYNC_BRANCH: automation/upstream-release-sync
+
+jobs:
+  sync:
+    if: github.repository == 'jakedolan443/libredesk'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out fork main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Find latest upstream release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$(gh api "repos/${UPSTREAM_REPO}/releases/latest" --jq '.tag_name')"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Upstream returned an unexpected release tag: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_url=https://github.com/${UPSTREAM_REPO}/releases/tag/${tag}" >> "$GITHUB_OUTPUT"
+          echo "Latest upstream release: $tag"
+
+      - name: Merge upstream release into a sync branch
+        id: sync
+        env:
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch --no-tags upstream "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
+          git fetch origin "refs/heads/main:refs/remotes/origin/main"
+
+          if git merge-base --is-ancestor "$UPSTREAM_TAG" origin/main; then
+            echo "Upstream release $UPSTREAM_TAG is already included in fork main."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git switch --create "$SYNC_BRANCH" origin/main
+          if ! git merge --no-ff --no-edit "$UPSTREAM_TAG"; then
+            git merge --abort || true
+            echo "::error title=Upstream sync conflict::${UPSTREAM_TAG} conflicts with fork customizations. Resolve the merge manually, then rerun this workflow."
+            exit 1
+          fi
+
+          # Populate the lease when a previous run already created the branch;
+          # an absent branch is fine on the first run.
+          git fetch origin "refs/heads/${SYNC_BRANCH}:refs/remotes/origin/${SYNC_BRANCH}" 2>/dev/null || true
+          git push --force-with-lease origin "HEAD:${SYNC_BRANCH}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update the upstream PR
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+          RELEASE_URL: ${{ steps.upstream.outputs.release_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="chore: sync upstream release ${UPSTREAM_TAG}"
+          body=$(cat <<EOF
+          This automated PR syncs the fork with upstream LibreDesk release [${UPSTREAM_TAG}](${RELEASE_URL}).
+
+          Please review conflicts and fork-specific behavior carefully before merging. This repository contains custom changes that must remain maintainable against upstream.
+
+          The workflow uses the fixed branch `${SYNC_BRANCH}`, so later upstream releases update this PR instead of opening duplicates.
+          EOF
+          )
+          existing_pr="$(gh pr list --repo "${GITHUB_REPOSITORY}" --base main --head "${SYNC_BRANCH}" --state open --json number --jq '.[0].number // ""')"
+          if [[ -n "$existing_pr" ]]; then
+            gh pr edit "$existing_pr" --title "$title" --body "$body"
+            echo "Updated PR #$existing_pr"
+          else
+            gh pr create --repo "${GITHUB_REPOSITORY}" --base main --head "${SYNC_BRANCH}" --title "$title" --body "$body"
+          fi
