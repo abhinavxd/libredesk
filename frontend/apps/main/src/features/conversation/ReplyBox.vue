@@ -585,12 +585,8 @@ watch(
 watch(
   () => conversationStore.currentBCC,
   (newVal) => {
-    const newBcc = newVal?.join(', ') || ''
-    bcc.value = newBcc
-    // Only show BCC field if it has content
-    if (newBcc.length > 0) {
-      showBcc.value = true
-    }
+    bcc.value = newVal?.join(', ') || ''
+    showBcc.value = bcc.value.length > 0
   },
   { deep: true, immediate: true }
 )
