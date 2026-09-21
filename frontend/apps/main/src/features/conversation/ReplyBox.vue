@@ -320,7 +320,6 @@ const focusFromPalette = () => {
 }
 
 const toggleMinimize = () => {
-  // The cramped layout is always collapsed, minimizing it would do nothing visible.
   if (isCramped.value || isEditorFullscreen.value) return
   isMinimized.value = !isMinimized.value
   if (!isMinimized.value) nextTick(() => replyBoxContentRef.value?.focus())
@@ -347,7 +346,7 @@ const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
 
-// No editor is mounted while the composer is collapsed, so textContent is empty until it opens.
+// textContent stays empty while the composer is collapsed, no editor is mounted to fill it.
 const draftPreview = computed(() => textContent.value.trim() || getTextFromHTML(htmlContent.value))
 
 const isCollapsed = computed(() => isCramped.value || isMinimized.value)
