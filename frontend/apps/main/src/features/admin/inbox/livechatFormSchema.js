@@ -251,7 +251,11 @@ export const createFormSchema = (t) =>
     linked_email_inbox_id: z.number().nullable().optional(),
     config: z.object({
       campaigns: z.array(createCampaignSchema(t)).max(50).default([]),
-      campaign_cooldown_hours: rangeInteger(t, 0, 8760).default(24),
+      campaign_cooldown: z
+        .string()
+        .min(1, { message: t('globals.messages.required') })
+        .refine(isGoDuration, { message: t('validation.invalidDuration') })
+        .default('24h'),
       help: z
         .object({
           help_center_id: z.number().int().min(0),

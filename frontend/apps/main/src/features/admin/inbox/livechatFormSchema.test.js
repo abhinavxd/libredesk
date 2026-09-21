@@ -287,7 +287,7 @@ describe('Livechat Inbox Form Schema', () => {
             repeat_hours: 0
           }
         ],
-        campaign_cooldown_hours: -1
+        campaign_cooldown: 'tomorrow'
       })
     )
     expect(result.success).toBe(false)
@@ -295,9 +295,18 @@ describe('Livechat Inbox Form Schema', () => {
       'widget.campaignUrlLimit {}',
       'validation.minmaxNumber {"min":0,"max":86400}',
       'validation.minmaxNumber {"min":1,"max":8760}',
-      'validation.minmaxNumber {"min":0,"max":8760}'
+      'validation.invalidDuration {}'
     ])
   })
+
+  test.each(['0s', '10m', '1h', '1h30m'])(
+    'campaign cooldown accepts %s',
+    (campaignCooldown) => {
+      expect(() =>
+        schema.parse(withConfig({ campaign_cooldown: campaignCooldown }))
+      ).not.toThrow()
+    }
+  )
 
   test('quick replies reject more than six non-empty lines', () => {
     expect(() => schema.parse(withConfig({ quick_replies: '1\n2\n3\n4\n5\n6\n7' }))).toThrow()

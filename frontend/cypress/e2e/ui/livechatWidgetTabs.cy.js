@@ -129,6 +129,10 @@ describe('Live chat inbox form: proactive messages and help center tabs', () => 
     cy.get('#campaign-exclude_urls').clear().type('/checkout/*')
     cy.get('#campaign-delay_seconds').type('{selectall}25')
     cy.get('#campaign-event').clear().type('pricing_viewed')
+    cy.contains(
+      'Show this message only after your website tracks this event. Leave this field blank to show it without an event.'
+    ).should('be.visible')
+    cy.contains('code', 'window.Libredesk.trackEvent("pricing_viewed")').should('be.visible')
     selectOption('#campaign-repeat', 'After an interval')
     cy.get('#campaign-repeat_hours').type('{selectall}12')
 

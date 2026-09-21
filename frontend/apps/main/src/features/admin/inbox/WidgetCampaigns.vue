@@ -1,4 +1,6 @@
 <script setup>
+const HINT_CLASS = 'text-xs text-muted-foreground'
+
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
@@ -46,6 +48,7 @@ import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
 import WidgetConditions from './WidgetConditions.vue'
 import { createCampaignSchema, defaultCampaign, newCampaignId } from './livechatFormSchema.js'
 import { handleHTTPError } from '@shared-ui/utils/http'
+import { isGoDuration } from '@shared-ui/utils/string'
 import {
   ChevronRight,
   ChevronDown,
@@ -75,7 +78,7 @@ const props = defineProps({
   modelValue: { type: Array, default: () => [] },
   inboxId: { type: Number, default: 0 },
   brandName: { type: String, default: '' },
-  cooldown: { type: Number, default: 24 },
+  cooldown: { type: String, default: '24h' },
   showErrors: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue', 'update:cooldown', 'update:preview'])
@@ -92,6 +95,9 @@ const stats = ref([])
 const from = ref(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10))
 const to = ref(new Date().toISOString().slice(0, 10))
 const brandSenderName = computed(() => props.brandName.trim() || t('widget.brandBot'))
+const campaignEventExample = computed(
+  () => `window.Libredesk.trackEvent(${JSON.stringify(campaign.value?.event || 'pricing_viewed')})`
+)
 const senderName = (id) => {
   const agent = usersStore.options.find((item) => String(item.value) === String(id))
   return agent?.label || brandSenderName.value
@@ -113,10 +119,7 @@ const campaignSectionError = (field) =>
     ?.message || ''
 const cooldownError = computed(() => {
   if (!props.showErrors) return ''
-  const value = Number(props.cooldown)
-  return Number.isInteger(value) && value >= 0 && value <= 8760
-    ? ''
-    : t('validation.minmaxNumber', { min: 0, max: 8760 })
+  return isGoDuration(props.cooldown) ? '' : t('validation.invalidDuration')
 })
 
 const audienceLabel = (item) => t(AUDIENCE_TRANSLATION_KEYS[item.audience])
@@ -205,7 +208,7 @@ const remove = () => {
 }
 
 const showInvalidField = async (field) => {
-  if (field === 'config.campaign_cooldown_hours') {
+  if (field === 'config.campaign_cooldown') {
     root.value?.querySelector('#campaign-cooldown')?.focus()
     return
   }
@@ -280,13 +283,16 @@ onMounted(async () => {
         <Label for="campaign-cooldown">{{ t('widget.campaignCooldown') }}</Label>
         <Input
           id="campaign-cooldown"
-          type="number"
-          min="0"
-          max="8760"
+          type="text"
+          placeholder="1h"
           :model-value="cooldown"
-          @update:model-value="emit('update:cooldown', Number($event))"
+          aria-describedby="campaign-cooldown-hint"
+          @update:model-value="emit('update:cooldown', $event)"
           :aria-invalid="!!cooldownError"
         />
+        <p id="campaign-cooldown-hint" :class="HINT_CLASS">
+          {{ t('globals.messages.golangDurationHoursMinutes') }}
+        </p>
         <p v-if="cooldownError" role="alert" class="text-sm text-destructive">
           {{ cooldownError }}
         </p>
@@ -361,7 +367,7 @@ onMounted(async () => {
           <Plus class="size-4" />
           {{ t('widget.addCampaign') }}
         </Button>
-        <p v-if="modelValue.length >= MAX_CAMPAIGNS" class="text-xs text-muted-foreground">
+        <p v-if="modelValue.length >= MAX_CAMPAIGNS" :class="HINT_CLASS">
           {{ t('widget.campaignLimitReached') }}
         </p>
       </div>
@@ -580,7 +586,7 @@ onMounted(async () => {
             @update:model-value="update(key, $event.split('\n'))"
             :aria-invalid="!!campaignFieldError(key)"
           />
-          <p class="text-xs text-muted-foreground">{{ t('widget.urlPatternsHint') }}</p>
+          <p :class="HINT_CLASS">{{ t('widget.urlPatternsHint') }}</p>
           <p v-if="campaignFieldError(key)" role="alert" class="text-sm text-destructive">
             {{ campaignFieldError(key) }}
           </p>
@@ -612,9 +618,19 @@ onMounted(async () => {
             <Input
               id="campaign-event"
               :model-value="campaign.event"
+              placeholder="pricing_viewed"
               maxlength="128"
+              aria-describedby="campaign-event-hint campaign-event-example"
               @update:model-value="update('event', $event)"
             />
+            <p id="campaign-event-hint" :class="HINT_CLASS">
+              {{ t('widget.campaignEventHint') }}
+            </p>
+            <code
+              id="campaign-event-example"
+              class="block overflow-x-auto rounded-md border bg-muted px-3 py-2 text-xs"
+              >{{ campaignEventExample }}</code
+            >
           </div>
 
           <div class="space-y-2">

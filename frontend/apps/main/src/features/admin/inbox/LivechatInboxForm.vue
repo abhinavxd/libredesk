@@ -947,7 +947,7 @@
                   :model-value="form.values.config.campaigns || []"
                   :inbox-id="initialValues.id || 0"
                   :brand-name="form.values.config.brand_name || ''"
-                  :cooldown="form.values.config.campaign_cooldown_hours ?? 24"
+                  :cooldown="form.values.config.campaign_cooldown ?? '24h'"
                   :show-errors="showCampaignErrors"
                   @update:model-value="updateCampaigns"
                   @update:cooldown="updateCampaignCooldown"
@@ -1732,7 +1732,7 @@ const form = useForm({
       help: defaultWidgetHelp(),
       previews: defaultWidgetPreviews(),
       campaigns: [],
-      campaign_cooldown_hours: 24,
+      campaign_cooldown: '24h',
       brand_name: '',
       website_url: '',
       theme: 'light',
@@ -1890,8 +1890,8 @@ const hasCampaignErrors = computed(() =>
 )
 const updateCampaigns = (campaigns) =>
   form.setFieldValue('config.campaigns', campaigns, hasCampaignErrors.value)
-const updateCampaignCooldown = (hours) =>
-  form.setFieldValue('config.campaign_cooldown_hours', hours, hasCampaignErrors.value)
+const updateCampaignCooldown = (duration) =>
+  form.setFieldValue('config.campaign_cooldown', duration, hasCampaignErrors.value)
 
 // home_apps in form.values only syncs on change events, so pull the live ref for the preview.
 const previewTheme = inject('livechatPreviewTheme', ref('light'))
@@ -2130,7 +2130,7 @@ watch(
           ...audienceConfigs,
           prechat_form: pc,
           campaigns: newValues.config?.campaigns || [],
-          campaign_cooldown_hours: newValues.config?.campaign_cooldown_hours || 24,
+          campaign_cooldown: newValues.config?.campaign_cooldown || '24h',
           help: newValues.config?.help || defaultWidgetHelp(),
           previews: newValues.config?.previews || defaultWidgetPreviews(),
           features: {

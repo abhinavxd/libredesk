@@ -36,33 +36,33 @@ func TestEligibilityAndSuppression(t *testing.T) {
 		}
 	}
 	history := []Delivery{{CampaignID: "a", Displayed: true, CreatedAt: now.Add(-48 * time.Hour), SessionKey: "session"}}
-	if got := Suppression(campaign, ctx, history, 24); got != "repeat" {
+	if got := Suppression(campaign, ctx, history, 24*time.Hour); got != "repeat" {
 		t.Fatalf("once: %q", got)
 	}
 	campaign.Repeat = "session"
-	if got := Suppression(campaign, ctx, history, 24); got != "repeat" {
+	if got := Suppression(campaign, ctx, history, 24*time.Hour); got != "repeat" {
 		t.Fatalf("session: %q", got)
 	}
 	ctx.SessionKey = "new"
-	if got := Suppression(campaign, ctx, history, 24); got != "" {
+	if got := Suppression(campaign, ctx, history, 24*time.Hour); got != "" {
 		t.Fatalf("new session: %q", got)
 	}
 	campaign.Repeat = "interval"
 	campaign.RepeatHours = 72
-	if got := Suppression(campaign, ctx, history, 24); got != "repeat" {
+	if got := Suppression(campaign, ctx, history, 24*time.Hour); got != "repeat" {
 		t.Fatalf("interval: %q", got)
 	}
 	history[0].CampaignID = "other"
 	history[0].CreatedAt = now.Add(-time.Hour)
-	if got := Suppression(campaign, ctx, history, 24); got != "cooldown" {
+	if got := Suppression(campaign, ctx, history, 90*time.Minute); got != "cooldown" {
 		t.Fatalf("shared cooldown: %q", got)
 	}
 	history[0].Displayed = false
-	if got := Suppression(campaign, ctx, history, 24); got != "" {
+	if got := Suppression(campaign, ctx, history, 90*time.Minute); got != "" {
 		t.Fatalf("expired reservation suppressed: %q", got)
 	}
 	history[0].CreatedAt = now.Add(-time.Second)
-	if got := Suppression(campaign, ctx, history, 24); got != "cooldown" {
+	if got := Suppression(campaign, ctx, history, 10*time.Minute); got != "cooldown" {
 		t.Fatalf("concurrent reservation: %q", got)
 	}
 }

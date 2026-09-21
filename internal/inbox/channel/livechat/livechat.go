@@ -157,19 +157,19 @@ type PreChatFormConfig struct {
 
 // Config holds the live chat inbox configuration.
 type Config struct {
-	Campaigns             []proactive.Campaign `json:"campaigns"`
-	CampaignCooldownHours int                  `json:"campaign_cooldown_hours"`
-	Help                  HelpConfig           `json:"help"`
-	Previews              PreviewConfig        `json:"previews"`
-	BrandName             string               `json:"brand_name"`
-	WebsiteURL            string               `json:"website_url"`
-	Theme                 string               `json:"theme"`
-	ShowPoweredBy         bool                 `json:"show_powered_by"`
-	Language              string               `json:"language"`
-	FallbackLanguage      string               `json:"fallback_language"`
-	Users                 AudienceConfig       `json:"users"`
-	Branding              BrandingSet          `json:"branding"`
-	Features              struct {
+	Campaigns        []proactive.Campaign `json:"campaigns"`
+	CampaignCooldown string               `json:"campaign_cooldown"`
+	Help             HelpConfig           `json:"help"`
+	Previews         PreviewConfig        `json:"previews"`
+	BrandName        string               `json:"brand_name"`
+	WebsiteURL       string               `json:"website_url"`
+	Theme            string               `json:"theme"`
+	ShowPoweredBy    bool                 `json:"show_powered_by"`
+	Language         string               `json:"language"`
+	FallbackLanguage string               `json:"fallback_language"`
+	Users            AudienceConfig       `json:"users"`
+	Branding         BrandingSet          `json:"branding"`
+	Features         struct {
 		Emoji      bool `json:"emoji"`
 		FileUpload bool `json:"file_upload"`
 		Transcript bool `json:"transcript"`

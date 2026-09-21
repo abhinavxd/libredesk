@@ -112,7 +112,7 @@ func (m *Manager) error(err error) error {
 	return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 }
 
-func Suppression(c Campaign, ctx Context, history []Delivery, cooldownHours int) string {
+func Suppression(c Campaign, ctx Context, history []Delivery, cooldown time.Duration) string {
 	for _, d := range history {
 		if !d.Displayed && !d.Dismissed && !d.Replied && ctx.Now.Sub(d.CreatedAt) > time.Minute {
 			continue
@@ -123,7 +123,7 @@ func Suppression(c Campaign, ctx Context, history []Delivery, cooldownHours int)
 			}
 			continue
 		}
-		if cooldownHours > 0 && ctx.Now.Sub(d.CreatedAt) < time.Duration(cooldownHours)*time.Hour {
+		if cooldown > 0 && ctx.Now.Sub(d.CreatedAt) < cooldown {
 			return "cooldown"
 		}
 	}
