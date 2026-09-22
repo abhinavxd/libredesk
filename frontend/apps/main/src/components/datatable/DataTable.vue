@@ -28,9 +28,7 @@
               :class="{
                 'group cursor-pointer select-none transition-colors hover:text-foreground':
                   header.column.getCanSort(),
-                'max-sm:hidden':
-                  (headerIndex > 1 && header.column.id !== 'actions') ||
-                  ['created_at', 'updated_at'].includes(header.column.id)
+                'max-sm:hidden': isHiddenOnPhone(header.column.id, headerIndex)
               }"
               @click="header.column.getToggleSortingHandler()?.($event)"
             >
@@ -72,9 +70,7 @@
                 class="px-4 py-3 text-center text-sm sm:whitespace-nowrap"
                 :class="[
                   cell.column.id === 'actions' ? actionCellClass : '',
-                  ((cellIndex > 1 && cell.column.id !== 'actions') ||
-                    ['created_at', 'updated_at'].includes(cell.column.id)) &&
-                    'max-sm:hidden'
+                  isHiddenOnPhone(cell.column.id, cellIndex) && 'max-sm:hidden'
                 ]"
               >
                 <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
@@ -135,6 +131,9 @@ const { t } = useI18n()
 // Hidden until row-hover on pointer devices; always shown on touch, focus, and while the menu is open.
 const actionCellClass =
   'transition-opacity duration-150 can-hover:opacity-0 can-hover:group-hover/row:opacity-100 focus-within:!opacity-100 [&:has([data-state=open])]:!opacity-100 max-md:[&_button]:size-11'
+
+const isHiddenOnPhone = (columnId, index) =>
+  (index > 1 && columnId !== 'actions') || ['created_at', 'updated_at'].includes(columnId)
 
 const props = defineProps({
   columns: Array,

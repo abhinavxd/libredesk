@@ -132,7 +132,7 @@
         v-model:showBcc="showBcc"
         v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
-        @minimize="isMinimized = true"
+        @minimize="toggleMinimize"
         @send="processSend"
         @sendAndSetStatus="processSendAndSetStatus"
         @fileUpload="handleFileUpload"
@@ -320,7 +320,8 @@ const focusFromPalette = () => {
 }
 
 const toggleMinimize = () => {
-  if (isCramped.value || isEditorFullscreen.value) return
+  // Unmounting the editor mid AI rewrite drops the result and leaves isGenerating stuck.
+  if (isCramped.value || isEditorFullscreen.value || isGenerating.value) return
   isMinimized.value = !isMinimized.value
   if (!isMinimized.value) nextTick(() => replyBoxContentRef.value?.focus())
 }
