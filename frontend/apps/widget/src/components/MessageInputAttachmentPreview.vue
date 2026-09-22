@@ -7,10 +7,9 @@
     >
       <div v-if="isImage(attachment)" class="group relative">
         <img
-          :src="getThumbnailUrl(attachment)"
+          :src="attachment.url"
           :alt="attachment.filename"
           class="h-20 w-20 rounded-md border object-cover"
-          @error="fallbackToOriginal($event, attachment.url)"
         />
         <button
           type="button"
@@ -27,7 +26,7 @@
       >
         <div class="flex items-center space-x-1 py-1">
           <DotLoader v-if="attachment.loading" />
-          <File v-else :size="16" />
+          <Paperclip v-else :size="16" />
           <div
             class="max-w-[12rem] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-foreground"
             :title="attachment.filename"
@@ -54,9 +53,9 @@
 
 <script setup>
 import { computed } from 'vue'
-import { File, X } from 'lucide-vue-next'
+import { Paperclip, X } from 'lucide-vue-next'
 import { DotLoader } from '@shared-ui/components/ui/loader'
-import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
+import { formatBytes } from '@shared-ui/utils/file'
 
 const props = defineProps({
   attachments: {
@@ -86,16 +85,8 @@ const getAttachmentName = (name) => {
   return name.length > 20 ? `${name.substring(0, 17)}...` : name
 }
 
-const isImage = (attachment) => attachment.content_type?.startsWith('image/')
-
-const getThumbnailUrl = (attachment) =>
-  attachment.thumbnail_url || getThumbFilepath(attachment.url)
-
-const fallbackToOriginal = (event, originalUrl) => {
-  if (event.target.dataset.originalFallback) return
-  event.target.dataset.originalFallback = 'true'
-  event.target.src = originalUrl
-}
+const isImage = (attachment) =>
+  !attachment.loading && attachment.content_type?.startsWith('image/') && !!attachment.url
 </script>
 
 <style scoped>
