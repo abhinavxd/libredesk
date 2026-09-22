@@ -176,50 +176,6 @@
             :open="openSection === 'brand'"
             @toggle="toggleSection('brand')"
           >
-            <FormField v-slot="{ componentField }" name="theme.logo_url">
-              <FormItem>
-                <FormLabel>{{ t('globals.terms.logoUrl') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" v-bind="componentField" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <FormField v-slot="{ componentField }" name="theme.logo_url_dark">
-              <FormItem>
-                <FormLabel>{{ t('helpCenter.styling.darkLogoUrl') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" v-bind="componentField" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <FormField v-slot="{ value, handleChange }" name="theme.hide_theme_toggle">
-              <FormItem class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <FormControl>
-                    <Checkbox :checked="!value" @update:checked="(v) => handleChange(!v)" />
-                  </FormControl>
-                  <FormLabel class="font-normal cursor-pointer">{{
-                    t('helpCenter.styling.showThemeToggle')
-                  }}</FormLabel>
-                </div>
-                <FormDescription>{{ t('helpCenter.styling.themeToggleHint') }}</FormDescription>
-              </FormItem>
-            </FormField>
-
-            <FormField v-slot="{ componentField }" name="theme.color">
-              <FormItem>
-                <FormLabel>{{ t('globals.terms.primaryColor') }}</FormLabel>
-                <FormControl>
-                  <Input type="color" v-bind="componentField" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
             <FormField v-slot="{ componentField }" name="theme.favicon">
               <FormItem>
                 <FormLabel>{{ t('admin.general.faviconURL') }}</FormLabel>
@@ -233,6 +189,72 @@
                 <FormMessage />
               </FormItem>
             </FormField>
+
+            <FormField v-slot="{ componentField }" name="theme.color_scheme">
+              <FormItem>
+                <FormLabel>{{ t('globals.terms.theme') }}</FormLabel>
+                <FormControl>
+                  <RadioGroup v-bind="componentField" class="flex gap-4">
+                    <div class="flex items-center space-x-2">
+                      <RadioGroupItem id="hc-scheme-system" value="system" />
+                      <Label for="hc-scheme-system">{{ t('globals.terms.matchSystem') }}</Label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <RadioGroupItem id="hc-scheme-light" value="light" />
+                      <Label for="hc-scheme-light">{{ t('globals.terms.light') }}</Label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <RadioGroupItem id="hc-scheme-dark" value="dark" />
+                      <Label for="hc-scheme-dark">{{ t('globals.terms.dark') }}</Label>
+                    </div>
+                  </RadioGroup>
+                </FormControl>
+                <FormDescription>{{ t('globals.messages.matchSystemHint') }}</FormDescription>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+
+            <Tabs :model-value="editingScheme" @update:model-value="editingScheme = $event">
+              <TabsList class="w-full h-10">
+                <TabsTrigger value="light" class="flex-1 gap-2 h-8">
+                  <Sun class="size-4" />
+                  {{ t('globals.terms.light') }}
+                </TabsTrigger>
+                <TabsTrigger value="dark" class="flex-1 gap-2 h-8">
+                  <Moon class="size-4" />
+                  {{ t('globals.terms.dark') }}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <FormField
+              v-slot="{ componentField }"
+              :name="editingScheme === 'dark' ? 'theme.logo_url_dark' : 'theme.logo_url'"
+              keep-value
+            >
+              <FormItem>
+                <FormLabel>{{ t('globals.terms.logoUrl') }}</FormLabel>
+                <FormControl>
+                  <Input type="text" v-bind="componentField" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+
+            <FormField
+              v-slot="{ componentField }"
+              :name="editingScheme === 'dark' ? 'theme.color_dark' : 'theme.color'"
+              keep-value
+            >
+              <FormItem>
+                <FormLabel>{{ t('globals.terms.primaryColor') }}</FormLabel>
+                <FormControl>
+                  <Input type="color" v-bind="componentField" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+
           </CollapsibleSection>
 
           <CollapsibleSection
@@ -680,7 +702,7 @@
 </template>
 
 <script setup>
-import { watch, computed, ref, onMounted, nextTick } from 'vue'
+import { watch, computed, ref, inject, onMounted, nextTick } from 'vue'
 import { useForm, useFieldArray } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { Button } from '@shared-ui/components/ui/button'
@@ -703,7 +725,8 @@ import {
   FormMessage,
   FormDescription
 } from '@shared-ui/components/ui/form/index.js'
-import { X } from 'lucide-vue-next'
+import { X, Sun, Moon } from 'lucide-vue-next'
+import { RadioGroup, RadioGroupItem } from '@shared-ui/components/ui/radio-group'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import CollapsibleSection from './CollapsibleSection.vue'
 import LinkListField from './LinkListField.vue'
@@ -720,7 +743,7 @@ const FIELD_LOCATION = [
   ['theme.announcement', 'appearance', 'announcement'],
   ['theme.logo_url', 'appearance', 'brand'],
   ['theme.logo_url_dark', 'appearance', 'brand'],
-  ['theme.hide_theme_toggle', 'appearance', 'brand'],
+  ['theme.color_scheme', 'appearance', 'brand'],
   ['theme.color', 'appearance', 'brand'],
   ['theme.favicon', 'appearance', 'brand'],
   ['theme.nav_links', 'general', ''],
@@ -732,6 +755,13 @@ const FIELD_LOCATION = [
   ['custom_css', 'appearance', 'code'],
   ['custom_js', 'appearance', 'code']
 ]
+
+const SCHEME_FIELDS = {
+  'theme.logo_url': 'light',
+  'theme.color': 'light',
+  'theme.logo_url_dark': 'dark',
+  'theme.color_dark': 'dark'
+}
 
 const props = defineProps({
   helpCenter: {
@@ -781,10 +811,11 @@ const toFormValues = (hc) => ({
   allowed_locales:
     Array.isArray(hc?.allowed_locales) && hc.allowed_locales.length ? hc.allowed_locales : ['en'],
   theme: {
+    color_scheme: hc?.theme?.color_scheme || 'light',
     color: hc?.theme?.color || '#1f93ff',
+    color_dark: hc?.theme?.color_dark || hc?.theme?.color || '#1f93ff',
     logo_url: hc?.theme?.logo_url || '',
     logo_url_dark: hc?.theme?.logo_url_dark || '',
-    hide_theme_toggle: !!hc?.theme?.hide_theme_toggle,
     nav_links: Array.isArray(hc?.theme?.nav_links) ? hc.theme.nav_links : [],
     favicon: hc?.theme?.favicon || '',
     tagline: hc?.theme?.tagline || '',
@@ -853,6 +884,15 @@ const {
 
 const isClassic = computed(() => form.values.template === 'classic')
 
+const editingScheme = inject('helpCenterPreviewScheme', ref('light'))
+watch(
+  () => form.values.theme?.color_scheme,
+  (scheme) => {
+    editingScheme.value = scheme === 'dark' ? 'dark' : 'light'
+  },
+  { immediate: true }
+)
+
 const supportedLocales = ref([])
 
 onMounted(async () => {
@@ -917,6 +957,7 @@ const onSubmit = form.handleSubmit(
     if (match) {
       activeTab.value = match[1]
       openSection.value = match[2]
+      if (SCHEME_FIELDS[firstKey]) editingScheme.value = SCHEME_FIELDS[firstKey]
     } else if (firstKey) {
       activeTab.value = 'general'
     }

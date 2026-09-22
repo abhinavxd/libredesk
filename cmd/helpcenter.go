@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -147,6 +148,12 @@ type helpArticleResponse struct {
 type previewTOCItem struct {
 	ID    string
 	Title string
+}
+
+type colorSchemeResult struct {
+	dark         bool
+	showToggle   bool
+	followSystem bool
 }
 
 func (w helpCenterCacheLogWriter) Write(p []byte) (int, error) {
@@ -1778,6 +1785,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 	if pageTemplate == "" {
 		pageTemplate = hcmodels.TemplateClassic
 	}
+	embed := isEmbedRequest(r)
+	scheme := resolveColorScheme(theme.ColorScheme, string(r.RequestCtx.QueryArgs().Peek("theme")), embed)
 	return map[string]interface{}{
 		"Slug":              hc.Slug,
 		"Name":              hc.Name,
@@ -1787,9 +1796,11 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"PageTitle":         hc.PageTitle,
 		"HeaderText":        theme.Header.Heading,
 		"LogoURL":           publicAssetPaths(app, theme.LogoURL),
-		"LogoURLDark":       publicAssetPaths(app, theme.LogoURLDark),
-		"HideThemeToggle":   theme.HideThemeToggle,
+		"LogoURLDark":       publicAssetPaths(app, cmp.Or(theme.LogoURLDark, theme.LogoURL)),
 		"Color":             theme.Color,
+		"ColorDark":         cmp.Or(theme.ColorDark, theme.Color),
+		"ShowThemeToggle":   scheme.showToggle,
+		"FollowSystemTheme": scheme.followSystem,
 		"DefaultLocale":     hc.DefaultLocale,
 		"CurrentLocale":     locale,
 		"OGLocale":          strings.ReplaceAll(locale, "-", "_"),
@@ -1806,8 +1817,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"CustomJS":          template.JS(hc.CustomJS),
 		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
 		"WidgetRootURL":     helpCenterRootURL(app),
-		"Embed":             isEmbedRequest(r),
-		"Dark":              string(r.RequestCtx.QueryArgs().Peek("theme")) == "dark",
+		"Embed":             embed,
+		"Dark":              scheme.dark,
 	}
 }
 
@@ -2113,4 +2124,15 @@ func redirectPath(ctx *fasthttp.RequestCtx, uri string, statusCode int) {
 	ctx.Response.Header.SetCanonical([]byte(fasthttp.HeaderLocation), u.RequestURI())
 	ctx.SetStatusCode(statusCode)
 	ctx.Response.SetBodyString("")
+}
+
+// resolveColorScheme lets the widget embed and the admin preview override the admin's scheme.
+func resolveColorScheme(scheme, requested string, embed bool) colorSchemeResult {
+	res := colorSchemeResult{dark: scheme == hcmodels.ColorSchemeDark}
+	if requested != "" || embed {
+		res.dark = requested == hcmodels.ColorSchemeDark
+	}
+	res.showToggle = scheme == hcmodels.ColorSchemeSystem && !embed
+	res.followSystem = res.showToggle && requested == ""
+	return res
 }

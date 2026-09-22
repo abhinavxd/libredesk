@@ -115,10 +115,11 @@ const createBaseSchema = (t) => {
       .default(['en']),
     theme: z
       .object({
+        color_scheme: z.enum(['system', 'light', 'dark']).optional(),
         color: z.string().optional(),
+        color_dark: optionalHexColor,
         logo_url: optionalURL,
         logo_url_dark: optionalURL,
-        hide_theme_toggle: z.boolean().optional(),
         nav_links: linkArray,
         favicon: optionalURL,
         tagline: z.string().optional(),

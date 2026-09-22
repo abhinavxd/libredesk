@@ -254,7 +254,7 @@
                         </div>
                       </RadioGroup>
                     </FormControl>
-                    <FormDescription>{{ $t('admin.inbox.livechat.theme.description') }}</FormDescription>
+                    <FormDescription>{{ $t('globals.messages.matchSystemHint') }}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 </FormField>

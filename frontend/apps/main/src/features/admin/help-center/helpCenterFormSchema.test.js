@@ -65,6 +65,17 @@ describe('Help Center Form Schema', () => {
     ).not.toThrow()
   })
 
+  test('theme color scheme and dark branding', () => {
+    const withTheme = (theme) => ({ ...validForm, theme })
+    for (const color_scheme of ['system', 'light', 'dark']) {
+      expect(() => schema.parse(withTheme({ color_scheme }))).not.toThrow()
+    }
+    expect(() => schema.parse(withTheme({ color_scheme: 'auto' }))).toThrow()
+    expect(() => schema.parse(withTheme({ color_dark: '#46ce8e' }))).not.toThrow()
+    expect(() => schema.parse(withTheme({ color_dark: 'green' }))).toThrow()
+    expect(() => schema.parse(withTheme({ logo_url_dark: 'not a url' }))).toThrow()
+  })
+
   test('name missing', () => {
     const { name, ...form } = validForm
     expect(() => schema.parse(form)).toThrow()

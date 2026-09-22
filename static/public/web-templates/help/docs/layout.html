@@ -28,7 +28,7 @@
                 {{ end }}
                 <div class="hc-nav-actions">
                     {{ if gt (len .Data.HelpCenter.AvailableLocales) 1 }}{{ template "hc-lang-switcher" . }}{{ end }}
-                    {{ if not .Data.HelpCenter.HideThemeToggle }}{{ template "hc-theme-toggle" . }}{{ end }}
+                    {{ if .Data.HelpCenter.ShowThemeToggle }}{{ template "hc-theme-toggle" . }}{{ end }}
                 </div>
             </div>
         </div>
@@ -194,7 +194,7 @@
     </script>
     <script src="/static/public/static/help-center-search.js?v={{ AssetVer }}" defer></script>
     {{ if .Data.HelpCenter.CustomJS }}<script>{{ .Data.HelpCenter.CustomJS }}</script>{{ end }}
-    {{ if not .Data.HelpCenter.HideThemeToggle }}{{ template "hc-theme-script" . }}{{ end }}
+    {{ if .Data.HelpCenter.ShowThemeToggle }}{{ template "hc-theme-script" . }}{{ end }}
 {{ template "hc-livechat-widget" . }}
 </body>
 </html>

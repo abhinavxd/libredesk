@@ -53,6 +53,7 @@ var (
 	reservedSlugs = []string{"articles", "search", "api", "sitemap.xml"}
 
 	headerBackgroundTypes = []string{"solid", "gradient", "image"}
+	colorSchemes          = []string{models.ColorSchemeSystem, models.ColorSchemeLight, models.ColorSchemeDark}
 
 	helpCenterTemplates = []string{models.TemplateDocs, models.TemplateClassic}
 
@@ -241,6 +242,9 @@ func (m *Manager) GetAllHelpCenters() ([]models.HelpCenter, error) {
 		m.lo.Error("error fetching help centers", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	for i := range helpCenters {
+		fillThemeDefaults(&helpCenters[i])
+	}
 	return helpCenters, nil
 }
 
@@ -250,6 +254,9 @@ func (m *Manager) GetActiveHelpCenters() ([]models.HelpCenter, error) {
 	if err := m.q.GetActiveHelpCenters.Select(&helpCenters); err != nil {
 		m.lo.Error("error fetching active help centers", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	for i := range helpCenters {
+		fillThemeDefaults(&helpCenters[i])
 	}
 	return helpCenters, nil
 }
@@ -264,6 +271,7 @@ func (m *Manager) GetHelpCenterByID(id int) (models.HelpCenter, error) {
 		m.lo.Error("error fetching help center", "error", err, "id", id)
 		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	fillThemeDefaults(&hc)
 	return hc, nil
 }
 
@@ -277,6 +285,7 @@ func (m *Manager) GetHelpCenterBySlug(slug string) (models.HelpCenter, error) {
 		m.lo.Error("error fetching help center by slug", "error", err, "slug", slug)
 		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	fillThemeDefaults(&hc)
 	return hc, nil
 }
 
@@ -374,6 +383,7 @@ func (m *Manager) ToggleHelpCenterActive(id int) (models.HelpCenter, error) {
 	}
 	// A paused help center 404s publicly, so its articles must leave the AI index too.
 	m.reindexHelpCenterArticles(id)
+	fillThemeDefaults(&hc)
 	return hc, nil
 }
 
@@ -1604,18 +1614,26 @@ func (m *Manager) normalizeHelpCenterRequest(req HelpCenterRequest) (HelpCenterR
 
 // normalizeTheme drops theme values that aren't safe to inject into CSS, and rejects a theme it can't read.
 func normalizeTheme(raw json.RawMessage) (json.RawMessage, error) {
-	if len(raw) == 0 {
-		return json.RawMessage("{}"), nil
+	if len(raw) == 0 || string(raw) == "null" {
+		raw = json.RawMessage("{}")
 	}
 	t := models.DefaultTheme()
 	if err := json.Unmarshal(raw, &t); err != nil {
 		return nil, err
 	}
+	if !slices.Contains(colorSchemes, t.ColorScheme) {
+		t.ColorScheme = models.ColorSchemeLight
+	}
 	t.Color = sanitizeHexColor(t.Color)
 	if t.Color == "" {
 		t.Color = defaultAccentColor
 	}
+	t.ColorDark = sanitizeHexColor(t.ColorDark)
+	if t.ColorDark == "" {
+		t.ColorDark = t.Color
+	}
 	t.LogoURL = sanitizeAssetURL(t.LogoURL)
+	t.LogoURLDark = sanitizeAssetURL(t.LogoURLDark)
 	t.NavLinks = sanitizeNavLinks(t.NavLinks)
 	t.Header.Heading = strings.TrimSpace(t.Header.Heading)
 	t.Header.BackgroundColor = sanitizeHexColor(t.Header.BackgroundColor)
@@ -1792,4 +1810,11 @@ func buildInlineTextSanitizer() *bluemonday.Policy {
 	p.RequireNoFollowOnFullyQualifiedLinks(true)
 	p.AllowElements("b", "strong", "i", "em", "u", "s", "del", "ins", "mark", "small", "sub", "sup", "br", "span", "code")
 	return p
+}
+
+// fillThemeDefaults gives a theme saved before a field existed that field's default.
+func fillThemeDefaults(hc *models.HelpCenter) {
+	if theme, err := normalizeTheme(hc.Theme); err == nil {
+		hc.Theme = theme
+	}
 }
