@@ -60,10 +60,16 @@ import {
 
 const MAX_CAMPAIGNS = 50
 const STAT_KEYS = ['displayed', 'opened', 'dismissed', 'replied']
+const STAT_TRANSLATION_KEYS = {
+  displayed: 'globals.terms.displayed',
+  opened: 'globals.terms.opened',
+  dismissed: 'globals.terms.dismissed',
+  replied: 'globals.terms.replied'
+}
 const AUDIENCE_TRANSLATION_KEYS = {
-  all: 'widget.campaign.all',
+  all: 'globals.terms.everyone',
   visitors: 'admin.inbox.livechat.userSettings.visitors',
-  users: 'widget.campaign.users'
+  users: 'globals.terms.signedInUser'
 }
 const SELECT_FIELDS = [
   {
@@ -122,7 +128,7 @@ const cooldownError = computed(() => {
   return isGoDuration(props.cooldown) ? '' : t('validation.invalidDuration')
 })
 
-const audienceLabel = (item) => t(AUDIENCE_TRANSLATION_KEYS[item.audience])
+const audienceLabel = (audience) => t(AUDIENCE_TRANSLATION_KEYS[audience], 2)
 
 const pagesLabel = (item) =>
   item.include_urls.filter(Boolean).length
@@ -307,7 +313,9 @@ onMounted(async () => {
       </div>
 
       <div class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">{{ t('widget.proactiveMessages') }}</h4>
+        <h4 class="text-base font-semibold text-foreground">
+          {{ t('globals.terms.proactiveMessage', 2) }}
+        </h4>
         <p v-if="modelValue.length > 1" class="text-sm text-muted-foreground">
           {{ t('widget.campaignPriorityHint') }}
         </p>
@@ -356,7 +364,7 @@ onMounted(async () => {
                     </Badge>
                   </div>
                   <p class="text-xs text-muted-foreground truncate mt-0.5">
-                    {{ audienceLabel(item) }} · {{ pagesLabel(item) }}
+                    {{ audienceLabel(item.audience) }} · {{ pagesLabel(item) }}
                   </p>
                 </div>
                 <ChevronRight class="size-4 text-muted-foreground shrink-0" />
@@ -408,7 +416,7 @@ onMounted(async () => {
               <TableRow>
                 <TableHead>{{ t('globals.terms.name') }}</TableHead>
                 <TableHead v-for="key in STAT_KEYS" :key="key" class="text-right">
-                  {{ t(`widget.campaign.${key}`) }}
+                  {{ t(STAT_TRANSLATION_KEYS[key]) }}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -532,7 +540,7 @@ onMounted(async () => {
               <SelectTrigger :id="`campaign-${field.key}`"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="value in field.values" :key="value" :value="value">
-                  {{ t(AUDIENCE_TRANSLATION_KEYS[value]) }}
+                  {{ audienceLabel(value) }}
                 </SelectItem>
               </SelectContent>
             </Select>

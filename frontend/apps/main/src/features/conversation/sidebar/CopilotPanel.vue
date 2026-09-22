@@ -97,7 +97,7 @@
                 :disabled="isThinking"
                 @click="resolveToolApproval(msg.approval, false)"
               >
-                {{ $t('globals.messages.decline') }}
+                {{ $t('globals.messages.reject') }}
               </Button>
               <Button
                 type="button"

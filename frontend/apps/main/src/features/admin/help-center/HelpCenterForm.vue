@@ -42,7 +42,7 @@
 
           <FormField v-slot="{ componentField }" name="livechat_inbox_id">
             <FormItem>
-              <FormLabel>{{ t('helpCenter.livechatInbox') }}</FormLabel>
+              <FormLabel>{{ t('globals.terms.liveChatInbox') }}</FormLabel>
               <FormControl>
                 <Select v-bind="componentField">
                   <SelectTrigger>

@@ -79,7 +79,7 @@ const unusedArticles = computed(() =>
     </div>
 
     <p v-if="failed" role="alert" class="text-sm text-destructive">
-      {{ t('widget.helpLoadError') }}
+      {{ t('globals.messages.helpLoadError') }}
     </p>
 
     <template v-if="modelValue.help_center_id">
@@ -108,7 +108,9 @@ const unusedArticles = computed(() =>
       </div>
 
       <div data-featured-articles class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">{{ t('widget.featuredArticles') }}</h4>
+        <h4 class="text-base font-semibold text-foreground">
+          {{ t('globals.terms.featuredArticle', 2) }}
+        </h4>
         <p class="text-sm text-muted-foreground">{{ t('widget.featuredArticlesHint') }}</p>
 
         <Draggable
@@ -132,7 +134,7 @@ const unusedArticles = computed(() =>
                 class="flex-1 min-w-0 text-sm break-words"
                 :class="{ 'text-muted-foreground': !item.title }"
               >
-                {{ item.title || t('widget.articleUnavailable') }}
+                {{ item.title || t('globals.messages.articleUnavailable') }}
               </span>
               <Button
                 type="button"

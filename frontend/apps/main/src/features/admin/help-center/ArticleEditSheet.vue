@@ -30,7 +30,7 @@
                 rel="noopener"
                 class="h-auto gap-1 p-0 font-normal"
               >
-                {{ t('helpCenter.viewArticle') }}
+                {{ t('globals.messages.viewArticle') }}
                 <ExternalLink class="size-3.5" aria-hidden="true" />
               </Button>
             </div>
@@ -859,11 +859,7 @@ const confirmUnlink = async () => {
 const selectTranslationLocale = (locale) => {
   if (form.meta.value.dirty) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t(
-        translationByLocale.value.has(locale)
-          ? 'helpCenter.saveBeforeSwitchingTranslation'
-          : 'helpCenter.saveBeforeTranslation'
-      )
+      description: t('helpCenter.saveBeforeSwitchingTranslation')
     })
     return
   }

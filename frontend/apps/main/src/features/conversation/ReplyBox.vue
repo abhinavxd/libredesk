@@ -16,7 +16,7 @@
           :disabled="isGenerating"
           @click="resolveGenerateToolApproval(false)"
         >
-          {{ $t('globals.messages.decline') }}
+          {{ $t('globals.messages.reject') }}
         </Button>
         <Button type="button" :disabled="isGenerating" @click="resolveGenerateToolApproval(true)">
           {{ $t('globals.messages.approveAndRun') }}

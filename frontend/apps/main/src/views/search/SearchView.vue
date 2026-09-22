@@ -39,10 +39,6 @@
         >
           {{ $t('search.minQueryLength', { length: MIN_SEARCH_LENGTH }) }}
         </p>
-        <div v-else class="py-16 text-center text-muted-foreground">
-          <SearchIcon class="w-8 h-8 mx-auto mb-2 opacity-60" aria-hidden="true" />
-          <p class="text-sm">{{ $t('globals.messages.resultsAppearHere') }}</p>
-        </div>
       </div>
     </div>
   </div>
@@ -52,7 +48,6 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { Search as SearchIcon } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import SearchInput from '@shared-ui/components/SearchInput.vue'
 import SearchHeader from '@main/features/search/SearchHeader.vue'

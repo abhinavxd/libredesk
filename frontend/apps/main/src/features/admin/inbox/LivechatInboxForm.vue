@@ -475,7 +475,7 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="launcher" data-section="launcher">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.launcher.layout') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.launcher') }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <Tabs :model-value="editingTheme" @update:model-value="editingTheme = $event">
@@ -550,7 +550,7 @@
                   <div class="grid grid-cols-3 gap-4">
                     <FormField v-slot="{ componentField }" name="config.launcher.icon_scale">
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.livechat.launcher.iconScale') }}</FormLabel>
+                        <FormLabel>{{ $t('globals.terms.iconSize') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -859,7 +859,9 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="campaigns" data-section="campaigns">
-              <AccordionTrigger class="text-base">{{ $t('widget.proactiveMessages') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">
+                {{ $t('globals.terms.proactiveMessage', 2) }}
+              </AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <WidgetCampaigns
                   ref="campaignsRef"
@@ -1020,7 +1022,7 @@
 
                       <FormField v-slot="{ componentField }" name="config.visitors.quick_replies">
                         <FormItem>
-                          <FormLabel>{{ $t('admin.inbox.livechat.quickReplies') }}</FormLabel>
+                          <FormLabel>{{ $t('globals.terms.quickReply', 2) }}</FormLabel>
                           <FormControl>
                             <Textarea
                               v-bind="componentField"
@@ -1119,7 +1121,7 @@
 
                       <FormField v-slot="{ componentField }" name="config.users.quick_replies">
                         <FormItem>
-                          <FormLabel>{{ $t('admin.inbox.livechat.quickReplies') }}</FormLabel>
+                          <FormLabel>{{ $t('globals.terms.quickReply', 2) }}</FormLabel>
                           <FormControl>
                             <Textarea
                               v-bind="componentField"

@@ -73,7 +73,7 @@ onMounted(async () => {
       :to="{ name: 'custom-attributes' }"
       :class="buttonVariants({ variant: 'link', size: 'sm' })"
     >
-      {{ t('widget.addContactCustomAttribute') }}
+      {{ t('globals.messages.addContactCustomAttribute') }}
     </RouterLink>
   </div>
 </template>
