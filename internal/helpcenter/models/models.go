@@ -93,9 +93,11 @@ type CardTheme struct {
 }
 
 type FooterTheme struct {
-	BackgroundColor string `json:"background_color"`
-	TextColor       string `json:"text_color"`
-	Tagline         string `json:"tagline"`
+	BackgroundColor     string `json:"background_color"`
+	TextColor           string `json:"text_color"`
+	BackgroundColorDark string `json:"background_color_dark"`
+	TextColorDark       string `json:"text_color_dark"`
+	Tagline             string `json:"tagline"`
 }
 
 type SocialLink struct {

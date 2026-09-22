@@ -67,6 +67,7 @@ describe('Help center color scheme', () => {
       { color_scheme: 'system', color: LIGHT_COLOR, color_dark: DARK_COLOR },
       'docs'
     ).then((hc) => (created.docs = hc))
+    createHelpCenter('footer').then((hc) => (created.footer = hc))
   })
 
   beforeEach(() => {
@@ -144,6 +145,58 @@ describe('Help center color scheme', () => {
       cy.contains('label', /^Light$/).click()
       schemeTab('Light').should('have.attr', 'data-state', 'active')
       preview().should('have.attr', 'srcdoc').and('not.match', /<html[^>]*class="hc-dark"/)
+    })
+  })
+
+  describe('footer colors', () => {
+    const openFooter = () => {
+      cy.visit(`${listPath}/${created.footer.id}/customize`)
+      cy.contains('[role="tab"]', 'Appearance').click()
+      cy.contains('button[aria-expanded]', 'Footer')
+        .click()
+        .should('have.attr', 'aria-expanded', 'true')
+      return cy.contains('button[aria-expanded]', 'Footer').parent()
+    }
+
+    it('edits footer colors per theme and saves both', () => {
+      cy.intercept('PUT', `**/api/v1/help-centers/${created.footer.id}`).as('update')
+      openFooter().within(() => {
+        cy.get('input[name="theme.footer.background_color"]').clear().type('#e3e3e3')
+        cy.get('input[name="theme.footer.text_color"]').clear().type('#000000')
+
+        cy.contains('[role="tab"]', 'Dark').click()
+        cy.get('input[name="theme.footer.background_color"]').should('not.exist')
+        cy.get('input[name="theme.footer.background_color_dark"]')
+          .should('have.value', '')
+          .type('#101010')
+        cy.get('input[name="theme.footer.text_color_dark"]')
+          .should('have.value', '')
+          .type('#e5e5e5')
+
+        cy.contains('[role="tab"]', 'Light').click()
+        cy.get('input[name="theme.footer.background_color"]').should('have.value', '#e3e3e3')
+      })
+      cy.get('iframe[title="Help center"]')
+        .should('have.attr', 'srcdoc')
+        .and('not.match', /<html[^>]*class="hc-dark"/)
+      cy.get('button[type="submit"]').click()
+      cy.wait('@update').its('response.statusCode').should('eq', 200)
+
+      cy.api('GET', `/api/v1/help-centers/${created.footer.id}`)
+        .its('body.data.theme.footer')
+        .should('include', {
+          background_color: '#e3e3e3',
+          text_color: '#000000',
+          background_color_dark: '#101010',
+          text_color_dark: '#e5e5e5'
+        })
+    })
+
+    it('shows the dark footer colors on a dark page', () => {
+      cy.visit(`/hc/${created.footer.slug}/en?theme=dark`)
+      cy.get('footer').should('have.css', 'background-color', 'rgb(16, 16, 16)')
+      cy.visit(`/hc/${created.footer.slug}/en?theme=light`)
+      cy.get('footer').should('have.css', 'background-color', 'rgb(227, 227, 227)')
     })
   })
 

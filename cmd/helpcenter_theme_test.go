@@ -52,7 +52,9 @@ func TestBuildDarkThemeCSSVars(t *testing.T) {
 		{"header text on image header", hcmodels.HeaderTheme{BackgroundType: "image", BackgroundImage: "/a.png", TextColor: "#000"}, hcmodels.FooterTheme{}, ""},
 		{"header text on half-set gradient", hcmodels.HeaderTheme{BackgroundType: "gradient", GradientFrom: "#fff", TextColor: "#000"}, hcmodels.FooterTheme{}, "--hc-header-text:initial;"},
 		{"footer text on default footer", hcmodels.HeaderTheme{}, hcmodels.FooterTheme{TextColor: "#000"}, "--hc-footer-text:initial;"},
-		{"footer text on custom footer", hcmodels.HeaderTheme{}, hcmodels.FooterTheme{BackgroundColor: "#fff", TextColor: "#000"}, ""},
+		{"light footer colors only", hcmodels.HeaderTheme{}, hcmodels.FooterTheme{BackgroundColor: "#fff", TextColor: "#000"}, "--hc-footer-bg:initial;--hc-footer-text:initial;"},
+		{"dark footer colors", hcmodels.HeaderTheme{}, hcmodels.FooterTheme{BackgroundColor: "#fff", TextColor: "#000", BackgroundColorDark: "#111", TextColorDark: "#eee"}, "--hc-footer-bg:#111;--hc-footer-text:#eee;"},
+		{"dark footer text only", hcmodels.HeaderTheme{}, hcmodels.FooterTheme{TextColorDark: "#eee"}, "--hc-footer-text:#eee;"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

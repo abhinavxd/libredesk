@@ -162,6 +162,8 @@ const createBaseSchema = (t) => {
           .object({
             background_color: optionalHexColor,
             text_color: optionalHexColor,
+            background_color_dark: optionalHexColor,
+            text_color_dark: optionalHexColor,
             tagline: z.string().optional()
           })
           .optional(),

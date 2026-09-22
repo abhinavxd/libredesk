@@ -30,6 +30,21 @@ describe('API: help center color scheme', () => {
       logo_url_dark: '/uploads/dark.png'
     })
     createHelpCenter('system', { color_scheme: 'system', color: '#26583f' })
+    createHelpCenter('footer', {
+      color_scheme: 'system',
+      color: '#26583f',
+      footer: {
+        background_color: '#e3e3e3',
+        text_color: '#000000',
+        background_color_dark: '#101010',
+        text_color_dark: '#e5e5e5'
+      }
+    })
+    createHelpCenter('light-footer', {
+      color_scheme: 'system',
+      color: '#26583f',
+      footer: { background_color: '#e3e3e3', text_color: '#000000' }
+    })
   })
 
   beforeEach(() => {
@@ -83,6 +98,22 @@ describe('API: help center color scheme', () => {
       expect(html).to.contain('data-hc-theme')
       expect(html).to.contain('prefers-color-scheme')
     })
+  })
+
+  it('uses the dark footer colors in dark mode', () => {
+    page('footer').then((html) => {
+      expect(html).to.contain('--hc-footer-bg:#e3e3e3;--hc-footer-text:#000000;')
+      expect(html).to.contain(
+        ':root.hc-dark { --hc-accent: #26583f; --hc-footer-bg:#101010;--hc-footer-text:#e5e5e5; }'
+      )
+    })
+  })
+
+  it('falls back to the default dark footer when no dark footer color is set', () => {
+    page('light-footer').should(
+      'contain',
+      ':root.hc-dark { --hc-accent: #26583f; --hc-footer-bg:initial;--hc-footer-text:initial; }'
+    )
   })
 
   it('lets an embedded article follow the widget instead of the site', () => {

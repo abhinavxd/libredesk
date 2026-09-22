@@ -254,7 +254,6 @@
                 <FormMessage />
               </FormItem>
             </FormField>
-
           </CollapsibleSection>
 
           <CollapsibleSection
@@ -583,21 +582,58 @@
             :open="openSection === 'footer'"
             @toggle="toggleSection('footer')"
           >
+            <Tabs :model-value="editingScheme" @update:model-value="editingScheme = $event">
+              <TabsList class="w-full h-10">
+                <TabsTrigger value="light" class="flex-1 gap-2 h-8">
+                  <Sun class="size-4" />
+                  {{ t('globals.terms.light') }}
+                </TabsTrigger>
+                <TabsTrigger value="dark" class="flex-1 gap-2 h-8">
+                  <Moon class="size-4" />
+                  {{ t('globals.terms.dark') }}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <div class="flex gap-4">
-              <FormField v-slot="{ componentField }" name="theme.footer.background_color">
+              <FormField
+                v-slot="{ componentField }"
+                :name="
+                  editingScheme === 'dark'
+                    ? 'theme.footer.background_color_dark'
+                    : 'theme.footer.background_color'
+                "
+                keep-value
+              >
                 <FormItem class="flex-1">
                   <FormLabel>{{ t('globals.messages.backgroundColor') }}</FormLabel>
                   <FormControl>
-                    <Input type="text" placeholder="#ffffff" v-bind="componentField" />
+                    <Input
+                      type="text"
+                      :placeholder="editingScheme === 'dark' ? '#16181b' : '#ffffff'"
+                      v-bind="componentField"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               </FormField>
-              <FormField v-slot="{ componentField }" name="theme.footer.text_color">
+              <FormField
+                v-slot="{ componentField }"
+                :name="
+                  editingScheme === 'dark'
+                    ? 'theme.footer.text_color_dark'
+                    : 'theme.footer.text_color'
+                "
+                keep-value
+              >
                 <FormItem class="flex-1">
                   <FormLabel>{{ t('globals.terms.textColor') }}</FormLabel>
                   <FormControl>
-                    <Input type="text" placeholder="#909aa5" v-bind="componentField" />
+                    <Input
+                      type="text"
+                      :placeholder="editingScheme === 'dark' ? '#82878e' : '#909aa5'"
+                      v-bind="componentField"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -760,7 +796,11 @@ const SCHEME_FIELDS = {
   'theme.logo_url': 'light',
   'theme.color': 'light',
   'theme.logo_url_dark': 'dark',
-  'theme.color_dark': 'dark'
+  'theme.color_dark': 'dark',
+  'theme.footer.background_color': 'light',
+  'theme.footer.text_color': 'light',
+  'theme.footer.background_color_dark': 'dark',
+  'theme.footer.text_color_dark': 'dark'
 }
 
 const props = defineProps({
@@ -851,6 +891,8 @@ const toFormValues = (hc) => ({
     footer: {
       background_color: hc?.theme?.footer?.background_color || '',
       text_color: hc?.theme?.footer?.text_color || '',
+      background_color_dark: hc?.theme?.footer?.background_color_dark || '',
+      text_color_dark: hc?.theme?.footer?.text_color_dark || '',
       tagline: hc?.theme?.footer?.tagline || ''
     },
     footer_links: Array.isArray(hc?.theme?.footer_links) ? hc.theme.footer_links : [],

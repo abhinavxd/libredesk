@@ -1643,6 +1643,8 @@ func normalizeTheme(raw json.RawMessage) (json.RawMessage, error) {
 	t.Header.TextColor = sanitizeHexColor(t.Header.TextColor)
 	t.Footer.BackgroundColor = sanitizeHexColor(t.Footer.BackgroundColor)
 	t.Footer.TextColor = sanitizeHexColor(t.Footer.TextColor)
+	t.Footer.BackgroundColorDark = sanitizeHexColor(t.Footer.BackgroundColorDark)
+	t.Footer.TextColorDark = sanitizeHexColor(t.Footer.TextColorDark)
 	t.Favicon = sanitizeAssetURL(t.Favicon)
 	t.FooterLinks = sanitizeNavLinks(t.FooterLinks)
 	t.SocialLinks = sanitizeSocialLinks(t.SocialLinks)

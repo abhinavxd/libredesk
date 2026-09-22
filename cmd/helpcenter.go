@@ -1883,16 +1883,24 @@ func buildThemeCSSVars(t hcmodels.Theme) template.CSS {
 	return template.CSS(b.String())
 }
 
-// buildDarkThemeCSSVars resets text colors that sit on the default background, since those were picked against the light one.
+// buildDarkThemeCSSVars swaps in the dark footer colors and resets light-only colors to the dark defaults.
 func buildDarkThemeCSSVars(t hcmodels.Theme) template.CSS {
 	var b strings.Builder
 	if t.Header.TextColor != "" && !hasHeaderBackground(t.Header) {
 		b.WriteString("--hc-header-text:initial;")
 	}
-	if t.Footer.TextColor != "" && t.Footer.BackgroundColor == "" {
-		b.WriteString("--hc-footer-text:initial;")
-	}
+	writeDarkVar(&b, "--hc-footer-bg", t.Footer.BackgroundColorDark, t.Footer.BackgroundColor)
+	writeDarkVar(&b, "--hc-footer-text", t.Footer.TextColorDark, t.Footer.TextColor)
 	return template.CSS(b.String())
+}
+
+func writeDarkVar(b *strings.Builder, name, dark, light string) {
+	switch {
+	case dark != "":
+		fmt.Fprintf(b, "%s:%s;", name, dark)
+	case light != "":
+		fmt.Fprintf(b, "%s:initial;", name)
+	}
 }
 
 func hasHeaderBackground(h hcmodels.HeaderTheme) bool {

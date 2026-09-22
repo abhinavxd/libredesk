@@ -94,7 +94,8 @@ func TestNormalizeThemeDropsUnsafeValues(t *testing.T) {
 		"header": {"background_type": "wat", "background_color": "notacolor"},
 		"layout": {"collections": "wat", "columns": 5},
 		"cards": {"icon_position": "wat"},
-		"announcement": {"text": "", "link_url": "https://example.com", "link_label": "Go"}
+		"announcement": {"text": "", "link_url": "https://example.com", "link_label": "Go"},
+		"footer": {"background_color_dark": "black", "text_color_dark": "#eeeeee"}
 	}`))
 	if err != nil {
 		t.Fatalf("normalizeTheme: %v", err)
@@ -117,6 +118,9 @@ func TestNormalizeThemeDropsUnsafeValues(t *testing.T) {
 	}
 	if got.Cards.IconPosition != cardIconPositions[0] {
 		t.Errorf("icon_position = %q, want %q", got.Cards.IconPosition, cardIconPositions[0])
+	}
+	if got.Footer.BackgroundColorDark != "" || got.Footer.TextColorDark != "#eeeeee" {
+		t.Errorf("footer = %+v, want the bad dark background dropped and the dark text kept", got.Footer)
 	}
 	if got.Announcement != (models.AnnouncementTheme{}) {
 		t.Errorf("announcement = %+v, want cleared when the text is empty", got.Announcement)
