@@ -6,7 +6,6 @@
       class="max-w-xs"
       :placeholder="searchPlaceholder || t('globals.terms.search')"
       :clear-label="t('globals.messages.clearSearch')"
-      :loading="loading"
     />
 
     <div
