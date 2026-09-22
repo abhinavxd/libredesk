@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', '.github/ISSUE_TEMPLATE/**']
   pull_request:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', '.github/ISSUE_TEMPLATE/**']
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
