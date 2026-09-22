@@ -184,7 +184,6 @@ type Config struct {
 	DirectToConversation           bool              `json:"direct_to_conversation"`
 	GreetingMessage                string            `json:"greeting_message"`
 	ChatIntroduction               string            `json:"chat_introduction"`
-	QuickReplies                   []string          `json:"quick_replies"`
 	IntroductionMessage            string            `json:"introduction_message"`
 	Continuity                     ContinuityConfig  `json:"continuity"`
 	ShowOfficeHoursInChat          bool              `json:"show_office_hours_in_chat"`
@@ -356,9 +355,6 @@ func (c *Config) fillEmptyLists() {
 	}
 	if c.BlockedIPs == nil {
 		c.BlockedIPs = []string{}
-	}
-	if c.QuickReplies == nil {
-		c.QuickReplies = []string{}
 	}
 	if c.Users.QuickReplies == nil {
 		c.Users.QuickReplies = []string{}

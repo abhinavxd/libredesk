@@ -161,12 +161,9 @@ export const defaultCampaign = () => ({
 export const normalizeAudienceConfig = (config, audience) => {
   const audienceConfig = { ...config?.[audience] }
   const replies = audienceConfig.quick_replies
-  const legacyReplies = Array.isArray(config?.quick_replies)
-    ? config.quick_replies.join('\n')
-    : (config?.quick_replies ?? '')
   return {
     ...audienceConfig,
-    quick_replies: Array.isArray(replies) ? replies.join('\n') : (replies ?? legacyReplies),
+    quick_replies: Array.isArray(replies) ? replies.join('\n') : (replies ?? ''),
     direct_to_conversation:
       audienceConfig.direct_to_conversation ?? config?.direct_to_conversation ?? false
   }
@@ -279,7 +276,6 @@ export const createFormSchema = (t) =>
       greeting_message: z.string().optional(),
       introduction_message: z.string().optional(),
       chat_introduction: z.string(),
-      quick_replies: quickReplies(t).optional(),
       show_office_hours_in_chat: z.boolean(),
       show_office_hours_after_assignment: z.boolean(),
       chat_reply_expectation_message: z.string().optional(),

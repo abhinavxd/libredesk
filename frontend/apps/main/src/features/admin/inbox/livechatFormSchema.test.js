@@ -65,6 +65,8 @@ const validForm = {
 }
 
 const withConfig = (overrides) => ({ ...validForm, config: { ...validConfig, ...overrides } })
+const withVisitorReplies = (quickReplies) =>
+  withConfig({ visitors: { ...validConfig.visitors, quick_replies: quickReplies } })
 const withContinuity = (continuity) => ({
   ...withConfig({ continuity }),
   linked_email_inbox_id: 3
@@ -153,7 +155,6 @@ describe('Livechat Inbox Form Schema', () => {
           greeting_message: 'Hi there',
           introduction_message: 'We reply fast',
           chat_reply_expectation_message: 'Usually within an hour',
-          quick_replies: 'Billing question\nReset my password',
           notice_banner: { enabled: true, text: 'We are on holiday' },
           continuity: {
             offline_threshold: '5m',
@@ -190,8 +191,8 @@ describe('Livechat Inbox Form Schema', () => {
   })
 
   test('quick replies accept empty and repeated values', () => {
-    expect(() => schema.parse(withConfig({ quick_replies: '' }))).not.toThrow()
-    expect(() => schema.parse(withConfig({ quick_replies: 'Billing\nBilling' }))).not.toThrow()
+    expect(() => schema.parse(withVisitorReplies(''))).not.toThrow()
+    expect(() => schema.parse(withVisitorReplies('Billing\nBilling'))).not.toThrow()
   })
 
   test('campaigns trim and discard blank URL rows', () => {
@@ -289,12 +290,12 @@ describe('Livechat Inbox Form Schema', () => {
   )
 
   test('quick replies reject more than six non-empty lines', () => {
-    expect(() => schema.parse(withConfig({ quick_replies: '1\n2\n3\n4\n5\n6\n7' }))).toThrow()
-    expect(() => schema.parse(withConfig({ quick_replies: '1\n2\n\n3\n4\n5\n6' }))).not.toThrow()
+    expect(() => schema.parse(withVisitorReplies('1\n2\n3\n4\n5\n6\n7'))).toThrow()
+    expect(() => schema.parse(withVisitorReplies('1\n2\n\n3\n4\n5\n6'))).not.toThrow()
   })
 
   test('quick replies reject entries over 120 characters', () => {
-    expect(() => schema.parse(withConfig({ quick_replies: 'x'.repeat(121) }))).toThrow()
+    expect(() => schema.parse(withVisitorReplies('x'.repeat(121)))).toThrow()
   })
 
   test('audience quick replies are validated independently', () => {
@@ -308,31 +309,13 @@ describe('Livechat Inbox Form Schema', () => {
     ).toThrow()
   })
 
-  test('legacy audience settings are copied without changing behavior', () => {
-    const config = {
-      ...validConfig,
-      quick_replies: ['Billing', 'Support'],
-      direct_to_conversation: true
-    }
+  test('legacy direct to conversation is copied to both audiences', () => {
+    const config = { ...validConfig, direct_to_conversation: true }
     expect(normalizeAudienceConfig(config, 'visitors')).toMatchObject({
-      quick_replies: 'Billing\nSupport',
       direct_to_conversation: true
     })
     expect(normalizeAudienceConfig(config, 'users')).toMatchObject({
-      quick_replies: 'Billing\nSupport',
       direct_to_conversation: true
-    })
-  })
-
-  test('explicit empty audience quick replies do not fall back to legacy replies', () => {
-    const config = {
-      ...validConfig,
-      quick_replies: ['Legacy'],
-      visitors: { ...validConfig.visitors, quick_replies: [], direct_to_conversation: false }
-    }
-    expect(normalizeAudienceConfig(config, 'visitors')).toMatchObject({
-      quick_replies: '',
-      direct_to_conversation: false
     })
   })
 

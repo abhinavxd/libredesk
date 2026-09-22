@@ -278,7 +278,7 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			}
 		}
 
-		for _, replies := range [][]string{config.QuickReplies, config.Visitors.QuickReplies, config.Users.QuickReplies} {
+		for _, replies := range [][]string{config.Visitors.QuickReplies, config.Users.QuickReplies} {
 			if err := validateQuickReplies(app, replies); err != nil {
 				return err
 			}

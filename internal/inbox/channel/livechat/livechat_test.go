@@ -153,7 +153,7 @@ func TestUnmarshalFillsEmptyListsAndCooldown(t *testing.T) {
 	if err := json.Unmarshal(encoded, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"campaigns", "home_apps", "trusted_domains", "blocked_ips", "quick_replies"} {
+	for _, key := range []string{"campaigns", "home_apps", "trusted_domains", "blocked_ips"} {
 		if decoded[key] == nil {
 			t.Fatalf("%s encoded as null", key)
 		}

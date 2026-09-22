@@ -1473,7 +1473,6 @@ const FIELD_SECTION = [
   ['config.greeting_message', 'messages'],
   ['config.introduction_message', 'messages'],
   ['config.chat_introduction', 'messages'],
-  ['config.quick_replies', 'messages'],
   ['config.chat_reply_expectation_message', 'officeHours'],
   ['config.features', 'features'],
   ['config.prechat_form', 'prechat'],
@@ -1668,7 +1667,6 @@ const form = useForm({
       greeting_message: 'Hello {{.FirstName | there}}',
       introduction_message: 'How can we help?',
       chat_introduction: 'Ask us anything, or share your feedback.',
-      quick_replies: '',
       show_office_hours_in_chat: false,
       show_office_hours_after_assignment: false,
       chat_reply_expectation_message: 'We typically reply in 5 minutes.',
@@ -1931,7 +1929,6 @@ const onSubmit = form.handleSubmit(
   async (values) => {
     showCampaignErrors.value = false
     values.config.trusted_domains = textareaToLines(values.config.trusted_domains)
-    values.config.quick_replies = textareaToLines(values.config.quick_replies)
     values.config.visitors.quick_replies = textareaToLines(values.config.visitors.quick_replies)
     values.config.users.quick_replies = textareaToLines(values.config.users.quick_replies)
     values.config.blocked_ips = textareaToLines(values.config.blocked_ips)
@@ -1964,8 +1961,6 @@ const onSubmit = form.handleSubmit(
         audienceConfig.enabled = false
       }
     }
-    pc.title = pc.visitors.title
-    pc.fields = pc.visitors.fields
     values.config.prechat_form = pc
 
     await props.submitForm(values)
@@ -1996,10 +1991,6 @@ watch(
 
     if (Array.isArray(newValues.config?.trusted_domains)) {
       newValues.config.trusted_domains = newValues.config.trusted_domains.join('\n')
-    }
-
-    if (Array.isArray(newValues.config?.quick_replies)) {
-      newValues.config.quick_replies = newValues.config.quick_replies.join('\n')
     }
 
     const audienceConfigs = Object.fromEntries(

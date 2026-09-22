@@ -704,7 +704,7 @@ watch(
 )
 const campaignText = computed(() => campaign.value?.message?.slice(0, SNIPPET_LENGTH) || '')
 const quickReplies = computed(() => {
-  const replies = userTypeConfig.value.quick_replies ?? props.config.quick_replies
+  const replies = userTypeConfig.value.quick_replies
   if (Array.isArray(replies)) return replies
   return typeof replies === 'string'
     ? replies
