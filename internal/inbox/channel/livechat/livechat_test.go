@@ -138,3 +138,64 @@ func TestUnmarshalKeepsExplicitBranding(t *testing.T) {
 		t.Fatalf("branding = %+v", config.Branding)
 	}
 }
+
+func TestUnmarshalFillsEmptyListsAndCooldown(t *testing.T) {
+	var config Config
+	if err := json.Unmarshal([]byte(`{"brand_name":"Acme"}`), &config); err != nil {
+		t.Fatal(err)
+	}
+
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"campaigns", "home_apps", "trusted_domains", "blocked_ips", "quick_replies"} {
+		if decoded[key] == nil {
+			t.Fatalf("%s encoded as null", key)
+		}
+	}
+	if config.Help.FeaturedIDs == nil || config.PreChatForm.Fields == nil {
+		t.Fatalf("help featured ids = %v, prechat fields = %v", config.Help.FeaturedIDs, config.PreChatForm.Fields)
+	}
+	if config.Users.QuickReplies == nil || config.Visitors.QuickReplies == nil {
+		t.Fatalf("audience quick replies = %v, %v", config.Users.QuickReplies, config.Visitors.QuickReplies)
+	}
+	if config.CampaignCooldown != DefaultCampaignCooldown {
+		t.Fatalf("campaign cooldown = %q", config.CampaignCooldown)
+	}
+}
+
+func TestUnmarshalFillsValuesAConfigWrittenOutsideTheFormLacks(t *testing.T) {
+	var config Config
+	if err := json.Unmarshal([]byte(`{"brand_name":"Acme","colors":{"primary":"#112233"},"launcher":{"position":"right"}}`), &config); err != nil {
+		t.Fatal(err)
+	}
+
+	if config.SessionDuration != DefaultSessionDuration {
+		t.Fatalf("session duration = %q", config.SessionDuration)
+	}
+	if config.Language != DefaultLanguage || config.FallbackLanguage != DefaultLanguage {
+		t.Fatalf("language = %q, fallback = %q", config.Language, config.FallbackLanguage)
+	}
+	for theme, branding := range map[string]Branding{ThemeLight: config.Branding.Light, ThemeDark: config.Branding.Dark} {
+		if branding.Launcher.Color != DefaultLauncherColor {
+			t.Fatalf("%s launcher color = %q", theme, branding.Launcher.Color)
+		}
+		if branding.HomeScreen.Background.Type != BackgroundSolid {
+			t.Fatalf("%s background type = %q", theme, branding.HomeScreen.Background.Type)
+		}
+		if branding.Colors.Primary != "#112233" {
+			t.Fatalf("%s primary = %q", theme, branding.Colors.Primary)
+		}
+	}
+	if config.Branding.Light.HomeScreen.HeaderTextColor != "black" {
+		t.Fatalf("light header text = %q", config.Branding.Light.HomeScreen.HeaderTextColor)
+	}
+	if config.Branding.Dark.HomeScreen.HeaderTextColor != "white" {
+		t.Fatalf("dark header text = %q", config.Branding.Dark.HomeScreen.HeaderTextColor)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
@@ -33,6 +34,13 @@ const (
 	ThemeDark   = "dark"
 
 	DefaultLauncherIconScale = 100
+	DefaultCampaignCooldown  = "24h"
+	DefaultLauncherColor     = "#000000"
+	BackgroundSolid          = "solid"
+	// Matches the locale the widget falls back to when this is unset.
+	DefaultLanguage = "en-US"
+	// Matches the session TTL the chat handlers fall back to when this is unset.
+	DefaultSessionDuration = "4320h"
 )
 
 type Colors struct {
@@ -287,7 +295,80 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	if c.Launcher.IconScale == 0 {
 		c.Launcher.IconScale = DefaultLauncherIconScale
 	}
+	if c.CampaignCooldown == "" {
+		c.CampaignCooldown = DefaultCampaignCooldown
+	}
+	if c.SessionDuration == "" {
+		c.SessionDuration = DefaultSessionDuration
+	}
+	if c.Language == "" {
+		c.Language = DefaultLanguage
+	}
+	if c.FallbackLanguage == "" {
+		c.FallbackLanguage = DefaultLanguage
+	}
+	fillBrandingDefaults(&c.Branding.Light, ThemeLight)
+	fillBrandingDefaults(&c.Branding.Dark, ThemeDark)
+	c.fillEmptyLists()
 	return nil
+}
+
+func fillBrandingDefaults(branding *Branding, theme string) {
+	if branding.Launcher.Color == "" {
+		branding.Launcher.Color = DefaultLauncherColor
+	}
+	if branding.HomeScreen.Background.Type == "" {
+		branding.HomeScreen.Background.Type = BackgroundSolid
+	}
+	if branding.HomeScreen.HeaderTextColor == "" {
+		if theme == ThemeDark {
+			branding.HomeScreen.HeaderTextColor = "white"
+		} else {
+			branding.HomeScreen.HeaderTextColor = "black"
+		}
+	}
+}
+
+// A null list fails the admin form's validation.
+func (c *Config) fillEmptyLists() {
+	if c.Campaigns == nil {
+		c.Campaigns = []proactive.Campaign{}
+	}
+	for i := range c.Campaigns {
+		if c.Campaigns[i].IncludeURLs == nil {
+			c.Campaigns[i].IncludeURLs = []string{}
+		}
+		if c.Campaigns[i].ExcludeURLs == nil {
+			c.Campaigns[i].ExcludeURLs = []string{}
+		}
+		if c.Campaigns[i].Conditions.Rules == nil {
+			c.Campaigns[i].Conditions.Rules = []amodels.RuleDetail{}
+		}
+	}
+	if c.Help.FeaturedIDs == nil {
+		c.Help.FeaturedIDs = []int{}
+	}
+	if c.HomeApps == nil {
+		c.HomeApps = []HomeApp{}
+	}
+	if c.TrustedDomains == nil {
+		c.TrustedDomains = []string{}
+	}
+	if c.BlockedIPs == nil {
+		c.BlockedIPs = []string{}
+	}
+	if c.QuickReplies == nil {
+		c.QuickReplies = []string{}
+	}
+	if c.Users.QuickReplies == nil {
+		c.Users.QuickReplies = []string{}
+	}
+	if c.Visitors.QuickReplies == nil {
+		c.Visitors.QuickReplies = []string{}
+	}
+	if c.PreChatForm.Fields == nil {
+		c.PreChatForm.Fields = []PreChatFormField{}
+	}
 }
 
 func (c Config) ResolvePreChatForm(isVisitor bool) Config {

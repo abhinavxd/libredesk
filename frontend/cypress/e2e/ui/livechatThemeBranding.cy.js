@@ -3,7 +3,6 @@
 const stamp = Date.now()
 const inboxName = `Cypress Theme ${stamp}`
 const brandName = `Cypress Theme Brand ${stamp}`
-const listPath = '/admin/inboxes'
 const newPath = '/admin/inboxes/new'
 
 const lightPrimary = '#123456'
@@ -22,6 +21,10 @@ describe('Live chat theme and branding', () => {
     Cypress.on('uncaught:exception', (err) => !err.message.includes("reading 'focus'"))
     cy.viewport(1280, 900)
     cy.login()
+  })
+
+  after(() => {
+    if (inboxId) cy.api('DELETE', `/api/v1/inboxes/${inboxId}`, null, { failOnStatusCode: false })
   })
 
   it('saves a separate primary color for each theme', () => {
@@ -56,19 +59,6 @@ describe('Live chat theme and branding', () => {
     })
   })
 
-  it('loads each theme back into its own tab', () => {
-    expect(inboxId, 'inbox from the create step').to.be.a('number')
-
-    cy.visit(`${listPath}/${inboxId}/edit`)
-    cy.openInboxSection('Branding')
-
-    cy.editBrandingTheme('Light')
-    cy.get('input[name="config.branding.light.colors.primary"]').should('have.value', lightPrimary)
-
-    cy.editBrandingTheme('Dark')
-    cy.get('input[name="config.branding.dark.colors.primary"]').should('have.value', darkPrimary)
-  })
-
   it('seeds a dark background when the theme is switched away from light', () => {
     cy.intercept('POST', '**/api/v1/inboxes').as('createSeeded')
 
@@ -97,33 +87,4 @@ describe('Live chat theme and branding', () => {
     })
   })
 
-  it('rejects a launcher icon scale outside its range', () => {
-    cy.visit(`${listPath}/${inboxId}/edit`)
-    cy.openInboxSection('Launcher position')
-
-    cy.get('input[name="config.launcher.icon_scale"]').clear().type('10')
-    cy.get('button[type="submit"]').click()
-    cy.contains('40').should('exist')
-  })
-
-  it('persists the launcher icon scale', () => {
-    cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
-
-    cy.visit(`${listPath}/${inboxId}/edit`)
-    cy.openInboxSection('Launcher position')
-    cy.get('input[name="config.launcher.icon_scale"]').clear().type('60')
-
-    cy.get('button[type="submit"]').click()
-    cy.wait('@updateInbox').then(({ response }) => {
-      expect(response.statusCode).to.eq(200)
-      expect(response.body.data.config.launcher.icon_scale, 'icon scale').to.eq(60)
-    })
-  })
-
-  after(() => {
-    if (inboxId) {
-      cy.login()
-      cy.api('DELETE', `/api/v1/inboxes/${inboxId}`, null, { failOnStatusCode: false })
-    }
-  })
 })

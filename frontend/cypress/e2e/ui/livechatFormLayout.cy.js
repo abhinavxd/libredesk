@@ -173,16 +173,18 @@ describe('Live chat inbox form layout', () => {
     })
   })
 
-  it('renders the preview with its own theme toggle', () => {
+  it('keeps the preview and the branding tabs on the same theme', () => {
     cy.visit(`${listPath}/${inboxId}/edit`)
     cy.get('[data-preview-theme="light"]').should('be.visible')
 
     cy.openInboxSection('Branding')
     cy.editBrandingTheme('Dark')
-
-    cy.get('[data-preview-theme="light"]').should('have.attr', 'data-state', 'active')
-    cy.get('[data-preview-theme="dark"]').click()
     cy.get('[data-preview-theme="dark"]').should('have.attr', 'data-state', 'active')
+
+    cy.get('[data-preview-theme="light"]').click()
+    cy.inboxSection('Branding')
+      .find('[role="tab"][data-state="active"]')
+      .should('contain.text', 'Light')
   })
 
   it('rejects more than six quick replies', () => {

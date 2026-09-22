@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"slices"
 	"strconv"
 
 	cmodels "github.com/abhinavxd/libredesk/internal/custom_attribute/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -112,6 +114,9 @@ func handleDeleteCustomAttribute(r *fastglue.Request) error {
 	if err = app.customAttribute.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if err := removeAttributeFromPreChatForms(app, id); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	return r.SendEnvelope(true)
 }
 
@@ -136,4 +141,89 @@ func validateCustomAttribute(app *App, attribute cmodels.CustomAttribute) error 
 		return envelope.NewError(envelope.InputError, app.i18n.T("admin.customAttributes.keyNotAllowed"), nil)
 	}
 	return nil
+}
+
+func removeAttributeFromPreChatForms(app *App, attributeID int) error {
+	inboxes, err := app.inbox.GetAll()
+	if err != nil {
+		return err
+	}
+	for _, inb := range inboxes {
+		if inb.Channel != livechat.ChannelLiveChat {
+			continue
+		}
+		config, changed, err := stripPreChatFormAttribute(inb.Config, attributeID)
+		if err != nil {
+			app.lo.Error("error parsing live chat config", "id", inb.ID, "error", err)
+			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		if !changed {
+			continue
+		}
+		if err := app.inbox.UpdateConfig(inb.ID, config); err != nil {
+			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		if err := reloadInbox(app, inb.ID); err != nil {
+			app.lo.Error("error reloading inbox", "id", inb.ID, "error", err)
+		}
+	}
+	return nil
+}
+
+func stripPreChatFormAttribute(raw json.RawMessage, attributeID int) (json.RawMessage, bool, error) {
+	var config map[string]any
+	if len(raw) == 0 {
+		return raw, false, nil
+	}
+	if err := json.Unmarshal(raw, &config); err != nil {
+		return raw, false, err
+	}
+	form, ok := config["prechat_form"].(map[string]any)
+	if !ok {
+		return raw, false, nil
+	}
+	var changed bool
+	for _, holder := range []map[string]any{form, asObject(form["visitors"]), asObject(form["users"])} {
+		if holder == nil {
+			continue
+		}
+		fields, ok := holder["fields"].([]any)
+		if !ok {
+			continue
+		}
+		kept := make([]any, 0, len(fields))
+		for _, field := range fields {
+			if attributeIDOf(field) == attributeID {
+				changed = true
+				continue
+			}
+			kept = append(kept, field)
+		}
+		holder["fields"] = kept
+	}
+	if !changed {
+		return raw, false, nil
+	}
+	updated, err := json.Marshal(config)
+	if err != nil {
+		return raw, false, err
+	}
+	return updated, true, nil
+}
+
+func asObject(value any) map[string]any {
+	object, _ := value.(map[string]any)
+	return object
+}
+
+func attributeIDOf(field any) int {
+	object, ok := field.(map[string]any)
+	if !ok {
+		return 0
+	}
+	id, ok := object["custom_attribute_id"].(float64)
+	if !ok {
+		return 0
+	}
+	return int(id)
 }

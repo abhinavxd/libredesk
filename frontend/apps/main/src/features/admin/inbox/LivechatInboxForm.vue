@@ -1735,7 +1735,7 @@ const submitLabel = computed(() => {
 })
 
 const theme = computed(() => form.values.config?.theme || 'light')
-const editingTheme = ref('light')
+const editingTheme = inject('livechatPreviewTheme', ref('light'))
 const brandingPath = computed(() => `config.branding.${editingTheme.value}`)
 const activeBranding = computed(() => form.values.config?.branding?.[editingTheme.value])
 const activeBackgroundType = computed(() => activeBranding.value?.home_screen?.background?.type)
@@ -1807,13 +1807,12 @@ const updateCampaignCooldown = (duration) =>
   form.setFieldValue('config.campaign_cooldown', duration, hasCampaignErrors.value)
 
 // home_apps in form.values only syncs on change events, so pull the live ref for the preview.
-const previewTheme = inject('livechatPreviewTheme', ref('light'))
 const previewConfig = computed(() => {
-  const branding = form.values.config?.branding?.[previewTheme.value] || {}
+  const branding = form.values.config?.branding?.[editingTheme.value] || {}
   return {
     ...form.values.config,
     ...branding,
-    dark: previewTheme.value === 'dark',
+    dark: editingTheme.value === 'dark',
     launcher: { ...form.values.config?.launcher, ...branding.launcher },
     home_apps: homeApps.value,
     help_tree: helpTree.value,

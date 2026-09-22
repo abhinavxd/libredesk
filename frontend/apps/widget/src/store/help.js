@@ -28,13 +28,13 @@ export const useHelpStore = defineStore('help', () => {
     return collect(data.value?.tree)
   })
   const available = computed(() => !!data.value && articles.value.length > 0)
-  const featured = computed(() =>
-    data.value?.featured_ids?.length
-      ? data.value.featured_ids
-          .map((id) => articles.value.find((article) => article.id === id))
-          .filter(Boolean)
-      : data.value?.popular || []
-  )
+  const featured = computed(() => {
+    const picked = (data.value?.featured_ids || [])
+      .map((id) => articles.value.find((article) => article.id === id))
+      .filter(Boolean)
+    // Featured articles outside the visitor's locale are missing from the tree.
+    return picked.length ? picked : data.value?.popular || []
+  })
   const reset = () => {
     generation++
     identity.value++
