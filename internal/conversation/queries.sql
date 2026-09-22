@@ -965,6 +965,11 @@ update conversation_messages set status = $1, updated_at = NOW() where uuid = $2
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
 
+-- name: clear-message-handoff-form-pending
+UPDATE conversation_messages
+SET meta = meta || '{"handoff_form_pending": false}'::jsonb, updated_at = NOW()
+WHERE uuid = $1 AND COALESCE((meta->>'handoff_form_pending')::boolean, false);
+
 -- name: get-offline-livechat-conversations
 SELECT
     c.id,

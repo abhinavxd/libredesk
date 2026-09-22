@@ -458,6 +458,14 @@ func (m *Manager) CompleteHandoff(conv cmodels.Conversation) error {
 	if len(messages) == 0 || !messageMetaBool(messages[0].Meta, "handoff_form_pending") {
 		return fmt.Errorf("conversation has no pending handoff form")
 	}
+	// A refresh re-shows the form from the saved flag, and two submits racing must hand off only once.
+	cleared, err := m.convo.ClearHandoffFormPending(messages[0].UUID)
+	if err != nil {
+		return err
+	}
+	if !cleared {
+		return fmt.Errorf("conversation has no pending handoff form")
+	}
 	m.handoff(conv, assistant, "")
 	return nil
 }

@@ -370,6 +370,7 @@ type queries struct {
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
 	InsertMessage                      *sqlx.Stmt `query:"insert-message"`
 	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
+	ClearMessageHandoffFormPending     *sqlx.Stmt `query:"clear-message-handoff-form-pending"`
 	UpdateMessageSourceID              *sqlx.Stmt `query:"update-message-source-id"`
 	DeleteMessage                      *sqlx.Stmt `query:"delete-message"`
 	DeletePrivateMessage               *sqlx.Stmt `query:"delete-private-message"`

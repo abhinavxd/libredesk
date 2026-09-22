@@ -443,6 +443,17 @@ func (m *Manager) MarkMessageAsPending(uuid string) error {
 	return nil
 }
 
+// ClearHandoffFormPending clears the handoff form flag on a message and reports whether it was set.
+func (m *Manager) ClearHandoffFormPending(messageUUID string) (bool, error) {
+	res, err := m.q.ClearMessageHandoffFormPending.Exec(messageUUID)
+	if err != nil {
+		m.lo.Error("error clearing handoff form flag", "message_uuid", messageUUID, "error", err)
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 // SendPrivateNote inserts a private message in a conversation.
 func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string, mentions []models.MentionInput) (models.Message, error) {
 	// Best-effort render template variables before saving.
