@@ -21,16 +21,18 @@
                 {{ t('globals.terms.lastUpdated') }}:
                 {{ formatDate(loadedArticle.updated_at) }}
               </SheetDescription>
-              <a
+              <Button
                 v-if="articleUrl"
+                as="a"
+                variant="link"
                 :href="articleUrl"
                 target="_blank"
                 rel="noopener"
-                class="flex items-center gap-1 text-sm text-muted-foreground underline underline-offset-4 can-hover:hover:text-foreground"
+                class="h-auto gap-1 p-0 font-normal"
               >
                 {{ t('helpCenter.viewArticle') }}
                 <ExternalLink class="size-3.5" aria-hidden="true" />
-              </a>
+              </Button>
             </div>
           </div>
         </div>
@@ -122,9 +124,10 @@
 
                 <div class="space-y-2">
                   <div v-for="locale in translatedLocales" :key="locale" class="flex gap-2">
-                    <button
+                    <Button
                       type="button"
-                      class="flex min-w-0 flex-1 items-center gap-3 rounded-md border bg-card px-3 py-2.5 text-left text-sm disabled:cursor-default can-hover:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      variant="outline"
+                      class="h-auto min-w-0 flex-1 justify-start gap-3 px-3 py-2.5 text-left font-normal disabled:opacity-100"
                       :class="{ 'font-medium': locale === loadedArticle.locale }"
                       :disabled="locale === loadedArticle.locale"
                       :aria-current="locale === loadedArticle.locale ? 'page' : undefined"
@@ -142,17 +145,19 @@
                         class="size-4 shrink-0 text-muted-foreground"
                         aria-hidden="true"
                       />
-                    </button>
+                    </Button>
                     <Tooltip v-if="translatedLocales.length > 1">
                       <TooltipTrigger as-child>
-                        <button
+                        <Button
                           type="button"
-                          class="shrink-0 rounded-md border bg-card px-2.5 text-muted-foreground can-hover:hover:bg-accent can-hover:hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          variant="outline"
+                          size="icon"
+                          class="h-auto shrink-0 text-muted-foreground hover:text-destructive"
                           :aria-label="t('helpCenter.unlinkTranslation')"
                           @click="askUnlink(locale)"
                         >
-                          <Unlink class="size-4" aria-hidden="true" />
-                        </button>
+                          <Unlink aria-hidden="true" />
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>
                         {{ t('helpCenter.unlinkTranslation') }}

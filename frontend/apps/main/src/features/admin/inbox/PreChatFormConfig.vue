@@ -35,9 +35,9 @@
 
         <div v-if="audienceConfig.enabled" class="space-y-6">
           <div>
-            <label class="text-sm font-medium">
+            <Label>
               {{ $t('admin.inbox.livechat.prechatForm.title') }}
-            </label>
+            </Label>
             <Input
               type="text"
               v-model="audienceConfig.title"
@@ -101,7 +101,7 @@
                     <div v-if="field.enabled" class="space-y-4">
                       <div class="grid grid-cols-2 gap-4">
                         <div>
-                          <label class="text-sm font-medium">{{ $t('globals.terms.label') }}</label>
+                          <Label>{{ $t('globals.terms.label') }}</Label>
                           <Input
                             v-model="field.label"
                             :placeholder="$t('placeholders.fieldLabel')"
@@ -110,9 +110,9 @@
                         </div>
 
                         <div>
-                          <label class="text-sm font-medium">
+                          <Label>
                             {{ $t('globals.terms.placeholder') }}
-                          </label>
+                          </Label>
                           <Input
                             v-model="field.placeholder"
                             :placeholder="$t('placeholders.fieldPlaceholder')"
@@ -123,7 +123,7 @@
 
                       <div v-if="field.type !== 'checkbox'" class="flex items-center space-x-2">
                         <Checkbox v-model:checked="field.required" />
-                        <label class="text-sm">{{ $t('globals.terms.required') }}</label>
+                        <Label class="font-normal">{{ $t('globals.terms.required') }}</Label>
                       </div>
                     </div>
                   </div>
@@ -199,6 +199,7 @@ export const getDefaultPrechatFields = () => [
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Input } from '@shared-ui/components/ui/input'
+import { Label } from '@shared-ui/components/ui/label'
 import { Button } from '@shared-ui/components/ui/button'
 import { Switch } from '@shared-ui/components/ui/switch'
 import SwitchField from '@shared-ui/components/SwitchField.vue'

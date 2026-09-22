@@ -22,15 +22,17 @@
       @update:model-value="emit('update:modelValue', $event)"
     />
     <slot name="trailing" />
-    <button
+    <Button
       v-if="modelValue"
       type="button"
+      variant="ghost"
+      size="icon"
       :aria-label="clearLabel"
-      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+      class="absolute right-2 top-1/2 size-7 -translate-y-1/2 text-muted-foreground"
       @click="clear"
     >
-      <X class="size-4" aria-hidden="true" />
-    </button>
+      <X aria-hidden="true" />
+    </Button>
   </div>
 </template>
 
@@ -38,6 +40,7 @@
 import { ref } from 'vue'
 import { Search, X } from 'lucide-vue-next'
 import { Input } from '@shared-ui/components/ui/input'
+import { Button } from '@shared-ui/components/ui/button'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 
 defineProps({
