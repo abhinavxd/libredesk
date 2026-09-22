@@ -13,9 +13,8 @@
       <!-- Unified Input Container -->
       <div class="border border-input rounded-md bg-background focus-within:border-secondary">
         <MessageInputAttachmentPreview
-          v-if="mediaFiles.length || currentUploadingFiles.length"
-          :attachments="mediaFiles"
-          :uploadingFiles="currentUploadingFiles"
+          v-if="mediaFiles.length"
+          :attachments="attachmentPreviews"
           @delete="handleFileDelete"
         />
         <!-- Textarea Container -->
@@ -107,14 +106,16 @@ const quickReplies = computed(() => {
   return audience?.quick_replies ?? config.value.quick_replies ?? []
 })
 const mediaFiles = computed(() => chatStore.attachmentDrafts[draftKey.value] || [])
-const currentUploadingFiles = computed(() =>
-  chatStore.uploadingFiles.filter((item) => item.conversationUUID === draftKey.value)
+const uploadingAttachmentIds = ref(new Set())
+const attachmentPreviews = computed(() =>
+  mediaFiles.value.map((attachment) => ({
+    ...attachment,
+    loading: uploadingAttachmentIds.value.has(attachment.uuid)
+  }))
 )
-const isUploading = computed(() => currentUploadingFiles.value.length > 0)
+const isUploading = computed(() => uploadingAttachmentIds.value.size > 0)
 const MAX_STAGED_ATTACHMENTS = 5
-const stagedAttachmentCount = computed(
-  () => mediaFiles.value.length + currentUploadingFiles.value.length
-)
+const stagedAttachmentCount = computed(() => mediaFiles.value.length)
 const isAttachmentLimitReached = computed(
   () => stagedAttachmentCount.value >= MAX_STAGED_ATTACHMENTS
 )
@@ -179,22 +180,54 @@ const sendMessageToConversation = async (
   })
 
   if (tempMessageID && messageResp.data.data) {
-    chatStore.replaceMessage(
-      conversationUUID,
-      tempMessageID,
-      messageResp.data.data
-    )
+    chatStore.replaceMessage(conversationUUID, tempMessageID, messageResp.data.data)
   }
   if (messageResp.data.data) {
-    chatStore.updateConversationListLastMessage(
-      conversationUUID,
-      messageResp.data.data
-    )
+    chatStore.updateConversationListLastMessage(conversationUUID, messageResp.data.data)
   }
 }
 
+const uploadStagedAttachments = async (conversationUUID, activeDraftKey, attachments) => {
+  const uploadedAttachments = []
+  uploadingAttachmentIds.value = new Set(
+    attachments
+      .filter((attachment) => !attachment.uploadedMedia?.id)
+      .map((attachment) => attachment.uuid)
+  )
+
+  for (const attachment of attachments) {
+    if (attachment.uploadedMedia?.id) {
+      uploadedAttachments.push(attachment.uploadedMedia)
+      continue
+    }
+
+    const resp = await api.uploadMedia(conversationUUID, attachment.file)
+    if (!resp.data.data) throw new Error('Media upload returned no attachment')
+    const uploadedMedia = resp.data.data
+    uploadedAttachments.push(uploadedMedia)
+    chatStore.attachmentDrafts = {
+      ...chatStore.attachmentDrafts,
+      [activeDraftKey]: (chatStore.attachmentDrafts[activeDraftKey] || []).map((item) =>
+        item.uuid === attachment.uuid ? { ...item, uploadedMedia } : item
+      )
+    }
+  }
+
+  return uploadedAttachments
+}
+
+const revokeAttachmentPreviews = (attachments) => {
+  attachments.forEach((attachment) => {
+    if (attachment.url?.startsWith('blob:')) URL.revokeObjectURL(attachment.url)
+  })
+}
+
 const sendMessage = async () => {
-  if ((!newMessage.value.trim() && !mediaFiles.value.length) || isUploading.value || isSending.value) {
+  if (
+    (!newMessage.value.trim() && !mediaFiles.value.length) ||
+    isUploading.value ||
+    isSending.value
+  ) {
     return
   }
 
@@ -226,8 +259,19 @@ const sendMessage = async () => {
     if (!conversationUUID) {
       await initChatConversation(messageText)
     } else {
-      await sendMessageToConversation(conversationUUID, messageText, attachments, tempMessageID)
+      const uploadedAttachments = await uploadStagedAttachments(
+        conversationUUID,
+        activeDraftKey,
+        attachments
+      )
+      await sendMessageToConversation(
+        conversationUUID,
+        messageText,
+        uploadedAttachments,
+        tempMessageID
+      )
     }
+    revokeAttachmentPreviews(attachments)
     chatStore.attachmentDrafts = { ...chatStore.attachmentDrafts, [activeDraftKey]: [] }
     emit('error', '')
   } catch (error) {
@@ -239,6 +283,7 @@ const sendMessage = async () => {
     chatStore.drafts[activeDraftKey] = messageText
     emit('error', handleHTTPError(error).message)
   } finally {
+    uploadingAttachmentIds.value = new Set()
     isSending.value = false
     focusTextarea()
   }
@@ -264,7 +309,7 @@ const handleKeydown = (event) => {
   }
 }
 
-const handleFileUpload = async (files) => {
+const handleFileUpload = (files) => {
   if (!chatStore.currentConversation.uuid || files.length === 0) return
 
   const conversationUUID = chatStore.currentConversation.uuid
@@ -276,41 +321,27 @@ const handleFileUpload = async (files) => {
   }
   if (acceptedFiles.length === 0) return
 
-  const selectedFiles = acceptedFiles.map((file) => ({
-    file,
-    name: file.name,
-    size: file.size,
-    conversationUUID,
-    tempId: `${conversationUUID}-${Date.now()}-${uploadSequence++}`
-  }))
-  chatStore.uploadingFiles.push(...selectedFiles)
+  const selectedFiles = acceptedFiles.map((file) => {
+    const uuid = `${conversationUUID}-${Date.now()}-${uploadSequence++}`
+    return {
+      file,
+      uuid,
+      filename: file.name,
+      size: file.size,
+      content_type: file.type,
+      url: file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+    }
+  })
+  chatStore.attachmentDrafts = {
+    ...chatStore.attachmentDrafts,
+    [conversationUUID]: [...(chatStore.attachmentDrafts[conversationUUID] || []), ...selectedFiles]
+  }
   if (!limitExceeded) emit('error', '')
-
-  await Promise.all(
-    selectedFiles.map(async (selectedFile) => {
-      try {
-        const resp = await api.uploadMedia(conversationUUID, selectedFile.file)
-        if (resp.data.data) {
-          chatStore.attachmentDrafts = {
-            ...chatStore.attachmentDrafts,
-            [conversationUUID]: [
-              ...(chatStore.attachmentDrafts[conversationUUID] || []),
-              resp.data.data
-            ]
-          }
-        }
-      } catch (error) {
-        emit('error', handleHTTPError(error).message)
-      } finally {
-        chatStore.uploadingFiles = chatStore.uploadingFiles.filter(
-          (item) => item.tempId !== selectedFile.tempId
-        )
-      }
-    })
-  )
 }
 
 const handleFileDelete = (uuid) => {
+  const attachment = mediaFiles.value.find((item) => item.uuid === uuid)
+  if (attachment) revokeAttachmentPreviews([attachment])
   chatStore.attachmentDrafts = {
     ...chatStore.attachmentDrafts,
     [draftKey.value]: mediaFiles.value.filter((attachment) => attachment.uuid !== uuid)
