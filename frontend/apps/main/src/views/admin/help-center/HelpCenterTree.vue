@@ -133,6 +133,8 @@
     :help-center-id="parseInt(id)"
     :help-center-name="helpCenter?.name || ''"
     :help-center-slug="helpCenter?.slug || ''"
+    :help-center-color="helpCenter?.theme?.color || ''"
+    :help-center-color-dark="helpCenter?.theme?.color_dark || ''"
     :help-center-locales="helpCenter?.allowed_locales || ['en']"
     :default-locale="props.locale"
     :translation-source="translationSource"

@@ -30,9 +30,8 @@
     <link rel="stylesheet" href="/static/public/static/help-center-cards.css?v={{ AssetVer }}" />
     <link rel="stylesheet" href="/static/public/static/help-center-{{ .Data.HelpCenter.Template }}.css?v={{ AssetVer }}" />
     <link rel="stylesheet" href="/static/public/static/article-content.css?v={{ AssetVer }}" />
-    <style>:root { --hc-accent: {{ .Data.HelpCenter.Color }}; }
-    :root.hc-dark { --hc-accent: {{ .Data.HelpCenter.ColorDark }}; }
-    :root:not(.hc-dark) { {{ .Data.HelpCenter.ThemeCSS }} }</style>
+    <style>:root { --hc-accent: {{ .Data.HelpCenter.Color }}; {{ .Data.HelpCenter.ThemeCSS }} }
+    :root.hc-dark { --hc-accent: {{ .Data.HelpCenter.ColorDark }};{{ with .Data.HelpCenter.ThemeCSSDark }} {{ . }}{{ end }} }</style>
     {{ if .Data.HelpCenter.CustomCSS }}<style>{{ .Data.HelpCenter.CustomCSS }}</style>{{ end }}
     {{ if .Data.JSONLD }}<script type="application/ld+json">{{ .Data.JSONLD }}</script>{{ end }}
     {{ if .Data.HelpCenter.FollowSystemTheme }}<script>

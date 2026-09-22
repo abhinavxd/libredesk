@@ -1,6 +1,8 @@
 :root {
     /* Darkened accent, readable as text/icon on white for any customer hue. */
     --hc-accent-ink: color-mix(in srgb, var(--hc-accent), #0d1117 46%);
+    /* Stays dark in both modes, so white text on it remains readable. */
+    --hc-accent-fill: color-mix(in srgb, var(--hc-accent), #0d1117 46%);
     --hc-accent-tint: color-mix(in srgb, var(--hc-accent) 7%, #ffffff);
     --hc-accent-tint-2: color-mix(in srgb, var(--hc-accent) 13%, #ffffff);
     --hc-accent-line: color-mix(in srgb, var(--hc-accent) 24%, #ffffff);
@@ -46,7 +48,7 @@ a:hover { text-decoration: underline; }
     justify-content: center;
     gap: .5rem;
     padding: .55rem 1rem;
-    background: var(--hc-accent-ink);
+    background: var(--hc-accent-fill);
     color: #ffffff;
     font-size: .9rem;
     text-align: center;

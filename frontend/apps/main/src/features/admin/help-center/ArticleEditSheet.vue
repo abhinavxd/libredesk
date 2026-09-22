@@ -71,6 +71,8 @@
                         enableInlineImages
                         linkedModel="help_articles"
                         :toolbarTarget="toolbarSlot"
+                        :accent-color="helpCenterColor"
+                        :accent-color-dark="helpCenterColorDark"
                         class="min-h-[400px] border-0 px-0 shadow-none focus-visible:ring-0"
                       />
                     </div>
@@ -541,6 +543,14 @@ const props = defineProps({
     default: ''
   },
   helpCenterSlug: {
+    type: String,
+    default: ''
+  },
+  helpCenterColor: {
+    type: String,
+    default: ''
+  },
+  helpCenterColorDark: {
     type: String,
     default: ''
   },

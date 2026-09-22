@@ -1809,6 +1809,7 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"NavLinks":          theme.NavLinks,
 		"Theme":             theme,
 		"ThemeCSS":          buildThemeCSSVars(theme),
+		"ThemeCSSDark":      buildDarkThemeCSSVars(theme),
 		"AnnouncementKey":   announcementKey(hc.Slug, theme.Announcement),
 		"TaglineHTML":       template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
 		"FooterTaglineHTML": template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
@@ -1880,6 +1881,30 @@ func buildThemeCSSVars(t hcmodels.Theme) template.CSS {
 		fmt.Fprintf(&b, "--hc-footer-text:%s;", t.Footer.TextColor)
 	}
 	return template.CSS(b.String())
+}
+
+// buildDarkThemeCSSVars resets text colors that sit on the default background, since those were picked against the light one.
+func buildDarkThemeCSSVars(t hcmodels.Theme) template.CSS {
+	var b strings.Builder
+	if t.Header.TextColor != "" && !hasHeaderBackground(t.Header) {
+		b.WriteString("--hc-header-text:initial;")
+	}
+	if t.Footer.TextColor != "" && t.Footer.BackgroundColor == "" {
+		b.WriteString("--hc-footer-text:initial;")
+	}
+	return template.CSS(b.String())
+}
+
+func hasHeaderBackground(h hcmodels.HeaderTheme) bool {
+	switch h.BackgroundType {
+	case "image":
+		return h.BackgroundImage != ""
+	case "gradient":
+		return h.GradientFrom != "" && h.GradientTo != ""
+	case "solid":
+		return h.BackgroundColor != ""
+	}
+	return false
 }
 
 // renderHelpCenterNotFound renders the help center's themed 404, falling back to the
