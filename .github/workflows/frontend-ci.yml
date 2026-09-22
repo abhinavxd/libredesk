@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
     services:
       db:
         image: postgres:17-alpine
@@ -45,13 +45,22 @@ jobs:
         with:
           go-version: "1.25.0"
 
+      - name: Install pnpm
+        run: npm install -g pnpm@9.15.3
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: "20"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Install pnpm
-        run: npm install -g pnpm@9.15.3
+      - name: Cache the cypress binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: cypress-${{ runner.os }}-
 
       - name: Install cypress deps
         run: sudo apt-get update && sudo apt-get install -y libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb
@@ -93,6 +102,6 @@ jobs:
             sleep 1
           done
           cd frontend
-          specs=$(find cypress/e2e -name '*.cy.js' | sort | awk -v s=${{ matrix.shard }} -v n=4 'NR % n == s % n' | paste -sd,)
+          specs=$(find cypress/e2e -name '*.cy.js' | sort | awk -v s=${{ matrix.shard }} -v n=5 'NR % n == s % n' | paste -sd,)
           echo "shard ${{ matrix.shard }} runs: $specs"
           pnpm exec cypress run --e2e --headless --spec "$specs"
