@@ -69,12 +69,12 @@ describe('Live chat inbox form: every field', () => {
     cy.get('input[name="name"]').type(created.name)
     cy.get('input[name="config.brand_name"]').type(created.brandName)
     cy.get('input[name="config.website_url"]').type(created.websiteUrl)
-    cy.switchField('CSAT Surveys').click()
-    cy.switchField('Prompt to tag before replying').click()
+    cy.switchFieldIn('General', 'CSAT Surveys').click()
+    cy.switchFieldIn('General', 'Prompt to tag before replying').click()
 
     cy.openInboxSection('Theme')
     cy.get('#theme-system').click()
-    cy.switchField('Show powered by').click()
+    cy.switchFieldIn('Theme', 'Show powered by').click()
 
     cy.openInboxSection('Branding')
     cy.editBrandingTheme('Light')
@@ -82,7 +82,7 @@ describe('Live chat inbox form: every field', () => {
     setColor('config.branding.light.colors.primary', created.lightPrimary)
     cy.get('#text-white').click()
     cy.get('#bg-gradient').click()
-    cy.switchField('Fade background').click()
+    cy.switchFieldIn('Branding', 'Fade background').click()
 
     cy.editBrandingTheme('Dark')
     setColor('config.branding.dark.colors.primary', created.darkPrimary)
@@ -106,14 +106,14 @@ describe('Live chat inbox form: every field', () => {
     cy.get('textarea[name="config.chat_introduction"]').clear().type(created.chatIntroduction)
 
     cy.openInboxSection('Notice banner')
-    cy.switchField('Enable notice banner').click()
+    cy.switchFieldIn('Notice banner', 'Enable notice banner').click()
     cy.get('textarea[name="config.notice_banner.text"]').clear().type(created.notice)
 
     cy.openInboxSection('Features')
-    cy.switchField('Emoji support').click()
+    cy.switchFieldIn('Features', 'Emoji support').click()
 
     cy.openInboxSection('Office hours')
-    cy.switchField('Show office hours in chat').click()
+    cy.switchFieldIn('Office hours', 'Show office hours in chat').click()
     cy.get('input[name="config.chat_reply_expectation_message"]')
       .clear()
       .type(created.replyExpectation)
@@ -198,12 +198,12 @@ describe('Live chat inbox form: every field', () => {
     cy.get('input[name="name"]').should('have.value', created.name)
     cy.get('input[name="config.brand_name"]').should('have.value', created.brandName)
     cy.get('input[name="config.website_url"]').should('have.value', created.websiteUrl)
-    cy.switchField('CSAT Surveys').should('have.attr', 'data-state', 'checked')
-    cy.switchField('Prompt to tag before replying').should('have.attr', 'data-state', 'checked')
+    cy.switchFieldIn('General', 'CSAT Surveys').should('have.attr', 'data-state', 'checked')
+    cy.switchFieldIn('General', 'Prompt to tag before replying').should('have.attr', 'data-state', 'checked')
 
     cy.openInboxSection('Theme')
     cy.get('#theme-system').should('have.attr', 'data-state', 'checked')
-    cy.switchField('Show powered by').should('have.attr', 'data-state', 'unchecked')
+    cy.switchFieldIn('Theme', 'Show powered by').should('have.attr', 'data-state', 'unchecked')
 
     cy.openInboxSection('Branding')
     cy.editBrandingTheme('Light')
@@ -273,19 +273,19 @@ describe('Live chat inbox form: every field', () => {
     cy.get('input[name="name"]').clear().type(edited.name)
     cy.get('input[name="config.brand_name"]').clear().type(edited.brandName)
     cy.get('input[name="config.website_url"]').clear().type(edited.websiteUrl)
-    cy.switchField('CSAT Surveys').click()
-    cy.switchField('Prompt to tag before replying').click()
+    cy.switchFieldIn('General', 'CSAT Surveys').click()
+    cy.switchFieldIn('General', 'Prompt to tag before replying').click()
 
     cy.openInboxSection('Theme')
     cy.get('#theme-light').click()
-    cy.switchField('Show powered by').click()
+    cy.switchFieldIn('Theme', 'Show powered by').click()
 
     cy.openInboxSection('Branding')
     cy.editBrandingTheme('Light')
     setColor('config.branding.light.colors.primary', edited.lightPrimary)
     cy.get('#text-black').click()
     cy.get('#bg-solid').click()
-    cy.switchField('Fade background').click()
+    cy.switchFieldIn('Branding', 'Fade background').click()
 
     cy.openInboxSection('Launcher position')
     cy.get('select[name="config.launcher.position"]').siblings('button[role="combobox"]').click()
@@ -304,8 +304,8 @@ describe('Live chat inbox form: every field', () => {
     cy.get('textarea[name="config.notice_banner.text"]').clear().type(edited.notice)
 
     cy.openInboxSection('Features')
-    cy.switchField('File upload').click()
-    cy.switchField('Download transcript').click()
+    cy.switchFieldIn('Features', 'File upload').click()
+    cy.switchFieldIn('Features', 'Download transcript').click()
 
     cy.openInboxSection('Office hours')
     cy.get('input[name="config.chat_reply_expectation_message"]')
@@ -456,7 +456,7 @@ describe('Live chat inbox form: every field', () => {
     cy.get('input[name="config.continuity.min_email_interval"]').clear().type('9m')
 
     cy.openInboxSection('Office hours')
-    cy.switchField('Show office hours after team assignment').click()
+    cy.switchFieldIn('Office hours', 'Show office hours after team assignment').click()
 
     cy.openInboxSection('Users')
     cy.audienceSwitch('visitors', 'Allow start conversation').click()

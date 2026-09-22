@@ -433,10 +433,11 @@ Cypress.Commands.add('switchField', (title) =>
 )
 
 // Switch labels and audience tabs repeat across sections, so these scope by section.
+// Section scoping already picks one label, and ':visible' turns flaky while a section opens.
 Cypress.Commands.add('switchFieldIn', (section, title) =>
   cy
     .inboxSection(section)
-    .contains('p:visible', new RegExp(`^\\s*${title}\\s*$`))
+    .contains('p', new RegExp(`^\\s*${title}\\s*$`))
     .parent()
     .find('button[role="switch"]')
 )
