@@ -286,6 +286,7 @@ import { useUserStore } from '@widget/store/user.js'
 import { resolvePreChatForm } from '@widget/utils/preChatForm.js'
 import { useI18n } from 'vue-i18n'
 import { createPreChatFormSchema } from './preChatFormSchema.js'
+import api from '@widget/api/index.js'
 
 const props = defineProps({
   excludeDefaultFields: {
@@ -431,13 +432,30 @@ watch(
   }
 )
 
+// The server asked for this form with its current settings, so an empty form here means the widget's settings are stale.
+let settingsRefreshed = false
+const refreshSettings = async () => {
+  if (settingsRefreshed) return
+  settingsRefreshed = true
+  try {
+    const inboxID = new URLSearchParams(window.location.search).get('inbox_id')
+    const resp = await api.getWidgetSettings(inboxID)
+    widgetStore.updateConfig(resp.data.data)
+  } catch (error) {
+    console.error('Error refreshing widget settings:', error)
+  }
+}
+
 // Auto-submit when no fields to show (e.g., all fields excluded)
 watch(
   showForm,
   (newValue) => {
-    if (!newValue) {
-      emit('submit', { formData: {}, message: '' })
+    if (newValue) return
+    if (props.handoffMode) {
+      refreshSettings()
+      return
     }
+    emit('submit', { formData: {}, message: '' })
   },
   { immediate: true }
 )
