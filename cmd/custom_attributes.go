@@ -168,8 +168,11 @@ func removeAttributeFromPreChatForms(app *App, attributeID int) error {
 			failed++
 			continue
 		}
+		// A retry finds the config already clean and skips the reload, so the running
+		// inbox would keep the deleted field until the next restart.
 		if err := reloadInbox(app, inb.ID); err != nil {
 			app.lo.Error("error reloading inbox", "id", inb.ID, "error", err)
+			failed++
 		}
 	}
 	if failed > 0 {
