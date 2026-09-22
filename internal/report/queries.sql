@@ -24,7 +24,7 @@ agents AS (
     SELECT
         COUNT(*) FILTER (
             WHERE
-                availability_status = 'online'
+                availability_status IN ('online', 'away')
         ) AS agents_online,
         COUNT(*) FILTER (
             WHERE
@@ -36,7 +36,7 @@ agents AS (
         ) AS agents_reassigning,
         COUNT(*) FILTER (
             WHERE
-                availability_status IN ('offline', 'away')
+                availability_status = 'offline'
         ) AS agents_offline
     FROM
         users

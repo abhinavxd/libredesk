@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Libredesk widget - JWT test</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #222; }
+  @media (max-width: 640px) {
+    body { margin: 16px auto; }
+    .row { flex-direction: column; gap: 0; }
+  }
   h1 { font-size: 18px; }
   label { display: block; margin-top: 14px; font-size: 13px; font-weight: 600; color: #444; }
   input, textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 13px; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 6px; }
@@ -16,12 +21,13 @@
   .row { display: flex; gap: 12px; }
   .row > div { flex: 1; }
   .hint { font-size: 12px; color: #777; font-weight: 400; }
+  .field-hint { display: block; margin-top: 4px; }
 </style>
 </head>
 <body>
 
 <h1>Libredesk widget - JWT auth test</h1>
-<p class="hint">Edit the payload below, click "Sign JWT &amp; load widget". <code>exp</code> is auto-set to now + 1 hour on every generate so the token never shows up expired. The signing secret must match the "Secret Key" configured on this inbox's Security tab in Libredesk admin.</p>
+<p class="hint">Edit the payload below, then load the widget. The signing secret must match the "Secret Key" configured in the inbox form.</p>
 
 <div class="row">
   <div>
@@ -29,8 +35,9 @@
     <input id="baseURL" value="http://localhost:8001">
   </div>
   <div>
-    <label>inboxID</label>
-    <input id="inboxID" placeholder="livechat inbox UUID from inbox form" value="">
+    <label for="inboxID">Inbox UUID</label>
+    <input id="inboxID" aria-describedby="inboxIDHint" value="">
+    <span id="inboxIDHint" class="hint field-hint">Copy the UUID from your inbox form.</span>
   </div>
 </div>
 

@@ -156,3 +156,48 @@ func TestV2_9_0PreservesExistingQueuedEmails(t *testing.T) {
 		t.Fatal("existing queued email changed")
 	}
 }
+
+func TestWidgetCampaignMigration(t *testing.T) {
+	db := testutil.NewDB(t, "widget_migration")
+	db.MustExec(`DROP TABLE widget_campaign_deliveries`)
+	for range 2 {
+		if err := V2_9_0(db, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var count int
+	if err := db.Get(&count, `SELECT COUNT(*) FROM pg_indexes WHERE tablename = 'widget_campaign_deliveries'`); err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Fatalf("expected primary key and three indexes, got %d", count)
+	}
+}
+
+func TestHelpArticleTranslationGroupMigration(t *testing.T) {
+	db := testutil.NewDB(t, "article_translation_group_migration")
+	db.MustExec(`
+		INSERT INTO help_centers (name, slug, allowed_locales) VALUES ('Docs', 'docs', '["en", "fr"]');
+		INSERT INTO article_collections (help_center_id, slug, locale, name) VALUES
+			(1, 'general', 'en', 'General'),
+			(1, 'general', 'fr', 'Général');
+		INSERT INTO help_articles (collection_id, slug, locale, title) VALUES
+			(1, 'billing', 'en', 'Billing'),
+			(2, 'billing', 'fr', 'Facturation');
+		ALTER TABLE help_articles DROP COLUMN translation_group_id;
+	`)
+
+	for range 2 {
+		if err := V2_9_0(db, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var groups int
+	if err := db.Get(&groups, `SELECT COUNT(DISTINCT translation_group_id) FROM help_articles`); err != nil {
+		t.Fatal(err)
+	}
+	if groups != 2 {
+		t.Fatalf("expected every existing article in its own group, got %d groups", groups)
+	}
+}

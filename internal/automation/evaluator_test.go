@@ -468,6 +468,53 @@ func TestCustomAttributes_MissingField(t *testing.T) {
 	assert.Equal(t, 0, mockStore.callCount, "Missing custom attribute should fail the rule")
 }
 
+func TestCustomAttributes_SetNotSet(t *testing.T) {
+	tests := []struct {
+		name      string
+		attrs     json.RawMessage
+		operator  string
+		wantMatch bool
+	}{
+		{"missing field is not set", json.RawMessage(`{"client_id":"YYYYYY"}`), models.RuleOperatorNotSet, true},
+		{"missing field is not set", json.RawMessage(`{"client_id":"YYYYYY"}`), models.RuleOperatorSet, false},
+		{"empty value is not set", json.RawMessage(`{"plan":""}`), models.RuleOperatorNotSet, true},
+		{"empty value is not set", json.RawMessage(`{"plan":""}`), models.RuleOperatorSet, false},
+		{"contact with no attributes saved", nil, models.RuleOperatorNotSet, true},
+		{"contact with no attributes saved", nil, models.RuleOperatorSet, false},
+		{"filled value is set", json.RawMessage(`{"plan":"pro"}`), models.RuleOperatorNotSet, false},
+		{"filled value is set", json.RawMessage(`{"plan":"pro"}`), models.RuleOperatorSet, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name+"/"+tt.operator, func(t *testing.T) {
+			mockStore := new(mockConversationStore)
+			mockStore.On("ApplyAction", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			engine := createTestEngine(mockStore)
+			conversation := createTestConversation(func(c *cmodels.Conversation) {
+				c.Contact.CustomAttributes = tt.attrs
+			})
+			rules := []models.Rule{
+				{
+					Groups: []models.RuleGroup{
+						{
+							LogicalOp: models.OperatorAnd,
+							Rules: []models.RuleDetail{
+								{Field: "plan", Operator: tt.operator, FieldType: models.FieldTypeContactCustomAttribute},
+							},
+						},
+					},
+					Actions:       []models.RuleAction{{Type: models.ActionSetStatus, Value: []string{"2"}}},
+					GroupOperator: models.OperatorAnd,
+					ExecutionMode: models.ExecutionModeAll,
+				},
+			}
+
+			engine.evalConversationRules(rules, conversation, nil)
+
+			assert.Equal(t, tt.wantMatch, mockStore.callCount == 1)
+		})
+	}
+}
+
 // Test: Contains operator with multiple values
 func TestContainsOperator_MultipleValues(t *testing.T) {
 	mockStore := new(mockConversationStore)

@@ -9,7 +9,7 @@
             </SheetTitle>
             <SheetDescription v-if="collection" class="mt-1">
               {{ t('globals.terms.lastUpdated') }}:
-              {{ format(new Date(collection.updated_at), 'PPpp') }}
+              {{ formatDate(collection.updated_at) }}
             </SheetDescription>
           </div>
         </div>
@@ -156,11 +156,11 @@
               <div v-if="collection" class="space-y-3 text-sm border-t pt-4">
                 <div class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('globals.terms.createdAt') }}</span>
-                  <span>{{ format(new Date(collection.created_at), 'PPpp') }}</span>
+                  <span>{{ formatDate(collection.created_at) }}</span>
                 </div>
                 <div class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('globals.terms.updatedAt') }}</span>
-                  <span>{{ format(new Date(collection.updated_at), 'PPpp') }}</span>
+                  <span>{{ formatDate(collection.updated_at) }}</span>
                 </div>
                 <div v-if="collection.articles" class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('globals.terms.article', 2) }}</span>
@@ -205,9 +205,13 @@ import api from '@/api'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { format } from 'date-fns'
+import { format, isValid } from 'date-fns'
 
 const { t } = useI18n()
+const formatDate = (value) => {
+  const date = new Date(value)
+  return isValid(date) ? format(date, 'PPpp') : '-'
+}
 
 const props = defineProps({
   isOpen: {
