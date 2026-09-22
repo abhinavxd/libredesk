@@ -11,6 +11,8 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+const maxTranscriptDownloadMessages = 1000
+
 func handleWidgetTranscript(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	config, err := getWidgetConfig(r)
