@@ -415,6 +415,8 @@ Cypress.Commands.add('openInboxSection', (section) => {
     if ($btn.attr('aria-expanded') !== 'true') cy.wrap($btn).click()
   })
   trigger().should('have.attr', 'aria-expanded', 'true')
+  // aria-expanded flips before the open animation ends, and the content is force mounted.
+  cy.inboxSection(section).find('[role="region"]').should('be.visible')
 })
 
 // Branding and launcher both carry this switch, only the open section's one is visible.
