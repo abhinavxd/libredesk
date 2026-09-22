@@ -264,12 +264,13 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	*c = Config(cfg)
 
 	var legacy struct {
-		Branding   *json.RawMessage `json:"branding"`
-		DarkMode   bool             `json:"dark_mode"`
-		Colors     Colors           `json:"colors"`
-		LogoURL    string           `json:"logo_url"`
-		HomeScreen HomeScreen       `json:"home_screen"`
-		Launcher   BrandingLauncher `json:"launcher"`
+		Branding              *json.RawMessage `json:"branding"`
+		DarkMode              bool             `json:"dark_mode"`
+		Colors                Colors           `json:"colors"`
+		LogoURL               string           `json:"logo_url"`
+		HomeScreen            HomeScreen       `json:"home_screen"`
+		Launcher              BrandingLauncher `json:"launcher"`
+		CampaignCooldownHours *int             `json:"campaign_cooldown_hours"`
 	}
 	if err := json.Unmarshal(data, &legacy); err != nil {
 		return err
@@ -293,6 +294,9 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	if c.Launcher.IconScale == 0 {
 		c.Launcher.IconScale = DefaultLauncherIconScale
+	}
+	if c.CampaignCooldown == "" && legacy.CampaignCooldownHours != nil && *legacy.CampaignCooldownHours > 0 {
+		c.CampaignCooldown = strconv.Itoa(*legacy.CampaignCooldownHours) + "h"
 	}
 	if c.CampaignCooldown == "" {
 		c.CampaignCooldown = DefaultCampaignCooldown

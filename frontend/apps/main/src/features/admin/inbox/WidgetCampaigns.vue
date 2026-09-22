@@ -42,6 +42,7 @@ import {
   CollapsibleTrigger
 } from '@shared-ui/components/ui/collapsible'
 import Draggable from 'vuedraggable'
+import ReorderButtons from '@shared-ui/components/ReorderButtons.vue'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
@@ -189,6 +190,13 @@ const orderedCampaigns = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
+const moveCampaign = (index, direction) => {
+  const campaigns = [...props.modelValue]
+  const [campaign] = campaigns.splice(index, 1)
+  campaigns.splice(index + direction, 0, campaign)
+  emit('update:modelValue', campaigns)
+}
+
 const add = (source) => {
   const item = source
     ? {
@@ -332,7 +340,7 @@ onMounted(async () => {
           ghost-class="drag-ghost"
           class="space-y-2"
         >
-          <template #item="{ element: item }">
+          <template #item="{ element: item, index }">
             <div
               class="flex items-center gap-3 border rounded-md hover:bg-accent/50 transition-colors"
             >
@@ -342,6 +350,12 @@ onMounted(async () => {
               >
                 <GripVertical class="size-4" aria-hidden="true" />
               </div>
+              <ReorderButtons
+                v-if="modelValue.length > 1"
+                :index="index"
+                :length="modelValue.length"
+                @move="moveCampaign(index, $event)"
+              />
               <Switch
                 :class="modelValue.length > 1 ? '' : 'ml-3'"
                 :checked="item.enabled"

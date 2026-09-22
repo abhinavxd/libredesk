@@ -10,7 +10,7 @@ const TABS = ['General', 'Appearance', 'Content', 'Conversations', 'Setup']
 
 const SECTIONS = {
   General: ['General', 'Conversation continuity email inbox'],
-  Appearance: ['Theme', 'Branding', 'Launcher position'],
+  Appearance: ['Theme', 'Branding', 'Launcher'],
   Content: ['Messages', 'Notice banner', 'Home screen apps', 'Help center', 'Proactive messages'],
   Conversations: ['Features', 'Office hours', 'Pre-chat form', 'Users'],
   Setup: ['Installation', 'Identity verification', 'JavaScript API', 'Security']

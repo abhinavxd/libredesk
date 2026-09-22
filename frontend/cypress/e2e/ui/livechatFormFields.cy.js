@@ -127,7 +127,7 @@ describe('Live chat inbox form: every field', () => {
     cy.editBrandingTheme('Dark')
     setColor('config.branding.dark.colors.primary', created.darkPrimary)
 
-    cy.openInboxSection('Launcher position')
+    cy.openInboxSection('Launcher')
     cy.editBrandingTheme('Light')
     cy.get('input[name="config.branding.light.launcher.logo_url"]')
       .clear()
@@ -260,7 +260,7 @@ describe('Live chat inbox form: every field', () => {
       created.darkPrimary
     )
 
-    cy.openInboxSection('Launcher position')
+    cy.openInboxSection('Launcher')
     cy.get('select[name="config.launcher.position"]').should('have.value', 'left')
     cy.get('input[name="config.launcher.icon_scale"]').should('have.value', '80')
     cy.get('input[name="config.launcher.spacing.side"]').should('have.value', '30')
@@ -327,7 +327,7 @@ describe('Live chat inbox form: every field', () => {
     cy.get('#bg-solid').click()
     cy.switchFieldIn('Branding', 'Fade background').click()
 
-    cy.openInboxSection('Launcher position')
+    cy.openInboxSection('Launcher')
     cy.get('select[name="config.launcher.position"]').siblings('button[role="combobox"]').click()
     cy.get('[role="option"]').contains('Right').click()
     cy.get('[role="option"]').should('not.exist')
@@ -532,8 +532,8 @@ describe('Live chat inbox form: every field', () => {
     cy.intercept('PUT', `**/api/v1/inboxes/${inboxId}`).as('updateInbox')
 
     const cases = [
-      ['Launcher position', 'input[name="config.launcher.icon_scale"]', '5'],
-      ['Launcher position', 'input[name="config.launcher.spacing.side"]', '900'],
+      ['Launcher', 'input[name="config.launcher.icon_scale"]', '5'],
+      ['Launcher', 'input[name="config.launcher.spacing.side"]', '900'],
       ['Security', 'input[name="config.session_duration"]', 'nope'],
       ['General', 'input[name="config.website_url"]', 'not-a-url']
     ]

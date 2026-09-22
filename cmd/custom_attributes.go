@@ -111,10 +111,10 @@ func handleDeleteCustomAttribute(r *fastglue.Request) error {
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
-	if err = app.customAttribute.Delete(id); err != nil {
+	if err := removeAttributeFromPreChatForms(app, id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if err := removeAttributeFromPreChatForms(app, id); err != nil {
+	if err = app.customAttribute.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)
@@ -148,8 +148,6 @@ func removeAttributeFromPreChatForms(app *App, attributeID int) error {
 	if err != nil {
 		return err
 	}
-	// One bad inbox leaves the rest pointing at an attribute that is already gone,
-	// so every inbox is attempted and the failures are reported at the end.
 	var failed int
 	for _, inb := range inboxes {
 		if inb.Channel != livechat.ChannelLiveChat {
@@ -168,8 +166,6 @@ func removeAttributeFromPreChatForms(app *App, attributeID int) error {
 			failed++
 			continue
 		}
-		// A retry finds the config already clean and skips the reload, so the running
-		// inbox would keep the deleted field until the next restart.
 		if err := reloadInbox(app, inb.ID); err != nil {
 			app.lo.Error("error reloading inbox", "id", inb.ID, "error", err)
 			failed++

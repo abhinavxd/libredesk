@@ -169,6 +169,23 @@ func TestUnmarshalFillsEmptyListsAndCooldown(t *testing.T) {
 	}
 }
 
+func TestUnmarshalLegacyCampaignCooldown(t *testing.T) {
+	var config Config
+	if err := json.Unmarshal([]byte(`{"campaign_cooldown_hours":12}`), &config); err != nil {
+		t.Fatal(err)
+	}
+	if config.CampaignCooldown != "12h" {
+		t.Fatalf("campaign cooldown = %q", config.CampaignCooldown)
+	}
+
+	if err := json.Unmarshal([]byte(`{"campaign_cooldown":"30m","campaign_cooldown_hours":12}`), &config); err != nil {
+		t.Fatal(err)
+	}
+	if config.CampaignCooldown != "30m" {
+		t.Fatalf("campaign cooldown = %q", config.CampaignCooldown)
+	}
+}
+
 func TestUnmarshalFillsValuesAConfigWrittenOutsideTheFormLacks(t *testing.T) {
 	var config Config
 	if err := json.Unmarshal([]byte(`{"brand_name":"Acme","colors":{"primary":"#112233"},"launcher":{"position":"right"}}`), &config); err != nil {

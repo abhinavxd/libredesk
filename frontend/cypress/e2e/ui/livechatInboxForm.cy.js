@@ -41,7 +41,7 @@ describe('Live chat inbox form', () => {
     cy.get('input[name="config.brand_name"]').type(brandName)
     cy.get('input[name="config.website_url"]').type(websiteUrl)
 
-    cy.openInboxSection('Launcher position')
+    cy.openInboxSection('Launcher')
     cy.get('input[name="config.launcher.spacing.side"]').clear().type('35')
     cy.get('input[name="config.launcher.spacing.bottom"]').clear().type('45')
     cy.get('select[name="config.launcher.position"]')

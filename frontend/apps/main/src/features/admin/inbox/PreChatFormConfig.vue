@@ -70,8 +70,13 @@
                     <div class="flex items-center justify-between">
                       <div class="flex items-center space-x-3">
                         <div class="drag-handle cursor-move text-muted-foreground">
-                          <GripVertical class="w-4 h-4" />
+                          <GripVertical class="w-4 h-4" aria-hidden="true" />
                         </div>
+                        <ReorderButtons
+                          :index="index"
+                          :length="draggableFields.length"
+                          @move="moveField(index, $event)"
+                        />
                         <div>
                           <div class="font-medium">{{ field.label }}</div>
                           <div class="text-sm text-muted-foreground">
@@ -203,6 +208,7 @@ import { Label } from '@shared-ui/components/ui/label'
 import { Button } from '@shared-ui/components/ui/button'
 import { Switch } from '@shared-ui/components/ui/switch'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
+import ReorderButtons from '@shared-ui/components/ReorderButtons.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { Plus, X, GripVertical } from 'lucide-vue-next'
@@ -256,6 +262,13 @@ const draggableFields = computed({
     audienceConfig.value.fields = fieldsWithUpdatedOrder
   }
 })
+
+const moveField = (index, direction) => {
+  const fields = [...draggableFields.value]
+  const [field] = fields.splice(index, 1)
+  fields.splice(index + direction, 0, field)
+  draggableFields.value = fields
+}
 
 const removeField = (index) => {
   const fields = formFields.value.filter((_, i) => i !== index)

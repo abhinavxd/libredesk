@@ -11,6 +11,7 @@ import {
   SelectItem
 } from '@shared-ui/components/ui/select'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
+import ReorderButtons from '@shared-ui/components/ReorderButtons.vue'
 import { GripVertical, X, FileText } from 'lucide-vue-next'
 import Draggable from 'vuedraggable'
 
@@ -49,6 +50,13 @@ const featured = computed({
       items.map((item) => item.id)
     )
 })
+
+const moveFeatured = (index, direction) => {
+  const ids = [...featuredIds.value]
+  const [id] = ids.splice(index, 1)
+  ids.splice(index + direction, 0, id)
+  update('featured_ids', ids)
+}
 
 const unusedArticles = computed(() =>
   props.articles.filter((article) => !featuredIds.value.includes(article.id))
@@ -127,8 +135,13 @@ const unusedArticles = computed(() =>
           <template #item="{ element: item, index }">
             <div class="flex items-center gap-2 p-2 border rounded-md">
               <div class="drag-handle cursor-move text-muted-foreground">
-                <GripVertical class="size-4" />
+                <GripVertical class="size-4" aria-hidden="true" />
               </div>
+              <ReorderButtons
+                :index="index"
+                :length="featured.length"
+                @move="moveFeatured(index, $event)"
+              />
               <FileText class="size-4 shrink-0 text-muted-foreground" />
               <span
                 class="flex-1 min-w-0 text-sm break-words"
@@ -148,7 +161,7 @@ const unusedArticles = computed(() =>
                   )
                 "
               >
-                <X class="size-4" />
+                <X class="size-4" aria-hidden="true" />
               </Button>
             </div>
           </template>
