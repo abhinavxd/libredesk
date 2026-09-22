@@ -28,6 +28,7 @@ type campaignCandidate struct {
 	snapshot proactive.Snapshot
 }
 
+// handleWidgetCampaign is called by the widget as the visitor browses the site and returns the campaign message to pop up for this visitor right now, or nothing.
 func handleWidgetCampaign(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	var ctx proactive.Context
@@ -108,6 +109,7 @@ func handleWidgetCampaign(r *fastglue.Request) error {
 	return r.SendEnvelope(nil)
 }
 
+// handleWidgetCampaignEvent is called by the widget when a campaign message is shown, opened or closed, for the campaign stats.
 func handleWidgetCampaignEvent(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	var req campaignEventRequest
@@ -143,6 +145,7 @@ func handleWidgetCampaignEvent(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
+// handleCampaignStats returns shown, opened, dismissed and replied counts for each campaign in an inbox over a date range.
 func handleCampaignStats(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))

@@ -589,6 +589,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	return sendChatMessageResponse(app, r, message.UUID)
 }
 
+// handleChatSubmitHandoffForm saves the form the AI agent asks the visitor to fill before it hands the chat to a human agent.
 func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 	var (
 		app              = r.Context.(*App)
