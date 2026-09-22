@@ -148,6 +148,9 @@ func removeAttributeFromPreChatForms(app *App, attributeID int) error {
 	if err != nil {
 		return err
 	}
+	// One bad inbox leaves the rest pointing at an attribute that is already gone,
+	// so every inbox is attempted and the failures are reported at the end.
+	var failed int
 	for _, inb := range inboxes {
 		if inb.Channel != livechat.ChannelLiveChat {
 			continue
@@ -155,17 +158,23 @@ func removeAttributeFromPreChatForms(app *App, attributeID int) error {
 		config, changed, err := stripPreChatFormAttribute(inb.Config, attributeID)
 		if err != nil {
 			app.lo.Error("error parsing live chat config", "id", inb.ID, "error", err)
-			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+			failed++
+			continue
 		}
 		if !changed {
 			continue
 		}
 		if err := app.inbox.UpdateConfig(inb.ID, config); err != nil {
-			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+			failed++
+			continue
 		}
 		if err := reloadInbox(app, inb.ID); err != nil {
 			app.lo.Error("error reloading inbox", "id", inb.ID, "error", err)
 		}
+	}
+	if failed > 0 {
+		app.lo.Error("error clearing deleted custom attribute from live chat inboxes", "inboxes", failed)
+		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }

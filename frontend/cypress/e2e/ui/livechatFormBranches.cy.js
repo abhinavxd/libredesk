@@ -7,6 +7,8 @@ const emailInboxName = `Cypress Branch Email ${stamp}`
 const attributeName = `Cypress Branch Attr ${stamp}`
 const attributeKey = `cypress_branch_attr_${stamp}`
 const campaignName = `Cypress Branch Campaign ${stamp}`
+const teamName = `Cypress Branch Team ${stamp}`
+const agentName = `CypressBranchAgent${stamp}`
 const listPath = '/admin/inboxes'
 
 const selectOption = (trigger, option) => {
@@ -18,9 +20,16 @@ const selectOption = (trigger, option) => {
 
 const editInbox = (inboxId) => cy.visit(`${listPath}/${inboxId}/edit`)
 
-const pickFromLabelledSelect = (label, optionIndex) => {
+const pickFromLabelledSelect = (label, option) => {
   cy.contains('label', label).parent().find('button').click()
-  cy.get('[role="option"]').eq(optionIndex).click()
+  cy.get('[role="option"]').contains(option).click()
+  cy.get('[role="option"]').should('not.exist')
+}
+
+// The agent list loads after the listbox opens, so the brand entry shows on its own first.
+const pickAnAgentSender = () => {
+  cy.contains('label', 'Sender').parent().find('button').click()
+  cy.get('[role="option"]').contains(agentName).click()
   cy.get('[role="option"]').should('not.exist')
 }
 
@@ -49,6 +58,8 @@ describe('Live chat inbox form: branches the other specs skip', () => {
   let inboxId
   let emailInboxId
   let attributeId
+  let teamId
+  let agentId
 
   before(() => {
     cy.login()
@@ -63,6 +74,26 @@ describe('Live chat inbox form: branches the other specs skip', () => {
       regex_hint: ''
     }).then(({ body }) => {
       attributeId = body.data.id
+    })
+    cy.api('POST', '/api/v1/agents', {
+      first_name: agentName,
+      last_name: 'Sender',
+      email: `branch.agent.${stamp}@example.com`,
+      roles: ['Agent'],
+      new_password: `Cypress!${stamp}`,
+      enabled: true
+    }).then(({ body }) => {
+      agentId = body.data.id
+    })
+    cy.api('POST', '/api/v1/teams', {
+      name: teamName,
+      timezone: 'Asia/Kolkata',
+      business_hours_id: null,
+      emoji: '\u{1F600}',
+      conversation_assignment_type: 'Round robin',
+      max_auto_assigned_conversations: 0
+    }).then(({ body }) => {
+      teamId = body.data.id
     })
     cy.api('POST', '/api/v1/inboxes', {
       name: emailInboxName,
@@ -110,6 +141,8 @@ describe('Live chat inbox form: branches the other specs skip', () => {
         failOnStatusCode: false
       })
     }
+    if (teamId) cy.api('DELETE', `/api/v1/teams/${teamId}`, null, { failOnStatusCode: false })
+    if (agentId) cy.api('DELETE', `/api/v1/agents/${agentId}`, null, { failOnStatusCode: false })
   })
 
   it('creates the inbox the other steps edit', () => {
@@ -510,8 +543,8 @@ describe('Live chat inbox form: branches the other specs skip', () => {
     cy.contains('button', campaignName).click()
 
     // SelectAgentCombobox and SelectTeamCombobox drop the id they are given.
-    pickFromLabelledSelect('Sender', 1)
-    pickFromLabelledSelect('Route replies to team', 1)
+    pickAnAgentSender()
+    pickFromLabelledSelect('Route replies to team', teamName)
     selectOption('#campaign-audience', 'Signed-in users')
 
     cy.get('button[type="submit"]').click()

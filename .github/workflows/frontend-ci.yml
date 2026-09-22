@@ -102,6 +102,6 @@ jobs:
             sleep 1
           done
           cd frontend
-          specs=$(find cypress/e2e -name '*.cy.js' | sort | awk -v s=${{ matrix.shard }} -v n=5 'NR % n == s % n' | paste -sd,)
+          specs=$(find cypress/e2e -type f -regextype posix-extended -regex '.*\.(cy|spec)\.(js|jsx|ts|tsx)$' | sort | awk -v s=${{ matrix.shard }} -v n=5 'NR % n == s % n' | paste -sd,)
           echo "shard ${{ matrix.shard }} runs: $specs"
           pnpm exec cypress run --e2e --headless --spec "$specs"

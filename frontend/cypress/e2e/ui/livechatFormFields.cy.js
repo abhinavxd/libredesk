@@ -53,6 +53,46 @@ const setColor = (name, value) =>
 
 describe('Live chat inbox form: every field', () => {
   let inboxId
+  let emailInboxId
+  const emailInboxName = `Cypress Fields Email ${stamp}`
+
+  before(() => {
+    cy.login()
+    // The continuity step links an email inbox, so this spec creates its own.
+    cy.api('POST', '/api/v1/inboxes', {
+      name: emailInboxName,
+      channel: 'email',
+      enabled: true,
+      from: `Fields ${stamp} <fields.${stamp}@example.com>`,
+      config: {
+        auth_type: 'password',
+        from: `Fields ${stamp} <fields.${stamp}@example.com>`,
+        smtp: [
+          {
+            host: '127.0.0.1',
+            port: Number(Cypress.env('SMTP_PORT') || 1025),
+            username: '',
+            password: '',
+            auth_protocol: 'none',
+            tls_type: 'none',
+            max_conns: 2,
+            max_msg_retries: 1,
+            idle_timeout: '5s',
+            pool_wait_timeout: '5s'
+          }
+        ],
+        imap: []
+      }
+    }).then(({ body }) => {
+      emailInboxId = body.data.id
+    })
+  })
+
+  after(() => {
+    if (emailInboxId) {
+      cy.api('DELETE', `/api/v1/inboxes/${emailInboxId}`, null, { failOnStatusCode: false })
+    }
+  })
 
   beforeEach(() => {
     Cypress.on('uncaught:exception', (err) => !err.message.includes("reading 'focus'"))
@@ -449,7 +489,7 @@ describe('Live chat inbox form: every field', () => {
 
     cy.openInboxSection('Conversation continuity email inbox')
     cy.get('select[name="linked_email_inbox_id"]').siblings('button[role="combobox"]').click()
-    cy.get('[role="option"]').not(':contains("None")').first().click()
+    cy.get('[role="option"]').contains(emailInboxName).click()
     cy.get('[role="option"]').should('not.exist')
     cy.get('input[name="config.continuity.offline_threshold"]').clear().type('12m')
     cy.get('input[name="config.continuity.max_messages_per_email"]').clear().type('7')
