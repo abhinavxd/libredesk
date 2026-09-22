@@ -39,6 +39,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	return handleMediaUploadWithMeta(r, nil)
 }
 
+// handleMediaUploadWithMeta uploads media and merges extra values into its metadata.
 func handleMediaUploadWithMeta(r *fastglue.Request, extraMeta map[string]any) error {
 	var (
 		app     = r.Context.(*App)

@@ -711,6 +711,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	return handleMediaUploadWithMeta(r, map[string]any{"widget_contact_id": senderID})
 }
 
+// getWidgetMessageMedia returns unlinked staged media owned by the widget contact.
 func getWidgetMessageMedia(app *App, ids []int, contactID int) ([]mmodels.Media, error) {
 	media, err := app.media.GetMany(ids)
 	if err != nil {
