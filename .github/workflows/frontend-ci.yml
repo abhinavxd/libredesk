@@ -9,6 +9,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     services:
       db:
         image: postgres:17-alpine
@@ -89,4 +93,6 @@ jobs:
             sleep 1
           done
           cd frontend
-          pnpm run test:e2e:ci
+          specs=$(find cypress/e2e -name '*.cy.js' | sort | awk -v s=${{ matrix.shard }} -v n=4 'NR % n == s % n' | paste -sd,)
+          echo "shard ${{ matrix.shard }} runs: $specs"
+          pnpm exec cypress run --e2e --headless --spec "$specs"
