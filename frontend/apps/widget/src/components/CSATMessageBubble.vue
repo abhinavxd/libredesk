@@ -9,7 +9,7 @@
           :key="rating.value"
           @click="selectedRating = rating.value"
           :aria-label="rating.text"
-          class="flex flex-col items-center p-2 rounded-lg cursor-pointer hover:bg-muted transition-all"
+          class="flex flex-col items-center p-2 rounded-md cursor-pointer hover:bg-muted transition-all"
           :class="{ 'scale-125 bg-muted': selectedRating === rating.value }"
         >
           <span class="text-xl mb-1">{{ rating.emoji }}</span>
@@ -21,25 +21,24 @@
         <label class="text-xs text-muted-foreground mb-2 block">
           {{ t('globals.messages.additionalFeedback') }}
         </label>
-        <textarea
+        <Textarea
           v-model="feedback"
           :placeholder="$t('globals.terms.tellUsMore')"
-          class="w-full p-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground"
-          rows="2"
+          class="min-h-[60px]"
           maxlength="500"
-        ></textarea>
+        />
         <div class="text-xs text-muted-foreground text-right mt-1">{{ feedback.length }}/500</div>
       </div>
 
-      <button
-        @click="submitRating"
+      <Button
+        type="button"
+        class="w-full"
         :disabled="(!selectedRating && !feedback.trim()) || isSubmitting"
-        class="w-full py-2 bg-primary text-primary-foreground rounded-md text-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+        @click="submitRating"
       >
-        <div v-if="isSubmitting" class="w-4 h-4 border border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
-        <span v-if="isSubmitting">{{ t('globals.messages.submitting') }}</span>
-        <span v-else>{{ t('globals.messages.submitFeedback') }}</span>
-      </button>
+        <Spinner v-if="isSubmitting" size="sm" :absolute="false" :center="false" />
+        {{ isSubmitting ? t('globals.messages.submitting') : t('globals.messages.submitFeedback') }}
+      </Button>
     </div>
 
     <div v-else class="text-center py-2">
@@ -63,6 +62,9 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@widget/api/index.js'
+import { Button } from '@shared-ui/components/ui/button'
+import { Textarea } from '@shared-ui/components/ui/textarea'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 
 const props = defineProps({
   message: { type: Object, required: true }

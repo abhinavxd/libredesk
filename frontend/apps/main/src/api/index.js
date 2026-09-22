@@ -532,10 +532,10 @@ const createHelpCenter = (data) => http.post('/api/v1/help-centers', data)
 const updateHelpCenter = (id, data) => http.put(`/api/v1/help-centers/${id}`, data)
 const deleteHelpCenter = (id) => http.delete(`/api/v1/help-centers/${id}`)
 const toggleHelpCenter = (id) => http.put(`/api/v1/help-centers/${id}/toggle`)
-const previewHelpCenter = (id, data, page) =>
+const previewHelpCenter = (id, data, page, theme) =>
   http.post(`/api/v1/help-centers/${id}/preview`, data, {
     responseType: 'text',
-    params: page ? { page } : {}
+    params: { ...(page ? { page } : {}), ...(theme ? { theme } : {}) }
   })
 const getHelpCenterTree = (id, locale) =>
   http.get(`/api/v1/help-centers/${id}/tree`, { params: locale ? { locale } : {} })
@@ -560,6 +560,12 @@ const updateArticle = (id, data) => http.put(`/api/v1/articles/${id}`, data)
 const deleteArticle = (collectionId, id) =>
   http.delete(`/api/v1/collections/${collectionId}/articles/${id}`)
 const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data)
+const unlinkArticleTranslation = (id) => http.put(`/api/v1/articles/${id}/unlink-translation`)
+const linkArticleTranslation = (id, data) => http.put(`/api/v1/articles/${id}/link-translation`, data)
+const getLinkableArticles = (helpCenterId, excludeLocale) =>
+  http.get(`/api/v1/help-centers/${helpCenterId}/linkable-articles`, {
+    params: { exclude_locale: excludeLocale }
+  })
 const getHelpCenterInsights = (id) => http.get(`/api/v1/help-centers/${id}/insights`)
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
@@ -632,7 +638,10 @@ const updateNotificationPreferences = (data) => http.put('/api/v1/notifications/
 const createPushSubscription = (data) => http.post('/api/v1/notifications/push-subscriptions', data)
 const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/push-subscriptions', { data: { endpoint } })
 
+const getCampaignStats = (id, params) => http.get(`/api/v1/inboxes/${id}/campaign-stats`, { params })
+
 export default {
+ getCampaignStats,
   login,
   deleteUser,
   importAgents,
@@ -812,6 +821,9 @@ export default {
   updateArticle,
   deleteArticle,
   updateArticleStatus,
+  unlinkArticleTranslation,
+  linkArticleTranslation,
+  getLinkableArticles,
   getHelpCenterInsights,
   getAIFaqSuggestions,
   approveAIFaqSuggestion,

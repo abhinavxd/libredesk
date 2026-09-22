@@ -4,7 +4,7 @@
       <div :class="FILTER_CLASS">
         <SelectComboBox
           :model-value="filters.status"
-          :items="conversationStore.statusOptions"
+          :items="statusItems"
           :placeholder="t('globals.terms.status')"
           align="start"
           @update:model-value="set('status', $event)"
@@ -13,7 +13,7 @@
       <div :class="FILTER_CLASS">
         <SelectComboBox
           :model-value="filters.priority"
-          :items="conversationStore.priorityOptions"
+          :items="priorityItems"
           :placeholder="t('globals.terms.priority')"
           align="start"
           @update:model-value="set('priority', $event)"
@@ -60,17 +60,19 @@
     </div>
 
     <div v-if="selectedTags.length" class="flex flex-wrap gap-1.5">
-      <button
+      <Button
         v-for="tag in selectedTags"
         :key="tag.value"
         type="button"
-        class="inline-flex min-h-7 max-w-full items-center gap-1 rounded-md bg-secondary px-2 text-sm text-secondary-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        variant="secondary"
+        size="xs"
+        class="max-w-full gap-1 font-normal"
         :aria-label="`${t('globals.terms.remove')} ${tag.label}`"
         @click="removeTag(tag.value)"
       >
         <span class="truncate">{{ tag.label }}</span>
-        <X class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      </button>
+        <X aria-hidden="true" />
+      </Button>
     </div>
   </div>
 </template>
@@ -78,6 +80,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { X } from 'lucide-vue-next'
+import { Button } from '@shared-ui/components/ui/button'
 import { useI18n } from 'vue-i18n'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
@@ -91,6 +94,9 @@ import { UNASSIGNED } from './searchFilters'
 
 const FILTER_CLASS = 'flex-1 min-w-28'
 
+// The combobox matches the selected value by strict equality against a string.
+const asStringValues = (options) => options.map((option) => ({ ...option, value: String(option.value) }))
+
 const props = defineProps({
   filters: { type: Object, required: true }
 })
@@ -98,6 +104,8 @@ const emit = defineEmits(['update:filters'])
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
+const statusItems = computed(() => asStringValues(conversationStore.statusOptions))
+const priorityItems = computed(() => asStringValues(conversationStore.priorityOptions))
 const inboxStore = useInboxStore()
 const tagStore = useTagStore()
 

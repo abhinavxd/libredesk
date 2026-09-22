@@ -23,6 +23,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/microcosm-cc/bluemonday"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -52,6 +53,7 @@ var (
 	reservedSlugs = []string{"articles", "search", "api", "sitemap.xml"}
 
 	headerBackgroundTypes = []string{"solid", "gradient", "image"}
+	colorSchemes          = []string{models.ColorSchemeSystem, models.ColorSchemeLight, models.ColorSchemeDark}
 
 	helpCenterTemplates = []string{models.TemplateDocs, models.TemplateClassic}
 
@@ -107,6 +109,7 @@ type HelpCenterRequest struct {
 	Theme           json.RawMessage `json:"theme"`
 	CustomDomain    string          `json:"custom_domain"`
 	Template        string          `json:"template"`
+	LivechatInboxID null.Int        `json:"livechat_inbox_id"`
 }
 
 type CollectionRequest struct {
@@ -134,6 +137,7 @@ type ArticleRequest struct {
 	AIEnabled       bool   `json:"ai_enabled"`
 	CollectionID    *int   `json:"collection_id,omitempty"`
 	AuthorID        *int64 `json:"author_id"`
+	TranslationOfID *int   `json:"translation_of_id,omitempty"`
 	CreatedBy       *int64 `json:"-"`
 }
 
@@ -182,6 +186,7 @@ type queries struct {
 	DeleteCollection           *sqlx.Stmt `query:"delete-collection"`
 
 	GetArticleByID                *sqlx.Stmt `query:"get-article-by-id"`
+	GetArticleTranslations        *sqlx.Stmt `query:"get-article-translations"`
 	InsertArticle                 *sqlx.Stmt `query:"insert-article"`
 	UpdateArticle                 *sqlx.Stmt `query:"update-article"`
 	ArticleSlugExistsInHelpCenter *sqlx.Stmt `query:"article-slug-exists-in-help-center"`
@@ -189,13 +194,18 @@ type queries struct {
 	MoveArticleToCollection       *sqlx.Stmt `query:"move-article-to-collection"`
 	UpdateArticleSortOrder        *sqlx.Stmt `query:"update-article-sort-order"`
 	UpdateArticleStatus           *sqlx.Stmt `query:"update-article-status"`
+	UnlinkArticleTranslation      *sqlx.Stmt `query:"unlink-article-translation"`
+	LinkArticleTranslation        *sqlx.Stmt `query:"link-article-translation"`
+	GetLinkableArticles           *sqlx.Stmt `query:"get-linkable-translation-articles"`
+	LocaleInTranslationGroup      *sqlx.Stmt `query:"article-locale-in-translation-group"`
+	CountTranslationSiblings      *sqlx.Stmt `query:"count-article-translation-siblings"`
 	DeleteArticle                 *sqlx.Stmt `query:"delete-article"`
 	UserIsAuthorAssignable        *sqlx.Stmt `query:"user-is-author-assignable"`
 
 	GetHelpCenterTreeData            *sqlx.Stmt `query:"get-help-center-tree-data"`
 	GetPublicTreeData                *sqlx.Stmt `query:"get-public-tree-data"`
 	GetPublishedArticleBySlug        *sqlx.Stmt `query:"get-published-article-by-slug"`
-	GetPublishedArticleLocales       *sqlx.Stmt `query:"get-published-article-locales"`
+	GetPublishedArticleTranslations  *sqlx.Stmt `query:"get-published-article-translations"`
 	GetPublishedCollectionLocales    *sqlx.Stmt `query:"get-published-collection-locales"`
 	GetPublishedArticles             *sqlx.Stmt `query:"get-published-articles"`
 	GetPublishedArticlesByCollection *sqlx.Stmt `query:"get-published-articles-by-collection"`
@@ -232,6 +242,9 @@ func (m *Manager) GetAllHelpCenters() ([]models.HelpCenter, error) {
 		m.lo.Error("error fetching help centers", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	for i := range helpCenters {
+		fillThemeDefaults(&helpCenters[i])
+	}
 	return helpCenters, nil
 }
 
@@ -241,6 +254,9 @@ func (m *Manager) GetActiveHelpCenters() ([]models.HelpCenter, error) {
 	if err := m.q.GetActiveHelpCenters.Select(&helpCenters); err != nil {
 		m.lo.Error("error fetching active help centers", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	for i := range helpCenters {
+		fillThemeDefaults(&helpCenters[i])
 	}
 	return helpCenters, nil
 }
@@ -255,6 +271,7 @@ func (m *Manager) GetHelpCenterByID(id int) (models.HelpCenter, error) {
 		m.lo.Error("error fetching help center", "error", err, "id", id)
 		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	fillThemeDefaults(&hc)
 	return hc, nil
 }
 
@@ -268,6 +285,7 @@ func (m *Manager) GetHelpCenterBySlug(slug string) (models.HelpCenter, error) {
 		m.lo.Error("error fetching help center by slug", "error", err, "slug", slug)
 		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	fillThemeDefaults(&hc)
 	return hc, nil
 }
 
@@ -290,7 +308,7 @@ func (m *Manager) CreateHelpCenter(req HelpCenterRequest) (models.HelpCenter, er
 	if err := m.validateCustomDomain(req.CustomDomain, 0); err != nil {
 		return hc, err
 	}
-	if err := m.q.InsertHelpCenter.Get(&hc, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template); err != nil {
+	if err := m.q.InsertHelpCenter.Get(&hc, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template, req.LivechatInboxID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return hc, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}
@@ -320,6 +338,7 @@ func (m *Manager) DraftHelpCenter(id int, req HelpCenterRequest) (models.HelpCen
 	hc.Theme = req.Theme
 	hc.CustomDomain = req.CustomDomain
 	hc.Template = req.Template
+	hc.LivechatInboxID = req.LivechatInboxID
 	return hc, nil
 }
 
@@ -345,7 +364,7 @@ func (m *Manager) UpdateHelpCenter(id int, req HelpCenterRequest) (models.HelpCe
 	if err := m.validateCustomDomain(req.CustomDomain, id); err != nil {
 		return hc, err
 	}
-	if err := m.q.UpdateHelpCenter.Get(&hc, id, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template); err != nil {
+	if err := m.q.UpdateHelpCenter.Get(&hc, id, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template, req.LivechatInboxID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return hc, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}
@@ -364,6 +383,7 @@ func (m *Manager) ToggleHelpCenterActive(id int) (models.HelpCenter, error) {
 	}
 	// A paused help center 404s publicly, so its articles must leave the AI index too.
 	m.reindexHelpCenterArticles(id)
+	fillThemeDefaults(&hc)
 	return hc, nil
 }
 
@@ -620,6 +640,15 @@ func (m *Manager) GetArticleByID(id int) (models.Article, error) {
 	return article, nil
 }
 
+func (m *Manager) GetArticleTranslations(id int) ([]models.ArticleTranslation, error) {
+	var translations = make([]models.ArticleTranslation, 0)
+	if err := m.q.GetArticleTranslations.Select(&translations, id); err != nil {
+		m.lo.Error("error fetching article translations", "error", err, "id", id)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return translations, nil
+}
+
 // CreateArticle creates a new article.
 func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Article, error) {
 	var article models.Article
@@ -637,6 +666,25 @@ func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Ar
 	}
 	if err := m.validateArticleAuthor(req.AuthorID); err != nil {
 		return article, err
+	}
+	translationGroupID := ""
+	if req.TranslationOfID != nil {
+		source, err := m.GetArticleByID(*req.TranslationOfID)
+		if err != nil {
+			return article, err
+		}
+		sourceCollection, err := m.GetCollectionByID(source.CollectionID)
+		if err != nil {
+			return article, err
+		}
+		targetCollection, err := m.GetCollectionByID(collectionID)
+		if err != nil {
+			return article, err
+		}
+		if sourceCollection.HelpCenterID != targetCollection.HelpCenterID {
+			return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidCollection"), nil)
+		}
+		translationGroupID = source.TranslationGroupID
 	}
 
 	// Slug uniqueness is per help center but the DB index is per collection, so the
@@ -657,7 +705,7 @@ func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Ar
 	req.Slug = slug
 	req.Content = articleSanitizer.Sanitize(req.Content)
 	req.Excerpt = strings.TrimSpace(req.Excerpt)
-	if err := tx.Stmtx(m.q.InsertArticle).Get(&article, collectionID, req.AuthorID, req.CreatedBy, req.Slug, req.Locale, req.Title, req.Content, req.Excerpt, req.MetaTitle, req.MetaDescription, req.MetaImageURL, req.SortOrder, req.Status, req.AIEnabled); err != nil {
+	if err := tx.Stmtx(m.q.InsertArticle).Get(&article, collectionID, req.AuthorID, req.CreatedBy, req.Slug, req.Locale, req.Title, req.Content, req.Excerpt, req.MetaTitle, req.MetaDescription, req.MetaImageURL, req.SortOrder, req.Status, req.AIEnabled, translationGroupID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
 		}
@@ -829,6 +877,83 @@ func (m *Manager) UpdateArticleStatus(id int, status string) (models.Article, er
 	return article, nil
 }
 
+// GetLinkableArticles returns articles in the help center written in another locale and not yet part of a translation group.
+func (m *Manager) GetLinkableArticles(helpCenterID int, excludeLocale string) ([]models.LinkableArticle, error) {
+	var articles = make([]models.LinkableArticle, 0)
+	if err := m.q.GetLinkableArticles.Select(&articles, helpCenterID, excludeLocale); err != nil {
+		m.lo.Error("error fetching linkable articles", "error", err, "help_center_id", helpCenterID)
+		return articles, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return articles, nil
+}
+
+// LinkArticleTranslation moves an article into the translation group of another article.
+func (m *Manager) LinkArticleTranslation(id, translationOfID int) (models.Article, error) {
+	var article models.Article
+	if id == translationOfID {
+		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.cannotLinkArticleToItself"), nil)
+	}
+	source, err := m.GetArticleByID(translationOfID)
+	if err != nil {
+		return article, err
+	}
+	target, err := m.GetArticleByID(id)
+	if err != nil {
+		return article, err
+	}
+	sourceCollection, err := m.GetCollectionByID(source.CollectionID)
+	if err != nil {
+		return article, err
+	}
+	targetCollection, err := m.GetCollectionByID(target.CollectionID)
+	if err != nil {
+		return article, err
+	}
+	if sourceCollection.HelpCenterID != targetCollection.HelpCenterID {
+		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidCollection"), nil)
+	}
+	var siblings int
+	if err := m.q.CountTranslationSiblings.Get(&siblings, target.TranslationGroupID, target.ID); err != nil {
+		m.lo.Error("error counting translation siblings", "error", err, "id", id)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if siblings > 0 {
+		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.articleAlreadyTranslated"), nil)
+	}
+	var localeTaken bool
+	if err := m.q.LocaleInTranslationGroup.Get(&localeTaken, source.TranslationGroupID, target.Locale); err != nil {
+		m.lo.Error("error checking translation group locale", "error", err, "id", id)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if localeTaken {
+		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.localeAlreadyTranslated"), nil)
+	}
+	if err := m.q.LinkArticleTranslation.Get(&article, id, source.TranslationGroupID); err != nil {
+		if err == sql.ErrNoRows {
+			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.articleAlreadyTranslated"), nil)
+		}
+		if dbutil.IsUniqueViolationError(err) {
+			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.localeAlreadyTranslated"), nil)
+		}
+		m.lo.Error("error linking article translation", "error", err, "id", id)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return article, nil
+}
+
+// UnlinkArticleTranslation detaches an article from its translation group by giving it a group of its own.
+func (m *Manager) UnlinkArticleTranslation(id int) (models.Article, error) {
+	var article models.Article
+	if err := m.q.UnlinkArticleTranslation.Get(&article, id); err != nil {
+		if err == sql.ErrNoRows {
+			return article, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		m.lo.Error("error unlinking article translation", "error", err, "id", id)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return article, nil
+}
+
 // DeleteArticle deletes an article by ID.
 func (m *Manager) DeleteArticle(id int) error {
 	if _, err := m.q.DeleteArticle.Exec(id); err != nil {
@@ -892,6 +1017,15 @@ func (m *Manager) GetPublishedArticle(helpCenterSlug, articleSlug, locale string
 	return article, nil
 }
 
+func (m *Manager) GetPublishedArticleTranslations(helpCenterSlug string, articleID int) ([]models.ArticleTranslation, error) {
+	var translations = make([]models.ArticleTranslation, 0)
+	if err := m.q.GetPublishedArticleTranslations.Select(&translations, helpCenterSlug, articleID); err != nil {
+		m.lo.Error("error fetching article translations", "error", err, "help_center_slug", helpCenterSlug)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return translations, nil
+}
+
 // GetPopularArticles returns the most viewed published articles for a help center, filtered to locale (empty = all).
 func (m *Manager) GetPopularArticles(helpCenterSlug, locale string, limit int) ([]models.Article, error) {
 	var articles = make([]models.Article, 0)
@@ -910,16 +1044,6 @@ func (m *Manager) GetPublishedArticlesByCollection(collectionID, excludeArticleI
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return articles, nil
-}
-
-// GetPublishedArticleLocales returns the locales a published article with the given slug exists in.
-func (m *Manager) GetPublishedArticleLocales(helpCenterSlug, articleSlug string) ([]string, error) {
-	var locales = make([]string, 0)
-	if err := m.q.GetPublishedArticleLocales.Select(&locales, helpCenterSlug, articleSlug); err != nil {
-		m.lo.Error("error fetching article locales", "error", err, "help_center_slug", helpCenterSlug, "article_slug", articleSlug)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	return locales, nil
 }
 
 // GetPublishedCollectionLocales returns the locales a published collection with the given slug exists in.
@@ -1490,18 +1614,26 @@ func (m *Manager) normalizeHelpCenterRequest(req HelpCenterRequest) (HelpCenterR
 
 // normalizeTheme drops theme values that aren't safe to inject into CSS, and rejects a theme it can't read.
 func normalizeTheme(raw json.RawMessage) (json.RawMessage, error) {
-	if len(raw) == 0 {
-		return json.RawMessage("{}"), nil
+	if len(raw) == 0 || string(raw) == "null" {
+		raw = json.RawMessage("{}")
 	}
 	t := models.DefaultTheme()
 	if err := json.Unmarshal(raw, &t); err != nil {
 		return nil, err
 	}
+	if !slices.Contains(colorSchemes, t.ColorScheme) {
+		t.ColorScheme = models.ColorSchemeLight
+	}
 	t.Color = sanitizeHexColor(t.Color)
 	if t.Color == "" {
 		t.Color = defaultAccentColor
 	}
+	t.ColorDark = sanitizeHexColor(t.ColorDark)
+	if t.ColorDark == "" {
+		t.ColorDark = t.Color
+	}
 	t.LogoURL = sanitizeAssetURL(t.LogoURL)
+	t.LogoURLDark = sanitizeAssetURL(t.LogoURLDark)
 	t.NavLinks = sanitizeNavLinks(t.NavLinks)
 	t.Header.Heading = strings.TrimSpace(t.Header.Heading)
 	t.Header.BackgroundColor = sanitizeHexColor(t.Header.BackgroundColor)
@@ -1511,6 +1643,8 @@ func normalizeTheme(raw json.RawMessage) (json.RawMessage, error) {
 	t.Header.TextColor = sanitizeHexColor(t.Header.TextColor)
 	t.Footer.BackgroundColor = sanitizeHexColor(t.Footer.BackgroundColor)
 	t.Footer.TextColor = sanitizeHexColor(t.Footer.TextColor)
+	t.Footer.BackgroundColorDark = sanitizeHexColor(t.Footer.BackgroundColorDark)
+	t.Footer.TextColorDark = sanitizeHexColor(t.Footer.TextColorDark)
 	t.Favicon = sanitizeAssetURL(t.Favicon)
 	t.FooterLinks = sanitizeNavLinks(t.FooterLinks)
 	t.SocialLinks = sanitizeSocialLinks(t.SocialLinks)
@@ -1678,4 +1812,11 @@ func buildInlineTextSanitizer() *bluemonday.Policy {
 	p.RequireNoFollowOnFullyQualifiedLinks(true)
 	p.AllowElements("b", "strong", "i", "em", "u", "s", "del", "ins", "mark", "small", "sub", "sup", "br", "span", "code")
 	return p
+}
+
+// fillThemeDefaults gives a theme saved before a field existed that field's default.
+func fillThemeDefaults(hc *models.HelpCenter) {
+	if theme, err := normalizeTheme(hc.Theme); err == nil {
+		hc.Theme = theme
+	}
 }

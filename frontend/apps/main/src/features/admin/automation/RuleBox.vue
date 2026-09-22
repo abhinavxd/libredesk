@@ -42,18 +42,18 @@
               v-model="rule.field"
               @update:modelValue="(value) => handleFieldChange(value, index)"
             >
-              <SelectTrigger class="w-56">
+              <SelectTrigger :class="fieldClass">
                 <SelectValue :placeholder="t('placeholders.selectField')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <!-- Conversation fields -->
-                  <SelectLabel>{{ $t('globals.terms.conversation') }}</SelectLabel>
+                  <SelectLabel v-if="!contactsOnly">{{ $t('globals.terms.conversation') }}</SelectLabel>
                   <SelectItem v-for="(field, key) in currentFilters" :key="key" :value="key">
                     {{ field.label }}
                   </SelectItem>
                   <!-- Contact custom attributes -->
-                  <SelectLabel>{{ $t('globals.terms.contact') }}</SelectLabel>
+                  <SelectLabel v-if="hasContactCustomAttributes">{{ $t('globals.terms.contact') }}</SelectLabel>
                   <SelectItem
                     v-for="(field, key) in contactCustomAttributes"
                     :key="key"
@@ -70,7 +70,7 @@
               v-model="rule.operator"
               @update:modelValue="(value) => handleOperatorChange(value, index)"
             >
-              <SelectTrigger class="w-56">
+              <SelectTrigger :class="fieldClass">
                 <SelectValue :placeholder="t('placeholders.selectOperator')" />
               </SelectTrigger>
               <SelectContent>
@@ -87,7 +87,7 @@
             </Select>
 
             <!-- Value -->
-            <div v-if="showInput(index)" class="flex-1">
+            <div v-if="showInput(index)" :class="fieldClass">
               <!-- Plain text input -->
               <Input
                 type="text"
@@ -180,8 +180,7 @@
               </Select>
             </div>
 
-            <!-- Placeholder for spacing -->
-            <div v-else class="flex-1"></div>
+            <div class="flex-1"></div>
 
             <!-- Remove condition -->
             <CloseButton :onClose="() => removeCondition(index)" />
@@ -231,13 +230,14 @@ import {
 import { Label } from '@shared-ui/components/ui/label'
 import { Input } from '@shared-ui/components/ui/input'
 import { useI18n } from 'vue-i18n'
-import { useConversationFilters } from '../../../composables/useConversationFilters'
+import { useConversationFilters } from '@/composables/useConversationFilters'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
 import { operatorLabel } from '@/constants/filterConfig'
 
 const props = defineProps({
+  contactsOnly: { type: Boolean, default: false },
   ruleGroup: {
     type: Object,
     required: true
@@ -252,18 +252,22 @@ const props = defineProps({
   }
 })
 
+const fieldClass = 'flex-1 min-w-0 max-w-xs'
+
 const fieldTypeConstants = {
   conversation: 'conversation',
   contact_custom_attribute: 'contact_custom_attribute'
 }
 const { conversationFilters, newConversationFilters, contactCustomAttributes } =
   useConversationFilters()
+const hasContactCustomAttributes = computed(() => Object.keys(contactCustomAttributes.value).length > 0)
 const { ruleGroup } = toRefs(props)
 const emit = defineEmits(['update-group', 'add-condition', 'remove-condition'])
 const { t } = useI18n()
 
 // Computed property to get the correct filters based on type
 const currentFilters = computed(() => {
+  if (props.contactsOnly) return {}
   if (props.type === 'new_conversation') return newConversationFilters.value
   if (props.type === 'conversation_update') return conversationFilters.value
   // previous_* values only exist on conversation update events.
@@ -306,11 +310,8 @@ const handleFieldChange = (value, ruleIndex) => {
 }
 
 const handleOperatorChange = (value, ruleIndex) => {
-  if (['contains', 'not contains'].includes(value)) {
-    ruleGroup.value.rules[ruleIndex].value = []
-  } else {
-    ruleGroup.value.rules[ruleIndex].value = ''
-  }
+  // Every operator stores its value as a comma separated string, multi-value ones included.
+  ruleGroup.value.rules[ruleIndex].value = ''
   ruleGroup.value.rules[ruleIndex].operator = value
   emitUpdate()
 }

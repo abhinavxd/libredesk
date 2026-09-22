@@ -34,7 +34,7 @@ func (m *Manager) BuildTranscript(conversation models.Conversation, messages []m
 		}
 		fmt.Fprintf(&b, "\n[%s] %s (%s):\n%s\n",
 			message.CreatedAt.UTC().Format(transcriptTimeFormat),
-			message.Author.FullName(),
+			transcriptAuthor(message),
 			m.senderTypeLabel(message.SenderType),
 			content,
 		)
@@ -57,4 +57,11 @@ func (m *Manager) senderTypeLabel(senderType string) string {
 		return m.i18n.T("globals.terms.contact")
 	}
 	return senderType
+}
+
+func transcriptAuthor(message models.Message) string {
+	if sender := proactiveSender(message.Meta); sender != "" {
+		return sender
+	}
+	return message.Author.FullName()
 }

@@ -309,6 +309,9 @@ func New(
 }
 
 type queries struct {
+	LockCampaignDelivery     *sqlx.Stmt `query:"lock-campaign-delivery"`
+	CompleteCampaignDelivery *sqlx.Stmt `query:"complete-campaign-delivery"`
+	AssignProactiveTeam      *sqlx.Stmt `query:"assign-proactive-team"`
 	// Conversation queries.
 	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
 	GetConversation                     *sqlx.Stmt `query:"get-conversation"`
@@ -359,6 +362,7 @@ type queries struct {
 	// Message queries.
 	GetMessage                         *sqlx.Stmt `query:"get-message"`
 	GetMessages                        string     `query:"get-messages"`
+	GetContactUnreadPreviewMessages    *sqlx.Stmt `query:"get-contact-unread-preview-messages"`
 	GetOutgoingPendingMessages         *sqlx.Stmt `query:"get-outgoing-pending-messages"`
 	GetMessageSourceIDs                *sqlx.Stmt `query:"get-message-source-ids"`
 	GetConversationUUIDFromMessageUUID *sqlx.Stmt `query:"get-conversation-uuid-from-message-uuid"`
@@ -366,6 +370,7 @@ type queries struct {
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
 	InsertMessage                      *sqlx.Stmt `query:"insert-message"`
 	UpdateMessageStatus                *sqlx.Stmt `query:"update-message-status"`
+	ClearMessageHandoffFormPending     *sqlx.Stmt `query:"clear-message-handoff-form-pending"`
 	UpdateMessageSourceID              *sqlx.Stmt `query:"update-message-source-id"`
 	DeleteMessage                      *sqlx.Stmt `query:"delete-message"`
 	DeletePrivateMessage               *sqlx.Stmt `query:"delete-private-message"`
@@ -508,8 +513,42 @@ func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.
 			c.SignAvatarURL(&conversations[i].Assignee.AvatarURL)
 		}
 		c.SignAvatarURL(&conversations[i].LastChatMessage.Author.AvatarURL)
+		c.SignAttachmentURLs(conversations[i].LastChatMessage.Attachments)
 	}
 	return conversations, nil
+}
+
+func (c *Manager) GetContactUnreadPreviewMessages(contactID, inboxID, limit int) ([]models.ChatMessage, error) {
+	var messages []models.Message
+	if err := c.q.GetContactUnreadPreviewMessages.Select(&messages, contactID, inboxID, limit); err != nil {
+		c.lo.Error("error fetching unread preview messages", "contact_id", contactID, "inbox_id", inboxID, "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	previews := make([]models.ChatMessage, 0, len(messages))
+	for _, message := range messages {
+		c.SignAvatarURL(&message.Author.AvatarURL)
+		c.SignAttachmentURLs(message.Attachments)
+		author := message.Author
+		if sender := proactiveSender(message.Meta); sender != "" {
+			author.FirstName = sender
+			author.LastName = ""
+		}
+		author.Email = null.String{}
+		previews = append(previews, models.ChatMessage{
+			ID:               message.ID,
+			UUID:             message.UUID,
+			Status:           message.Status,
+			ConversationUUID: message.ConversationUUID,
+			CreatedAt:        message.CreatedAt,
+			Content:          message.Content,
+			TextContent:      message.TextContent,
+			Author:           author,
+			Attachments:      message.Attachments,
+			Meta:             message.Meta,
+		})
+	}
+	return previews, nil
 }
 
 // GetChatConversation retrieves a single chat conversation by UUID
@@ -526,6 +565,7 @@ func (c *Manager) GetChatConversation(conversationUUID string) (models.ChatConve
 		c.SignAvatarURL(&conversation.Assignee.AvatarURL)
 	}
 	c.SignAvatarURL(&conversation.LastChatMessage.Author.AvatarURL)
+	c.SignAttachmentURLs(conversation.LastChatMessage.Attachments)
 	return conversation, nil
 }
 
@@ -1799,9 +1839,15 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 	return nil
 }
 
-// SendCSATReply sends a CSAT reply message to a conversation. No-op if one was already sent or contact has no email.
+// SendCSATReply sends a CSAT reply message to a conversation. No-op if one was already sent.
 func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversation) error {
-	if conversation.Contact.Email.String == "" {
+	inb, err := m.inboxStore.GetDBRecord(conversation.InboxID)
+	if err != nil {
+		m.lo.Error("error fetching inbox for CSAT", "conversation_uuid", conversation.UUID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	isEmail := inb.Channel == inbox.ChannelEmail
+	if isEmail && conversation.Contact.Email.String == "" {
 		m.lo.Info("CSAT reply skipped: contact has no email for conversation: %s", "conversation_uuid", conversation.UUID)
 		return nil
 	}
@@ -1812,25 +1858,6 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		}
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	appRootURL, err := m.settingsStore.GetAppRootURL()
-	if err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	csatPublicURL := m.csatStore.MakePublicURL(appRootURL, csatResp.UUID)
-
-	// Render CSAT email template.
-	data, err := m.BuildTemplateData(conversation.UUID, actorUserID)
-	if err != nil {
-		m.lo.Error("error building CSAT template data", "conversation_uuid", conversation.UUID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	data["CSATLink"] = csatPublicURL
-	data["CSATUUID"] = csatResp.UUID
-	message, err := m.template.RenderStoredTemplate(template.TmplCSATRequest, data)
-	if err != nil {
-		m.lo.Error("error rendering CSAT template", "conversation_uuid", conversation.UUID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
 
 	meta := map[string]any{
 		"is_csat":      true,
@@ -1838,9 +1865,34 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		"csat_uuid":    csatResp.UUID,
 	}
 
-	// Only send CSAT to contact.
-	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, []string{conversation.Contact.Email.String}, nil, nil, meta)
-	if err != nil {
+	var (
+		message string
+		to      []string
+	)
+	if isEmail {
+		appRootURL, err := m.settingsStore.GetAppRootURL()
+		if err != nil {
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		data, err := m.BuildTemplateData(conversation.UUID, actorUserID)
+		if err != nil {
+			m.lo.Error("error building CSAT template data", "conversation_uuid", conversation.UUID, "error", err)
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		data["CSATLink"] = m.csatStore.MakePublicURL(appRootURL, csatResp.UUID)
+		data["CSATUUID"] = csatResp.UUID
+		message, err = m.template.RenderStoredTemplate(template.TmplCSATRequest, data)
+		if err != nil {
+			m.lo.Error("error rendering CSAT template", "conversation_uuid", conversation.UUID, "error", err)
+			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		to = []string{conversation.Contact.Email.String}
+	} else {
+		// The widget renders the rating form from the meta, the text is what the agent view shows.
+		message = m.i18n.T("globals.messages.pleaseRateConversation")
+	}
+
+	if _, err := m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, nil, nil, meta); err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -2088,9 +2140,14 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 
 			// Strip agent email from widget responses.
 			author := msg.Author
+			if sender := proactiveSender(msg.Meta); sender != "" {
+				author.FirstName = sender
+				author.LastName = ""
+			}
 			author.Email = null.String{}
 
 			chatMessages = append(chatMessages, models.ChatMessage{
+				ID:               msg.ID,
 				UUID:             msg.UUID,
 				Status:           msg.Status,
 				CreatedAt:        msg.CreatedAt,

@@ -429,6 +429,10 @@
   .link-style {
     @apply text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors;
   }
+
+  .drag-ghost {
+    @apply bg-accent/60 opacity-60;
+  }
 }
 
 /* Fix collapsed sidebar visibility in padding gap.

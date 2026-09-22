@@ -685,6 +685,7 @@ CREATE TABLE help_centers (
 	theme JSONB NOT NULL DEFAULT '{}',
 	custom_domain TEXT NOT NULL DEFAULT '',
 	template TEXT NOT NULL DEFAULT 'classic',
+	livechat_inbox_id INTEGER NULL REFERENCES inboxes(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_help_centers_on_template CHECK (template IN ('docs', 'classic'))
 );
 
@@ -715,6 +716,7 @@ CREATE TABLE help_articles (
 	collection_id INTEGER NOT NULL REFERENCES article_collections(id) ON DELETE CASCADE,
 	author_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
 	created_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	translation_group_id UUID NOT NULL DEFAULT gen_random_uuid(),
 	slug TEXT NOT NULL,
 	locale TEXT NOT NULL DEFAULT 'en',
 	title TEXT NOT NULL,
@@ -737,6 +739,7 @@ CREATE TABLE help_articles (
 	CONSTRAINT constraint_help_articles_on_status CHECK (status IN ('draft', 'published'))
 );
 CREATE UNIQUE INDEX index_unique_help_articles_on_collection_slug_locale ON help_articles(collection_id, slug, locale);
+CREATE UNIQUE INDEX index_unique_help_articles_on_translation_group_locale ON help_articles(translation_group_id, locale);
 CREATE INDEX index_help_articles_on_collection_id ON help_articles(collection_id);
 CREATE INDEX index_help_articles_on_author_id ON help_articles(author_id);
 CREATE INDEX index_help_articles_on_title_trgm ON help_articles USING gin (title gin_trgm_ops);
@@ -999,6 +1002,26 @@ CREATE TABLE notification_email_queue (
 	CONSTRAINT constraint_uniq_notification_email_queue UNIQUE (user_id, notification_type, conversation_id)
 );
 CREATE INDEX index_notification_email_queue_on_send_at ON notification_email_queue(send_at);
+
+DROP TABLE IF EXISTS widget_campaign_deliveries CASCADE;
+CREATE TABLE widget_campaign_deliveries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id UUID NOT NULL,
+    inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+    browser_key UUID NOT NULL,
+    session_key UUID NOT NULL,
+    contact_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    snapshot JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    displayed BOOLEAN NOT NULL DEFAULT FALSE,
+    opened BOOLEAN NOT NULL DEFAULT FALSE,
+    dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+    replied BOOLEAN NOT NULL DEFAULT FALSE,
+    conversation_uuid UUID REFERENCES conversations(uuid) ON DELETE SET NULL
+);
+CREATE INDEX idx_widget_campaign_browser ON widget_campaign_deliveries(inbox_id, browser_key, created_at DESC);
+CREATE INDEX idx_widget_campaign_contact ON widget_campaign_deliveries(inbox_id, contact_id, created_at DESC) WHERE contact_id IS NOT NULL;
+CREATE INDEX idx_widget_campaign_stats ON widget_campaign_deliveries(inbox_id, campaign_id, created_at);
 
 INSERT INTO ai_providers
 ("name", provider, type, config, is_default)

@@ -1,19 +1,29 @@
 <template>
-  <div class="border-t focus:ring-0 focus:outline-none">
+  <div class="focus:ring-0 focus:outline-none">
+    <ReplyButtons
+      v-if="quickReplies.length"
+      :replies="quickReplies"
+      :disabled="isSending"
+      align="end"
+      class="px-2 pb-2"
+      @select="sendQuickReply"
+    />
     <!-- Message Input -->
-    <div class="p-2">
+    <div class="p-2 border-t">
       <!-- Unified Input Container -->
-      <div class="border border-input rounded-lg bg-background focus-within:border-secondary">
+      <div class="border border-input rounded-md bg-background focus-within:border-secondary">
         <!-- Textarea Container -->
         <div class="p-2">
           <Textarea
             v-model="newMessage"
             @keydown="handleKeydown"
             @input="handleTyping"
+            :aria-label="$t('globals.terms.typeMessage')"
             :placeholder="$t('globals.terms.typeMessage')"
             :disabled="isSending"
             maxlength="10000"
-            class="w-full max-h-32 resize-none border-0 bg-transparent focus:ring-0 focus:outline-none focus-visible:ring-0 p-0 shadow-none" style="min-height:20px;height:20px"
+            class="w-full max-h-32 resize-none border-0 bg-transparent focus:ring-0 focus:outline-none focus-visible:ring-0 p-0 shadow-none"
+            style="min-height: 20px; height: 20px"
             ref="messageInput"
           ></Textarea>
         </div>
@@ -33,13 +43,14 @@
 
           <!-- Send Button -->
           <Button
+            type="button"
             @click="sendMessage"
             :aria-label="$t('globals.messages.send')"
             size="sm"
             class="h-9 w-9 p-0 rounded-full disabled:opacity-50 disabled:cursor-not-allowed border-0"
             :disabled="!newMessage.trim() || isUploading || isSending"
           >
-            <ArrowUp class="w-4 h-4" />
+            <ArrowUp class="w-4 h-4" aria-hidden="true" />
           </Button>
         </div>
       </div>
@@ -51,36 +62,56 @@
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { ArrowUp } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
+import ReplyButtons from './ReplyButtons.vue'
 import { Textarea } from '@shared-ui/components/ui/textarea'
-import { useWidgetStore } from '../store/widget.js'
-import { useChatStore } from '../store/chat.js'
+import { useWidgetStore } from '@widget/store/widget.js'
+import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from '@widget/store/user.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { sendWidgetTyping } from '../websocket.js'
+import { sendWidgetTyping } from '@widget/websocket.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageInputActions from './MessageInputActions.vue'
 import api, { saveSession } from '@widget/api/index.js'
 
+import { useProactiveStore } from '@widget/store/proactive.js'
+const proactive = useProactiveStore()
 const emit = defineEmits(['error'])
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const messageInput = ref(null)
-const newMessage = ref('')
+const draftKey = computed(
+  () => chatStore.currentConversation?.uuid || proactive.pending?.id || 'new'
+)
+const newMessage = computed({
+  get: () => chatStore.drafts[draftKey.value] || '',
+  set: (value) => {
+    chatStore.drafts[draftKey.value] = value
+  }
+})
 const isUploading = ref(false)
 const isSending = ref(false)
 const config = computed(() => widgetStore.config)
+const quickReplies = computed(() => {
+  if (chatStore.currentConversation?.uuid) return []
+  const audience = userStore.isVisitor ? config.value.visitors : config.value.users
+  return audience?.quick_replies ?? []
+})
 
-const getTextareaEl = () => messageInput.value?.$el?.querySelector?.('textarea') || messageInput.value?.$el
+const getTextareaEl = () =>
+  messageInput.value?.$el?.querySelector?.('textarea') || messageInput.value?.$el
 
 const focusTextarea = () => {
   nextTick(() => getTextareaEl()?.focus())
 }
 
 onMounted(focusTextarea)
-watch(() => widgetStore.isOpen, (open) => {
-  if (open) focusTextarea()
-})
+watch(
+  () => widgetStore.isOpen,
+  (open) => {
+    if (open) focusTextarea()
+  }
+)
 
 // Setup typing indicator
 const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
@@ -90,8 +121,15 @@ const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
 })
 
 const initChatConversation = async (messageText) => {
-  const resp = await api.initChatConversation({ message: messageText })
-  const { conversation, session_token, user, messages, business_hours_id, working_hours_utc_offset } = resp.data.data
+  const resp = await api.initChatConversation({ message: messageText, ...proactive.replyPayload() })
+  const {
+    conversation,
+    session_token,
+    user,
+    messages,
+    business_hours_id,
+    working_hours_utc_offset
+  } = resp.data.data
   conversation.business_hours_id = business_hours_id
   conversation.working_hours_utc_offset = working_hours_utc_offset
 
@@ -105,6 +143,7 @@ const initChatConversation = async (messageText) => {
   // Update chat store with new conversation and messages.
   chatStore.setCurrentConversation(conversation)
   chatStore.replaceMessages(messages)
+  proactive.replied()
 }
 
 const sendMessageToConversation = async (messageText, tempMessageID) => {
@@ -164,12 +203,20 @@ const sendMessage = async () => {
       chatStore.removeMessage(chatStore.currentConversation.uuid, tempMessageID)
     }
 
+    newMessage.value = messageText
     emit('error', handleHTTPError(error).message)
   } finally {
     isSending.value = false
     focusTextarea()
   }
 }
+
+const sendQuickReply = (reply) => {
+  newMessage.value = reply
+  sendMessage()
+}
+
+defineExpose({ sendQuickReply })
 
 // Handle typing events
 const handleTyping = () => {
@@ -214,7 +261,10 @@ const handleFileUpload = async (files) => {
       chatStore.replaceMessage(chatStore.currentConversation.uuid, tempMessageID, resp.data.data)
     }
     if (resp.data.data) {
-      chatStore.updateConversationListLastMessage(chatStore.currentConversation.uuid, resp.data.data)
+      chatStore.updateConversationListLastMessage(
+        chatStore.currentConversation.uuid,
+        resp.data.data
+      )
     }
   } catch (error) {
     // Remove failed upload message

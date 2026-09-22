@@ -10,7 +10,8 @@ BUILDSTR := ${VERSION} (\#${LAST_COMMIT} $(shell date -u +"%Y-%m-%dT%H:%M:%S%z")
 BIN := libredesk
 FRONTEND_DIR := frontend
 FRONTEND_DIST := ${FRONTEND_DIR}/dist
-STATIC := ${FRONTEND_DIST} i18n schema.sql static
+WIDGET_JS_MIN := static/widget.min.js
+STATIC := ${FRONTEND_DIST} i18n schema.sql static/email-templates static/public ${WIDGET_JS_MIN}:static/widget.js
 GOPATH ?= $(HOME)/go
 STUFFBIN ?= $(GOPATH)/bin/stuffbin
 
@@ -31,6 +32,11 @@ install-deps: $(STUFFBIN)
 # Build the frontend for production (both apps).
 .PHONY: frontend-build
 frontend-build: frontend-build-main frontend-build-widget
+
+.PHONY: minify-widget-js
+minify-widget-js: install-deps
+	@echo "→ Minifying widget loader..."
+	@cd ${FRONTEND_DIR} && pnpm build:widget-loader
 
 # Build only the main frontend app.
 .PHONY: frontend-build-main
@@ -90,7 +96,7 @@ build: frontend-build build-backend
 
 # Stuff static assets into the binary using stuffbin.
 .PHONY: stuff
-stuff: $(STUFFBIN)
+stuff: $(STUFFBIN) minify-widget-js
 	@echo "→ Stuffing static assets into binary..."
 	@$(STUFFBIN) -a stuff -in ${BIN} -out ${BIN} ${STATIC}
 

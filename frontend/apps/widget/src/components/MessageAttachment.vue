@@ -10,7 +10,7 @@
         <img
           :src="getThumbnailUrl(attachment)"
           :alt="attachment.name"
-          class="max-w-48 max-h-32 rounded-lg object-cover"
+          class="max-w-48 max-h-32 rounded-md object-cover"
           @error="fallbackToOriginal($event, attachment.url)"
           @click="openImage(attachment.url)"
         />
@@ -19,7 +19,7 @@
       <!-- File attachment -->
       <div
         v-else
-        class="flex items-center gap-2 p-2 bg-muted rounded-lg border border-border hover:bg-muted/80 transition-colors"
+        class="flex items-center gap-2 p-2 bg-muted rounded-md border border-border hover:bg-muted/80 transition-colors"
         @click="downloadFile(attachment)"
       >
         <div class="flex-shrink-0">
