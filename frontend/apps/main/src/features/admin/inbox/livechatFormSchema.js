@@ -377,7 +377,7 @@ export const createFormSchema = (t) =>
         }
       }
       const max = Number(continuity.max_messages_per_email)
-      if (!Number.isFinite(max) || max < 1 || max > 100) {
+      if (!Number.isInteger(max) || max < 1 || max > 100) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['config', 'continuity', 'max_messages_per_email'],

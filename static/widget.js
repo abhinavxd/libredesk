@@ -389,9 +389,13 @@
 
         watchColorScheme () {
             if (!window.matchMedia) return;
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            const query = window.matchMedia('(prefers-color-scheme: dark)');
+            const onChange = () => {
                 if (this.widgetSettings.theme === 'system') this.applyLauncherTheme();
-            });
+            };
+            // Safari 13.1 and older only have the deprecated addListener.
+            if (query.addEventListener) query.addEventListener('change', onChange);
+            else if (query.addListener) query.addListener(onChange);
         }
 
         iframeBottomOffset () {

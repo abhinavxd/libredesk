@@ -623,6 +623,18 @@ describe('Livechat Inbox Form Schema', () => {
     ).toThrow()
   })
 
+  test('continuity max_messages_per_email rejects a fraction', () => {
+    expect(() =>
+      schema.parse(
+        withContinuity({
+          offline_threshold: '5m',
+          max_messages_per_email: 1.5,
+          min_email_interval: '30m'
+        })
+      )
+    ).toThrow()
+  })
+
   test('continuity max_messages_per_email out of range', () => {
     expect(() =>
       schema.parse(
