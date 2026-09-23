@@ -130,7 +130,7 @@ func (c *Manager) makeViewCountsQuery(userID int, teamIDs []int, listTypes []str
 	var (
 		args  = []any{}
 		parts = make([]string, 0, len(views))
-		loc   = c.filterLocation()
+		loc   = c.FilterLocation()
 	)
 
 	for _, view := range views {
@@ -159,7 +159,7 @@ func (c *Manager) makeConversationsCountQuery(existingArgs []any, userID int, te
 
 	baseQuery := fmt.Sprintf(c.q.GetConversationsCountBase, listTypeWhereClause(conditions))
 
-	return dbutil.BuildFilterQuery(baseQuery, qArgs, filtersJSON, conversationListAllowedFields, conversationFilterRenderers, loc)
+	return dbutil.BuildFilterQuery(baseQuery, qArgs, filtersJSON, ListFilterAllowedFields, ListFilterRenderers, loc)
 }
 
 // ListsForUserPermissions returns conversation list types the user may access.

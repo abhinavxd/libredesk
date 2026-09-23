@@ -1,7 +1,13 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Chat header -->
-    <ChatHeader @goBack="goBack" />
+    <ChatHeader @goBack="goBack" @error="handleError" />
+
+    <ProactiveMessage
+      v-if="showPreChatForm && proactive.pending"
+      :pending="proactive.pending"
+      class="px-4 pt-4"
+    />
 
     <!-- Pre-chat form -->
     <PreChatForm
@@ -13,13 +19,24 @@
     />
 
     <!-- Messages container (when no pre-chat form) -->
-    <ChatMessages v-else ref="chatMessages" :showPreChatForm="showPreChatForm" />
+    <ChatMessages
+      v-else
+      ref="chatMessages"
+      :showPreChatForm="showPreChatForm"
+      :handoff-form-submitting="isSubmittingHandoffForm"
+      @suggested-reply="sendSuggestedReply"
+      @handoff-form-submit="submitHandoffForm"
+    />
 
     <!-- Error display -->
     <WidgetError :errorMessage="errorMessage" />
 
     <!-- Message input (only when pre-chat form is not shown) -->
-    <MessageInput v-if="!showPreChatForm && !isConversationClosed" @error="handleError" />
+    <MessageInput
+      v-if="!showPreChatForm && !isConversationClosed && !hasPendingHandoffForm"
+      ref="messageInput"
+      @error="handleError"
+    />
 
     <!-- Closed conversation notice -->
     <div v-if="isConversationClosed" class="border-t p-4 text-center text-sm text-muted-foreground">
@@ -30,9 +47,9 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useWidgetStore } from '../store/widget.js'
-import { useUserStore } from '../store/user.js'
-import { useChatStore } from '../store/chat.js'
+import { useWidgetStore } from '@widget/store/widget.js'
+import { useUserStore } from '@widget/store/user.js'
+import { useChatStore } from '@widget/store/chat.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api, { saveSession } from '@widget/api/index.js'
 import WidgetError from '@widget/components/WidgetError.vue'
@@ -40,21 +57,34 @@ import ChatHeader from '@widget/components/ChatHeader.vue'
 import ChatMessages from '@widget/components/ChatMessages.vue'
 import MessageInput from '@widget/components/MessageInput.vue'
 import PreChatForm from '@widget/components/PreChatForm.vue'
+import ProactiveMessage from '@widget/components/ProactiveMessage.vue'
+import { resolvePreChatForm } from '@widget/utils/preChatForm.js'
 
+import { useProactiveStore } from '@widget/store/proactive.js'
+const proactive = useProactiveStore()
 const widgetStore = useWidgetStore()
 const userStore = useUserStore()
 const chatStore = useChatStore()
 const errorMessage = ref('')
+const messageInput = ref(null)
 const preChatFormSubmitted = ref(false)
 const isInitializing = ref(false)
+const isSubmittingHandoffForm = ref(false)
 const config = computed(() => widgetStore.config)
 
 // Determine if pre-chat form should be shown
 const showPreChatForm = computed(() => {
-  const preChatForm = config.value?.prechat_form
+  const preChatForm = resolvePreChatForm(
+    config.value?.prechat_form,
+    userStore.isVisitor
+  )
 
   // Must be enabled and not submitted
-  if (!preChatForm?.enabled || preChatFormSubmitted.value) {
+  if (!preChatForm.enabled || preChatFormSubmitted.value) {
+    return false
+  }
+
+  if (preChatForm.handoff_only) {
     return false
   }
 
@@ -77,8 +107,12 @@ const isConversationClosed = computed(() => {
   const settingsKey = userStore.isVisitor ? 'visitors' : 'users'
   return config.value?.[settingsKey]?.prevent_reply_to_closed_conversation ?? false
 })
+const hasPendingHandoffForm = computed(() => {
+  return !!chatStore.getCurrentConversationLastMessage?.meta?.handoff_form_pending
+})
 
 const goBack = () => {
+  if (!chatStore.currentConversation?.uuid) proactive.abandon()
   widgetStore.navigateToMessages()
 }
 
@@ -88,6 +122,29 @@ const handleError = (message) => {
     setTimeout(() => {
       errorMessage.value = ''
     }, 5000)
+  }
+}
+
+const sendSuggestedReply = (reply) => {
+  messageInput.value?.sendQuickReply(reply)
+}
+
+const submitHandoffForm = async ({ formData, message }) => {
+  if (isSubmittingHandoffForm.value) return
+  isSubmittingHandoffForm.value = true
+  errorMessage.value = ''
+  const uuid = chatStore.currentConversation.uuid
+  try {
+    await api.submitHandoffForm(uuid, formData)
+    chatStore.replaceMessage(uuid, message.uuid, {
+      ...message,
+      meta: { ...message.meta, handoff_form_pending: false }
+    })
+    chatStore.handoffDraft = {}
+  } catch (error) {
+    errorMessage.value = handleHTTPError(error).message
+  } finally {
+    isSubmittingHandoffForm.value = false
   }
 }
 
@@ -104,7 +161,8 @@ const handlePreChatFormSubmit = async ({ formData, message }) => {
 
   try {
     const payload = {
-      message: message
+      message: message,
+      ...proactive.replyPayload()
     }
 
     if (Object.keys(formData).length > 0) {
@@ -112,7 +170,14 @@ const handlePreChatFormSubmit = async ({ formData, message }) => {
     }
 
     const resp = await api.initChatConversation(payload)
-    const { conversation, session_token, user, messages, business_hours_id, working_hours_utc_offset } = resp.data.data
+    const {
+      conversation,
+      session_token,
+      user,
+      messages,
+      business_hours_id,
+      working_hours_utc_offset
+    } = resp.data.data
     conversation.business_hours_id = business_hours_id
     conversation.working_hours_utc_offset = working_hours_utc_offset
 
@@ -125,6 +190,8 @@ const handlePreChatFormSubmit = async ({ formData, message }) => {
     chatStore.replaceMessages(messages)
 
     preChatFormSubmitted.value = true
+    chatStore.preChatDraft = {}
+    proactive.replied()
   } catch (error) {
     errorMessage.value = handleHTTPError(error).message
   } finally {

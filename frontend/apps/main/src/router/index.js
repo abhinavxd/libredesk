@@ -1,9 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import App from '@main/App.vue'
-import OuterApp from '@main/OuterApp.vue'
-import InboxLayout from '@main/layouts/inbox/InboxLayout.vue'
-import AccountLayout from '@main/layouts/account/AccountLayout.vue'
-import AdminLayout from '@main/layouts/admin/AdminLayout.vue'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 import { getI18n } from '@main/i18n'
 import { abortRouteScope } from '@main/api'
@@ -11,7 +6,7 @@ import { abortRouteScope } from '@main/api'
 const routes = [
   {
     path: '/',
-    component: OuterApp,
+    component: () => import('@main/OuterApp.vue'),
     children: [
       {
         path: '',
@@ -35,7 +30,7 @@ const routes = [
   },
   {
     path: '/',
-    component: App,
+    component: () => import('@main/App.vue'),
     children: [
       {
         path: 'contacts',
@@ -66,7 +61,7 @@ const routes = [
         path: '/inboxes/teams/:teamID',
         name: 'teams',
         props: true,
-        component: InboxLayout,
+        component: () => import('@main/layouts/inbox/InboxLayout.vue'),
         meta: { titleKey: 'globals.terms.teamInbox', hidePageHeader: true },
         children: [
           {
@@ -90,7 +85,7 @@ const routes = [
         path: '/inboxes/views/:viewID',
         name: 'views',
         props: true,
-        component: InboxLayout,
+        component: () => import('@main/layouts/inbox/InboxLayout.vue'),
         meta: { titleKey: 'globals.terms.view', hidePageHeader: true },
         children: [
           {
@@ -120,7 +115,7 @@ const routes = [
         path: '/inboxes/:type(assigned|unassigned|all|mentioned)?',
         name: 'inboxes',
         redirect: '/inboxes/assigned',
-        component: InboxLayout,
+        component: () => import('@main/layouts/inbox/InboxLayout.vue'),
         props: true,
         meta: { titleKey: 'globals.terms.inbox', hidePageHeader: true },
         children: [
@@ -164,7 +159,7 @@ const routes = [
         path: '/account/:page?',
         name: 'account',
         redirect: '/account/profile',
-        component: AccountLayout,
+        component: () => import('@main/layouts/account/AccountLayout.vue'),
         props: true,
         meta: { titleKey: 'globals.terms.account' },
         children: [
@@ -186,7 +181,7 @@ const routes = [
       {
         path: '/admin',
         name: 'admin',
-        component: AdminLayout,
+        component: () => import('@main/layouts/admin/AdminLayout.vue'),
         meta: { titleKey: 'globals.terms.admin' },
         children: [
           {

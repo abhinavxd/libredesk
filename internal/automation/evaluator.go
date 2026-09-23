@@ -167,6 +167,9 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 	} else if rule.FieldType == models.FieldTypeContactCustomAttribute {
 		// If the field type is custom attribute, need to extract the value from the custom attributes
 		var attributes json.RawMessage = conversation.Contact.CustomAttributes
+		if len(attributes) == 0 {
+			attributes = json.RawMessage(`{}`)
+		}
 
 		// Unmarshal the custom attributes
 		if err := json.Unmarshal(attributes, &customAttributes); err != nil {
@@ -175,8 +178,13 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 		}
 		e.lo.Debug("unmarshalled custom attributes", "custom_attributes", customAttributes, "conversation_uuid", conversation.UUID)
 
-		// Check if the field exists in the custom attributes, If the field is not found, return false.
-		if val, ok := customAttributes[rule.Field]; ok {
+		// Only the set/not set operators can act on an attribute the contact does not have.
+		val, ok := customAttributes[rule.Field]
+		if !ok && rule.Operator != models.RuleOperatorSet && rule.Operator != models.RuleOperatorNotSet {
+			e.lo.Warn("field not found in custom attribute", "field", rule.Field, "field_type", rule.FieldType, "conversation_uuid", conversation.UUID)
+			return false
+		}
+		if ok {
 			// Convert the value to a string for comparison, Handle different types of values, really not required but just to be safe.
 			switch v := val.(type) {
 			case string:
@@ -191,9 +199,6 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 			default:
 				valueToCompare = fmt.Sprintf("%v", v)
 			}
-		} else {
-			e.lo.Warn("field not found in custom attribute", "field", rule.Field, "field_type", rule.FieldType, "conversation_uuid", conversation.UUID, "custom_attributes", customAttributes)
-			return false
 		}
 	} else {
 		e.lo.Error("error unrecognized field type", "field_type", rule.FieldType, "conversation_uuid", conversation.UUID)

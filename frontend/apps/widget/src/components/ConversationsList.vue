@@ -28,7 +28,7 @@
             </div>
             <div class="flex items-center gap-2">
               <p class="text-sm text-muted-foreground truncate flex-1 min-w-0">
-                {{ conversation.last_message.content }}
+                {{ lastMessagePreview(conversation.last_message, t) }}
               </p>
               <UnreadCountBadge :count="conversation.unread_message_count" class="flex-shrink-0" />
             </div>
@@ -50,6 +50,7 @@ import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import UnreadCountBadge from './UnreadCountBadge.vue'
+import { lastMessagePreview } from '@widget/utils/messagePreview.js'
 
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()
@@ -78,7 +79,7 @@ function getAvatarUrl(conversation) {
     if (assignee?.id > 0) {
       return assignee.avatar_url || ''
     }
-    return widgetStore.config.launcher?.logo_url || ''
+    return widgetStore.branding?.launcher?.logo_url || ''
   }
   return author?.avatar_url || ''
 }

@@ -1,9 +1,9 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useEmitter } from '../composables/useEmitter'
-import { EMITTER_EVENTS } from '../constants/emitterEvents'
-import api from '../api'
+import api from '@/api'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents'
+import { useEmitter } from '@/composables/useEmitter'
 
 export const useCustomAttributeStore = defineStore('customAttributes', () => {
     const attributes = ref([])
@@ -28,8 +28,7 @@ export const useCustomAttributeStore = defineStore('customAttributes', () => {
     })
     let inflight = null
     let hasFetched = false
-    const fetchCustomAttributes = () => {
-        if (hasFetched) return Promise.resolve()
+    const loadCustomAttributes = () => {
         if (inflight) return inflight
         inflight = api.getCustomAttributes()
             .then(response => {
@@ -45,10 +44,13 @@ export const useCustomAttributeStore = defineStore('customAttributes', () => {
             .finally(() => { inflight = null })
         return inflight
     }
+    const fetchCustomAttributes = () => hasFetched ? Promise.resolve() : loadCustomAttributes()
+    const refreshCustomAttributes = () => loadCustomAttributes()
     return {
         attributes,
         conversationAttributeOptions,
         contactAttributeOptions,
         fetchCustomAttributes,
+        refreshCustomAttributes,
     }
 })

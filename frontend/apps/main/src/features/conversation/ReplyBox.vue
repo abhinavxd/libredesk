@@ -1,4 +1,30 @@
 <template>
+  <AlertDialog
+    :open="!!pendingToolApproval && pendingToolConversationUUID === currentConversationUUID"
+  >
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ $t('ai.toolApprovalTitle') }}</AlertDialogTitle>
+        <AlertDialogDescription as="div">
+          <ToolApprovalDetails v-if="pendingToolApproval" :approval="pendingToolApproval" />
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          :disabled="isGenerating"
+          @click="resolveGenerateToolApproval(false)"
+        >
+          {{ $t('globals.messages.reject') }}
+        </Button>
+        <Button type="button" :disabled="isGenerating" @click="resolveGenerateToolApproval(true)">
+          {{ $t('globals.messages.approveAndRun') }}
+        </Button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
   <AlertDialog :open="showContactEmailWarning" @update:open="showContactEmailWarning = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
@@ -95,7 +121,11 @@
         <Pencil class="shrink-0 text-muted-foreground" />
         <span v-if="draftPreview" class="truncate">{{ draftPreview }}</span>
         <span v-else class="truncate text-muted-foreground">
-          {{ messageType === 'private_note' ? $t('globals.terms.privateNote') : $t('globals.terms.reply') }}
+          {{
+            messageType === 'private_note'
+              ? $t('globals.terms.privateNote')
+              : $t('globals.terms.reply')
+          }}
         </span>
         <span
           v-if="attachmentCount"
@@ -170,6 +200,7 @@ import {
 } from '@shared-ui/components/ui/alert-dialog'
 import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
 import { Button } from '@shared-ui/components/ui/button'
+import ToolApprovalDetails from '@/features/conversation/ToolApprovalDetails.vue'
 import { Pencil, Paperclip } from 'lucide-vue-next'
 import { useVisualViewportHeight } from '@main/composables/useVisualViewportHeight'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
@@ -310,18 +341,33 @@ const activeContentRef = () =>
   isEditorFullscreen.value ? fullscreenContentRef.value : replyBoxContentRef.value
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
+const pendingToolApproval = ref(null)
+const pendingToolConversationUUID = ref('')
 const deferredStatus = ref(null)
 const mentions = ref([])
 
+watch(currentConversationUUID, (uuid) => {
+  if (pendingToolApproval.value && pendingToolConversationUUID.value !== uuid) {
+    pendingToolApproval.value = null
+    pendingToolConversationUUID.value = ''
+  }
+})
+
 const runAiGeneration = async (requestFn) => {
-  if (isGenerating.value) return
+  if (isGenerating.value || pendingToolApproval.value) return
   const uuid = currentConversationUUID.value
   if (!uuid) return
   isGenerating.value = true
   try {
     const resp = await requestFn(uuid)
     if (uuid !== currentConversationUUID.value) return
-    htmlContent.value = resp.data.data || ''
+    const result = resp.data.data
+    if (result.status === 'approval_required') {
+      pendingToolApproval.value = result.approval
+      pendingToolConversationUUID.value = uuid
+      return
+    }
+    htmlContent.value = result.content || ''
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -336,6 +382,39 @@ const handleGenerateReply = () =>
   runAiGeneration((uuid) =>
     api.aiGenerateReply({ conversation_uuid: uuid, instruction: textContent.value })
   )
+
+const resolveGenerateToolApproval = async (approved) => {
+  const approval = pendingToolApproval.value
+  const uuid = pendingToolConversationUUID.value
+  if (!approval || isGenerating.value) return
+  isGenerating.value = true
+  try {
+    const resp = approved
+      ? await api.approveAIToolRun(approval.run_id)
+      : await api.declineAIToolRun(approval.run_id)
+    const result = resp.data.data
+    if (uuid !== currentConversationUUID.value) return
+    if (result.status === 'approval_required') {
+      pendingToolApproval.value = result.approval
+      pendingToolConversationUUID.value = uuid
+      return
+    }
+    pendingToolApproval.value = null
+    pendingToolConversationUUID.value = ''
+    htmlContent.value = result.content || ''
+  } catch (error) {
+    if ([403, 404, 409].includes(error?.response?.status)) {
+      pendingToolApproval.value = null
+      pendingToolConversationUUID.value = ''
+    }
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isGenerating.value = false
+  }
+}
 
 // Copilot's "Insert into reply" replaces the draft with its answer (already HTML from the panel),
 // forcing reply mode so a private note in progress does not silently receive customer-facing text.
@@ -383,7 +462,11 @@ const draftPreview = computed(() => textContent.value.trim())
 
 const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.value.length)
 
-const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
+const processSend = async (
+  skipContactEmailCheck = false,
+  skipMissingTagsCheck = false,
+  statusToSet = null
+) => {
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
@@ -395,9 +478,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
 
   if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
 
-  const currentInbox = inboxStore.inboxes.find(
-    (i) => i.id === conversationStore.current.inbox_id
-  )
+  const currentInbox = inboxStore.inboxes.find((i) => i.id === conversationStore.current.inbox_id)
   if (
     !isPrivate &&
     !skipMissingTagsCheck &&
@@ -598,8 +679,10 @@ watch(
   [loadedMacroID, loadedMacroActions],
   ([id, actions]) => {
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
-    if (id > 0) conversationStore.setMacro({ id, actions: [...toRaw(actions)] }, MACRO_CONTEXT.REPLY)
-    else if (actions.length) conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
+    if (id > 0)
+      conversationStore.setMacro({ id, actions: [...toRaw(actions)] }, MACRO_CONTEXT.REPLY)
+    else if (actions.length)
+      conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
   },
   { deep: true }
 )

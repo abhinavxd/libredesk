@@ -3,6 +3,7 @@
     <Popover v-if="range" v-model:open="rangeOpen">
       <PopoverTrigger as-child>
         <Button
+          type="button"
           variant="outline"
           :class="
             cn(
@@ -11,8 +12,8 @@
             )
           "
         >
-          <CalendarIcon class="mr-2 h-4 w-4" />
-          {{ rangeLabel || t('globals.terms.pickDate') }}
+          <CalendarIcon class="mr-2 h-4 w-4" aria-hidden="true" />
+          {{ rangeLabel || placeholder || t('globals.terms.pickDate') }}
         </Button>
       </PopoverTrigger>
       <PopoverContent class="w-auto p-0">
@@ -26,6 +27,7 @@
     <Popover v-else v-model:open="open">
       <PopoverTrigger as-child>
         <Button
+          type="button"
           variant="outline"
           :class="
             cn(
@@ -34,8 +36,8 @@
             )
           "
         >
-          <CalendarIcon class="mr-2 h-4 w-4" />
-          {{ modelValue ? formatDisplay(modelValue) : t('globals.terms.pickDate') }}
+          <CalendarIcon class="mr-2 h-4 w-4" aria-hidden="true" />
+          {{ modelValue ? formatDisplay(modelValue) : placeholder || t('globals.terms.pickDate') }}
         </Button>
       </PopoverTrigger>
       <PopoverContent class="w-auto p-0">
@@ -64,7 +66,8 @@ const { t } = useI18n()
 const modelValue = defineModel({ type: String, default: '' })
 
 defineProps({
-  range: { type: Boolean, default: false }
+  range: { type: Boolean, default: false },
+  placeholder: { type: String, default: '' }
 })
 
 const open = ref(false)

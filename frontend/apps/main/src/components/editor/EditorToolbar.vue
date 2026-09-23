@@ -417,7 +417,7 @@ const complete = async (promptKey) => {
   emit('aiGenerationChange', true)
   try {
     const content = await aiPromptStore.complete(promptKey, props.editor.getHTML())
-    if (content !== null) props.editor.commands.setContent(content)
+    if (content !== null) props.editor.commands.setContent(content, true)
   } finally {
     isGenerating.value = false
     emit('aiGenerationChange', false)

@@ -20,7 +20,11 @@
       </div>
     </Teleport>
 
-    <EditorContent :editor="editor" class="hc-prose flex-1 min-h-0 overflow-y-auto" />
+    <EditorContent
+      :editor="editor"
+      class="hc-prose flex-1 min-h-0 overflow-y-auto"
+      :style="{ '--hc-editor-accent': accentColor || null, '--hc-editor-accent-dark': accentColorDark || null }"
+    />
 
     <input
       ref="imageInput"
@@ -58,7 +62,9 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   enableInlineImages: { type: Boolean, default: false },
   linkedModel: { type: String, default: 'messages' },
-  toolbarTarget: { type: null, default: null }
+  toolbarTarget: { type: null, default: null },
+  accentColor: { type: String, default: '' },
+  accentColorDark: { type: String, default: '' }
 })
 
 const emit = defineEmits(['send', 'filesDropped'])
@@ -104,11 +110,22 @@ defineExpose({ focus })
 
 <style lang="scss">
 .tiptap {
-  --hc-accent: hsl(var(--primary));
+  --hc-accent: var(--hc-editor-accent, hsl(var(--primary)));
   --hc-accent-ink: color-mix(in srgb, var(--hc-accent), #0d1117 46%);
+  --hc-accent-fill: color-mix(in srgb, var(--hc-accent), #0d1117 46%);
   --hc-border: hsl(var(--border));
-  --hc-accent-tint: hsl(var(--primary) / 0.08);
+  --hc-bg: hsl(var(--background));
+  --hc-accent-tint: color-mix(in srgb, var(--hc-accent) 8%, var(--hc-bg));
   --hc-muted: hsl(var(--muted-foreground));
+
+  table td,
+  table th {
+    border-color: var(--hc-border);
+  }
+
+  table th {
+    background: var(--hc-accent-tint);
+  }
 
   details.hc-details > .hc-details-content {
     margin-top: 0.5rem;
@@ -123,5 +140,11 @@ defineExpose({ focus })
     outline: 2px solid hsl(var(--link));
     outline-offset: 2px;
   }
+}
+
+.dark .tiptap {
+  --hc-accent: var(--hc-editor-accent-dark, var(--hc-editor-accent, hsl(var(--primary))));
+  --hc-accent-ink: color-mix(in srgb, var(--hc-accent), #ffffff 34%);
+  --hc-accent-tint: color-mix(in srgb, var(--hc-accent) 12%, var(--hc-bg));
 }
 </style>

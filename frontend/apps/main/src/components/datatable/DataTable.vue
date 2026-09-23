@@ -1,13 +1,12 @@
 <template>
   <div class="w-full space-y-3">
-    <div v-if="searchable" class="relative max-w-xs">
-      <Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        v-model="globalFilter"
-        :placeholder="searchPlaceholder || t('globals.terms.search')"
-        class="pl-8"
-      />
-    </div>
+    <SearchInput
+      v-if="searchable"
+      v-model="globalFilter"
+      class="max-w-xs"
+      :placeholder="searchPlaceholder || t('globals.terms.search')"
+      :clear-label="t('globals.messages.clearSearch')"
+    />
 
     <div
       ref="scrollContainer"
@@ -112,7 +111,8 @@ import {
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
-import { ArrowUpDown, ChevronDown, ChevronUp, Ghost, Search } from 'lucide-vue-next'
+import { ArrowUpDown, ChevronDown, ChevronUp, Ghost } from 'lucide-vue-next'
+import SearchInput from '@shared-ui/components/SearchInput.vue'
 import {
   TableBody,
   TableCell,
@@ -120,7 +120,6 @@ import {
   TableHeader,
   TableRow
 } from '@shared-ui/components/ui/table'
-import { Input } from '@shared-ui/components/ui/input'
 
 const { t } = useI18n()
 

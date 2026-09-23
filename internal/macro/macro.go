@@ -105,7 +105,7 @@ func (m *Manager) GetAll() ([]models.Macro, error) {
 // GetAllCompact returns macros without message content filtered by name, all of them when pageSize is 0.
 func (m *Manager) GetAllCompact(query string, page, pageSize int) ([]models.MacroCompact, error) {
 	macros := make([]models.MacroCompact, 0)
-	err := m.q.GetAllCompact.Select(&macros, query, pageSize, dbutil.PageOffset(page, pageSize))
+	err := m.q.GetAllCompact.Select(&macros, query, pageSize, dbutil.PageOffset(page, pageSize), dbutil.ContainsPattern(query))
 	if err != nil {
 		m.lo.Error("error fetching macros", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -116,7 +116,7 @@ func (m *Manager) GetAllCompact(query string, page, pageSize int) ([]models.Macr
 // SearchCompact returns the top macros without message content visible to the given user.
 func (m *Manager) SearchCompact(query, view string, userID int, teamIDs []int) ([]models.MacroCompact, error) {
 	macros := make([]models.MacroCompact, 0)
-	err := m.q.SearchCompact.Select(&macros, query, view, userID, pq.Array(teamIDs))
+	err := m.q.SearchCompact.Select(&macros, query, view, userID, pq.Array(teamIDs), dbutil.ContainsPattern(query))
 	if err != nil {
 		m.lo.Error("error searching macros", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

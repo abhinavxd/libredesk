@@ -20,6 +20,10 @@ export const useInboxStore = defineStore('inbox', () => {
     .filter(inb => inb.channel === 'whatsapp')
     .map(inb => ({ label: inb.name, value: String(inb.id) }))
   )
+  const livechatOptions = computed(() => inboxes.value
+    .filter(inb => inb.channel === 'livechat')
+    .map(inb => ({ label: inb.name, value: String(inb.id) }))
+  )
   const fetchInboxes = async (force = false) => {
     if (!force && inboxes.value.length) return
     try {
@@ -37,6 +41,7 @@ export const useInboxStore = defineStore('inbox', () => {
     options,
     emailOptions,
     whatsappOptions,
+    livechatOptions,
     fetchInboxes,
   }
 })
