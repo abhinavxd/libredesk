@@ -33,7 +33,7 @@
           :aria-label="t('globals.terms.collapse')"
           @click="emit('minimize')"
         >
-          <Minus />
+          <Minus class="translate-y-1" />
         </Button>
         <Button
           class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0"
