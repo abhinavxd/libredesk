@@ -5,8 +5,11 @@ It holds two fake accounts and looks them up by the contact's external user id,
 which libredesk sends in the `X-Libredesk-Contact-External-Id` header. Add your
 own test users by editing the `users` map in `main.go`.
 
-Custom tools are only called by AI assistants. Copilot gets the built-in tools
-and never touches these.
+AI assistants call every enabled custom tool. Copilot and Generate Reply call the
+ones with "Available in Copilot" or "Available in Generate Reply" turned on, and a
+tool with "Require agent approval" on waits for the agent to approve the call there.
+"Require verified contact" applies to assistant runs only, since an agent is the one
+asking on the Copilot and Generate Reply surfaces.
 
 ## Run
 

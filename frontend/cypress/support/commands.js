@@ -27,7 +27,7 @@
 // Real login as the System user. Caches the session (and the csrf_token cookie
 // the backend sets on login) across specs so subsequent writes don't 403.
 Cypress.Commands.add('login', () => {
-  const email = 'System'
+  const email = Cypress.env('SYSTEM_EMAIL') || 'System'
   const password = Cypress.env('SYSTEM_PASSWORD') || 'StrongPass!123'
   cy.session(
     'system-agent',

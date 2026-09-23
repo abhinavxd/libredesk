@@ -33,6 +33,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/macro"
@@ -1124,7 +1125,7 @@ func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleInde
 }
 
 // initAIAgent inits the autonomous AI agent manager.
-func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
+func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, inboxManager *inbox.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
 	m, err := aiagent.New(aiagent.Opts{
 		DB:                 db,
 		Lo:                 initLogger("ai_agent"),
@@ -1132,7 +1133,7 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 		QueueSize:          cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
 		MaxSteps:           min(max(cmp.Or(ko.Int("ai_agent.max_steps"), 6), 1), 20),
 		MaxHistoryMessages: min(max(cmp.Or(ko.Int("ai_agent.max_history_messages"), 30), 5), 100),
-	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
+	}, aiManager, convo, inboxManager, mediaManager, settingManager, userManager, notifierService, rdb)
 	if err != nil {
 		log.Fatalf("error initializing AI agent manager: %v", err)
 	}
@@ -1140,12 +1141,15 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 }
 
 // initSearch inits search manager.
-func initSearch(db *sqlx.DB, i18n *i18n.I18n) *search.Manager {
+func initSearch(db *sqlx.DB, i18n *i18n.I18n, convo *conversation.Manager) *search.Manager {
 	lo := initLogger("search")
 	m, err := search.New(search.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:              db,
+		Lo:              lo,
+		I18n:            i18n,
+		FilterFields:    conversation.ListFilterAllowedFields,
+		FilterRenderers: conversation.ListFilterRenderers,
+		FilterLocation:  convo.FilterLocation,
 	})
 	if err != nil {
 		log.Fatalf("error initializing search manager: %v", err)
@@ -1389,4 +1393,12 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 	}
 
 	return limiter
+}
+
+func initProactive(db *sqlx.DB, i18n *i18n.I18n) *proactive.Manager {
+	manager, err := proactive.New(proactive.Opts{DB: db, I18n: i18n, Lo: initLogger("proactive")})
+	if err != nil {
+		log.Fatalf("error initializing proactive messages: %v", err)
+	}
+	return manager
 }

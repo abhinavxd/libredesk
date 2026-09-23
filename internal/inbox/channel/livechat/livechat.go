@@ -9,8 +9,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -25,7 +27,69 @@ const (
 
 	HomeAppAnnouncement = "announcement"
 	HomeAppExternalLink = "external_link"
+	HomeAppHelp         = "help"
+
+	ThemeSystem = "system"
+	ThemeLight  = "light"
+	ThemeDark   = "dark"
+
+	DefaultLauncherIconScale = 100
+	DefaultCampaignCooldown  = "24h"
+	DefaultLauncherColor     = "#000000"
+	BackgroundSolid          = "solid"
+	// Matches the locale the widget falls back to when this is unset.
+	DefaultLanguage = "en-US"
+	// Matches the session TTL the chat handlers fall back to when this is unset.
+	DefaultSessionDuration = "4320h"
 )
+
+type Colors struct {
+	Primary string `json:"primary"`
+}
+
+type Background struct {
+	Type          string `json:"type"`
+	Color         string `json:"color"`
+	GradientStart string `json:"gradient_start"`
+	GradientEnd   string `json:"gradient_end"`
+	ImageURL      string `json:"image_url"`
+}
+
+type HomeScreen struct {
+	HeaderTextColor string     `json:"header_text_color"`
+	Background      Background `json:"background"`
+	FadeBackground  bool       `json:"fade_background"`
+}
+
+type BrandingLauncher struct {
+	LogoURL string `json:"logo_url"`
+	Color   string `json:"color"`
+}
+
+// Branding is the appearance of the widget under one color scheme.
+type Branding struct {
+	Colors     Colors           `json:"colors"`
+	LogoURL    string           `json:"logo_url"`
+	Launcher   BrandingLauncher `json:"launcher"`
+	HomeScreen HomeScreen       `json:"home_screen"`
+}
+
+type BrandingSet struct {
+	Light Branding `json:"light"`
+	Dark  Branding `json:"dark"`
+}
+
+type LauncherSpacing struct {
+	Side   int `json:"side"`
+	Bottom int `json:"bottom"`
+}
+
+// LauncherLayout is the launcher geometry, which does not change with the color scheme.
+type LauncherLayout struct {
+	Spacing   LauncherSpacing `json:"spacing"`
+	Position  string          `json:"position"`
+	IconScale int             `json:"icon_scale"`
+}
 
 type PreChatFormField struct {
 	Key               string `json:"key"`
@@ -46,82 +110,87 @@ type ContinuityConfig struct {
 	MinEmailInterval    string `json:"min_email_interval"`
 }
 
+type HomeApp struct {
+	Type        string `json:"type"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	ImageURL    string `json:"image_url,omitempty"`
+	URL         string `json:"url"`
+	Text        string `json:"text,omitempty"`
+}
+
+type HelpAudience struct {
+	Tab bool `json:"tab"`
+}
+
+type HelpConfig struct {
+	HelpCenterID int          `json:"help_center_id"`
+	Visitors     HelpAudience `json:"visitors"`
+	Users        HelpAudience `json:"users"`
+	FeaturedIDs  []int        `json:"featured_ids"`
+}
+
+type AudienceConfig struct {
+	AllowStartConversation           bool     `json:"allow_start_conversation"`
+	PreventMultipleConversations     bool     `json:"prevent_multiple_conversations"`
+	PreventReplyToClosedConversation bool     `json:"prevent_reply_to_closed_conversation"`
+	StartConversationButtonText      string   `json:"start_conversation_button_text"`
+	QuickReplies                     []string `json:"quick_replies"`
+	DirectToConversation             *bool    `json:"direct_to_conversation,omitempty"`
+}
+
+type AudiencePreChatFormConfig struct {
+	Enabled *bool              `json:"enabled,omitempty"`
+	Title   *string            `json:"title,omitempty"`
+	Fields  []PreChatFormField `json:"fields"`
+}
+
+type PreChatFormConfig struct {
+	Enabled     bool                       `json:"enabled"`
+	HandoffOnly bool                       `json:"handoff_only"`
+	Title       string                     `json:"title"`
+	Fields      []PreChatFormField         `json:"fields"`
+	Visitors    *AudiencePreChatFormConfig `json:"visitors,omitempty"`
+	Users       *AudiencePreChatFormConfig `json:"users,omitempty"`
+}
+
 // Config holds the live chat inbox configuration.
 type Config struct {
-	BrandName        string `json:"brand_name"`
-	WebsiteURL       string `json:"website_url"`
-	DarkMode         bool   `json:"dark_mode"`
-	ShowPoweredBy    bool   `json:"show_powered_by"`
-	Language         string `json:"language"`
-	FallbackLanguage string `json:"fallback_language"`
-	Users            struct {
-		AllowStartConversation           bool   `json:"allow_start_conversation"`
-		PreventMultipleConversations     bool   `json:"prevent_multiple_conversations"`
-		PreventReplyToClosedConversation bool   `json:"prevent_reply_to_closed_conversation"`
-		StartConversationButtonText      string `json:"start_conversation_button_text"`
-	} `json:"users"`
-	Colors struct {
-		Primary string `json:"primary"`
-	} `json:"colors"`
-	HomeScreen struct {
-		HeaderTextColor string `json:"header_text_color"`
-		Background      struct {
-			Type          string `json:"type"`
-			Color         string `json:"color"`
-			GradientStart string `json:"gradient_start"`
-			GradientEnd   string `json:"gradient_end"`
-			ImageURL      string `json:"image_url"`
-		} `json:"background"`
-		FadeBackground bool `json:"fade_background"`
-	} `json:"home_screen"`
-	Features struct {
+	Campaigns        []proactive.Campaign `json:"campaigns"`
+	CampaignCooldown string               `json:"campaign_cooldown"`
+	Help             HelpConfig           `json:"help"`
+	BrandName        string               `json:"brand_name"`
+	WebsiteURL       string               `json:"website_url"`
+	Theme            string               `json:"theme"`
+	ShowPoweredBy    bool                 `json:"show_powered_by"`
+	Language         string               `json:"language"`
+	FallbackLanguage string               `json:"fallback_language"`
+	Users            AudienceConfig       `json:"users"`
+	Branding         BrandingSet          `json:"branding"`
+	Features         struct {
 		Emoji      bool `json:"emoji"`
 		FileUpload bool `json:"file_upload"`
+		Transcript bool `json:"transcript"`
 	} `json:"features"`
-	Launcher struct {
-		Spacing struct {
-			Side   int `json:"side"`
-			Bottom int `json:"bottom"`
-		} `json:"spacing"`
-		LogoURL  string `json:"logo_url"`
-		Position string `json:"position"`
-		Color    string `json:"color"`
-	} `json:"launcher"`
-	LogoURL  string `json:"logo_url"`
-	Visitors struct {
-		AllowStartConversation           bool   `json:"allow_start_conversation"`
-		PreventMultipleConversations     bool   `json:"prevent_multiple_conversations"`
-		PreventReplyToClosedConversation bool   `json:"prevent_reply_to_closed_conversation"`
-		StartConversationButtonText      string `json:"start_conversation_button_text"`
-	} `json:"visitors"`
+	Launcher     LauncherLayout `json:"launcher"`
+	Visitors     AudienceConfig `json:"visitors"`
 	NoticeBanner struct {
 		Text    string `json:"text"`
 		Enabled bool   `json:"enabled"`
 	} `json:"notice_banner"`
-	HomeApps []struct {
-		Type        string `json:"type"`
-		Title       string `json:"title,omitempty"`
-		Description string `json:"description,omitempty"`
-		ImageURL    string `json:"image_url,omitempty"`
-		URL         string `json:"url"`
-		Text        string `json:"text,omitempty"`
-	} `json:"home_apps"`
-	TrustedDomains                 []string         `json:"trusted_domains"`
-	BlockedIPs                     []string         `json:"blocked_ips"`
-	DirectToConversation           bool             `json:"direct_to_conversation"`
-	GreetingMessage                string           `json:"greeting_message"`
-	ChatIntroduction               string           `json:"chat_introduction"`
-	IntroductionMessage            string           `json:"introduction_message"`
-	Continuity                     ContinuityConfig `json:"continuity"`
-	ShowOfficeHoursInChat          bool             `json:"show_office_hours_in_chat"`
-	ShowOfficeHoursAfterAssignment bool             `json:"show_office_hours_after_assignment"`
-	ChatReplyExpectationMessage    string           `json:"chat_reply_expectation_message"`
-	SessionDuration                string           `json:"session_duration"`
-	PreChatForm                    struct {
-		Enabled bool               `json:"enabled"`
-		Title   string             `json:"title"`
-		Fields  []PreChatFormField `json:"fields"`
-	} `json:"prechat_form"`
+	HomeApps                       []HomeApp         `json:"home_apps"`
+	TrustedDomains                 []string          `json:"trusted_domains"`
+	BlockedIPs                     []string          `json:"blocked_ips"`
+	DirectToConversation           bool              `json:"direct_to_conversation"`
+	GreetingMessage                string            `json:"greeting_message"`
+	ChatIntroduction               string            `json:"chat_introduction"`
+	IntroductionMessage            string            `json:"introduction_message"`
+	Continuity                     ContinuityConfig  `json:"continuity"`
+	ShowOfficeHoursInChat          bool              `json:"show_office_hours_in_chat"`
+	ShowOfficeHoursAfterAssignment bool              `json:"show_office_hours_after_assignment"`
+	ChatReplyExpectationMessage    string            `json:"chat_reply_expectation_message"`
+	SessionDuration                string            `json:"session_duration"`
+	PreChatForm                    PreChatFormConfig `json:"prechat_form"`
 }
 
 // Client represents a connected chat client
@@ -183,6 +252,145 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*LiveC
 		clients:       make(map[string][]*Client),
 	}
 	return lc, nil
+}
+
+// UnmarshalJSON fills missing branding and theme values from the old config layout.
+func (c *Config) UnmarshalJSON(data []byte) error {
+	type plain Config
+	var cfg plain
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+	*c = Config(cfg)
+
+	var legacy struct {
+		Branding              *json.RawMessage `json:"branding"`
+		DarkMode              bool             `json:"dark_mode"`
+		Colors                Colors           `json:"colors"`
+		LogoURL               string           `json:"logo_url"`
+		HomeScreen            HomeScreen       `json:"home_screen"`
+		Launcher              BrandingLauncher `json:"launcher"`
+		CampaignCooldownHours *int             `json:"campaign_cooldown_hours"`
+	}
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return err
+	}
+
+	if legacy.Branding == nil {
+		branding := Branding{
+			Colors:     legacy.Colors,
+			LogoURL:    legacy.LogoURL,
+			Launcher:   legacy.Launcher,
+			HomeScreen: legacy.HomeScreen,
+		}
+		c.Branding.Light = branding
+		c.Branding.Dark = branding
+		if legacy.DarkMode {
+			c.Theme = ThemeDark
+		}
+	}
+	if c.Theme == "" {
+		c.Theme = ThemeLight
+	}
+	if c.Launcher.IconScale == 0 {
+		c.Launcher.IconScale = DefaultLauncherIconScale
+	}
+	if c.CampaignCooldown == "" && legacy.CampaignCooldownHours != nil && *legacy.CampaignCooldownHours > 0 {
+		c.CampaignCooldown = strconv.Itoa(*legacy.CampaignCooldownHours) + "h"
+	}
+	if c.CampaignCooldown == "" {
+		c.CampaignCooldown = DefaultCampaignCooldown
+	}
+	if c.SessionDuration == "" {
+		c.SessionDuration = DefaultSessionDuration
+	}
+	if c.Language == "" {
+		c.Language = DefaultLanguage
+	}
+	if c.FallbackLanguage == "" {
+		c.FallbackLanguage = DefaultLanguage
+	}
+	fillBrandingDefaults(&c.Branding.Light, ThemeLight)
+	fillBrandingDefaults(&c.Branding.Dark, ThemeDark)
+	c.fillEmptyLists()
+	return nil
+}
+
+func fillBrandingDefaults(branding *Branding, theme string) {
+	if branding.Launcher.Color == "" {
+		branding.Launcher.Color = DefaultLauncherColor
+	}
+	if branding.HomeScreen.Background.Type == "" {
+		branding.HomeScreen.Background.Type = BackgroundSolid
+	}
+	if branding.HomeScreen.HeaderTextColor == "" {
+		if theme == ThemeDark {
+			branding.HomeScreen.HeaderTextColor = "white"
+		} else {
+			branding.HomeScreen.HeaderTextColor = "black"
+		}
+	}
+}
+
+// A null list fails the admin form's validation.
+func (c *Config) fillEmptyLists() {
+	if c.Campaigns == nil {
+		c.Campaigns = []proactive.Campaign{}
+	}
+	for i := range c.Campaigns {
+		if c.Campaigns[i].IncludeURLs == nil {
+			c.Campaigns[i].IncludeURLs = []string{}
+		}
+		if c.Campaigns[i].ExcludeURLs == nil {
+			c.Campaigns[i].ExcludeURLs = []string{}
+		}
+		if c.Campaigns[i].Conditions.Rules == nil {
+			c.Campaigns[i].Conditions.Rules = []amodels.RuleDetail{}
+		}
+	}
+	if c.Help.FeaturedIDs == nil {
+		c.Help.FeaturedIDs = []int{}
+	}
+	if c.HomeApps == nil {
+		c.HomeApps = []HomeApp{}
+	}
+	if c.TrustedDomains == nil {
+		c.TrustedDomains = []string{}
+	}
+	if c.BlockedIPs == nil {
+		c.BlockedIPs = []string{}
+	}
+	if c.Users.QuickReplies == nil {
+		c.Users.QuickReplies = []string{}
+	}
+	if c.Visitors.QuickReplies == nil {
+		c.Visitors.QuickReplies = []string{}
+	}
+	if c.PreChatForm.Fields == nil {
+		c.PreChatForm.Fields = []PreChatFormField{}
+	}
+}
+
+func (c Config) ResolvePreChatForm(isVisitor bool) Config {
+	audience := c.PreChatForm.Users
+	if isVisitor {
+		audience = c.PreChatForm.Visitors
+	}
+	c.PreChatForm.Visitors = nil
+	c.PreChatForm.Users = nil
+	if audience == nil {
+		return c
+	}
+	if audience.Enabled != nil {
+		c.PreChatForm.Enabled = c.PreChatForm.Enabled && *audience.Enabled
+	}
+	if audience.Title != nil {
+		c.PreChatForm.Title = *audience.Title
+	}
+	if audience.Fields != nil {
+		c.PreChatForm.Fields = audience.Fields
+	}
+	return c
 }
 
 // Identifier returns the unique identifier of the inbox which is the database ID.

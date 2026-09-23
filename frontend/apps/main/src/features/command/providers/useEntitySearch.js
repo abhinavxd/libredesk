@@ -31,8 +31,8 @@ export function useEntitySearch() {
   }
 
   const searchConversations = async (term) => {
-    const response = await api.searchConversations({ query: term, limit: RESULT_LIMIT })
-    return (response.data.data || []).map((conversation) => ({
+    const response = await api.searchConversations({ query: term, page_size: RESULT_LIMIT })
+    return (response.data.data?.results || []).map((conversation) => ({
       id: `search.conversation.${conversation.uuid}`,
       label: conversation.subject || `#${conversation.reference_number}`,
       hint: `#${conversation.reference_number} · ${conversation.status}`,

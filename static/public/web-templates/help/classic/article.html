@@ -1,7 +1,7 @@
 {{ define "classic-help-article" }}
 {{ template "classic-header" . }}
 
-<nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
+{{ if not .Data.HelpCenter.Embed }}<nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
     <ol>
         <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
         {{ if .Data.Collection.Name }}
@@ -9,7 +9,7 @@
         {{ end }}
         <li><span class="hc-current" aria-current="page">{{ .Data.Article.Title }}</span></li>
     </ol>
-</nav>
+</nav>{{ end }}
 
 <article class="hc-article">
     <h1>{{ .Data.Article.Title }}</h1>

@@ -60,11 +60,13 @@ type Manager struct {
 	chunkCfg      stringutil.ChunkConfig
 	index         *embeddingIndex
 	// indexReady is closed once the boot-time index load finishes; Search blocks on it.
-	indexReady  chan struct{}
-	reindexMu   sync.Mutex
-	reconcileMu sync.Mutex
-	genMu       sync.Mutex
-	gen         map[genKey]uint64
+	indexReady   chan struct{}
+	reindexMu    sync.Mutex
+	reconcileMu  sync.Mutex
+	genMu        sync.Mutex
+	gen          map[genKey]uint64
+	pendingRunMu sync.Mutex
+	pendingRuns  map[string]*pendingAgentRun
 	// tagGen is bumped on every tag vector purge; an in-flight tag reindex only commits if its gen is still current.
 	tagGen atomic.Uint64
 	// embedSem caps concurrent background embed jobs.
@@ -123,6 +125,8 @@ type queries struct {
 	GetTools                     *sqlx.Stmt `query:"get-tools"`
 	GetTool                      *sqlx.Stmt `query:"get-tool"`
 	GetEnabledToolsByIDs         *sqlx.Stmt `query:"get-enabled-tools-by-ids"`
+	GetEnabledCopilotToolIDs     *sqlx.Stmt `query:"get-enabled-copilot-tool-ids"`
+	GetEnabledGenerateToolIDs    *sqlx.Stmt `query:"get-enabled-generate-reply-tool-ids"`
 	GetToolAuth                  *sqlx.Stmt `query:"get-tool-auth"`
 	InsertTool                   *sqlx.Stmt `query:"insert-tool"`
 	UpdateTool                   *sqlx.Stmt `query:"update-tool"`
@@ -150,6 +154,7 @@ func New(opts Opts) (*Manager, error) {
 		index:         newEmbeddingIndex(),
 		indexReady:    make(chan struct{}),
 		gen:           make(map[genKey]uint64),
+		pendingRuns:   make(map[string]*pendingAgentRun),
 		embedSem:      make(chan struct{}, maxConcurrentEmbeds),
 		httpClient: &http.Client{
 			Timeout:   20 * time.Second,

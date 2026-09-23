@@ -15,6 +15,8 @@ const (
 	RoleUser      = "user"
 	RoleAssistant = "assistant"
 	RoleTool      = "tool"
+	// RoleApproval is a synthetic copilot turn carrying a pending tool approval; it is never persisted.
+	RoleApproval = "approval"
 
 	ProviderTypeCompletion = "completion"
 	ProviderTypeEmbedding  = "embedding"
@@ -30,6 +32,12 @@ const (
 	KnowledgeSourceManual       = "manual"
 	KnowledgeSourceConversation = "conversation"
 	KnowledgeSourceURL          = "url"
+
+	ToolInvocationCopilot = "copilot"
+	ToolInvocationReply   = "generate_reply"
+
+	AgentRunCompleted        = "completed"
+	AgentRunApprovalRequired = "approval_required"
 )
 
 // Provider is a row in ai_providers (one per type: completion / embedding).
@@ -102,18 +110,33 @@ type HelpArticleItem struct {
 
 // Tool is a custom, admin-defined HTTP tool the assistant can call.
 type Tool struct {
-	ID          int            `db:"id" json:"id"`
-	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time      `db:"updated_at" json:"updated_at"`
-	Name        string         `db:"name" json:"name"`
-	Description string         `db:"description" json:"description"`
-	URL         string         `db:"url" json:"url"`
-	Method      string         `db:"method" json:"method"`
-	Auth        types.JSONText `db:"auth" json:"auth"`
-	Parameters  types.JSONText `db:"parameters" json:"parameters"`
-	Enabled     bool           `db:"enabled" json:"enabled"`
+	ID                    int            `db:"id" json:"id"`
+	CreatedAt             time.Time      `db:"created_at" json:"created_at"`
+	UpdatedAt             time.Time      `db:"updated_at" json:"updated_at"`
+	Name                  string         `db:"name" json:"name"`
+	Description           string         `db:"description" json:"description"`
+	URL                   string         `db:"url" json:"url"`
+	Method                string         `db:"method" json:"method"`
+	Auth                  types.JSONText `db:"auth" json:"auth"`
+	Parameters            types.JSONText `db:"parameters" json:"parameters"`
+	Enabled               bool           `db:"enabled" json:"enabled"`
+	CopilotEnabled        bool           `db:"copilot_enabled" json:"copilot_enabled"`
+	GenerateReplyEnabled  bool           `db:"generate_reply_enabled" json:"generate_reply_enabled"`
+	RequiresAgentApproval bool           `db:"requires_agent_approval" json:"requires_agent_approval"`
 	// RequiresVerification fails closed: a flagged tool is blocked until the contact is verified for the conversation.
 	RequiresVerification bool `db:"requires_verification" json:"requires_verification"`
+}
+
+type ToolApproval struct {
+	RunID     string `json:"run_id"`
+	ToolName  string `json:"tool_name"`
+	Arguments string `json:"arguments"`
+}
+
+type AgentRunResult struct {
+	Status   string        `json:"status"`
+	Content  string        `json:"content,omitempty"`
+	Approval *ToolApproval `json:"approval,omitempty"`
 }
 
 // ToolAuth is the decoded ai_tools.auth JSONB: headers injected on every request.
@@ -171,8 +194,9 @@ type ChatImage struct {
 
 // CopilotMessage is one persisted turn of an agent's copilot chat on a conversation.
 type CopilotMessage struct {
-	Role    string `db:"role" json:"role"`
-	Content string `db:"content" json:"content"`
+	Role     string        `db:"role" json:"role"`
+	Content  string        `db:"content" json:"content"`
+	Approval *ToolApproval `db:"-" json:"approval,omitempty"`
 }
 
 // MarshalJSON emits plain string content when there are no images, or the OpenAI multimodal

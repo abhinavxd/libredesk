@@ -1,32 +1,32 @@
 -- name: get-all-help-centers
-SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template
+SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template, livechat_inbox_id
 FROM help_centers
 ORDER BY created_at DESC;
 
 -- name: get-active-help-centers
-SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template
+SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template, livechat_inbox_id
 FROM help_centers
 WHERE is_active = true
 ORDER BY created_at DESC;
 
 -- name: get-help-center-by-id
-SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template
+SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template, livechat_inbox_id
 FROM help_centers
 WHERE id = $1;
 
 -- name: get-help-center-by-slug
-SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template
+SELECT id, created_at, updated_at, name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, is_active, theme, custom_domain, template, livechat_inbox_id
 FROM help_centers
 WHERE slug = $1 AND is_active = true;
 
 -- name: insert-help-center
-INSERT INTO help_centers (name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, theme, custom_domain, template)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO help_centers (name, slug, page_title, meta_description, custom_css, custom_js, default_locale, allowed_locales, theme, custom_domain, template, livechat_inbox_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: update-help-center
 UPDATE help_centers
-SET name = $2, slug = $3, page_title = $4, meta_description = $5, custom_css = $6, custom_js = $7, default_locale = $8, allowed_locales = $9, theme = $10, custom_domain = $11, template = $12, updated_at = NOW()
+SET name = $2, slug = $3, page_title = $4, meta_description = $5, custom_css = $6, custom_js = $7, default_locale = $8, allowed_locales = $9, theme = $10, custom_domain = $11, template = $12, livechat_inbox_id = $13, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 
@@ -133,7 +133,7 @@ DELETE FROM article_collections
 WHERE id = $1;
 
 -- name: get-article-by-id
-SELECT a.id, a.created_at, a.updated_at, a.collection_id, a.author_id, a.created_by, a.slug, a.locale, a.title, a.content,
+SELECT a.id, a.created_at, a.updated_at, a.collection_id, a.author_id, a.created_by, a.translation_group_id, a.slug, a.locale, a.title, a.content,
     a.excerpt, a.meta_title, a.meta_description, a.meta_image_url, a.sort_order, a.status, a.view_count, a.ai_enabled,
     TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS author_name,
     TRIM(cu.first_name || ' ' || COALESCE(cu.last_name, '')) AS created_by_name,
@@ -144,17 +144,29 @@ LEFT JOIN users u ON u.id = a.author_id
 LEFT JOIN users cu ON cu.id = a.created_by
 WHERE a.id = $1;
 
+-- name: get-article-translations
+SELECT a.id, a.collection_id, a.locale, a.slug, a.title, a.status
+FROM help_articles a
+WHERE a.translation_group_id = (SELECT translation_group_id FROM help_articles WHERE id = $1)
+ORDER BY a.locale;
+
 -- name: insert-article
-INSERT INTO help_articles (collection_id, author_id, created_by, slug, locale, title, content, excerpt, meta_title, meta_description, meta_image_url, sort_order, status, ai_enabled)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING *;
+INSERT INTO help_articles (collection_id, author_id, created_by, slug, locale, title, content, excerpt, meta_title, meta_description, meta_image_url, sort_order, status, ai_enabled, translation_group_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE(NULLIF($15, '')::UUID, gen_random_uuid()))
+RETURNING id, created_at, updated_at, collection_id, author_id, created_by,
+    translation_group_id, slug, locale, title, content, excerpt, meta_title,
+    meta_description, meta_image_url, sort_order, status, view_count,
+    ai_enabled, embedded_fingerprint, search_tsv;
 
 -- name: update-article
 UPDATE help_articles
 SET collection_id = COALESCE($9, collection_id), slug = $2, locale = $3, title = $4, content = $5, sort_order = $6, status = $7, ai_enabled = $8,
     excerpt = $10, meta_title = $11, meta_description = $12, meta_image_url = $13, author_id = $14, updated_at = NOW()
 WHERE id = $1
-RETURNING *;
+RETURNING id, created_at, updated_at, collection_id, author_id, created_by,
+    translation_group_id, slug, locale, title, content, excerpt, meta_title,
+    meta_description, meta_image_url, sort_order, status, view_count,
+    ai_enabled, embedded_fingerprint, search_tsv;
 
 -- name: user-is-author-assignable
 SELECT EXISTS(
@@ -194,6 +206,44 @@ WHERE id = $1 AND collection_id = $2;
 -- name: update-article-status
 UPDATE help_articles
 SET status = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: get-linkable-translation-articles
+SELECT a.id, a.title, a.locale, c.name AS collection_name
+FROM help_articles a
+JOIN article_collections c ON c.id = a.collection_id
+WHERE c.help_center_id = $1
+    AND a.locale != $2
+    AND NOT EXISTS (
+        SELECT 1 FROM help_articles sibling
+        WHERE sibling.translation_group_id = a.translation_group_id AND sibling.id != a.id
+    )
+ORDER BY a.locale, a.title;
+
+-- name: article-locale-in-translation-group
+SELECT EXISTS(
+    SELECT 1 FROM help_articles
+    WHERE translation_group_id = $1 AND locale = $2
+);
+
+-- name: count-article-translation-siblings
+SELECT COUNT(*) FROM help_articles
+WHERE translation_group_id = $1 AND id != $2;
+
+-- name: link-article-translation
+UPDATE help_articles a
+SET translation_group_id = $2::UUID, updated_at = NOW()
+WHERE a.id = $1
+    AND NOT EXISTS (
+        SELECT 1 FROM help_articles sibling
+        WHERE sibling.translation_group_id = a.translation_group_id AND sibling.id != a.id
+    )
+RETURNING *;
+
+-- name: unlink-article-translation
+UPDATE help_articles
+SET translation_group_id = gen_random_uuid(), updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 
@@ -344,7 +394,7 @@ WHERE a.slug = $2 AND a.status = 'published' AND ($3 = '' OR a.locale = $3)
 ORDER BY c.sort_order, a.sort_order, a.id
 LIMIT 1;
 
--- name: get-published-article-locales
+-- name: get-published-article-translations
 WITH RECURSIVE published_collections AS (
     SELECT c.id FROM article_collections c
     JOIN help_centers h ON h.id = c.help_center_id
@@ -354,10 +404,12 @@ WITH RECURSIVE published_collections AS (
     JOIN published_collections p ON c.parent_id = p.id
     WHERE c.is_published = true
 )
-SELECT DISTINCT a.locale
+SELECT a.id, a.collection_id, a.locale, a.slug, a.title, a.status
 FROM help_articles a
 JOIN article_collections c ON c.id = a.collection_id AND c.locale = a.locale AND c.id IN (SELECT id FROM published_collections)
-WHERE a.slug = $2 AND a.status = 'published';
+WHERE a.translation_group_id = (SELECT translation_group_id FROM help_articles WHERE id = $2)
+    AND a.status = 'published'
+ORDER BY a.locale;
 
 -- name: get-published-collection-locales
 WITH RECURSIVE published_collections AS (
@@ -415,7 +467,7 @@ FROM help_articles a
 JOIN article_collections c ON c.id = a.collection_id AND c.locale = a.locale AND c.id IN (SELECT id FROM published_collections)
 WHERE a.status = 'published' AND a.locale = $4
     AND (a.search_tsv @@ to_tsquery(help_article_search_config($4), NULLIF($5, ''))
-        OR a.title ILIKE '%' || $2 || '%' OR a.content ILIKE '%' || $2 || '%')
+        OR a.title ILIKE $2 ESCAPE '\' OR a.content ILIKE $2 ESCAPE '\')
 ORDER BY ts_rank(a.search_tsv, to_tsquery(help_article_search_config($4), NULLIF($5, '')), 2) DESC, a.view_count DESC, a.created_at DESC
 LIMIT $3;
 

@@ -26,6 +26,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/colorlog"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/report"
@@ -96,6 +97,7 @@ const (
 
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
+	proactive          *proactive.Manager
 	ctx                context.Context
 	fs                 stuffbin.FileSystem
 	consts             atomic.Value
@@ -267,7 +269,7 @@ func main() {
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
-		aiAgent                     = initAIAgent(db, i18n, ai, conversation, media, settings, user, notifier, rdb)
+		aiAgent                     = initAIAgent(db, i18n, ai, conversation, inbox, media, settings, user, notifier, rdb)
 		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
@@ -334,7 +336,7 @@ func main() {
 		authz:            initAuthz(i18n),
 		view:             initView(db, i18n),
 		report:           initReport(db, i18n),
-		search:           initSearch(db, i18n),
+		search:           initSearch(db, i18n, conversation),
 		role:             initRole(db, i18n),
 		tag:              initTag(db, i18n),
 		macro:            initMacro(db, i18n),
@@ -344,6 +346,7 @@ func main() {
 		importer:         initImporter(i18n),
 		webhook:          webhook,
 		contextLink:      initContextLink(db, i18n),
+		proactive:        initProactive(db, i18n),
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		fc:               initFastCache(rdb),
