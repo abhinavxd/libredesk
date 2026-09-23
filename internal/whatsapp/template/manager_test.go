@@ -675,7 +675,7 @@ func TestEnsureReservedResubmitsWhenMetaIDIsMissing(t *testing.T) {
 		t.Fatalf("expected a rejected row with no meta id: %+v", stored)
 	}
 
-	desired.BodyContent = "Rate us now"
+	// Unchanged content must still be resubmitted, since nothing was ever registered on Meta.
 	if err := m.EnsureReserved(context.Background(), desired); err != nil {
 		t.Fatalf("second ensure: %v", err)
 	}

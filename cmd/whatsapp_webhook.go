@@ -222,12 +222,6 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		return ctx.Err()
 	}
 
-	if exists, err := app.conversation.AdvanceWhatsAppWindowForMessage(m.ID, m.Timestamp); err != nil {
-		return fmt.Errorf("repairing duplicate: %w", err)
-	} else if exists {
-		return nil
-	}
-
 	contactID, err := upsertWhatsAppContact(app, m)
 	if err != nil {
 		return fmt.Errorf("resolving contact: %w", err)

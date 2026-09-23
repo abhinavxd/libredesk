@@ -265,7 +265,7 @@ func (c *Client) UploadMedia(ctx context.Context, acc Account, content []byte, c
 	}
 	req.Header.Set("Authorization", "Bearer "+acc.AccessToken)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.mediaClient().Do(req)
 	if err != nil {
 		return "", fmt.Errorf("uploading media: %w", err)
 	}

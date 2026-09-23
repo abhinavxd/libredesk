@@ -165,7 +165,9 @@ func (m *Manager) EnsureReserved(ctx context.Context, desired models.Template) e
 		m.lo.Error("error loading reserved whatsapp template", "inbox_id", desired.InboxID, "name", desired.Name, "error", err)
 		return err
 	}
-	if !reservedContentChanged(existing, desired) {
+	// A row without a Meta template ID never reached Meta (its first submit failed), so it is resubmitted even when unchanged.
+	registered := existing.MetaTemplateID.Valid && existing.MetaTemplateID.String != ""
+	if registered && !reservedContentChanged(existing, desired) {
 		m.lo.Debug("reserved template already matches desired content", "id", existing.ID, "name", existing.Name)
 		return nil
 	}

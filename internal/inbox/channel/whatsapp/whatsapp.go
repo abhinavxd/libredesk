@@ -22,6 +22,9 @@ const ChannelWhatsApp = "whatsapp"
 
 const MetaCallTimeout = 30 * time.Second
 
+// Covers uploading a file up to Meta's 100 MB document cap, then the send call.
+const attachmentSendTimeout = 5*time.Minute + MetaCallTimeout
+
 const (
 	sendMaxAttempts  = 3
 	sendRetryBackoff = 2 * time.Second
@@ -183,10 +186,9 @@ func (w *WhatsApp) send(message models.OutboundMessage) error {
 		return fmt.Errorf("missing recipient phone number on outbound message")
 	}
 
-	// An attachment costs two calls: the media upload and the send.
 	timeout := MetaCallTimeout
 	if len(message.Attachments) > 0 {
-		timeout = 2 * MetaCallTimeout
+		timeout = attachmentSendTimeout
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

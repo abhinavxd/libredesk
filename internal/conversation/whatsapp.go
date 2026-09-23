@@ -244,7 +244,8 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		if dialCode == "" {
 			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
 		}
-		toPhone, matchesCountry := stringutil.WhatsAppPhoneForDialCode(contact.PhoneNumber.String, dialCode)
+		var matchesCountry bool
+		toPhone, matchesCountry = stringutil.WhatsAppPhoneForDialCode(contact.PhoneNumber.String, dialCode)
 		if !matchesCountry {
 			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
 		}
