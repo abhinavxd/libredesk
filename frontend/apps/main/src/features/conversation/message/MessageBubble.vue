@@ -52,7 +52,7 @@
       </template>
 
       <div
-        class="w-full md:w-4/5"
+        class="w-4/5"
         :class="{ 'flex justify-end items-center gap-2': isOutgoing }"
         style="contain: inline-size"
       >

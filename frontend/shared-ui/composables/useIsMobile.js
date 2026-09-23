@@ -1,6 +1,6 @@
 import { useMediaQuery } from '@vueuse/core'
 
-// 1279px is the exact complement of Tailwind's `xl:` (min-width: 1280px).
+// 1023px is the exact complement of Tailwind's `lg:` (min-width: 1024px).
 export function useIsMobile() {
-  return useMediaQuery('(max-width: 1279px)')
+  return useMediaQuery('(max-width: 1023px)')
 }

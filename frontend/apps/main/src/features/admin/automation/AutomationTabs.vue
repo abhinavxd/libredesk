@@ -1,6 +1,6 @@
 <template>
   <Tabs default-value="new_conversation" v-model="selectedTab">
-    <TabsList class="flex w-full justify-start overflow-x-auto mb-5 sm:grid sm:grid-cols-3">
+    <TabsList class="flex w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mb-5 sm:grid sm:grid-cols-3">
       <TabsTrigger value="new_conversation" :class="AUTOMATION_TAB_CLASS">
         {{ $t('conversation.newConversation') }}
       </TabsTrigger>

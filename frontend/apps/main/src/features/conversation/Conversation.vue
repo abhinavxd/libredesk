@@ -6,7 +6,7 @@
         <Button
           v-if="isMobile"
           variant="ghost"
-          class="w-11 h-11 xl:w-8 xl:h-8 p-0 shrink-0 -ml-2 xl:-ml-1"
+          class="w-11 h-11 lg:w-8 lg:h-8 p-0 shrink-0 -ml-2 lg:-ml-1"
           :aria-label="t('globals.messages.back')"
           @click="goBackToList"
         >
@@ -39,10 +39,10 @@
           <DropdownMenuTrigger>
             <div
               v-if="conversationStore.current?.status"
-              class="flex h-11 xl:h-8 items-center cursor-pointer"
+              class="flex h-11 lg:h-8 items-center cursor-pointer"
             >
               <span
-                class="rounded-md bg-primary px-2.5 py-1 text-xs xl:text-sm font-medium text-primary-foreground"
+                class="rounded-md bg-primary px-2.5 py-1 text-xs lg:text-sm font-medium text-primary-foreground"
               >
                 {{ conversationStore.current?.status }}
               </span>
@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-const MOBILE_ICON_BUTTON_CLASS = 'w-11 h-11 xl:w-8 xl:h-8 p-0'
+const MOBILE_ICON_BUTTON_CLASS = 'w-11 h-11 lg:w-8 lg:h-8 p-0'
 
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'

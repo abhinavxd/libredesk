@@ -52,7 +52,7 @@
         }}</TooltipContent>
       </Tooltip>
       <template v-if="conversation?.contact?.email">
-        <span class="sidebar-value break-all">
+        <span class="sidebar-value min-w-0 truncate" :title="conversation.contact.email">
           {{ conversation.contact.email }}
         </span>
         <CopyButton :text="conversation.contact.email" class="shrink-0" />

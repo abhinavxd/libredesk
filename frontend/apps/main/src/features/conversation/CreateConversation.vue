@@ -12,7 +12,7 @@
         <form
           @submit="createConversation"
           novalidate
-          class="flex flex-col flex-1 min-h-0 overflow-y-auto xl:overflow-hidden"
+          class="flex flex-col flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
         >
           <!-- Form Fields Section -->
           <div class="space-y-4 pb-2 flex-shrink-0">
@@ -176,7 +176,7 @@
           </div>
 
           <!-- Message Editor Section -->
-          <div class="flex flex-none flex-col min-h-64 mt-4 xl:flex-1 xl:min-h-0">
+          <div class="flex flex-none flex-col min-h-64 mt-4 lg:flex-1 lg:min-h-0">
             <FormField v-slot="{ componentField }" name="content">
               <FormItem class="flex flex-col h-full">
                 <FormLabel>{{ $t('globals.terms.message') }}</FormLabel>

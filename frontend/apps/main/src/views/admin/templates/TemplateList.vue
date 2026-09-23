@@ -10,7 +10,7 @@
     </div>
     <div>
       <Tabs default-value="email_outgoing" v-model="templateType">
-        <TabsList class="flex w-full justify-start overflow-x-auto mb-5 sm:grid sm:grid-cols-2">
+        <TabsList class="flex w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mb-5 sm:grid sm:grid-cols-2">
           <TabsTrigger value="email_outgoing" :class="TEMPLATE_TAB_CLASS">
             {{ $t('admin.template.outgoingEmailTemplates') }}
           </TabsTrigger>
