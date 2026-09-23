@@ -6,7 +6,7 @@
       class="mb-1 flex items-center gap-1.5"
       :class="isOutgoing ? 'md:pr-[47px]' : 'md:pl-[47px]'"
     >
-      <Avatar class="w-5 h-5 text-[10px] md:hidden" :class="{ 'order-last': isOutgoing }">
+      <Avatar class="w-7 h-7 text-xs md:hidden" :class="{ 'order-last': isOutgoing }">
         <AvatarImage :src="getAvatar" />
         <AvatarFallback class="font-medium">
           {{ avatarFallback }}
