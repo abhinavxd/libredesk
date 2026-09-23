@@ -471,15 +471,16 @@ func TestParseSendMeta(t *testing.T) {
 }
 
 func TestTextBody(t *testing.T) {
-	if got := textBody(models.OutboundMessage{TextContent: "plain", Content: "<p>html</p>"}); got != "plain" {
+	if got := textBody(models.OutboundMessage{ContentType: models.ContentTypeText, TextContent: "plain", Content: "plain"}); got != "plain" {
 		t.Fatalf("expected the stored text content, got %q", got)
 	}
-	got := textBody(models.OutboundMessage{ContentType: models.ContentTypeHTML, Content: "<p>hello <b>there</b></p>"})
-	if strings.Contains(got, "<") {
-		t.Fatalf("expected HTML to be flattened, got %q", got)
+	// The stored text content is flattened; HTML replies must be re-rendered so WhatsApp formatting survives.
+	got := textBody(models.OutboundMessage{ContentType: models.ContentTypeHTML, Content: "<p>hello <b>there</b></p><ul><li><p>one</p></li></ul>", TextContent: "hello there\n\none"})
+	if got != "hello *there*\n\n- one" {
+		t.Fatalf("expected WhatsApp formatting, got %q", got)
 	}
-	if !strings.Contains(got, "hello") {
-		t.Fatalf("expected the text to survive, got %q", got)
+	if got := textBody(models.OutboundMessage{ContentType: models.ContentTypeHTML, Content: "<p>hi</p>"}); got != "hi" {
+		t.Fatalf("expected flattened HTML, got %q", got)
 	}
 }
 

@@ -600,7 +600,10 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
 	}
 
-	var sourceID string
+	var (
+		sourceID    string
+		contentType = models.ContentTypeHTML
+	)
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
@@ -640,6 +643,10 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			return models.Message{}, err
 		}
 		content = rendered
+		// A rendered template body is plain text; storing it as HTML drops its line breaks in the timeline.
+		if extractInt(metaMap, "whatsapp_template_id") > 0 {
+			contentType = models.ContentTypeText
+		}
 	}
 
 	// Marshal meta.
@@ -664,7 +671,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		SenderType:        models.SenderTypeAgent,
 		Status:            models.MessageStatusPending,
 		Content:           content,
-		ContentType:       models.ContentTypeHTML,
+		ContentType:       contentType,
 		Private:           false,
 		Media:             media,
 		SourceID:          null.NewString(sourceID, sourceID != ""),

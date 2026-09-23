@@ -30,7 +30,8 @@ import (
 const (
 	whatsAppDefaultContactName = "Contact"
 	// Retry window for a status whose message row is missing; older events reference a wamid that will never exist locally.
-	whatsAppStatusNotFoundGrace = 10 * time.Minute
+	// Must exceed whatsAppReclaimMinIdle, since the first retry only happens after that idle period.
+	whatsAppStatusNotFoundGrace = 30 * time.Minute
 
 	whatsAppMediaAttemptTimeout = 3 * time.Minute
 	whatsAppMediaMaxAttempts    = 3

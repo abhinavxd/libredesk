@@ -277,13 +277,13 @@ func parseSendMeta(raw json.RawMessage) (SendMeta, error) {
 	return meta, nil
 }
 
-// textBody returns the plain-text body; raw HTML must never reach WhatsApp verbatim.
+// textBody renders HTML replies with WhatsApp formatting markers; raw HTML must never reach WhatsApp verbatim.
 func textBody(m models.OutboundMessage) string {
+	if m.ContentType == models.ContentTypeHTML && m.Content != "" {
+		return stringutil.HTML2WhatsApp(m.Content)
+	}
 	if m.TextContent != "" {
 		return m.TextContent
-	}
-	if m.ContentType == models.ContentTypeHTML {
-		return stringutil.HTML2Text(m.Content)
 	}
 	return m.Content
 }

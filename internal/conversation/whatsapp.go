@@ -337,7 +337,7 @@ func (m *Manager) validateWhatsAppContent(content string, hasAttachments bool) e
 	if hasAttachments {
 		limit = whatsAppMaxCaptionLength
 	}
-	if utf8.RuneCountInString(stringutil.HTML2Text(content)) > limit {
+	if utf8.RuneCountInString(stringutil.HTML2WhatsApp(content)) > limit {
 		return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.tooLong", "limit", strconv.Itoa(limit)), nil)
 	}
 	return nil
