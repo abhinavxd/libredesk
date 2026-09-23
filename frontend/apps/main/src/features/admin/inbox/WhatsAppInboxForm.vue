@@ -8,30 +8,15 @@
       <span>{{ $t('admin.inbox.whatsapp.tokenInvalid') }}</span>
     </div>
 
-    <div class="grid grid-cols-2 gap-4">
-      <FormField v-slot="{ componentField }" name="name">
-        <FormItem>
-          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="" v-bind="componentField" />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField }" name="reopen_window_hours">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
-          <FormControl>
-            <Input type="number" min="0" placeholder="48" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.whatsapp.reopenWindow.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-    </div>
+    <FormField v-slot="{ componentField }" name="name">
+      <FormItem>
+        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+        <FormControl>
+          <Input type="text" placeholder="" v-bind="componentField" />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <FormField v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
@@ -68,6 +53,21 @@
         <span>{{ $t('admin.inbox.csatSurveys.description_3') }}</span>
       </p>
     </FormField>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <FormField v-slot="{ componentField }" name="reopen_window_hours">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
+          <FormControl>
+            <Input type="number" min="0" placeholder="48" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>
+            {{ $t('admin.inbox.whatsapp.reopenWindow.description') }}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </div>
 
     <div v-show="csatEnabled" class="box p-4 space-y-4">
       <div>

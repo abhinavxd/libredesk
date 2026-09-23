@@ -10,7 +10,12 @@
     <div v-else-if="!selectedTemplate" :class="fill ? 'flex flex-col flex-1 min-h-0' : ''">
       <div class="relative mb-2 shrink-0">
         <Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="search" :placeholder="$t('globals.terms.search')" class="px-8" />
+        <Input
+          ref="searchInputRef"
+          v-model="search"
+          :placeholder="$t('globals.terms.search')"
+          class="px-8"
+        />
         <button
           v-if="search"
           type="button"
@@ -83,7 +88,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Search, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Badge } from '@shared-ui/components/ui/badge'
@@ -98,12 +103,18 @@ const props = defineProps({
   urlButtonParams: { type: Array, default: () => [] },
   renderedPreview: { type: String, default: '' },
   isFetching: { type: Boolean, default: false },
-  fill: { type: Boolean, default: false }
+  fill: { type: Boolean, default: false },
+  autofocus: { type: Boolean, default: false }
 })
 
 defineEmits(['pick', 'back', 'update:param'])
 
 const search = ref('')
+const searchInputRef = ref(null)
+
+watch(searchInputRef, (input) => {
+  if (props.autofocus) input?.$el?.focus()
+})
 
 const filteredTemplates = computed(() => {
   const q = search.value.trim().toLowerCase()

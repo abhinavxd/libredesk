@@ -41,6 +41,7 @@
           :url-button-params="urlButtonParams"
           :rendered-preview="renderedPreview"
           :is-fetching="isFetchingTemplates"
+          autofocus
           @pick="pickTemplate"
           @back="selectedTemplate = null"
           @update:param="(key, v) => (templateParams[key] = v)"
