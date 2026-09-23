@@ -1,6 +1,6 @@
 <template>
   <!-- idk why I named this select tag, should be named multi-select -->
-  <TagsInput v-model="tags" class="px-0 gap-0" :displayValue="getLabel">
+  <TagsInput ref="rootRef" v-model="tags" class="px-0 gap-0" :displayValue="getLabel">
     <!-- Tags visible to the user -->
     <div class="flex gap-2 flex-wrap items-center px-3">
       <TagsInputItem v-for="tagValue in tags" :key="tagValue" :value="tagValue">
@@ -78,7 +78,7 @@ import {
   ComboboxPortal,
   ComboboxRoot
 } from 'radix-vue'
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { useField } from 'vee-validate'
 import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
 import { useRemoteSearch } from '@shared-ui/composables/useRemoteSearch'
@@ -123,6 +123,7 @@ const { handleBlur } = useField(() => props.name, undefined, {
 
 const open = ref(false)
 const searchTerm = ref('')
+const rootRef = ref(null)
 
 const {
   results: remoteItems,
@@ -175,8 +176,9 @@ const getLabel = (value) => {
   return item?.label || seenLabels.get(value) || value
 }
 
+// Closing the list here, not in the combobox, keeps focus in the input for the next pick.
 const handleSelect = (event) => {
-  if (props.keepOpenOnSelect) event.preventDefault()
+  event.preventDefault()
 
   const selectedValue = event.detail.value
   if (selectedValue) {
@@ -184,9 +186,11 @@ const handleSelect = (event) => {
     searchTerm.value = ''
   }
 
-  if (filteredOptions.value.length === 0) {
+  if (!props.keepOpenOnSelect || filteredOptions.value.length === 0) {
     open.value = false
   }
+
+  nextTick(() => rootRef.value?.$el?.querySelector('input')?.focus())
 }
 
 const filterFunc = (remainingItemValues, term) => {

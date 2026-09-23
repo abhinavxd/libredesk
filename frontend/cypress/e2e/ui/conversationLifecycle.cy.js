@@ -14,6 +14,8 @@ describe('Conversation lifecycle', () => {
   const ccContactLastName = `CcCustomer${stamp}`
   const ccContactName = `Lifecycle ${ccContactLastName}`
   const ccAddress = `lifecycle.cc.${stamp}@example.com`
+  const customerEmail = `lifecycle.customer.${stamp}@example.com`
+  const ccCustomerEmail = `lifecycle.cc-customer.${stamp}@example.com`
   const bccAddress = `lifecycle.bcc.${stamp}@example.com`
 
   const smtpHost = Cypress.env('SMTP_HOST') || '127.0.0.1'
@@ -120,7 +122,7 @@ describe('Conversation lifecycle', () => {
       })
       cy.api('POST', '/api/v1/conversations', {
         inbox_id: inboxID,
-        contact_email: `lifecycle.customer.${stamp}@example.com`,
+        contact_email: customerEmail,
         first_name: 'Lifecycle',
         last_name: contactLastName,
         subject,
@@ -131,7 +133,6 @@ describe('Conversation lifecycle', () => {
         expect(conversationUuid, 'conversation uuid').to.be.a('string').and.not.be.empty
       })
       // The reply box prefills CC from the last email, so this thread ends on an agent reply that CC'd someone.
-      const ccCustomerEmail = `lifecycle.cc-customer.${stamp}@example.com`
       cy.api('POST', '/api/v1/conversations', {
         inbox_id: inboxID,
         contact_email: ccCustomerEmail,
@@ -304,6 +305,8 @@ describe('Conversation lifecycle', () => {
 
     cy.contains(contactName).click()
     cy.location('pathname').should('include', conversationUuid)
+    // A filled TO box means the new thread has loaded.
+    recipientRow('TO:').find('input').should('have.value', customerEmail)
     cy.contains('label', 'CC:').should('not.exist')
     cy.contains('label', 'BCC:').should('not.exist')
     sendReply('Reply after switching away')
@@ -311,6 +314,7 @@ describe('Conversation lifecycle', () => {
 
     cy.contains(ccContactName).click()
     cy.location('pathname').should('include', ccConversationUuid)
+    recipientRow('TO:').find('input').should('have.value', ccCustomerEmail)
     recipientRow('CC:').find('input').should('have.value', ccAddress)
     cy.contains('label', 'BCC:').should('not.exist')
     sendReply('Reply after switching back')
