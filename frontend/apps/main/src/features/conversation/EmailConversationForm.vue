@@ -1,5 +1,9 @@
 <template>
-  <form @submit="createConversation" novalidate class="flex flex-col flex-1 overflow-hidden">
+  <form
+    @submit="createConversation"
+    novalidate
+    class="flex flex-col flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
+  >
     <div class="space-y-4 pb-2 flex-shrink-0">
       <div class="space-y-2">
         <FormField name="contact_email">
@@ -43,7 +47,7 @@
           </FormItem>
         </FormField>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div :class="FIELD_GRID_CLASS">
           <FormField v-slot="{ componentField }" name="first_name">
             <FormItem>
               <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
@@ -76,7 +80,7 @@
           </FormField>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div :class="FIELD_GRID_CLASS">
           <FormField v-slot="{ componentField }" name="subject">
             <FormItem>
               <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
@@ -113,7 +117,7 @@
           </FormField>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div :class="FIELD_GRID_CLASS">
           <FormField v-slot="{ componentField }" name="team_id">
             <FormItem>
               <FormLabel>
@@ -143,7 +147,7 @@
       </div>
     </div>
 
-    <div class="flex-1 flex flex-col min-h-0 mt-4">
+    <div class="flex flex-none flex-col min-h-64 mt-4 lg:flex-1 lg:min-h-0">
       <FormField v-slot="{ componentField }" name="content">
         <FormItem class="flex flex-col h-full">
           <FormLabel>{{ $t('globals.terms.message') }}</FormLabel>
@@ -202,6 +206,8 @@
 </template>
 
 <script setup>
+const FIELD_GRID_CLASS = 'grid grid-cols-1 gap-4 sm:grid-cols-2'
+
 import { DialogFooter } from '@shared-ui/components/ui/dialog'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'

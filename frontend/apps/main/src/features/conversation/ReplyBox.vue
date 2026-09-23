@@ -92,6 +92,7 @@
           v-model:bcc="bcc"
           v-model:emailErrors="emailErrors"
           v-model:messageType="messageType"
+          v-model:showCc="showCc"
           v-model:showBcc="showBcc"
           v-model:mentions="mentions"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
@@ -110,13 +111,13 @@
       </DialogContent>
     </Dialog>
 
-    <div v-if="isCramped && !isEditorFullscreen" class="p-2">
+    <div v-if="isCollapsed && !isEditorFullscreen" class="p-2">
       <Button
         type="button"
         variant="outline"
         class="w-full h-11 justify-start font-normal min-w-0"
         :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
-        @click="isEditorFullscreen = true"
+        @click="expandComposer"
       >
         <Pencil class="shrink-0 text-muted-foreground" />
         <span v-if="draftPreview" class="truncate">{{ draftPreview }}</span>
@@ -141,7 +142,7 @@
     <div
       class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
       :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
-      v-if="!isCramped && !isEditorFullscreen"
+      v-if="!isCollapsed && !isEditorFullscreen"
     >
       <ReplyBoxContent
         ref="replyBoxContentRef"
@@ -157,9 +158,11 @@
         v-model:bcc="bcc"
         v-model:emailErrors="emailErrors"
         v-model:messageType="messageType"
+        v-model:showCc="showCc"
         v-model:showBcc="showBcc"
         v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
+        @minimize="toggleMinimize"
         @send="processSend"
         @sendAndSetStatus="processSendAndSetStatus"
         @fileUpload="handleFileUpload"
@@ -178,6 +181,7 @@
 <script setup>
 import { ref, watch, computed, toRaw, nextTick, onMounted, onUnmounted } from 'vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { getTextFromHTML } from '@shared-ui/utils/string'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { WHATSAPP_CHANNEL, isWhatsAppWindowOpen } from '@main/features/conversation/whatsappTemplate'
@@ -328,11 +332,13 @@ const {
 
 // Rest of existing state
 const isEditorFullscreen = ref(false)
+const isMinimized = ref(false)
 const isSending = ref(false)
 const isGenerating = ref(false)
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
+const showCc = ref(false)
 const showBcc = ref(false)
 const emailErrors = ref([])
 const replyBoxContentRef = ref(null)
@@ -421,6 +427,7 @@ const resolveGenerateToolApproval = async (approved) => {
 const handleCopilotInsertReply = (html) => {
   if (!html || !canSendReply.value) return
   if (messageType.value === 'private_note') messageType.value = 'reply'
+  isMinimized.value = false
   htmlContent.value = html
 }
 
@@ -436,19 +443,33 @@ const focusFromPalette = () => {
     nextTick(() => fullscreenContentRef.value?.focus())
     return
   }
+  if (isMinimized.value) {
+    isMinimized.value = false
+    nextTick(() => replyBoxContentRef.value?.focus())
+    return
+  }
   activeContentRef()?.focus()
+}
+
+const toggleMinimize = () => {
+  // Unmounting the editor mid AI rewrite drops the result and leaves isGenerating stuck.
+  if (isCramped.value || isEditorFullscreen.value || isGenerating.value) return
+  isMinimized.value = !isMinimized.value
+  if (!isMinimized.value) nextTick(() => replyBoxContentRef.value?.focus())
 }
 
 onMounted(() => {
   emitter.on(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
   emitter.on(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
   emitter.on(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
+  emitter.on(EMITTER_EVENTS.REPLY_BOX_TOGGLE_MINIMIZE, toggleMinimize)
 })
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
   emitter.off(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
   emitter.off(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
+  emitter.off(EMITTER_EVENTS.REPLY_BOX_TOGGLE_MINIMIZE, toggleMinimize)
 })
 
 /**
@@ -458,7 +479,15 @@ const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
 
-const draftPreview = computed(() => textContent.value.trim())
+// textContent stays empty while the composer is collapsed, no editor is mounted to fill it.
+const draftPreview = computed(() => textContent.value.trim() || getTextFromHTML(htmlContent.value))
+
+const isCollapsed = computed(() => isCramped.value || isMinimized.value)
+
+const expandComposer = () => {
+  if (isCramped.value) isEditorFullscreen.value = true
+  else isMinimized.value = false
+}
 
 const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.value.length)
 
@@ -703,6 +732,7 @@ watch(
   () => conversationStore.currentCC,
   (newVal) => {
     cc.value = newVal?.join(', ') || ''
+    showCc.value = cc.value.length > 0
   },
   { deep: true, immediate: true }
 )
@@ -718,12 +748,8 @@ watch(
 watch(
   () => conversationStore.currentBCC,
   (newVal) => {
-    const newBcc = newVal?.join(', ') || ''
-    bcc.value = newBcc
-    // Only show BCC field if it has content
-    if (newBcc.length > 0) {
-      showBcc.value = true
-    }
+    bcc.value = newVal?.join(', ') || ''
+    showBcc.value = bcc.value.length > 0
   },
   { deep: true, immediate: true }
 )

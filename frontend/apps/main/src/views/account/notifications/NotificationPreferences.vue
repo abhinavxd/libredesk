@@ -42,18 +42,24 @@
         </div>
 
         <div class="border border-border rounded-md divide-y divide-border">
-          <div class="flex items-center px-4 py-2 text-xs font-medium text-muted-foreground">
-            <div class="flex-grow" />
-            <div v-for="channel in channels" :key="channel.key" class="w-20 text-center">
+          <div
+            class="grid grid-cols-3 items-center px-4 py-2 text-xs font-medium text-muted-foreground sm:grid-cols-[minmax(0,1fr)_repeat(3,5rem)]"
+          >
+            <div class="hidden sm:block" />
+            <div v-for="channel in channels" :key="channel.key" class="text-center">
               {{ $t(channel.labelKey) }}
             </div>
           </div>
 
-          <div v-for="row in rows" :key="row.type" class="flex items-center px-4 py-3">
-            <div class="flex-grow pr-4">
+          <div
+            v-for="row in rows"
+            :key="row.type"
+            class="grid grid-cols-3 items-center gap-y-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_repeat(3,5rem)]"
+          >
+            <div class="col-span-3 min-w-0 sm:col-span-1 sm:pr-4">
               <p class="text-sm text-foreground">{{ typeLabel(row.type) }}</p>
             </div>
-            <div v-for="channel in channels" :key="channel.key" class="w-20 flex justify-center">
+            <div v-for="channel in channels" :key="channel.key" class="flex justify-center">
               <Switch
                 :checked="row[channel.key]"
                 :disabled="
