@@ -1,6 +1,6 @@
 <template>
   <div class="flex justify-between flex-1 min-h-0">
-    <div class="relative pr-6" :class="fixedHelp ? 'flex-1 min-w-0' : 'w-full xl:w-8/12'">
+    <div class="relative" :class="fixedHelp ? 'flex-1 min-w-0 xl:pr-6' : 'w-full lg:pr-6 xl:w-8/12'">
       <slot name="content" />
     </div>
     <div
