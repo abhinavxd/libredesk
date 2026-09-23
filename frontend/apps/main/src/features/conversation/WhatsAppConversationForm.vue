@@ -114,7 +114,23 @@
       </div>
     </div>
 
-    <div class="flex-1 flex flex-col min-h-0 mt-4">
+    <Alert v-if="existingConversation?.exists" class="mt-4">
+      <AlertDescription class="flex items-center justify-between gap-4">
+        <span>{{ existingConversationMessage }}</span>
+        <Button
+          v-if="existingConversation.uuid"
+          type="button"
+          size="sm"
+          variant="outline"
+          class="shrink-0"
+          @click="openExistingConversation"
+        >
+          {{ $t('actions.openConversation') }}
+        </Button>
+      </AlertDescription>
+    </Alert>
+
+    <div v-else class="flex-1 flex flex-col min-h-0 mt-4">
       <label class="text-sm font-medium mb-2">{{ $t('globals.terms.template', 1) }}</label>
 
       <p v-if="!inboxId" class="text-sm text-muted-foreground">
@@ -138,7 +154,7 @@
       </template>
     </div>
 
-    <DialogFooter class="mt-4 pt-2 flex-shrink-0">
+    <DialogFooter v-if="!existingConversation?.exists" class="mt-4 pt-2 flex-shrink-0">
       <Button type="submit" :disabled="!canSubmit || loading" :isLoading="loading">
         {{ $t('globals.messages.submit') }}
       </Button>
@@ -150,6 +166,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IdCard } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Alert, AlertDescription } from '@shared-ui/components/ui/alert'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { DialogFooter } from '@shared-ui/components/ui/dialog'
@@ -182,6 +200,7 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
+const router = useRouter()
 const emitter = useEmitter()
 const inboxStore = useInboxStore()
 const userStore = useUserStore()
@@ -237,6 +256,35 @@ watch(
 
 watch(inboxId, (id) => fetchTemplates(id))
 
+const existingConversation = ref(null)
+const existingConversationMessage = computed(() =>
+  t(
+    existingConversation.value?.uuid
+      ? 'conversation.whatsapp.error.conversationExists'
+      : 'conversation.whatsapp.error.conversationExistsNoAccess'
+  )
+)
+
+watch([selectedContact, inboxId], async ([contact, inbox]) => {
+  existingConversation.value = null
+  if (!contact || !inbox) return
+  try {
+    const resp = await api.getWhatsAppOpenConversation(contact.id, Number(inbox))
+    if (contact === selectedContact.value && inbox === inboxId.value) {
+      existingConversation.value = resp.data.data
+    }
+  } catch {
+    // A failed lookup leaves the form usable; the create call rejects a duplicate anyway.
+  }
+})
+
+const goToConversation = (uuid) => {
+  emit('close')
+  router.push({ name: 'inbox-conversation', params: { uuid, type: 'assigned' } })
+}
+
+const openExistingConversation = () => goToConversation(existingConversation.value.uuid)
+
 const hasContact = computed(() => {
   if (selectedContact.value) return true
   return (
@@ -247,7 +295,12 @@ const hasContact = computed(() => {
 })
 
 const canSubmit = computed(
-  () => !!inboxId.value && !!selectedTemplate.value && allParamsFilled.value && hasContact.value
+  () =>
+    !!inboxId.value &&
+    !!selectedTemplate.value &&
+    allParamsFilled.value &&
+    hasContact.value &&
+    !existingConversation.value?.exists
 )
 
 watch([phoneNumber, phoneCountryCode], ([num, code]) => {
@@ -284,10 +337,12 @@ const createConversation = async () => {
     await api.createConversation(payload)
     emit('close')
   } catch (error) {
+    const err = handleHTTPError(error)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: handleHTTPError(error).message
+      description: err.message
     })
+    if (err.data?.conversation_uuid) goToConversation(err.data.conversation_uuid)
   } finally {
     loading.value = false
   }

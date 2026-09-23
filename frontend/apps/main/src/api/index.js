@@ -436,6 +436,10 @@ const createWhatsAppTemplate = (data) =>
 const deleteWhatsAppTemplate = (id) => http.delete(`/api/v1/whatsapp/templates/${id}`)
 const syncWhatsAppTemplates = (inboxId) =>
   http.post(`/api/v1/whatsapp/templates/sync?inbox_id=${inboxId}`, {})
+const getWhatsAppOpenConversation = (contactId, inboxId) =>
+  http.get(`/api/v1/whatsapp/contacts/${contactId}/open-conversation`, {
+    params: { inbox_id: inboxId }
+  })
 const saveDraft = (uuid, type, data) =>
   http.post(`/api/v1/conversations/${uuid}/draft`, { ...data, type }, {
     headers: {
@@ -739,6 +743,7 @@ export default {
   createWhatsAppTemplate,
   deleteWhatsAppTemplate,
   syncWhatsAppTemplates,
+  getWhatsAppOpenConversation,
   createTeam,
   updateTeam,
   getSettings,
