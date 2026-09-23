@@ -15,6 +15,8 @@ type Attachment struct {
 	Filename    string
 	ContentType string
 	Content     []byte
+	// ContentID is set for inline images, which the HTML references as <img src="cid:ContentID">.
+	ContentID string
 }
 
 // OutboundEmail is the normalized shape passed to a Provider for sending.

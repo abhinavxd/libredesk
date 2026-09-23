@@ -104,7 +104,10 @@ func TestSendViaHTTPAPI(t *testing.T) {
 		References:       []string{"ref-1", "ref-2"},
 		ConversationUUID: "conv-uuid",
 		Attachments: attachment.Attachments{
-			{Name: "a.txt", Content: []byte("data"), ContentType: "text/plain"},
+			{Name: "a.txt", Content: []byte("data"), ContentType: "text/plain", ContentID: "a-uuid",
+				Header: attachment.MakeHeader("text/plain", "a-uuid", "a.txt", "", "attachment")},
+			{Name: "img.png", Content: []byte("png"), ContentType: "image/png", ContentID: "ldsk-img-uuid",
+				Header: attachment.MakeHeader("image/png", "ldsk-img-uuid", "img.png", "", "inline")},
 		},
 	})
 	require.NoError(t, err)
@@ -119,9 +122,11 @@ func TestSendViaHTTPAPI(t *testing.T) {
 	assert.Equal(t, "conv-uuid", provider.sentMsg.Headers[headerLibredeskConversationID])
 	assert.Contains(t, provider.sentMsg.Headers[headerReferences], "<ref-1>")
 	assert.Equal(t, "support+conv-conv-uuid@example.com", provider.sentMsg.ReplyTo)
-	require.Len(t, provider.sentMsg.Attachments, 1)
+	require.Len(t, provider.sentMsg.Attachments, 2)
 	assert.Equal(t, "a.txt", provider.sentMsg.Attachments[0].Filename)
 	assert.Equal(t, []byte("data"), provider.sentMsg.Attachments[0].Content)
+	assert.Empty(t, provider.sentMsg.Attachments[0].ContentID, "regular attachments must not be sent inline")
+	assert.Equal(t, "ldsk-img-uuid", provider.sentMsg.Attachments[1].ContentID)
 }
 
 func TestSendViaHTTPAPIError(t *testing.T) {

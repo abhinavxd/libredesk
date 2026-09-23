@@ -72,6 +72,8 @@ type resendAttachment struct {
 	Filename    string `json:"filename"`
 	Content     string `json:"content"` // base64-encoded
 	ContentType string `json:"content_type,omitempty"`
+	// ContentID makes Resend embed the attachment inline, for <img src="cid:..."> in the HTML.
+	ContentID string `json:"content_id,omitempty"`
 }
 
 type resendSendRequest struct {
@@ -115,6 +117,7 @@ func (p *resendProvider) Send(ctx context.Context, msg OutboundEmail) (string, e
 			Filename:    att.Filename,
 			Content:     base64.StdEncoding.EncodeToString(att.Content),
 			ContentType: att.ContentType,
+			ContentID:   att.ContentID,
 		})
 	}
 

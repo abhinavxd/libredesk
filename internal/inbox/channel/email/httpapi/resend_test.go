@@ -100,6 +100,7 @@ func TestResendSend(t *testing.T) {
 		Headers: map[string]string{"Message-ID": "<abc@example.com>"},
 		Attachments: []Attachment{
 			{Filename: "file.txt", Content: []byte("hello"), ContentType: "text/plain"},
+			{Filename: "img.png", Content: []byte("png"), ContentType: "image/png", ContentID: "ldsk-img-uuid"},
 		},
 	}
 
@@ -110,8 +111,10 @@ func TestResendSend(t *testing.T) {
 	assert.Equal(t, msg.From, capturedReq.From)
 	assert.Equal(t, msg.To, capturedReq.To)
 	assert.Equal(t, "<abc@example.com>", capturedReq.Headers["Message-ID"])
-	require.Len(t, capturedReq.Attachments, 1)
+	require.Len(t, capturedReq.Attachments, 2)
 	assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("hello")), capturedReq.Attachments[0].Content)
+	assert.Empty(t, capturedReq.Attachments[0].ContentID)
+	assert.Equal(t, "ldsk-img-uuid", capturedReq.Attachments[1].ContentID)
 
 	assert.Equal(t, "resend", provider.Name())
 }

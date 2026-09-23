@@ -63,11 +63,16 @@ func (e *Email) sendViaHTTPAPI(m models.OutboundMessage) error {
 	if m.Attachments != nil {
 		attachments = make([]httpapi.Attachment, 0, len(m.Attachments))
 		for _, file := range m.Attachments {
-			attachments = append(attachments, httpapi.Attachment{
+			att := httpapi.Attachment{
 				Filename:    file.Name,
 				ContentType: file.ContentType,
 				Content:     append([]byte(nil), file.Content...),
-			})
+			}
+			// Every outgoing attachment has a ContentID, but only inline ones are referenced from the HTML.
+			if file.Header.Get("Content-Disposition") == dispositionInline {
+				att.ContentID = file.ContentID
+			}
+			attachments = append(attachments, att)
 		}
 	}
 
