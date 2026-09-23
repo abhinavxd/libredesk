@@ -753,6 +753,7 @@
   "contact.deleteNote": "Delete note",
   "contact.deleteNoteConfirmation": "This will permanently delete the note.",
   "contact.editContact": "Edit contact",
+  "contact.emailOrPhoneRequired": "Add an email or a phone number. A contact needs at least one to be reached.",
   "contact.identityNotVerified": "Identity not verified",
   "contact.identityVerified": "Identity verified",
   "contact.newNote": "New note",

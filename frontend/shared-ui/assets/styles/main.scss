@@ -94,6 +94,10 @@
       padding-left: 0.25rem;
     }
 
+    blockquote {
+      @apply my-2 border-l-2 border-border pl-3 text-muted-foreground;
+    }
+
     p:last-child,
     ul:last-child,
     ol:last-child {

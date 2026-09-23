@@ -976,8 +976,11 @@ export const useConversationStore = defineStore('conversation', () => {
   let pendingMessageSeq = 0
 
   function addPendingMessage (conversationUUID, content, isPrivate, author, attachments = [], textContent = '', meta = {}) {
+    const tempUUID = `pending-${Date.now()}-${++pendingMessageSeq}`
     const pendingMessage = {
-      uuid: `pending-${Date.now()}-${++pendingMessageSeq}`,
+      uuid: tempUUID,
+      // Stays fixed when the server uuid replaces the temp one, so the bubble is not re-rendered.
+      render_key: tempUUID,
       type: 'outgoing',
       status: 'pending',
       content,
@@ -1053,9 +1056,26 @@ export const useConversationStore = defineStore('conversation', () => {
     return conversations.listType === CONVERSATION_LIST_TYPE.ALL
   }
 
+  function isInCurrentList (conv) {
+    return (conversations.status === '' || conv.status === conversations.status) && belongsToList(conv)
+  }
+
+  // Keeps the list total in step when a live update moves a loaded row into or out of the current list.
+  function mergeLiveUpdate (uuid, payload) {
+    const existing = conversations.data?.find(c => c.uuid === uuid)
+    if (!existing) return null
+    const wasListed = isInCurrentList(existing)
+    deepMerge(existing, payload)
+    const isListed = isInCurrentList(existing)
+    if (wasListed !== isListed) {
+      conversations.total = Math.max(0, conversations.total + (isListed ? 1 : -1))
+    }
+    return existing
+  }
+
   function handleConvPush (payload) {
     if (!payload || !payload.uuid) return
-    if (mergeIntoList(payload.uuid, payload)) {
+    if (mergeLiveUpdate(payload.uuid, payload)) {
       if (conversation.data?.uuid === payload.uuid) {
         deepMerge(conversation.data, payload)
       }
@@ -1073,7 +1093,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (conversation.data?.uuid === update.uuid) {
       deepMerge(conversation.data, update)
     }
-    mergeIntoList(update.uuid, update)
+    mergeLiveUpdate(update.uuid, update)
   }
 
   function mergeContactUpdate (update) {

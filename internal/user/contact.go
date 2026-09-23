@@ -32,10 +32,12 @@ func (u *Manager) CreateContact(user *models.User) error {
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	user.Email = null.NewString(strings.ToLower(strings.TrimSpace(user.Email.String)), user.Email.Valid)
-	if _, err := u.GetContactByEmail(user.Email.String); err == nil {
-		return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
-	} else if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
-		return err
+	if user.Email.Valid {
+		if _, err := u.GetContactByEmail(user.Email.String); err == nil {
+			return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
+		} else if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
+			return err
+		}
 	}
 	if err := u.q.InsertContact.QueryRow(user.Email, user.FirstName, user.LastName, password, user.PhoneNumber, user.PhoneNumberCountryCode, user.Country).Scan(&user.ID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {

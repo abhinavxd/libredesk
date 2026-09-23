@@ -344,6 +344,9 @@ import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
 import { getMessageDeliveryStatus } from './messageDeliveryStatus.js'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
+// The sanitizer has no strikethrough tag, so these are rewritten to a styled span it keeps.
+const STRIKE_OPEN_TAG = /<(s|del|strike)(?=[\s>])[^>]*>/gi
+const STRIKE_CLOSE_TAG = /<\/(s|del|strike)\s*>/gi
 
 const COLLAPSE_THRESHOLD_PX = 400
 
@@ -438,7 +441,11 @@ const sanitizedContent = computed(() => {
   if (props.message.meta?.is_csat) {
     return t('globals.messages.pleaseRateConversation')
   }
-  return props.message.content || ''
+  const content = props.message.content || ''
+  if (props.message.content_type === 'text') return content
+  return content
+    .replace(STRIKE_OPEN_TAG, '<span style="text-decoration: line-through">')
+    .replace(STRIKE_CLOSE_TAG, '</span>')
 })
 
 const nonInlineAttachments = computed(() =>
