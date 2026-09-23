@@ -105,7 +105,7 @@
                 </template>
                 <template v-else>
                   <Reply
-                    class="text-success inline-block align-text-bottom mr-0.5"
+                    class="text-success inline-block align-[-2px] mr-0.5"
                     :size="14"
                     v-if="conversation.last_message_sender === 'agent'"
                   />{{ trimmedLastMessage }}

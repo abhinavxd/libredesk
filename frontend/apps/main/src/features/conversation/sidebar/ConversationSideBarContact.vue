@@ -55,7 +55,7 @@
         <span class="sidebar-value min-w-0 truncate" :title="conversation.contact.email">
           {{ conversation.contact.email }}
         </span>
-        <CopyButton :text="conversation.contact.email" class="shrink-0" />
+        <CopyButton :text="conversation.contact.email" class="h-6 w-6 shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5" />
       </template>
       <span v-else class="sidebar-label">
         {{ t('conversation.sidebar.notAvailable') }}
