@@ -139,7 +139,7 @@ describe('WhatsApp template management', () => {
       .click()
     cy.wait('@delete').its('response.statusCode').should('eq', 400)
     cy.contains('Template deletion refused').should('be.visible')
-    cy.contains('td', name).should('be.visible')
+    cy.contains('td', name).scrollIntoView().should('be.visible')
   })
 
   it('deletes successfully and stays deleted after sync', () => {
