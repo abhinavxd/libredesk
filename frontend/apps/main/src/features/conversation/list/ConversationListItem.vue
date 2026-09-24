@@ -167,8 +167,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Mail, MessageSquare, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
-import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
+import { Mail, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
+import { CHANNEL_ICONS } from '@main/constants/channelIcons.js'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,
@@ -204,11 +204,6 @@ const props = defineProps({
 
 const handleMarkAsUnread = () => {
   conversationStore.markAsUnread(props.conversation.uuid)
-}
-
-const CHANNEL_ICONS = {
-  livechat: MessageSquare,
-  whatsapp: WhatsAppIcon
 }
 
 const channelIcon = computed(() => CHANNEL_ICONS[props.conversation.inbox_channel] || Mail)
