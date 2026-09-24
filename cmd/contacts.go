@@ -318,6 +318,7 @@ func handleBlockContact(r *fastglue.Request) error {
 	return r.SendEnvelope(contact)
 }
 
+// contactFromForm parses and validates the contact fields from a multipart request, returning the raw form for avatar files.
 func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) {
 	var app = r.Context.(*App)
 

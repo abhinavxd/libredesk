@@ -418,6 +418,10 @@ func main() {
 		}
 	}
 	cancelShutdown()
+	if ing := app.ingester(); ing != nil {
+		colorlog.Red("Shutting down whatsapp ingester...")
+		ing.Close()
+	}
 	colorlog.Red("Shutting down AI agent...")
 	aiAgent.Close()
 	colorlog.Red("Shutting down AI...")
@@ -432,10 +436,6 @@ func main() {
 	notifier.Close()
 	colorlog.Red("Shutting down webhook...")
 	webhook.Close()
-	if ing := app.ingester(); ing != nil {
-		colorlog.Red("Shutting down whatsapp ingester...")
-		ing.Close()
-	}
 	colorlog.Red("Shutting down conversation...")
 	conversation.Close()
 	colorlog.Red("Shutting down SLA...")

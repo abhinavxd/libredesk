@@ -240,14 +240,14 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		conversationID, conversationUUID, err = app.conversation.CreateConversation(
 			contactID,
 			inboxID,
-			textPreview(m),
-			time.Now(),
-			"",
-			false,
-			nil,
-			nil,
-			0,
-			0,
+			textPreview(m), /** last_message **/
+			time.Now(),     /** last_message_at **/
+			"",             /** subject **/
+			false,          /** append_ref_num_to_subject **/
+			nil,            /** meta **/
+			nil,            /** custom_attributes **/
+			0,              /** max_conversations **/
+			0,              /** rate_limit_window **/
 		)
 		if err != nil {
 			return fmt.Errorf("creating conversation: %w", err)
