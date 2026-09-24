@@ -1413,6 +1413,15 @@ func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) e
 // function to trigger the necessary hooks.
 func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConversation bool) error {
 	conversationUUID := message.ConversationUUID
+	var recipients struct {
+		To []string `json:"to"`
+	}
+	if len(message.Meta) > 0 {
+		if err := json.Unmarshal(message.Meta, &recipients); err != nil {
+			m.lo.Warn("error reading incoming message recipients", "conversation_uuid", conversationUUID, "error", err)
+		}
+	}
+	incomingTo := recipients.To
 
 	// Start waiting since clock, cleared when agent replies.
 	m.StartConversationWaitingSince(conversationUUID, time.Now())
@@ -1421,7 +1430,11 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 	if isNewConversation {
 		conversation, err := m.GetConversation(0, conversationUUID, "")
 		if err == nil {
-			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, conversation)
+			conversation.IncomingTo = incomingTo
+			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, struct {
+				models.Conversation
+				To []string `json:"to"`
+			}{Conversation: conversation, To: conversation.IncomingTo})
 			m.automation.EvaluateNewConversationRules(conversation)
 		}
 		return nil
@@ -1451,6 +1464,7 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 	if err != nil {
 		m.lo.Error("error fetching conversation for incoming message hooks", "conversation_uuid", conversationUUID, "error", err)
 	} else {
+		conversation.IncomingTo = incomingTo
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming, previousValues, umodels.User{ID: conversation.ContactID})
 
