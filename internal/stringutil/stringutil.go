@@ -31,8 +31,8 @@ var (
 	regexpHyphens         = regexp.MustCompile(`-+`)
 	regexpConvUUID        = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
 
-	// Italy, San Marino and Côte d'Ivoire keep the leading 0 in international numbers.
-	trunkZeroKeptDialCodes = map[string]bool{"39": true, "378": true, "225": true}
+	// Italy, San Marino, Côte d'Ivoire and Congo keep the leading 0 in international numbers.
+	trunkZeroKeptDialCodes = map[string]bool{"39": true, "378": true, "225": true, "242": true}
 
 	// markdownRenderer escapes raw HTML in the input; single newlines render as <br>.
 	markdownRenderer = goldmark.New(
