@@ -3,12 +3,12 @@ package migrations
 import (
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/testdb"
+	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/jmoiron/sqlx"
 )
 
 func TestBackfillLastResolvedAtIsBatchedAndResumable(t *testing.T) {
-	db := testdb.New(t, "migrations")
+	db := testutil.NewDB(t, "migrations")
 	seedResolvedConversations(t, db, 5)
 
 	batches, err := backfillLastResolvedAt(db, 2)
@@ -75,7 +75,7 @@ func seedResolvedConversations(t *testing.T, db *sqlx.DB, n int) {
 }
 
 func TestCreateIndexConcurrentlyReplacesAnInvalidIndex(t *testing.T) {
-	db := testdb.New(t, "migrations")
+	db := testutil.NewDB(t, "migrations")
 	const name = "index_test_concurrent_build"
 	ddl := `CREATE INDEX CONCURRENTLY IF NOT EXISTS ` + name + ` ON conversations (last_inbound_at)`
 

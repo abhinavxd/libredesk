@@ -11,10 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"strings"
-
 	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/testdb"
+	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/jmoiron/sqlx"
@@ -267,15 +265,7 @@ func testInboxAppWithRedis(t *testing.T, addr string) (*App, *sqlx.DB, *miniredi
 
 func newInboxApp(t *testing.T) (*App, *sqlx.DB) {
 	t.Helper()
-	testdb.New(t, "cmd")
-	db, err := sqlx.Connect("postgres", strings.Replace(os.Getenv("LIBREDESK_TEST_DB_DSN"), "/libredesk?", "/libredesk_test_cmd?", 1))
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	if _, err := db.Exec(`DELETE FROM inboxes`); err != nil {
-		t.Fatalf("clearing inboxes: %v", err)
-	}
+	db := testutil.NewDB(t, "cmd_whatsapp")
 
 	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
 	raw, err := os.ReadFile(filepath.Join("..", "i18n", "en-US.json"))

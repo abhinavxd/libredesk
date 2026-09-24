@@ -8,15 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/testdb"
+	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 	"github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
 )
-
-const testInboxName = "wa-test"
 
 var errAccount = &whatsapp.MetaAPIError{Message: "no account"}
 
@@ -33,8 +31,8 @@ func (failingResolver) WhatsAppAccount(inboxID int) (whatsapp.Account, error) {
 }
 
 func TestCreateAndFetch(t *testing.T) {
-	m, _ := testManager(t, metaOK("111"))
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, metaOK("111"))
+	inboxID := seedInbox(t, db)
 
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID:      inboxID,
@@ -85,8 +83,8 @@ func TestCreateAndFetch(t *testing.T) {
 }
 
 func TestCreateDuplicateNameAndLanguage(t *testing.T) {
-	m, _ := testManager(t, metaOK("222"))
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, metaOK("222"))
+	inboxID := seedInbox(t, db)
 	tmpl := models.Template{InboxID: inboxID, Name: "dupe", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi"}
 
 	if _, err := m.Create(context.Background(), tmpl); err != nil {
@@ -100,8 +98,8 @@ func TestCreateDuplicateNameAndLanguage(t *testing.T) {
 
 // The same name in another language is a separate template on Meta, so it must be allowed.
 func TestCreateSameNameDifferentLanguage(t *testing.T) {
-	m, _ := testManager(t, metaOK("333"))
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, metaOK("333"))
+	inboxID := seedInbox(t, db)
 	base := models.Template{InboxID: inboxID, Name: "greeting", Category: models.CategoryUtility, BodyContent: "Hi"}
 
 	base.Language = "en_US"
@@ -115,11 +113,11 @@ func TestCreateSameNameDifferentLanguage(t *testing.T) {
 }
 
 func TestCreateMarksRejectedWhenMetaRefuses(t *testing.T) {
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(400)
 		w.Write([]byte(`{"error":{"message":"bad content","code":100,"error_user_msg":"Template violates policy"}}`))
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "rejected_tmpl", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
@@ -142,8 +140,8 @@ func TestCreateMarksRejectedWhenMetaRefuses(t *testing.T) {
 
 // A template Meta never accepted still needs sample values, so a missing one is a local rejection.
 func TestCreateMarksRejectedWhenSubmissionCannotBeBuilt(t *testing.T) {
-	m, _ := testManager(t, metaOK("444"))
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, metaOK("444"))
+	inboxID := seedInbox(t, db)
 
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "no_samples", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi {{name}}",
@@ -157,9 +155,9 @@ func TestCreateMarksRejectedWhenSubmissionCannotBeBuilt(t *testing.T) {
 }
 
 func TestCreateWithoutMetaClientStaysPending(t *testing.T) {
-	m, _ := testManager(t, nil)
+	m, db := testManager(t, nil)
 	m.client, m.resolver = nil, nil
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "offline_tmpl", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
@@ -173,9 +171,9 @@ func TestCreateWithoutMetaClientStaysPending(t *testing.T) {
 }
 
 func TestCreateWhenAccountCannotBeResolved(t *testing.T) {
-	m, _ := testManager(t, metaOK("555"))
+	m, db := testManager(t, metaOK("555"))
 	m.resolver = failingResolver{}
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "no_account", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
@@ -196,16 +194,16 @@ func TestGetByIDNotFound(t *testing.T) {
 }
 
 func TestGetByNameNotFound(t *testing.T) {
-	m, _ := testManager(t, nil)
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, nil)
+	inboxID := seedInbox(t, db)
 	if _, err := m.GetByName(inboxID, "missing"); err != ErrTemplateNotFound {
 		t.Fatalf("expected ErrTemplateNotFound, got %v", err)
 	}
 }
 
 func TestGetApproved(t *testing.T) {
-	m, _ := testManager(t, metaOK("666"))
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, metaOK("666"))
+	inboxID := seedInbox(t, db)
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "approval_flow", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
 	})
@@ -234,8 +232,8 @@ func TestGetApproved(t *testing.T) {
 }
 
 func TestHandleStatusUpdate(t *testing.T) {
-	m, _ := testManager(t, metaOK("777"))
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, metaOK("777"))
+	inboxID := seedInbox(t, db)
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "status_flow", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
 	})
@@ -279,8 +277,8 @@ func TestHandleStatusUpdate(t *testing.T) {
 }
 
 func TestHandleStatusUpdateIgnoresUnknownRowsAndEvents(t *testing.T) {
-	m, _ := testManager(t, nil)
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, nil)
+	inboxID := seedInbox(t, db)
 
 	if err := m.HandleStatusUpdate(inboxID, "", "", "en_US", "APPROVED", ""); err == nil {
 		t.Fatal("expected an error when the payload identifies no template")
@@ -299,7 +297,7 @@ func TestHandleStatusUpdateIgnoresUnknownRowsAndEvents(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	var deleted []string
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			deleted = append(deleted, r.URL.Query().Get("name"))
 			w.Write([]byte(`{"success":true}`))
@@ -307,7 +305,7 @@ func TestDelete(t *testing.T) {
 		}
 		metaOK("888")(w, r)
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "deletable", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
 	})
@@ -328,8 +326,8 @@ func TestDelete(t *testing.T) {
 
 // The CSAT template is provisioned by libredesk, so deleting it would break resolved-conversation surveys.
 func TestDeleteRejectsReservedTemplate(t *testing.T) {
-	m, _ := testManager(t, metaOK("999"))
-	inboxID := seedInbox(t, m)
+	m, db := testManager(t, metaOK("999"))
+	inboxID := seedInbox(t, db)
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: models.CSATTemplateName(inboxID), Language: "en_US", Category: models.CategoryUtility, BodyContent: "Rate us",
 	})
@@ -346,7 +344,7 @@ func TestDeleteRejectsReservedTemplate(t *testing.T) {
 }
 
 func TestDeletePreservesTemplateWhenMetaFails(t *testing.T) {
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			w.WriteHeader(400)
 			w.Write([]byte(`{"error":{"message":"gone","code":100}}`))
@@ -354,7 +352,7 @@ func TestDeletePreservesTemplateWhenMetaFails(t *testing.T) {
 		}
 		metaOK("1000")(w, r)
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "stale", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
 	})
@@ -372,9 +370,9 @@ func TestDeletePreservesTemplateWhenMetaFails(t *testing.T) {
 func TestDeletePreservesTemplateWithoutAccount(t *testing.T) {
 	for _, missing := range []string{"resolver error", "resolver", "client"} {
 		t.Run(missing, func(t *testing.T) {
-			m, _ := testManager(t, metaOK("unavailable"))
+			m, db := testManager(t, metaOK("unavailable"))
 			created, err := m.Create(t.Context(), models.Template{
-				InboxID: seedInbox(t, m), Name: "delete_no_account", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
+				InboxID: seedInbox(t, db), Name: "delete_no_account", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -398,11 +396,11 @@ func TestDeletePreservesTemplateWithoutAccount(t *testing.T) {
 }
 
 func TestDeleteLocalTemplateWithoutMeta(t *testing.T) {
-	m, _ := testManager(t, nil)
+	m, db := testManager(t, nil)
 	m.client = nil
 	m.resolver = nil
 	created, err := m.Create(t.Context(), models.Template{
-		InboxID: seedInbox(t, m), Name: "local_delete", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
+		InboxID: seedInbox(t, db), Name: "local_delete", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -423,7 +421,7 @@ func TestDeleteNotFound(t *testing.T) {
 }
 
 func TestSyncFromMeta(t *testing.T) {
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"data": []map[string]any{
 			{
 				"id": "SYNC1", "name": "synced_one", "language": "en_US", "category": "MARKETING", "status": "APPROVED",
@@ -437,7 +435,7 @@ func TestSyncFromMeta(t *testing.T) {
 			{"id": "SYNC2", "name": "synced_two", "language": "mr", "category": "UTILITY", "status": "PENDING"},
 		}})
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 
 	count, err := m.SyncFromMeta(context.Background(), inboxID)
 	if err != nil {
@@ -470,7 +468,7 @@ func TestSyncFromMeta(t *testing.T) {
 // Meta is the source of truth, so a status change there overwrites the local one.
 func TestSyncFromMetaOverwritesLocalStatus(t *testing.T) {
 	status := "APPROVED"
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			metaOK("SYNC3")(w, r)
 			return
@@ -480,7 +478,7 @@ func TestSyncFromMetaOverwritesLocalStatus(t *testing.T) {
 				"components": []map[string]any{{"type": "BODY", "text": "Hi"}}},
 		}})
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 	created, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "drifting", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Hi",
 	})
@@ -522,23 +520,23 @@ func TestSyncFromMetaFailures(t *testing.T) {
 	})
 
 	t.Run("meta rejects the fetch", func(t *testing.T) {
-		m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+		m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(401)
 			w.Write([]byte(`{"error":{"message":"bad token","code":190}}`))
 		})
-		if _, err := m.SyncFromMeta(context.Background(), seedInbox(t, m)); err == nil {
+		if _, err := m.SyncFromMeta(context.Background(), seedInbox(t, db)); err == nil {
 			t.Fatal("expected an error")
 		}
 	})
 
 	t.Run("a row that cannot be stored is skipped", func(t *testing.T) {
-		m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+		m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]any{"data": []map[string]any{
 				{"id": "SYNC4", "name": strings.Repeat("x", 600), "language": "en_US", "category": "UTILITY", "status": "APPROVED"},
 				{"id": "SYNC5", "name": "fine", "language": "en_US", "category": "UTILITY", "status": "APPROVED"},
 			}})
 		})
-		count, err := m.SyncFromMeta(context.Background(), seedInbox(t, m))
+		count, err := m.SyncFromMeta(context.Background(), seedInbox(t, db))
 		if err != nil {
 			t.Fatalf("sync: %v", err)
 		}
@@ -553,7 +551,7 @@ func TestEnsureReservedCreatesThenEdits(t *testing.T) {
 		submitted []map[string]any
 		edited    []string
 	)
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/message_templates") && r.Method == http.MethodPost {
 			var body map[string]any
 			json.NewDecoder(r.Body).Decode(&body)
@@ -568,7 +566,7 @@ func TestEnsureReservedCreatesThenEdits(t *testing.T) {
 		}
 		writeJSON(w, map[string]any{"data": []any{}})
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 	name := models.CSATTemplateName(inboxID)
 
 	desired := models.Template{
@@ -625,11 +623,11 @@ func TestEnsureReservedCreatesThenEdits(t *testing.T) {
 // A language change is a different template on Meta, so it has to be created rather than edited.
 func TestEnsureReservedCreatesPerLanguage(t *testing.T) {
 	submits := 0
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		submits++
 		writeJSON(w, map[string]any{"id": "CSAT" + string(rune('A'+submits)), "status": "PENDING"})
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 	desired := models.Template{
 		InboxID: inboxID, Name: models.CSATTemplateName(inboxID), Category: models.CategoryUtility,
 		BodyContent: "Rate us", Buttons: csatButtons("Rate us", "https://desk.test/csat/{{1}}"),
@@ -651,7 +649,7 @@ func TestEnsureReservedCreatesPerLanguage(t *testing.T) {
 // A template that was rejected before it reached Meta has no id to edit, so it is submitted afresh.
 func TestEnsureReservedResubmitsWhenMetaIDIsMissing(t *testing.T) {
 	submits := 0
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		submits++
 		if submits == 1 {
 			w.WriteHeader(400)
@@ -660,7 +658,7 @@ func TestEnsureReservedResubmitsWhenMetaIDIsMissing(t *testing.T) {
 		}
 		writeJSON(w, map[string]any{"id": "CSAT9", "status": "PENDING"})
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 	desired := models.Template{
 		InboxID: inboxID, Name: models.CSATTemplateName(inboxID), Language: "en_US", Category: models.CategoryUtility,
 		BodyContent: "Rate us", Buttons: csatButtons("Rate us", "https://desk.test/csat/{{1}}"),
@@ -686,7 +684,7 @@ func TestEnsureReservedResubmitsWhenMetaIDIsMissing(t *testing.T) {
 
 func TestEnsureReservedEditFailures(t *testing.T) {
 	t.Run("meta rejects the edit", func(t *testing.T) {
-		m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+		m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasSuffix(r.URL.Path, "/message_templates") {
 				writeJSON(w, map[string]any{"id": "CSATE", "status": "PENDING"})
 				return
@@ -694,7 +692,7 @@ func TestEnsureReservedEditFailures(t *testing.T) {
 			w.WriteHeader(400)
 			w.Write([]byte(`{"error":{"message":"cannot edit","code":100,"error_user_msg":"Edit refused"}}`))
 		})
-		inboxID := seedInbox(t, m)
+		inboxID := seedInbox(t, db)
 		name := models.CSATTemplateName(inboxID)
 		desired := models.Template{
 			InboxID: inboxID, Name: name, Language: "en_US", Category: models.CategoryUtility,
@@ -717,8 +715,8 @@ func TestEnsureReservedEditFailures(t *testing.T) {
 	})
 
 	t.Run("account cannot be resolved", func(t *testing.T) {
-		m, _ := testManager(t, metaOK("CSATF"))
-		inboxID := seedInbox(t, m)
+		m, db := testManager(t, metaOK("CSATF"))
+		inboxID := seedInbox(t, db)
 		name := models.CSATTemplateName(inboxID)
 		desired := models.Template{
 			InboxID: inboxID, Name: name, Language: "en_US", Category: models.CategoryUtility,
@@ -742,8 +740,8 @@ func TestEnsureReservedEditFailures(t *testing.T) {
 	})
 
 	t.Run("submission cannot be built", func(t *testing.T) {
-		m, _ := testManager(t, metaOK("CSATG"))
-		inboxID := seedInbox(t, m)
+		m, db := testManager(t, metaOK("CSATG"))
+		inboxID := seedInbox(t, db)
 		name := models.CSATTemplateName(inboxID)
 		desired := models.Template{
 			InboxID: inboxID, Name: name, Language: "en_US", Category: models.CategoryUtility,
@@ -767,8 +765,8 @@ func TestEnsureReservedEditFailures(t *testing.T) {
 	})
 
 	t.Run("without a meta client the row is unchanged", func(t *testing.T) {
-		m, _ := testManager(t, metaOK("CSATH"))
-		inboxID := seedInbox(t, m)
+		m, db := testManager(t, metaOK("CSATH"))
+		inboxID := seedInbox(t, db)
 		name := models.CSATTemplateName(inboxID)
 		desired := models.Template{
 			InboxID: inboxID, Name: name, Language: "en_US", Category: models.CategoryUtility,
@@ -854,7 +852,7 @@ func TestButtonsSurfaceEqualHandlesMalformedJSON(t *testing.T) {
 
 func testManager(t *testing.T, handler http.HandlerFunc) (*Manager, *sqlx.DB) {
 	t.Helper()
-	db := testdb.New(t, testInboxName)
+	db := testutil.NewDB(t, "whatsapp_template")
 
 	var client *whatsapp.Client
 	if handler != nil {
@@ -873,10 +871,9 @@ func testManager(t *testing.T, handler http.HandlerFunc) (*Manager, *sqlx.DB) {
 	return m, db
 }
 
-func seedInbox(t *testing.T, m *Manager) int {
+func seedInbox(t *testing.T, db *sqlx.DB) int {
 	t.Helper()
 	var id int
-	db := testdb.New(t, testInboxName)
 	if err := db.QueryRow(`INSERT INTO inboxes (channel, config, "name", enabled) VALUES ('whatsapp', '{}'::jsonb, $1, true) RETURNING id`,
 		"wa-"+t.Name()).Scan(&id); err != nil {
 		t.Fatalf("seeding an inbox: %v", err)
@@ -917,11 +914,7 @@ func testI18n(t *testing.T) *i18n.I18n {
 // managerOnClosedDB builds a manager whose statements are prepared and then invalidated.
 func managerOnClosedDB(t *testing.T) *Manager {
 	t.Helper()
-	testdb.New(t, testInboxName)
-	db, err := sqlx.Connect("postgres", testdb.DSN(t, testInboxName))
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
+	db := testutil.NewDB(t, "whatsapp_template_closed")
 	srv := httptest.NewServer(metaOK("CLOSED"))
 	t.Cleanup(srv.Close)
 	client := whatsapp.New(testLogger())
@@ -940,7 +933,7 @@ func managerOnClosedDB(t *testing.T) *Manager {
 // A typo'd or reassigned WABA id answers 200 with an empty page, and pruned sample values are unrecoverable.
 func TestSyncFromMetaEmptyListDoesNotPrune(t *testing.T) {
 	empty := false
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			metaOK("KEEP1")(w, r)
 			return
@@ -954,7 +947,7 @@ func TestSyncFromMetaEmptyListDoesNotPrune(t *testing.T) {
 				"components": []map[string]any{{"type": "BODY", "text": "Hi {{1}}"}}},
 		}})
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 
 	if _, err := m.Create(context.Background(), models.Template{
 		InboxID: inboxID, Name: "keeper", Language: "en_US", Category: models.CategoryUtility,

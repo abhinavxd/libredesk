@@ -5,13 +5,13 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/testdb"
+	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
 
 func TestGetOutgoingPendingMessagesSerializesConversations(t *testing.T) {
-	db := testdb.New(t, "conversation")
+	db := testutil.NewDB(t, "conversation")
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
 		t.Fatalf("preparing conversation queries: %v", err)

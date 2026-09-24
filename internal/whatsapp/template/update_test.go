@@ -15,7 +15,7 @@ func TestUpdateTemplate(t *testing.T) {
 	for _, status := range []string{models.StatusApproved, models.StatusRejected, models.StatusPaused} {
 		t.Run(status, func(t *testing.T) {
 			var edit whatsapp.TemplateEdit
-			m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+			m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 				if strings.HasSuffix(r.URL.Path, "/message_templates") {
 					metaOK("EDIT1")(w, r)
 					return
@@ -26,7 +26,7 @@ func TestUpdateTemplate(t *testing.T) {
 				writeJSON(w, map[string]bool{"success": true})
 			})
 			original, err := m.Create(t.Context(), models.Template{
-				InboxID: seedInbox(t, m), Name: "editable", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Original",
+				InboxID: seedInbox(t, db), Name: "editable", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Original",
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -74,12 +74,12 @@ func TestUpdateTemplateRejectsInvalidChanges(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
-			m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+			m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 				calls++
 				metaOK("GUARD1")(w, r)
 			})
 			original, err := m.Create(t.Context(), models.Template{
-				InboxID: seedInbox(t, m), Name: "unchanged", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Original",
+				InboxID: seedInbox(t, db), Name: "unchanged", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Original",
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -101,7 +101,7 @@ func TestUpdateTemplateRejectsInvalidChanges(t *testing.T) {
 }
 
 func TestUpdateTemplatePreservesContentOnMetaFailure(t *testing.T) {
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/message_templates") {
 			metaOK("REFUSED1")(w, r)
 			return
@@ -110,7 +110,7 @@ func TestUpdateTemplatePreservesContentOnMetaFailure(t *testing.T) {
 		writeJSON(w, map[string]any{"error": map[string]any{"code": 100, "message": "Edit refused"}})
 	})
 	original, err := m.Create(t.Context(), models.Template{
-		InboxID: seedInbox(t, m), Name: "refused", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Original",
+		InboxID: seedInbox(t, db), Name: "refused", Language: "en_US", Category: models.CategoryUtility, BodyContent: "Original",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -130,13 +130,13 @@ func TestUpdateTemplatePreservesContentOnMetaFailure(t *testing.T) {
 }
 
 func TestSyncPreservesUnsupportedComponentTypes(t *testing.T) {
-	m, _ := testManager(t, func(w http.ResponseWriter, r *http.Request) {
+	m, db := testManager(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"data": []whatsapp.MetaTemplate{{
 			ID: "CAROUSEL1", Name: "arbitrary_name", Language: "en_US", Category: "MARKETING", Status: "APPROVED",
 			Components: []whatsapp.TemplateComponent{{Type: "BODY", Text: "Offers"}, {Type: "CAROUSEL"}},
 		}}})
 	})
-	inboxID := seedInbox(t, m)
+	inboxID := seedInbox(t, db)
 	if count, err := m.SyncFromMeta(t.Context(), inboxID); err != nil || count != 1 {
 		t.Fatalf("sync: count=%d, error=%v", count, err)
 	}
