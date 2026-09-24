@@ -108,11 +108,13 @@ func portalAuth(next fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 		// Per-contact limits are independent of the existing IP-based public limit.
 		method := string(r.RequestCtx.Method())
 		write := method == http.MethodPost || method == http.MethodPut || method == http.MethodDelete
+		requestClass := "read"
 		limit := int64(120)
 		if write {
+			requestClass = "write"
 			limit = 30
 		}
-		key := fmt.Sprintf("portal_rate:%s:%d", externalUserID, time.Now().Unix()/60)
+		key := fmt.Sprintf("portal_rate:%s:%s:%d", externalUserID, requestClass, time.Now().Unix()/60)
 		count, err := app.redis.Incr(r.RequestCtx, key).Result()
 		if err == nil {
 			if count == 1 {
