@@ -474,7 +474,7 @@ func TestTextBody(t *testing.T) {
 	if got := textBody(models.OutboundMessage{ContentType: models.ContentTypeText, TextContent: "plain", Content: "plain"}); got != "plain" {
 		t.Fatalf("expected the stored text content, got %q", got)
 	}
-	// The stored text content is flattened; HTML replies must be re-rendered so WhatsApp formatting survives.
+	// The stored text content is flattened. HTML replies must be re-rendered so WhatsApp formatting survives.
 	got := textBody(models.OutboundMessage{ContentType: models.ContentTypeHTML, Content: "<p>hello <b>there</b></p><ul><li><p>one</p></li></ul>", TextContent: "hello there\n\none"})
 	if got != "hello *there*\n\n- one" {
 		t.Fatalf("expected WhatsApp formatting, got %q", got)
@@ -610,7 +610,7 @@ func TestSendDoesNotRetryATransportFailure(t *testing.T) {
 		t.Fatal("expected the transport failure to surface")
 	}
 	if got := atomic.LoadInt32(&attempts); got != 1 {
-		t.Fatalf("a dropped connection may already have been accepted by Meta; expected one attempt, got %d", got)
+		t.Fatalf("a dropped connection may already have been accepted by Meta. Expected one attempt, got %d", got)
 	}
 }
 

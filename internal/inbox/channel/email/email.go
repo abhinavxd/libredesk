@@ -48,7 +48,7 @@ type Email struct {
 // It receives the inbox ID and the updated config with new tokens.
 type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
 
-// AuthStatusCallback reports the provider's latest verdict on the inbox credentials; ok=true clears a previously flagged failure.
+// AuthStatusCallback reports the provider's latest verdict on the inbox credentials. Ok=true clears a previously flagged failure.
 type AuthStatusCallback func(inboxID int, ok bool)
 
 // Opts holds the options required for the email inbox.

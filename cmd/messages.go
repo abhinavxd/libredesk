@@ -25,7 +25,7 @@ type messageReq struct {
 	EchoID      string                 `json:"echo_id"`
 	SourceID    string                 `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact sender only.
 
-	// WhatsApp-only. Set TemplateID to send an approved template; omit for free-form.
+	// WhatsApp-only. Set TemplateID to send an approved template. Omit for free-form.
 	WhatsAppTemplateID     int               `json:"whatsapp_template_id,omitempty"`
 	WhatsAppTemplateParams map[string]string `json:"whatsapp_template_params,omitempty"`
 }

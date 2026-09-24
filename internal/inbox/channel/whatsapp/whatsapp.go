@@ -84,7 +84,7 @@ func (c Config) Account() whatsapp.Account {
 	}
 }
 
-// SendMeta is the per-message metadata threaded through OutboundMessage.Meta; a set TemplateName means a template send.
+// SendMeta is the per-message metadata threaded through OutboundMessage.Meta. A set TemplateName means a template send.
 type SendMeta struct {
 	ToPhone               string                    `json:"to_phone"`
 	ReplyToWAMessageID    string                    `json:"reply_to_wa_message_id,omitempty"`
@@ -153,7 +153,7 @@ func (w *WhatsApp) ReplyToAddress() string   { return "" }
 func (w *WhatsApp) FromNameTemplate() string { return "" }
 func (w *WhatsApp) Close() error             { return nil }
 
-// Receive is a no-op; inbound messages arrive via the webhook handler.
+// Receive is a no-op. Inbound messages arrive via the webhook handler.
 func (w *WhatsApp) Receive(ctx context.Context) error { return nil }
 
 // Retries a 429 or 5xx only, since a send carries no idempotency key and Meta may already have accepted it.
@@ -225,13 +225,13 @@ func (w *WhatsApp) send(message models.OutboundMessage) error {
 	return err
 }
 
-// sendAttachment uploads and sends one attachment; Meta accepts only one media per message.
+// sendAttachment uploads and sends one attachment. Meta accepts only one media per message.
 func (w *WhatsApp) sendAttachment(ctx context.Context, acc whatsapp.Account, meta SendMeta, message models.OutboundMessage) (string, error) {
 	if len(message.Attachments) > 1 {
 		return "", fmt.Errorf("whatsapp accepts one attachment per message, got %d", len(message.Attachments))
 	}
 	if bad := rejectedAttachments(message.Attachments); len(bad) > 0 {
-		return "", fmt.Errorf("WhatsApp can't send these files: %s", strings.Join(bad, "; "))
+		return "", fmt.Errorf("WhatsApp can't send these files: %s", strings.Join(bad, ", "))
 	}
 
 	att := message.Attachments[0]
@@ -242,7 +242,7 @@ func (w *WhatsApp) sendAttachment(ctx context.Context, acc whatsapp.Account, met
 	return w.client.SendMedia(ctx, acc, meta.ToPhone, mediaTypeForAttachment(att), mediaID, strings.TrimSpace(textBody(message)), att.Name, meta.ReplyToWAMessageID)
 }
 
-// SupportsCaption reports whether media of this content type can carry a caption; audio can't.
+// SupportsCaption reports whether media of this content type can carry a caption. Audio can't.
 func SupportsCaption(contentType string) bool {
 	return mediaTypeForAttachment(attachment.Attachment{ContentType: contentType}) != "audio"
 }
@@ -277,7 +277,7 @@ func parseSendMeta(raw json.RawMessage) (SendMeta, error) {
 	return meta, nil
 }
 
-// textBody renders HTML replies with WhatsApp formatting markers; raw HTML must never reach WhatsApp verbatim.
+// textBody renders HTML replies with WhatsApp formatting markers. Raw HTML must never reach WhatsApp verbatim.
 func textBody(m models.OutboundMessage) string {
 	if m.ContentType == models.ContentTypeHTML && m.Content != "" {
 		return stringutil.HTML2WhatsApp(m.Content)
@@ -293,7 +293,7 @@ func rejectedAttachments(atts []attachment.Attachment) []string {
 	for _, att := range atts {
 		mime := normalizeMIME(att.ContentType)
 		if mime == "image/webp" {
-			reasons = append(reasons, fmt.Sprintf("%s (WebP images aren't supported; convert to JPEG or PNG)", att.Name))
+			reasons = append(reasons, fmt.Sprintf("%s (WebP images aren't supported. Convert to JPEG or PNG)", att.Name))
 			continue
 		}
 		if _, ok := supportedMediaMIMETypes[mime]; !ok {

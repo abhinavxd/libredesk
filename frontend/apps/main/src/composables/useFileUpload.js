@@ -68,7 +68,7 @@ export function useFileUpload (options = {}) {
         uploadingFiles.value = files
         isUploading.value = true
 
-        // Uploads run in parallel but land in selection order; WhatsApp sends each file as its own message in list order.
+        // Uploads run in parallel but land in selection order. WhatsApp sends each file as its own message in list order.
         let previous = Promise.resolve()
         for (const file of files) {
             const uploading = upload(file)

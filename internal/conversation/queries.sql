@@ -1013,7 +1013,7 @@ WHERE m.uuid = $1
 RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
 
 -- name: apply-whatsapp-message-status
--- Meta guard is monotonic (rank order) and sticky on failure; the enum status only guards against un-failing a failed message.
+-- Meta guard is monotonic (rank order) and sticky on failure. The enum status only guards against un-failing a failed message.
 WITH ranks(status, rank) AS (
   VALUES ('sent', 1), ('delivered', 2), ('read', 3), ('failed', 4)
 )

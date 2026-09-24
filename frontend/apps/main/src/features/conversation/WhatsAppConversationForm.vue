@@ -141,7 +141,7 @@
           class="shrink-0"
           @click="openExistingConversation"
         >
-          {{ $t('actions.openConversation') }}
+          {{ $t('globals.messages.openConversation') }}
         </Button>
       </AlertDescription>
     </Alert>
@@ -149,10 +149,7 @@
     <div v-else class="flex-1 flex flex-col min-h-0 px-3 pt-3">
       <p class="text-sm text-muted-foreground mb-2">{{ $t('globals.terms.template', 1) }}</p>
 
-      <p v-if="!inboxId" class="text-sm text-muted-foreground">
-        {{ $t('conversation.whatsapp.selectInboxFirst') }}
-      </p>
-      <template v-else>
+      <template v-if="inboxId">
         <WhatsAppTemplatePicker
           fill
           class="flex-1"
@@ -332,7 +329,7 @@ watch([selectedContact, inboxId], async ([contact, inbox]) => {
       existingConversation.value = resp.data.data
     }
   } catch {
-    // A failed lookup leaves the form usable; the create call rejects a duplicate anyway.
+    // A failed lookup leaves the form usable. The create call rejects a duplicate anyway.
   }
 })
 

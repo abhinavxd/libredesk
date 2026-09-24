@@ -234,7 +234,7 @@ func waPrefixLines(s, prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
-// waNormalize strips trailing whitespace per line and collapses runs of blank lines; leading indentation is kept.
+// waNormalize strips trailing whitespace per line and collapses runs of blank lines. Leading indentation is kept.
 func waNormalize(s string) string {
 	lines := strings.Split(strings.ReplaceAll(s, "\r", ""), "\n")
 	for i, line := range lines {

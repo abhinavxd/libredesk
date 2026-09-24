@@ -153,7 +153,7 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 	return m.submitNewToMeta(ctx, stored), nil
 }
 
-// EnsureReserved reconciles a fixed-name template such as the per-inbox CSAT one; a language change creates a new one since Meta keys templates by name+language.
+// EnsureReserved reconciles a fixed-name template such as the per-inbox CSAT one. A language change creates a new one since Meta keys templates by name+language.
 func (m *Manager) EnsureReserved(ctx context.Context, desired models.Template) error {
 	var existing models.Template
 	err := m.q.GetByNameLanguage.Get(&existing, desired.InboxID, desired.Name, desired.Language)
@@ -171,7 +171,7 @@ func (m *Manager) EnsureReserved(ctx context.Context, desired models.Template) e
 		m.lo.Debug("reserved template already matches desired content", "id", existing.ID, "name", existing.Name)
 		return nil
 	}
-	// Meta only allows editing a template in approved/rejected/paused state; a pending one reconciles on the next save.
+	// Meta only allows editing a template in approved/rejected/paused state. A pending one reconciles on the next save.
 	if strings.EqualFold(existing.Status, models.StatusPending) {
 		m.lo.Warn("skipping reserved template edit while pending meta review", "id", existing.ID, "name", existing.Name)
 		return nil
@@ -304,7 +304,7 @@ func (m *Manager) Delete(ctx context.Context, id int) error {
 	if strings.HasPrefix(t.Name, models.CSATTemplateNamePrefix) {
 		return envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.reserved"), nil)
 	}
-	// Without a Meta template ID nothing was registered; deleting by name alone would take out every language variant sharing it.
+	// Without a Meta template ID nothing was registered. Deleting by name alone would take out every language variant sharing it.
 	if t.MetaTemplateID.Valid && t.MetaTemplateID.String != "" {
 		if m.client == nil || m.resolver == nil {
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -661,7 +661,7 @@ func submitErrReason(err error) string {
 	return err.Error()
 }
 
-// mapTemplateEventToStatus maps a Meta event to a local status; REINSTATED is an event, not a status, that means approved again.
+// mapTemplateEventToStatus maps a Meta event to a local status. REINSTATED is an event, not a status, that means approved again.
 func mapTemplateEventToStatus(event string) string {
 	switch strings.ToUpper(event) {
 	case "APPROVED", "REINSTATED":

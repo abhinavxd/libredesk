@@ -301,7 +301,7 @@ func (u *Manager) upsertContactWithChannelIdentity(channel, identifier string, c
 		u.lo.Error("error upserting contact with channel identity", "channel", channel, "identifier", identifier, "error", err)
 		return 0, fmt.Errorf("upserting contact with channel identity: %w", err)
 	}
-	// A concurrent upsert can win the identity insert; the row this statement created is then orphaned.
+	// A concurrent upsert can win the identity insert. The row this statement created is then orphaned.
 	if insertedID.Valid && int(insertedID.Int64) != id {
 		if _, err := u.q.DeleteOrphanedContact.Exec(insertedID.Int64); err != nil {
 			u.lo.Error("error deleting orphaned contact after identity race", "user_id", insertedID.Int64, "error", err)

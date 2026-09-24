@@ -5,7 +5,7 @@
       class="box border-destructive/40 bg-destructive/5 p-3 text-sm flex items-start gap-2"
     >
       <TriangleAlert class="size-4 mt-0.5 text-destructive shrink-0" />
-      <span>{{ $t('admin.inbox.email.authenticationFailed') }}</span>
+      <span>{{ $t('admin.inbox.authenticationFailed') }}</span>
     </div>
 
     <!-- Basic Fields -->

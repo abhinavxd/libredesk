@@ -416,7 +416,7 @@ func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
 		m.lo.Error("error updating message status", "message_uuid", messageUUID, "error", err)
 		return err
 	}
-	// The sent-onto-failed guard can make this a no-op; a status that wasn't applied must not be broadcast.
+	// The sent-onto-failed guard can make this a no-op. A status that wasn't applied must not be broadcast.
 	if n, _ := res.RowsAffected(); n == 0 {
 		return nil
 	}
@@ -640,7 +640,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		if len(media) > 1 {
 			return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.oneAttachment"), nil)
 		}
-		// Reject unsendable media here; Meta's upload endpoint enforces the same caps and would only fail after the message is queued.
+		// Reject unsendable media here. Meta's upload endpoint enforces the same caps and would only fail after the message is queued.
 		for _, md := range media {
 			if reason := whatsappChannel.RejectMediaReason(md.Filename, md.ContentType, md.Size); reason != "" {
 				return models.Message{}, envelope.NewError(envelope.InputError, reason, nil)
@@ -651,7 +651,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			return models.Message{}, err
 		}
 		content = rendered
-		// A rendered template body is plain text; storing it as HTML drops its line breaks in the timeline.
+		// A rendered template body is plain text. Storing it as HTML drops its line breaks in the timeline.
 		if extractInt(metaMap, "whatsapp_template_id") > 0 {
 			contentType = models.ContentTypeText
 		}

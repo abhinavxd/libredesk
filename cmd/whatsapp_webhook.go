@@ -29,7 +29,7 @@ import (
 
 const (
 	whatsAppDefaultContactName = "Contact"
-	// Retry window for a status whose message row is missing; older events reference a wamid that will never exist locally.
+	// Retry window for a status whose message row is missing. Older events reference a wamid that will never exist locally.
 	// Must exceed whatsAppReclaimMinIdle, since the first retry only happens after that idle period.
 	whatsAppStatusNotFoundGrace = 30 * time.Minute
 
@@ -124,7 +124,7 @@ func handleWhatsAppWebhookEvent(r *fastglue.Request) error {
 	return r.SendEnvelope(map[string]string{"status": "ok"})
 }
 
-// processWhatsAppPayload applies every message/status/template event in one delivery; returning an error retries the whole delivery.
+// processWhatsAppPayload applies every message/status/template event in one delivery. Returning an error retries the whole delivery.
 func processWhatsAppPayload(ctx context.Context, app *App, inboxID int, payload *whatsapp.WebhookPayload) error {
 	var errs []error
 
@@ -233,7 +233,7 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 	isNewConversation := false
 	conversationID, conversationUUID, err := app.conversation.GetLatestOpenConversationForContact(contactID, inboxID)
 	if errors.Is(err, sql.ErrNoRows) && inbRec.ReopenWindowHours > 0 {
-		// Reuse a recently-resolved conversation; the message insert hook reopens it.
+		// Reuse a recently-resolved conversation. The message insert hook reopens it.
 		conversationID, conversationUUID, err = app.conversation.GetReopenableConversationForContact(contactID, inboxID, inbRec.ReopenWindowHours)
 	}
 	if errors.Is(err, sql.ErrNoRows) {
@@ -322,7 +322,7 @@ func buildInboundMeta(app *App, m whatsapp.ParsedMessage) json.RawMessage {
 	return raw
 }
 
-// fetchWhatsAppAttachments returns (nil, nil) on a permanent (4xx) failure so a placeholder is stored; any other error propagates for a queue retry.
+// fetchWhatsAppAttachments returns (nil, nil) on a permanent (4xx) failure so a placeholder is stored. Any other error propagates for a queue retry.
 func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel.Config, m whatsapp.ParsedMessage) (attachment.Attachments, error) {
 	if m.MediaID == "" || app.whatsappClient == nil {
 		return nil, nil
@@ -403,7 +403,7 @@ func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel
 func isPermanentMediaError(err error) bool {
 	var me *whatsapp.MetaAPIError
 	if errors.As(err, &me) {
-		// 408 and 429 are 4xx but retryable; 401/403 recover once the operator replaces the token; 5xx are transient.
+		// 408 and 429 are 4xx but retryable. 401/403 recover once the operator replaces the token. 5xx are transient.
 		if me.StatusCode == http.StatusRequestTimeout || me.StatusCode == http.StatusTooManyRequests ||
 			me.StatusCode == http.StatusUnauthorized || me.StatusCode == http.StatusForbidden {
 			return false
@@ -558,7 +558,7 @@ func resolveWhatsAppInbox(app *App, urlInboxID int, phoneNumberID string) (imode
 	return imodels.Inbox{}, whatsappChannel.Config{}, errNoEnabledWhatsAppInbox
 }
 
-// forEachEnabledWhatsAppInbox invokes fn with each enabled WhatsApp inbox's record and decoded config; returning false stops iteration.
+// forEachEnabledWhatsAppInbox invokes fn with each enabled WhatsApp inbox's record and decoded config. Returning false stops iteration.
 func forEachEnabledWhatsAppInbox(app *App, fn func(rec imodels.Inbox, cfg whatsappChannel.Config) bool) error {
 	inboxes, err := app.inbox.GetAll()
 	if err != nil {
@@ -581,7 +581,7 @@ func forEachEnabledWhatsAppInbox(app *App, fn func(rec imodels.Inbox, cfg whatsa
 	return nil
 }
 
-// whatsAppConfigForInbox prefers the running inbox's in-memory config; the DB fallback covers disabled or unregistered inboxes.
+// whatsAppConfigForInbox prefers the running inbox's in-memory config. The DB fallback covers disabled or unregistered inboxes.
 func whatsAppConfigForInbox(app *App, inboxID int) (whatsappChannel.Config, error) {
 	if inb, err := app.inbox.Get(inboxID); err == nil {
 		if wa, ok := inb.(interface{ Config() whatsappChannel.Config }); ok {
@@ -606,7 +606,7 @@ func whatsAppConfigFromRecord(rec imodels.Inbox) (whatsappChannel.Config, error)
 	return cfg, nil
 }
 
-// markWhatsAppMessageRead sends a read receipt to Meta for an inbound message; best-effort, logs and swallows failures.
+// markWhatsAppMessageRead sends a read receipt to Meta for an inbound message. Best-effort, logs and swallows failures.
 func markWhatsAppMessageRead(app *App, inboxID int, sourceID string) {
 	if app.whatsappClient == nil || sourceID == "" {
 		return

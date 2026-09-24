@@ -26,7 +26,10 @@ const visitDraft = (channel = 'email', draft = emailDraft, path = '/inboxes/assi
   } })
   expand()
 }
-const reloadDraft = () => { cy.reload(); expand() }
+const reloadDraft = () => {
+  cy.reload()
+  expand()
+}
 const submit = () => panel().find('form:visible').find('button[type="submit"]').scrollIntoView().click()
 const checkSaved = (channel, assertion) => cy.window().should((win) => {
   assertion(JSON.parse(win.localStorage.getItem(`newConversationDraft${channel}`)))

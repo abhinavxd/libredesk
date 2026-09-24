@@ -295,7 +295,7 @@ SELECT COALESCE(
 (SELECT id FROM new_contact) AS inserted_id;
 
 -- name: delete-orphaned-contact
--- Cleans up the losing row of a concurrent identity upsert; the guard keeps it a no-op for any contact that gained an identity.
+-- Cleans up the losing row of a concurrent identity upsert. The guard keeps it a no-op for any contact that gained an identity.
 DELETE FROM users
 WHERE id = $1 AND type = 'contact'
 AND NOT EXISTS (SELECT 1 FROM contact_channel_identities WHERE contact_id = $1);

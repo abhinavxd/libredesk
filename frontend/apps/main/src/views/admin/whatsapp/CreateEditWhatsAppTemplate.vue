@@ -48,7 +48,7 @@
                     :disabled="template?.status === 'APPROVED'"
                   >
                     <SelectTrigger>
-                      <SelectValue :placeholder="$t('globals.messages.selectCategory')" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem v-for="c in TEMPLATE_CATEGORIES" :key="c" :value="c">{{
@@ -162,7 +162,6 @@
                 <FormLabel>{{ $t('globals.terms.bodyText') }}</FormLabel>
                 <FormControl>
                   <Textarea
-                    :placeholder="$t('admin.whatsappTemplates.bodyText.placeholder')"
                     rows="4"
                     :modelValue="componentField.modelValue"
                     @update:modelValue="(v) => handleChange(v, meta.validated)"
@@ -301,9 +300,6 @@
         <div class="space-y-1">
           <p class="text-sm font-medium text-foreground">
             {{ isEditing ? $t('globals.messages.edit') : $t('globals.messages.newTemplate') }}
-          </p>
-          <p class="text-sm text-muted-foreground">
-            {{ $t('admin.whatsappTemplates.help.create') }}
           </p>
           <a
             href="https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates"

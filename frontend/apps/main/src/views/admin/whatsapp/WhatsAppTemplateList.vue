@@ -180,7 +180,7 @@ const columns = [
                 h(Info, { class: 'size-3.5 text-muted-foreground cursor-help' })
               ),
               h(TooltipContent, { class: 'max-w-xs' }, () =>
-                t('admin.whatsappTemplates.csatReserved')
+                t('admin.whatsappTemplates.error.reserved')
               )
             ]
           })

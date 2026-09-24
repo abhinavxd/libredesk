@@ -31,7 +31,7 @@ const (
 
 var hexColorRegex = regexp.MustCompile(`^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`)
 
-// csatTemplateLocks serializes CSAT template reconciliation per inbox; EnsureReserved reads then creates.
+// csatTemplateLocks serializes CSAT template reconciliation per inbox. EnsureReserved reads then creates.
 var csatTemplateLocks = &keyedLock{entries: make(map[string]*keyedLockEntry)}
 
 // handleGetInboxes returns all inboxes
@@ -133,7 +133,7 @@ func isPublicWebhookURL(root string) bool {
 	return true
 }
 
-// subscribeWhatsAppWebhook best-effort points the WABA's webhook at this inbox; the manual Meta dashboard setup stays as fallback.
+// subscribeWhatsAppWebhook best-effort points the WABA's webhook at this inbox. The manual Meta dashboard setup stays as fallback.
 func subscribeWhatsAppWebhook(app *App, inboxID int) {
 	cfg, err := whatsAppConfigForInbox(app, inboxID)
 	if err != nil || app.whatsappClient == nil {
@@ -141,14 +141,14 @@ func subscribeWhatsAppWebhook(app *App, inboxID int) {
 	}
 	root, _ := app.setting.GetAppRootURL()
 	if !isPublicWebhookURL(root) {
-		app.lo.Warn("whatsapp webhook not auto-registered: the app root URL must be a public HTTPS URL Meta can reach; set it in Settings and re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "root_url", root)
+		app.lo.Warn("whatsapp webhook not auto-registered: the app root URL must be a public HTTPS URL Meta can reach. Set it in Settings and re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "root_url", root)
 		return
 	}
 	callbackURL := whatsAppCallbackURLFromRoot(root, inboxID)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := app.whatsappClient.SubscribeWebhook(ctx, cfg.Account(), callbackURL, cfg.WebhookVerifyToken); err != nil {
-		app.lo.Error("whatsapp webhook auto-registration failed; configure it manually in the Meta dashboard or re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "callback_url", callbackURL, "error", err)
+		app.lo.Error("whatsapp webhook auto-registration failed. Configure it manually in the Meta dashboard or re-save the inbox, otherwise inbound messages will not arrive", "inbox_id", inboxID, "callback_url", callbackURL, "error", err)
 		return
 	}
 	app.lo.Info("whatsapp webhook subscribed automatically", "inbox_id", inboxID, "callback_url", callbackURL)
@@ -168,7 +168,7 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	return nil
 }
 
-// ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta; a language change creates a fresh one. Approval arrives via webhook/sync.
+// ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta. A language change creates a fresh one. Approval arrives via webhook/sync.
 func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -250,7 +250,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Credentials arrive masked; the check must run on the merged config, before anything is persisted.
+	// Credentials arrive masked. The check must run on the merged config, before anything is persisted.
 	if inbox.Channel == whatsappChannel.ChannelWhatsApp {
 		previous, err := app.inbox.GetDBRecord(id)
 		if err != nil {

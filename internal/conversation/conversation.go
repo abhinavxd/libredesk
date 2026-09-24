@@ -319,7 +319,7 @@ func New(
 	return c, nil
 }
 
-// SetWhatsAppTemplateStore wires the WhatsApp template store after construction; nil disables template sends.
+// SetWhatsAppTemplateStore wires the WhatsApp template store after construction. Nil disables template sends.
 func (m *Manager) SetWhatsAppTemplateStore(s WhatsAppTemplateStore) {
 	m.whatsappTemplate = s
 }
@@ -483,7 +483,7 @@ func (c *Manager) GetConversation(id int, uuid, refNum string) (models.Conversat
 		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Only email inboxes carry an address here; other channels store a display name in inbox_mail.
+	// Only email inboxes carry an address here. Other channels store a display name in inbox_mail.
 	if conversation.InboxChannel == inbox.ChannelEmail && conversation.InboxMail != "" {
 		var err error
 		conversation.InboxMail, err = stringutil.ExtractEmail(conversation.InboxMail)

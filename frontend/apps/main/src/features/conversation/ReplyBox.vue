@@ -638,7 +638,7 @@ const processSend = async (
         }
       } catch (error) {
         hasMessageSendingErrored = true
-        // Drop the bubbles for everything still unsent; parts already accepted stay in the timeline.
+        // Drop the bubbles for everything still unsent. Parts already accepted stay in the timeline.
         tempUUIDs.slice(i).forEach((uuid) => conversationStore.removePendingMessage(convUUID, uuid))
         // Already-accepted attachments must not be resent on retry.
         const sentIDs = new Set(parts.slice(0, i).flatMap((p) => p.attachments.map((f) => f.id)))

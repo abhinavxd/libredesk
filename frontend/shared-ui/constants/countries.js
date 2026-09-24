@@ -13,4 +13,4 @@ export const countryOptions = countries.map((country) => ({
     emoji: country.emoji
 }))
 
-export default countries;
+export default countries

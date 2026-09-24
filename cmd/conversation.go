@@ -63,7 +63,7 @@ type createConversationRequest struct {
 	Content                string            `json:"content"`
 	Attachments            []int             `json:"attachments"`
 	Initiator              string            `json:"initiator"` // "contact" | "agent"
-	SourceID               string            `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact-initiated only.
+	SourceID               string            `json:"source_id"` // RFC 5322 Message-ID of the inbound message. Stored on the created contact message so replies thread on it. Contact-initiated only.
 	CustomAttributes       map[string]any    `json:"custom_attributes"`
 	ContactID              int               `json:"contact_id"`
 	PhoneNumber            string            `json:"phone_number"`
@@ -974,7 +974,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
 	}
 
-	// WhatsApp is always an agent-initiated template; email follows the initiator.
+	// WhatsApp is always an agent-initiated template. Email follows the initiator.
 	agentInitiated := true
 	var sendErr error
 	switch {

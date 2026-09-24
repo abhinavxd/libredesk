@@ -123,13 +123,9 @@
       <div class="grid grid-cols-2 gap-4">
         <FormField v-slot="{ componentField }" name="config.phone_number_id">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.phoneNumberID') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.phoneNumberID') }}</FormLabel>
             <FormControl>
-              <Input
-                type="text"
-                :placeholder="t('admin.inbox.whatsapp.phoneNumberID.placeholder')"
-                v-bind="componentField"
-              />
+              <Input type="text" v-bind="componentField" />
             </FormControl>
             <FormDescription>
               {{ $t('admin.inbox.whatsapp.phoneNumberID.description') }}
@@ -142,11 +138,7 @@
           <FormItem>
             <FormLabel>{{ $t('admin.inbox.whatsapp.wabaID') }}</FormLabel>
             <FormControl>
-              <Input
-                type="text"
-                :placeholder="t('admin.inbox.whatsapp.wabaID.placeholder')"
-                v-bind="componentField"
-              />
+              <Input type="text" v-bind="componentField" />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -207,13 +199,9 @@
       <div class="grid grid-cols-2 gap-4">
         <FormField v-slot="{ componentField }" name="config.webhook_verify_token">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.verifyToken') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.webhookVerifyToken') }}</FormLabel>
             <FormControl>
-              <Input
-                type="text"
-                :placeholder="t('admin.inbox.whatsapp.verifyToken.placeholder')"
-                v-bind="componentField"
-              />
+              <Input type="text" v-bind="componentField" />
             </FormControl>
             <FormDescription>
               {{ $t('admin.inbox.whatsapp.verifyToken.description') }}

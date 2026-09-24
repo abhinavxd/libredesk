@@ -91,7 +91,7 @@ func (m *Manager) ApplyWhatsAppStatus(sourceID, metaStatus string, eventAt time.
 		return err
 	}
 
-	// The message_status enum collapses delivered/read into sent; the full lifecycle lives in meta.
+	// The message_status enum collapses delivered/read into sent. The full lifecycle lives in meta.
 	dbStatus := models.MessageStatusSent
 	if metaStatus == WhatsAppStatusFailed {
 		dbStatus = models.MessageStatusFailed
@@ -227,7 +227,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		return content, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// The channel identity is the wa_id Meta routes by; the phone columns are display data an agent may edit freely.
+	// The channel identity is the wa_id Meta routes by. The phone columns are display data an agent may edit freely.
 	toPhone, err := m.userStore.GetChannelIdentity(conv.ContactID, whatsappChannel.ChannelWhatsApp)
 	if err != nil {
 		return content, err
@@ -373,7 +373,7 @@ func (m *Manager) validateTemplateParams(t wtmodels.Template, params map[string]
 	return nil
 }
 
-// renderTemplateBody fills {{name}} placeholders from "body:"+name params; unmatched ones stay verbatim so missing params show in the timeline.
+// renderTemplateBody fills {{name}} placeholders from "body:"+name params. Unmatched ones stay verbatim so missing params show in the timeline.
 func renderTemplateBody(body string, params map[string]string) string {
 	if body == "" || len(params) == 0 {
 		return body
