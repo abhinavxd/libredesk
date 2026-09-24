@@ -982,6 +982,7 @@
   "globals.messages.hoursSinceCreated": "Hours since created",
   "globals.messages.hoursSinceFirstReply": "Hours since first reply",
   "globals.messages.hoursSinceLastReply": "Hours since last reply",
+  "globals.messages.hoursSinceLastResolved": "Hours since last resolved",
   "globals.messages.hoursSinceResolved": "Hours since resolved",
   "globals.messages.import": "Import",
   "globals.messages.insertExample": "Insert example",
