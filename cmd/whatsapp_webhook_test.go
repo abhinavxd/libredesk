@@ -7,12 +7,17 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/jmoiron/sqlx"
@@ -20,6 +25,129 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/logf"
 )
+
+func TestIngestWhatsAppMessageBlockedContact(t *testing.T) {
+	app, db := newInboxApp(t)
+	var err error
+	app.user, err = user.New(app.i18n, user.Opts{DB: db, Lo: app.lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.conversation, err = conversation.New(
+		nil, /** wsHub **/
+		app.i18n,
+		nil, /** slaStore **/
+		nil, /** statusStore **/
+		nil, /** priorityStore **/
+		app.inbox,
+		app.user,
+		nil, /** teamStore **/
+		nil, /** mediaStore **/
+		nil, /** settingsStore **/
+		nil, /** csatStore **/
+		nil, /** automation **/
+		nil, /** template **/
+		nil, /** webhook **/
+		nil, /** dispatcher **/
+		conversation.Opts{DB: db, Lo: app.lo},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var downloads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		downloads.Add(1)
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+	app.whatsappClient = whatsapp.New(app.lo)
+	app.whatsappClient.SetBaseURL(server.URL)
+
+	var inboxID int
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (channel, name, "from", config, reopen_window_hours)
+		VALUES ('whatsapp', 'Blocking test', '', '{"phone_number_id":"PN-BLOCKING"}', 24) RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, category := range []string{"none", "open", "resolved", "duplicate"} {
+		t.Run(category, func(t *testing.T) {
+			var contactID int
+			if err := db.Get(&contactID, `INSERT INTO users (type, first_name, last_name, enabled)
+				VALUES ('contact', 'Customer', '', false) RETURNING id`); err != nil {
+				t.Fatal(err)
+			}
+			from := fmt.Sprintf("155500001%02d", i)
+			if _, err := app.user.LinkChannelIdentity(contactID, "whatsapp", from); err != nil {
+				t.Fatal(err)
+			}
+			if category != "none" {
+				statusCategory := category
+				if category == "duplicate" {
+					statusCategory = "open"
+				}
+				var conversationID int
+				if err := db.Get(&conversationID, `INSERT INTO conversations (contact_id, inbox_id, status_id, resolved_at, last_inbound_at)
+					VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE category = $3 LIMIT 1), NOW(), NOW() - INTERVAL '2 days')
+					RETURNING id`, contactID, inboxID, statusCategory); err != nil {
+					t.Fatal(err)
+				}
+				if category == "duplicate" {
+					if _, err := db.Exec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, content, text_content, content_type, source_id)
+						VALUES ($1, $2, 'contact', 'incoming', 'received', 'Hello', 'Hello', 'text', $3)`, conversationID, contactID, "wamid.blocked."+from+"text"); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			snapshot := func() string {
+				t.Helper()
+				var state string
+				if err := db.Get(&state, `SELECT COALESCE(jsonb_agg(jsonb_build_object(
+					'id', id, 'status_id', status_id, 'last_inbound_at', last_inbound_at)), '[]'::jsonb)
+					FROM conversations WHERE contact_id = $1`, contactID); err != nil {
+					t.Fatal(err)
+				}
+				return state
+			}
+			before := snapshot()
+			for _, typ := range []string{"text", "image", "unsupported"} {
+				msg := whatsapp.ParsedMessage{ID: "wamid.blocked." + from + typ, From: from, Type: typ, Text: "Hello", Timestamp: time.Now()}
+				if typ == "image" {
+					msg.MediaID = "blocked-media"
+				}
+				for range 2 {
+					if err := ingestWhatsAppMessage(t.Context(), app, inboxID, msg); err != nil {
+						t.Fatalf("blocked delivery must be acknowledged: %v", err)
+					}
+				}
+			}
+			if after := snapshot(); after != before {
+				t.Fatalf("blocked messages changed conversations: before %s, after %s", before, after)
+			}
+			var count int
+			if err := db.Get(&count, `SELECT COUNT(*) FROM conversation_messages WHERE sender_id = $1`, contactID); err != nil {
+				t.Fatal(err)
+			}
+			wantCount := 0
+			if category == "duplicate" {
+				wantCount = 1
+			}
+			if count != wantCount || downloads.Load() != 0 {
+				t.Fatalf("blocked delivery produced %d messages and %d downloads", count, downloads.Load())
+			}
+
+			if _, err := db.Exec(`UPDATE users SET enabled = true WHERE id = $1`, contactID); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			msg := whatsapp.ParsedMessage{ID: "wamid.unblocked." + from, From: from, Type: "text", Text: "Hello", Timestamp: time.Now()}
+			if err := ingestWhatsAppMessage(ctx, app, inboxID, msg); !errors.Is(err, context.Canceled) {
+				t.Fatalf("unblocked contact did not resume ingestion: %v", err)
+			}
+		})
+	}
+}
 
 func TestTextPreview(t *testing.T) {
 	tests := []struct {

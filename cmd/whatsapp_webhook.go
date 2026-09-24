@@ -208,6 +208,18 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 
 	app.lo.Debug("ingesting whatsapp message", "wa_message_id", m.ID, "type", m.Type, "media_id", m.MediaID, "mime", m.MediaMimeType, "context_id", m.ContextID)
 
+	contactID, err := upsertWhatsAppContact(app, m)
+	if err != nil {
+		return fmt.Errorf("resolving contact: %w", err)
+	}
+	contact, err := app.user.GetContactOrVisitor(contactID, "" /** email **/)
+	if err != nil {
+		return fmt.Errorf("checking contact: %w", err)
+	}
+	if !contact.Enabled {
+		return nil
+	}
+
 	// Skip the media download up front when the message is already ingested (retries, Meta redeliveries).
 	if exists, err := app.conversation.AdvanceWhatsAppWindowForMessage(m.ID, m.Timestamp); err != nil {
 		return fmt.Errorf("repairing duplicate: %w", err)
@@ -221,11 +233,6 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
-	}
-
-	contactID, err := upsertWhatsAppContact(app, m)
-	if err != nil {
-		return fmt.Errorf("resolving contact: %w", err)
 	}
 
 	defer lockWhatsAppConversation(contactID, inboxID)()

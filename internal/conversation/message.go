@@ -608,6 +608,13 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
 	}
 
+	isWhatsAppTemplate := inboxRecord.Channel == inbox.ChannelWhatsApp && extractInt(metaMap, "whatsapp_template_id") > 0
+	if !isWhatsAppTemplate {
+		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
+			content = m.template.RenderString(data, content)
+		}
+	}
+
 	var (
 		sourceID    string
 		contentType = models.ContentTypeHTML
@@ -652,7 +659,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		}
 		content = rendered
 		// A rendered template body is plain text. Storing it as HTML drops its line breaks in the timeline.
-		if extractInt(metaMap, "whatsapp_template_id") > 0 {
+		if isWhatsAppTemplate {
 			contentType = models.ContentTypeText
 		}
 	}
@@ -662,13 +669,6 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	if err != nil {
 		m.lo.Error("error marshalling message meta map to JSON", "error", err)
 		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
-	// Best-effort render template variables before saving so agents see rendered content immediately.
-	if inboxRecord.Channel != inbox.ChannelWhatsApp {
-		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-			content = m.template.RenderString(data, content)
-		}
 	}
 
 	// Insert the message into the database

@@ -9,10 +9,145 @@ import (
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/abhinavxd/libredesk/internal/inbox"
+	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
+	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	"github.com/abhinavxd/libredesk/internal/template"
+	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/abhinavxd/libredesk/internal/user"
+	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
+	"github.com/abhinavxd/libredesk/internal/ws"
+	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/volatiletech/null/v9"
+	"github.com/zerodha/logf"
 )
+
+type whatsAppReplyMedia struct{ mediaStore }
+
+type whatsAppReplyWebhook struct{ webhookStore }
+
+type whatsAppReplyTemplates struct {
+	WhatsAppTemplateStore
+	template wtmodels.Template
+}
+
+func (whatsAppReplyMedia) LinkMessageMediaTx(*sqlx.Tx, int, []mmodels.Media, []string) error {
+	return nil
+}
+
+func (whatsAppReplyWebhook) TriggerEvent(wmodels.WebhookEvent, any) {}
+
+func (s whatsAppReplyTemplates) GetByID(int) (wtmodels.Template, error) {
+	return s.template, nil
+}
+
+func TestQueueWhatsAppReplyVariables(t *testing.T) {
+	db := testutil.NewDB(t, "whatsapp_reply_variables")
+	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
+	lang := testutil.NewI18n(t)
+	inboxes, err := inbox.New(&lo, db, lang, "0123456789abcdef0123456789abcdef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	users, err := user.New(lang, user.Opts{DB: db, Lo: &lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := &Manager{
+		db: db, lo: &lo, i18n: lang, inboxStore: inboxes, userStore: users,
+		template: &template.Manager{}, mediaStore: whatsAppReplyMedia{},
+		webhookStore: whatsAppReplyWebhook{}, wsHub: ws.NewHub(&lo, nil /** userStore **/),
+	}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contactID, senderID, inboxID int
+	if err := db.Get(&contactID, `INSERT INTO users (type, first_name, last_name)
+		VALUES ('contact', 'Customer', 'A') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&senderID, `INSERT INTO users (type, email, first_name, last_name)
+		VALUES ('agent', 'agent@example.com', 'Agent', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (channel, name, "from")
+		VALUES ('whatsapp', 'Reply variables', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := users.LinkChannelIdentity(contactID, "whatsapp", "15550000100"); err != nil {
+		t.Fatal(err)
+	}
+	var conv models.Conversation
+	if err := db.Get(&conv, `INSERT INTO conversations (contact_id, inbox_id, status_id, subject, last_inbound_at)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE category = 'open' LIMIT 1), 'Support request', NOW())
+		RETURNING id, uuid, reference_number`, contactID, inboxID); err != nil {
+		t.Fatal(err)
+	}
+	m.whatsappTemplate = whatsAppReplyTemplates{template: wtmodels.Template{
+		ID: 7, InboxID: inboxID, Name: "greeting", Language: "en", Status: wtmodels.StatusApproved,
+		BodyContent: "Hello {{1}}", ComponentTypes: []string{"BODY"},
+	}}
+
+	for _, tc := range []struct {
+		name    string
+		content string
+		meta    map[string]any
+		want    string
+	}{
+		{"contact and reference", "Hi {{ .Contact.FirstName }}, reference {{ .Conversation.ReferenceNumber }}", map[string]any{}, "Hi Customer, reference " + conv.ReferenceNumber},
+		{"automated reply", "{{ .Recipient.FullName }}: {{ .Conversation.Subject }}", map[string]any{"is_automated": true}, "Customer A: Support request"},
+		{"repeated variables", "{{ .Contact.FirstName }} {{ .Contact.FirstName }}", map[string]any{}, "Customer Customer"},
+		{"zero template id", "{{ .Contact.FirstName }}", map[string]any{"whatsapp_template_id": 0}, "Customer"},
+		{"negative template id", "{{ .Contact.FirstName }}", map[string]any{"whatsapp_template_id": -1}, "Customer"},
+		{"decoded template id", "ignored", map[string]any{"whatsapp_template_id": float64(7), "whatsapp_template_params": map[string]string{"body:1": "{{ .Contact.FirstName }}"}}, "Hello {{ .Contact.FirstName }}"},
+		{"plain text", "Hello", map[string]any{}, "Hello"},
+		{"rendered text at limit", strings.Repeat("x", whatsAppMaxTextLength-len("Customer")) + "{{ .Contact.FirstName }}", map[string]any{}, strings.Repeat("x", whatsAppMaxTextLength-len("Customer")) + "Customer"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			message, err := m.QueueReply(nil, /** media **/
+				inboxID, senderID, contactID, conv.UUID, tc.content,
+				nil, /** to **/
+				nil, /** cc **/
+				nil, /** bcc **/
+				tc.meta)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if message.Content != tc.want || message.TextContent != tc.want {
+				t.Fatalf("queued content = %q, text = %q, want %q", message.Content, message.TextContent, tc.want)
+			}
+			if tc.name == "decoded template id" {
+				var meta struct {
+					WhatsApp whatsappChannel.SendMeta `json:"whatsapp"`
+				}
+				if err := json.Unmarshal(message.Meta, &meta); err != nil {
+					t.Fatal(err)
+				}
+				if message.ContentType != models.ContentTypeText || meta.WhatsApp.TemplateParams["body:1"] != "{{ .Contact.FirstName }}" {
+					t.Fatalf("Meta template content was changed: %+v", message)
+				}
+			}
+		})
+	}
+
+	t.Run("expanded content exceeds limit", func(t *testing.T) {
+		if _, err := db.Exec(`UPDATE users SET first_name = $1 WHERE id = $2`, strings.Repeat("a", 64), contactID); err != nil {
+			t.Fatal(err)
+		}
+		content := strings.Repeat("x", whatsAppMaxTextLength-32) + "{{ .Contact.FirstName }}"
+		if _, err := m.QueueReply(nil, /** media **/
+			inboxID, senderID, contactID, conv.UUID, content,
+			nil, /** to **/
+			nil, /** cc **/
+			nil, /** bcc **/
+			map[string]any{}); err == nil || !strings.Contains(err.Error(), "4096") {
+			t.Fatalf("expected rendered content to exceed the limit, got %v", err)
+		}
+	})
+}
 
 func TestRenderTemplateBody(t *testing.T) {
 	tests := []struct {
