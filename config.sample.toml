@@ -186,6 +186,14 @@ requests_per_minute = 30
 enabled = true
 requests_per_minute = 100
 
+[portal]
+enabled = false
+api_key = ""
+
+[rate_limit.portal]
+enabled = true
+requests_per_minute = 120
+
 # Public media downloads (uploaded files, avatars).
 [rate_limit.media]
 enabled = true

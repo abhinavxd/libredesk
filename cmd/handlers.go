@@ -21,6 +21,13 @@ const (
 
 // initHandlers initializes the HTTP routes and handlers for the application.
 func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
+	// Server-to-server client portal API.
+	g.POST("/api/v1/portal/contact", rateLimit(portalAuth(handlePortalResolveContact), "portal"))
+	g.GET("/api/v1/portal/conversations", rateLimit(portalAuth(handlePortalListConversations), "portal"))
+	g.GET("/api/v1/portal/conversations/{uuid}", rateLimit(portalAuth(handlePortalGetConversation), "portal"))
+	g.POST("/api/v1/portal/conversations", rateLimit(portalAuth(handlePortalCreateConversation), "portal"))
+	g.POST("/api/v1/portal/conversations/{uuid}/messages", rateLimit(portalAuth(handlePortalReply), "portal"))
+
 	// Authentication.
 	g.POST("/api/v1/auth/login", rateLimit(handleLogin, "auth"))
 	g.GET("/logout", auth(handleLogout))
