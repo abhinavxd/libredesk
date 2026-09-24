@@ -653,9 +653,10 @@ func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n) *automation.Engine {
 	var lo = initLogger("automation_engine")
 	engine, err := automation.New(automation.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:                      db,
+		Lo:                      lo,
+		I18n:                    i18n,
+		TimeTriggerLookbackDays: ko.Int("automation.time_trigger_lookback_days"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing automation engine: %v", err)
