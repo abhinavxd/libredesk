@@ -430,7 +430,7 @@ func decodePortalWrite(r *fastglue.Request, creating bool, app *App) (portalWrit
 	if len(form.Value["message"]) > 0 {
 		req.Message = form.Value["message"][0]
 	}
-	if !creating && req.InboxID != 0 || !creating && req.Subject != "" {
+	if !creating && (len(form.Value["inbox_id"]) > 0 || len(form.Value["subject"]) > 0) {
 		return req, nil, portalWriteBadRequest(r, app, "Unexpected field")
 	}
 	files := form.File["files"]
