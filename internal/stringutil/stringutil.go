@@ -31,6 +31,9 @@ var (
 	regexpHyphens         = regexp.MustCompile(`-+`)
 	regexpConvUUID        = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
 
+	// Italy, San Marino and Côte d'Ivoire keep the leading 0 in international numbers.
+	trunkZeroKeptDialCodes = map[string]bool{"39": true, "378": true, "225": true}
+
 	// markdownRenderer escapes raw HTML in the input; single newlines render as <br>.
 	markdownRenderer = goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
@@ -62,13 +65,20 @@ func WhatsAppPhoneForDialCode(phone, dialCode string) (string, bool) {
 	if digits == "" {
 		return "", true
 	}
+	national := digits
 	if isInternational {
 		if !strings.HasPrefix(digits, dialCode) {
 			return "", false
 		}
-		return digits, true
+		national = strings.TrimPrefix(digits, dialCode)
 	}
-	return dialCode + digits, true
+	if !trunkZeroKeptDialCodes[dialCode] {
+		national = strings.TrimPrefix(national, "0")
+	}
+	if national == "" {
+		return "", true
+	}
+	return dialCode + national, true
 }
 
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.

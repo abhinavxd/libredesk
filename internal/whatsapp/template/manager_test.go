@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -919,7 +918,7 @@ func testI18n(t *testing.T) *i18n.I18n {
 func managerOnClosedDB(t *testing.T) *Manager {
 	t.Helper()
 	testdb.New(t, testInboxName)
-	db, err := sqlx.Connect("postgres", strings.Replace(os.Getenv("LIBREDESK_TEST_DB_DSN"), "/libredesk?", "/libredesk_test_"+testInboxName+"?", 1))
+	db, err := sqlx.Connect("postgres", testdb.DSN(t, testInboxName))
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}

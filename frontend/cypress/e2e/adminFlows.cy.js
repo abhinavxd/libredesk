@@ -109,7 +109,7 @@ describe('Admin setup and outgoing conversation', () => {
       .find('.tiptap.ProseMirror')
       .click()
       .type('Hello, this is an automated outgoing conversation.')
-    cy.get('[role="dialog"]').contains('button', 'Submit').click()
+    cy.get('[role="dialog"]').find('button[type="submit"]').click()
 
     cy.wait('@createConversation').then(({ response }) => {
       expect(response.statusCode).to.eq(200)

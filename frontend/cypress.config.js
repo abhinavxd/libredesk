@@ -10,9 +10,7 @@ export default defineConfig({
     baseUrl: 'http://localhost:9000',
     async setupNodeEvents(on) {
       // The app reaches this stand-in Graph API when whatsapp.api_url points at this port.
-      await start(metaMockPort).catch((err) => {
-        if (err.code !== 'EADDRINUSE') throw err
-      })
+      await start(metaMockPort)
       on('task', {
         'metaMock:reset': control.reset,
         'metaMock:requests': control.requests,

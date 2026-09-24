@@ -214,7 +214,7 @@ describe('Create conversation dialog', () => {
     cy.get('@createConversation.all').should('have.length', 0)
 
     // The dialog is v-if'd, so closing it destroys the form and its state.
-    cy.get('[role="dialog"] > button.absolute.right-4.top-4').click()
+    cy.get('[role="dialog"]').find('header button[aria-label="Close"]').click()
     cy.get('[role="dialog"]').should('not.exist')
 
     cy.contains('New conversation').click()

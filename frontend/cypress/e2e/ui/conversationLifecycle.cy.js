@@ -291,7 +291,7 @@ describe('Conversation lifecycle', () => {
     captureSend()
     openConversation(ccConversationUuid)
     recipientRow(/^CC$/).find('button[aria-label="Remove CC"]').click()
-    cy.contains('label', 'CC:').should('not.exist')
+    cy.contains('label', /^CC$/).should('not.exist')
     sendReply('Reply after closing CC')
     expectSentRecipients(ccConversationUuid, { cc: [], bcc: [] })
   })
@@ -307,8 +307,8 @@ describe('Conversation lifecycle', () => {
     cy.location('pathname').should('include', conversationUuid)
     // A filled TO box means the new thread has loaded.
     recipientRow(/^To$/).find('input').should('have.value', customerEmail)
-    cy.contains('label', 'CC:').should('not.exist')
-    cy.contains('label', 'BCC:').should('not.exist')
+    cy.contains('label', /^CC$/).should('not.exist')
+    cy.contains('label', /^BCC$/).should('not.exist')
     sendReply('Reply after switching away')
     expectSentRecipients(conversationUuid, { cc: [], bcc: [] })
 
@@ -316,7 +316,7 @@ describe('Conversation lifecycle', () => {
     cy.location('pathname').should('include', ccConversationUuid)
     recipientRow(/^To$/).find('input').should('have.value', ccCustomerEmail)
     recipientRow(/^CC$/).find('input').should('have.value', ccAddress)
-    cy.contains('label', 'BCC:').should('not.exist')
+    cy.contains('label', /^BCC$/).should('not.exist')
     sendReply('Reply after switching back')
     expectSentRecipients(ccConversationUuid, { cc: [ccAddress], bcc: [] })
   })

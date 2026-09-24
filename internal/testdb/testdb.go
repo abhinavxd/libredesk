@@ -14,7 +14,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const dsnEnvVar = "LIBREDESK_TEST_DB_DSN"
+const (
+	dsnEnvVar    = "LIBREDESK_TEST_DB_DSN"
+	dbNamePrefix = "libredesk_test_"
+)
 
 var (
 	mu      sync.Mutex
@@ -43,7 +46,7 @@ func New(t testing.TB, suffix string) *sqlx.DB {
 	}
 	defer admin.Close()
 
-	name := "libredesk_test_" + suffix
+	name := dbNamePrefix + suffix
 	if _, err := admin.Exec(`CREATE DATABASE ` + pq(name)); err != nil && !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("creating test database %s: %v", name, err)
 	}
@@ -58,6 +61,12 @@ func New(t testing.TB, suffix string) *sqlx.DB {
 
 	loaded[suffix] = db
 	return db
+}
+
+// DSN returns the connection string for the database New creates for suffix.
+func DSN(t testing.TB, suffix string) string {
+	t.Helper()
+	return swapDatabase(t, strings.TrimSpace(os.Getenv(dsnEnvVar)), dbNamePrefix+suffix)
 }
 
 func swapDatabase(t testing.TB, dsn, name string) string {
