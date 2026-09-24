@@ -383,6 +383,7 @@ func (e *Engine) handleTimeTrigger() {
 		total        = 0
 		batch        = 0
 	)
+	e.lo.Info("starting conversation evaluation for time triggers", "rules_count", len(rules), "lookback_days", lookbackDays)
 	for {
 		refs, err := e.conversationStore.GetConversationsCreatedAfter(createdAfter, afterID, timeTriggerBatchSize)
 		if err != nil {
