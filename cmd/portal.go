@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -373,6 +374,15 @@ func handlePortalReply(r *fastglue.Request) error {
 	return r.SendEnvelope(portalMessageResponse{UUID: message.UUID, CreatedAt: message.CreatedAt, Type: message.Type, SenderType: message.SenderType, Content: message.Content, ContentType: message.ContentType, Attachments: portalAttachments(message.Attachments)})
 }
 
+var errPortalWriteBadRequest = errors.New("portal write rejected")
+
+func portalWriteBadRequest(r *fastglue.Request, app *App, msg string) error {
+	if err := portalBadRequest(r, app, msg); err != nil {
+		return err
+	}
+	return errPortalWriteBadRequest
+}
+
 func decodePortalWrite(r *fastglue.Request, creating bool, app *App) (portalWriteRequest, []mmodels.Media, error) {
 	var req portalWriteRequest
 	ct, _, _ := mime.ParseMediaType(string(r.RequestCtx.Request.Header.ContentType()))
@@ -380,35 +390,35 @@ func decodePortalWrite(r *fastglue.Request, creating bool, app *App) (portalWrit
 		dec := json.NewDecoder(bytes.NewReader(r.RequestCtx.PostBody()))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&req); err != nil {
-			return req, nil, portalBadRequest(r, app, "Invalid request body")
+			return req, nil, portalWriteBadRequest(r, app, "Invalid request body")
 		}
 		if dec.Decode(&struct{}{}) != io.EOF {
-			return req, nil, portalBadRequest(r, app, "Invalid request body")
+			return req, nil, portalWriteBadRequest(r, app, "Invalid request body")
 		}
 		return req, nil, nil
 	}
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
-		return req, nil, portalBadRequest(r, app, "Invalid multipart body")
+		return req, nil, portalWriteBadRequest(r, app, "Invalid multipart body")
 	}
 	consts := app.consts.Load().(*constants)
 	maxBody := int64(consts.MaxFileUploadSizeMB)*portalMaxFiles*1024*1024 + 1024*1024
 	if int64(len(r.RequestCtx.PostBody())) > maxBody {
-		return req, nil, portalBadRequest(r, app, "Request is too large")
+		return req, nil, portalWriteBadRequest(r, app, "Request is too large")
 	}
 	for key := range form.File {
 		if key != "files" {
-			return req, nil, portalBadRequest(r, app, "Unknown file field")
+			return req, nil, portalWriteBadRequest(r, app, "Unknown file field")
 		}
 	}
 	for key := range form.Value {
 		if key != "inbox_id" && key != "subject" && key != "message" {
-			return req, nil, portalBadRequest(r, app, "Unknown form field")
+			return req, nil, portalWriteBadRequest(r, app, "Unknown form field")
 		}
 	}
 	for _, key := range []string{"inbox_id", "subject", "message"} {
 		if len(form.Value[key]) > 1 {
-			return req, nil, portalBadRequest(r, app, "Duplicate form field")
+			return req, nil, portalWriteBadRequest(r, app, "Duplicate form field")
 		}
 	}
 	if len(form.Value["inbox_id"]) > 0 {
@@ -421,11 +431,11 @@ func decodePortalWrite(r *fastglue.Request, creating bool, app *App) (portalWrit
 		req.Message = form.Value["message"][0]
 	}
 	if !creating && req.InboxID != 0 || !creating && req.Subject != "" {
-		return req, nil, portalBadRequest(r, app, "Unexpected field")
+		return req, nil, portalWriteBadRequest(r, app, "Unexpected field")
 	}
 	files := form.File["files"]
 	if len(files) > portalMaxFiles {
-		return req, nil, portalBadRequest(r, app, "Too many files")
+		return req, nil, portalWriteBadRequest(r, app, "Too many files")
 	}
 	media := make([]mmodels.Media, 0, len(files))
 	for _, fh := range files {
@@ -433,18 +443,18 @@ func decodePortalWrite(r *fastglue.Request, creating bool, app *App) (portalWrit
 		ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(name)), ".")
 		if fh.Size <= 0 || bytesToMegabytes(fh.Size) > float64(consts.MaxFileUploadSizeMB) || !slices.Contains(consts.AllowedUploadFileExtensions, "*") && !slices.Contains(consts.AllowedUploadFileExtensions, ext) {
 			cleanupPortalMedia(app, media)
-			return req, nil, portalBadRequest(r, app, "Invalid attachment")
+			return req, nil, portalWriteBadRequest(r, app, "Invalid attachment")
 		}
 		f, e := fh.Open()
 		if e != nil {
 			cleanupPortalMedia(app, media)
-			return req, nil, portalBadRequest(r, app, "Invalid attachment")
+			return req, nil, portalWriteBadRequest(r, app, "Invalid attachment")
 		}
 		data, e := io.ReadAll(io.LimitReader(f, int64(consts.MaxFileUploadSizeMB)*1024*1024+1))
 		f.Close()
 		if e != nil || len(data) == 0 || bytesToMegabytes(int64(len(data))) > float64(consts.MaxFileUploadSizeMB) {
 			cleanupPortalMedia(app, media)
-			return req, nil, portalBadRequest(r, app, "Invalid attachment")
+			return req, nil, portalWriteBadRequest(r, app, "Invalid attachment")
 		}
 		contentType := http.DetectContentType(data)
 		m, e := app.media.UploadAndInsert(name, contentType, "", null.String{}, null.Int{}, bytes.NewReader(data), len(data), null.StringFrom(attachment.DispositionAttachment), []byte("{}"), true)
