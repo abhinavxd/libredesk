@@ -569,7 +569,7 @@ onMounted(loadDashboardData)
 }
 
 .metric-label {
-  @apply text-xs text-muted-foreground uppercase tracking-wider;
+  @apply text-xs text-muted-foreground;
 }
 
 .card-title {
@@ -581,6 +581,6 @@ onMounted(loadDashboardData)
 }
 
 .section-title {
-  @apply text-sm font-medium text-center text-muted-foreground uppercase tracking-wider;
+  @apply text-sm font-medium text-center text-muted-foreground;
 }
 </style>

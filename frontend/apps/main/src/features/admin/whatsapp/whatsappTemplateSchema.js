@@ -1,6 +1,6 @@
 import * as z from 'zod'
 
-export const TEMPLATE_CATEGORIES = ['MARKETING', 'UTILITY', 'AUTHENTICATION']
+export const TEMPLATE_CATEGORIES = ['MARKETING', 'UTILITY']
 export const HEADER_TYPES = ['NONE', 'TEXT']
 export const BUTTON_TYPES = ['URL', 'PHONE_NUMBER', 'QUICK_REPLY']
 

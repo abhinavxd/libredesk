@@ -53,6 +53,8 @@ type createConversationRequest struct {
 	AssignedAgentID        int               `json:"agent_id"`
 	AssignedTeamID         int               `json:"team_id"`
 	Email                  string            `json:"contact_email"`
+	CC                     []string          `json:"cc"`
+	BCC                    []string          `json:"bcc"`
 	FirstName              string            `json:"first_name"`
 	LastName               string            `json:"last_name"`
 	ExternalUserID         string            `json:"external_user_id"`
@@ -920,6 +922,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	subject, appendRefNum := req.Subject, true
 	if channel == whatsappChannel.ChannelWhatsApp {
 		subject, appendRefNum = "", false
+		// A contact gets one open WhatsApp conversation per inbox. The lock keeps an incoming message from creating one between this check and the create below.
 		defer lockWhatsAppConversation(contactID, req.InboxID)()
 		_, openUUID, lookupErr := app.conversation.GetLatestOpenConversationForContact(contactID, req.InboxID)
 		switch {
@@ -936,8 +939,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 			}
 			return sendErrorEnvelope(r, envelope.NewError(envelope.ConflictError, app.i18n.T(messageKey), data))
 		case !errors.Is(lookupErr, sql.ErrNoRows):
-			app.lo.Error("error finding open whatsapp conversation", "error", lookupErr)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			return sendErrorEnvelope(r, lookupErr)
 		}
 	}
 
@@ -948,9 +950,10 @@ func handleCreateConversation(r *fastglue.Request) error {
 		time.Now(), /** last_message_at **/
 		subject,
 		appendRefNum,
-		nil,
+		nil, /** meta **/
 		req.CustomAttributes,
-		0, 0,
+		0, /** max_conversations **/
+		0, /** rate_limit_window **/
 	)
 	if err != nil {
 		app.lo.Error("error creating conversation", "error", err)
@@ -980,9 +983,9 @@ func handleCreateConversation(r *fastglue.Request) error {
 		if len(req.WhatsAppTemplateParams) > 0 {
 			meta["whatsapp_template_params"] = req.WhatsAppTemplateParams
 		}
-		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, "", nil, nil, nil, meta)
+		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, "" /** content **/, nil /** to **/, nil /** cc **/, nil /** bcc **/, meta)
 	case req.Initiator == umodels.UserTypeAgent:
-		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, nil, nil, map[string]any{})
+		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, req.CC, req.BCC, map[string]any{})
 	case req.Initiator == umodels.UserTypeContact:
 		agentInitiated = false
 		_, sendErr = app.conversation.CreateContactMessage(media, contactID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true, req.SourceID)
@@ -1040,8 +1043,7 @@ func handleGetWhatsAppOpenConversation(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, err)
 		}
 	case !errors.Is(err, sql.ErrNoRows):
-		app.lo.Error("error finding open whatsapp conversation", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(resp)
 }
@@ -1087,6 +1089,11 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 		}
 		if !stringutil.ValidEmail(req.Email) {
 			return "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+		}
+		for _, addr := range append(req.CC, req.BCC...) {
+			if !stringutil.ValidEmail(addr) {
+				return "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+			}
 		}
 		if req.Initiator != umodels.UserTypeContact && req.Initiator != umodels.UserTypeAgent {
 			return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)

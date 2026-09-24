@@ -270,6 +270,7 @@ function buildWhatsAppReplyParts(content, files) {
 }
 
 function validateWhatsAppFiles(files) {
+  if (messageType.value === 'private_note') return files
   if (conversationStore.current?.inbox_channel !== WHATSAPP_CHANNEL) return files
   const valid = []
   for (const file of files) {

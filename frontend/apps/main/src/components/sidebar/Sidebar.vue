@@ -29,8 +29,8 @@ import {
   User,
   Search,
   Plus,
-  CircleDashed,
-  List,
+  UserRoundX,
+  Inbox,
   AtSign,
 } from 'lucide-vue-next'
 
@@ -399,7 +399,7 @@ onMounted(() => {
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/unassigned')" @click="navigateToInbox('unassigned')">
-                    <CircleDashed />
+                    <UserRoundX />
                     <span class="flex-1 truncate">
                       {{ t('globals.terms.unassigned') }}
                     </span>
@@ -412,7 +412,7 @@ onMounted(() => {
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/all')" @click="navigateToInbox('all')">
-                    <List />
+                    <Inbox />
                     <span class="flex-1 truncate">
                       {{ t('globals.messages.all') }}
                     </span>

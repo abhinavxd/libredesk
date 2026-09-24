@@ -52,7 +52,7 @@
         v-if="messageType === 'reply'"
       >
         <div class="flex items-center gap-2">
-          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">TO:</label>
+          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('globals.terms.to') }}</label>
           <Input
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
@@ -82,7 +82,7 @@
           </Button>
         </div>
         <div v-if="showCc" class="flex items-center gap-2">
-          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">CC:</label>
+          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('replyBox.cc') }}</label>
           <Input
             ref="ccInputRef"
             type="text"
@@ -103,7 +103,7 @@
           </Button>
         </div>
         <div v-if="showBcc" class="flex items-center gap-2">
-          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">BCC:</label>
+          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('replyBox.bcc') }}</label>
           <Input
             ref="bccInputRef"
             type="text"
@@ -179,8 +179,8 @@
     <ReplyBoxMenuBar
       class="mt-2"
       :isFullscreen="isFullscreen"
-      :isWhatsApp="isWhatsAppConversation"
-      :showWhatsAppTemplate="isWhatsAppConversation && messageType !== 'private_note'"
+      :isWhatsApp="isWhatsAppReply"
+      :showWhatsAppTemplate="isWhatsAppReply"
       :handleFileUpload="handleFileUpload"
       :isSending="isSending"
       :enableSend="enableSend"
@@ -346,8 +346,10 @@ const emit = defineEmits([
 ])
 
 const conversationStore = useConversationStore()
-const isWhatsAppConversation = computed(
-  () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
+const isWhatsAppReply = computed(
+  () =>
+    conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL &&
+    messageType.value !== 'private_note'
 )
 const isCramped = useIsComposerCramped()
 const emitter = useEmitter()

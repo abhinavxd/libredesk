@@ -1,197 +1,245 @@
 <template>
-  <form
-    @submit="createConversation"
-    novalidate
-    class="flex flex-col flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
-  >
-    <div class="space-y-4 pb-2 flex-shrink-0">
-      <div class="space-y-2">
-        <FormField name="contact_email">
-          <FormItem class="relative">
-            <FormLabel>{{ $t('globals.terms.email') }}</FormLabel>
+  <form @submit="createConversation" novalidate class="flex flex-col flex-1 min-h-0 overflow-y-auto">
+    <div class="shrink-0">
+      <FormField v-slot="{ componentField }" name="inbox_id">
+        <FormItem :class="ROW_CLASS">
+          <div class="flex items-center gap-2">
+            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.from') }}</FormLabel>
+            <Select v-bind="componentField">
+              <FormControl>
+                <SelectTrigger :class="ROW_INPUT_CLASS">
+                  <SelectValue :placeholder="t('placeholders.selectInbox')" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem
+                    v-for="option in inboxStore.emailOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <FormMessage :class="ROW_MESSAGE_CLASS" />
+        </FormItem>
+      </FormField>
+
+      <FormField name="contact_email">
+        <FormItem :class="[ROW_CLASS, 'relative']">
+          <div class="flex items-center gap-2">
+            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.to') }}</FormLabel>
             <FormControl>
               <Input
                 ref="emailInputRef"
                 type="email"
                 :placeholder="t('conversation.searchContact')"
                 v-model="emailQuery"
+                :class="ROW_INPUT_CLASS"
                 @input="handleSearchContacts"
                 @keydown="handleSearchKeydown"
                 @blur="clearSearchResults"
                 autocomplete="off"
               />
             </FormControl>
-            <FormMessage />
-
-            <ContactSearchResults
-              :results="searchResults"
-              :highlighted-index="highlightedIndex"
-              @select="selectContact"
+            <Button
+              v-if="!showCc"
+              type="button"
+              size="sm"
+              variant="ghost"
+              :class="RECIPIENT_TOGGLE_CLASS"
+              @click="showRecipientField('cc')"
             >
-              <template #default="{ contact }">
-                <div>
-                  <p class="font-medium">
-                    {{ contact.first_name }} {{ contact.last_name }}
-                  </p>
-                  <p class="text-xs text-muted-foreground">{{ contact.email }}</p>
-                  <div
-                    v-if="contact.external_user_id"
-                    class="flex items-center gap-1 text-xs text-muted-foreground"
-                  >
-                    <IdCard :size="12" class="flex-shrink-0" />
-                    <span class="truncate">{{ contact.external_user_id }}</span>
-                  </div>
+              {{ $t('replyBox.cc') }}
+            </Button>
+            <Button
+              v-if="!showBcc"
+              type="button"
+              size="sm"
+              variant="ghost"
+              :class="RECIPIENT_TOGGLE_CLASS"
+              @click="showRecipientField('bcc')"
+            >
+              {{ $t('replyBox.bcc') }}
+            </Button>
+          </div>
+          <FormMessage :class="ROW_MESSAGE_CLASS" />
+
+          <ContactSearchResults
+            :results="searchResults"
+            :highlighted-index="highlightedIndex"
+            @select="selectContact"
+          >
+            <template #default="{ contact }">
+              <div>
+                <p class="font-medium">
+                  {{ contact.first_name }} {{ contact.last_name }}
+                </p>
+                <p class="text-xs text-muted-foreground">{{ contact.email }}</p>
+                <div
+                  v-if="contact.external_user_id"
+                  class="flex items-center gap-1 text-xs text-muted-foreground"
+                >
+                  <IdCard :size="12" class="flex-shrink-0" />
+                  <span class="truncate">{{ contact.external_user_id }}</span>
                 </div>
-              </template>
-            </ContactSearchResults>
+              </div>
+            </template>
+          </ContactSearchResults>
+        </FormItem>
+      </FormField>
+
+      <FormField
+        v-for="field in visibleRecipientFields"
+        :key="field.name"
+        v-slot="{ componentField }"
+        :name="field.name"
+      >
+        <FormItem :class="ROW_CLASS">
+          <div class="flex items-center gap-2">
+            <FormLabel :class="ROW_LABEL_CLASS">{{ field.label }}</FormLabel>
+            <FormControl>
+              <Input
+                :ref="(el) => (recipientInputRefs[field.name] = el)"
+                type="text"
+                :placeholder="t('replyBox.emailAddresess')"
+                v-bind="componentField"
+                :class="ROW_INPUT_CLASS"
+              />
+            </FormControl>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              :class="RECIPIENT_TOGGLE_CLASS"
+              :aria-label="field.removeLabel"
+              @click="hideRecipientField(field.name)"
+            >
+              <X class="w-4 h-4" />
+            </Button>
+          </div>
+          <FormMessage :class="ROW_MESSAGE_CLASS" />
+        </FormItem>
+      </FormField>
+
+      <div :class="[ROW_CLASS, 'flex items-start gap-2']">
+        <span :class="[ROW_LABEL_CLASS, 'h-9 flex items-center']">{{ $t('globals.terms.name', 1) }}</span>
+        <FormField v-slot="{ componentField }" name="first_name">
+          <FormItem class="flex-1 min-w-0 space-y-0">
+            <FormControl>
+              <Input
+                type="text"
+                :placeholder="t('globals.terms.firstName')"
+                :aria-label="t('globals.terms.firstName')"
+                v-bind="componentField"
+                :disabled="!!selectedContact"
+                :class="ROW_INPUT_CLASS"
+              />
+            </FormControl>
+            <FormMessage class="pb-2" />
           </FormItem>
         </FormField>
+        <FormField v-slot="{ componentField }" name="last_name">
+          <FormItem class="flex-1 min-w-0 space-y-0">
+            <FormControl>
+              <Input
+                type="text"
+                :placeholder="t('globals.terms.lastName')"
+                :aria-label="t('globals.terms.lastName')"
+                v-bind="componentField"
+                :disabled="!!selectedContact"
+                :class="ROW_INPUT_CLASS"
+              />
+            </FormControl>
+          </FormItem>
+        </FormField>
+      </div>
 
-        <div :class="FIELD_GRID_CLASS">
-          <FormField v-slot="{ componentField }" name="first_name">
-            <FormItem>
-              <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
-              <FormControl>
-                <Input
-                  type="text"
-                  placeholder=""
-                  v-bind="componentField"
-                  :disabled="!!selectedContact"
-                  required
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
+      <FormField v-slot="{ componentField }" name="subject">
+        <FormItem :class="ROW_CLASS">
+          <div class="flex items-center gap-2">
+            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.subject') }}</FormLabel>
+            <FormControl>
+              <Input type="text" v-bind="componentField" :class="ROW_INPUT_CLASS" />
+            </FormControl>
+          </div>
+          <FormMessage :class="ROW_MESSAGE_CLASS" />
+        </FormItem>
+      </FormField>
 
-          <FormField v-slot="{ componentField }" name="last_name">
-            <FormItem>
-              <FormLabel>{{ $t('globals.terms.lastName') }}</FormLabel>
-              <FormControl>
-                <Input
-                  type="text"
-                  placeholder=""
-                  v-bind="componentField"
-                  :disabled="!!selectedContact"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
-
-        <div :class="FIELD_GRID_CLASS">
-          <FormField v-slot="{ componentField }" name="subject">
-            <FormItem>
-              <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
-              <FormControl>
-                <Input type="text" placeholder="" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ componentField }" name="inbox_id">
-            <FormItem>
-              <FormLabel>{{ $t('globals.terms.inbox') }}</FormLabel>
-              <FormControl>
-                <Select v-bind="componentField">
-                  <SelectTrigger>
-                    <SelectValue :placeholder="t('placeholders.selectInbox')" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem
-                        v-for="option in inboxStore.emailOptions"
-                        :key="option.value"
-                        :value="option.value"
-                      >
-                        {{ option.label }}
-                      </SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
-
-        <div :class="FIELD_GRID_CLASS">
-          <FormField v-slot="{ componentField }" name="team_id">
-            <FormItem>
-              <FormLabel>
-                {{ $t('actions.assignTeam') }}
-                ({{ $t('globals.terms.optional') }})
-              </FormLabel>
-              <FormControl>
-                <SelectTeamCombobox v-bind="componentField" include-none />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ componentField }" name="agent_id">
-            <FormItem>
-              <FormLabel>
-                {{ $t('actions.assignAgent') }}
-                ({{ $t('globals.terms.optional') }})
-              </FormLabel>
-              <FormControl>
-                <SelectAgentCombobox v-bind="componentField" include-none />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
+      <div :class="[ROW_CLASS, 'grid grid-cols-1 sm:grid-cols-2 sm:gap-4']">
+        <FormField v-slot="{ componentField }" name="team_id">
+          <FormItem class="flex items-center gap-2 min-w-0 space-y-0">
+            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.team', 1) }}</FormLabel>
+            <FormControl>
+              <SelectTeamCombobox
+                v-bind="componentField"
+                include-none
+                :button-class="isUnset(componentField.modelValue) ? ROW_COMBOBOX_EMPTY_CLASS : ROW_COMBOBOX_CLASS"
+              />
+            </FormControl>
+          </FormItem>
+        </FormField>
+        <FormField v-slot="{ componentField }" name="agent_id">
+          <FormItem class="flex items-center gap-2 min-w-0 space-y-0">
+            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.agent', 1) }}</FormLabel>
+            <FormControl>
+              <SelectAgentCombobox
+                v-bind="componentField"
+                include-none
+                :button-class="isUnset(componentField.modelValue) ? ROW_COMBOBOX_EMPTY_CLASS : ROW_COMBOBOX_CLASS"
+              />
+            </FormControl>
+          </FormItem>
+        </FormField>
       </div>
     </div>
 
-    <div class="flex flex-none flex-col min-h-64 mt-4 lg:flex-1 lg:min-h-0">
-      <FormField v-slot="{ componentField }" name="content">
-        <FormItem class="flex flex-col h-full">
-          <FormLabel>{{ $t('globals.terms.message') }}</FormLabel>
-          <FormControl class="flex-1 flex flex-col min-h-0">
-            <div class="flex flex-col h-full">
-              <Editor
-                v-model:htmlContent="componentField.modelValue"
-                @update:htmlContent="(value) => componentField.onChange(value)"
-                :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')"
-                :insertContent="insertContent"
-                :autoFocus="false"
-                :enableInlineImages="true"
-                class="w-full flex-1 overflow-y-auto p-2 box min-h-0"
-                @send="createConversation"
-                @filesDropped="uploadFiles"
-              />
+    <FormField v-slot="{ componentField }" name="content">
+      <FormItem class="flex flex-col flex-1 min-h-40 space-y-0 px-3 pt-2">
+        <FormControl class="flex-1 flex flex-col min-h-0">
+          <div class="flex flex-col h-full">
+            <Editor
+              v-model:htmlContent="componentField.modelValue"
+              @update:htmlContent="(value) => componentField.onChange(value)"
+              :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')"
+              :insertContent="insertContent"
+              :autoFocus="false"
+              :enableInlineImages="true"
+              class="w-full flex-1 overflow-y-auto min-h-0"
+              @send="createConversation"
+              @filesDropped="uploadFiles"
+            />
 
-              <MacroActionsPreview
-                v-if="
-                  conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).actions?.length > 0
-                "
-                :actions="conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)?.actions || []"
-                :onRemove="
-                  (action) =>
-                    conversationStore.removeMacroAction(action, MACRO_CONTEXT.NEW_CONVERSATION)
-                "
-                class="mt-2 flex-shrink-0"
-              />
+            <MacroActionsPreview
+              v-if="
+                conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).actions?.length > 0
+              "
+              :actions="conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)?.actions || []"
+              :onRemove="
+                (action) =>
+                  conversationStore.removeMacroAction(action, MACRO_CONTEXT.NEW_CONVERSATION)
+              "
+              class="mt-2 flex-shrink-0"
+            />
 
-              <ReplyBoxAttachmentPreview
-                :attachments="mediaFiles"
-                :uploadingFiles="uploadingFiles"
-                :onDelete="handleFileDelete"
-                v-if="mediaFiles.length > 0 || uploadingFiles.length > 0"
-                class="mt-2 flex-shrink-0"
-              />
-            </div>
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-    </div>
+            <ReplyBoxAttachmentPreview
+              :attachments="mediaFiles"
+              :uploadingFiles="uploadingFiles"
+              :onDelete="handleFileDelete"
+              v-if="mediaFiles.length > 0 || uploadingFiles.length > 0"
+              class="mt-2 flex-shrink-0"
+            />
+          </div>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
-    <DialogFooter class="mt-4 pt-2 flex items-center !justify-between w-full flex-shrink-0">
+    <div class="flex items-center justify-between gap-2 px-3 py-2 shrink-0">
       <ReplyBoxMenuBar
         :handleFileUpload="handleFileUpload"
         @emojiSelect="handleEmojiSelect"
@@ -199,16 +247,15 @@
         :showGenerateReply="false"
       />
       <Button type="submit" :disabled="isDisabled" :isLoading="loading">
-        {{ $t('globals.messages.submit') }}
+        {{ $t('globals.messages.send') }}
       </Button>
-    </DialogFooter>
+    </div>
   </form>
 </template>
 
 <script setup>
-const FIELD_GRID_CLASS = 'grid grid-cols-1 gap-4 sm:grid-cols-2'
+const RECIPIENT_TOGGLE_CLASS = 'shrink-0 px-2 text-muted-foreground'
 
-import { DialogFooter } from '@shared-ui/components/ui/dialog'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { useForm } from 'vee-validate'
@@ -243,23 +290,31 @@ import {
 import { useI18n } from 'vue-i18n'
 import { useFileUpload } from '@/composables/useFileUpload'
 import Editor from '@/components/editor/ConversationEditor.vue'
-import { useMacroStore } from '@/stores/macro'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
 import { UserTypeAgent } from '@/constants/user'
-import { IdCard } from 'lucide-vue-next'
+import { IdCard, X } from 'lucide-vue-next'
+import { validateEmail } from '@shared-ui/utils/string'
+import {
+  ROW_CLASS,
+  ROW_LABEL_CLASS,
+  ROW_INPUT_CLASS,
+  ROW_COMBOBOX_CLASS,
+  ROW_COMBOBOX_EMPTY_CLASS,
+  ROW_MESSAGE_CLASS,
+  isUnset
+} from '@/features/conversation/composerRowClasses.js'
 import api from '@/api'
 import { useContactSearch } from '@/features/conversation/useContactSearch.js'
 import ContactSearchResults from '@/features/conversation/ContactSearchResults.vue'
+import { useNewConversationDraft } from '@/features/conversation/useNewConversationDraft.js'
 import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
-import { useCommandPalette } from '@main/features/command/useCommandPalette'
 
 const emit = defineEmits(['close'])
 const props = defineProps({
   initialContact: { type: Object, default: null }
 })
-const palette = useCommandPalette()
 
 const inboxStore = useInboxStore()
 const { t } = useI18n()
@@ -269,11 +324,40 @@ const emitter = useEmitter()
 const loading = ref(false)
 const emailQuery = ref('')
 const conversationStore = useConversationStore()
-const macroStore = useMacroStore()
-let previousMacroView = ''
 const insertContent = ref('')
 const selectedContact = ref(null)
 const emailInputRef = ref(null)
+const draft = useNewConversationDraft('email')
+const showCc = ref(false)
+const showBcc = ref(false)
+const recipientInputRefs = {}
+
+const visibleRecipientFields = computed(() =>
+  [
+    showCc.value && { name: 'cc', label: t('replyBox.cc'), removeLabel: t('replyBox.removeCC') },
+    showBcc.value && { name: 'bcc', label: t('replyBox.bcc'), removeLabel: t('replyBox.removeBCC') }
+  ].filter(Boolean)
+)
+
+const showRecipientField = async (field) => {
+  if (field === 'cc') showCc.value = true
+  else showBcc.value = true
+  await nextTick()
+  recipientInputRefs[field]?.$el?.focus()
+}
+
+// A hidden field must stay empty, its address would still be sent otherwise.
+const hideRecipientField = (field) => {
+  if (field === 'cc') showCc.value = false
+  else showBcc.value = false
+  form.setFieldValue(field, '', false)
+}
+
+const splitEmails = (value) =>
+  (value || '')
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean)
 
 const handleEmojiSelect = (emoji) => {
   insertContent.value = undefined
@@ -287,7 +371,8 @@ const {
   handleFileDelete,
   uploadFiles,
   mediaFiles,
-  clearMediaFiles
+  clearMediaFiles,
+  setMediaFiles
 } = useFileUpload({
   linkedModel: 'messages'
 })
@@ -297,6 +382,11 @@ const isDisabled = computed(() => {
   if (hasPendingInlineUpload(form?.values?.content)) return true
   return false
 })
+
+const emailListSchema = z
+  .string()
+  .refine((v) => splitEmails(v).every(validateEmail), { message: t('validation.invalidEmail') })
+  .default('')
 
 const formSchema = z.object({
   subject: z.string().min(1, t('validation.subjectCannotBeEmpty')),
@@ -309,6 +399,8 @@ const formSchema = z.object({
   team_id: z.any().optional(),
   agent_id: z.any().optional(),
   contact_email: z.string().email(t('validation.invalidEmail')),
+  cc: emailListSchema,
+  bcc: emailListSchema,
   first_name: z.string().min(1, t('globals.messages.required')),
   last_name: z.string().optional()
 })
@@ -316,19 +408,14 @@ const formSchema = z.object({
 onUnmounted(() => {
   clearMediaFiles()
   conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
-  macroStore.setCurrentView(previousMacroView)
-  palette.setMacroContext(MACRO_CONTEXT.REPLY)
 })
 
 onMounted(() => {
-  previousMacroView = macroStore.currentView
-  macroStore.setCurrentView('starting_conversation')
-  palette.setMacroContext(MACRO_CONTEXT.NEW_CONVERSATION)
+  restoreDraft()
   if (props.initialContact?.email) selectContact(props.initialContact)
-  nextTick(() => {
-    emailInputRef.value?.$el?.focus()
-  })
 })
+
+defineExpose({ focus: () => emailInputRef.value?.$el?.focus() })
 
 watch(
   () => props.initialContact,
@@ -346,17 +433,19 @@ const form = useForm({
     subject: '',
     content: '',
     contact_email: '',
+    cc: '',
+    bcc: '',
     first_name: '',
     last_name: ''
   }
 })
 
 watch(emailQuery, (newVal) => {
-  form.setFieldValue('contact_email', newVal)
+  form.setFieldValue('contact_email', newVal, form.submitCount.value > 0)
   if (selectedContact.value && newVal !== selectedContact.value.email) {
     selectedContact.value = null
-    form.setFieldValue('first_name', '')
-    form.setFieldValue('last_name', '')
+    form.setFieldValue('first_name', '', false)
+    form.setFieldValue('last_name', '', false)
   }
 })
 
@@ -367,8 +456,8 @@ const { searchResults, highlightedIndex, handleSearchContacts, handleSearchKeydo
     onSelect: (contact) => {
       selectedContact.value = contact
       emailQuery.value = contact.email
-      form.setFieldValue('first_name', contact.first_name)
-      form.setFieldValue('last_name', contact.last_name || '')
+      form.setFieldValue('first_name', contact.first_name, false)
+      form.setFieldValue('last_name', contact.last_name || '', false)
     }
   })
 
@@ -379,6 +468,8 @@ const createConversation = form.handleSubmit(async (values) => {
     values.team_id = values.team_id && values.team_id !== 'none' ? Number(values.team_id) : null
     values.agent_id =
       values.agent_id && values.agent_id !== 'none' ? Number(values.agent_id) : null
+    values.cc = splitEmails(values.cc)
+    values.bcc = splitEmails(values.bcc)
     values.attachments = mediaFiles.value.map((file) => file.id)
     if (selectedContact.value?.external_user_id) {
       values.external_user_id = selectedContact.value.external_user_id
@@ -400,6 +491,7 @@ const createConversation = form.handleSubmit(async (values) => {
         })
       }
     }
+    draft.value = null
     emit('close')
     form.resetForm()
   } catch (error) {
@@ -417,6 +509,33 @@ watch(
   () => {
     const content = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
     if (content) form.setFieldValue('content', content)
+  },
+  { deep: true }
+)
+
+const hasDraftContent = (values) =>
+  [values.contact_email, values.subject, values.cc, values.bcc, values.first_name].some((v) => v?.trim()) ||
+  hasMessageContent(values.content)
+
+const hasMessageContent = (html) => !!html && (html.replace(/<[^>]*>/g, '').trim() !== '' || html.includes('<img'))
+
+function restoreDraft () {
+  if (!draft.value?.values) return
+  const { values, contact, attachments = [] } = draft.value
+  form.setValues(values, false)
+  setMediaFiles([...attachments])
+  selectedContact.value = contact || null
+  emailQuery.value = values.contact_email || ''
+  showCc.value = !!values.cc
+  showBcc.value = !!values.bcc
+}
+
+watch(
+  [() => form.values, selectedContact, mediaFiles],
+  ([values, contact, attachments]) => {
+    draft.value = hasDraftContent(values) || attachments.length
+      ? { values: { ...values }, contact, attachments: [...attachments] }
+      : null
   },
   { deep: true }
 )

@@ -485,7 +485,11 @@ func (m *Manager) GetLatestOpenConversationForContact(contactID, inboxID int) (i
 		UUID string `db:"uuid"`
 	}
 	if err := m.q.GetLatestOpenConversationByContact.Get(&row, contactID, inboxID); err != nil {
-		return 0, "", err
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, "", err
+		}
+		m.lo.Error("error fetching open conversation for contact", "contact_id", contactID, "inbox_id", inboxID, "error", err)
+		return 0, "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return row.ID, row.UUID, nil
 }
@@ -497,7 +501,11 @@ func (m *Manager) GetReopenableConversationForContact(contactID, inboxID, window
 		UUID string `db:"uuid"`
 	}
 	if err := m.q.GetReopenableConversationByContact.Get(&row, contactID, inboxID, windowHours); err != nil {
-		return 0, "", err
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, "", err
+		}
+		m.lo.Error("error fetching reopenable conversation for contact", "contact_id", contactID, "inbox_id", inboxID, "error", err)
+		return 0, "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return row.ID, row.UUID, nil
 }

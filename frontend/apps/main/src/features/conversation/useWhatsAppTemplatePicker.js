@@ -84,7 +84,7 @@ export function useWhatsAppTemplatePicker() {
   const isFetchingTemplates = ref(false)
   let fetchSeq = 0
 
-  const fetchTemplates = async (inboxID) => {
+  const fetchTemplates = async (inboxID, { templateId, params = {} } = {}) => {
     reset()
     // Bumping the sequence invalidates any in-flight request, so a slow response for a previously selected inbox can't land.
     const seq = ++fetchSeq
@@ -94,6 +94,13 @@ export function useWhatsAppTemplatePicker() {
       const resp = await api.getWhatsAppTemplates(inboxID)
       if (seq !== fetchSeq) return
       templates.value = resp.data.data || []
+      const template = approvedTemplates.value.find((tmpl) => tmpl.id === templateId)
+      if (template) {
+        pickTemplate(template)
+        for (const key of allParamKeys.value) {
+          templateParams[key] = params[key] ?? ''
+        }
+      }
     } catch (error) {
       if (seq !== fetchSeq) return
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
