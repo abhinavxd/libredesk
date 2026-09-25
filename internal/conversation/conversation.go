@@ -194,10 +194,10 @@ type mediaStore interface {
 	GetURL(uuid, contentType, fileName string) string
 	GetSignedURL(name string) string
 	GetThumbnailURL(uuid string) string
-	LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []mmodels.Media, inlineUUIDs []string) error
+	LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []mmodels.Media, inlineUUIDs []string, uploadedBy int) error
 	GetByModel(id int, model string) ([]mmodels.Media, error)
 	GetByContentIDs(contentIDs []string, conversationUUID string) ([]mmodels.Media, error)
-	GetDraftInlineMedia(uuid string, conversationID int) (mmodels.Media, error)
+	GetDraftInlineMedia(uuid string, conversationID, userID int) (mmodels.Media, error)
 	ContentIDExists(contentID, conversationUUID string) (bool, string, error)
 	Upload(fileName, contentType string, content io.ReadSeeker) (string, string, error)
 	UploadAndInsert(fileName, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (mmodels.Media, error)
@@ -496,9 +496,16 @@ func (c *Manager) GetConversation(id int, uuid, refNum string) (models.Conversat
 }
 
 // GetContactPreviousConversations retrieves previous conversations for a contact with a configurable limit.
-func (c *Manager) GetContactPreviousConversations(contactID int, limit int) ([]models.PreviousConversation, error) {
+func (c *Manager) GetContactPreviousConversations(contactID int, limit int, user umodels.User) ([]models.PreviousConversation, error) {
 	var conversations = make([]models.PreviousConversation, 0)
-	if err := c.q.GetContactPreviousConversations.Select(&conversations, contactID, limit); err != nil {
+	if err := c.q.GetContactPreviousConversations.Select(&conversations, contactID, limit,
+		user.ID, pq.Array(user.Teams.IDs()),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsRead),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAll),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAssigned),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamAll),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamInbox),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadUnassigned)); err != nil {
 		c.lo.Error("error fetching previous conversations", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

@@ -1,5 +1,5 @@
 -- name: insert-media
-INSERT INTO media (store, filename, content_type, size, meta, model_id, model_type, disposition, content_id, uuid, private)
+INSERT INTO media (store, filename, content_type, size, meta, model_id, model_type, disposition, content_id, uuid, private, uploaded_by)
 VALUES(
   $1,
   $2,
@@ -11,12 +11,13 @@ VALUES(
   $8,
   $9,
   $10,
-  $11
+  $11,
+  $12
 )
 RETURNING id;
 
 -- name: get-media
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE
    ($1 > 0 AND id = $1)
@@ -24,7 +25,7 @@ WHERE
    ($2 != '' AND uuid = NULLIF($2, '')::uuid)
 
 -- name: get-media-by-uuid
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE uuid = $1;
 
@@ -42,16 +43,17 @@ SET model_type = 'messages',
     END
 WHERE (id = ANY($2::INT[]) OR uuid = ANY($3::uuid[]))
   AND COALESCE(model_type, 'messages') = 'messages'
-  AND COALESCE(model_id, 0) = 0;
+  AND COALESCE(model_id, 0) = 0
+  AND (uploaded_by = NULLIF($4, 0) OR ($4 = 0 AND uploaded_by IS NULL));
 
 -- name: get-model-media
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE model_type = $1
     AND model_id = $2;
 
 -- name: get-unlinked-message-media
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE model_type = 'messages'
   AND (
@@ -60,7 +62,7 @@ WHERE model_type = 'messages'
   );
 
 -- name: get-unlinked-help-article-media
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE model_type = 'help_articles'
   AND (model_id IS NULL OR model_id = 0 OR NOT EXISTS (SELECT 1 FROM help_articles ha WHERE ha.id = media.model_id))
@@ -90,7 +92,7 @@ WHERE m.model_type = 'messages'
   AND cm.conversation_id = (SELECT id FROM conversations WHERE uuid = $2::uuid LIMIT 1);
 
 -- name: get-media-by-content-ids
-SELECT m.id, m.created_at, m.updated_at, m."uuid", m.store, m.filename, m.content_type, m.content_id, m.model_id, m.model_type, m.disposition, m."size", m.meta, m.private
+SELECT m.id, m.created_at, m.updated_at, m."uuid", m.store, m.filename, m.content_type, m.content_id, m.model_id, m.model_type, m.disposition, m."size", m.meta, m.private, m.uploaded_by
 FROM media m
 INNER JOIN conversation_messages cm ON cm.id = m.model_id
 WHERE m.model_type = 'messages'
@@ -98,8 +100,11 @@ WHERE m.model_type = 'messages'
   AND cm.conversation_id = (SELECT id FROM conversations WHERE uuid = $2::uuid LIMIT 1);
 
 -- name: get-draft-inline-media
-SELECT m.id, m.created_at, m.updated_at, m."uuid", m.store, m.filename, m.content_type, m.content_id, m.model_id, m.model_type, m.disposition, m."size", m.meta
+SELECT m.id, m.created_at, m.updated_at, m."uuid", m.store, m.filename, m.content_type, m.content_id, m.model_id, m.model_type, m.disposition, m."size", m.meta, m.private, m.uploaded_by
 FROM media m
 LEFT JOIN conversation_messages cm ON cm.id = m.model_id AND m.model_type = 'messages'
 WHERE m.uuid = $1
-  AND (COALESCE(m.model_id, 0) = 0 OR cm.conversation_id = $2);
+  AND (
+    (COALESCE(m.model_id, 0) = 0 AND m.uploaded_by = $3 AND COALESCE(m.model_type, 'messages') = 'messages')
+    OR cm.conversation_id = $2
+  );

@@ -245,16 +245,16 @@ func handleSendMessage(r *fastglue.Request) error {
 	}
 
 	// Get media for all attachments, skip any already associated with a model.
-	media, err := getUnassociatedMedia(app, req.Attachments)
+	media, err := getUnassociatedMedia(app, req.Attachments, auser.ID)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return sendErrorEnvelope(r, err)
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
 
 	// Create contact message.
 	if req.SenderType == umodels.UserTypeContact {
-		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false, req.SourceID)
+		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false, req.SourceID, auser.ID)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}

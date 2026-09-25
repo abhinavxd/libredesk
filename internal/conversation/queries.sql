@@ -317,6 +317,14 @@ SELECT
 FROM users u
 JOIN conversations c ON c.contact_id = u.id
 WHERE c.contact_id = $1
+  AND $5
+  AND (
+       $6
+    OR ($7 AND c.assigned_user_id = $3)
+    OR ($8 AND c.assigned_team_id = ANY($4::int[]))
+    OR ($9 AND c.assigned_team_id = ANY($4::int[]) AND c.assigned_user_id IS NULL)
+    OR ($10 AND c.assigned_user_id IS NULL AND c.assigned_team_id IS NULL)
+  )
 ORDER BY c.created_at DESC
 LIMIT $2;
 

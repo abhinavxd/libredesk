@@ -115,10 +115,10 @@ func (h *Hub) SubscribeOpenConv(client *Client, uuid string) {
 // ListSubscribers returns the union of list-source and open-source subscribers for a conversation.
 func (h *Hub) ListSubscribers(uuid string) []*Client {
 	h.subsMu.RLock()
-	defer h.subsMu.RUnlock()
 	listSet := h.convSubsList[uuid]
 	openSet := h.convSubsOpen[uuid]
 	if len(listSet) == 0 && len(openSet) == 0 {
+		h.subsMu.RUnlock()
 		return nil
 	}
 	union := make(map[*Client]struct{}, len(listSet)+len(openSet))
@@ -128,8 +128,20 @@ func (h *Hub) ListSubscribers(uuid string) []*Client {
 	for c := range openSet {
 		union[c] = struct{}{}
 	}
+	h.subsMu.RUnlock()
 	out := make([]*Client, 0, len(union))
+	authorized := make(map[int]bool)
 	for c := range union {
+		allowed, checked := authorized[c.ID]
+		if !checked && h.conversationStore != nil {
+			uuids, err := h.conversationStore.FilterAuthorizedListUUIDs(c.ID, []string{uuid})
+			allowed = err == nil && slices.Contains(uuids, uuid)
+			authorized[c.ID] = allowed
+		}
+		if !allowed {
+			h.removeConversationSub(c, uuid)
+			continue
+		}
 		out = append(out, c)
 	}
 	return out
@@ -237,6 +249,23 @@ func (h *Hub) BroadcastTypingToConversation(conversationUUID string, typingMsg m
 func (h *Hub) BroadcastTypingToAllConversationClients(conversationUUID string, data []byte) {
 	for _, c := range h.ListSubscribers(conversationUUID) {
 		c.SendMessage(data, websocket.TextMessage)
+	}
+}
+
+func (h *Hub) removeConversationSub(client *Client, uuid string) {
+	h.subsMu.Lock()
+	defer h.subsMu.Unlock()
+	delete(h.convSubsList[uuid], client)
+	if len(h.convSubsList[uuid]) == 0 {
+		delete(h.convSubsList, uuid)
+	}
+	delete(h.clientListSubs[client], uuid)
+	delete(h.convSubsOpen[uuid], client)
+	if len(h.convSubsOpen[uuid]) == 0 {
+		delete(h.convSubsOpen, uuid)
+	}
+	if h.clientOpenSub[client] == uuid {
+		delete(h.clientOpenSub, client)
 	}
 }
 

@@ -78,6 +78,7 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
+	GetSessionVersion                *sqlx.Stmt `query:"get-session-version"`
 	GetUser                          *sqlx.Stmt `query:"get-user"`
 	GetNotes                         *sqlx.Stmt `query:"get-notes"`
 	GetNote                          *sqlx.Stmt `query:"get-note"`
@@ -612,7 +613,7 @@ func promptAndHashPassword(ctx context.Context) ([]byte, error) {
 
 // updateSystemUserPassword updates the password of the system user in the database.
 func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) error {
-	_, err := db.Exec(`UPDATE users SET password = $1 WHERE email = $2`, hashedPassword, models.SystemUserEmail)
+	_, err := db.Exec(`UPDATE users SET password = $1, session_version = session_version + 1 WHERE email = $2`, hashedPassword, models.SystemUserEmail)
 	if err != nil {
 		return fmt.Errorf("failed to update system user password: %v", err)
 	}
