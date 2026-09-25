@@ -764,6 +764,7 @@
   "conversation.placeholder": "Select a conversation from the left panel.",
   "conversation.search": "Search conversations",
   "conversation.searchContact": "Search contact by email or type new email",
+  "conversation.seenBy": "Seen by {name} {relativeTime} ({dateTime})",
   "conversation.sentViaEmail": "Sent via email",
   "conversation.showQuotedText": "Show quoted text",
   "conversation.sidebar.contactAttributes": "Contact attributes",

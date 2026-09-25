@@ -333,6 +333,7 @@ type queries struct {
 	UpdateConversationReplyTimestamps   *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
 	UpdateConversationContactLastSeen   *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
 	UpsertUserLastSeen                  *sqlx.Stmt `query:"upsert-user-last-seen"`
+	GetConversationSeenBy               *sqlx.Stmt `query:"get-conversation-seen-by"`
 	MarkConversationUnread              *sqlx.Stmt `query:"mark-conversation-unread"`
 	UpdateConversationAssignedUser      *sqlx.Stmt `query:"update-conversation-assigned-user"`
 	ClaimUnassignedConversation         *sqlx.Stmt `query:"claim-unassigned-conversation"`
@@ -595,6 +596,10 @@ func (c *Manager) UpdateUserLastSeen(uuid string, userID int) error {
 		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+
+	if seenBy, err := c.GetConversationSeenBy(uuid); err == nil {
+		c.BroadcastConversationUpdate(uuid, map[string]any{"seen_by": seenBy})
+	}
 	return nil
 }
 
@@ -604,7 +609,21 @@ func (c *Manager) MarkAsUnread(uuid string, userID int) error {
 		c.lo.Error("error marking conversation as unread", "user_id", userID, "conversation_uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+
+	if seenBy, err := c.GetConversationSeenBy(uuid); err == nil {
+		c.BroadcastConversationUpdate(uuid, map[string]any{"seen_by": seenBy})
+	}
 	return nil
+}
+
+// GetConversationSeenBy retrieves the list of users who have seen a conversation.
+func (c *Manager) GetConversationSeenBy(uuid string) ([]models.ConversationSeenBy, error) {
+	seenBy := make([]models.ConversationSeenBy, 0)
+	if err := c.q.GetConversationSeenBy.Select(&seenBy, uuid); err != nil {
+		c.lo.Error("error fetching conversation seen by", "uuid", uuid, "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return seenBy, nil
 }
 
 // UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.

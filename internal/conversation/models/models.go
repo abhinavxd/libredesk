@@ -219,6 +219,7 @@ type Conversation struct {
 	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
 	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
+	SeenBy                    []ConversationSeenBy   `db:"-" json:"seen_by"`
 }
 
 type ConversationContact struct {
@@ -284,6 +285,14 @@ type ConversationParticipant struct {
 	FirstName string      `db:"first_name" json:"first_name"`
 	LastName  string      `db:"last_name" json:"last_name"`
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
+}
+
+type ConversationSeenBy struct {
+	UserID     int         `db:"user_id" json:"user_id"`
+	FirstName  string      `db:"first_name" json:"first_name"`
+	LastName   string      `db:"last_name" json:"last_name"`
+	AvatarURL  null.String `db:"avatar_url" json:"avatar_url"`
+	LastSeenAt time.Time   `db:"last_seen_at" json:"last_seen_at"`
 }
 
 type MessageAuthor struct {
