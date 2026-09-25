@@ -292,7 +292,6 @@ func TestCreateIndexConcurrentlyReplacesAnInvalidIndex(t *testing.T) {
 	if !indexIsValid(t, db, name) {
 		t.Fatal("an invalid index survived the rebuild, so the index silently never works")
 	}
-	db.Exec(`DROP INDEX IF EXISTS ` + name)
 }
 
 func seedResolvedConversations(t *testing.T, db *sqlx.DB, n int) {

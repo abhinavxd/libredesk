@@ -493,7 +493,7 @@ describe('WhatsApp channel', () => {
         message: '', sender_type: 'agent', whatsapp_template_id: carousel.id, whatsapp_template_params: {}
       }, { failOnStatusCode: false }).then(({ status, body }) => {
         expect(status).to.eq(400)
-        expect(body.message).to.contain('content Libredesk cannot send')
+        expect(body.message).to.contain('content libredesk cannot send')
       })
     })
     cy.waMetaCalls((request) => request.body?.template?.name === carouselName).should('have.length', 0)
