@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,10 @@ import (
 
 // ErrOIDCInvalidClient reports the provider rejecting the client credentials, typically an expired or wrong client secret.
 var ErrOIDCInvalidClient = errors.New("oidc provider rejected client credentials")
+
+type userStore interface {
+	GetSessionVersion(userID int) (int, error)
+}
 
 // OIDCclaim holds OIDC token claims data
 type OIDCclaim struct {
@@ -71,10 +76,11 @@ type Auth struct {
 	logger       *logf.Logger
 	rd           *redis.Client
 	oidcClient   *http.Client
+	users        userStore
 }
 
 // New creates an Auth service with configured OIDC providers.
-func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control) (*Auth, error) {
+func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control, users userStore) (*Auth, error) {
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
 	redirectURLs := make(map[int]func() (string, error))
@@ -134,6 +140,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 		logger:       logger,
 		rd:           rd,
 		oidcClient:   oidcClient,
+		users:        users,
 	}, nil
 }
 
@@ -194,6 +201,14 @@ func (a *Auth) Reload(cfg Config) error {
 	a.redirectURLs = redirectURLs
 
 	return nil
+}
+
+func (a *Auth) RemoveProvider(id int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.oauthCfgs, id)
+	delete(a.verifiers, id)
+	delete(a.redirectURLs, id)
 }
 
 // LoginURL returns the login URL for the given provider.
@@ -266,6 +281,9 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 		a.logger.Error("error parsing claims from oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, errors.New("error getting user from OIDC")
 	}
+	if !claims.EmailVerified || strings.TrimSpace(claims.Email) == "" {
+		return "", OIDCclaim{}, errors.New("oidc email ownership is not verified")
+	}
 	a.logger.Debug("oidc token exchange successful", "provider_id", providerID, "email", claims.Email, "email_verified", claims.EmailVerified)
 	return rawIDTk, claims, nil
 }
@@ -282,10 +300,11 @@ func (a *Auth) SaveSession(user amodels.User, r *fastglue.Request) error {
 	}
 
 	if err := sess.SetMulti(map[string]interface{}{
-		"id":         user.ID,
-		"email":      user.Email,
-		"first_name": user.FirstName,
-		"last_name":  user.LastName,
+		"id":              user.ID,
+		"session_version": user.SessionVersion,
+		"email":           user.Email,
+		"first_name":      user.FirstName,
+		"last_name":       user.LastName,
 	}); err != nil {
 		a.logger.Error("error setting login session", "error", err)
 		return err
@@ -366,7 +385,7 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 		return models.User{}, err
 	}
 
-	sessVals, err := sess.GetMulti("id", "email", "first_name", "last_name")
+	sessVals, err := sess.GetMulti("id", "email", "first_name", "last_name", "session_version")
 	if err != nil {
 		a.logger.Error("error fetching session variables", "error", err)
 		return models.User{}, err
@@ -378,6 +397,17 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 		firstName, _ = sess.String(sessVals["first_name"], nil)
 		lastName, _  = sess.String(sessVals["last_name"], nil)
 	)
+
+	if userID > 0 {
+		version, err := sess.Int(sessVals["session_version"], nil /** err **/)
+		if err != nil || version <= 0 {
+			return models.User{}, simplesessions.ErrInvalidSession
+		}
+		current, err := a.users.GetSessionVersion(userID)
+		if err != nil || version != current {
+			return models.User{}, simplesessions.ErrInvalidSession
+		}
+	}
 
 	return models.User{
 		ID:        userID,
@@ -437,9 +467,7 @@ func getRequestCookie(name string, r *fastglue.Request) (*fasthttp.Cookie, error
 	return c, nil
 }
 
-// simpleSessGetCookieCB is the simplessesions callback for retrieving the session cookie
-// from a fastglue request.
-func simpleSessGetCookieCB(name string, r interface{}) (*http.Cookie, error) {
+func simpleSessGetCookieCB(name string, r any) (*http.Cookie, error) {
 	req, ok := r.(*fastglue.Request)
 	if !ok {
 		return nil, errors.New("session callback doesn't have fastglue.Request")
@@ -470,9 +498,7 @@ func simpleSessGetCookieCB(name string, r interface{}) (*http.Cookie, error) {
 	}, nil
 }
 
-// simpleSessSetCookieCB is the simplessesions callback for setting the session cookie
-// to a fastglue request.
-func simpleSessSetCookieCB(c *http.Cookie, w interface{}) error {
+func simpleSessSetCookieCB(c *http.Cookie, w any) error {
 	req, ok := w.(*fastglue.Request)
 	if !ok {
 		return errors.New("session callback doesn't have fastglue.Request")

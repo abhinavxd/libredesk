@@ -25,6 +25,13 @@ var notificationTypesV2_9_0 = []string{
 }
 
 func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+	if _, err := db.Exec(`
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INT NOT NULL DEFAULT 1;
+		ALTER TABLE media ADD COLUMN IF NOT EXISTS uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+	`); err != nil {
+		return err
+	}
+
 	_, err := db.Exec(`ALTER TYPE channels ADD VALUE IF NOT EXISTS 'whatsapp';`)
 	if err != nil {
 		return err

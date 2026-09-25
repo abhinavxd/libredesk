@@ -175,6 +175,7 @@ CREATE TABLE users (
     phone_number TEXT NULL,
     country TEXT NULL,
     "password" VARCHAR(150) NULL,
+    session_version INT NOT NULL DEFAULT 1,
     avatar_url TEXT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
 	external_user_id TEXT NULL,
@@ -436,6 +437,7 @@ CREATE TABLE media (
 	"size" INT NULL,
 	meta jsonb DEFAULT '{}'::jsonb NOT NULL,
 	private BOOLEAN NOT NULL DEFAULT true,
+	uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_media_on_filename CHECK (length(filename) <= 1000),
 	CONSTRAINT constraint_media_on_content_id CHECK (length(content_id) <= 300)
 );

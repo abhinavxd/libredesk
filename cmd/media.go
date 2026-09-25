@@ -39,6 +39,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	var (
 		app     = r.Context.(*App)
 		cleanUp = false
+		auser   = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 
 	form, err := r.RequestCtx.MultipartForm()
@@ -162,7 +163,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel))
+	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel), null.IntFrom(auser.ID))
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error inserting metadata into database", "error", err)
@@ -209,6 +210,10 @@ func handleServeMedia(r *fastglue.Request) error {
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if media.ModelID.Int <= 0 && (!media.UploadedBy.Valid || media.UploadedBy.Int != auser.ID) {
+		return r.SendErrorEnvelope(http.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
 
 	// Check if the user has permission to access the linked model.
@@ -288,14 +293,21 @@ func bytesToMegabytes(bytes int64) float64 {
 	return float64(bytes) / 1024 / 1024
 }
 
-// getUnassociatedMedia fetches media by IDs, skipping any already associated with a model.
-func getUnassociatedMedia(app *App, ids []int) ([]mmodels.Media, error) {
+func getUnassociatedMedia(app *App, ids []int, userID int) ([]mmodels.Media, error) {
 	all, err := app.media.GetMany(ids)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]mmodels.Media, 0, len(all))
+	seen := make(map[int]bool, len(all))
 	for _, m := range all {
+		if !m.UploadedBy.Valid || m.UploadedBy.Int != userID || userID <= 0 || (m.Model.String != "" && m.Model.String != mmodels.ModelMessages) {
+			return nil, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
+		}
+		if seen[m.ID] {
+			continue
+		}
+		seen[m.ID] = true
 		if m.ModelID.Int > 0 {
 			app.lo.Warn("attachment already associated with another model, skipping", "media_id", m.ID, "model", m.Model.String, "model_id", m.ModelID.Int)
 			continue

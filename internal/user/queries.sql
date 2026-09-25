@@ -47,6 +47,7 @@ SELECT
     u.updated_at,
     u.email,
     u.password,
+    u.session_version,
     u.type,
     u.enabled,
     u.avatar_url,
@@ -86,7 +87,7 @@ LIMIT 1;
 
 -- name: set-user-password
 UPDATE users
-SET password = $1, updated_at = now()
+SET password = $1, session_version = session_version + 1, updated_at = now()
 WHERE id = $2;
 
 -- name: update-agent
@@ -110,6 +111,7 @@ SET first_name = COALESCE($2, first_name),
  email = COALESCE($4, email),
  avatar_url = COALESCE($6, avatar_url), 
  password = COALESCE($7, password),
+ session_version = session_version + CASE WHEN $7 IS NULL THEN 0 ELSE 1 END,
  enabled = COALESCE($8, enabled),
  availability_status = COALESCE($9, availability_status),
  updated_at = now()
@@ -167,7 +169,7 @@ WHERE id = $1 AND type = 'agent';
 
 -- name: set-password
 UPDATE users
-SET password = $1, reset_password_token = NULL, reset_password_token_expiry = NULL
+SET password = $1, session_version = session_version + 1, reset_password_token = NULL, reset_password_token_expiry = NULL
 WHERE reset_password_token = $2 AND reset_password_token_expiry > now()
 RETURNING id;
 
@@ -390,6 +392,7 @@ SELECT
     u.updated_at,
     u.email,
     u.password,
+    u.session_version,
     u.type,
     u.enabled,
     u.avatar_url,
@@ -448,6 +451,7 @@ SELECT
     u.updated_at,
     u.email,
     u.password,
+    u.session_version,
     u.type,
     u.enabled,
     u.avatar_url,
@@ -598,3 +602,7 @@ SELECT jsonb_build_object(
         WHERE c.contact_id = $1
     )
 );
+
+-- name: get-session-version
+SELECT session_version FROM users
+WHERE id = $1 AND type = 'agent' AND enabled AND deleted_at IS NULL;

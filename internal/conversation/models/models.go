@@ -325,6 +325,7 @@ type NewConversationsStats struct {
 
 // Message represents a message in a conversation
 type Message struct {
+	UploadUserID      int                    `db:"-" json:"-"`
 	Total             int                    `db:"total" json:"-"`
 	ID                int                    `db:"id" json:"id"`
 	CreatedAt         time.Time              `db:"created_at" json:"created_at"`
