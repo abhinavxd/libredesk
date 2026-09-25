@@ -135,9 +135,7 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 // searchMessages searches for messages in the specified time range.
 // Uses ESEARCH if supported by the server, otherwise falls back to standard SEARCH.
 func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*imap.SearchData, error) {
-	criteria := &imap.SearchCriteria{
-		Since: since,
-	}
+	criteria := buildSearchCriteria(since)
 
 	// Attempt ESEARCH if server supports it
 	if client.Caps().Has(imap.CapESearch) {
@@ -157,6 +155,16 @@ func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*ima
 	}
 
 	return client.Search(criteria, nil).Wait()
+}
+
+// buildSearchCriteria builds the criteria for searching messages since the given time.
+// Messages flagged as deleted are excluded so that messages deleted on the server
+// while Libredesk was offline aren't re-imported on the next scan.
+func buildSearchCriteria(since time.Time) *imap.SearchCriteria {
+	return &imap.SearchCriteria{
+		Since:   since,
+		NotFlag: []imap.Flag{imap.FlagDeleted},
+	}
 }
 
 // fetchAndProcessMessages fetches and processes messages based on the search results.
