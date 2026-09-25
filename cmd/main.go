@@ -257,7 +257,7 @@ func main() {
 		businessHours               = initBusinessHours(db, i18n)
 		webhook                     = initWebhook(db, i18n, ssrfControl)
 		user                        = initUser(i18n, db)
-		auth                        = initAuth(oidc, rdb, i18n, ssrfControl, user, settings)
+		auth                        = initAuth(oidc, rdb, i18n, ssrfControl, user)
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
 		userNotification            = initUserNotification(db, i18n)

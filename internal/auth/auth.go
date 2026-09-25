@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -60,7 +59,6 @@ type Config struct {
 	Providers       []Provider
 	SecureCookies   bool
 	SessionLifetime time.Duration
-	RootURL         func() (string, error)
 }
 
 // defaultSessionLifetime is used when Config.SessionLifetime is unset or non-positive.
@@ -79,7 +77,6 @@ type Auth struct {
 	rd           *redis.Client
 	oidcClient   *http.Client
 	users        userStore
-	rootURL      func() (string, error)
 }
 
 // New creates an Auth service with configured OIDC providers.
@@ -131,8 +128,9 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 	st := sessredisstore.New(context.TODO(), rd)
 	st.SetTTL(lifetime, false)
 	sess.UseStore(st)
+	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
 
-	a := &Auth{
+	return &Auth{
 		cfg:          cfg,
 		i18n:         i18n,
 		oauthCfgs:    oauthCfgs,
@@ -143,10 +141,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 		rd:           rd,
 		oidcClient:   oidcClient,
 		users:        users,
-		rootURL:      cfg.RootURL,
-	}
-	sess.SetCookieHooks(a.getCookie, a.setCookie)
-	return a, nil
+	}, nil
 }
 
 // newOIDCClient builds the HTTP client used for OIDC discovery.
@@ -472,14 +467,10 @@ func getRequestCookie(name string, r *fastglue.Request) (*fasthttp.Cookie, error
 	return c, nil
 }
 
-func (a *Auth) getCookie(name string, r interface{}) (*http.Cookie, error) {
+func simpleSessGetCookieCB(name string, r any) (*http.Cookie, error) {
 	req, ok := r.(*fastglue.Request)
 	if !ok {
 		return nil, errors.New("session callback doesn't have fastglue.Request")
-	}
-
-	if !a.isSessionHost(req) {
-		return nil, simplesessions.ErrInvalidSession
 	}
 
 	// Create fast http cookie and parse it from cookie bytes.
@@ -507,14 +498,10 @@ func (a *Auth) getCookie(name string, r interface{}) (*http.Cookie, error) {
 	}, nil
 }
 
-func (a *Auth) setCookie(c *http.Cookie, w interface{}) error {
+func simpleSessSetCookieCB(c *http.Cookie, w any) error {
 	req, ok := w.(*fastglue.Request)
 	if !ok {
 		return errors.New("session callback doesn't have fastglue.Request")
-	}
-
-	if !a.isSessionHost(req) {
-		return simplesessions.ErrInvalidSession
 	}
 
 	fc := fasthttp.AcquireCookie()
@@ -532,20 +519,4 @@ func (a *Auth) setCookie(c *http.Cookie, w interface{}) error {
 
 	req.RequestCtx.Response.Header.SetCookie(fc)
 	return nil
-}
-
-func (a *Auth) isSessionHost(r *fastglue.Request) bool {
-	if a.rootURL == nil {
-		return false
-	}
-	root, err := a.rootURL()
-	if err != nil {
-		return false
-	}
-	rootURL, err := url.Parse(root)
-	if err != nil || rootURL.Hostname() == "" {
-		return false
-	}
-	requestURL, err := url.Parse("//" + string(r.RequestCtx.Host()))
-	return err == nil && strings.EqualFold(rootURL.Hostname(), requestURL.Hostname())
 }
