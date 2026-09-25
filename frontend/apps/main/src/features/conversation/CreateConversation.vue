@@ -1,518 +1,174 @@
 <template>
-  <div>
-    <Dialog v-model:open="dialogOpen">
-      <DialogContent class="max-w-5xl h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>
-            {{ $t('conversation.newConversation') }}
-          </DialogTitle>
-          <DialogDescription />
-        </DialogHeader>
+  <div
+    v-if="dialogOpen && expanded && !minimized"
+    class="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm animate-in fade-in-0"
+    @click="expanded = false"
+  />
+  <section
+    v-if="dialogOpen"
+    role="dialog"
+    :aria-label="$t('conversation.newConversation')"
+    :class="panelClass"
+  >
+    <header class="flex items-center gap-1 border-b border-border bg-muted pl-4 pr-1 h-11 shrink-0">
+      <button
+        type="button"
+        class="flex-1 min-w-0 truncate text-left text-sm font-medium"
+        @click="minimized = !minimized"
+      >
+        {{ $t('conversation.newConversation') }}
+      </button>
+      <Badge v-if="minimized && hasDraft" variant="secondary" class="shrink-0">
+        {{ $t('globals.terms.draft') }}
+      </Badge>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        :class="HEADER_BUTTON_CLASS"
+        :aria-label="minimized ? t('globals.terms.expand') : t('globals.terms.collapse')"
+        @click="minimized = !minimized"
+      >
+        <ChevronUp v-if="minimized" />
+        <Minus v-else class="translate-y-1" />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        :class="[HEADER_BUTTON_CLASS, 'max-sm:hidden']"
+        :aria-label="expanded ? t('globals.terms.collapse') : t('globals.terms.expand')"
+        @click="toggleExpanded"
+      >
+        <component :is="expanded ? Minimize2 : Maximize2" />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        :class="HEADER_BUTTON_CLASS"
+        :aria-label="t('globals.messages.close')"
+        @click="discard"
+      >
+        <X />
+      </Button>
+    </header>
 
-        <form
-          @submit="createConversation"
-          novalidate
-          class="flex flex-col flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
-        >
-          <!-- Form Fields Section -->
-          <div class="space-y-4 pb-2 flex-shrink-0">
-            <div class="space-y-2">
-              <FormField name="contact_email">
-                <FormItem class="relative">
-                  <FormLabel>{{ $t('globals.terms.email') }}</FormLabel>
-                  <FormControl>
-                    <Input
-                      ref="emailInputRef"
-                      type="email"
-                      :placeholder="t('conversation.searchContact')"
-                      v-model="emailQuery"
-                      @input="handleSearchContacts"
-                      @keydown="handleSearchKeydown"
-                      autocomplete="off"
-                    />
-                  </FormControl>
-                  <FormMessage />
+    <div v-show="!minimized" class="flex flex-col flex-1 min-h-0">
+      <Tabs v-if="showChannelTabs" v-model="channel" class="flex flex-col flex-1 min-h-0">
+        <TabsList class="w-max mx-3 mt-3 mb-2">
+          <TabsTrigger value="email">{{ $t('globals.terms.email') }}</TabsTrigger>
+          <TabsTrigger value="whatsapp">{{ $t('globals.terms.whatsapp') }}</TabsTrigger>
+        </TabsList>
+        <EmailConversationForm
+          ref="emailFormRef"
+          v-show="channel === 'email'"
+          :initial-contact="props.initialContact"
+          @close="dialogOpen = false"
+        />
+        <WhatsAppConversationForm
+          ref="whatsappFormRef"
+          v-show="channel === 'whatsapp'"
+          :initial-contact="props.initialContact"
+          @close="dialogOpen = false"
+        />
+      </Tabs>
 
-                  <div
-                    v-if="searchResults.length"
-                    class="absolute w-full z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-                  >
-                    <ul class="max-h-60 overflow-y-auto" role="listbox">
-                      <li
-                        v-for="(contact, index) in searchResults"
-                        :key="contact.email"
-                        @click="selectContact(contact)"
-                        role="option"
-                        :aria-selected="index === highlightedIndex"
-                        class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors duration-200"
-                        :class="
-                          index === highlightedIndex
-                            ? 'bg-accent text-accent-foreground'
-                            : 'hover:bg-accent hover:text-accent-foreground'
-                        "
-                      >
-                        <div>
-                          <p class="font-medium">
-                            {{ contact.first_name }} {{ contact.last_name }}
-                          </p>
-                          <p class="text-xs text-muted-foreground">{{ contact.email }}</p>
-                          <div
-                            v-if="contact.external_user_id"
-                            class="flex items-center gap-1 text-xs text-muted-foreground"
-                          >
-                            <IdCard :size="12" class="flex-shrink-0" />
-                            <span class="truncate">{{ contact.external_user_id }}</span>
-                          </div>
-                        </div>
-                      </li>
-                    </ul>
-                  </div>
-                </FormItem>
-              </FormField>
-
-              <!-- Name Group -->
-              <div :class="FIELD_GRID_CLASS">
-                <FormField v-slot="{ componentField }" name="first_name">
-                  <FormItem>
-                    <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder=""
-                        v-bind="componentField"
-                        :disabled="!!selectedContact"
-                        required
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
-
-                <FormField v-slot="{ componentField }" name="last_name">
-                  <FormItem>
-                    <FormLabel>{{ $t('globals.terms.lastName') }}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder=""
-                        v-bind="componentField"
-                        :disabled="!!selectedContact"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
-              </div>
-
-              <!-- Subject and Inbox Group -->
-              <div :class="FIELD_GRID_CLASS">
-                <FormField v-slot="{ componentField }" name="subject">
-                  <FormItem>
-                    <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
-                    <FormControl>
-                      <Input type="text" placeholder="" v-bind="componentField" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
-
-                <FormField v-slot="{ componentField }" name="inbox_id">
-                  <FormItem>
-                    <FormLabel>{{ $t('globals.terms.inbox') }}</FormLabel>
-                    <FormControl>
-                      <Select v-bind="componentField">
-                        <SelectTrigger>
-                          <SelectValue :placeholder="t('placeholders.selectInbox')" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem
-                              v-for="option in inboxStore.emailOptions"
-                              :key="option.value"
-                              :value="option.value"
-                            >
-                              {{ option.label }}
-                            </SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
-              </div>
-
-              <!-- Assignment Group -->
-              <div :class="FIELD_GRID_CLASS">
-                <!-- Set assigned team -->
-                <FormField v-slot="{ componentField }" name="team_id">
-                  <FormItem>
-                    <FormLabel>
-                      {{ $t('actions.assignTeam') }}
-                      ({{ $t('globals.terms.optional') }})
-                    </FormLabel>
-                    <FormControl>
-                      <SelectTeamCombobox v-bind="componentField" include-none />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
-
-                <!-- Set assigned agent -->
-                <FormField v-slot="{ componentField }" name="agent_id">
-                  <FormItem>
-                    <FormLabel>
-                      {{ $t('actions.assignAgent') }}
-                      ({{ $t('globals.terms.optional') }})
-                    </FormLabel>
-                    <FormControl>
-                      <SelectAgentCombobox v-bind="componentField" include-none />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
-              </div>
-            </div>
-          </div>
-
-          <!-- Message Editor Section -->
-          <div class="flex flex-none flex-col min-h-64 mt-4 lg:flex-1 lg:min-h-0">
-            <FormField v-slot="{ componentField }" name="content">
-              <FormItem class="flex flex-col h-full">
-                <FormLabel>{{ $t('globals.terms.message') }}</FormLabel>
-                <FormControl class="flex-1 flex flex-col min-h-0">
-                  <div class="flex flex-col h-full">
-                    <Editor
-                      v-model:htmlContent="componentField.modelValue"
-                      @update:htmlContent="(value) => componentField.onChange(value)"
-                      :placeholder="
-                        isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')
-                      "
-                      :insertContent="insertContent"
-                      :autoFocus="false"
-                      :enableInlineImages="true"
-                      class="w-full flex-1 overflow-y-auto p-2 box min-h-0"
-                      @send="createConversation"
-                      @filesDropped="uploadFiles"
-                    />
-
-                    <MacroActionsPreview
-                      v-if="
-                        conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).actions?.length >
-                        0
-                      "
-                      :actions="
-                        conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)?.actions || []
-                      "
-                      :onRemove="
-                        (action) =>
-                          conversationStore.removeMacroAction(
-                            action,
-                            MACRO_CONTEXT.NEW_CONVERSATION
-                          )
-                      "
-                      class="mt-2 flex-shrink-0"
-                    />
-
-                    <ReplyBoxAttachmentPreview
-                      :attachments="mediaFiles"
-                      :uploadingFiles="uploadingFiles"
-                      :onDelete="handleFileDelete"
-                      v-if="mediaFiles.length > 0 || uploadingFiles.length > 0"
-                      class="mt-2 flex-shrink-0"
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-          </div>
-
-          <DialogFooter class="mt-4 pt-2 flex items-center !justify-between w-full flex-shrink-0">
-            <ReplyBoxMenuBar
-              :handleFileUpload="handleFileUpload"
-              @emojiSelect="handleEmojiSelect"
-              :showSendButton="false"
-              :showGenerateReply="false"
-            />
-            <Button type="submit" :disabled="isDisabled" :isLoading="loading">
-              {{ $t('globals.messages.submit') }}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  </div>
+      <EmailConversationForm
+        ref="emailFormRef"
+        v-else
+        :initial-contact="props.initialContact"
+        @close="dialogOpen = false"
+      />
+    </div>
+  </section>
 </template>
 
 <script setup>
-const FIELD_GRID_CLASS = 'grid grid-cols-1 gap-4 sm:grid-cols-2'
-
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription
-} from '@shared-ui/components/ui/dialog'
-import { Button } from '@shared-ui/components/ui/button'
-import { Input } from '@shared-ui/components/ui/input'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
-} from '@shared-ui/components/ui/form'
-import { z } from 'zod'
-import { ref, watch, onUnmounted, nextTick, onMounted, computed } from 'vue'
-import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
-import { useConversationStore } from '@main/stores/conversation'
-import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
-import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
-import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
-import { MACRO_CONTEXT } from '@main/constants/conversation'
-import { useEmitter } from '@main/composables/useEmitter'
-import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useInboxStore } from '@main/stores/inbox'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@shared-ui/components/ui/select'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useFileUpload } from '@/composables/useFileUpload'
-import Editor from '@/components/editor/ConversationEditor.vue'
-import { useMacroStore } from '@/stores/macro'
-import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
-import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
-import { UserTypeAgent } from '@/constants/user'
-import { IdCard } from 'lucide-vue-next'
-import api from '@/api'
-import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
-import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
-import { useCommandPalette } from '@/features/command/useCommandPalette'
+import { ChevronUp, Maximize2, Minimize2, Minus, X } from 'lucide-vue-next'
+import { Button } from '@shared-ui/components/ui/button'
+import { Badge } from '@shared-ui/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
+import { MACRO_CONTEXT } from '@main/constants/conversation'
+import { useCommandPalette } from '@main/features/command/useCommandPalette'
+import { useInboxStore } from '@main/stores/inbox'
+import EmailConversationForm from './EmailConversationForm.vue'
+import WhatsAppConversationForm from './WhatsAppConversationForm.vue'
+import { useNewConversationDraft, clearNewConversationDrafts } from './useNewConversationDraft.js'
+
+const HEADER_BUTTON_CLASS = 'h-8 w-8 max-sm:h-11 max-sm:w-11 text-muted-foreground'
 
 const dialogOpen = defineModel({
   required: false,
   default: () => false
 })
 const props = defineProps({
-  initialContact: { type: Object, default: null }
+  initialContact: { type: Object, default: null },
+  startMinimized: { type: Boolean, default: false }
 })
-const palette = useCommandPalette()
 
-const inboxStore = useInboxStore()
 const { t } = useI18n()
-const emitter = useEmitter()
-const isCramped = useIsComposerCramped()
-const loading = ref(false)
-const searchResults = ref([])
-const emailQuery = ref('')
-const conversationStore = useConversationStore()
-const macroStore = useMacroStore()
-let timeoutId = null
-let previousMacroView = ''
-const insertContent = ref('')
-const selectedContact = ref(null)
-const emailInputRef = ref(null)
+const inboxStore = useInboxStore()
+const palette = useCommandPalette()
+const drafts = { email: useNewConversationDraft('email'), whatsapp: useNewConversationDraft('whatsapp') }
+const channel = ref(!drafts.email.value && drafts.whatsapp.value ? 'whatsapp' : 'email')
+const minimized = ref(props.startMinimized)
+const expanded = ref(false)
 
-const handleEmojiSelect = (emoji) => {
-  insertContent.value = undefined
-  // Force reactivity so the user can select the same emoji multiple times
-  nextTick(() => (insertContent.value = emoji))
+const emailFormRef = ref(null)
+const whatsappFormRef = ref(null)
+
+const hasDraft = computed(() => !!drafts[channel.value].value)
+
+const restore = () => {
+  minimized.value = false
 }
 
-const {
-  uploadingFiles,
-  handleFileUpload,
-  handleFileDelete,
-  uploadFiles,
-  mediaFiles,
-  clearMediaFiles
-} = useFileUpload({
-  linkedModel: 'messages'
+defineExpose({ restore })
+
+const discard = () => {
+  clearNewConversationDrafts(window.localStorage)
+  dialogOpen.value = false
+}
+
+const showChannelTabs = computed(() => inboxStore.whatsappOptions.length > 0)
+
+watch(
+  () => dialogOpen.value && !minimized.value && (!showChannelTabs.value || channel.value === 'email'),
+  (active) => palette.setMacroContext(active ? MACRO_CONTEXT.NEW_CONVERSATION : MACRO_CONTEXT.REPLY),
+  { immediate: true }
+)
+
+onUnmounted(() => palette.setMacroContext(MACRO_CONTEXT.REPLY))
+
+const panelClass = computed(() => {
+  const base =
+    'fixed z-50 flex flex-col overflow-hidden border border-border bg-background shadow-2xl animate-in fade-in-0 slide-in-from-bottom-4 duration-200 motion-reduce:animate-none'
+  if (minimized.value) return [base, 'bottom-0 inset-x-0 sm:inset-x-auto sm:right-4 sm:w-80 sm:rounded-t-lg']
+  if (expanded.value) return [base, 'inset-4 mx-auto max-w-5xl rounded-lg']
+  return [
+    base,
+    'inset-0 sm:inset-auto sm:bottom-0 sm:right-4 sm:w-[40rem] sm:h-[min(42rem,calc(100vh-2rem))] sm:rounded-t-lg'
+  ]
 })
 
-const isDisabled = computed(() => {
-  if (loading.value || uploadingFiles.value.length > 0) return true
-  if (hasPendingInlineUpload(form?.values?.content)) return true
-  return false
-})
+const toggleExpanded = () => {
+  expanded.value = !expanded.value
+  minimized.value = false
+}
 
-const formSchema = z.object({
-  subject: z.string().min(1, t('validation.subjectCannotBeEmpty')),
-  content: z.string().min(1, t('validation.messageCannotBeEmpty')),
-  inbox_id: z
-    .any()
-    .refine((val) => inboxStore.emailOptions.some((option) => option.value === val), {
-      message: t('globals.messages.required')
-    }),
-  team_id: z.any().optional(),
-  agent_id: z.any().optional(),
-  contact_email: z.string().email(t('validation.invalidEmail')),
-  first_name: z.string().min(1, t('globals.messages.required')),
-  last_name: z.string().optional()
-})
+const focusActiveForm = () => {
+  if (!dialogOpen.value || minimized.value) return
+  const form = channel.value === 'whatsapp' ? whatsappFormRef.value : emailFormRef.value
+  form?.focus()
+}
 
-onUnmounted(() => {
-  clearTimeout(timeoutId)
-  clearMediaFiles()
-  conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
-  macroStore.setCurrentView(previousMacroView)
-  palette.setMacroContext(MACRO_CONTEXT.REPLY)
-})
+watch([dialogOpen, minimized, channel], focusActiveForm, { flush: 'post' })
 
 onMounted(() => {
-  previousMacroView = macroStore.currentView
-  macroStore.setCurrentView('starting_conversation')
-  palette.setMacroContext(MACRO_CONTEXT.NEW_CONVERSATION)
-  if (props.initialContact?.email) selectContact(props.initialContact)
-  nextTick(() => {
-    emailInputRef.value?.$el?.focus()
-  })
+  inboxStore.fetchInboxes()
+  focusActiveForm()
 })
-
-watch(
-  () => props.initialContact,
-  (contact) => {
-    if (contact?.email) selectContact(contact)
-  }
-)
-
-const form = useForm({
-  validationSchema: toTypedSchema(formSchema),
-  initialValues: {
-    inbox_id: null,
-    team_id: null,
-    agent_id: null,
-    subject: '',
-    content: '',
-    contact_email: '',
-    first_name: '',
-    last_name: ''
-  }
-})
-
-watch(emailQuery, (newVal) => {
-  form.setFieldValue('contact_email', newVal)
-  if (selectedContact.value && newVal !== selectedContact.value.email) {
-    selectedContact.value = null
-    form.setFieldValue('first_name', '')
-    form.setFieldValue('last_name', '')
-  }
-})
-
-const handleSearchContacts = async () => {
-  clearTimeout(timeoutId)
-  timeoutId = setTimeout(async () => {
-    const query = emailQuery.value.trim()
-
-    if (query.length < 3) {
-      searchResults.value.splice(0)
-      return
-    }
-
-    try {
-      const resp = await api.searchContacts({ query })
-      searchResults.value = [...resp.data.data]
-      highlightedIndex.value = -1
-    } catch (error) {
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-      searchResults.value.splice(0)
-    }
-  }, 300)
-}
-
-const highlightedIndex = ref(-1)
-
-const handleSearchKeydown = (e) => {
-  if (!searchResults.value.length) return
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    highlightedIndex.value = Math.min(highlightedIndex.value + 1, searchResults.value.length - 1)
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    highlightedIndex.value = Math.max(highlightedIndex.value - 1, 0)
-  } else if (e.key === 'Enter' && highlightedIndex.value >= 0) {
-    e.preventDefault()
-    selectContact(searchResults.value[highlightedIndex.value])
-  } else if (e.key === 'Escape') {
-    searchResults.value.splice(0)
-    highlightedIndex.value = -1
-  }
-}
-
-const selectContact = (contact) => {
-  selectedContact.value = contact
-  emailQuery.value = contact.email
-  form.setFieldValue('first_name', contact.first_name)
-  form.setFieldValue('last_name', contact.last_name || '')
-  searchResults.value.splice(0)
-  highlightedIndex.value = -1
-}
-
-const createConversation = form.handleSubmit(async (values) => {
-  loading.value = true
-  try {
-    // Convert ids to numbers if they are not already
-    values.inbox_id = Number(values.inbox_id)
-    values.team_id = values.team_id ? Number(values.team_id) : null
-    values.agent_id = values.agent_id ? Number(values.agent_id) : null
-    // Array of attachment ids.
-    values.attachments = mediaFiles.value.map((file) => file.id)
-    if (selectedContact.value?.external_user_id) {
-      values.external_user_id = selectedContact.value.external_user_id
-    }
-    // Form data is a snapshot from search; never let it overwrite the stored contact.
-    values.reuse_contact = true
-    // Initiator of this conversation is always agent
-    values.initiator = UserTypeAgent
-    const conversation = await api.createConversation(values)
-    const conversationUUID = conversation.data.data.uuid
-
-    // Get macro from context, and set if any actions are available.
-    const macro = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION)
-    if (conversationUUID !== '' && macro?.id) {
-      try {
-        await api.applyMacro(conversationUUID, macro.id, macro.actions)
-      } catch (error) {
-        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-          variant: 'destructive',
-          description: handleHTTPError(error).message
-        })
-      }
-    }
-    dialogOpen.value = false
-    form.resetForm()
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    loading.value = false
-  }
-})
-
-/**
- * Watches for changes in the macro id and update message content.
- */
-watch(
-  () => conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).id,
-  () => {
-    const content = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
-    if (content) form.setFieldValue('content', content)
-  },
-  { deep: true }
-)
 </script>

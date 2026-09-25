@@ -14,7 +14,7 @@
     width="250">
 </picture>
 
-<br> Modern, open source, self-hosted omnichannel customer support desk. Live chat, email, and more in a single binary.
+<br> Open source, self-hosted customer support software for email, live chat, and WhatsApp. Distributed as a single binary.
 
 ![image](https://libredesk.io/hero-dark.png?v=1)
 
@@ -23,42 +23,34 @@ Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live 
 
 ## Features
 
-- **Omnichannel inbox**  
-  Live chat and email in one inbox. Every conversation lands in the same place, whichever channel it came from.
-- **Live chat widget**  
-  Embed a real-time chat widget on your website. Replies go out from the same inbox your team already works in.
-- **Help center**  
-  Publish a searchable knowledge base with collections, articles in multiple languages, and customize it however you want.  
-- **AI assistant**  
-  Answer live chat conversations automatically with an AI assistant grounded in your knowledge base. Hands off to a human when it can't help.
-- **Agent copilot**  
-  Draft replies, summarize conversations, and look up answers from the knowledge base without leaving the inbox.
-- **Automations**  
-  Rules that run on conversation events. Tag, assign, and route conversations based on conditions you define.
-- **Granular permissions**  
-  Role-based access control. Create custom roles with per-action permissions for teams and individual agents.
-- **CSAT & analytics**  
-  Send CSAT surveys automatically after a conversation closes. Track response times, resolution rates, and agent activity.
-- **Custom attributes**  
-  Create custom attributes for contacts or conversations such as the subscription plan or the date of their first purchase.
-- **Macros**  
-  Save replies you send often. One macro can send the message, set tags, and assign the conversation to a team.
-- **Organization**  
-  Tags, custom statuses, and snoozing to keep the inbox in order. Search covers every conversation.
-- **Auto assignment**  
-  Assign incoming conversations automatically, based on agent capacity or on criteria you define.
-- **SLA management**  
-  Set and track response time targets. Get notified when conversations are at risk of breaching SLA commitments.
-- **SSO logins**  
-  Google, Microsoft, and any OIDC provider are supported out of the box.
-- **API**  
-  HTTP/JSON APIs and webhooks for custom integrations and workflows.
-- **Activity logs**  
-  Track all actions performed by agents and admins, for auditing and accountability.
-- **Command bar**  
-  Opens with a simple shortcut (CTRL+K) and lets you quickly perform actions on conversations.
+### Inbox and channels
 
-And more — checkout [libredesk.io](https://libredesk.io) or try the [live demo](https://demo.libredesk.io/).
+- **Shared inbox:** Handle email, live chat, and WhatsApp conversations in one place.
+- **Live chat:** Add a real-time chat widget to your website.
+- **WhatsApp:** Connect a number through the Meta Cloud API.
+- **Inbox organization:** Use teams, tags, custom statuses, custom attributes, snoozing, and search.
+
+### Help center and AI
+
+- **Help center:** Publish a searchable, multilingual knowledge base.
+- **AI assistant:** Answer live chat questions using your knowledge base and hand conversations to an agent when needed.
+- **Agent copilot:** Draft replies, summarize conversations, and find answers without leaving the inbox.
+
+### Workflow and reporting
+
+- **Automations:** Tag, assign, and route conversations using rules you define.
+- **Macros:** Send saved replies and apply conversation actions in one step.
+- **Auto assignment:** Distribute incoming conversations by agent capacity or your own criteria.
+- **SLA management:** Set response targets and get notified about conversations at risk of breaching them.
+- **CSAT and analytics:** Collect customer ratings and track response times, resolution rates, and agent activity.
+
+### Administration and integrations
+
+- **Permissions and SSO:** Create roles with per-action permissions and sign in through Google, Microsoft, or another OIDC provider.
+- **Activity logs:** Review actions performed by agents and admins.
+- **API and webhooks:** Connect LibreDesk to other systems and workflows.
+
+See [libredesk.io](https://libredesk.io) for the full feature set, or try the [live demo](https://demo.libredesk.io/).
 
 
 ## Installation

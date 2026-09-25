@@ -421,6 +421,25 @@ const updateInbox = (id, data) =>
     }
   })
 const deleteInbox = (id) => http.delete(`/api/v1/inboxes/${id}`)
+
+const getWhatsAppTemplates = (inboxId) =>
+  http.get('/api/v1/whatsapp/templates', { params: { inbox_id: inboxId } })
+const getWhatsAppTemplate = (id) => http.get(`/api/v1/whatsapp/templates/${id}`)
+const updateWhatsAppTemplate = (id, data) =>
+  http.put(`/api/v1/whatsapp/templates/${id}`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const createWhatsAppTemplate = (data) =>
+  http.post('/api/v1/whatsapp/templates', data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const deleteWhatsAppTemplate = (id) => http.delete(`/api/v1/whatsapp/templates/${id}`)
+const syncWhatsAppTemplates = (inboxId) =>
+  http.post(`/api/v1/whatsapp/templates/sync?inbox_id=${inboxId}`, {})
+const getWhatsAppOpenConversation = (contactId, inboxId) =>
+  http.get(`/api/v1/whatsapp/contacts/${contactId}/open-conversation`, {
+    params: { inbox_id: inboxId }
+  })
 const saveDraft = (uuid, type, data) =>
   http.post(`/api/v1/conversations/${uuid}/draft`, { ...data, type }, {
     headers: {
@@ -731,6 +750,13 @@ export default {
   updateInbox,
   deleteInbox,
   toggleInbox,
+  getWhatsAppTemplates,
+  getWhatsAppTemplate,
+  updateWhatsAppTemplate,
+  createWhatsAppTemplate,
+  deleteWhatsAppTemplate,
+  syncWhatsAppTemplates,
+  getWhatsAppOpenConversation,
   createTeam,
   updateTeam,
   getSettings,

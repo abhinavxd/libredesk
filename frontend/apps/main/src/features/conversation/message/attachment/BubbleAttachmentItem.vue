@@ -13,10 +13,14 @@
         >
           <template v-if="isImage">
             <img
-              :src="attachment.thumbnail_url || getThumbFilepath(attachment.url)"
+              :src="
+                thumbFailed
+                  ? attachment.url
+                  : attachment.thumbnail_url || getThumbFilepath(attachment.url)
+              "
               :alt="attachment.name"
               class="w-full h-full object-cover"
-              @error="fallbackToOriginal($event, attachment.url)"
+              @error="thumbFailed = true"
             />
             <div
               class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent transition-opacity pointer-events-none can-hover:opacity-0 can-hover:group-hover:opacity-100"
@@ -62,7 +66,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 import DownloadLink from '@/components/DownloadLink.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
@@ -82,14 +86,16 @@ const props = defineProps({
 const emit = defineEmits(['preview'])
 
 const showAudio = ref(false)
+const thumbFailed = ref(false)
+
+watch(
+  () => props.attachment.url,
+  () => {
+    thumbFailed.value = false
+  }
+)
 
 const shortName = (name) => (name || '').substring(0, 40)
-
-const fallbackToOriginal = (event, originalUrl) => {
-  if (event.target.dataset.originalFallback) return
-  event.target.dataset.originalFallback = 'true'
-  event.target.src = originalUrl
-}
 
 const isImage = computed(() => (props.attachment.content_type || '').startsWith('image/'))
 

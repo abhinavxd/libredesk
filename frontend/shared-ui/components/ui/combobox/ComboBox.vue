@@ -3,6 +3,8 @@
     <PopoverTrigger as-child>
       <slot name="trigger" :selected="selectedItem" :open="open">
         <Button
+          type="button"
+          :disabled="disabled"
           variant="outline"
           role="combobox"
           :aria-expanded="open"
@@ -68,6 +70,7 @@ const props = defineProps({
     required: true
   },
   placeholder: String,
+  disabled: { type: Boolean, default: false },
   defaultLabel: String,
   buttonClass: {
     type: String,
