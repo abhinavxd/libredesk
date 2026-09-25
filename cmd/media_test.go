@@ -39,7 +39,7 @@ func TestPrepareImageUploadAllowsOversizedImageWithoutThumbnail(t *testing.T) {
 	}
 }
 
-func TestServeMediaFileSandboxesAllButPDF(t *testing.T) {
+func TestServeMediaFileSandboxesDownloads(t *testing.T) {
 	const uuid = "0b7a3c1e-2f4d-4b8a-9c6e-1d2f3a4b5c6d"
 	dir := t.TempDir()
 	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`)
@@ -66,10 +66,13 @@ func TestServeMediaFileSandboxesAllButPDF(t *testing.T) {
 		{"svg with bad param", "image/svg+xml; x", false, "image/svg+xml", "attachment", true},
 		{"other xml image", "image/x+xml", false, "image/x+xml", "attachment", true},
 		{"unparseable", "text/plain,image/svg+xml", false, "application/octet-stream", "attachment", true},
-		{"png", "image/png", false, "image/png", "inline", true},
+		{"html", "text/html", false, "text/html", "attachment", true},
+		{"png", "image/png", false, "image/png", "inline", false},
 		{"png forced download", "image/png", true, "image/png", "attachment", true},
+		{"video", "video/mp4", false, "video/mp4", "inline", false},
+		{"video forced download", "video/mp4", true, "video/mp4", "attachment", true},
 		{"pdf", "application/pdf", false, "application/pdf", "inline", false},
-		{"pdf forced download", "application/pdf", true, "application/pdf", "attachment", false},
+		{"pdf forced download", "application/pdf", true, "application/pdf", "attachment", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -265,8 +265,9 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 		r.RequestCtx.Response.Header.Set("Content-Type", contentType)
 		r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": media.Filename}))
 		r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
-		// Chrome's PDF viewer does not load in a sandboxed page.
-		if contentType != mmodels.ContentTypePDF {
+		// Chrome's video and PDF viewers break in a sandbox, and inline types run no script anyway.
+		// Downloads are sandboxed for webviews that render attachments inline.
+		if disposition == mmodels.DispositionAttachment {
 			r.RequestCtx.Response.Header.Set("Content-Security-Policy", "sandbox")
 		}
 		r.RequestCtx.Response.Header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, immutable", cacheVisibility(media.Private), int(mediaCacheTTL.Seconds())))
