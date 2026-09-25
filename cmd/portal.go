@@ -75,9 +75,10 @@ type portalAttachmentResponse struct {
 }
 
 type portalWriteRequest struct {
-	InboxID int    `json:"inbox_id"`
-	Subject string `json:"subject"`
-	Message string `json:"message"`
+	InboxID  int    `json:"inbox_id"`
+	Subject  string `json:"subject"`
+	Message  string `json:"message"`
+	Priority string `json:"priority,omitempty"`
 }
 
 type portalContactSyncRequest struct {
@@ -315,6 +316,24 @@ func handlePortalCreateConversation(r *fastglue.Request) error {
 		cleanupPortalMedia(app, media)
 		return portalBadRequest(r, app, "Invalid conversation fields")
 	}
+	if req.Priority != "" {
+		priorities, err := app.priority.GetAll()
+		if err != nil {
+			cleanupPortalMedia(app, media)
+			return sendErrorEnvelope(r, err)
+		}
+		valid := false
+		for _, priority := range priorities {
+			if priority.Name == req.Priority {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			cleanupPortalMedia(app, media)
+			return portalBadRequest(r, app, "Invalid priority")
+		}
+	}
 	inbox, err := app.inbox.GetDBRecord(req.InboxID)
 	if err != nil || !inbox.Enabled || (inbox.Channel != "email" && inbox.Channel != "livechat") {
 		cleanupPortalMedia(app, media)
@@ -325,6 +344,13 @@ func handlePortalCreateConversation(r *fastglue.Request) error {
 	if err != nil {
 		cleanupPortalMedia(app, media)
 		return sendErrorEnvelope(r, err)
+	}
+	if req.Priority != "" {
+		if err := app.conversation.UpdateConversationPriority(uuidValue, 0, req.Priority, contact); err != nil {
+			_ = app.conversation.DeleteConversation(uuidValue)
+			cleanupPortalMedia(app, media)
+			return sendErrorEnvelope(r, err)
+		}
 	}
 	message, err := app.conversation.CreateContactMessage(media, contact.ID, uuidValue, req.Message, cmodels.ContentTypeText, true, "")
 	if err != nil {
@@ -412,11 +438,18 @@ func decodePortalWrite(r *fastglue.Request, creating bool, app *App) (portalWrit
 		}
 	}
 	for key := range form.Value {
+		if key != "inbox_id" && key != "subject" && key != "message" && (creating && key == "priority") {
+			continue
+		}
 		if key != "inbox_id" && key != "subject" && key != "message" {
 			return req, nil, portalWriteBadRequest(r, app, "Unknown form field")
 		}
 	}
-	for _, key := range []string{"inbox_id", "subject", "message"} {
+	allowedFields := []string{"inbox_id", "subject", "message"}
+	if creating {
+		allowedFields = append(allowedFields, "priority")
+	}
+	for _, key := range allowedFields {
 		if len(form.Value[key]) > 1 {
 			return req, nil, portalWriteBadRequest(r, app, "Duplicate form field")
 		}
@@ -429,6 +462,9 @@ func decodePortalWrite(r *fastglue.Request, creating bool, app *App) (portalWrit
 	}
 	if len(form.Value["message"]) > 0 {
 		req.Message = form.Value["message"][0]
+	}
+	if len(form.Value["priority"]) > 0 {
+		req.Priority = form.Value["priority"][0]
 	}
 	if !creating && (len(form.Value["inbox_id"]) > 0 || len(form.Value["subject"]) > 0) {
 		return req, nil, portalWriteBadRequest(r, app, "Unexpected field")
