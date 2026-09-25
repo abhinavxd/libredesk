@@ -259,6 +259,11 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 			"Priority":        conversation.Priority.String,
 			"UUID":            conversation.UUID,
 		},
+		// The inbox the message leaves from, so one outgoing template can sign or brand per inbox.
+		"Inbox": map[string]any{
+			"Name":    conversation.InboxName,
+			"Channel": conversation.InboxChannel,
+		},
 		"Contact": map[string]any{
 			"FirstName": conversation.Contact.FirstName,
 			"LastName":  conversation.Contact.LastName,
