@@ -1367,6 +1367,7 @@
   "helpCenter.cannotLinkArticleToItself": "An article cannot be its own translation.",
   "helpCenter.collectionLocaleMismatch": "The collection is in a different language than the article. Pick a collection in the article's language.",
   "helpCenter.createdBy": "Created by",
+  "helpCenter.customCodeDomainHint": "Custom CSS and JavaScript are disabled on the dashboard domain and in previews. Set a separate help-center domain to enable them on the public site.",
   "helpCenter.customCSS": "Custom CSS",
   "helpCenter.customDomain": "Custom domain (optional)",
   "helpCenter.customDomainHint": "Serve this help center on its own domain instead of the app URL. Point the domain at Libredesk in your DNS and reverse proxy first.",

@@ -31,6 +31,14 @@ func (u *Manager) MonitorUserAvailability(ctx context.Context, onUsersOffline fu
 	}
 }
 
+func (u *Manager) GetSessionVersion(userID int) (int, error) {
+	var version int
+	if err := u.q.GetSessionVersion.Get(&version, userID); err != nil {
+		return 0, err
+	}
+	return version, nil
+}
+
 // GetAgent retrieves an agent (or AI assistant) by ID and caches it.
 func (u *Manager) GetAgent(id int, email string) (models.User, error) {
 	agent, err := u.Get(id, email, []string{models.UserTypeAgent, models.UserTypeAIAssistant})

@@ -30,6 +30,7 @@ func IsPublicModel(modelType string) bool {
 
 // Media represents an uploaded object in DB and storage backend.
 type Media struct {
+	UploadedBy  null.Int        `db:"uploaded_by" json:"-"`
 	ID          int             `db:"id" json:"id"`
 	CreatedAt   time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt   time.Time       `db:"updated_at" json:"updated_at"`

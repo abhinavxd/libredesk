@@ -541,6 +541,7 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 	message := models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
+		UploadUserID:     senderID,
 		Type:             models.MessageOutgoing,
 		SenderType:       models.SenderTypeAgent,
 		Status:           models.MessageStatusSent,
@@ -566,11 +567,12 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 
 // CreateContactMessage creates a contact message in a conversation.
 // sourceID is the bare RFC 5322 Message-ID of the inbound message; it is normalized and stored on the message so replies thread on it, mirroring the IMAP ingestion path. Empty leaves the column NULL.
-func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, conversationUUID, content, contentType string, isNewConversation bool, sourceID string) (models.Message, error) {
+func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, conversationUUID, content, contentType string, isNewConversation bool, sourceID string, actorUserID int) (models.Message, error) {
 	sourceID = stringutil.NormalizeMessageID(sourceID)
 	message := models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         contactID,
+		UploadUserID:     actorUserID,
 		Type:             models.MessageIncoming,
 		SenderType:       models.SenderTypeContact,
 		Status:           models.MessageStatusReceived,
@@ -675,6 +677,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	message = models.Message{
 		ConversationUUID:  conversationUUID,
 		SenderID:          senderID,
+		UploadUserID:      senderID,
 		Type:              models.MessageOutgoing,
 		SenderType:        models.SenderTypeAgent,
 		Status:            models.MessageStatusPending,
@@ -747,7 +750,7 @@ func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]strin
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	if err := m.mediaStore.LinkMessageMediaTx(tx, message.ID, message.Media, inlineUUIDs); err != nil {
+	if err := m.mediaStore.LinkMessageMediaTx(tx, message.ID, message.Media, inlineUUIDs, message.UploadUserID); err != nil {
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return inlineUUIDs, nil

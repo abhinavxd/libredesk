@@ -53,37 +53,37 @@ export default defineConfig(({ mode, command }) => {
       proxy: {
         '/api': {
           target: apiTarget,
-          changeOrigin: true,
+          changeOrigin: false,
         },
         '/widget.js': {
           target: apiTarget,
-          changeOrigin: true,
+          changeOrigin: false,
         },
         '/static': {
           target: apiTarget,
-          changeOrigin: true,
+          changeOrigin: false,
         },
         '/logout': {
           target: apiTarget,
-          changeOrigin: true,
+          changeOrigin: false,
         },
         '/uploads': {
           target: apiTarget,
-          changeOrigin: true,
+          changeOrigin: false,
         },
         '/webhooks': {
           target: apiTarget,
-          changeOrigin: true,
+          changeOrigin: false,
         },
         '/ws': {
           target: wsTarget,
           ws: true,
-          changeOrigin: true,
+          changeOrigin: false,
         },
         '/widget/ws': {
           target: wsTarget,
           ws: true,
-          changeOrigin: true,
+          changeOrigin: false,
         }
       },
     },
