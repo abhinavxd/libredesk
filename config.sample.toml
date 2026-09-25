@@ -33,6 +33,10 @@ max_body_size = 104857600
 read_buffer_size = 65536
 # Keepalive settings.
 keepalive_timeout = "10s"
+# Origins allowed to call the API from a browser (CORS), eg ["https://admin.example.com"].
+# Requests must authenticate with an API key; cookies/sessions are never allowed cross-origin.
+# Leave empty to disable CORS.
+cors_allowed_origins = []
 
 [auth]
 # Allow users to sign in with their libredesk email and password.

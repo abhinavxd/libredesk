@@ -351,6 +351,7 @@ func main() {
 	g := fastglue.NewGlue()
 	g.SetContext(app)
 	initHandlers(g, wsHub)
+	initCORS(g, ko)
 	g.Router.NotFound = helpCenterHostNotFound(app, g)
 
 	// Buffers above this are dropped rather than reused, and the ones we keep stay with the connection until it closes.
