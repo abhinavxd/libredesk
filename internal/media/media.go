@@ -263,7 +263,7 @@ func (m *Manager) GetURL(uuid, contentType, fileName string) string {
 }
 
 func (m *Manager) GetURLForDownload(uuid, fileName string) string {
-	return m.store.GetURL(uuid, "attachment", fileName)
+	return m.store.GetURL(uuid, models.DispositionAttachment, fileName)
 }
 
 // GetSignedURL generates a signed URL for secure media access if the store supports it.
@@ -290,7 +290,7 @@ func (m *Manager) GetThumbnailURL(uuid string) string {
 			return u.String()
 		}
 	}
-	return m.store.GetURL(image.ThumbPrefix+uuid, "inline", "")
+	return m.store.GetURL(image.ThumbPrefix+uuid, models.DispositionInline, "")
 }
 
 // SignedURLValidator returns the store's signature validator if available.
@@ -409,7 +409,7 @@ func (m *Manager) detectContentType(sourceContentType string, content io.ReadSee
 	sourceContentType = models.NormalizeContentType(sourceContentType)
 
 	// Trust source unless it's a generic/useless type
-	if sourceContentType != "application/octet-stream" &&
+	if sourceContentType != models.ContentTypeOctetStream &&
 		sourceContentType != "application/data" &&
 		sourceContentType != "application/binary" {
 		m.lo.Debug("detected media content type from trusted source", "detected_type", sourceContentType)
@@ -426,7 +426,7 @@ func (m *Manager) detectContentType(sourceContentType string, content io.ReadSee
 
 	// If stdlib gives a useful type, use it.
 	// stdlib defaults to application/octet-stream for unknown types.
-	if detected != "application/octet-stream" {
+	if detected != models.ContentTypeOctetStream {
 		content.Seek(0, io.SeekStart)
 		m.lo.Debug("detected media content type using stdlib", "detected_type", detected, "source_type", sourceContentType)
 		return detected, nil
