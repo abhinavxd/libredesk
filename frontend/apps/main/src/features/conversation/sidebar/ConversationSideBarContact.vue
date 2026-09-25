@@ -27,16 +27,18 @@
       </Button>
     </div>
 
-    <div class="h-6 flex items-center gap-2">
+    <div class="min-h-6 flex items-center gap-2">
       <router-link
         v-if="userStore.can('contacts:read') && conversation?.contact_id"
         :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
-        class="flex items-center gap-2 hover:underline cursor-pointer"
+        class="flex min-w-0 items-center gap-2 hover:underline cursor-pointer"
       >
-        {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
+        <span class="min-w-0 break-words">
+          {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
+        </span>
         <ExternalLink size="16" class="text-muted-foreground flex-shrink-0" />
       </router-link>
-      <span v-else>
+      <span v-else class="min-w-0 break-words">
         {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
       </span>
     </div>
