@@ -57,7 +57,7 @@ const (
 	helpCenterCacheGroup = "helpcenter"
 
 	helpCenterCacheNamespaceKey = "hc_cache_ns"
-	helpCenterCacheNamespace    = "hc-isolated"
+	helpCenterCacheNamespace    = "hc"
 
 	helpCenterXMLCacheControl = "public, max-age=300, stale-while-revalidate=3600"
 
@@ -1778,10 +1778,6 @@ func sidebarTree(app *App, hc hcmodels.HelpCenter, locale string) []hcmodels.Tre
 
 // helpCenterTemplateData shapes a help center row for the public templates.
 func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
-	customCSS, customJS := "", ""
-	if helpCenterCustomCodeAllowed(helpCenterRootURL(app), string(r.RequestCtx.Host()), hc.CustomDomain) {
-		customCSS, customJS = hc.CustomCSS, hc.CustomJS
-	}
 	theme := helpCenterTheme(hc)
 	theme.Favicon = publicAssetPaths(app, theme.Favicon)
 	theme.Header.BackgroundImage = publicAssetPaths(app, theme.Header.BackgroundImage)
@@ -1818,8 +1814,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"TaglineHTML":       template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
 		"FooterTaglineHTML": template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
 		"AnnouncementHTML":  template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text)),
-		"CustomCSS":         template.CSS(customCSS),
-		"CustomJS":          template.JS(customJS),
+		"CustomCSS":         template.CSS(hc.CustomCSS),
+		"CustomJS":          template.JS(hc.CustomJS),
 		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
 		"WidgetRootURL":     helpCenterRootURL(app),
 		"Embed":             embed,
@@ -2172,11 +2168,4 @@ func resolveColorScheme(scheme, requested string, embed bool) colorSchemeResult 
 	res.showToggle = scheme == hcmodels.ColorSchemeSystem && !embed
 	res.followSystem = res.showToggle && requested == ""
 	return res
-}
-
-func helpCenterCustomCodeAllowed(rootURL, requestHost, customDomain string) bool {
-	rootHost, customHost := urlHostname(rootURL), urlHostname(customDomain)
-	return rootHost != "" && customHost != "" &&
-		!strings.EqualFold(rootHost, customHost) &&
-		strings.EqualFold(hostWithoutPort(requestHost), customHost)
 }
