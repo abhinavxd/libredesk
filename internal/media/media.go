@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -260,15 +259,7 @@ func (m *Manager) GetBlob(name string) ([]byte, error) {
 
 // GetURL returns the URL for accessing a media file by its name.
 func (m *Manager) GetURL(uuid, contentType, fileName string) string {
-	// Keep some content types inline. SVG excluded.
-	disposition := "attachment"
-	if contentType != "image/svg+xml" &&
-		(strings.HasPrefix(contentType, "image/") ||
-			strings.HasPrefix(contentType, "video/") ||
-			contentType == "application/pdf") {
-		disposition = "inline"
-	}
-	return m.store.GetURL(uuid, disposition, fileName)
+	return m.store.GetURL(uuid, models.ContentDisposition(contentType), fileName)
 }
 
 func (m *Manager) GetURLForDownload(uuid, fileName string) string {
@@ -415,15 +406,7 @@ func (m *Manager) deleteUnlinkedRows(stmt *sqlx.Stmt) error {
 // For generic types, it uses http.DetectContentType (stdlib) as a fast path,
 // falling back to mimetype library for deeper inspection using magic numbers.
 func (m *Manager) detectContentType(sourceContentType string, content io.ReadSeeker) (string, error) {
-	// Set default if empty
-	if sourceContentType == "" {
-		sourceContentType = "application/octet-stream"
-	}
-
-	// Handle "image/svg+xml; charset=utf-8", keep just the type.
-	if mediaType, _, err := mime.ParseMediaType(sourceContentType); err == nil && mediaType != "" {
-		sourceContentType = mediaType
-	}
+	sourceContentType = models.NormalizeContentType(sourceContentType)
 
 	// Trust source unless it's a generic/useless type
 	if sourceContentType != "application/octet-stream" &&

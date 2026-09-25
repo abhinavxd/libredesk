@@ -255,22 +255,18 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 	consts := app.consts.Load().(*constants)
 	switch consts.UploadProvider {
 	case "fs":
-		disposition := "attachment"
-
-		// Inline images/videos/pdfs. SVG excluded.
-		if !forceDownload &&
-			media.ContentType != "image/svg+xml" &&
-			(strings.HasPrefix(media.ContentType, "image/") ||
-				strings.HasPrefix(media.ContentType, "video/") ||
-				media.ContentType == "application/pdf") {
-			disposition = "inline"
+		// Older rows hold content types exactly as the client sent them.
+		contentType := mmodels.NormalizeContentType(media.ContentType)
+		disposition := mmodels.ContentDisposition(contentType)
+		if forceDownload {
+			disposition = mmodels.DispositionAttachment
 		}
 
-		r.RequestCtx.Response.Header.Set("Content-Type", media.ContentType)
+		r.RequestCtx.Response.Header.Set("Content-Type", contentType)
 		r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": media.Filename}))
 		r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
-		// Sandbox SVGs.
-		if media.ContentType == "image/svg+xml" {
+		// Chrome's PDF viewer does not load in a sandboxed page.
+		if contentType != mmodels.ContentTypePDF {
 			r.RequestCtx.Response.Header.Set("Content-Security-Policy", "sandbox")
 		}
 		r.RequestCtx.Response.Header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, immutable", cacheVisibility(media.Private), int(mediaCacheTTL.Seconds())))
