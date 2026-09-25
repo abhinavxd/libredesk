@@ -524,7 +524,7 @@ const processSend = async (
     if (!isWhatsAppWindowOpen(conversationStore.current)) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
-        description: t('conversation.whatsapp.windowClosed.description')
+        description: t('conversation.whatsapp.error.windowClosed')
       })
       return
     }

@@ -180,9 +180,6 @@
             <FormControl>
               <Input type="text" placeholder="v26.0" v-bind="componentField" />
             </FormControl>
-            <FormDescription>
-              {{ $t('admin.inbox.whatsapp.apiVersion.description') }}
-            </FormDescription>
             <FormMessage />
           </FormItem>
         </FormField>

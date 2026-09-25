@@ -6,12 +6,7 @@
     >
       <div class="flex items-start gap-2 text-sm">
         <TriangleAlert class="size-4 mt-0.5 text-destructive shrink-0" />
-        <div>
-          <p class="font-medium">{{ $t('conversation.whatsapp.windowClosed.title') }}</p>
-          <p class="text-muted-foreground text-xs">
-            {{ $t('conversation.whatsapp.windowClosed.description') }}
-          </p>
-        </div>
+        <p class="font-medium">{{ $t('conversation.whatsapp.windowClosed.title') }}</p>
       </div>
       <Button size="sm" variant="outline" @click="openTemplatePicker">
         {{ $t('globals.messages.sendTemplate') }}

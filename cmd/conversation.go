@@ -1162,11 +1162,11 @@ func localPhoneNumber(app *App, phone, dialCode string) (string, error) {
 		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.phoneCountryMismatch"), nil)
 	}
 	if phone == "" {
-		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.enterValidPhoneNumber"), nil)
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidPhone"), nil)
 	}
 	local := strings.TrimPrefix(phone, dialCode)
 	if local == "" {
-		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.enterValidPhoneNumber"), nil)
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidPhone"), nil)
 	}
 	return local, nil
 }

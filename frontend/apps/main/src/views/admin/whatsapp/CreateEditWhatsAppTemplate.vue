@@ -176,7 +176,7 @@
 
             <FormField v-slot="{ componentField, handleChange, meta }" name="footer_content">
               <FormItem>
-                <FormLabel>{{ $t('globals.messages.footerOptional') }}</FormLabel>
+                <FormLabel>{{ $t('globals.terms.footer') }}</FormLabel>
                 <FormControl>
                   <Input
                     type="text"
