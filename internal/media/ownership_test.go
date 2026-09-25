@@ -31,7 +31,7 @@ func TestPendingMediaOwnership(t *testing.T) {
 	}
 	for _, uploader := range []int{owner, other, 0} {
 		var med models.Media
-		if err := db.Get(&med, `INSERT INTO media (store, filename, content_type, model_type, uploaded_by) VALUES ('fs', 'draft.png', 'image/png', 'messages', NULLIF($1, 0)) RETURNING id, uuid`, uploader); err != nil {
+		if err := db.Get(&med, `INSERT INTO media (store, filename, content_type, content_id, size, model_type, uploaded_by) VALUES ('fs', 'draft.png', 'image/png', '', 1, 'messages', NULLIF($1, 0)) RETURNING id, uuid`, uploader); err != nil {
 			t.Fatal(err)
 		}
 		_, err := m.GetDraftInlineMedia(med.UUID, 0 /** conversationID **/, owner)
