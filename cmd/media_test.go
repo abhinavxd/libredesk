@@ -55,21 +55,28 @@ func TestServeMediaFileSandboxesAllButPDF(t *testing.T) {
 	app.consts.Store(&constants{UploadProvider: "fs"})
 
 	tests := []struct {
+		name            string
 		contentType     string
+		download        bool
 		wantType        string
 		wantDisposition string
 		wantSandbox     bool
 	}{
-		{"image/svg+xml", "image/svg+xml", "attachment", true},
-		{"image/svg+xml; x", "image/svg+xml", "attachment", true},
-		{"image/x+xml", "image/x+xml", "attachment", true},
-		{"text/plain,image/svg+xml", "application/octet-stream", "attachment", true},
-		{"image/png", "image/png", "inline", true},
-		{"application/pdf", "application/pdf", "inline", false},
+		{"svg", "image/svg+xml", false, "image/svg+xml", "attachment", true},
+		{"svg with bad param", "image/svg+xml; x", false, "image/svg+xml", "attachment", true},
+		{"other xml image", "image/x+xml", false, "image/x+xml", "attachment", true},
+		{"unparseable", "text/plain,image/svg+xml", false, "application/octet-stream", "attachment", true},
+		{"png", "image/png", false, "image/png", "inline", true},
+		{"png forced download", "image/png", true, "image/png", "attachment", true},
+		{"pdf", "application/pdf", false, "application/pdf", "inline", false},
+		{"pdf forced download", "application/pdf", true, "application/pdf", "attachment", false},
 	}
 	for _, tt := range tests {
-		t.Run(tt.contentType, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			req := &fastglue.Request{RequestCtx: &fasthttp.RequestCtx{}, Context: app}
+			if tt.download {
+				req.RequestCtx.Request.SetRequestURI("/uploads/" + uuid + "?download=1")
+			}
 			media := &mmodels.Media{ContentType: tt.contentType, Filename: "file", Private: true}
 			if err := serveMediaFile(req, app, uuid, media); err != nil {
 				t.Fatal(err)

@@ -290,7 +290,7 @@ func (m *Manager) GetThumbnailURL(uuid string) string {
 			return u.String()
 		}
 	}
-	return m.store.GetURL(image.ThumbPrefix+uuid, models.DispositionInline, "")
+	return m.store.GetURL(image.ThumbPrefix+uuid, models.DispositionInline, "" /** fileName **/)
 }
 
 // SignedURLValidator returns the store's signature validator if available.
