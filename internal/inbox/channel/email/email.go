@@ -1,4 +1,5 @@
-// Package email provides functionality for an email inbox with multiple SMTP servers and IMAP clients.
+// Package email provides functionality for an email inbox, either over multiple SMTP servers
+// and IMAP clients, or via an HTTPS transactional email API provider (e.g. Resend).
 package email
 
 import (
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/httpapi"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/knadh/smtppool"
@@ -19,15 +21,20 @@ const (
 	ChannelEmail = "email"
 )
 
-// Email represents the email inbox with multiple SMTP servers and IMAP clients.
+// Email represents the email inbox with multiple SMTP servers and IMAP clients, or,
+// when configured for the HTTP API transport, an HTTPS transactional email provider
+// (e.g. Resend) reached over its REST API instead.
 type Email struct {
 	id                   int
 	name                 string
+	transport            string // models.TransportSMTPIMAP (default) or models.TransportHTTPAPI
 	smtpPools            []*smtppool.Pool
 	smtpPoolsMu          sync.RWMutex
 	smtpPoolsToken       string
 	smtpCfg              []models.SMTPConfig
 	imapCfg              []models.IMAPConfig
+	httpAPICfg           *models.HTTPAPIConfig
+	httpProvider         httpapi.Provider
 	oauth                *models.OAuthConfig
 	oauthMu              sync.RWMutex
 	authType             string
@@ -59,9 +66,31 @@ type Opts struct {
 
 // New returns a new instance of the email inbox.
 func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email, error) {
-	pools, err := NewSmtpPool(opts.Config.SMTP, opts.Config.OAuth)
-	if err != nil {
-		return nil, err
+	transport := opts.Config.Transport
+	if transport == "" {
+		transport = models.TransportSMTPIMAP
+	}
+
+	var (
+		pools        []*smtppool.Pool
+		httpProvider httpapi.Provider
+		err          error
+	)
+
+	switch transport {
+	case models.TransportHTTPAPI:
+		if opts.Config.HTTPAPI == nil {
+			return nil, fmt.Errorf("http_api config is required for the http_api transport")
+		}
+		httpProvider, err = httpapi.New(*opts.Config.HTTPAPI)
+		if err != nil {
+			return nil, fmt.Errorf("initializing http api provider: %w", err)
+		}
+	default:
+		pools, err = NewSmtpPool(opts.Config.SMTP, opts.Config.OAuth)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var poolsToken string
@@ -72,12 +101,15 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 	e := &Email{
 		id:                   opts.ID,
 		name:                 opts.Name,
+		transport:            transport,
 		headers:              opts.Headers,
 		from:                 opts.Config.From,
 		fromNameTemplate:     opts.Config.FromNameTemplate,
 		replyTo:              opts.Config.ReplyTo,
 		smtpCfg:              opts.Config.SMTP,
 		imapCfg:              opts.Config.IMAP,
+		httpAPICfg:           opts.Config.HTTPAPI,
+		httpProvider:         httpProvider,
 		lo:                   opts.Lo,
 		smtpPools:            pools,
 		smtpPoolsToken:       poolsToken,
@@ -96,8 +128,16 @@ func (e *Email) Identifier() int {
 	return e.id
 }
 
-// Receive starts reading incoming messages for each IMAP client.
+// Receive starts reading incoming messages for each IMAP client. For the HTTP API transport,
+// inbound mail arrives via the provider's webhook (see ReceiveWebhook) instead of polling, so
+// this just blocks until the inbox is shut down, keeping the manager's receiver-goroutine
+// lifecycle unchanged for both transports.
 func (e *Email) Receive(ctx context.Context) error {
+	if e.transport == models.TransportHTTPAPI {
+		<-ctx.Done()
+		return nil
+	}
+
 	for _, cfg := range e.imapCfg {
 		e.wg.Add(1)
 		go func(cfg models.IMAPConfig) {
@@ -111,8 +151,11 @@ func (e *Email) Receive(ctx context.Context) error {
 	return nil
 }
 
-// Close cloes email channel by closing the smtp pool
+// Close closes the email channel, closing the SMTP pool if the transport uses one.
 func (e *Email) Close() error {
+	if e.transport == models.TransportHTTPAPI {
+		return nil
+	}
 	return e.closeSMTPPool()
 }
 
@@ -148,8 +191,10 @@ func (e *Email) getCurrentConfig() models.Config {
 	e.oauthMu.RUnlock()
 
 	return models.Config{
+		Transport:            e.transport,
 		SMTP:                 e.smtpCfg,
 		IMAP:                 e.imapCfg,
+		HTTPAPI:              e.httpAPICfg,
 		From:                 e.from,
 		FromNameTemplate:     e.fromNameTemplate,
 		ReplyTo:              e.replyTo,
