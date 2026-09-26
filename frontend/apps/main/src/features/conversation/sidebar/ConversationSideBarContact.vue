@@ -63,7 +63,7 @@
         {{ t('conversation.sidebar.notAvailable') }}
       </span>
     </div>
-    <div class="flex gap-2 items-center">
+    <div v-if="conversation?.contact?.phone_number" class="flex gap-2 items-center">
       <Phone size="16" class="text-muted-foreground flex-shrink-0" />
       <span class="sidebar-value">
         {{ phoneNumber }}
@@ -145,7 +145,7 @@ const userStore = useUserStore()
 
 const phoneNumber = computed(() => {
   const countryCodeValue = conversation.value?.contact?.phone_number_country_code || ''
-  const number = conversation.value?.contact?.phone_number || t('conversation.sidebar.notAvailable')
+  const number = conversation.value?.contact?.phone_number
   if (!countryCodeValue) return number
 
   // Lookup calling code
