@@ -47,6 +47,7 @@ var (
 
 	ActivityStatusChange        = "status_change"
 	ActivityPriorityChange      = "priority_change"
+	ActivitySubjectChange       = "subject_change"
 	ActivityAssignedUserChange  = "assigned_user_change"
 	ActivityAssignedTeamChange  = "assigned_team_change"
 	ActivityAssigneeUserRemoved = "assignee_user_removed"
