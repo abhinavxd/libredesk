@@ -63,6 +63,12 @@
     </AlertDialogContent>
   </AlertDialog>
 
+  <ReplyGuardDialog
+    v-model:open="showReplyGuard"
+    :matches="replyGuardMatches"
+    @confirm="processSend(true, true, deferredStatus, true)"
+  />
+
   <div class="text-foreground">
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
@@ -217,6 +223,9 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
+import ReplyGuardDialog from '@/features/conversation/ReplyGuardDialog.vue'
+import { findReplyGuardMatches } from '@/features/conversation/replyGuard'
+import { useAppSettingsStore } from '@main/stores/appSettings'
 import { UserTypeAgent } from '@/constants/user'
 import { permissions as perms } from '@main/constants/permissions.js'
 
@@ -224,6 +233,7 @@ const { t } = useI18n()
 const conversationStore = useConversationStore()
 const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
+const appSettingsStore = useAppSettingsStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
 const isCramped = useIsComposerCramped()
@@ -355,6 +365,8 @@ const activeContentRef = () =>
   isEditorFullscreen.value ? fullscreenContentRef.value : replyBoxContentRef.value
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
+const showReplyGuard = ref(false)
+const replyGuardMatches = ref([])
 const pendingToolApproval = ref(null)
 const pendingToolConversationUUID = ref('')
 const deferredStatus = ref(null)
@@ -502,7 +514,8 @@ const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.
 const processSend = async (
   skipContactEmailCheck = false,
   skipMissingTagsCheck = false,
-  statusToSet = null
+  statusToSet = null,
+  skipReplyGuard = false
 ) => {
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
@@ -569,6 +582,22 @@ const processSend = async (
       }
     }
   }
+
+  // Checked last, so "Send anyway" in its dialog is the final step before sending.
+  if (!isPrivate && !skipReplyGuard) {
+    const matches = findReplyGuardMatches({
+      text: textContent.value,
+      html,
+      phrases: appSettingsStore.settings['app.reply_guard_phrases']
+    })
+    if (matches.length > 0) {
+      replyGuardMatches.value = matches
+      deferredStatus.value = statusToSet
+      showReplyGuard.value = true
+      return
+    }
+  }
+
   let tempUUIDs = []
 
   // Add pending message to cache for instant display.
