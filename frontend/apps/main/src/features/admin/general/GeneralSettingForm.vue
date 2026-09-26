@@ -94,6 +94,19 @@
             <FormMessage />
           </FormItem>
         </FormField>
+
+        <FormField v-slot="{ componentField }" name="reply_guard_phrases">
+          <FormItem class="col-span-full">
+            <FormLabel>{{ t('admin.general.replyGuardPhrases') }}</FormLabel>
+            <FormControl>
+              <Textarea rows="4" v-bind="componentField" />
+            </FormControl>
+            <FormDescription>
+              {{ t('admin.general.replyGuardPhrases.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
       </FormGrid>
       <FormField v-slot="{ componentField, handleChange }" name="show_conversation_subject">
         <FormItem class="mt-5">
@@ -211,6 +224,7 @@ import {
   TagsInputItemText
 } from '@shared-ui/components/ui/tags-input/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
+import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
