@@ -802,6 +802,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (!conversation.data) return
     const uuid = conversation.data.uuid
     const previous = conversation.data.subject
+    v = v.replace(/\s+/g, ' ').trim()
     if ((previous || '') === v) return
     conversation.data.subject = v
     try {
