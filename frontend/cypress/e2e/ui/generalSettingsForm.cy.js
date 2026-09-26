@@ -14,7 +14,8 @@ describe('General settings form', () => {
     'app.allowed_file_upload_extensions',
     'app.timezone',
     'app.business_hours_id',
-    'app.show_conversation_subject'
+    'app.show_conversation_subject',
+    'app.reply_guard_phrases'
   ]
 
   let original

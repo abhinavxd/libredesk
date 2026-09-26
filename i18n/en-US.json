@@ -287,6 +287,8 @@
   "admin.general.maxAllowedFileUploadSize": "Max allowed file upload size",
   "admin.general.maxAllowedFileUploadSize.description": "Max allowed file upload size in MB.",
   "admin.general.maxAllowedFileUploadSize.valid": "Max allowed file upload size should be between 1 and 500 MB",
+  "admin.general.replyGuardPhrases": "Warn before sending a reply that contains",
+  "admin.general.replyGuardPhrases.description": "One word or phrase per line, matched as a whole word in any case. Mentions, unfilled placeholders and keys are always checked.",
   "admin.general.rootURL.description": "Root URL for the app. (No trailing slash).",
   "admin.general.rootURL.valid": "Root URL should be a valid URL",
   "admin.general.siteName": "Site name",
