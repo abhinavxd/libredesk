@@ -336,6 +336,12 @@ const updateConversationPriority = (uuid, data) =>
       'Content-Type': 'application/json'
     }
   })
+const updateConversationSubject = (uuid, data) =>
+  http.put(`/api/v1/conversations/${uuid}/subject`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const updateAssigneeLastSeen = (uuid, messageUUID) => http.put(`/api/v1/conversations/${uuid}/last-seen`, { message_uuid: messageUUID })
 const markConversationAsUnread = (uuid) => http.put(`/api/v1/conversations/${uuid}/mark-unread`)
 const getConversationMessage = (cuuid, uuid) =>
@@ -736,6 +742,7 @@ export default {
   updateAssignee,
   updateConversationStatus,
   updateConversationPriority,
+  updateConversationSubject,
   upsertTags,
   updateConversationCustomAttribute,
   updateContactCustomAttribute,
