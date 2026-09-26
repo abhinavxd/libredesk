@@ -55,6 +55,28 @@
       </FormItem>
     </FormField>
 
+    <FormField v-slot="{ componentField }" name="time_format">
+      <FormItem>
+        <FormLabel>
+          {{ t('admin.general.timeFormat') }}
+        </FormLabel>
+        <FormControl>
+          <Select v-bind="componentField">
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="12h">{{ t('admin.general.timeFormat.12h') }}</SelectItem>
+                <SelectItem value="24h">{{ t('admin.general.timeFormat.24h') }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <FormField v-slot="{ componentField }" name="business_hours_id">
       <FormItem>
         <FormLabel>

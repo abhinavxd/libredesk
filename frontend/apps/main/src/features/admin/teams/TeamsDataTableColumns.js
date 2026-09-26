@@ -1,7 +1,7 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import TeamDataTableDropdown from '@/features/admin/teams/TeamDataTableDropdown.vue'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 import { getI18n } from '@/i18n'
 
 const t = () => getI18n().global.t
@@ -34,7 +34,7 @@ export const columns = [
       return h(
         'div',
         { class: 'text-center' },
-        format(row.getValue('created_at'), 'PPpp')
+        formatDateTime(row.getValue('created_at'))
       )
     }
   },
@@ -47,7 +47,7 @@ export const columns = [
       return h(
         'div',
         { class: 'text-center' },
-        format(row.getValue('updated_at'), 'PPpp')
+        formatDateTime(row.getValue('updated_at'))
       )
     }
   },

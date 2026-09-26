@@ -30,10 +30,27 @@ export const formatDuration = (seconds, showSeconds = true) => {
   return `${hours}h ${mins}m ${showSeconds ? `${secs}s` : ''}`
 }
 
+// Desk-wide time format, '12h' or '24h'. The agent app sets it once settings load, the widget keeps the default.
+let timeFormat = '12h'
+
+export const setTimeFormat = (value) => {
+  timeFormat = value === '24h' ? '24h' : '12h'
+}
+
+// timePattern returns the date-fns time pattern for the desk-wide time format.
+export const timePattern = (withSeconds = false) => {
+  if (timeFormat === '24h') return withSeconds ? 'HH:mm:ss' : 'HH:mm'
+  return withSeconds ? 'pp' : 'p'
+}
+
 export const formatMessageTimestamp = (time) => {
-  return format(time, 'd MMM, hh:mm a')
+  return format(time, timeFormat === '24h' ? 'd MMM, HH:mm' : 'd MMM, hh:mm a')
 }
 
 export const formatFullTimestamp = (time) => {
-  return format(time, 'd MMM yyyy, hh:mm a')
+  return format(time, timeFormat === '24h' ? 'd MMM yyyy, HH:mm' : 'd MMM yyyy, hh:mm a')
+}
+
+export const formatDateTime = (time) => {
+  return format(time, timeFormat === '24h' ? 'PP, HH:mm:ss' : 'PPpp')
 }
