@@ -152,6 +152,19 @@
         <FormMessage />
       </FormItem>
     </FormField>
+
+    <FormField v-slot="{ componentField }" name="reply_guard_phrases">
+      <FormItem>
+        <FormLabel>{{ t('admin.general.replyGuardPhrases') }}</FormLabel>
+        <FormControl>
+          <Textarea rows="4" v-bind="componentField" />
+        </FormControl>
+        <FormDescription>
+          {{ t('admin.general.replyGuardPhrases.description') }}
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
     </div>
 
     <div class="grid gap-6 md:grid-cols-2">
@@ -201,6 +214,7 @@ import {
   TagsInputItemText
 } from '@shared-ui/components/ui/tags-input/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
+import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
