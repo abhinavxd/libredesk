@@ -8,7 +8,7 @@
 // One name/version token plus a single parenthesised platform, and nothing else.
 const PRODUCT_UA = /^([A-Za-z][A-Za-z0-9 ._-]*?)\/(\d[A-Za-z0-9.+-]*)\s*\(([A-Za-z][A-Za-z0-9 ._-]*)\)$/
 
-const MACHINE_UA = /^(curl|wget|node|axios|go-http-client|python-requests)(\/|$)|bot\b|crawler|spider/i
+const MACHINE_UA = /^(curl|wget|node|node-fetch|axios|go-http-client|python-requests)(\/|$)|bot\b|crawler|spider/i
 
 const MOBILE = /\b(android|ios|ipados|iphone|ipad|mobile)\b/i
 

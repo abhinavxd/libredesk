@@ -44,6 +44,7 @@ describe('formatUserAgent', () => {
     expect(formatUserAgent('curl/8.5.0')).toBeNull()
     expect(formatUserAgent('Wget/1.21.4')).toBeNull()
     expect(formatUserAgent('python-requests/2.31.0')).toBeNull()
+    expect(formatUserAgent('node-fetch/1.0 (+https://github.com/bitinn/node-fetch)')).toBeNull()
     expect(formatUserAgent('ExampleBot/1.0 (+https://example.com/bot)')).toBeNull()
     expect(formatUserAgent('Mozilla/5.0 (compatible; examplebot/2.1)')).toBeNull()
   })
