@@ -76,21 +76,20 @@
       </span>
     </div>
 
-    <!-- Livechat visitor info -->
-    <template v-if="isLivechat">
-      <div v-if="conversation?.contact?.country" class="flex gap-2 items-center">
-        <Globe size="16" class="text-muted-foreground flex-shrink-0" />
-        <span class="sidebar-value">{{ countryName }}</span>
-      </div>
-      <div v-if="conversation?.meta?.ip" class="flex gap-2 items-center">
-        <Monitor size="16" class="text-muted-foreground flex-shrink-0" />
-        <span class="sidebar-value break-all">{{ conversation.meta.ip }}</span>
-      </div>
-      <div v-if="conversation?.meta?.user_agent" class="flex gap-2 items-center">
-        <Smartphone size="16" class="text-muted-foreground flex-shrink-0" />
-        <span class="sidebar-value break-all">{{ parsedUA }}</span>
-      </div>
-    </template>
+    <div v-if="conversation?.contact?.country" class="flex gap-2 items-center">
+      <Globe size="16" class="text-muted-foreground flex-shrink-0" />
+      <span class="sidebar-value">{{ countryName }}</span>
+    </div>
+
+    <!-- Recorded per conversation by the livechat widget -->
+    <div v-if="conversation?.meta?.ip" class="flex gap-2 items-center">
+      <Monitor size="16" class="text-muted-foreground flex-shrink-0" />
+      <span class="sidebar-value break-all">{{ conversation.meta.ip }}</span>
+    </div>
+    <div v-if="conversation?.meta?.user_agent" class="flex gap-2 items-center">
+      <Smartphone size="16" class="text-muted-foreground flex-shrink-0" />
+      <span class="sidebar-value break-all">{{ parsedUA }}</span>
+    </div>
 
     <!-- Context Links -->
     <template v-if="contextLinks.length > 0">
