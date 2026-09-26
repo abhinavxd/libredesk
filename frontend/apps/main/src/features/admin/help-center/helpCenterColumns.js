@@ -1,5 +1,5 @@
 import { h } from 'vue'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import HelpCenterDropdown from './HelpCenterDropdown.vue'
 
@@ -50,7 +50,7 @@ export const createHelpCenterColumns = (t, { onOpen, onEdit, onDelete, onToggle 
     enableGlobalFilter: false,
     header: () => h('div', { class: 'text-center' }, t('globals.terms.updatedAt')),
     cell: ({ row }) =>
-      h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      h('div', { class: 'text-center' }, formatDateTime(row.getValue('updated_at')))
   },
   {
     id: 'actions',

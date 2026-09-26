@@ -29,7 +29,7 @@ import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useInboxStore } from '@main/stores/inbox'
 import api from '@main/api'
@@ -142,7 +142,7 @@ const columns = [
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h('div', { class: 'text-center' }, formatDateTime(row.getValue('created_at')))
     }
   },
   {
@@ -151,7 +151,7 @@ const columns = [
       return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      return h('div', { class: 'text-center' }, formatDateTime(row.getValue('updated_at')))
     }
   },
   {
