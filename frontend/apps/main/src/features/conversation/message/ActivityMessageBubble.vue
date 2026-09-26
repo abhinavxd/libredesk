@@ -4,7 +4,7 @@
       {{ message.content }}
       <Tooltip>
         <TooltipTrigger>
-          <span class="text-xs ml-1">{{ format(message.updated_at, 'h:mm a') }}</span>
+          <span class="text-xs ml-1">{{ format(message.updated_at, timePattern()) }}</span>
         </TooltipTrigger>
         <TooltipContent>
           <p>
@@ -18,6 +18,7 @@
 
 <script setup>
 import { format } from 'date-fns'
+import { timePattern } from '@shared-ui/utils/datetime.js'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 
 defineProps({
