@@ -2,7 +2,9 @@ package user
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -15,6 +17,9 @@ import (
 func (u *Manager) ResolveContact(user *models.User, policy models.ContactPolicy) error {
 	if len(user.CustomAttributes) == 0 {
 		user.CustomAttributes = []byte("{}")
+	}
+	if len(user.ExternalSync) == 0 {
+		user.ExternalSync = []byte("{}")
 	}
 
 	user.Email = null.NewString(strings.ToLower(strings.TrimSpace(user.Email.String)), user.Email.Valid)
@@ -54,6 +59,65 @@ func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email, pho
 		return fmt.Errorf("updating contact basic info: %w", err)
 	}
 	return nil
+}
+
+// SyncContactExternalIdentity brings a contact's identity fields in line with what an external
+// integration supplies, keeping any field an agent corrected by hand (see models.ResolveExternalSync),
+// and records what the integration supplied. The read, the decision and the write run under one row
+// lock, so neither an agent's edit nor a second sync can slip in between them. It returns the fields
+// that were written; an unchanged claim writes nothing.
+func (u *Manager) SyncContactExternalIdentity(id int, incoming map[string]string) (map[string]string, error) {
+	tx, err := u.db.Beginx()
+	if err != nil {
+		u.lo.Error("error beginning contact identity sync", "contact_id", id, "error", err)
+		return nil, fmt.Errorf("beginning contact identity sync: %w", err)
+	}
+	defer tx.Rollback()
+
+	var row struct {
+		FirstName              string          `db:"first_name"`
+		LastName               string          `db:"last_name"`
+		Email                  string          `db:"email"`
+		PhoneNumber            string          `db:"phone_number"`
+		PhoneNumberCountryCode string          `db:"phone_number_country_code"`
+		ExternalSync           json.RawMessage `db:"external_sync"`
+	}
+	if err := tx.Stmtx(u.q.LockContactExternalIdentity).Get(&row, id); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		u.lo.Error("error reading contact for identity sync", "contact_id", id, "error", err)
+		return nil, fmt.Errorf("reading contact for identity sync: %w", err)
+	}
+
+	current := map[string]string{
+		models.ExternalSyncFirstName:        row.FirstName,
+		models.ExternalSyncLastName:         row.LastName,
+		models.ExternalSyncEmail:            row.Email,
+		models.ExternalSyncPhoneNumber:      row.PhoneNumber,
+		models.ExternalSyncPhoneCountryCode: row.PhoneNumberCountryCode,
+	}
+	synced := models.UnmarshalExternalSync(row.ExternalSync)
+	apply, next := models.ResolveExternalSync(current, synced, incoming)
+	if len(apply) == 0 && maps.Equal(next, synced) {
+		return apply, nil
+	}
+	record, err := json.Marshal(next)
+	if err != nil {
+		u.lo.Error("error encoding external sync record", "contact_id", id, "error", err)
+		return nil, fmt.Errorf("encoding external sync record: %w", err)
+	}
+	if _, err := tx.Stmtx(u.q.SyncContactExternalIdentity).Exec(id,
+		apply[models.ExternalSyncFirstName], apply[models.ExternalSyncLastName], apply[models.ExternalSyncEmail],
+		apply[models.ExternalSyncPhoneNumber], apply[models.ExternalSyncPhoneCountryCode], record); err != nil {
+		u.lo.Error("error syncing contact external identity", "contact_id", id, "error", err)
+		return nil, fmt.Errorf("syncing contact external identity: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		u.lo.Error("error committing contact identity sync", "contact_id", id, "error", err)
+		return nil, fmt.Errorf("committing contact identity sync: %w", err)
+	}
+	return apply, nil
 }
 
 func (u *Manager) UpdateContact(id int, user models.User) error {
@@ -186,7 +250,7 @@ func (u *Manager) syncContact(user *models.User) error {
 		}
 
 		// Upsert by ext_id - creates new or updates email/name on ext_id conflict.
-		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes, user.PhoneNumber, user.PhoneNumberCountryCode).Scan(&user.ID); err != nil {
+		if err := u.q.InsertContactWithExtID.QueryRow(user.Email, user.FirstName, user.LastName, password, user.AvatarURL, user.ExternalUserID, user.CustomAttributes, user.PhoneNumber, user.PhoneNumberCountryCode, user.ExternalSync).Scan(&user.ID); err != nil {
 			u.lo.Error("error inserting contact with external ID", "error", err)
 			return fmt.Errorf("inserting contact with external ID: %w", err)
 		}
