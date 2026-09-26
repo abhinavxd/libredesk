@@ -797,6 +797,24 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  // Optimistically set the subject; the conversation_update broadcast confirms it and updates the list.
+  async function updateSubject (v) {
+    if (!conversation.data) return
+    const uuid = conversation.data.uuid
+    const previous = conversation.data.subject
+    if ((previous || '') === v) return
+    conversation.data.subject = v
+    try {
+      await api.updateConversationSubject(uuid, { subject: v })
+    } catch (error) {
+      if (conversation.data?.uuid === uuid) conversation.data.subject = previous
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: handleHTTPError(error).message
+      })
+    }
+  }
+
   async function snoozeConversation (snoozeDuration) {
     try {
       await api.updateConversationStatus(conversation.data.uuid, { status: CONVERSATION_DEFAULT_STATUSES.SNOOZED, snoozed_until: snoozeDuration })
@@ -1277,6 +1295,7 @@ export const useConversationStore = defineStore('conversation', () => {
     updateAssignee,
     updatePriority,
     updateStatus,
+    updateSubject,
     refreshConversationList,
     resetConversations,
     updateConversationLastMessage,
